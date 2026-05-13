@@ -2,7 +2,8 @@
 id: 208
 title: Per-cat Action overlay for the windowed UI
 status: ready
-cluster: null
+cluster: tooling-diagnostics-ui
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

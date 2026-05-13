@@ -2,7 +2,7 @@
 id: 2026-04-24
 title: "Acceptance & mastery restoration — iteration 1"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 00deb6f
 landed-on: 2026-04-24
 ---

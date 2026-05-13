@@ -454,8 +454,8 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // land (no DSE consumes it yet) but trace-visible.
     world.insert_resource(crate::resources::RecentAmbushMap::default());
 
-    // Insert cat presence map resource.
-    world.insert_resource(crate::resources::CatPresenceMap::default());
+    // Insert cat scent map resource.
+    world.insert_resource(crate::resources::CatScentMap::default());
 
     // 256 R5: cat patrol deterrent map. Cats deposit when patrolling;
     // foxes read as routing cost in their A* via
@@ -464,6 +464,13 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
 
     // Insert ward coverage map resource (ticket 045 — substrate-refactor §5.6.3).
     world.insert_resource(crate::resources::WardCoverageMap::default());
+
+    // 301: ward-placement intent map. Dormant at default
+    // `SimConstants` (populator and reader both short-circuit on
+    // their flags). Allocated unconditionally so the resource is
+    // present for the L1 trace walker and so the populator can stamp
+    // into it without an Option<ResMut> guard.
+    world.insert_resource(crate::resources::WardIntentMap::default());
 
     // 035: Insert grave-aura map resource. Recomputed each tick by
     // `update_grave_aura_map` from live `Grave` entities; consumed

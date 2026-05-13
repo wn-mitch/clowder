@@ -2,7 +2,8 @@
 id: 124
 title: `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias)
 status: ready
-cluster: ai-substrate
+cluster: belief-perception
+initiative: [full-sensory-perception]
 added: 2026-05-01
 parked: null
 blocked-by: []

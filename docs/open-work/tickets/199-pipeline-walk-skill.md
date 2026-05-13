@@ -2,7 +2,8 @@
 id: 199
 title: Hunt / production / consumption pipeline-walk skill (194 P4)
 status: parked
-cluster: process-discipline
+cluster: tooling-diagnostics-ui
+initiative: []
 added: 2026-05-06
 parked: 2026-05-06
 blocked-by: []

@@ -14,7 +14,7 @@ use crate::components::physical::{Dead, Position};
 use crate::components::skills::Skills;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::Relationships;
-use crate::resources::sim_constants::SimConstants;
+use crate::resources::sim_constants::{SimConstants, WardPlacementSemantics};
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{TimeScale, TimeState};
 
@@ -181,7 +181,7 @@ pub fn evaluate_coordinators(
 pub struct WardPlacementSignals<'w> {
     pub tile_map: Res<'w, crate::resources::map::TileMap>,
     pub fox_scent: Res<'w, crate::resources::FoxScentMap>,
-    pub cat_presence: Res<'w, crate::resources::CatPresenceMap>,
+    pub cat_scent: Res<'w, crate::resources::CatScentMap>,
     pub ward_coverage: Res<'w, crate::resources::WardCoverageMap>,
     /// 220: recent-ambush event memory (from ticket 219). Read at
     /// each candidate tile to bias placement toward empirical hot zones
@@ -193,6 +193,15 @@ pub struct WardPlacementSignals<'w> {
     /// posture as `recent_ambush`; weight gated by
     /// `ScoringConstants::ward_recency_anchor_weight`.
     pub carcass_scent: Res<'w, crate::resources::CarcassScentMap>,
+    /// 301: coordinator-stamped ward-placement intent. Populated by
+    /// `compute_ward_placement` when
+    /// `ward_placement_semantics == DescendingResidual`. At default
+    /// `SingleShotArgmax` the populator short-circuits — the map is
+    /// never written and the resource decays at no rate (factor 1.0,
+    /// no f32 change), preserving seed-42 byte-identity. Bundled into
+    /// this SystemParam to stay under Bevy's 16-param tuple limit on
+    /// `assess_colony_needs`.
+    pub intent: ResMut<'w, crate::resources::WardIntentMap>,
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +231,7 @@ pub fn assess_colony_needs(
     herb_query: Query<&crate::components::magic::Herb, With<crate::components::magic::Harvestable>>,
     wildlife: Query<(Entity, &Position, &crate::components::wildlife::WildAnimal)>,
     carcass_query: Query<(Entity, &Position, &crate::components::wildlife::Carcass)>,
-    placement_signals: WardPlacementSignals,
+    mut placement_signals: WardPlacementSignals,
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     constants: Res<SimConstants>,
     colony_center: Res<crate::resources::ColonyCenter>,
@@ -488,7 +497,7 @@ pub fn assess_colony_needs(
             let mut local_rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
             let placement_maps = PlacementMaps {
                 fox_scent: &placement_signals.fox_scent,
-                cat_presence: &placement_signals.cat_presence,
+                cat_scent: &placement_signals.cat_scent,
                 ward_coverage: &placement_signals.ward_coverage,
                 tile_map: &placement_signals.tile_map,
                 recent_ambush: &placement_signals.recent_ambush,
@@ -501,6 +510,7 @@ pub fn assess_colony_needs(
                 &placement_maps,
                 &constants,
                 &mut local_rng,
+                Some(&mut placement_signals.intent),
             );
             queue.directives.push(Directive {
                 kind: DirectiveKind::SetWard,
@@ -1331,7 +1341,7 @@ fn footprints_overlap_with_gap(
 /// (testable without spinning up a Bevy World).
 pub(crate) struct PlacementMaps<'a> {
     pub fox_scent: &'a crate::resources::FoxScentMap,
-    pub cat_presence: &'a crate::resources::CatPresenceMap,
+    pub cat_scent: &'a crate::resources::CatScentMap,
     pub ward_coverage: &'a crate::resources::WardCoverageMap,
     pub tile_map: &'a crate::resources::map::TileMap,
     /// 220: ambush-event memory (substrate from ticket 219). Sampled at
@@ -1382,7 +1392,7 @@ impl<'a> PlacementMaps<'a> {
 ///   Inline computation (not a populated Resource) avoids a
 ///   schedule-edge perturbation of seed-42 (ticket 061 precedent at
 ///   `simulation.rs:314-326`).
-/// - `cat_value = cat_presence` — modest bonus for tiles where cats
+/// - `cat_value = cat_scent` — modest bonus for tiles where cats
 ///   actually live (a ward covering nobody is wasted).
 /// - `distance_cost = DIST_PENALTY_PER_TILE × manhattan(anchor, candidate)`
 ///   — soft travel-cost term so the priestess doesn't walk to the
@@ -1409,6 +1419,13 @@ pub(crate) fn compute_ward_placement(
     maps: &PlacementMaps<'_>,
     constants: &SimConstants,
     rng: &mut impl rand::Rng,
+    // 301: when present *and* semantics is `DescendingResidual`, the
+    // function stamps each of the K round picks into this map (with
+    // a per-wake decay applied first). `None` is the test-harness and
+    // pre-301 path — no stamping occurs. Under `SingleShotArgmax`
+    // (the default) this is a no-op regardless of `Some`/`None`, so
+    // dormant runs are byte-identical with or without an intent map.
+    intent_map: Option<&mut crate::resources::WardIntentMap>,
 ) -> Position {
     let anchor = if building_positions.is_empty() {
         colony_center
@@ -1468,9 +1485,6 @@ pub(crate) fn compute_ward_placement(
         return anchor;
     }
 
-    let mut best_pos = candidates[0];
-    let mut best_score = f32::NEG_INFINITY;
-
     // 220: dormancy invariant — both weights default to 0.0, so the
     // lifts evaluate to exactly 0.0 and the formula reduces to the
     // pre-220 baseline. Clamp defensively in case a balance experiment
@@ -1503,11 +1517,22 @@ pub(crate) fn compute_ward_placement(
         constants.scoring.fox_intercept_kernel_radius_tiles as i32;
     let corruption_threshold = constants.magic.shadow_fox_corruption_threshold;
 
+    // 301: materialize per-candidate scoring data into a Vec instead of
+    // tracking the argmax inline. The scoring loop's RNG consumption
+    // (one `random_range` draw per candidate, in candidate order) and
+    // the score arithmetic are unchanged — `SingleShotArgmax` walks
+    // `scored` once and picks the max-score candidate, reproducing
+    // pre-301 behavior bit-for-bit. `DescendingResidual` re-uses the
+    // cached scoring terms across K rounds, stamping virtual coverage
+    // around each round's pick so successive rounds re-score against a
+    // partially-eaten threat surface.
+    let mut scored: Vec<CandidateScore> = Vec::with_capacity(candidates.len());
+
     for candidate in &candidates {
         let fox_scent = maps.fox_scent.get(candidate.x, candidate.y);
         let corruption = maps.corruption_at(candidate.x, candidate.y);
         let coverage = maps.ward_coverage.get(candidate.x, candidate.y);
-        let cat_value = maps.cat_presence.get(candidate.x, candidate.y);
+        let cat_value = maps.cat_scent.get(candidate.x, candidate.y);
 
         // 220 lift terms. Skip the sigmoid evaluation entirely when the
         // weight is zero so dormant runs incur no extra arithmetic.
@@ -1553,7 +1578,6 @@ pub(crate) fn compute_ward_placement(
 
         let threat = (fox_scent.max(corruption) + ambush_lift + carcass_lift + fox_intercept_lift)
             .min(1.0);
-        let unaddressed_threat = (threat - coverage).clamp(0.0, 1.0);
 
         let dist = anchor.manhattan_distance(candidate) as f32;
         let distance_cost = DIST_PENALTY_PER_TILE * dist;
@@ -1561,14 +1585,180 @@ pub(crate) fn compute_ward_placement(
         // Small jitter ([0, 0.05)) breaks ties deterministically without
         // overwhelming the influence-map signal.
         let jitter = rng.random_range(0.0_f32..0.05);
-        let score = unaddressed_threat + w_cat_value * cat_value - distance_cost + jitter;
 
+        scored.push(CandidateScore {
+            pos: *candidate,
+            threat,
+            real_coverage: coverage,
+            cat_value,
+            distance_cost,
+            jitter,
+        });
+    }
+
+    match constants.scoring.ward_placement_semantics {
+        WardPlacementSemantics::SingleShotArgmax => {
+            // Default flag — never touches `intent_map` so the
+            // resource remains all-zeros and byte-identity vs pre-301
+            // holds whether or not the caller passed `Some(&mut …)`.
+            select_argmax(&scored, w_cat_value, candidates[0])
+        }
+        WardPlacementSemantics::DescendingResidual => {
+            let k = constants.scoring.ward_placement_residual_rounds.max(1) as usize;
+            let (pick, round_picks) =
+                select_descending_residual(&scored, w_cat_value, k, candidates[0]);
+            if let Some(intent) = intent_map {
+                // Decay first so stale intent fades before the new
+                // round picks land their fresh stamps.
+                intent.decay_all(constants.scoring.ward_intent_decay_per_wake);
+                /// Radius used when stamping intent under
+                /// `DescendingResidual`. Wider than
+                /// `THORNWARD_VIRTUAL_RADIUS` (the in-function virtual
+                /// coverage radius) because intent should bias Path B
+                /// cats who *walk past* the picked tile, not just cats
+                /// already standing on it. Picked dimensionlessly
+                /// against the influence-map bucket size (5 tiles) —
+                /// two buckets of influence in every direction.
+                const INTENT_STAMP_RADIUS: f32 = 10.0;
+                const INTENT_STAMP_STRENGTH: f32 = 1.0;
+                for round_pick in &round_picks {
+                    intent.stamp_intent(
+                        round_pick.x,
+                        round_pick.y,
+                        INTENT_STAMP_STRENGTH,
+                        INTENT_STAMP_RADIUS,
+                    );
+                }
+            }
+            pick
+        }
+    }
+}
+
+/// 301: per-candidate scoring terms cached after the single scoring
+/// loop in [`compute_ward_placement`]. Storing the terms (rather than
+/// the final score) lets [`select_descending_residual`] re-score the
+/// same candidate against an updated `virtual_coverage` across K rounds
+/// without re-drawing the jitter or re-sampling influence maps. The
+/// `jitter` is drawn once per candidate so each round's selection is
+/// deterministic given the same start state — the only round-to-round
+/// input that changes is the virtual coverage stamp.
+#[derive(Debug, Clone, Copy)]
+struct CandidateScore {
+    pos: Position,
+    /// `(fox_scent.max(corruption) + lifts).min(1.0)` — pre-coverage.
+    threat: f32,
+    /// `maps.ward_coverage.get(pos)` — real coverage from already-
+    /// placed wards. Stamped virtual coverage (descending-residual)
+    /// adds on top of this at score time.
+    real_coverage: f32,
+    /// `maps.cat_scent.get(pos)`.
+    cat_value: f32,
+    /// `DIST_PENALTY_PER_TILE * manhattan(anchor, pos)`.
+    distance_cost: f32,
+    /// `rng.random_range(0.0..0.05)` — drawn once per candidate.
+    jitter: f32,
+}
+
+impl CandidateScore {
+    /// Score formula identical to pre-301's inline expression, with
+    /// `virtual_coverage` summed into `real_coverage` before the
+    /// `(threat - coverage).clamp(0.0, 1.0)` step. At
+    /// `virtual_coverage == 0.0` this is bit-identical to pre-301.
+    fn score(&self, virtual_coverage: f32, w_cat_value: f32) -> f32 {
+        let effective_coverage = self.real_coverage + virtual_coverage;
+        let unaddressed_threat = (self.threat - effective_coverage).clamp(0.0, 1.0);
+        unaddressed_threat + w_cat_value * self.cat_value - self.distance_cost + self.jitter
+    }
+}
+
+/// 301: argmax over `scored` at zero virtual coverage. Reproduces
+/// pre-301 single-shot selection bit-for-bit: the `f32` score
+/// recomputed from cached terms equals the inline score that the
+/// original loop tracked, and the iteration order matches the original
+/// loop, so the `if score > best_score` comparison produces the same
+/// updates.
+fn select_argmax(scored: &[CandidateScore], w_cat_value: f32, fallback: Position) -> Position {
+    let mut best_pos = fallback;
+    let mut best_score = f32::NEG_INFINITY;
+    for cs in scored {
+        let score = cs.score(0.0, w_cat_value);
         if score > best_score {
             best_score = score;
-            best_pos = *candidate;
+            best_pos = cs.pos;
         }
     }
     best_pos
+}
+
+/// 301 SPLIT option: K rounds of submodular greedy. Round 0 picks the
+/// argmax winner (identical to [`select_argmax`]); the winner stamps
+/// virtual coverage around itself with thornward-radius falloff, then
+/// round 1 re-scores all candidates against the updated virtual
+/// coverage. Repeats for K rounds.
+///
+/// Returns `(final_pick, all_round_picks)` — the round-(K-1) pick
+/// (the most-diversified one, returned as the coordinator's directive
+/// target) and every round's pick in order, so the caller can stamp
+/// intent for every round into `WardIntentMap`.
+///
+/// `THORNWARD_VIRTUAL_RADIUS` matches `Ward::thornward().repel_radius()`
+/// — the coordinator's `SetWard` directive plants a thornward at the
+/// chosen tile, so the virtual stamp approximates what its real
+/// coverage will look like once the cat materializes the placement.
+fn select_descending_residual(
+    scored: &[CandidateScore],
+    w_cat_value: f32,
+    k: usize,
+    fallback: Position,
+) -> (Position, Vec<Position>) {
+    /// Matches `Ward::thornward().repel_radius()` —
+    /// `WardKind::Thornward` base `6.0` × strength `1.0`. The
+    /// coordinator's `SetWard` directive plants thornwards by default
+    /// (`resolve_set_ward` in `src/steps/magic/set_ward.rs`), so the
+    /// virtual stamp approximates the real coverage radius the next
+    /// directive's ward will project.
+    const THORNWARD_VIRTUAL_RADIUS: f32 = 6.0;
+    const THORNWARD_VIRTUAL_STRENGTH: f32 = 1.0;
+
+    let mut virtual_cov: Vec<f32> = vec![0.0; scored.len()];
+    let mut round_pick = fallback;
+    let mut all_picks: Vec<Position> = Vec::with_capacity(k);
+
+    for round in 0..k {
+        let mut best_idx: usize = 0;
+        let mut best_score = f32::NEG_INFINITY;
+        for (i, cs) in scored.iter().enumerate() {
+            let score = cs.score(virtual_cov[i], w_cat_value);
+            if score > best_score {
+                best_score = score;
+                best_idx = i;
+            }
+        }
+        round_pick = scored[best_idx].pos;
+        all_picks.push(round_pick);
+
+        // Stamp virtual coverage around `round_pick` into every other
+        // candidate's `virtual_cov` slot, mirroring
+        // `WardCoverageMap::stamp_ward`'s radial-falloff shape. Skip on
+        // the last round — the stamp is only meaningful as input to a
+        // subsequent round.
+        if round + 1 < k {
+            let pick = scored[best_idx].pos;
+            for (i, cs) in scored.iter().enumerate() {
+                let dx = (cs.pos.x - pick.x) as f32;
+                let dy = (cs.pos.y - pick.y) as f32;
+                let dist = (dx * dx + dy * dy).sqrt();
+                if dist > THORNWARD_VIRTUAL_RADIUS {
+                    continue;
+                }
+                let falloff = (1.0 - dist / THORNWARD_VIRTUAL_RADIUS).max(0.0);
+                let contribution = THORNWARD_VIRTUAL_STRENGTH * falloff;
+                virtual_cov[i] = (virtual_cov[i] + contribution).min(1.0);
+            }
+        }
+    }
+    (round_pick, all_picks)
 }
 
 /// 220: shared sigmoid for the ward-placement threat lifts. Matches the
@@ -1721,7 +1911,7 @@ mod tests {
 
     fn empty_placement_maps() -> (
         crate::resources::FoxScentMap,
-        crate::resources::CatPresenceMap,
+        crate::resources::CatScentMap,
         crate::resources::WardCoverageMap,
         crate::resources::map::TileMap,
         crate::resources::RecentAmbushMap,
@@ -1729,7 +1919,7 @@ mod tests {
     ) {
         (
             crate::resources::FoxScentMap::default(),
-            crate::resources::CatPresenceMap::default(),
+            crate::resources::CatScentMap::default(),
             crate::resources::WardCoverageMap::default(),
             crate::resources::map::TileMap::new(120, 90, crate::resources::Terrain::Grass),
             crate::resources::RecentAmbushMap::default(),
@@ -1764,6 +1954,141 @@ mod tests {
         }
     }
 
+    /// 301 regression guard: `DescendingResidual` with `K=1` is
+    /// identical to `SingleShotArgmax`. The round-0 pick is the
+    /// argmax winner; with K=1 no virtual coverage is stamped and the
+    /// function returns the same `Position` from the same RNG state.
+    /// If this drifts, the byte-identity invariant for the default
+    /// flag (`SingleShotArgmax`) is at risk because the cached-score
+    /// arithmetic in `CandidateScore::score` would no longer match the
+    /// inline pre-301 formula.
+    #[test]
+    fn descending_residual_k1_matches_single_shot_argmax() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+        let (mut fs, cp, wc, tm, ra, cs) = empty_placement_maps();
+        // Saturate one hot tile so the threat term clamps and the
+        // argmax decision lives in the cat_value/distance/jitter
+        // domain — the regime 297 iter-2 named as load-bearing.
+        fs.deposit(67, 45, 1.0);
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_scent: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
+        };
+        let mut argmax_constants = crate::resources::SimConstants::default();
+        argmax_constants.scoring.ward_placement_semantics =
+            WardPlacementSemantics::SingleShotArgmax;
+        let mut residual_k1_constants = crate::resources::SimConstants::default();
+        residual_k1_constants.scoring.ward_placement_semantics =
+            WardPlacementSemantics::DescendingResidual;
+        residual_k1_constants.scoring.ward_placement_residual_rounds = 1;
+
+        let mut rng_a = rand_chacha::ChaCha8Rng::seed_from_u64(7);
+        let argmax_pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &argmax_constants,
+            &mut rng_a,
+        None,
+        );
+        let mut rng_b = rand_chacha::ChaCha8Rng::seed_from_u64(7);
+        let residual_pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &residual_k1_constants,
+            &mut rng_b,
+        None,
+        );
+        assert_eq!(
+            argmax_pos, residual_pos,
+            "K=1 descending-residual must produce the same Position \
+             as single-shot argmax for the same RNG seed — byte-identity \
+             gate for the default flag"
+        );
+    }
+
+    /// 301 spread invariant: under `DescendingResidual` with K=2, the
+    /// round-1 pick must be geographically distant from the round-0
+    /// pick on a map with two disjoint saturated threat clusters.
+    /// Round-0 picks the dominant cluster; the virtual coverage stamp
+    /// around it suppresses every nearby candidate, so round-1's
+    /// argmax must reach the second cluster.
+    ///
+    /// Pairwise Manhattan ≥ `THORNWARD_VIRTUAL_RADIUS` (6) — the virtual
+    /// stamp's repel radius — is the load-bearing assertion: if it
+    /// failed, the descending-residual algorithm would not in fact be
+    /// spreading picks across the threat surface.
+    #[test]
+    fn descending_residual_spreads_picks_across_disjoint_clusters() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+        let (mut fs, cp, wc, tm, ra, cs) = empty_placement_maps();
+        // Two disjoint saturated clusters, both far enough from the
+        // existing ward at (60, 45) to escape the Manhattan-3 hard
+        // exclusion. Picks should split across them.
+        fs.deposit(20, 20, 1.0);
+        fs.deposit(100, 70, 1.0);
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_scent: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
+        };
+        let mut k1_constants = crate::resources::SimConstants::default();
+        k1_constants.scoring.ward_placement_semantics =
+            WardPlacementSemantics::DescendingResidual;
+        k1_constants.scoring.ward_placement_residual_rounds = 1;
+        let mut k2_constants = k1_constants.clone();
+        k2_constants.scoring.ward_placement_residual_rounds = 2;
+
+        let mut rng_a = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let round_0_pick = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &k1_constants,
+            &mut rng_a,
+        None,
+        );
+        let mut rng_b = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let round_1_pick = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &k2_constants,
+            &mut rng_b,
+        None,
+        );
+        // K=2 returns round-1's pick; K=1 returns round-0's pick.
+        // The two must differ — the spread invariant. Manhattan ≥ 6
+        // (THORNWARD_VIRTUAL_RADIUS) confirms the virtual coverage
+        // stamp actually moved the argmax off round-0's cluster.
+        assert_ne!(
+            round_0_pick, round_1_pick,
+            "round-1 pick must differ from round-0 pick on a map with \
+             two disjoint clusters; got {round_0_pick:?} both rounds"
+        );
+        let spread = round_0_pick.manhattan_distance(&round_1_pick);
+        assert!(
+            spread >= 6,
+            "round-1 pick {round_1_pick:?} must be ≥ 6 Manhattan from \
+             round-0 pick {round_0_pick:?} (THORNWARD_VIRTUAL_RADIUS); \
+             got spread = {spread}"
+        );
+    }
+
     #[test]
     fn ward_placement_first_ward_lands_on_cluster_centroid() {
         // Empty wards + structures present → first-ward fallback returns
@@ -1774,7 +2099,7 @@ mod tests {
         let (fs, cp, wc, tm, ra, cs) = empty_placement_maps();
         let maps = PlacementMaps {
             fox_scent: &fs,
-            cat_presence: &cp,
+            cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
             recent_ambush: &ra,
@@ -1789,6 +2114,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
+        None,
         );
         assert_eq!(pos, Position::new(12, 10));
     }
@@ -1806,7 +2132,7 @@ mod tests {
         fs.deposit(67, 45, 1.0);
         let maps = PlacementMaps {
             fox_scent: &fs,
-            cat_presence: &cp,
+            cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
             recent_ambush: &ra,
@@ -1821,6 +2147,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
+        None,
         );
         let dx = (pos.x - 67).abs();
         let dy = (pos.y - 45).abs();
@@ -1849,7 +2176,7 @@ mod tests {
         wc.stamp_ward(60, 45, 1.0, 9.0);
         let maps = PlacementMaps {
             fox_scent: &fs,
-            cat_presence: &cp,
+            cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
             recent_ambush: &ra,
@@ -1864,6 +2191,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
+        None,
         );
         assert!(
             pos.manhattan_distance(&Position::new(60, 45)) > 3,
@@ -1883,7 +2211,7 @@ mod tests {
         fs.deposit(67, 85, 1.0); // 47 tiles from anchor — much farther
         let maps = PlacementMaps {
             fox_scent: &fs,
-            cat_presence: &cp,
+            cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
             recent_ambush: &ra,
@@ -1898,6 +2226,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
+        None,
         );
         let dist_near = pos.manhattan_distance(&Position::new(67, 45));
         let dist_far = pos.manhattan_distance(&Position::new(67, 85));
@@ -1924,7 +2253,7 @@ mod tests {
         fs_a.deposit(67, 45, 1.0);
         let maps_a = PlacementMaps {
             fox_scent: &fs_a,
-            cat_presence: &cp_a,
+            cat_scent: &cp_a,
             ward_coverage: &wc_a,
             tile_map: &tm_a,
             recent_ambush: &ra_a,
@@ -1940,7 +2269,7 @@ mod tests {
         cs_b.deposit(40, 70, 1.0);
         let maps_b = PlacementMaps {
             fox_scent: &fs_b,
-            cat_presence: &cp_b,
+            cat_scent: &cp_b,
             ward_coverage: &wc_b,
             tile_map: &tm_b,
             recent_ambush: &ra_b,
@@ -1963,6 +2292,7 @@ mod tests {
             &maps_a,
             &constants,
             &mut rng_a,
+        None,
         );
         let pos_b = compute_ward_placement(
             &structures,
@@ -1971,6 +2301,7 @@ mod tests {
             &maps_b,
             &constants,
             &mut rng_b,
+        None,
         );
         assert_eq!(
             pos_a, pos_b,
@@ -1994,7 +2325,7 @@ mod tests {
         ra.deposit(60, 52, 1.0);
         let maps = PlacementMaps {
             fox_scent: &fs,
-            cat_presence: &cp,
+            cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
             recent_ambush: &ra,
@@ -2013,6 +2344,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
+        None,
         );
         // The ambush hotspot is +y from the anchor; the fox-scent peak
         // is -y. The +0.5 baseline of the logistic at zero input means
@@ -2044,7 +2376,7 @@ mod tests {
         cs.deposit(60, 50, 1.0);
         let maps = PlacementMaps {
             fox_scent: &fs,
-            cat_presence: &cp,
+            cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
             recent_ambush: &ra,
@@ -2060,6 +2392,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
+        None,
         );
         assert!(
             pos.y >= 45,
@@ -2087,7 +2420,7 @@ mod tests {
         tm.get_mut(60, 60).corruption = 1.0;
         let maps = PlacementMaps {
             fox_scent: &fs,
-            cat_presence: &cp,
+            cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
             recent_ambush: &ra,
@@ -2103,6 +2436,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
+        None,
         );
         // Placement should land in the fox-intercept halo around the
         // corruption tile. The halo radius is 20 world tiles (default
@@ -2134,7 +2468,7 @@ mod tests {
         fs_a.deposit(67, 45, 1.0);
         let maps_a = PlacementMaps {
             fox_scent: &fs_a,
-            cat_presence: &cp_a,
+            cat_scent: &cp_a,
             ward_coverage: &wc_a,
             tile_map: &tm_a,
             recent_ambush: &ra_a,
@@ -2149,7 +2483,7 @@ mod tests {
         tm_b.get_mut(40, 70).corruption = 1.0;
         let maps_b = PlacementMaps {
             fox_scent: &fs_b,
-            cat_presence: &cp_b,
+            cat_scent: &cp_b,
             ward_coverage: &wc_b,
             tile_map: &tm_b,
             recent_ambush: &ra_b,
@@ -2172,6 +2506,7 @@ mod tests {
             &maps_a,
             &constants,
             &mut rng_a,
+        None,
         );
         let pos_b = compute_ward_placement(
             &structures,
@@ -2180,6 +2515,7 @@ mod tests {
             &maps_b,
             &constants,
             &mut rng_b,
+        None,
         );
         assert_eq!(
             pos_a, pos_b,
@@ -2411,8 +2747,9 @@ mod tests {
         world.insert_resource(SystemActivation::default());
         world.insert_resource(crate::resources::ColonyCenter(Position::new(20, 20)));
         world.insert_resource(crate::resources::FoxScentMap::default());
-        world.insert_resource(crate::resources::CatPresenceMap::default());
+        world.insert_resource(crate::resources::CatScentMap::default());
         world.insert_resource(crate::resources::WardCoverageMap::default());
+        world.insert_resource(crate::resources::WardIntentMap::default());
         world.insert_resource(crate::resources::RecentAmbushMap::default());
         world.insert_resource(crate::resources::CarcassScentMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(
@@ -2462,8 +2799,9 @@ mod tests {
         world.insert_resource(SystemActivation::default());
         world.insert_resource(crate::resources::ColonyCenter(Position::new(20, 20)));
         world.insert_resource(crate::resources::FoxScentMap::default());
-        world.insert_resource(crate::resources::CatPresenceMap::default());
+        world.insert_resource(crate::resources::CatScentMap::default());
         world.insert_resource(crate::resources::WardCoverageMap::default());
+        world.insert_resource(crate::resources::WardIntentMap::default());
         world.insert_resource(crate::resources::RecentAmbushMap::default());
         world.insert_resource(crate::resources::CarcassScentMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(

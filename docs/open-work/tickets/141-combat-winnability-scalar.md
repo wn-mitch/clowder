@@ -2,7 +2,8 @@
 id: 141
 title: combat_winnability perception scalar — sibling to escape_viability
 status: ready
-cluster: ai-substrate
+cluster: belief-perception
+initiative: [full-sensory-perception]
 added: 2026-05-02
 parked: null
 blocked-by: []

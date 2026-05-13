@@ -2,7 +2,8 @@
 id: 026
 title: Apprenticeship XP-boost on per-skill Skills component
 status: blocked
-cluster: null
+cluster: life-cycle
+initiative: [generational-continuity]
 added: 2026-04-24
 parked: null
 blocked-by: ["mastery-restoration iteration 2"]

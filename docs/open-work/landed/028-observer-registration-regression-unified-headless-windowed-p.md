@@ -2,7 +2,7 @@
 id: 028
 title: observer registration regression + unified headless/windowed pipeline
 status: done
-cluster: null
+cluster: ai-substrate
 also-landed: [30]
 landed-at: null
 landed-on: 2026-04-25

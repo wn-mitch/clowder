@@ -2,7 +2,8 @@
 id: 265
 title: Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox)
 status: blocked
-cluster: C
+cluster: wildlife
+initiative: [predator-prey-dynamics]
 added: 2026-05-10
 parked: null
 blocked-by: [261]

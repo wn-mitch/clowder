@@ -444,6 +444,18 @@ pub struct ScoringContext<'a> {
     /// `compute_ward_placement()`, which reads the map directly (not
     /// via this scalar) to score candidate placement tiles.
     pub carcass_scent_at_position: f32,
+    /// 301: per-tile `WardIntentMap` sample at the cat's current
+    /// position (0.0–1.0). Coordinator-stamped intent under
+    /// `WardPlacementSemantics::DescendingResidual`; sample reads
+    /// `0.0` everywhere at default (resource allocated but unwritten)
+    /// because the populator short-circuits. Consumed by
+    /// `HerbcraftWardDse`'s conditional 4th consideration when
+    /// `ward_intent_dse_weight > 0.0` — absent from the DSE's axis
+    /// list at default (4th-axis-conditional pattern), so the score
+    /// at dormancy is byte-identical pre-301 even with this scalar
+    /// populated. Surfaced in `ctx_scalars` for `trace-*.jsonl`
+    /// visibility.
+    pub ward_intent_at_position: f32,
     /// 209: Colony-tension proxy — currently `(1 - needs.safety)` of
     /// the cat being scored. Consumed by `TensionDefusionGroomLift`
     /// modifier as the "is the colony stressed enough that
@@ -790,6 +802,14 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert("spirituality", ctx.personality.spirituality.clamp(0.0, 1.0));
     m.insert("herbcraft_skill", ctx.herbcraft_skill.clamp(0.0, 1.0));
     m.insert("magic_skill", ctx.magic_skill.clamp(0.0, 1.0));
+    // 301: `WardIntentMap` sample at the cat's position. Consumed
+    // by `HerbcraftWardDse`'s conditional 4th axis (active only
+    // when `ward_intent_dse_weight > 0.0`); always emitted for
+    // soak-trace visibility regardless of activation state.
+    m.insert(
+        "ward_intent_at_position",
+        ctx.ward_intent_at_position.clamp(0.0, 1.0),
+    );
     // Ward deficit: 1.0 when wards are low, 0 when fully warded.
     // `ward_strength_low` is the inline gate today; port as a 0/1
     // scalar so the sibling DSE sees it through Linear identity.
@@ -2774,7 +2794,7 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::wander_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::herbcraft_gather_dse());
             r.cat_dses.push(crate::ai::dses::herbcraft_prepare_dse());
-            r.cat_dses.push(crate::ai::dses::herbcraft_ward_dse());
+            r.cat_dses.push(crate::ai::dses::herbcraft_ward_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::scry_dse());
             r.cat_dses.push(crate::ai::dses::durable_ward_dse());
             r.cat_dses.push(crate::ai::dses::cleanse_dse(&scoring));
@@ -2967,6 +2987,7 @@ mod tests {
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
+            ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3165,6 +3186,7 @@ mod tests {
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
+            ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3386,6 +3408,7 @@ mod tests {
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
+            ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3671,6 +3694,7 @@ mod tests {
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
+            ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3817,6 +3841,7 @@ mod tests {
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
+            ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -3968,6 +3993,7 @@ mod tests {
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
+            ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -4299,6 +4325,7 @@ mod tests {
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
+            ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,
@@ -4427,6 +4454,7 @@ mod tests {
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
+            ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             nearby_carcass_count: 0,

@@ -69,7 +69,7 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry
         .target_taking_dses
         .push(dses::apply_remedy_target_dse());
-    registry.cat_dses.push(dses::herbcraft_ward_dse());
+    registry.cat_dses.push(dses::herbcraft_ward_dse(scoring));
     registry.cat_dses.push(dses::scry_dse());
     registry.cat_dses.push(dses::durable_ward_dse());
     registry.cat_dses.push(dses::cleanse_dse(scoring));
@@ -139,9 +139,10 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // and §4.7 of `docs/systems/ai-substrate-refactor.md` for the
     // substrate-vs-search-state boundary.
     use crate::resources::{
-        CarcassScentMap, CatPatrolDeterrentMap, CatPresenceMap, ConstructionSiteMap,
+        CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, ConstructionSiteMap,
         ExplorationMap, FoodLocationMap, FoxScentMap, GardenLocationMap, GraveAuraMap,
         HerbLocationMap, KittenCryMap, PreyScentMap, RecentAmbushMap, TileMap, WardCoverageMap,
+        WardIntentMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -151,11 +152,17 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // scoring at land (no DSE reads it yet); registered so its samples
     // surface in `trace-*.jsonl` for soak-trace verification.
     registry.register::<RecentAmbushMap>();
-    registry.register::<CatPresenceMap>();
+    registry.register::<CatScentMap>();
     // 256 R5: cat patrol deterrent — read by fox A* as routing cost.
     registry.register::<CatPatrolDeterrentMap>();
     registry.register::<ExplorationMap>();
     registry.register::<WardCoverageMap>();
+    // 301: coordinator-stamped ward-placement intent. Substrate is
+    // dormant at default `SimConstants` (semantics is
+    // `SingleShotArgmax` so the populator short-circuits, and the
+    // Path-B DSE weight is 0.0). Registered so the field surfaces in
+    // `trace-*.jsonl` for soak-trace verification once activated.
+    registry.register::<WardIntentMap>();
     registry.register::<FoodLocationMap>();
     registry.register::<GardenLocationMap>();
     registry.register::<ConstructionSiteMap>();
@@ -703,8 +710,8 @@ impl Plugin for SimulationPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                systems::disposition::cat_presence_tick.after(systems::goap::resolve_goap_plans),
-                // 256 R5 — runs alongside cat_presence_tick (both
+                systems::disposition::cat_scent_tick.after(systems::goap::resolve_goap_plans),
+                // 256 R5 — runs alongside cat_scent_tick (both
                 // depend on resolve_goap_plans having set the cat's
                 // current_action for this tick). Fox AI in the same
                 // schedule (further down) consumes the deterrent

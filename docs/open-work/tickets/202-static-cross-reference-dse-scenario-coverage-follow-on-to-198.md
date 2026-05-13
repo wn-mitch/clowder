@@ -3,6 +3,7 @@ id: 202
 title: Static cross-reference DSE → scenario coverage (follow-on to 198)
 status: ready
 cluster: process-discipline
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

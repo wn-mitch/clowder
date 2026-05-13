@@ -2,7 +2,7 @@
 id: 272
 title: MatingOccurred still gated by has_eligible_mate() breeding-floor AND-gate (post-257 follow-on)
 status: done
-cluster: null
+cluster: ai-substrate
 added: 2026-05-10
 parked: null
 blocked-by: []

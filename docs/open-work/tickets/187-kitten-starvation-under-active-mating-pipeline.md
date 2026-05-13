@@ -2,7 +2,8 @@
 id: 187
 title: Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate
 status: ready
-cluster: ai-substrate
+cluster: life-cycle
+initiative: [generational-continuity, welfare-fidelity]
 added: 2026-05-06
 parked: null
 blocked-by: []

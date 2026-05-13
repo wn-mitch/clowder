@@ -2,7 +2,8 @@
 id: 292
 title: RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on)
 status: ready
-cluster: C
+cluster: belief-perception
+initiative: [full-sensory-perception]
 added: 2026-05-11
 parked: null
 blocked-by: []

@@ -2,7 +2,8 @@
 id: 050
 title: §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den
 status: ready
-cluster: null
+cluster: ai-substrate
+initiative: [smarter-cats]
 added: 2026-04-27
 parked: null
 blocked-by: []

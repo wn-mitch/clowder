@@ -2,7 +2,8 @@
 id: 268
 title: Hide DSE — wire C3 Belief + ActionAffordance for general threat-response (door-slam scenario)
 status: blocked
-cluster: C
+cluster: combat-threat
+initiative: []
 added: 2026-05-10
 parked: null
 blocked-by: [261]

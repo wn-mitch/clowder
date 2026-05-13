@@ -2,7 +2,7 @@
 id: 065
 title: §L2.10.7 SpatialConsideration roster sweep (cat self-state DSEs + fox dispositions)
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 1b34947
 landed-on: 2026-04-28
 ---

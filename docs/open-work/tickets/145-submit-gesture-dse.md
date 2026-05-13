@@ -2,7 +2,8 @@
 id: 145
 title: Submit gesture DSE — appeasement infrastructure for IntraspeciesConflict.Fawn
 status: ready
-cluster: ai-substrate
+cluster: combat-threat
+initiative: []
 added: 2026-05-02
 parked: null
 blocked-by: []

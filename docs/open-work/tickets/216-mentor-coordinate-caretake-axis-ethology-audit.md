@@ -2,7 +2,8 @@
 id: 216
 title: Mentor / Coordinate / Caretake axis ethology audit
 status: blocked
-cluster: ai-substrate
+cluster: social-coordination
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: [209]

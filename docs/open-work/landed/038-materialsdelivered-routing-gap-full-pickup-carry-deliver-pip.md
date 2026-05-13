@@ -2,7 +2,7 @@
 id: 038
 title: "MaterialsDelivered routing gap → full Pickup/Carry/Deliver pipeline (infrastructure landed, founding spawn parked)"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-26
 ---

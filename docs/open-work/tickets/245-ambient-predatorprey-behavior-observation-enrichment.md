@@ -2,7 +2,8 @@
 id: 245
 title: Ambient predator/prey behavior-observation enrichment
 status: blocked
-cluster: null
+cluster: wildlife
+initiative: [predator-prey-dynamics, environmental-simulation]
 added: 2026-05-08
 parked: null
 blocked-by: [243]

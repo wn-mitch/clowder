@@ -2,7 +2,7 @@
 id: 002
 title: Hunt-approach pipeline failures
 status: ready
-cluster: null
+cluster: ai-substrate
 added: 2026-04-20
 parked: null
 blocked-by: []

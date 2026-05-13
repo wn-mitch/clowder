@@ -2,7 +2,8 @@
 id: 186
 title: add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items
 status: ready
-cluster: null
+cluster: items-crafting
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

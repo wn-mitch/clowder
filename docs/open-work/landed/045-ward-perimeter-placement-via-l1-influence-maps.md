@@ -2,7 +2,7 @@
 id: 045
 title: Ward perimeter placement via L1 influence maps
 status: done
-cluster: null
+cluster: buildings-zones
 landed-at: 2836cf48
 landed-on: 2026-04-27
 ---

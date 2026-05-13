@@ -2,7 +2,8 @@
 id: 200
 title: Land PlannerZone::Midden — building-singleton zone for Trashing
 status: ready
-cluster: process-discipline
+cluster: buildings-zones
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

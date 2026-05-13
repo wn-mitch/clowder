@@ -2,7 +2,8 @@
 id: 128
 title: HTN method composition over `HeldIntention.goal`
 status: ready
-cluster: C
+cluster: ai-substrate
+initiative: [smarter-cats]
 added: 2026-05-02
 parked: null
 blocked-by: []

@@ -2,7 +2,8 @@
 id: 279
 title: Body-cue-driven joint adoption (compose 127 with 242 + 243)
 status: ready
-cluster: null
+cluster: social-coordination
+initiative: [generational-continuity, full-sensory-perception]
 added: 2026-05-11
 parked: null
 blocked-by: []

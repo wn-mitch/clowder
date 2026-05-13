@@ -2,7 +2,7 @@
 id: 257
 title: Mate election crowded out by Patrol in post-256 regime
 status: done
-cluster: null
+cluster: ai-substrate
 added: 2026-05-10
 parked: null
 blocked-by: []

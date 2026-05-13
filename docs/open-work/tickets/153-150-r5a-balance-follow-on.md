@@ -2,7 +2,7 @@
 id: 153
 title: 150 R5a balance follow-on — Resting score-mass and courtship recovery
 status: ready
-cluster: balance
+cluster: ai-substrate
 added: 2026-05-03
 parked: null
 blocked-by: []

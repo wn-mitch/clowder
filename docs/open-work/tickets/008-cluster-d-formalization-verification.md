@@ -2,7 +2,7 @@
 id: 008
 title: Formalization and verification (Cluster D)
 status: ready
-cluster: D
+cluster: ai-substrate
 added: 2026-04-20
 parked: null
 blocked-by: []

@@ -2,7 +2,7 @@
 id: 031
 title: Balance-tooling composition layer (verdict / hypothesize / sweep-stats / fingerprint / explain / bisect-canary / promote)
 status: done
-cluster: null
+cluster: tooling-diagnostics-ui
 landed-at: null
 landed-on: 2026-04-26
 ---

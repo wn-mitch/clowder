@@ -13,7 +13,7 @@
 //!   committed in `SimConstants::sensory` — wire, don't re-author.
 //!
 //! **Phase 2A scope:** scaffolding only. Three persistent-grid maps
-//! already in the codebase (`FoxScentMap`, `CatPresenceMap`,
+//! already in the codebase (`FoxScentMap`, `CatScentMap`,
 //! `ExplorationMap`) get `InfluenceMap` impls so their per-position
 //! reads become uniform. Scent-from-on-demand-detection and
 //! corruption-from-TileMap are Phase 2B migrations — they require
@@ -81,7 +81,7 @@ pub enum Faction {
     Species(SensorySpecies),
     /// Neutral, non-faction substrate (corruption, carcasses —
     /// no allegiance). §5.5 defers cat-pairwise social affinity to
-    /// the ToT belief layer; congregation (where cats gather) is
+    /// the ToT belief layer; `cat_scent` (where cats mark) is
     /// `Colony`, not `Neutral`.
     Neutral,
     /// Colony-scoped — wards, colony-cats-as-group, stores,
@@ -309,11 +309,19 @@ impl InfluenceMap for crate::resources::RecentAmbushMap {
     }
 }
 
-impl InfluenceMap for crate::resources::CatPresenceMap {
+impl InfluenceMap for crate::resources::CatScentMap {
     fn metadata(&self) -> MapMetadata {
+        // 260: re-tagged from ("congregation", Sight) to ("cat_scent",
+        // Scent). Cats deposit a steady-state scent every tick plus a
+        // patrol/fight/explore bonus (see `cat_scent_tick` in
+        // disposition.rs). Foxes route around high-scent tiles
+        // (`shadow_fox_cat_scent_avoid` branch in wildlife.rs) —
+        // distinct from `CatPatrolDeterrentMap` (Sight × Colony, only
+        // active-patrol deposit) and `WardCoverageMap` (Sight × Colony,
+        // ward-radiation gradient).
         MapMetadata {
-            name: "congregation",
-            channel: ChannelKind::Sight,
+            name: "cat_scent",
+            channel: ChannelKind::Scent,
             faction: Faction::Colony,
         }
     }
@@ -368,6 +376,24 @@ impl InfluenceMap for crate::resources::WardCoverageMap {
             // CorruptionLens convention. Faction::Colony — wards are
             // a colony-faction emitter.
             name: "ward_coverage",
+            channel: ChannelKind::Sight,
+            faction: Faction::Colony,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
+impl InfluenceMap for crate::resources::WardIntentMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // 301: coordinator-stamped ward-placement intent.
+            // Sight × Colony matching the WardCoverageMap convention —
+            // the field is a colony-faction directive surface that
+            // cats read at score-time.
+            name: "ward_intent",
             channel: ChannelKind::Sight,
             faction: Faction::Colony,
         }
@@ -765,12 +791,12 @@ mod tests {
     }
 
     #[test]
-    fn cat_presence_map_implements_influence_map() {
-        use crate::resources::CatPresenceMap;
-        let map = CatPresenceMap::default();
+    fn cat_scent_map_implements_influence_map() {
+        use crate::resources::CatScentMap;
+        let map = CatScentMap::default();
         let md = map.metadata();
-        assert_eq!(md.name, "congregation");
-        assert_eq!(md.channel, ChannelKind::Sight);
+        assert_eq!(md.name, "cat_scent");
+        assert_eq!(md.channel, ChannelKind::Scent);
         assert!(matches!(md.faction, Faction::Colony));
     }
 

@@ -2,7 +2,7 @@
 id: 036
 title: "`goap.rs` crafting_hint derivation drops the Cook branch"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: a879f43
 landed-on: 2026-04-26
 ---

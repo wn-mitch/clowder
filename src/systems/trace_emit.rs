@@ -12,7 +12,7 @@
 //!
 //! - **L1** (Phase 2 enrichment) — one record per (focal cat × registered
 //!   influence map × tick). Walks every `InfluenceMap`-implementing
-//!   resource (FoxScentMap, CatPresenceMap, ExplorationMap as of
+//!   resource (FoxScentMap, CatScentMap, ExplorationMap as of
 //!   Phase 2A) and emits a record carrying the map's metadata, base
 //!   sample at the focal cat's position, and per-channel attenuation
 //!   from the §5.6.6 pipeline. Scent-from-on-demand and corruption

@@ -2,7 +2,8 @@
 id: 303
 title: split cat_value into movement-intensity and residence axes (298 structural follow-on)
 status: ready
-cluster: balance
+cluster: buildings-zones
+initiative: []
 added: 2026-05-12
 parked: null
 blocked-by: []

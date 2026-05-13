@@ -1,16 +1,17 @@
 ---
 id: 301
 title: evolve ward placement decision semantics beyond single-shot argmax (285+296+297 architectural follow-on)
-status: ready
-cluster: ai-substrate
+status: done
+cluster: buildings-zones
+initiative: []
 added: 2026-05-12
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [284-ward-anchor-tuning.md, 297-fox-patrol-topology-axis.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-13
 ---
 
 ## Why
@@ -84,3 +85,4 @@ This ticket is structurally heavier than 298 / 299 / 300 (those are parameter sw
 
 ## Log
 - 2026-05-12: opened as lever #4 of four follow-on tickets from 297's iter-2 architectural finding. Deepest structural lever — changes composition rather than parameters. Sequence after 298/299/300 land or in parallel if surface investigation proceeds independently.
+- 2026-05-13: 2026-05-13: landed as substrate-no-op (flags default to dormant). First-light soak (seed-42) anti-concordant on shadow_foxes_avoided_ward_total — score formula lacks topology-aware input. Follow-ons: 311 (chokepoint scenario), 312 (corridor perception axis), 313 (cat_value / distance_cost re-examination). See docs/balance/301-ward-placement-decision-semantics.md.

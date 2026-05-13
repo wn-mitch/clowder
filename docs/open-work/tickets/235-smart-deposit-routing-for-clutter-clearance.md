@@ -2,7 +2,8 @@
 id: 235
 title: Smart deposit routing for clutter clearance
 status: ready
-cluster: null
+cluster: items-crafting
+initiative: []
 added: 2026-05-08
 parked: null
 blocked-by: []

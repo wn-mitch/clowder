@@ -2,7 +2,8 @@
 id: 229
 title: add just similar — semantic retrieval over Clowder prose
 status: in-progress
-cluster: tooling
+cluster: tooling-diagnostics-ui
+initiative: []
 added: 2026-05-08
 parked: null
 blocked-by: []

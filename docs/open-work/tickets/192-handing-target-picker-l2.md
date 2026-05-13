@@ -2,7 +2,8 @@
 id: 192
 title: handing_target_dse — L2 multi-axis recipient picker (188 follow-on)
 status: ready
-cluster: ai-substrate
+cluster: social-coordination
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

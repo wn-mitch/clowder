@@ -2,7 +2,7 @@
 id: 214
 title: tune patrol_fox_scent_weight
 status: parked
-cluster: balance
+cluster: combat-threat
 added: 2026-05-07
 parked: 2026-05-07
 blocked-by: [209]

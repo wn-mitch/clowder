@@ -2,7 +2,7 @@
 id: 052
 title: §L2.10.7 plan-cost feedback substrate + cat target-taking roster
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 11f57d9
 landed-on: 2026-04-28
 ---

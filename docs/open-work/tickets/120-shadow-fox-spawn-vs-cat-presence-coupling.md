@@ -2,7 +2,8 @@
 id: 120
 title: Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%)
 status: ready
-cluster: ai-substrate
+cluster: wildlife
+initiative: [predator-prey-dynamics]
 added: 2026-05-01
 parked: null
 blocked-by: []

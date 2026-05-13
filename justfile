@@ -479,6 +479,36 @@ open-work-wip:
 open-work-index:
     uv run scripts/generate_open_work.py
 
+# Active focus: in-progress + ready blockers of active work + top-5 from `just next`.
+# Mirrors the `## Active focus` section in docs/open-work.md without scrolling.
+open-work-active:
+    uv run scripts/open_work_filters.py active
+
+# Filter ready tickets by cluster or initiative. With no flags, lists all ready.
+#
+#   just open-work-ready                          # all ready
+#   just open-work-ready --cluster ai-substrate   # one cluster
+#   just open-work-ready --initiative world-richness  # one initiative
+open-work-ready-filtered *ARGS:
+    uv run scripts/open_work_filters.py ready {{ARGS}}
+
+# List parked tickets older than N days (default 30). Also surfaces undated
+# parks (parked: null) — they need backfilling before the staleness window can
+# include them.
+open-work-stale *ARGS:
+    uv run scripts/open_work_filters.py stale {{ARGS}}
+
+# Show all transitive blockers of a given ticket.
+#
+#   just open-work-blocking 305
+open-work-blocking ID:
+    uv run scripts/open_work_filters.py blocking {{ID}}
+
+# List active initiatives with (open, landed) counts. Use when you want to see
+# project trajectory per thematic outcome.
+initiatives:
+    uv run scripts/open_work_filters.py initiatives
+
 # Per-epic progress (children done / open / blocked / parked, plus a bar).
 # Reads each `*-epic.md`'s roster table; child status comes from frontmatter.
 #

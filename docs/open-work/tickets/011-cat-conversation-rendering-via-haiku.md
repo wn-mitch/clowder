@@ -2,7 +2,8 @@
 id: 011
 title: Cat-conversation rendering via Haiku (presenter over C3)
 status: blocked
-cluster: null
+cluster: magic-mythic
+initiative: [mythic-texture]
 added: 2026-04-21
 parked: null
 blocked-by: [007, 010]

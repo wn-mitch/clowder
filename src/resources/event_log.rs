@@ -225,11 +225,22 @@ pub enum EventKind {
         damage: f32,
     },
     /// A cat successfully placed a ward.
+    ///
+    /// **`via_directive`** (301): `true` when the cat was operating
+    /// under a coordinator-issued `ActiveDirective::SetWard` at the
+    /// time the ward materialized — i.e., Path A (coordinator-driven,
+    /// target chosen by `compute_ward_placement`'s argmax / descending-
+    /// residual). `false` for Path B (cat's own `HerbcraftSetWard`
+    /// pick, ward planted at the cat's current position). The split
+    /// is load-bearing for ticket 301 because the structural change
+    /// to `compute_ward_placement` only shifts Path A's target;
+    /// validation needs the Path-A subset to measure spread.
     WardPlaced {
         cat: String,
         ward_kind: String,
         location: (i32, i32),
         strength: f32,
+        via_directive: bool,
     },
     /// A ward expired (decayed to zero). Separate from WardPlaced so you can
     /// answer "is siege-heavy decay concentrated near the colony edge?"

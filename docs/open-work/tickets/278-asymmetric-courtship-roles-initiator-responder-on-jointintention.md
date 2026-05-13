@@ -2,7 +2,8 @@
 id: 278
 title: Asymmetric Courtship roles (Initiator / Responder) on JointIntention
 status: ready
-cluster: null
+cluster: social-coordination
+initiative: [generational-continuity]
 added: 2026-05-11
 parked: null
 blocked-by: []

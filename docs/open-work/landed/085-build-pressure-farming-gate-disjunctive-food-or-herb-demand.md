@@ -2,7 +2,7 @@
 id: 085
 title: "Build-pressure farming gate: disjunctive food-or-herb demand"
 status: done
-cluster: null
+cluster: items-crafting
 landed-at: null
 landed-on: 2026-04-30
 ---

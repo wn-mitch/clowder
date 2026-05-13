@@ -2,7 +2,8 @@
 id: 021
 title: Monuments — civic & memorial structures
 status: blocked
-cluster: null
+cluster: buildings-zones
+initiative: [world-richness]
 added: 2026-04-22
 parked: null
 blocked-by: [020]

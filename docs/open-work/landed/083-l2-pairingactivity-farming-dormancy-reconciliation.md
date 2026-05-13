@@ -2,7 +2,7 @@
 id: 083
 title: L2 PairingActivity Farming dormancy reconciliation
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 1265400
 landed-on: 2026-04-29
 ---

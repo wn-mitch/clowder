@@ -2,7 +2,8 @@
 id: 277
 title: N>2 joint practices (group hunting / kitten circles) — participants: HashSet<Entity> shape
 status: ready
-cluster: null
+cluster: social-coordination
+initiative: []
 added: 2026-05-11
 parked: null
 blocked-by: []

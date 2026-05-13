@@ -1,0 +1,100 @@
+---
+id: 306
+title: Corpus tagging pass — backfill cluster+initiative across active and landed tickets
+status: blocked
+cluster: process-discipline
+initiative: []
+added: 2026-05-13
+parked: null
+blocked-by: [305]
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+305 lands the schema (`initiative:` frontmatter + open-time gate + two-axis
+rendering). This ticket is the corresponding *content* pass — backfill the
+new fields across the existing corpus so the rollups actually populate.
+
+Two passes over the same workflow:
+
+- **Active (~134 tickets)** — 63 have `cluster: null` today; all 134 have
+  `initiative: []`. Cluster-tagging closes the discipline leak; initiative-
+  tagging is selective (most tickets won't carry an initiative tag — that's
+  correct, initiatives are for cross-cluster thematic threads only).
+- **Landed (~190 tickets)** — back-cataloguing converts the embedding pool
+  from "current corpus" to "project-trajectory substrate." Initiative
+  rollups become `(X open, Y landed)` — narrative, not just filter.
+
+This is the intervention with the largest agent-affordance gap vs. Linear:
+on Linear, retroactively tagging 190 issues is one-by-one manual work; on
+markdown with `just similar` already wired, this is a script that suggests
+the nearest cluster+initiative for each untagged ticket via top-K neighbor
+vote, and human approves in batches.
+
+## Scope
+
+- Write `scripts/suggest_tags.py` — for each untagged ticket, query the
+  embedding index for top-K neighbors, vote on cluster (and initiative,
+  weighted by initiative-already-tagged neighbors), emit a YAML proposal
+  file that a human can edit and apply.
+- Run over `docs/open-work/tickets/*.md` for 63 untagged-cluster tickets.
+- Run over `docs/open-work/landed/*.md` for 190 landed tickets.
+- Concurrently: backfill `parked:` dates on the 8 status-parked tickets
+  whose `parked:` field is `null`. Source dates from `git log --follow`
+  on each ticket file (first commit with `status: parked`).
+- After tagging, regenerate `docs/open-work.md` and verify the rollup
+  counts populate.
+
+## Out of scope
+
+- Schema/rendering changes — those live in 305 and must land first.
+- New clusters or initiatives discovered during the pass — fine to add
+  them inline; document in `docs/open-work/initiatives/<name>.md` stubs.
+- Re-classifying tickets whose cluster is already set — only fill nulls
+  unless the existing tag is obviously wrong.
+
+## Current state
+
+Blocked on 305. Can scaffold the suggestion script in parallel against a
+draft `initiative:` schema, but the actual tagging pass shouldn't run until
+the renderer can show its effect.
+
+## Approach
+
+1. Once 305 lands and the embedding index has `initiative:` in chunk
+   metadata, write `scripts/suggest_tags.py` that:
+   - Loads the embedding index
+   - For each ticket missing cluster/initiative, finds top-K=10 neighbors
+   - Tallies cluster votes (excluding the ticket itself); proposes the
+     plurality cluster, plus runners-up
+   - Tallies initiative votes (per-initiative independent yes/no signal
+     based on tagged-neighbor density); proposes initiatives above a
+     density threshold
+   - Emits a `tag-proposals.yaml` with `ticket_id, current, proposed,
+     confidence, top_neighbors` per ticket
+2. Human review in batches of ~20, edit YAML, apply via a small
+   `apply_tags.py` that rewrites frontmatter.
+3. Re-run embedding rebuild after each batch (so subsequent batches benefit
+   from newly-tagged neighbors).
+
+## Verification
+
+- `## Uncategorized (N ready)` count in `docs/open-work.md` drops to ~0
+  after active pass.
+- `## Ready by initiative` rollups populate non-trivially across landed
+  back-catalogue — e.g., `world-richness (X open, Y landed)` where Y > 0.
+- `just similar --centroid <initiative>` (lands in 307) returns coherent
+  neighbor sets per initiative (qualitative smoke test).
+- `parked:` dates populated for all 10 status-parked tickets.
+- `just open-work-stale --days 30` (lands in 307) returns a non-empty list
+  — the park-bankruptcy candidates.
+
+## Log
+
+- 2026-05-13: opened as follow-on to 305 per the corpus-hygiene plan
+  (`~/.claude/plans/wondrous-greeting-tome.md`).

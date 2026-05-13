@@ -445,7 +445,7 @@ pub struct CapturedDse {
 }
 
 /// Per-tick focal-cat scoring capture. Populated during
-/// `evaluate_and_plan` / `cat_presence_tick` (whichever system's scoring
+/// `evaluate_and_plan` / `cat_scent_tick` (whichever system's scoring
 /// pass runs for a given cat); drained and cleared by
 /// `emit_focal_trace`.
 ///

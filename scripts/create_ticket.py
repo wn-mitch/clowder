@@ -47,6 +47,35 @@ TEMPLATE_DEFAULT = TICKETS_DIR / "_template.md"
 TEMPLATE_BUGFIX = TICKETS_DIR / "_template_bugfix.md"
 
 
+def known_clusters() -> list[str]:
+    """Existing cluster values across active + landed tickets.
+
+    Used to validate `--cluster` at open-time so the discipline can't leak.
+    Returns a sorted list with `null` excluded. Cheap enough to recompute
+    each call (≤500 files, single grep-like pass).
+    """
+    clusters: set[str] = set()
+    pat = re.compile(r"^cluster:\s*(.+?)\s*(?:#.*)?$")
+    for directory in (TICKETS_DIR, LANDED_DIR):
+        if not directory.exists():
+            continue
+        for path in directory.glob("*.md"):
+            if path.name.startswith("_"):
+                continue
+            try:
+                with path.open(encoding="utf-8") as fh:
+                    for line in fh:
+                        m = pat.match(line)
+                        if m:
+                            val = m.group(1).strip()
+                            if val and val.lower() not in ("null", "~", "[]"):
+                                clusters.add(val)
+                            break
+            except OSError:
+                continue
+    return sorted(clusters)
+
+
 def all_ticket_ids() -> list[int]:
     """Every 3-digit ticket id reachable in tickets/ + landed/ (deduped).
 
@@ -84,6 +113,7 @@ def slugify(title: str) -> str:
 def render_ticket(template_path: Path, *,
                   ticket_id: int, title: str,
                   cluster: str | None,
+                  initiative: list[str],
                   blocked_by: list[int],
                   today: str) -> str:
     text = template_path.read_text(encoding="utf-8")
@@ -104,6 +134,10 @@ def render_ticket(template_path: Path, *,
             return f"status: {status}"
         if body.startswith("cluster:"):
             return f"cluster: {cluster if cluster else 'null'}"
+        if body.startswith("initiative:"):
+            if not initiative:
+                return "initiative: []"
+            return "initiative: [" + ", ".join(initiative) + "]"
         if body.startswith("added:"):
             return f"added: {today}"
         if body.startswith("parked:"):
@@ -157,7 +191,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--bugfix", action="store_true",
                     help="Use _template_bugfix.md (audit table + structural-option slot)")
     ap.add_argument("--cluster", default=None,
-                    help="Set frontmatter `cluster:` (e.g. process-discipline)")
+                    help="Set frontmatter `cluster:` — REQUIRED. See docs/open-work/clusters.md.")
+    ap.add_argument("--initiative", default="",
+                    help="Comma-separated initiative tags (zero-or-more); see docs/open-work/initiatives/")
     ap.add_argument("--blocked-by", default="",
                     help="Comma-separated ticket ids; sets status: blocked automatically")
     ap.add_argument("--slug", default=None,
@@ -171,6 +207,23 @@ def main(argv: list[str]) -> int:
     if not template.exists():
         print(f"create_ticket: template not found at {template}", file=sys.stderr)
         return 1
+
+    if not args.cluster:
+        existing = known_clusters()
+        print(
+            "create_ticket: --cluster is required.\n"
+            "  Cluster is the categorical bucket (one per ticket). See\n"
+            "  docs/open-work/clusters.md for the taxonomy.\n"
+            f"  Existing values: {', '.join(existing) if existing else '(none yet)'}",
+            file=sys.stderr,
+        )
+        return 2
+
+    initiative_tags: list[str] = []
+    for token in args.initiative.split(","):
+        token = token.strip()
+        if token:
+            initiative_tags.append(token)
 
     ticket_id = args.forced_id if args.forced_id is not None else next_id()
     if args.forced_id is not None and ticket_id in all_ticket_ids():
@@ -199,6 +252,7 @@ def main(argv: list[str]) -> int:
         ticket_id=ticket_id,
         title=args.title,
         cluster=args.cluster,
+        initiative=initiative_tags,
         blocked_by=blocked_by_ids,
         today=today,
     )

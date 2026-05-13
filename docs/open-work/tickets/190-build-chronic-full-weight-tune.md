@@ -2,7 +2,7 @@
 id: 190
 title: Tune build_chronic_full_weight (179 follow-on)
 status: ready
-cluster: balance
+cluster: ai-substrate
 added: 2026-05-06
 parked: null
 blocked-by: []

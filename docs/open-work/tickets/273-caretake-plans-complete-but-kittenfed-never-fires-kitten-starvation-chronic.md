@@ -2,7 +2,8 @@
 id: 273
 title: Caretake plans complete but KittenFed never fires — kitten starvation chronic
 status: parked
-cluster: null
+cluster: life-cycle
+initiative: [generational-continuity]
 added: 2026-05-11
 parked: 2026-05-11
 blocked-by: []

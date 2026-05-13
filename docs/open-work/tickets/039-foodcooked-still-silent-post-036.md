@@ -2,7 +2,8 @@
 id: 039
 title: FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook
 status: ready
-cluster: null
+cluster: items-crafting
+initiative: []
 added: 2026-04-26
 parked: null
 blocked-by: []

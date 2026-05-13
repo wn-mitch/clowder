@@ -14,7 +14,7 @@ use crate::components::wildlife::{
     BehaviorType, FoxAiPhase, FoxDen, FoxLifeStage, FoxSex, FoxState, WildAnimal, WildSpecies,
     WildlifeAiState,
 };
-use crate::resources::cat_presence_map::CatPresenceMap;
+use crate::resources::cat_scent_map::CatScentMap;
 use crate::resources::food::FoodStores;
 use crate::resources::fox_scent_map::FoxScentMap;
 use crate::resources::map::{Terrain, TileMap};
@@ -41,7 +41,7 @@ pub struct DetectionCooldowns {
 // ---------------------------------------------------------------------------
 
 /// Move each wild animal according to its behavior pattern.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn wildlife_ai(
     mut query: Query<(&WildAnimal, &mut Position, &mut WildlifeAiState), Without<FoxState>>,
     wards: Query<(&Ward, &Position), Without<WildAnimal>>,
@@ -57,12 +57,22 @@ pub fn wildlife_ai(
     mut map: ResMut<TileMap>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
+    ward_coverage: Res<crate::resources::WardCoverageMap>,
+    cat_scent: Res<CatScentMap>,
     mut activation: ResMut<SystemActivation>,
 ) {
     let c = &constants.wildlife;
     let ward_multiplier = constants.magic.shadow_fox_ward_repel_multiplier;
+    let ward_avoid_threshold = c.shadow_fox_ward_avoid_threshold;
+    let cat_scent_avoid_threshold = constants.fox_ecology.cat_scent_avoidance_threshold;
 
-    // Snapshot ward positions (non-inverted, alive) for shadow fox avoidance.
+    // 260: snapshot kept *only* for siege state (ward identity at
+    // siege start, alive-check during encircle, orbit radius). The
+    // avoidance decision now reads `WardCoverageMap` directly, making
+    // shadow-fox-vs-ward avoidance trace-visible through the
+    // `ward_coverage` InfluenceMap metadata. Pre-260, this snapshot
+    // doubled as the avoidance signal — a hardcoded side-channel
+    // CLAUDE.md's "Substrate over hacks" pillar prohibits.
     let ward_positions: Vec<(Position, f32)> = wards
         .iter()
         .filter(|(w, _)| !w.inverted && w.strength > 0.01)
@@ -72,26 +82,41 @@ pub fn wildlife_ai(
     for (animal, mut pos, mut ai_state) in &mut query {
         match *ai_state {
             WildlifeAiState::Patrolling { dx, dy } => {
-                // Shadow fox ward avoidance: reverse if next step enters a ward.
+                // 260: shadow-fox orthogonal-axis avoidance.
+                // - Magic channel: `WardCoverageMap` (Sight × Colony).
+                // - Scent channel: `CatScentMap` (Scent × Colony).
+                // Both fire independently; ward triggers the siege
+                // roll, scent only reverses (cat scent isn't a thing
+                // to siege).
                 if animal.species == WildSpecies::ShadowFox {
                     let next = Position::new(pos.x + dx, pos.y + dy);
-                    if let Some((wp, _radius)) = ward_positions
-                        .iter()
-                        .find(|(wp, radius)| (next.manhattan_distance(wp) as f32) <= *radius)
-                    {
-                        // Chance to siege the ward instead of retreating.
-                        if rng.rng.random::<f32>() < c.ward_siege_chance {
-                            *ai_state = WildlifeAiState::EncirclingWard {
-                                ward_x: wp.x,
-                                ward_y: wp.y,
-                                angle: 0.0,
-                                ticks: 0,
-                            };
-                            activation.record(Feature::WardSiegeStarted);
-                        } else {
-                            *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
+                    if ward_coverage.get(next.x, next.y) >= ward_avoid_threshold {
+                        // For siege geometry we still need the ward's
+                        // entity-level (x, y); pull the nearest from
+                        // the snapshot so the EncirclingWard branch
+                        // can orbit a concrete ward, not a grid cell.
+                        let siege_anchor = ward_positions
+                            .iter()
+                            .min_by_key(|(wp, _)| next.manhattan_distance(wp));
+                        if let Some((wp, _radius)) = siege_anchor {
+                            if rng.rng.random::<f32>() < c.ward_siege_chance {
+                                *ai_state = WildlifeAiState::EncirclingWard {
+                                    ward_x: wp.x,
+                                    ward_y: wp.y,
+                                    angle: 0.0,
+                                    ticks: 0,
+                                };
+                                activation.record(Feature::WardSiegeStarted);
+                            } else {
+                                *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
+                            }
+                            activation.record(Feature::ShadowFoxAvoidedWard);
+                            continue;
                         }
-                        activation.record(Feature::ShadowFoxAvoidedWard);
+                    }
+                    if cat_scent.get(next.x, next.y) >= cat_scent_avoid_threshold {
+                        *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
+                        activation.record(Feature::ShadowFoxAvoidedCatScent);
                         continue;
                     }
                 }
@@ -214,15 +239,15 @@ pub fn wildlife_ai(
             }
 
             WildlifeAiState::Stalking { target_x, target_y } => {
-                // Shadow fox ward avoidance: cancel stalk if next step enters a ward.
+                // Shadow fox ward avoidance: cancel stalk if next step would
+                // enter a ward-covered tile (260: was a hardcoded
+                // `ward_positions` distance check; now reads the same
+                // `WardCoverageMap` threshold as the patrol-step branch).
                 if animal.species == WildSpecies::ShadowFox {
                     let dx = (target_x - pos.x).signum();
                     let dy = (target_y - pos.y).signum();
                     let next = Position::new(pos.x + dx, pos.y + dy);
-                    let enters_ward = ward_positions
-                        .iter()
-                        .any(|(wp, radius)| (next.manhattan_distance(wp) as f32) <= *radius);
-                    if enters_ward {
+                    if ward_coverage.get(next.x, next.y) >= ward_avoid_threshold {
                         *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
                         activation.record(Feature::ShadowFoxAvoidedWard);
                         continue;
@@ -1618,7 +1643,7 @@ pub fn fox_ai_decision(
     time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
     scent_map: Res<FoxScentMap>,
-    cat_presence: Res<CatPresenceMap>,
+    cat_scent: Res<CatScentMap>,
 ) {
     let fc = &constants.fox_ecology;
     let wc = &constants.wildlife;
@@ -1955,17 +1980,17 @@ pub fn fox_ai_decision(
 
         // --- Cat presence deterrent: avoid high cat-presence zones ---
         if fox.hunger < fc.ward_hunger_override_threshold {
-            let presence = cat_presence.get(pos.x, pos.y);
-            if presence >= fc.cat_presence_avoidance_threshold {
+            let presence = cat_scent.get(pos.x, pos.y);
+            if presence >= fc.cat_scent_avoidance_threshold {
                 // Move toward the lowest-presence adjacent bucket.
-                let bs = cat_presence.bucket_size;
+                let bs = cat_scent.bucket_size;
                 let mut best_dx: i32 = 0;
                 let mut best_dy: i32 = 0;
                 let mut best_val = presence;
                 for (ddx, ddy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
                     let nx = pos.x + ddx * bs;
                     let ny = pos.y + ddy * bs;
-                    let v = cat_presence.get(nx, ny);
+                    let v = cat_scent.get(nx, ny);
                     if v < best_val {
                         best_val = v;
                         best_dx = ddx;
@@ -2016,9 +2041,9 @@ pub fn fox_ai_decision(
         if let Some(den_entity) = fox.home_den {
             if let Ok((_, den, den_pos)) = dens.get(den_entity) {
                 // 3.16: Cat presence near den contracts effective patrol radius.
-                let den_presence = cat_presence.get(den_pos.x, den_pos.y);
+                let den_presence = cat_scent.get(den_pos.x, den_pos.y);
                 let effective_radius = if den_presence > 0.1 {
-                    // Contract by up to 50% based on cat presence intensity.
+                    // Contract by up to 50% based on cat scent intensity.
                     let contraction = (den_presence * 0.5).min(0.5);
                     ((den.territory_radius as f32) * (1.0 - contraction)).max(3.0) as i32
                 } else {
@@ -2455,6 +2480,11 @@ mod tests {
         world.insert_resource(SimRng::new(42));
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
+        // 260: wildlife_ai now reads WardCoverageMap and CatScentMap
+        // through the InfluenceMap registry; insert defaults so the
+        // unit tests can exercise the no-ward / no-scent baseline.
+        world.insert_resource(crate::resources::WardCoverageMap::default());
+        world.insert_resource(CatScentMap::default());
 
         let mut schedule = Schedule::default();
         schedule.add_systems(wildlife_ai);

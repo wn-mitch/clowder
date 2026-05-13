@@ -2,7 +2,8 @@
 id: 129
 title: Care DSEs over perceivable intentions
 status: ready
-cluster: C
+cluster: social-coordination
+initiative: []
 added: 2026-05-02
 parked: null
 blocked-by: []

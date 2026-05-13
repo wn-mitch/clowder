@@ -2,7 +2,7 @@
 id: 009
 title: World-generation richness (Cluster E)
 status: ready
-cluster: E
+cluster: ai-substrate
 added: 2026-04-20
 parked: null
 blocked-by: []

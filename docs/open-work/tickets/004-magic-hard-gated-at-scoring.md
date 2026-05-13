@@ -2,7 +2,8 @@
 id: 004
 title: Magic hard-gated at scoring
 status: ready
-cluster: null
+cluster: magic-mythic
+initiative: [mythic-texture]
 added: 2026-04-20
 parked: null
 blocked-by: []

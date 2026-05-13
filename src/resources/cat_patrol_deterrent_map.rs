@@ -10,7 +10,7 @@ use bevy_ecs::prelude::*;
 /// corridors — only sustained patrol presence creates a meaningful
 /// detour for foxes.
 ///
-/// Distinct from `CatPresenceMap`: the presence map deposits
+/// Distinct from `CatScentMap`: the presence map deposits
 /// unconditionally from any active cat, including idle / foraging /
 /// sleeping. The deterrent map is patrol-only — sleeping cats are
 /// vulnerable, not threatening.

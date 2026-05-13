@@ -954,6 +954,14 @@ pub fn resolve_magic_task_chains(
                         m,
                         &constants.combat,
                         &time_scale,
+                        // 301: Legacy disposition-pipeline path
+                        // (unscheduled per ticket 027b). `event_log:
+                        // None` means no `WardPlaced` event is emitted
+                        // from here, so `via_directive` is value-
+                        // immaterial; pass `false` as the natural
+                        // default (this path has no coordinator
+                        // directive plumbing).
+                        false,
                     ),
                     &mut chain,
                 );

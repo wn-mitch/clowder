@@ -2,7 +2,8 @@
 id: 032
 title: Starvation rebalance — align with IRL cat biology, interesting not cutthroat
 status: in-progress
-cluster: null
+cluster: life-cycle
+initiative: [welfare-fidelity]
 added: 2026-04-26
 parked: null
 blocked-by: []

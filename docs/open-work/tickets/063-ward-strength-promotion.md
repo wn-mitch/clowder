@@ -2,7 +2,8 @@
 id: 063
 title: Ward-strength promotion — first-class spatial axis (§5.6.3 row #3)
 status: ready
-cluster: null
+cluster: buildings-zones
+initiative: []
 added: 2026-04-27
 parked: null
 blocked-by: []

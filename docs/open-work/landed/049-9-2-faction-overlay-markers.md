@@ -2,7 +2,7 @@
 id: 049
 title: §9.2 faction overlay markers
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 384bf25
 landed-on: 2026-04-27
 ---

@@ -123,6 +123,7 @@ pub enum Feature {
     FoxAvoidedWard,
     FoxAvoidedPresence,
     ShadowFoxAvoidedWard,
+    ShadowFoxAvoidedCatScent,
     DirectiveDelivered,
     // --- Corruption & carcass systems ---
     CarcassSpawned,
@@ -474,6 +475,7 @@ impl Feature {
         Feature::FoxAvoidedWard,
         Feature::FoxAvoidedPresence,
         Feature::ShadowFoxAvoidedWard,
+        Feature::ShadowFoxAvoidedCatScent,
         Feature::DirectiveDelivered,
         // Corruption & carcass systems
         Feature::CarcassSpawned,
@@ -599,6 +601,7 @@ impl Feature {
             // Defensive wins against corruption / shadowfoxes.
             Feature::CorruptionPushback => Positive,
             Feature::ShadowFoxAvoidedWard => Positive,
+            Feature::ShadowFoxAvoidedCatScent => Positive,
             // §Phase 5a silent-advance audit — healthy-subsystem activity
             Feature::FoodEaten => Positive,
             Feature::Socialized => Positive,
@@ -750,6 +753,13 @@ impl Feature {
             Feature::FateAwakened => false,
             Feature::SpiritCommunion => false,
             Feature::ShadowFoxAvoidedWard => false,
+            // 260: shadow-fox cat-scent avoidance — depends on
+            // colony scent gradient overlap with ShadowFox patrol
+            // route. Same exemption logic as `ShadowFoxAvoidedWard`
+            // and `FoxAvoidedPresence`: structural verification lives
+            // in the `fox_cat_scent_avoidance` scenario, not the
+            // seed-42 canary.
+            Feature::ShadowFoxAvoidedCatScent => false,
             Feature::ShadowFoxSpawn => false,
             Feature::WardSiegeStarted => false,
             Feature::DeathOldAge => false,
@@ -1009,6 +1019,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::FoxAvoidedWard => "FoxAvoidedWard",
         Feature::FoxAvoidedPresence => "FoxAvoidedPresence",
         Feature::ShadowFoxAvoidedWard => "ShadowFoxAvoidedWard",
+        Feature::ShadowFoxAvoidedCatScent => "ShadowFoxAvoidedCatScent",
         Feature::DirectiveDelivered => "DirectiveDelivered",
         Feature::CarcassSpawned => "CarcassSpawned",
         Feature::WardSiegeStarted => "WardSiegeStarted",
@@ -1326,7 +1337,12 @@ mod tests {
         // PairingDropped), net -2 Positive / -1 Neutral.
         // Ticket 288 added 1 Neutral (CommitmentDropMoraleBreak — the
         // morale_break-driven commitment release counter).
-        assert_eq!(positive, 54);
+        // Ticket 260 added 1 Positive (ShadowFoxAvoidedCatScent — the
+        // substrate-visible scent-channel sibling of the existing
+        // ShadowFoxAvoidedWard magic-channel feature; both are
+        // exempt from the seed-42 canary because firing depends on
+        // ShadowFox/ward/colony spatial overlap).
+        assert_eq!(positive, 55);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 35);
     }
@@ -1401,9 +1417,11 @@ mod tests {
         // for the PA Feature deletions (PairingIntentionEmitted /
         // PairingBiasApplied / PairingDropped).
         // Ticket 288: +1 Neutral (CommitmentDropMoraleBreak).
+        // Ticket 260: +1 Positive (ShadowFoxAvoidedCatScent — the
+        // scent-channel sibling of ShadowFoxAvoidedWard).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            54
+            55
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

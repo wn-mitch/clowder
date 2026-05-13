@@ -26,7 +26,7 @@ pub struct ColonyContext<'w> {
     /// `CatAnchorPositions.nearest_prey`. Read-only; the replan path
     /// queries via `PreyScentMap::highest_nearby` once per cat.
     pub prey_scent_map: Res<'w, crate::resources::PreyScentMap>,
-    pub cat_presence_map: ResMut<'w, crate::resources::CatPresenceMap>,
+    pub cat_scent_map: ResMut<'w, crate::resources::CatScentMap>,
     /// Hearing-channel kitten-cry broadcast (ticket 156). Sampled at
     /// each cat's position to populate `ScoringContext::kitten_cry_perceived`.
     pub kitten_cry_map: Res<'w, crate::resources::KittenCryMap>,
@@ -49,6 +49,15 @@ pub struct ColonyContext<'w> {
     /// coverage yet). Read in both the disposition-pipeline scoring
     /// path (`disposition.rs`) and the replan path (`goap.rs`).
     pub ward_coverage_map: Res<'w, crate::resources::WardCoverageMap>,
+    /// 301 — coordinator-stamped ward-placement intent. Sampled at
+    /// the cat's current position to populate
+    /// `ScoringContext::ward_intent_at_position`, which the
+    /// `HerbcraftWardDse` reads as a substrate-dormant scalar gated
+    /// by `ward_intent_dse_weight` (default 0.0). At default
+    /// `SimConstants` the resource is allocated but unwritten; the
+    /// sample reads 0.0 everywhere and the dormant weight makes the
+    /// DSE score byte-identical pre-301.
+    pub ward_intent_map: Res<'w, crate::resources::WardIntentMap>,
 }
 
 pub mod actions;

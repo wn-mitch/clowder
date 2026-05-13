@@ -2,7 +2,8 @@
 id: 053
 title: §7.7.b death-event grief emission — relationship-classified survivors payload
 status: blocked
-cluster: null
+cluster: life-cycle
+initiative: [welfare-fidelity]
 added: 2026-04-27
 parked: null
 blocked-by: [007]

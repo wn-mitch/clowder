@@ -35,6 +35,8 @@ pub mod farming_cycle;
 pub mod flee_calibration;
 pub mod flee_commitment;
 pub mod fondness_kitten_imprint;
+pub mod fox_cat_scent_avoidance;
+pub mod fox_ward_only_avoidance;
 pub mod grooming_other;
 pub mod guarding_morale_break_releases;
 pub mod hunt_acquisition;
@@ -188,6 +190,14 @@ pub const ALL: &[&Scenario] = &[
     // dispatcher releases the commitment so L3 re-elects instead of
     // replanning inside Guarding.
     &guarding_morale_break_releases::SCENARIO,
+    // 260 — orthogonal-channel avoidance microexperiments.
+    // `fox_cat_scent_avoidance` — colony cats radiate scent; lone
+    // ShadowFox flips on `Feature::ShadowFoxAvoidedCatScent`.
+    // `fox_ward_only_avoidance` — durable ward, no cats; lone
+    // ShadowFox flips on `Feature::ShadowFoxAvoidedWard`. Together
+    // they prove the magic + scent channels fire independently.
+    &fox_cat_scent_avoidance::SCENARIO,
+    &fox_ward_only_avoidance::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

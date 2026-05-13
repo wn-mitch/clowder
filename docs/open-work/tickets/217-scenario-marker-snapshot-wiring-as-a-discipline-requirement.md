@@ -3,6 +3,7 @@ id: 217
 title: scenario marker-snapshot wiring as a discipline requirement
 status: ready
 cluster: process-discipline
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

@@ -2,7 +2,8 @@
 id: 025
 title: Hawk and snake GOAP planner domains
 status: in-progress
-cluster: null
+cluster: wildlife
+initiative: [predator-prey-dynamics]
 added: 2026-04-24
 parked: null
 blocked-by: []

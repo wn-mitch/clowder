@@ -2,7 +2,7 @@
 id: 232
 title: Body-state-coupled L3 softmax temperature for stake-aware decision sharpness
 status: done
-cluster: null
+cluster: ai-substrate
 added: 2026-05-08
 parked: null
 blocked-by: []

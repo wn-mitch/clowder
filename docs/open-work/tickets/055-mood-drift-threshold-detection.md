@@ -2,7 +2,7 @@
 id: 055
 title: §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger
 status: blocked
-cluster: null
+cluster: ai-substrate
 added: 2026-04-27
 parked: null
 blocked-by: [056]

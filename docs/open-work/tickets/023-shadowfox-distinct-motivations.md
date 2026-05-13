@@ -2,7 +2,8 @@
 id: 023
 title: Shadowfox motivations distinct from normal foxes
 status: ready
-cluster: null
+cluster: wildlife
+initiative: [predator-prey-dynamics]
 added: 2026-04-14
 parked: null
 blocked-by: []

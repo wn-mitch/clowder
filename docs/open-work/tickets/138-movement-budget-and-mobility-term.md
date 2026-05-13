@@ -2,7 +2,7 @@
 id: 138
 title: Phase 1 — MovementBudget per entity + escape_viability mobility term
 status: ready
-cluster: substrate-migration
+cluster: ai-substrate
 added: 2026-05-02
 parked: null
 blocked-by: [135]

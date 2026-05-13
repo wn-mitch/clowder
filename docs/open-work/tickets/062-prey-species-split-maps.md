@@ -2,7 +2,8 @@
 id: 062
 title: Prey-species split — per-species scent maps (§5.6.3 row #5)
 status: ready
-cluster: null
+cluster: belief-perception
+initiative: [environmental-simulation, predator-prey-dynamics]
 added: 2026-04-27
 parked: null
 blocked-by: []

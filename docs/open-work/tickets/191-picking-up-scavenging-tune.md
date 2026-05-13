@@ -2,7 +2,7 @@
 id: 191
 title: Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on)
 status: ready
-cluster: balance
+cluster: items-crafting
 added: 2026-05-06
 parked: null
 blocked-by: []

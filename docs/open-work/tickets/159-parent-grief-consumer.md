@@ -2,7 +2,8 @@
 id: 159
 title: Parent grief consumer for kitten / dependent death
 status: ready
-cluster: ai-substrate
+cluster: life-cycle
+initiative: [welfare-fidelity]
 added: 2026-05-04
 parked: null
 blocked-by: []

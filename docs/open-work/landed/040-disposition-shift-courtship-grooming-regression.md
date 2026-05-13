@@ -2,7 +2,7 @@
 id: 040
 title: Disposition shift after 036 collapsed Courtship / Grooming / Mythic-texture continuity
 status: done
-cluster: null
+cluster: ai-substrate
 added: 2026-04-26
 parked: null
 blocked-by: []

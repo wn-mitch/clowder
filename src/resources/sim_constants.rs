@@ -1324,6 +1324,28 @@ impl Default for SpeciesConstants {
 
 // ---------- ScoringConstants ----------
 
+/// 301: selection rule used by the coordinator's ward-placement
+/// scorer in `compute_ward_placement()`. The first enum-typed field
+/// in `ScoringConstants` — serde-serializes the variant as a JSON
+/// string into the events.jsonl header. Variant names are stable
+/// identifiers; new options must be added as new variants rather
+/// than renamed in place.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
+)]
+pub enum WardPlacementSemantics {
+    /// Pre-301 behavior. The scorer picks the single highest-scored
+    /// candidate tile per coordinator wake. Default.
+    #[default]
+    SingleShotArgmax,
+    /// 301 SPLIT option. Run K=`ward_placement_residual_rounds`
+    /// rounds of submodular greedy inside the scorer: round 0 picks
+    /// the argmax winner, stamps virtual coverage around it, then
+    /// round 1 re-scores all candidates against the partially-eaten
+    /// threat surface, etc. Returns the round-(K-1) pick.
+    DescendingResidual,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ScoringConstants {
     pub jitter_range: f32,
@@ -2056,7 +2078,7 @@ pub struct ScoringConstants {
     /// schedule-edge perturbation of seed-42 (ticket 061 precedent).
     #[serde(default = "default_fox_intercept_kernel_radius_tiles")]
     pub fox_intercept_kernel_radius_tiles: u32,
-    /// 298: weight on the `CatPresenceMap` lift to ward-placement's
+    /// 298: weight on the `CatScentMap` lift to ward-placement's
     /// argmax tiebreak among threat-saturated tiles. The `0.3` default
     /// preserves ticket 045's first-light reasoning ("modest weight
     /// keeps placement biased toward where cats actually live") and
@@ -2074,6 +2096,58 @@ pub struct ScoringConstants {
     /// `docs/balance/298-ward-placement-cat-value-coefficient.md`.
     #[serde(default = "default_ward_placement_cat_value_weight")]
     pub ward_placement_cat_value_weight: f32,
+    /// 301: selection rule for the coordinator's ward-placement scorer
+    /// in `compute_ward_placement()`. After 285+296+297+298+300 ruled
+    /// out five threat- and tiebreak-side levers as movers of the
+    /// argmax across seeds 42/99/7, ticket 301 targets the composition
+    /// rule itself. `SingleShotArgmax` (default) reproduces the
+    /// pre-301 single-best-tile selection byte-for-byte.
+    /// `DescendingResidual` runs K=`ward_placement_residual_rounds`
+    /// rounds of submodular greedy inside the scorer: each round
+    /// stamps virtual coverage around its winner so the next round
+    /// re-scores against a partially-eaten threat surface, returning
+    /// the K-th pick. Spreads successive placements across the threat
+    /// field instead of co-locating in the same saturated cluster.
+    ///
+    /// **First enum-typed field in `ScoringConstants`.** Serde
+    /// serializes the variant as a JSON string into the events.jsonl
+    /// header (`headless_io.rs:263`), so the comparability invariant
+    /// is preserved. Variant names are stable identifiers — never
+    /// rename in place; add new variants and deprecate old ones.
+    #[serde(default = "default_ward_placement_semantics")]
+    pub ward_placement_semantics: WardPlacementSemantics,
+    /// 301: K (number of greedy rounds) used by
+    /// `WardPlacementSemantics::DescendingResidual`. K=1 is identical
+    /// to `SingleShotArgmax` (round 0 = argmax). Default `2` lifts
+    /// once when the descending-residual flag is on. Ignored when
+    /// `ward_placement_semantics == SingleShotArgmax`. Clamped `>= 1`
+    /// defensively at use-site.
+    #[serde(default = "default_ward_placement_residual_rounds")]
+    pub ward_placement_residual_rounds: i32,
+    /// 301: weight on the `WardIntentMap` lift to the Path-B
+    /// `HerbcraftWardDse` score (`src/ai/dses/herbcraft_ward.rs`).
+    /// Default `0.0` — substrate is wired but dormant at land per the
+    /// 220 / 297 first-light pattern, so the DSE score is byte-identical
+    /// pre-301 at the default. Coordinator-stamped intent (populated
+    /// by `compute_ward_placement` when `ward_placement_semantics ==
+    /// DescendingResidual`) biases cats toward planting on tiles the
+    /// colony's spread logic has marked. The DSE doesn't pick a target
+    /// position — it boosts the score when the cat is *standing on* an
+    /// intent tile, so wandering cats whose path crosses an intent
+    /// tile are more likely to commit there.
+    #[serde(default = "default_ward_intent_dse_weight")]
+    pub ward_intent_dse_weight: f32,
+    /// 301: multiplicative per-wake decay factor applied to
+    /// `WardIntentMap` at the start of each coordinator wake under
+    /// `WardPlacementSemantics::DescendingResidual`. Applied to every
+    /// bucket before the round picks stamp fresh intent. `0.5` →
+    /// ~one-wake half-life on a stamp that wasn't refreshed (~20 ticks
+    /// at default `coordination.assess_interval`). Dormant when
+    /// semantics is `SingleShotArgmax` (the populator short-circuits
+    /// so decay never runs either) — at default `SimConstants` this
+    /// field is allocated but never read.
+    #[serde(default = "default_ward_intent_decay_per_wake")]
+    pub ward_intent_decay_per_wake: f32,
     /// 256 R5: deposit per tick when a cat's current action is
     /// `Action::Patrol`. Lays a deterrent gradient that foxes read as
     /// routing cost via `CatPatrolDeterrentOverlay`. Default `0.05`
@@ -2415,6 +2489,10 @@ impl Default for ScoringConstants {
             ward_fox_intercept_anchor_weight: default_ward_fox_intercept_anchor_weight(),
             fox_intercept_kernel_radius_tiles: default_fox_intercept_kernel_radius_tiles(),
             ward_placement_cat_value_weight: default_ward_placement_cat_value_weight(),
+            ward_placement_semantics: default_ward_placement_semantics(),
+            ward_placement_residual_rounds: default_ward_placement_residual_rounds(),
+            ward_intent_dse_weight: default_ward_intent_dse_weight(),
+            ward_intent_decay_per_wake: default_ward_intent_decay_per_wake(),
             cat_patrol_deterrent_deposit_per_tick:
                 default_cat_patrol_deterrent_deposit_per_tick(),
             cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
@@ -3635,7 +3713,7 @@ fn default_patrol_fox_scent_weight() -> f32 {
 /// `compute_ward_placement()`. 284 lifted from the 220-dormant 0.0
 /// to 0.5 as a first-light activation — strong enough to dominate
 /// `fox_scent.max(corruption)` when an ambush cluster is present,
-/// but not so strong it overrides cat_presence / distance_cost.
+/// but not so strong it overrides cat_scent / distance_cost.
 /// Tighter magnitude tuning is deferred to a follow-on.
 fn default_ward_ambush_anchor_weight() -> f32 {
     0.5
@@ -3696,11 +3774,41 @@ fn default_fox_intercept_kernel_radius_tiles() -> u32 {
     20
 }
 
-/// 298: weight on the `CatPresenceMap` lift to ward-placement's
+/// 298: weight on the `CatScentMap` lift to ward-placement's
 /// argmax tiebreak. Default `0.3` preserves ticket 045's first-light
 /// value (hardcoded as a literal until 298's promotion).
 fn default_ward_placement_cat_value_weight() -> f32 {
     0.3
+}
+
+/// 301: default placement semantics. `SingleShotArgmax` reproduces
+/// the pre-301 single-best-tile selection byte-for-byte.
+fn default_ward_placement_semantics() -> WardPlacementSemantics {
+    WardPlacementSemantics::SingleShotArgmax
+}
+
+/// 301: K (number of greedy rounds) under
+/// `WardPlacementSemantics::DescendingResidual`. K=1 is identical to
+/// `SingleShotArgmax`; default `2` lifts once when the descending-
+/// residual flag is on. Ignored when semantics is `SingleShotArgmax`.
+fn default_ward_placement_residual_rounds() -> i32 {
+    2
+}
+
+/// 301: weight on the `WardIntentMap` sample at the cat's current
+/// position in `HerbcraftWardDse`. Default `0.0` — substrate is
+/// wired but dormant at land per the 220 / 297 first-light pattern,
+/// so the DSE score is byte-identical pre-301 at the default.
+fn default_ward_intent_dse_weight() -> f32 {
+    0.0
+}
+
+/// 301: per-wake decay applied to `WardIntentMap` under
+/// `DescendingResidual`. Default `0.5` — fades a fresh stamp by half
+/// each wake when not refreshed, so stale intent doesn't linger past
+/// a few coordinator cycles. Dormant under `SingleShotArgmax`.
+fn default_ward_intent_decay_per_wake() -> f32 {
+    0.5
 }
 
 /// 228: Patrol `Consideration::Field` route-cost axis weight.
@@ -4271,6 +4379,18 @@ pub struct WildlifeConstants {
     /// deposit to fade below the typical detection threshold.
     #[serde(default = "default_carcass_scent_decay_rate")]
     pub carcass_scent_decay_rate: RatePerDay,
+    /// `WardCoverageMap` bucket value at which a shadow fox flips
+    /// into ward-avoidance (260: replaces the hardcoded
+    /// `Ward.repel_radius() * shadow_fox_ward_repel_multiplier`
+    /// snapshot read with a `InfluenceMap`-visible threshold).
+    ///
+    /// `WardCoverageMap` stamps linear falloff
+    /// `strength * (1 - dist/repel_radius)`, so at the default
+    /// strength 1.0 and repel_radius ≈ 9 a fox 2/3 of the way out
+    /// from a ward reads ≈ 0.33 — `0.15` is roughly the boundary the
+    /// pre-260 `multiplier=3.0` check fired at.
+    #[serde(default = "default_shadow_fox_ward_avoid_threshold")]
+    pub shadow_fox_ward_avoid_threshold: f32,
     /// Probability a shadow fox encircles a ward instead of reversing.
     pub ward_siege_chance: f32,
     /// Extra decay per tick per encircling shadow fox.
@@ -4337,6 +4457,7 @@ impl Default for WildlifeConstants {
             carcass_max_age: 500,
             carcass_scent_deposit_per_tick: default_carcass_scent_deposit_per_tick(),
             carcass_scent_decay_rate: default_carcass_scent_decay_rate(),
+            shadow_fox_ward_avoid_threshold: default_shadow_fox_ward_avoid_threshold(),
             ward_siege_chance: 0.3,
             ward_siege_decay_bonus: 0.0005,
             ward_siege_corruption_rate: 0.005,
@@ -4356,12 +4477,42 @@ fn default_recent_ambush_half_life_ticks() -> u32 {
     5000
 }
 
+/// 260: `WardCoverageMap` intensity above which shadow foxes flip
+/// into ward-avoidance. Calibrated so the new substrate-visible
+/// trigger fires at roughly the same boundary as the pre-260
+/// hardcoded `manhattan_distance <= repel_radius * 3.0` check
+/// (default ward strength 1.0, repel_radius ≈ 9, multiplier 3 →
+/// fox flinches inside ~27 tiles; 0.15 coverage corresponds to a
+/// similar gradient point on the linear falloff).
+fn default_shadow_fox_ward_avoid_threshold() -> f32 {
+    0.15
+}
+
 fn default_carcass_scent_deposit_per_tick() -> f32 {
     0.1
 }
 
 fn default_carcass_scent_decay_rate() -> RatePerDay {
     RatePerDay::new(0.5)
+}
+
+/// 260: small base deposit so every adult cat radiates a steady-state
+/// scent residue. Calibrated as `~10%` of the pre-260 patrol-only
+/// rate, since every cat now emits every tick. Steady-state intensity
+/// is `base / per_tick_decay` — at decay_rate `0.1/day` (≈1e-4/tick at
+/// default time scale) and `base = 0.01`, a base-only tile plateaus
+/// near 1.0 over a long horizon; saturate-and-decay is the dominant
+/// behavior, so the gradient still reflects activity.
+fn default_cat_scent_base_deposit() -> f32 {
+    0.01
+}
+
+/// 260: patrol/fight/explore bonus on top of `cat_scent_base_deposit`.
+/// `base + bonus = 0.10`, preserving the pre-260 `scent_deposit` peak
+/// intensity for active-territorial actions and making the rename a
+/// near-no-op for seed-42 behavioral baselines.
+fn default_cat_scent_action_bonus() -> f32 {
+    0.09
 }
 
 // ---------- FoxEcologyConstants ----------
@@ -4439,7 +4590,7 @@ pub struct FoxEcologyConstants {
     /// Scent amount deposited per marking event.
     pub scent_deposit: f32,
     /// Global scent decay on `FoxScentMap` (and the symmetric
-    /// `CatPresenceMap` at `disposition.rs:cat_presence_tick`),
+    /// `CatScentMap` at `disposition.rs:cat_scent_tick`),
     /// expressed per in-game day.
     ///
     /// Fox scent is a *territorial mark* — long persistence (days),
@@ -4465,11 +4616,28 @@ pub struct FoxEcologyConstants {
     /// Cat proximity to stores that deters a raid.
     pub guard_deterrent_range: i32,
 
-    // --- Ward / cat presence ---
+    // --- Ward / cat scent ---
     /// Hunger threshold above which a fox pushes through wards anyway.
     pub ward_hunger_override_threshold: f32,
-    /// Cat-presence bucket value above which foxes avoid the area.
-    pub cat_presence_avoidance_threshold: f32,
+    /// `CatScentMap` bucket value above which foxes avoid the area
+    /// (ticket 260: was `cat_presence_avoidance_threshold` before the
+    /// rename, semantics unchanged).
+    pub cat_scent_avoidance_threshold: f32,
+    /// Per-tick scent every adult cat deposits at its position
+    /// (steady-state component of `CatScentMap`). With the default
+    /// decay rate this plateaus at roughly `base / per_tick_decay` —
+    /// well below the 1.0 ceiling, but enough to register against
+    /// `cat_scent_avoidance_threshold` in dense colony interiors.
+    /// Ticket 260: replaces the patrol-only reuse of `scent_deposit`
+    /// with a two-rate (base + action bonus) model.
+    #[serde(default = "default_cat_scent_base_deposit")]
+    pub cat_scent_base_deposit: f32,
+    /// Additional per-tick scent a cat in `Patrol`/`Fight`/`Explore`
+    /// deposits on top of `cat_scent_base_deposit`. Calibrated so
+    /// `base + bonus ≈ scent_deposit (0.1)` for backward compatibility
+    /// with the pre-260 patrol-only peak intensity.
+    #[serde(default = "default_cat_scent_action_bonus")]
+    pub cat_scent_action_bonus: f32,
 
     // --- Cooldowns ---
     /// Cooldown duration after any confrontation/raid/hunt action
@@ -4533,9 +4701,11 @@ impl Default for FoxEcologyConstants {
             raid_food_stolen: 2.0,
             guard_deterrent_range: 5,
 
-            // Ward / cat presence
+            // Ward / cat scent
             ward_hunger_override_threshold: 0.7,
-            cat_presence_avoidance_threshold: 0.3,
+            cat_scent_avoidance_threshold: 0.3,
+            cat_scent_base_deposit: default_cat_scent_base_deposit(),
+            cat_scent_action_bonus: default_cat_scent_action_bonus(),
 
             // Cooldowns
             // Reduced from 2000 to 800 (~0.8 sim days) — 2000 was suppressing

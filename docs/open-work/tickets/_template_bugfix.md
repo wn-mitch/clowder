@@ -2,7 +2,8 @@
 id: NNN
 title: Short title describing this bugfix
 status: ready              # ready | in-progress | parked | blocked | done | dropped
-cluster: null              # A/B/C/D/E or null — matches substrate-refactor clusters
+cluster: null              # categorical bucket (one); see docs/open-work/clusters.md
+initiative: []             # thematic outcomes (zero-or-more); see docs/open-work/initiatives/
 added: YYYY-MM-DD
 parked: null               # YYYY-MM-DD date parked, or null
 blocked-by: []             # list of other ticket ids that must land first

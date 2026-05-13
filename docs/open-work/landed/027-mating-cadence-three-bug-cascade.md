@@ -2,7 +2,7 @@
 id: 027
 title: Mating cadence — three-bug cascade blocking MatingOccurred
 status: done
-cluster: null
+cluster: ai-substrate
 added: 2026-04-25
 parked: null
 blocked-by: []

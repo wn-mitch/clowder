@@ -2,7 +2,7 @@
 id: 2026-04-25
 title: Respect restoration — iteration 2 (witness magnitude tune)
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: da51270
 landed-on: 2026-04-25
 ---

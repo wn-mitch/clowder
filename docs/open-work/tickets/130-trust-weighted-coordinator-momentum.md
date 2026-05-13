@@ -2,7 +2,8 @@
 id: 130
 title: Trust-weighted coordinator directive momentum
 status: blocked
-cluster: C
+cluster: social-coordination
+initiative: []
 added: 2026-05-02
 parked: null
 blocked-by: [057]

@@ -2,7 +2,7 @@
 id: 281
 title: Rebaseline current.json against post-127 soak
 status: done
-cluster: null
+cluster: ai-substrate
 added: 2026-05-11
 parked: null
 blocked-by: []

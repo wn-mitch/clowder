@@ -2,7 +2,7 @@
 id: 140
 title: Phase 3 — Steering, smooth pursuit / flee, pathfinder polish
 status: blocked
-cluster: substrate-migration
+cluster: ai-substrate
 added: 2026-05-02
 parked: null
 blocked-by: [139]

@@ -2,7 +2,7 @@
 id: 213
 title: tune groom_food_security_weight
 status: blocked
-cluster: balance
+cluster: social-coordination
 added: 2026-05-07
 parked: null
 blocked-by: [209]

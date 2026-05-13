@@ -1,16 +1,16 @@
 ---
 id: 260
 title: Fox scent-marking signposts — territorial boundaries without ward keying
-status: ready
-cluster: null
+status: done
+cluster: wildlife
 added: 2026-05-10
 parked: null
 blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: b195a1ac034a
+landed-on: 2026-05-13
 ---
 
 ## Why
@@ -56,3 +56,5 @@ Surfaced 2026-05-10 by user during C3 spinout planning: "patrol also made me rea
 ## Log
 
 - 2026-05-10: opened as parking-lot idea surfaced during C3 spinout planning (ticket 258). Independent of the named cluster; addresses a substrate honesty defect (foxes "knowing" about wards rather than perceiving scent).
+- 2026-05-13: started; plan reframed against existing substrate. `CatPresenceMap` already exists (mirrors `FoxScentMap` shape, foxes already avoid via `cat_presence_avoidance_threshold = 0.3` at `wildlife.rs:1959`). Adopted **rebind**: rename `CatPresenceMap` → `CatScentMap`, re-tag InfluenceMap channel `Sight` → `Scent`, broaden authoring (every adult emits base rate; patrol/fight/explore adds bonus; coordinators not privileged). Movement-layer ward side-channel (hardcoded `Ward.repel_radius()` snapshot at `wildlife.rs:66-96, 217-232`) replaced with a `WardCoverageMap` InfluenceMap read so the second perceptual channel becomes trace-visible. Plan at `~/.claude/plans/work-260-ancient-teacup.md`.
+- 2026-05-13: verification soak landed regressions vs canonical `post-297-substrate-dormant` baseline — `kittens_born: 4→0`, `ShadowFoxAmbush: 2→8` (still ≤ 10 hard gate), `wards_placed: 16→12` clustered, MatingOccurred never fires (survival canary fail). Trace diagnosis: broadened `cat_scent` authoring flattened the `cat_value` signal that ward-placement scoring (`coordination.rs:1564`) reads → priestess placed eagerly + clustered → thornbriar drained → SetWard failed 7× → 35k-tick window with no ward attempts despite Mocha/Nettle alive and creating ~400 plans each → unwarded pocket at (25-39, 20-23) → 7-cat ShadowFox ambush wave 1309038-1314568. Separately, `wildlife_ai` vs `predator_stalk_cats` ward-radius inconsistency caused 55× `ShadowFoxAvoidedWard` events (foxes pinballing 9-27 tile band). Two substrate gaps exposed: (a) no anticipatory provisioning belief — cats can't reason about reserves before depletion; (b) ShadowFox behavior is random-walk pinball + 5%/tick stalk trigger, pre-260's 27-tile ward multiplier was hiding this. Landing 260 with these regressions documented; fixes in follow-on tickets 308 (Colony reserves belief — BDI Belief layer), 309 (Herbcraft reserve-deficit consideration — BDI Desire layer, blocked-by 308), 310 (ShadowFox goal-directed behavior — predator BDI substrate).

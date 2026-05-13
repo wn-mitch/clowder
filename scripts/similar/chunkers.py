@@ -164,6 +164,7 @@ def chunk_ticket_or_landed(
     ticket_id = meta.get("id", stem)
     status = meta.get("status", "?")
     cluster = meta.get("cluster") or "—"
+    initiative = meta.get("initiative") or []
     landed_on = meta.get("landed-on")
     title = meta.get("title", "")
 
@@ -172,6 +173,8 @@ def chunk_ticket_or_landed(
         f"status: {status}",
         f"cluster: {cluster}",
     ]
+    if initiative:
+        header_bits.append(f"initiative: {', '.join(initiative)}")
     if landed_on:
         header_bits.append(f"landed: {landed_on}")
     if title:
@@ -192,6 +195,7 @@ def chunk_ticket_or_landed(
                     "title": title,
                     "status": status,
                     "cluster": cluster,
+                    "initiative": initiative,
                     "landed_on": landed_on,
                 },
             )

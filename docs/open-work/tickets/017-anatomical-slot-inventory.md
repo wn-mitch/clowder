@@ -2,7 +2,8 @@
 id: 017
 title: Anatomical slot inventory
 status: blocked
-cluster: null
+cluster: items-crafting
+initiative: []
 added: 2026-04-22
 parked: null
 blocked-by: [016]

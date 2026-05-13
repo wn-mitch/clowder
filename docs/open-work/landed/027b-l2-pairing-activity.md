@@ -2,7 +2,7 @@
 id: 027b
 title: L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor)
 status: done
-cluster: null
+cluster: ai-substrate
 added: 2026-04-28
 parked: null
 blocked-by: []

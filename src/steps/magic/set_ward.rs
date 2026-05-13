@@ -51,6 +51,14 @@ pub fn resolve_set_ward(
     m: &MagicConstants,
     combat: &CombatConstants,
     time_scale: &TimeScale,
+    // 301: Path A (`true`) when the cat was carrying out an
+    // `ActiveDirective::SetWard` whose target the coordinator chose
+    // via `compute_ward_placement`; Path B (`false`) when the cat
+    // self-picked `HerbcraftSetWard` and is planting at its current
+    // position. Routed into the `WardPlaced` event so post-soak
+    // validation can isolate the directive-driven subset that the
+    // ticket-301 structural change actually shifts.
+    via_directive: bool,
 ) -> StepResult {
     if ticks >= m.set_ward_duration.ticks(time_scale) {
         // Consume thornbriar if setting a thornward.
@@ -98,6 +106,7 @@ pub fn resolve_set_ward(
                     ward_kind: format!("{kind:?}"),
                     location: (pos.x, pos.y),
                     strength: spawn_strength,
+                    via_directive,
                 },
             );
         }

@@ -2,7 +2,8 @@
 id: 238
 title: Ceremony richness from spirituality — Spirituality personality axis drives narrative + length
 status: ready
-cluster: null
+cluster: magic-mythic
+initiative: [mythic-texture]
 added: 2026-05-08
 parked: null
 blocked-by: []

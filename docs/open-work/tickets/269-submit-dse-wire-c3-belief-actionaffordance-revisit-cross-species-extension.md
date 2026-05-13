@@ -2,7 +2,8 @@
 id: 269
 title: Submit DSE — wire C3 Belief + ActionAffordance + revisit cross-species extension
 status: blocked
-cluster: C
+cluster: combat-threat
+initiative: []
 added: 2026-05-10
 parked: null
 blocked-by: [145, 261]

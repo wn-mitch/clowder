@@ -2,7 +2,8 @@
 id: 239
 title: Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker
 status: ready
-cluster: null
+cluster: life-cycle
+initiative: [welfare-fidelity, mythic-texture]
 added: 2026-05-08
 parked: null
 blocked-by: []

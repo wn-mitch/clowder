@@ -1937,6 +1937,11 @@ pub fn evaluate_and_plan(
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
             recent_ambush_at_position: colony.recent_ambush_map.get(pos.x, pos.y),
             carcass_scent_at_position: colony.carcass_scent_map.get(pos.x, pos.y),
+            // 301: coordinator-stamped ward-placement intent at cat's
+            // position. Dormant at default — the resource is allocated
+            // but unwritten because the populator short-circuits under
+            // `ward_placement_semantics == SingleShotArgmax`.
+            ward_intent_at_position: colony.ward_intent_map.get(pos.x, pos.y),
             // 209: per-cat proxy for colony-tension. `(1 - safety)` is
             // the cat's current threat-deficit; consumed by the
             // `TensionDefusionGroomLift` modifier (dormant at 0.0).
@@ -5511,6 +5516,11 @@ fn dispatch_step_action(
                         &ec.constants.magic,
                         &ec.constants.combat,
                         &ec.time_scale,
+                        // 301: Path A — `plan.ward_placement_pos` is
+                        // `Some` only when the cat is acting on an
+                        // `ActiveDirective::SetWard` whose target the
+                        // coordinator chose via `compute_ward_placement`.
+                        true,
                     );
                     if matches!(result, crate::steps::StepResult::Advance) {
                         if let Some(ref mut act) = narr.activation {
@@ -5550,6 +5560,13 @@ fn dispatch_step_action(
                     &ec.constants.magic,
                     &ec.constants.combat,
                     &ec.time_scale,
+                    // 301: Path B — `plan.ward_placement_pos` is
+                    // `None` here, meaning the cat self-picked
+                    // `HerbcraftSetWard` from its DSE and is planting
+                    // at its current position. The coordinator's
+                    // descending-residual algorithm doesn't touch
+                    // this case.
+                    false,
                 );
                 if matches!(result, crate::steps::StepResult::Advance) {
                     if let Some(ref mut act) = narr.activation {

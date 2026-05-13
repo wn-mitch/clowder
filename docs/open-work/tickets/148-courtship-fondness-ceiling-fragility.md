@@ -3,6 +3,7 @@ id: 148
 title: Courtship-chain fondness ceiling vs gate fragility
 status: in-progress
 cluster: ai-substrate
+initiative: [smarter-cats]
 added: 2026-05-02
 parked: null
 blocked-by: []

@@ -2,7 +2,8 @@
 id: 044
 title: "Recalibrate hangry curve to Logistic(8, 0.5)"
 status: done
-cluster: null
+cluster: ai-substrate
+initiative: [welfare-fidelity]
 landed-at: c8f8652
 landed-on: 2026-04-27
 ---

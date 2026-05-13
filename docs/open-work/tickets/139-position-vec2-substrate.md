@@ -2,7 +2,7 @@
 id: 139
 title: Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration)
 status: ready
-cluster: substrate-migration
+cluster: ai-substrate
 added: 2026-05-02
 parked: null
 blocked-by: [135]

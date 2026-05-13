@@ -2,7 +2,8 @@
 id: 261
 title: ActionAffordances substrate — per-action success scalars + ActionKind enum + heuristic estimators
 status: ready
-cluster: C
+cluster: ai-substrate
+initiative: [smarter-cats]
 added: 2026-05-10
 parked: null
 blocked-by: []

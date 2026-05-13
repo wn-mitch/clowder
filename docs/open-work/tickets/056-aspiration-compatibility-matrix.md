@@ -2,7 +2,7 @@
 id: 056
 title: §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration
 status: ready
-cluster: null
+cluster: ai-substrate
 added: 2026-04-27
 parked: null
 blocked-by: []

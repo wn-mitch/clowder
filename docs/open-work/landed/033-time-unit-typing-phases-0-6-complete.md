@@ -2,7 +2,7 @@
 id: 033
 title: Time-unit typing (Phases 0-6 complete)
 status: done
-cluster: null
+cluster: process-discipline
 landed-at: b8a7cf5
 landed-on: 2026-04-27
 ---

@@ -30,7 +30,7 @@ pub fn patrol_sector_id(
 /// Spatial grid tracking ward repulsion coverage across the map.
 ///
 /// Mirrors the bucketed-overlay pattern used by `FoxScentMap` and
-/// `CatPresenceMap`. Unlike scent maps (cumulative deposit + global
+/// `CatScentMap`. Unlike scent maps (cumulative deposit + global
 /// decay), ward coverage is a *current* property — it's recomputed
 /// each tick from live `Ward` entities. Each ward stamps a radial
 /// falloff `ward.strength * (1 - dist/repel_radius)` into nearby

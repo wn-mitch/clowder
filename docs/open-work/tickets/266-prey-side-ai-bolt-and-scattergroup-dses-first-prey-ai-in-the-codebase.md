@@ -2,7 +2,8 @@
 id: 266
 title: Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase)
 status: blocked
-cluster: C
+cluster: wildlife
+initiative: [predator-prey-dynamics]
 added: 2026-05-10
 parked: null
 blocked-by: [261]

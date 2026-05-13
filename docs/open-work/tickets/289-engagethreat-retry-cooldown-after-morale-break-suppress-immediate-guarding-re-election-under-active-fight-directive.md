@@ -2,7 +2,8 @@
 id: 289
 title: EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive
 status: ready
-cluster: null
+cluster: combat-threat
+initiative: []
 added: 2026-05-11
 parked: null
 blocked-by: []

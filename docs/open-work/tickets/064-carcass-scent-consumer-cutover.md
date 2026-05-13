@@ -2,7 +2,8 @@
 id: 064
 title: Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6)
 status: ready
-cluster: null
+cluster: belief-perception
+initiative: [full-sensory-perception]
 added: 2026-04-27
 parked: null
 blocked-by: []

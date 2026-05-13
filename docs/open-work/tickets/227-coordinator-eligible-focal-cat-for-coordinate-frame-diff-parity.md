@@ -2,7 +2,8 @@
 id: 227
 title: coordinator-eligible focal-cat for Coordinate frame-diff parity
 status: ready
-cluster: process-discipline
+cluster: tooling-diagnostics-ui
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

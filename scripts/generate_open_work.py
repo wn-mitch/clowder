@@ -18,8 +18,11 @@ Usage:
 
 import argparse
 import datetime as dt
+import json
 import re
+import subprocess
 import sys
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -134,6 +137,11 @@ class Ticket:
     @property
     def cluster(self):
         return self.frontmatter.get("cluster")
+
+    @property
+    def initiative(self) -> list:
+        val = self.frontmatter.get("initiative") or []
+        return val if isinstance(val, list) else [val]
 
     @property
     def parked(self):
@@ -357,6 +365,256 @@ def render_ticket_line(t: Ticket, repo_root: Path) -> str:
     return f"- **[{t.id}]({rel})** — {t.title}{suffix}"
 
 
+def compute_blocker_reverse_index(tickets: list[Ticket]) -> dict[str, set[str]]:
+    """Map each ticket id → set of ids that have it in their `blocked-by`.
+
+    Used to find ready tickets that unblock active work: if T's id appears in
+    some active ticket's blocker set, T is on the critical path.
+    """
+    reverse: dict[str, set[str]] = defaultdict(set)
+    for t in tickets:
+        for bid in t.blocked_by:
+            reverse[_format_id(bid)].add(t.id)
+    return reverse
+
+
+def fetch_next_top_k(k: int = 5) -> list[dict]:
+    """Shell out to `just next` and return top-K results, or [] on failure.
+
+    `just next` writes JSON to stdout (envelope shape from logq). We tolerate
+    non-zero exit (e.g. embedding index missing or `just` unavailable) by
+    returning [] so the section silently degrades.
+    """
+    try:
+        result = subprocess.run(
+            ["just", "next", "--top", str(k)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return []
+        envelope = json.loads(result.stdout)
+        return envelope.get("results", [])[:k]
+    except (subprocess.SubprocessError, json.JSONDecodeError, FileNotFoundError):
+        return []
+
+
+def render_active_focus_section(
+    tickets: list[Ticket],
+    repo_root: Path,
+) -> list[str]:
+    """`## Active focus` — what's loadbearing right now.
+
+    Composed of three slices: in-progress tickets, ready tickets that unblock
+    active work, and the top-5 recommendation from `just next`. Tickets that
+    appear in multiple slices are deduplicated by id with the first slice
+    winning (in-progress > blocker-of-active > just-next).
+    """
+    by_status: dict[str, list[Ticket]] = defaultdict(list)
+    for t in tickets:
+        by_status[t.status].append(t)
+    by_id = {t.id: t for t in tickets}
+
+    in_progress = sorted(by_status.get("in-progress", []), key=lambda t: t.id)
+    in_progress_ids = {t.id for t in in_progress}
+
+    # Build set of active-relevant ticket ids: in-progress + anything they
+    # transitively depend on (blocked-by chain among open tickets).
+    active_ids = set(in_progress_ids)
+    frontier = list(in_progress_ids)
+    while frontier:
+        cur = frontier.pop()
+        cur_t = by_id.get(cur)
+        if not cur_t:
+            continue
+        for bid in cur_t.blocked_by:
+            fid = _format_id(bid)
+            if fid not in active_ids and fid in by_id:
+                active_ids.add(fid)
+                frontier.append(fid)
+
+    # Ready blockers-of-active = ready tickets whose id is in active_ids and
+    # which are not themselves in-progress.
+    ready_blockers = sorted(
+        (
+            by_id[i]
+            for i in active_ids
+            if i in by_id
+            and by_id[i].status == "ready"
+            and i not in in_progress_ids
+        ),
+        key=lambda t: t.id,
+    )
+
+    next_results = fetch_next_top_k(5)
+
+    if not in_progress and not ready_blockers and not next_results:
+        return []
+
+    lines: list[str] = []
+    lines.append(
+        f"## Active focus ({len(in_progress)} in-progress · "
+        f"{len(ready_blockers)} ready blockers · {len(next_results)} next-recommended)"
+    )
+    lines.append("")
+    lines.append(
+        "Auto-generated projection: what's load-bearing right now. "
+        "In-progress tickets, ready tickets that unblock active work, and "
+        "the top-5 from `just next`. See `## Ready by cluster` / "
+        "`## Ready by initiative` below for the full queue."
+    )
+    lines.append("")
+
+    seen: set[str] = set()
+
+    if in_progress:
+        lines.append("### In progress")
+        lines.append("")
+        for t in in_progress:
+            lines.append(render_ticket_line(t, repo_root))
+            seen.add(t.id)
+        lines.append("")
+
+    fresh_blockers = [t for t in ready_blockers if t.id not in seen]
+    if fresh_blockers:
+        lines.append("### Ready — blocking active work")
+        lines.append("")
+        for t in fresh_blockers:
+            lines.append(render_ticket_line(t, repo_root))
+            seen.add(t.id)
+        lines.append("")
+
+    fresh_next = [r for r in next_results if str(r.get("id", "")) not in seen]
+    if fresh_next:
+        lines.append("### Next-recommended (from `just next`)")
+        lines.append("")
+        for r in fresh_next:
+            rid = _format_id(r.get("id", "???"))
+            title = r.get("title", "(untitled)")
+            cluster = r.get("cluster") or "—"
+            path = r.get("path", "")
+            bits = f"[{cluster}]"
+            score = r.get("score")
+            if score is not None:
+                bits += f" · score {score:.2f}"
+            lines.append(f"- **[{rid}]({path})** — {title} — _{bits}_")
+            seen.add(rid)
+        lines.append("")
+
+    return lines
+
+
+def render_ready_by_cluster_section(
+    ready_tickets: list[Ticket],
+    blocked_tickets: list[Ticket],
+    repo_root: Path,
+) -> list[str]:
+    """`## Ready by cluster` — cluster-major rendering of the ready queue.
+
+    Sort clusters by ready count descending; emit "Uncategorized" last
+    regardless of size so the gap is always the bottom-of-section signal.
+    Blocked count per cluster annotates the heading.
+    """
+    if not ready_tickets:
+        return []
+
+    ready_by_cluster: dict[str, list[Ticket]] = defaultdict(list)
+    for t in ready_tickets:
+        key = t.cluster or "__uncategorized__"
+        ready_by_cluster[key].append(t)
+
+    blocked_by_cluster: dict[str, int] = defaultdict(int)
+    for t in blocked_tickets:
+        key = t.cluster or "__uncategorized__"
+        blocked_by_cluster[key] += 1
+
+    # Sort: count descending, then alphabetical; Uncategorized always last.
+    named = [k for k in ready_by_cluster if k != "__uncategorized__"]
+    named.sort(key=lambda k: (-len(ready_by_cluster[k]), k))
+    cluster_order = named + (["__uncategorized__"] if "__uncategorized__" in ready_by_cluster else [])
+
+    lines: list[str] = []
+    lines.append(f"## Ready by cluster ({len(ready_tickets)})")
+    lines.append("")
+    lines.append(
+        "Cluster = categorical bucket (one per ticket). See "
+        "`docs/open-work/clusters.md` for the taxonomy. The Uncategorized "
+        "count is the actionable signal — tickets without a cluster don't "
+        "show up in `just open-work-ready --cluster X` filters."
+    )
+    lines.append("")
+
+    for key in cluster_order:
+        bucket = sorted(ready_by_cluster[key], key=lambda t: t.id)
+        if key == "__uncategorized__":
+            heading_name = "Uncategorized"
+        else:
+            heading_name = key
+        blocked_n = blocked_by_cluster.get(key, 0)
+        bits = f"{len(bucket)} ready"
+        if blocked_n:
+            bits += f", {blocked_n} blocked"
+        lines.append(f"### {heading_name} ({bits})")
+        lines.append("")
+        for t in bucket:
+            lines.append(render_ticket_line(t, repo_root))
+        lines.append("")
+
+    return lines
+
+
+def render_ready_by_initiative_section(
+    ready_tickets: list[Ticket],
+    landed_tickets: list[Ticket],
+    repo_root: Path,
+) -> list[str]:
+    """`## Ready by initiative` — thematic rollups across cluster lines.
+
+    Tickets without an `initiative:` tag are omitted — they appear under
+    `## Ready by cluster`. Tickets carrying multiple initiatives appear in
+    every matching subsection.
+    """
+    open_by_init: dict[str, list[Ticket]] = defaultdict(list)
+    for t in ready_tickets:
+        for init in t.initiative:
+            open_by_init[str(init)].append(t)
+
+    if not open_by_init:
+        return []
+
+    landed_by_init: dict[str, int] = defaultdict(int)
+    for t in landed_tickets:
+        for init in t.initiative:
+            landed_by_init[str(init)] += 1
+
+    # Sort: open count desc, then alphabetical.
+    init_order = sorted(open_by_init.keys(), key=lambda k: (-len(open_by_init[k]), k))
+
+    total_tagged = sum(len(v) for v in open_by_init.values())
+    lines: list[str] = []
+    lines.append(f"## Ready by initiative ({total_tagged} tag-memberships across {len(open_by_init)} initiatives)")
+    lines.append("")
+    lines.append(
+        "Initiative = thematic outcome (zero-or-more per ticket). Tickets "
+        "may appear in multiple subsections. Tickets without any initiative "
+        "tag are omitted here and visible under `## Ready by cluster`. See "
+        "`docs/open-work/initiatives/` for outcome definitions."
+    )
+    lines.append("")
+
+    for init in init_order:
+        bucket = sorted(open_by_init[init], key=lambda t: t.id)
+        landed_n = landed_by_init.get(init, 0)
+        lines.append(f"### {init} ({len(bucket)} open, {landed_n} landed)")
+        lines.append("")
+        for t in bucket:
+            lines.append(render_ticket_line(t, repo_root))
+        lines.append("")
+
+    return lines
+
+
 def render_epic_progress_section(
     epics: list[EpicProgress], repo_root: Path
 ) -> list[str]:
@@ -482,12 +740,15 @@ def render_index(
     lines.append("")
     lines.append(
         "Queue-view commands: `just open-work` · `just open-work-ready` · "
-        "`just open-work-wip` · `just open-work-epics` · "
-        "`just open-work-index` (regenerate this file)."
+        "`just open-work-wip` · `just open-work-active` · "
+        "`just open-work-epics` · `just open-work-index` (regenerate)."
     )
     lines.append("")
 
-    # Epic progress (between Summary and per-status sections)
+    # Active focus projection (in-progress + ready blockers + just next top-5)
+    lines.extend(render_active_focus_section(tickets, repo_root))
+
+    # Epic progress (between Summary/Active focus and per-status sections)
     ticket_index = build_ticket_index(repo_root)
     epics = [
         compute_epic_progress(e, ticket_index)
@@ -495,11 +756,29 @@ def render_index(
     ]
     lines.extend(render_epic_progress_section(epics, repo_root))
 
-    # Per-status sections
+    # Load landed once for initiative rollups.
+    landed_tickets_for_rollup = (
+        load_tickets(landed_dir) if landed_dir.exists() else []
+    )
+
+    # Per-status sections. Before the flat `## Ready (N)` list, emit the
+    # cluster-major and initiative-major projections so the queue is
+    # navigable by category before falling back to id order.
     for s in STATUS_ORDER:
         bucket = by_status.get(s, [])
         if not bucket:
             continue
+        if s == "ready":
+            lines.extend(
+                render_ready_by_cluster_section(
+                    bucket, by_status.get("blocked", []), repo_root
+                )
+            )
+            lines.extend(
+                render_ready_by_initiative_section(
+                    bucket, landed_tickets_for_rollup, repo_root
+                )
+            )
         lines.append(f"## {STATUS_LABEL[s]} ({len(bucket)})")
         lines.append("")
         for t in bucket:

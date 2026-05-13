@@ -2,7 +2,8 @@
 id: 295
 title: WitnessableEvent emit sites — wire Attack / Mate / Care / FleeFrom / Hunt from action resolvers (258 follow-on)
 status: done
-cluster: C
+cluster: belief-perception
+initiative: [full-sensory-perception, smarter-cats]
 added: 2026-05-11
 parked: null
 blocked-by: []

@@ -2,7 +2,7 @@
 id: 012
 title: Warmth split — temperature need vs social-warmth fulfillment axis
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: fc7f5e9
 landed-on: 2026-04-24
 ---

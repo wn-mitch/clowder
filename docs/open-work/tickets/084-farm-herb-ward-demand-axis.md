@@ -2,7 +2,8 @@
 id: 084
 title: Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food
 status: parked
-cluster: balance
+cluster: items-crafting
+initiative: []
 added: 2026-04-29
 parked: 2026-04-30
 blocked-by: []

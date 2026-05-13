@@ -2,7 +2,8 @@
 id: 054
 title: §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence
 status: ready
-cluster: null
+cluster: magic-mythic
+initiative: [mythic-texture]
 added: 2026-04-27
 parked: null
 blocked-by: []

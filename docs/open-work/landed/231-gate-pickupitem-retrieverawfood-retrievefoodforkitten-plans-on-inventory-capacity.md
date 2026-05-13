@@ -2,7 +2,7 @@
 id: 231
 title: Strengthen pickup-class substrate — capacity markers + body-state subscription
 status: done
-cluster: null
+cluster: ai-substrate
 added: 2026-05-08
 parked: null
 blocked-by: []

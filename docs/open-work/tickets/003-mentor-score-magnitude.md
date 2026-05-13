@@ -2,7 +2,7 @@
 id: 003
 title: Mentor score magnitude
 status: ready
-cluster: null
+cluster: ai-substrate
 added: 2026-04-20
 parked: null
 blocked-by: []

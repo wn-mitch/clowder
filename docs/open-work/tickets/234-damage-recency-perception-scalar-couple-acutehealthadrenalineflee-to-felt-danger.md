@@ -2,7 +2,8 @@
 id: 234
 title: Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger
 status: ready
-cluster: null
+cluster: belief-perception
+initiative: [full-sensory-perception, welfare-fidelity]
 added: 2026-05-08
 parked: null
 blocked-by: []

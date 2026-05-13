@@ -2,7 +2,7 @@
 id: 091
 title: "Post-087 seed-42 plan-execution collapse — Eat picks 62% but FoodEaten never witnesses; no Forage/Hunt; founder starvation cascade"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 25439daf
 landed-on: 2026-04-30
 ---

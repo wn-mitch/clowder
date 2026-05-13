@@ -2,7 +2,7 @@
 id: 212
 title: tune caretake_food_security_weight
 status: parked
-cluster: balance
+cluster: life-cycle
 added: 2026-05-07
 parked: 2026-05-10
 blocked-by: []

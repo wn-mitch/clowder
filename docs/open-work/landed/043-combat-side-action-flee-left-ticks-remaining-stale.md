@@ -2,7 +2,7 @@
 id: 043
 title: "Combat-side Action::Flee left ticks_remaining stale"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 9578abb
 landed-on: 2026-04-27
 ---

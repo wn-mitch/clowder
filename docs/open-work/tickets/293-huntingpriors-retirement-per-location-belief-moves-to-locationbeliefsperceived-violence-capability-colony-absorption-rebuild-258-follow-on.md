@@ -2,7 +2,7 @@
 id: 293
 title: HuntingPriors retirement — per-location belief moves to LocationBeliefs.perceived_violence_capability + colony absorption rebuild (258 follow-on)
 status: ready
-cluster: C
+cluster: ai-substrate
 added: 2026-05-11
 parked: null
 blocked-by: []

@@ -98,10 +98,15 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     world.insert_resource(crate::resources::CarcassScentMap::default());
     // 219: colony-shared recent-ambush event memory.
     world.insert_resource(crate::resources::RecentAmbushMap::default());
-    world.insert_resource(crate::resources::CatPresenceMap::default());
+    world.insert_resource(crate::resources::CatScentMap::default());
     // 256 R5: cat patrol deterrent map (read by fox A* via overlay).
     world.insert_resource(crate::resources::CatPatrolDeterrentMap::default());
     world.insert_resource(crate::resources::WardCoverageMap::default());
+    // 301: ward-placement intent map. Dormant at default
+    // `SimConstants`; the populator short-circuits and the DSE
+    // reader weight is 0.0. Inserted unconditionally because the
+    // `WardPlacementSignals` SystemParam reads it as `ResMut<>`.
+    world.insert_resource(crate::resources::WardIntentMap::default());
     // 035: grave-aura InfluenceMap; required by `update_grave_aura_map`
     // which is registered in the canonical schedule.
     world.insert_resource(crate::resources::GraveAuraMap::default());

@@ -2,7 +2,8 @@
 id: 280
 title: Mental model of partner JointIntention (compose 127 with 258 C3 mental models)
 status: ready
-cluster: null
+cluster: social-coordination
+initiative: [full-sensory-perception]
 added: 2026-05-11
 parked: null
 blocked-by: []

@@ -2,7 +2,8 @@
 id: 051
 title: Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers
 status: ready
-cluster: null
+cluster: wildlife
+initiative: [predator-prey-dynamics]
 added: 2026-04-27
 parked: null
 blocked-by: []

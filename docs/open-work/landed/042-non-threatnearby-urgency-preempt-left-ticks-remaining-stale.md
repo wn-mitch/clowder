@@ -2,7 +2,8 @@
 id: 042
 title: Non-ThreatNearby urgency preempt left ticks_remaining stale
 status: done
-cluster: null
+cluster: tooling-diagnostics-ui
+initiative: []
 landed-at: b86df27
 landed-on: 2026-04-27
 ---

@@ -2,7 +2,7 @@
 id: 007
 title: Deliberation-layer (Cluster C)
 status: ready
-cluster: C
+cluster: ai-substrate
 added: 2026-04-20
 parked: null
 blocked-by: []

@@ -2,7 +2,7 @@
 id: 073
 title: Wave 2 substrate hardening
 status: done
-cluster: null
+cluster: ai-substrate
 also-landed: [74, 75, 78, 80]
 landed-at: null
 landed-on: 2026-04-29

@@ -193,7 +193,7 @@ pub struct ChainResources<'w> {
     pub fox_scent_map: Res<'w, FoxScentMap>,
     /// Cat-presence influence map — sampled by `compute_ward_placement`
     /// to bias ward placement toward tiles where cats actually live.
-    pub cat_presence_map: Res<'w, crate::resources::CatPresenceMap>,
+    pub cat_scent_map: Res<'w, crate::resources::CatScentMap>,
     /// Hearing-channel kitten-cry broadcast (ticket 156). Sampled at
     /// each cat's position to populate `ScoringContext::kitten_cry_perceived`.
     pub kitten_cry_map: Res<'w, crate::resources::KittenCryMap>,
@@ -955,6 +955,9 @@ pub fn evaluate_dispositions(
             fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
             recent_ambush_at_position: colony.recent_ambush_map.get(pos.x, pos.y),
             carcass_scent_at_position: colony.carcass_scent_map.get(pos.x, pos.y),
+            // 301: coordinator-stamped ward-placement intent at cat's
+            // position. Dormant at default; see `goap.rs` mirror site.
+            ward_intent_at_position: colony.ward_intent_map.get(pos.x, pos.y),
             // 209: per-cat proxy for colony-tension; see goap.rs
             // construction site for rationale.
             colony_tension_recent: (1.0 - needs.safety).clamp(0.0, 1.0),
@@ -1086,7 +1089,7 @@ pub fn evaluate_dispositions(
         };
 
         // §11 trace plumbing — dormant except when running headless
-        // with `--focal-cat`. `cat_presence_tick` runs on a different
+        // with `--focal-cat`. `cat_scent_tick` runs on a different
         // cadence than `evaluate_and_plan`; both systems share the
         // FocalScoreCapture mutex, so captures from one pass don't
         // leak into another tick's replay frame.
@@ -1120,7 +1123,7 @@ pub fn evaluate_dispositions(
         // path. Disposition-level independence penalty is ported to an
         // action-level transform inside the helper so behavior is preserved.
         //
-        // §11.3 L3 capture — when `cat_presence_tick` is scoring the
+        // §11.3 L3 capture — when `cat_scent_tick` is scoring the
         // focal cat, surface the softmax distribution + RNG roll for
         // replay. Mirror of the `evaluate_and_plan` capture block; both
         // systems share `FocalScoreCapture` via the interior mutex.
@@ -1133,7 +1136,7 @@ pub fn evaluate_dispositions(
         // ceiling.
         let softmax_temperature = crate::ai::scoring::softmax_temperature(&ctx, sc);
         // Ticket 126 — `_with_trace` now returns `SoftmaxOutcome`;
-        // the auxiliary `cat_presence_tick` path doesn't author
+        // the auxiliary `cat_scent_tick` path doesn't author
         // `HeldIntention` (only `evaluate_and_plan` is the L2 author),
         // so we project to `.chosen` for back-compat.
         let chosen = crate::ai::scoring::select_disposition_via_intention_softmax_with_trace(
@@ -1588,7 +1591,7 @@ pub fn disposition_to_chain(
                 // GOAP planner. Retained for type-system completeness.
                 let placement_maps = crate::systems::coordination::PlacementMaps {
                     fox_scent: &res.fox_scent_map,
-                    cat_presence: &res.cat_presence_map,
+                    cat_scent: &res.cat_scent_map,
                     ward_coverage: &res.ward_coverage_map,
                     tile_map: &res.map,
                     recent_ambush: &res.recent_ambush_map,
@@ -2309,6 +2312,14 @@ fn build_crafting_chain(
             placement_maps,
             constants,
             rng,
+            // 301: Path B (cat's own `HerbcraftSetWard` chain) reads
+            // the scorer for target selection but is not authoritative
+            // over colony intent — only the coordinator (Path A,
+            // `assess_colony_needs`) stamps `WardIntentMap`. Passing
+            // `None` keeps Path B's target choice consistent with
+            // Path A's algorithm without letting individual cats
+            // perturb the shared field.
+            None,
         ))
     } else {
         None
@@ -4524,7 +4535,7 @@ fn dispatch_chain_step(
     }
 }
 // ---------------------------------------------------------------------------
-// cat_presence_tick
+// cat_scent_tick
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -4645,13 +4656,13 @@ mod tests {
         let _unmet_demand = crate::resources::UnmetDemand::default();
 
         let fox_scent_map = crate::resources::FoxScentMap::default();
-        let cat_presence_map = crate::resources::CatPresenceMap::default();
+        let cat_scent_map = crate::resources::CatScentMap::default();
         let ward_coverage_map = crate::resources::WardCoverageMap::default();
         let recent_ambush_map = crate::resources::RecentAmbushMap::default();
         let carcass_scent_map = crate::resources::CarcassScentMap::default();
         let placement_maps = crate::systems::coordination::PlacementMaps {
             fox_scent: &fox_scent_map,
-            cat_presence: &cat_presence_map,
+            cat_scent: &cat_scent_map,
             ward_coverage: &ward_coverage_map,
             tile_map: &map,
             recent_ambush: &recent_ambush_map,
@@ -4704,26 +4715,38 @@ mod tests {
     }
 }
 
-/// Deposit cat territorial presence for patrolling/guarding cats and decay
-/// the presence map globally. Runs every tick.
-pub fn cat_presence_tick(
-    cats: Query<(&Position, &CurrentAction), Without<Dead>>,
-    mut presence_map: ResMut<crate::resources::CatPresenceMap>,
+/// Deposit cat territorial scent each tick and decay the scent map
+/// globally.
+///
+/// 260: broadened from patrol-only authoring. Every adult cat deposits
+/// a small base rate every tick (steady-state scent residue, present
+/// even while the colony sleeps). Cats in active territorial actions
+/// (`Patrol`/`Fight`/`Explore`) add a larger bonus on top — those
+/// tiles reach the 1.0 ceiling and decay slowly, while base-only
+/// tiles plateau at `base / per_tick_decay`. Kittens skip (mirrors
+/// fox cub skip at `wildlife.rs:fox_scent_tick`).
+#[allow(clippy::type_complexity)]
+pub fn cat_scent_tick(
+    cats: Query<(&Position, &CurrentAction), (Without<Dead>, Without<markers::Kitten>)>,
+    mut scent_map: ResMut<crate::resources::CatScentMap>,
     constants: Res<SimConstants>,
     time_scale: Res<TimeScale>,
 ) {
     let fc = &constants.fox_ecology;
     // Global decay — same per-day rate as fox scent decay for territorial-mark symmetry.
-    presence_map.decay_all(fc.scent_decay_rate.per_tick(&time_scale));
+    scent_map.decay_all(fc.scent_decay_rate.per_tick(&time_scale));
 
-    // Patrolling/guarding cats deposit presence at their position.
-    let deposit = fc.scent_deposit; // reuse fox deposit rate for symmetry
+    let base = fc.cat_scent_base_deposit;
+    let bonus = fc.cat_scent_action_bonus;
     for (pos, action) in &cats {
+        // Every adult cat: steady-state scent.
+        scent_map.deposit(pos.x, pos.y, base);
+        // Active territorial actions: bonus on top.
         if matches!(
             action.action,
             Action::Patrol | Action::Fight | Action::Explore
         ) {
-            presence_map.deposit(pos.x, pos.y, deposit);
+            scent_map.deposit(pos.x, pos.y, bonus);
         }
     }
 }
@@ -4731,7 +4754,7 @@ pub fn cat_presence_tick(
 /// 256 R5 — deposit cat patrol deterrent for patrolling cats and
 /// decay the deterrent map globally. Runs every tick.
 ///
-/// Distinct from `cat_presence_tick`: that map deposits from any
+/// Distinct from `cat_scent_tick`: that map deposits from any
 /// active cat (patrol / fight / explore) and reads as colony presence
 /// for ward placement. This map deposits *only* from
 /// `Action::Patrol` and reads as a routing-cost gradient for foxes

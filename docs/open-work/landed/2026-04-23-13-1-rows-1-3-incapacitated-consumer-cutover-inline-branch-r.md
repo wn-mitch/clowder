@@ -2,7 +2,7 @@
 id: 2026-04-23
 title: §13.1 rows 1–3 — Incapacitated consumer cutover + inline-branch retirement
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-23
 ---

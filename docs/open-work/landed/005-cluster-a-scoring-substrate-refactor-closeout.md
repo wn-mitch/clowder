@@ -2,7 +2,7 @@
 id: 005
 title: Cluster-A scoring substrate refactor closeout
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: feedbac
 landed-on: 2026-04-27
 ---

@@ -2,7 +2,8 @@
 id: 101
 title: Environmental quality — five influence maps for ambient spatial pressure
 status: ready
-cluster: null
+cluster: belief-perception
+initiative: [environmental-simulation]
 added: 2026-05-01
 parked: null
 blocked-by: [100]

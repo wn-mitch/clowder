@@ -2,7 +2,8 @@
 id: 242
 title: Body-cue substrate (Disposition → observable markers)
 status: ready
-cluster: null
+cluster: belief-perception
+initiative: [full-sensory-perception]
 added: 2026-05-08
 parked: null
 blocked-by: []

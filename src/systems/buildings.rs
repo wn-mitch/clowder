@@ -246,7 +246,7 @@ pub fn tidy_buildings(
 // process_gates
 // ---------------------------------------------------------------------------
 
-/// After cats have moved, check gate state based on cat presence.
+/// After cats have moved, check gate state based on cat scent.
 ///
 /// - A cat standing on a gate tile opens it.
 /// - When no cat is on the gate, check cats one tile away (just walked through).

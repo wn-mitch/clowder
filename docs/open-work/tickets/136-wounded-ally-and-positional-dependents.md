@@ -2,7 +2,8 @@
 id: 136
 title: WoundedAlly marker + positional dependent-proximity for escape_viability
 status: ready
-cluster: ai-substrate
+cluster: combat-threat
+initiative: []
 added: 2026-05-02
 parked: null
 blocked-by: []
