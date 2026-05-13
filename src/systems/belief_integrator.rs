@@ -567,6 +567,117 @@ mod tests {
         );
     }
 
+    // 295 — emit-site coverage. Each test fires one new variant and
+    // asserts the integrator updates the documented facet. Out-of-range
+    // and self-witness gating is already covered by `Groom` tests above;
+    // these focus on the per-variant facet path.
+
+    #[test]
+    fn mate_event_lifts_witness_affiliation() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let target = spawn_cat(&mut world, Position::new(11, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Mate {
+            actor,
+            target,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        let model = cats.models.get(&actor).expect("witness holds belief on mating actor");
+        assert!(
+            model.affiliation_history.value > 0.0,
+            "Mate should lift actor's affiliation_history on witnesses"
+        );
+        assert_eq!(model.affiliation_history.last_source, EvidenceKind::Observation);
+    }
+
+    #[test]
+    fn care_event_lifts_witness_affiliation_on_caregiver() {
+        let (mut world, mut schedule) = test_world(100);
+        let caregiver = spawn_cat(&mut world, Position::new(10, 10));
+        let kitten = spawn_cat(&mut world, Position::new(11, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Care {
+            caregiver,
+            kitten,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        let model = cats.models.get(&caregiver).expect("witness holds belief on caregiver");
+        assert!(
+            model.affiliation_history.value > 0.0,
+            "Care should lift caregiver's affiliation_history on witnesses"
+        );
+    }
+
+    #[test]
+    fn hunt_success_lifts_hunter_violence_and_predictability() {
+        let (mut world, mut schedule) = test_world(100);
+        let hunter = spawn_cat(&mut world, Position::new(10, 10));
+        let witness = spawn_cat(&mut world, Position::new(11, 10));
+
+        world.write_message(WitnessableEvent::Hunt {
+            hunter,
+            prey_kind: crate::components::prey::PreyKind::Mouse,
+            position: Position::new(10, 10),
+            success: true,
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        let model = cats.models.get(&hunter).expect("witness holds belief on hunter");
+        assert!(
+            model.perceived_violence_capability.value > 0.0,
+            "Hunt success should lift hunter's perceived_violence_capability"
+        );
+        assert!(
+            model.predictability.value > 0.0,
+            "Hunt success should lift hunter's predictability"
+        );
+    }
+
+    #[test]
+    fn flee_from_event_lifts_fleer_predictability_and_threat_violence() {
+        let (mut world, mut schedule) = test_world(100);
+        let fleer = spawn_cat(&mut world, Position::new(10, 10));
+        let threat = spawn_cat(&mut world, Position::new(11, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::FleeFrom {
+            fleer,
+            threat,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        let fleer_model = cats.models.get(&fleer).expect("witness holds belief on fleer");
+        assert!(
+            fleer_model.predictability.value > 0.0,
+            "FleeFrom should lift fleer's predictability on witnesses"
+        );
+        let threat_model = cats.models.get(&threat).expect("witness holds belief on threat");
+        assert!(
+            threat_model.perceived_violence_capability.value > 0.0,
+            "FleeFrom should lift threat's perceived_violence_capability on witnesses"
+        );
+    }
+
     #[test]
     fn passive_decay_pulls_value_toward_prior() {
         let (mut world, mut schedule) = test_world(20);
