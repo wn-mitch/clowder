@@ -97,7 +97,30 @@ in ~700 ticks without intervention). Rest at a warded or commune-echoed tile acc
 | Ward strength at creation | 1.0 | Full potency on placement |
 | Ward decay — basic | 0.005/tick | ~200 ticks to failure |
 | Ward decay — durable | 0.001/tick | ~1000 ticks |
-| Shadow fox spawn threshold | tile corruption ≥ 0.8 | Crystallization point for wild-aspect density |
+| Shadow fox spawn threshold | tile corruption > 0.85 | Crystallization point for wild-aspect density |
+
+**Shadow-fox spawn algorithm.** Spawn is governed entirely by
+**corruption-tile area** × the per-tile `shadow_fox_spawn_chance`
+Bernoulli (default 0.001). On each cadence fire (~10 ticks),
+`spawn_shadow_fox_from_corruption` (`src/systems/magic.rs:691-750`)
+iterates the tilemap and spawns at the first tile where
+`corruption > shadow_fox_corruption_threshold (0.85)` and the roll
+succeeds. The function reads **no** cat positions, `CatScentMap`,
+ward coverage, or `congregation` influence map — there is no
+cat-presence input to the spawn decision. The only ceiling is the
+population cap (default 2 alive). Cat-presence affects spawn rate
+only indirectly, through downstream chains: ward maintenance and
+corruption cleansing shrink the eligible-tile pool, and fox kills
+open cap slots for replenishment. The corruption surface itself grows
+autocatalytically — foxes deposit `+0.001` per crossed tile
+(`src/systems/wildlife.rs:275`), ward-siege foxes deposit `+0.005`
+(`wildlife.rs:236`), and `corruption_spread` (`magic.rs:78-130`)
+diffuses to 4-neighbors every 10 ticks — so future substrate work
+that shifts cat-time-at-den should expect a 2nd-order spawn-rate
+shift via the ward / cleansing chain, not a direct one. Empirical
+attribution of the 047 Phase 3 +93% transient (and its post-118+119
+inversion) lives in
+`docs/balance/047-acute-health-adrenaline.md` §120 closure.
 
 ### Personal corruption tiers (new)
 

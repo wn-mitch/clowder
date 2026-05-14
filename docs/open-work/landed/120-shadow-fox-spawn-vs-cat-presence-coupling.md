@@ -1,7 +1,7 @@
 ---
 id: 120
 title: Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%)
-status: ready
+status: done
 cluster: wildlife
 initiative: [predator-prey-dynamics]
 added: 2026-05-01
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [047-acute-health-adrenaline.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -59,3 +59,4 @@ The point of this ticket is to *find out which*, so future substrate work knows 
 ## Log
 
 - 2026-05-01: Opened from ticket 047 Phase 3 sweep findings. The +93% shadow-fox spawn rate was the only `significant`-band metric in the cross-metric comparison; explanation hypothesis is cat-presence coupling.
+- 2026-05-14: Characterized as uncoupled from cat-presence: spawn function reads zero cat-coupled inputs (magic.rs:691-750). +93% Phase 3 transient fully inverted to 8 spawns (-73% vs promoted baseline) on logs/tuned-42 post-118+119 — same closure pattern as 117. Eligible-tile pool is stable (6 of 8 spawns at corruption=1.0); ward maintenance dampens the autocatalytic loop. Structural rejection + empirical readout in docs/balance/047-acute-health-adrenaline.md §120 closure; spawn-algorithm note in docs/systems/magic.md.

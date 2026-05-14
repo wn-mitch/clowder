@@ -685,8 +685,14 @@ pub fn herb_regrowth(
 // spawn_shadow_fox_from_corruption
 // ---------------------------------------------------------------------------
 
-/// Heavily corrupted tiles (> 0.7) may spontaneously spawn shadow-foxes, up to
-/// a population cap of 2.
+/// Tiles with `corruption > shadow_fox_corruption_threshold` (default 0.85) may
+/// spontaneously spawn shadow-foxes on each cadence fire, capped at
+/// `shadow_fox_population_cap` alive (default 2). Spawn rate has no cat-coupled
+/// inputs — no cat positions, scent map, ward coverage, or congregation map.
+/// The eligible-tile pool grows via the corruption-deposit (wildlife.rs:275)
+/// and corruption-spread (magic.rs:78-130) autocatalytic loop; see
+/// `docs/balance/047-acute-health-adrenaline.md` §120 closure for empirical
+/// attribution of the 047 Phase 3 +93% transient.
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_shadow_fox_from_corruption(
     map: ResMut<TileMap>,

@@ -181,3 +181,75 @@ welfare axes is not a tuning question, it's evidence the substrate
 expresses behaviorally now that the preempt path is live. Closes
 ticket 117. No further action on `acute_health_adrenaline_sleep_lift`;
 the 0.50 default promoted by 119 stands.
+
+---
+
+## Iteration 2026-05-14 — Ticket 120 closure (shadow-fox spawn-rate characterization)
+
+Phase 3's other `significant`-band metric was `shadow_fox_spawn_total`
+jumping 17.0 → 32.8 (+93%, p=0.017, d=1.35). The ticket framed three
+hypotheses: (a) cat-presence coupling, (b) downstream run-length, (c)
+new equilibrium with autocatalytic surface growth. Ticket 120
+characterized this independently of the 047 magnitude decision.
+
+**(a) is structurally rejected.** `spawn_shadow_fox_from_corruption`
+at `src/systems/magic.rs:691-750` reads `wildlife: Query<&WildAnimal>`
+(population-cap count only), `map: ResMut<TileMap>` (per-tile
+corruption scan), plus `rng`/`time`/`constants`. It does **not** read
+cat positions, `CatScentMap` (formerly `CatPresenceMap` /
+`congregation`), ward coverage, or any cat-coupled state. The
+algorithm is: cadence-gate every ~10 ticks → bail if
+`count ≥ shadow_fox_population_cap (2)` → iterate all tiles → spawn
+at first tile where `corruption > 0.85` AND `rng < 0.001`. The
++93% cannot be explained by cat-absence weighting because no
+such weighting exists in the spawn function.
+
+There IS an indirect autocatalytic loop: shadow foxes deposit
+`+0.001` corruption per crossed tile (`src/systems/wildlife.rs:275`),
+ward-siege foxes deposit `+0.005` (`src/systems/wildlife.rs:236`),
+and corruption diffuses to 4-neighbors every 10 ticks
+(`src/systems/magic.rs:78-130`). So the eligible-tile pool can grow
+over the run in regimes where wards aren't actively maintained.
+Cat-presence affects spawn rate only through downstream chains:
+ward maintenance, corruption cleansing, fox-kill rates that free
+cap slots, and run-length.
+
+**Empirical readout (post-118+119, single-seed `logs/tuned-42`,
+commit 9fb5c96f):**
+
+| `shadow_fox_spawn_total` | 047 baseline (lifts 0.0/0.0, mean over 9 runs) | 047 Phase 3 treatment (lifts 0.6/0.5, pre-118, mean over 9 runs) | Post-118+119 (current defaults, seed=42 single run) |
+|---|---:|---:|---:|
+| value | 17.0 | 32.8 | **8** |
+
+The metric fully inverted the Phase 3 elevation. Spawn-event detail
+from `just q events logs/tuned-42 --kind=ShadowFoxSpawn`:
+
+- 8 spawns across the run, ticks 1,211,440 → 1,270,030 (span 58,590
+  ticks, run length 104,877 ticks)
+- 6 of 8 fired at `corruption = 1.0` (saturated, long-established
+  tiles); only 2 in the 0.85–1.0 ramp zone
+- Locations dispersed across `x ∈ [40, 110]`, `y ∈ [28, 74]` — not
+  concentrated near a single fox path
+
+This rules out hypothesis (c) "autocatalytic surface growth dominant"
+for the current regime: the eligible-tile pool is stable, not growing
+late. The contemporaneous footer drift explains the suppression — the
+post-118+119 colony places +107% more wards
+(`wards_placed_total: 14 → 29`) and the ward layer aggressively
+repels foxes (`shadow_foxes_avoided_ward_total: 2 → 156`, +7700%)
+before they can grow the corruption surface. Survival canaries pass
+(`deaths_by_cause.ShadowFoxAmbush = 2` ≤ 10 hard gate;
+`deaths_by_cause.Starvation = 0`).
+
+Same closure pattern as 117: the Phase 3 elevation was a transient of
+the pre-118 momentum gap (cats stuck in plan-completion limbo,
+ward maintenance starved), not a property of the 047 modifier
+itself. Once 118 fixed the momentum gap and 119 promoted the
+magnitudes, ward maintenance dominates and the autocatalytic spawn
+loop is dampened. Single-seed measurement is sufficient because the
+sign inverted and survival canaries pass.
+
+Closes ticket 120. The structural finding — spawn rate is uncoupled
+from cat presence; the only coupling is the indirect autocatalytic
+loop through corruption deposit + diffusion — is documented in
+`docs/systems/magic.md` for future substrate work.
