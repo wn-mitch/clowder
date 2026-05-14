@@ -15,10 +15,10 @@ _Last generated: 2026-05-13._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 97 |
+| Ready | 98 |
 | Parked | 10 |
-| Blocked | 20 |
-| **Open total** | **133** |
+| Blocked | 22 |
+| **Open total** | **136** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,7 +44,7 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · score 0.92_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[wildlife] · score 0.91_
-- **[263](docs/open-work/tickets/263-256-cluster-dse-consumers-wire-belief-affordance-axes-flee-patrol-hunt-with-stalkchasepounce-sub-actions.md)** — 256-cluster DSE consumers wire belief + affordance axes (Flee, Patrol, Hunt with Stalk/Chase/Pounce sub-actions) — _[ai-substrate] · score 0.91_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (3)
 
@@ -65,11 +65,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling-diagnostics-ui] · added 2026-05-08_
 
-## Ready by cluster (97)
+## Ready by cluster (98)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (25 ready, 2 blocked)
+### ai-substrate (26 ready, 4 blocked)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _[ai-substrate] · added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
@@ -91,11 +91,12 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[233](docs/open-work/tickets/233-subscribe-non-pickup-work-dses-hunt-forage-cook-wander-explore-to-body-state-perception.md)** — Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception — _[ai-substrate] · added 2026-05-08_
 - **[241](docs/open-work/tickets/241-burial-canary-structurally-hard-to-fire-post-230-death-rate-audit-canary-policy.md)** — Burial canary structurally hard to fire post-230 — death-rate audit + canary policy — _[ai-substrate] · added 2026-05-08_
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
-- **[263](docs/open-work/tickets/263-256-cluster-dse-consumers-wire-belief-affordance-axes-flee-patrol-hunt-with-stalkchasepounce-sub-actions.md)** — 256-cluster DSE consumers wire belief + affordance axes (Flee, Patrol, Hunt with Stalk/Chase/Pounce sub-actions) — _[ai-substrate] · added 2026-05-10_
 - **[264](docs/open-work/tickets/264-social-dse-consumers-wire-belief-affordance-axes-socialize-groomother-mate-mentor-care-feedkitten.md)** — Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten) — _[ai-substrate] · added 2026-05-10_
 - **[286](docs/open-work/tickets/286-lower-threatproximityadrenalineflee-viability-threshold-so-cornered-cats-receive-flee-lift.md)** — Lower ThreatProximityAdrenalineFlee viability threshold so cornered cats receive flee_lift — _[ai-substrate] · added 2026-05-11_
 - **[291](docs/open-work/tickets/291-colonyknowledge-restructure-promotion-via-mental-model-agreement-replaces-carrier-count-threshold-258-follow-on.md)** — ColonyKnowledge restructure — promotion-via-mental-model-agreement replaces carrier-count threshold (258 follow-on) — _[ai-substrate] · added 2026-05-11_
 - **[293](docs/open-work/tickets/293-huntingpriors-retirement-per-location-belief-moves-to-locationbeliefsperceived-violence-capability-colony-absorption-rebuild-258-follow-on.md)** — HuntingPriors retirement — per-location belief moves to LocationBeliefs.perceived_violence_capability + colony absorption rebuild (258 follow-on) — _[ai-substrate] · added 2026-05-11_
+- **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · added 2026-05-13_
+- **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
 
 ### belief-perception (14 ready, 2 blocked)
 
@@ -277,7 +278,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 
-## Ready (97)
+## Ready (98)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _[ai-substrate] · added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
@@ -346,7 +347,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _[belief-perception] · added 2026-05-08_
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
 - **[259](docs/open-work/tickets/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer — _[tooling-diagnostics-ui] · added 2026-05-10_
-- **[263](docs/open-work/tickets/263-256-cluster-dse-consumers-wire-belief-affordance-axes-flee-patrol-hunt-with-stalkchasepounce-sub-actions.md)** — 256-cluster DSE consumers wire belief + affordance axes (Flee, Patrol, Hunt with Stalk/Chase/Pounce sub-actions) — _[ai-substrate] · added 2026-05-10_
 - **[264](docs/open-work/tickets/264-social-dse-consumers-wire-belief-affordance-axes-socialize-groomother-mate-mentor-care-feedkitten.md)** — Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten) — _[ai-substrate] · added 2026-05-10_
 - **[265](docs/open-work/tickets/265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md)** — Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox) — _[wildlife] · added 2026-05-10_
 - **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
@@ -376,6 +376,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[305](docs/open-work/tickets/305-corpus-projection-layer-split-cluster-into-clusterinitiative-render-two-axis-gate-open-time.md)** — Corpus projection layer — split cluster into cluster+initiative, render two-axis, gate open-time — _[process-discipline] · added 2026-05-13_
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
+- **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · added 2026-05-13_
+- **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
 
 ## Parked (10)
 
@@ -390,7 +392,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _[ai-substrate] · parked 2026-05-09 · added 2026-05-08_
 - **[273](docs/open-work/tickets/273-caretake-plans-complete-but-kittenfed-never-fires-kitten-starvation-chronic.md)** — Caretake plans complete but KittenFed never fires — kitten starvation chronic — _[life-cycle] · parked 2026-05-11 · added 2026-05-11_
 
-## Blocked (20)
+## Blocked (22)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -412,23 +414,26 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[269](docs/open-work/tickets/269-submit-dse-wire-c3-belief-actionaffordance-revisit-cross-species-extension.md)** — Submit DSE — wire C3 Belief + ActionAffordance + revisit cross-species extension — _[combat-threat] · blocked-by 145 · added 2026-05-10_
 - **[306](docs/open-work/tickets/306-corpus-tagging-pass-backfill-clusterinitiative-across-active-and-landed-tickets.md)** — Corpus tagging pass — backfill cluster+initiative across active and landed tickets — _[process-discipline] · blocked-by 305 · added 2026-05-13_
 - **[307](docs/open-work/tickets/307-clusterinitiative-filter-recipes-epic-rollup-lint-for-open-work-index.md)** — Cluster/initiative filter recipes + epic-rollup lint for open-work index — _[process-discipline] · blocked-by 305 · added 2026-05-13_
+- **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · blocked-by 314 · added 2026-05-13_
+- **[317](docs/open-work/tickets/317-retire-flee-threat-distance-power-invert-if-frame-diff-shows-redundancy-with-affordanceflee.md)** — retire flee_threat_distance Power-Invert if frame-diff shows redundancy with Affordance(Flee) — _[ai-substrate] · blocked-by 315 · added 2026-05-13_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (199)
+## Landed archive (200)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (134)
+### 2026-05 (135)
 
 - **[313](docs/open-work/landed/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) _(2026-05-13)_
 - **[312](docs/open-work/landed/312-fox-approach-corridor-perception-axis-for-ward-placement-301-fo-2.md)** — fox-approach-corridor perception axis for ward placement (301 FO-2) _(2026-05-13)_
 - **[311](docs/open-work/landed/311-scenario-fixture-chokepoint-isthmus-ward-corking-test-301-fo-1.md)** — scenario fixture — chokepoint isthmus ward-corking test (301 FO-1) _(2026-05-13)_
 - **[308](docs/open-work/landed/308-colony-reserves-belief-mental-model-facet-tracking-thornbriar-remedy-herb-stockpile-for-anticipatory-crafting.md)** — Colony reserves belief — mental-model facet tracking thornbriar / remedy-herb stockpile for anticipatory crafting _(2026-05-13)_
 - **[301](docs/open-work/landed/301-evolve-ward-placement-decision-semantics-beyond-single-shot-argmax-285296297-architectural-follow-on.md)** — evolve ward placement decision semantics beyond single-shot argmax (285+296+297 architectural follow-on) _(2026-05-13)_
+- **[263](docs/open-work/landed/263-256-cluster-dse-consumers-wire-belief-affordance-axes-flee-patrol-hunt-with-stalkchasepounce-sub-actions.md)** — 256-cluster DSE consumers wire belief + affordance axes (Flee, Patrol, Hunt with Stalk/Chase/Pounce sub-actions) _(2026-05-13)_
 - **[261](docs/open-work/landed/261-actionaffordances-substrate-per-action-success-scalars-actionkind-enum-heuristic-estimators.md)** — ActionAffordances substrate — per-action success scalars + ActionKind enum + heuristic estimators _(2026-05-13)_
 - **[260](docs/open-work/landed/260-fox-scent-marking-signposts-territorial-boundaries-without-ward-keying.md)** — Fox scent-marking signposts — territorial boundaries without ward keying _(2026-05-13)_
 - **[141](docs/open-work/landed/141-combat-winnability-scalar.md)** — combat_winnability perception scalar — sibling to escape_viability _(2026-05-13)_

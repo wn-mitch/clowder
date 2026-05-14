@@ -26,6 +26,7 @@
 //! invariant in tests via stdout-diff.
 
 pub mod affordance_substrate;
+pub mod belief_affordance_dse_consumers;
 pub mod chokepoint_defense_isthmus;
 pub mod colony_reserves_belief;
 pub mod disposal_dispatch;
@@ -234,6 +235,14 @@ pub const ALL: &[&Scenario] = &[
     &affordance_substrate::SCENARIO_CHASE_PREY,
     &affordance_substrate::SCENARIO_FIGHT_CAPABILITY_MATCH,
     &affordance_substrate::SCENARIO_SUPERSEDES_LEGACY_SCALARS,
+    // 263 — Flee/Patrol/Hunt belief + affordance consumer scenarios.
+    // All four 263 consumer axes ship dormant; these scenarios assert
+    // on the substrate-side reads (`ActionAffordances`,
+    // `LocationBeliefs` facets) rather than L3 election outcomes.
+    &belief_affordance_dse_consumers::SCENARIO_FLEE_BELIEF_HIGH_VIOLENCE,
+    &belief_affordance_dse_consumers::SCENARIO_PATROL_AVOIDS_HIGH_THREAT_SECTOR,
+    &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_STALK_FOR_OBLIVIOUS_PREY,
+    &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_CHASE_FOR_ALERTED_PREY,
 ];
 
 /// Look up a scenario by its `name` field.

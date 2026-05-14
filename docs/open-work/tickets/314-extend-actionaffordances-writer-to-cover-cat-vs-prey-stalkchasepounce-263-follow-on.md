@@ -1,0 +1,58 @@
+---
+id: 314
+title: extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on
+status: ready
+cluster: ai-substrate
+initiative: []
+added: 2026-05-13
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Substrate 261's `affordance_writer` covers cat-vs-cat and cat-vs-wildlife (Fox / Hawk / Snake / ShadowFox) but NOT cat-vs-prey — `PreyAnimal` is a distinct marker from `WildAnimal` and the writer's wildlife query excludes it. Ticket 263 wired the consumer reads for `Affordance(Stalk|Chase|Pounce, cat, prey)` into `hunt_target.rs::fetch_target` and `resolve_engage_prey`'s phase-band bias, but those reads return `0.0` today because the writer never populates cat-vs-prey entries. 315's activation methodology needs cat-vs-prey populated before Hunt's `hunt_best_predation_weight` and `hunt_stalk_chase_affordance_bias` can be lifted off zero with measurable signal.
+
+## Scope
+
+- Add a `prey: Query<(Entity, &Position, &PreyConfig, &PreyState, &Health), Without<Dead>>` query to `src/systems/affordance_writer.rs`.
+- Snapshot a `PreySnapshot` parallel to `WildSnapshot` (entity / position / kind / alertness / health_fraction).
+- Add a `write_cat_vs_prey` function in the style of `write_cat_vs_wildlife` that populates `ActionKind::Stalk` / `Chase` / `Pounce` for cat perceivers against prey targets. Gate all non-predation kinds (Flee, Fight, Threaten, social…) to `0.0` — cats don't flee from mice.
+- Compose belief inputs from the cat's `CatBeliefs` against the prey entity (note: 258 v1's `CatBeliefs` is keyed on cat entities; prey beliefs may need a separate facet store or piggyback on `CatBeliefs` if the keying allows non-cat entities. Investigate at impl time.).
+- Heuristic inputs for cat-vs-prey predation: proximity, cover_self, my_health, `(1 - intent_clarity_or_alertness_proxy)`. Mirror `write_cat_vs_wildlife`'s composition shape; weights live in `cfg.predation.stalk/chase/pounce`.
+- Verify the two `hunt_picks_*_for_*_prey` scenarios in `src/scenarios/belief_affordance_dse_consumers.rs` now show non-zero affordances and graduate the assertions from "writer-gap signal of 0.0" to "Stalk > Chase for low-alertness prey, Chase > Stalk for fleeing prey".
+
+## Out of scope
+
+- Activating the Hunt DSE's affordance axis (`hunt_best_predation_weight`) or the resolver phase-bias (`hunt_stalk_chase_affordance_bias`) — that's ticket 315's job, blocked-by this one.
+- Adding `Affordance(Bolt|ScatterGroup)` from the prey side (prey-side AI lives in ticket 266).
+- Adding belief facets specifically for prey — keep the existing `MentalModel` shape; if `CatBeliefs` doesn't accept prey entities, route through an existing facet store or a tiny side-table at compute time.
+
+## Current state
+
+Substrates 258 + 261 + 263 (this ticket's parent) all landed. The cat-vs-prey gap was discovered while implementing 263's Hunt-side scenarios and documented in the `belief_affordance_dse_consumers.rs` module rustdoc + the smoke-test assertion ("writer gap").
+
+## Approach
+
+1. Read `src/systems/affordance_writer.rs::write_cat_vs_wildlife` (lines 424–529) as the template.
+2. Add the prey query + snapshot collection at the top of `affordance_writer`.
+3. Inside the "Cat perceivers" loop add a third `for target in &prey_snaps` block that calls `write_cat_vs_prey`.
+4. `write_cat_vs_prey` writes only the three predation kinds; zero everything else.
+5. Belief input: read from `CatBeliefs.models.get(&prey_entity)` if the v1 substrate keys allow non-cat entities; if not, use a small per-call alertness-derived proxy and open a sister ticket to extend the belief substrate to cover prey targets explicitly.
+6. Update the 263 scenarios' assertions to graduate to behavioural shape claims.
+
+## Verification
+
+- Unit tests in `affordance_writer.rs`: a cat with a nearby prey writes non-zero `Stalk`/`Chase`/`Pounce`; non-predation kinds stay 0.0.
+- `just check` + `just test`.
+- The two graduated 263 scenarios pass the behavioural assertions.
+- `just verdict <run-dir>` shows no canary regression (this writer extension ships at the same dormant DSE weights — 315 activates them).
+
+## Log
+
+- 2026-05-13: opened as 263 follow-on after the cat-vs-prey gap surfaced during 263 implementation. Blocks 315's activation methodology.

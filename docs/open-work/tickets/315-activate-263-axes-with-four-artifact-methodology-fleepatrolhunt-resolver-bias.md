@@ -1,0 +1,59 @@
+---
+id: 315
+title: activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias)
+status: blocked
+cluster: ai-substrate
+initiative: []
+added: 2026-05-13
+parked: null
+blocked-by: [314]
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Ticket 263 lands four new substrate axes (Flee `flee_affordance`, Patrol `patrol_threat_recency`, Hunt per-target `hunt_best_predation_affordance`, Hunt resolver `hunt_stalk_chase_affordance_bias`) at default weight 0.0 — substrate is honest day-one but unconsumed. CLAUDE.md's balance discipline requires substrate-additions with >10% drift potential on the ShadowFoxAmbush canary to land with hypothesis + prediction + observation + concordance artifacts. This ticket owns that activation work: lifts the four weights to recommended values, runs the four-artifact methodology per axis, and verifies the L3 patrol-absorption-cascade is in fact priced by the new substrate.
+
+## Scope
+
+- Hypothesize doc per axis (or batched) under `docs/balance/263-activation/` with predictions for ShadowFoxAmbush canary, Patrol L3 share, Hunt success rate, and continuity canaries.
+- `just hypothesize` runs end-to-end against each lift:
+  - `flee_affordance_weight: 0.0 → 0.5`
+  - `patrol_threat_recency_weight: 0.0 → 1.0` (CP gate-shaped)
+  - `hunt_best_predation_weight: 0.0 → 0.15` (with the other four target-axis weights scaled by 0.85 — already wired in the factory)
+  - `hunt_stalk_chase_affordance_bias: 0.0 → 0.25`
+- Concordance verification: each lifted axis's empirical drift falls within ~2× of prediction, direction matches.
+- Hard gates: `Starvation == 0`, `ShadowFoxAmbush <= 10`, all five continuity canaries firing.
+
+## Out of scope
+
+- Retiring `flee_threat_distance` (ticket 317 — conditional on frame-diff showing redundancy after this activation lands).
+- Extending substrate facets (e.g., `perceived_ambush_likelihood`) — that's a 258-extension ticket.
+- Hunt resolver writing `StepPhase` for trace visibility (ticket 316).
+
+## Current state
+
+Blocked-by 263 (lands the substrate axes dormant) and 314 (extends ActionAffordances writer to cover cat-vs-prey so Hunt's affordance axis becomes meaningful). Once both land, this ticket is the substrate-activation pass.
+
+## Approach
+
+1. Read 263's plan file (`~/.claude/plans/work-263-zippy-sparrow.md`) for the activation-recommendation rationale per axis.
+2. One `specs/263-activation-*.yaml` per axis.
+3. `just hypothesize specs/263-activation-flee.yaml` etc.
+4. Frame-diff each treatment against the post-263-dormant baseline to confirm DSE-specific drift is concordant with the hypothesis and no orthogonal DSE drifts >10%.
+5. Promote the post-activation soak to a named baseline via `just promote`.
+
+## Verification
+
+- All four `just hypothesize` runs concord per CLAUDE.md balance discipline.
+- `just verdict` on the activation-soak — pass.
+- `just frame-diff <pre-263-baseline> <post-activation>` — Flee/Patrol/Hunt shifts concordant; no wrong-direction drift on other DSEs.
+- `just q anomalies <run-dir>` — no DSE absorbs >40% of elections (the L3 patrol-absorption-cascade signature).
+
+## Log
+
+- 2026-05-13: opened as 263 activation follow-on. Owns the four-artifact methodology that 263 deferred.

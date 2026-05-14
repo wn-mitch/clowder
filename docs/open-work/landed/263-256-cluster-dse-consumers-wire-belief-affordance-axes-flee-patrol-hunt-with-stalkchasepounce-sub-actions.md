@@ -1,7 +1,7 @@
 ---
 id: 263
 title: 256-cluster DSE consumers wire belief + affordance axes (Flee, Patrol, Hunt with Stalk/Chase/Pounce sub-actions)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-10
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-13
 ---
 
 ## Why
@@ -86,3 +86,4 @@ This is the consumer ticket where the substrate's payoff first appears in soak g
 ## Log
 
 - 2026-05-10: opened sibling-to-258. Smallest-blast-radius first consumer of the new Belief + Affordance substrates. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
+- 2026-05-13: Landed with 7-commit chain (scaffold + 4 dormant axes + 4 scenarios + follow-ons). All four 263 consumer axes ship dormant (weight=0.0); survival + continuity canaries pass. Follow-ons opened: 314 (cat-vs-prey writer extension), 315 (activation), 316 (StepPhase trace), 317 (flee_threat_distance retirement).
