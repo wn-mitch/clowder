@@ -122,7 +122,6 @@ fn build_scoring_context<'a>(
     fox_state: &FoxState,
     fox_pos: Position,
     den_pos: Option<Position>,
-    cubs_present_count: u32,
     cat_positions: &[Position],
     store_positions: &[Position],
     prey_positions: &[Position],
@@ -140,22 +139,14 @@ fn build_scoring_context<'a>(
     let prey_nearby = prey_positions
         .iter()
         .any(|p| p.manhattan_distance(&fox_pos) <= 9);
-    // Ticket 051: `store_visible` / `store_guarded` migrated from
-    // FoxScoringContext booleans to the §4 marker substrate authored
-    // by `fox_spatial::update_store_awareness_markers`. The DSE's
-    // `EligibilityFilter::require(StoreVisible).forbid(StoreGuarded)`
-    // resolves through the snapshot, so the build-context local
-    // computations retired in lockstep.
+    // Ticket 051: `store_visible` / `store_guarded` /
+    // `cat_threatening_den` / `has_cubs` / `cubs_hungry` migrated
+    // from FoxScoringContext booleans to the §4 marker substrate
+    // authored by `fox_spatial`'s per-tick authoring systems. Each
+    // fox DSE's `EligibilityFilter::require/forbid` resolves through
+    // the snapshot populated below, so these build-context locals
+    // retired in lockstep.
 
-    // Cat threatening the den if any cat is within 5 tiles AND cubs are present.
-    let cat_threatening_den = cubs_present_count > 0
-        && den_pos.is_some_and(|dp| {
-            cat_positions
-                .iter()
-                .any(|cp| cp.manhattan_distance(&dp) <= 5)
-        });
-
-    let has_cubs = cubs_present_count > 0;
     let is_dispersing_juvenile =
         fox_state.life_stage == FoxLifeStage::Juvenile && fox_state.home_den.is_none();
 
@@ -189,12 +180,9 @@ fn build_scoring_context<'a>(
         prey_nearby,
         local_prey_belief,
         cats_nearby,
-        cat_threatening_den,
         ward_nearby: false,
         local_threat_level: 0.0,
         local_exploration_coverage: 0.0,
-        has_cubs,
-        cubs_hungry: has_cubs && needs.cub_satiation < 0.4,
         is_dispersing_juvenile,
         has_den: fox_state.home_den.is_some(),
         befriended_ally,
@@ -468,12 +456,15 @@ pub fn fox_evaluate_and_plan(
 
     for (fox_entity, fox_state, fox_pos, needs, personality, hunting_beliefs, exploration) in &foxes
     {
-        let den_info = fox_state
+        // Ticket 051: the per-den `cubs_present` count no longer feeds
+        // the scoring context — every fox DSE that needed it now reads
+        // the §4 marker substrate (`HasCubs` / `CubsHungry` /
+        // `CatThreateningDen`) via its `EligibilityFilter`. Only the
+        // den position is forwarded for spatial anchors.
+        let den_pos = fox_state
             .home_den
             .and_then(|e| dens.get(e).ok())
-            .map(|(_, d, p)| (*p, d.cubs_present));
-        let den_pos = den_info.map(|(p, _)| p);
-        let cubs_present_count = den_info.map(|(_, c)| c).unwrap_or(0);
+            .map(|(_, _, p)| *p);
 
         let befriended_ally = fox_befriended_q.get(fox_entity).unwrap_or(false);
         let ctx = build_scoring_context(
@@ -483,7 +474,6 @@ pub fn fox_evaluate_and_plan(
             fox_state,
             *fox_pos,
             den_pos,
-            cubs_present_count,
             &cat_positions,
             &store_positions,
             &prey_positions,

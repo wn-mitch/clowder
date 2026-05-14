@@ -53,20 +53,12 @@ pub struct FoxScoringContext<'a> {
     pub local_prey_belief: f32,
     /// Number of cats within avoidance range.
     pub cats_nearby: usize,
-    /// Whether a cat is within den defense range (and cubs are present).
-    pub cat_threatening_den: bool,
     /// Whether a ward is within detection radius.
     pub ward_nearby: bool,
     /// Threat level at the fox's current location (from FoxThreatMemory).
     pub local_threat_level: f32,
     /// Exploration coverage around current position (from FoxExplorationMap).
     pub local_exploration_coverage: f32,
-
-    // --- Offspring state ---
-    /// Whether this fox has cubs at its den.
-    pub has_cubs: bool,
-    /// Whether cubs are hungry (cub_satiation < 0.4).
-    pub cubs_hungry: bool,
 
     // --- Lifecycle state ---
     /// Whether this fox is a homeless juvenile (forces Dispersing).
@@ -430,9 +422,12 @@ pub fn score_fox_dispositions(
     }
 
     // Den defense: §2.3 CP of cub_safety_deficit (flee_or_fight
-    // Logistic) + protectiveness Linear. Outer gate preserves
-    // `cat_threatening_den && has_cubs`.
-    if ctx.cat_threatening_den && ctx.has_cubs {
+    // Logistic) + protectiveness Linear. Ticket 051: the
+    // `cat_threatening_den && has_cubs` outer gate retired into
+    // `.require(CatThreateningDen).require(HasCubs)` on the DSE; `if
+    // score > 0.0` keeps the action out of the L3 pool when
+    // eligibility fails (preserves seed-42 pool size).
+    {
         let score = score_fox_dse_by_id("fox_den_defense", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::DenDefense, score + jitter(rng, j)));
@@ -526,12 +521,9 @@ mod tests {
             prey_nearby: true,
             local_prey_belief: 0.5,
             cats_nearby: 0,
-            cat_threatening_den: false,
             ward_nearby: false,
             local_threat_level: 0.0,
             local_exploration_coverage: 0.0,
-            has_cubs: false,
-            cubs_hungry: false,
             is_dispersing_juvenile: false,
             has_den: true,
             befriended_ally: false,
@@ -675,9 +667,7 @@ mod tests {
             protectiveness: 0.9,
             ..FoxPersonality::balanced()
         };
-        let mut ctx = default_context(&needs, &personality, &SCORING);
-        ctx.has_cubs = true;
-        ctx.cubs_hungry = true;
+        let ctx = default_context(&needs, &personality, &SCORING);
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
         // Ticket 051: FoxFeedingDse eligibility migrated to the §4
@@ -709,12 +699,16 @@ mod tests {
             protectiveness: 0.9,
             ..FoxPersonality::balanced()
         };
-        let mut ctx = default_context(&needs, &personality, &SCORING);
-        ctx.has_cubs = true;
-        ctx.cubs_hungry = true;
+        let ctx = default_context(&needs, &personality, &SCORING);
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        // Ticket 051: even with cubs hungry, T3 Feeding stays
+        // suppressed by survival; mark the cub-care markers so the
+        // pre-suppression evaluation matches old behavior.
+        let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+        let fox_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity(crate::components::markers::HasCubs::KEY, fox_entity, true);
+        markers.set_entity(crate::components::markers::CubsHungry::KEY, fox_entity, true);
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
@@ -738,13 +732,16 @@ mod tests {
             boldness: 0.8,
             ..FoxPersonality::balanced()
         };
-        let mut ctx = default_context(&needs, &personality, &SCORING);
-        ctx.has_cubs = true;
-        ctx.cubs_hungry = false;
-        ctx.cat_threatening_den = true;
+        let ctx = default_context(&needs, &personality, &SCORING);
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        // Ticket 051: FoxDenDefenseDse eligibility migrated to the
+        // §4 marker substrate (`CatThreateningDen` + `HasCubs`).
+        let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+        let fox_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity(crate::components::markers::HasCubs::KEY, fox_entity, true);
+        markers
+            .set_entity(crate::components::markers::CatThreateningDen::KEY, fox_entity, true);
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());

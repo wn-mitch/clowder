@@ -18,8 +18,12 @@
 //! ~0.99, and CP with RtM weights [1.0, 1.0] keeps the peak bounded
 //! by the peer-group 1.0 ceiling.
 //!
-//! **Eligibility gate.** `cat_threatening_den && has_cubs` stays
-//! outer in `score_fox_dispositions`.
+//! **Eligibility gate.** Ticket 051 migrates the old
+//! `cat_threatening_den && has_cubs` outer gate to the §4 marker
+//! substrate: `.require(CatThreateningDen).require(HasCubs)` on the
+//! filter, with both markers authored per-tick by `fox_spatial`'s
+//! authoring systems (`update_den_threat_markers` /
+//! `update_cub_marker`).
 
 use bevy::prelude::*;
 
@@ -31,6 +35,7 @@ use crate::ai::curves::{flee_or_fight, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const CUB_SAFETY_DEFICIT_INPUT: &str = "cub_safety_deficit";
 pub const PROTECTIVENESS_INPUT: &str = "protectiveness";
@@ -83,7 +88,12 @@ impl FoxDenDefenseDse {
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // Ticket 051: the `cat_threatening_den && has_cubs` outer
+            // gate at `fox_scoring.rs::score_fox_dispositions` retires
+            // into `.require(CatThreateningDen).require(HasCubs)` here.
+            eligibility: EligibilityFilter::new()
+                .require(markers::CatThreateningDen::KEY)
+                .require(markers::HasCubs::KEY),
         }
     }
 }
