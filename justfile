@@ -210,6 +210,20 @@ frame-diff BASELINE NEW HYPOTHESIS="":
 verdict *ARGS:
     @uv run scripts/verdict.py {{ARGS}}
 
+# HTN method-registry audit surface (ticket 319 — 128 epic infrastructure).
+# Lists every registered method (live + dormant) with its source file
+# and, for PendingSubstrate methods, the open glue ticket it's waiting
+# on. Composes scripts/check_method_registry.sh's --list-json side mode
+# with a formatter — single parse source-of-truth.
+#
+# Examples:
+#   just methods             # list all registered methods
+#   just methods --pending   # only PendingSubstrate (dormant) methods
+#   just methods --live      # only Live methods
+#   just methods --json      # raw JSON pass-through
+methods *ARGS:
+    @uv run scripts/methods.py {{ARGS}}
+
 # Audit an epic dashboard's child-ticket roster against frontmatter
 # truth (ticket 318). Surfaces drift between the dashboard's claim and
 # each child's actual `status` / `blocked-by` / landed sha. Default
@@ -402,7 +416,7 @@ test:
 
 # Check + clippy + step-resolver contract lint + time-unit lint + IAUS-coherence lint + substrate-stub lint + items-are-real lint + influence-map-registry lint + epic-children roster drift (ticket 318)
 check:
-    cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh && bash scripts/check_time_units.sh && bash scripts/check_iaus_coherence.sh && bash scripts/check_substrate_stubs.sh && bash scripts/check_item_transfers.sh && bash scripts/check_influence_map_registry.sh && bash scripts/check_epic_children.sh
+    cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh && bash scripts/check_time_units.sh && bash scripts/check_iaus_coherence.sh && bash scripts/check_substrate_stubs.sh && bash scripts/check_item_transfers.sh && bash scripts/check_influence_map_registry.sh && bash scripts/check_method_registry.sh && bash scripts/check_epic_children.sh
 
 # Generate a random template authoring prompt
 template-prompt:

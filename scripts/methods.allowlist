@@ -1,0 +1,24 @@
+# Allowlist for scripts/check_method_registry.sh.
+#
+# Format:
+#   <method-id> <ticket-id>     # rationale
+#
+# Comments: everything after `#` is ignored.
+#
+# Each entry MUST cite the ticket that wires the method via
+# `populate_method_registry` (src/plugins/simulation.rs) and matches
+# its frontmatter `wires-method:` to the method id. When the work
+# lands, drop the entry; the lint will then re-enforce the
+# bidirectional check. Adding a new entry without a ticket id is a
+# code-review failure.
+#
+# Empty at landing of ticket 319 — the registry is empty by design;
+# the first PendingSubstrate method to land (in tickets 320+) is the
+# first real exercise of the bidirectional check, and should land
+# with its glue ticket's `wires-method:` frontmatter intact rather
+# than via allowlist.
+#
+# Discipline reference: CLAUDE.md §"Bugfix discipline" /
+# "Every dormant method has a glue ticket."
+# Parallel precedent: scripts/influence_map_registry.allowlist (207),
+# scripts/substrate_stubs.allowlist (160).

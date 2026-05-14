@@ -1,0 +1,60 @@
+---
+id: 343
+title: Emit-cooldown discipline — per-emit cooldown_ticks
+status: parked
+cluster: ai-substrate
+initiative: [smarter-cats]
+added: 2026-05-14
+parked: 2026-05-14
+blocked-by: []
+supersedes: []
+related-systems: [htn-methods.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+128 epic open question (per
+[`docs/systems/htn-methods.md`](../../systems/htn-methods.md)
+§H open questions), parked at open-time. When a method abandons
+via `IntentionAbandonReason::BecameImpossible`, the picker may
+re-emit the same goal label next tick, causing thrash (immediate
+re-adoption of a method that will fail again).
+
+Phase-1 commits to relying on §7.4 commitment momentum to absorb
+the thrash. If post-Phase-1 soaks show thrash patterns in the
+trace surface, this ticket adds tactical per-emit cooldowns.
+
+Parked because:
+1. Phase-1 hasn't soaked yet; we don't know if thrash is a real
+   problem.
+2. The momentum lift (§7.4) might already suffice.
+3. Pre-implementing the discipline before evidence risks
+   premature constraint.
+
+Unparks when a Phase-1 soak shows the picker re-emitting an
+abandoned goal label within N ticks of abandonment, AND that
+behavior is judged bug-not-feature.
+
+## Scope (when unparked)
+
+- Add `cooldown_ticks: u32` field to `Emit` struct.
+- Picker tracks per-cat per-`Emit` last-abandonment-tick.
+- Picker skips emits within cooldown window after abandonment.
+
+## Out of scope
+
+- Phase-1 work — momentum lift handles initial thrash absorption.
+
+## Current state
+
+Parked 2026-05-14. Per
+[`docs/systems/htn-methods.md`](../../systems/htn-methods.md)
+§Future / out of scope.
+
+## Log
+
+- 2026-05-14: opened parked as 128 epic child #25 (Phase-2
+  open question).

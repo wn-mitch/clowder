@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::ai::eval::DseRegistry;
+use crate::ai::methods::MethodRegistry;
 use crate::ai::modifier::default_modifier_pipeline;
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::SimConstants;
@@ -215,6 +216,35 @@ pub fn register_influence_maps_at_startup(mut registry: ResMut<InfluenceMapRegis
     populate_influence_map_registry(&mut registry);
 }
 
+/// Single source of truth for HTN method catalog membership
+/// (ticket 319 — child #1 of the 128 epic). Empty at landing of 319
+/// by design — types and infrastructure first, methods authored in
+/// tickets 320 onward. The `scripts/check_method_registry.sh` lint
+/// passes vacuously on the empty registry; the first `PendingSubstrate`
+/// method to land exercises the bidirectional check (method → open
+/// ticket exists; ticket frontmatter `wires-method:` references the
+/// method back).
+///
+/// Method-declaration convention (read before authoring methods): every
+/// `Method` literal with `ApplicableWhen::PendingSubstrate` MUST sit in
+/// a single multi-line struct-literal block under `src/ai/methods/`,
+/// with `id: MethodId("<slug>")` and `blocker: "<ticket-id>"` each on
+/// their own line. See `src/ai/methods/mod.rs` module doc for the full
+/// contract.
+pub fn populate_method_registry(_registry: &mut MethodRegistry) {
+    // Methods will be registered here by tickets 320 onward. The
+    // registry stays empty at 319 landing — see
+    // `src/ai/methods/mod.rs` module doc and `docs/systems/htn-methods.md`.
+}
+
+/// Startup system that populates [`MethodRegistry`]. Independent of
+/// `register_dses_at_startup` and `register_influence_maps_at_startup`
+/// — registration only touches the registry, so no ordering constraint
+/// against `setup_world_exclusive`.
+pub fn register_methods_at_startup(mut registry: ResMut<MethodRegistry>) {
+    populate_method_registry(&mut registry);
+}
+
 /// Registers all simulation systems on `FixedUpdate` in the same order as the
 /// original `build_schedule()`.
 ///
@@ -296,6 +326,11 @@ impl Plugin for SimulationPlugin {
         // `L1Maps` SystemParam in `trace_emit.rs`. Empty at build time;
         // populated by `register_influence_maps_at_startup` below.
         app.init_resource::<InfluenceMapRegistry>();
+        // Ticket 319 — HTN MethodRegistry (child #1 of the 128 epic).
+        // Empty at build time and at 319 landing; populated by
+        // `register_methods_at_startup`. Tickets 320 onward author
+        // methods into `populate_method_registry`.
+        app.init_resource::<MethodRegistry>();
         // 176: chronicity tracker for `ColonyStoresChronicallyFull`.
         // Updated by `update_colony_building_markers` once per
         // `ScoringConstants::chronicity_window_ticks` ticks.
@@ -309,6 +344,10 @@ impl Plugin for SimulationPlugin {
         // time — so this can run alongside DSE registration without an
         // ordering constraint on `setup_world_exclusive`.
         app.add_systems(Startup, register_influence_maps_at_startup);
+        // 319 — HTN method registry. Same independence as the
+        // InfluenceMap registry above: registration only touches the
+        // resource, no setup ordering required.
+        app.add_systems(Startup, register_methods_at_startup);
 
         // Snapshot positions before any simulation system moves entities.
         // The rendering layer interpolates between PreviousPosition and Position.

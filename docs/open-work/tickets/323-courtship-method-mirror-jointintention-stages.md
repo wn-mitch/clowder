@@ -1,0 +1,90 @@
+---
+id: 323
+title: courtship_method — mirror JointIntention stages
+status: blocked
+cluster: social-coordination
+initiative: [smarter-cats]
+added: 2026-05-14
+parked: null
+blocked-by: [320]
+supersedes: []
+related-systems: [htn-methods.md, ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+128 epic Tier 1 — first live method that exercises the
+infrastructure end-to-end on real cats in real soaks. Mirrors
+127's `JointIntention.stage` advance: a `courtship_method` with
+4 sub-goals matching the four stages (CourtshipApproach →
+CourtshipCourting → CourtshipMating → CourtshipBonded).
+
+127 ships JointIntention as the mutually-public projection (per
+127's §Semantic category); this ticket adds the actor-private
+method that the L1→L2 emission picker can decompose. The two
+coexist by design — JointIntention is what *other cats see*;
+the method-frame is what *the cat itself commits to*.
+
+## Scope
+
+- Register `courtship_method` in `populate_method_registry` per
+  [`docs/systems/htn-methods.md`](../../systems/htn-methods.md)
+  §Migration catalogue / Courtship row.
+- Four `SubGoal::Primitive` entries matching JointIntention's
+  stage actions:
+  - `approach_partner` (existing Socialize-target leaf)
+  - `allogroom_partner` (existing Groom-other leaf)
+  - `mate_with_partner` (existing 4-step Mating chain via §7.M
+    L3, ported in #340)
+  - `consolidate_bonded` (Bonded-stage maintenance; held-action
+    matches the §7.M `CourtshipBonded` semantics)
+- Method advance keeps `JointIntention.stage` in sync via the
+  L2 evaluator's single author site (no separate stage-sync
+  system).
+- `applicable_when`: cat holds a `JointIntention { practice:
+  Courtship, .. }` (the practice-author system in 127 wires the
+  initial entry).
+
+## Out of scope
+
+- Modifying `JointIntention` substrate itself (127's contract is
+  preserved).
+- Porting the 4-step mating chain (that's #340).
+- Cross-cat method composition (banned by 126's actor-private
+  discipline).
+
+## Current state
+
+128 promoted to epic 2026-05-14; full design at
+[`docs/systems/htn-methods.md`](../../systems/htn-methods.md).
+Child #5 of 25, blocked on #319 + #320. Batch B Tier 1 — fully
+parallel with #324 / #325 / #326.
+
+## Approach
+
+Per htn-methods.md §Migration catalogue. The method authoring
+shape mirrors 127's `PracticeStage` enum:
+`CourtshipApproach → CourtshipCourting → CourtshipMating →
+CourtshipBonded`. The L2 evaluator pushes a `GoalFrame` when the
+practice-author system in 127 creates the JointIntention; the
+frame advances per the existing stage-advance predicate set
+(§Stage progression in 127). When the JointIntention drops via
+any `JointDropBranch`, the method frame propagates abandonment.
+
+## Verification
+
+- `cargo check --all-targets` passes.
+- `just check` passes.
+- `just soak-trace 42 <focal>` on a cat with an active Courtship
+  shows `Feature::MethodAdopted` count > 0 and the L3 trace's
+  `method_stack` carries the courtship_method frame with the
+  current sub-goal-index reflecting the JointIntention stage.
+- `just verdict logs/tuned-42` shows no regression on
+  Courtship-related continuity canaries (matings, bonds_formed).
+
+## Log
+
+- 2026-05-14: opened as 128 epic child #5 (Batch B Tier 1).
