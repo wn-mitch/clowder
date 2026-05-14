@@ -157,28 +157,50 @@ pub fn update_den_threat_markers(
 
 /// Author `HasCubs` per fox.
 ///
-/// **Predicate** — bit-for-bit mirror of
-/// `fox_goap.rs::build_scoring_context::has_cubs`:
-/// `cubs_present > 0` at the fox's home den.
+/// **Predicate** — the mother fox at a fox den whose
+/// `cubs_present > 0`.
 ///
-/// **v1 is per-tick scan**, not event-driven. The marker rustdoc
-/// nominates `CubsBorn` + on-despawn events; those don't exist yet.
-/// Per-tick scan keeps the slice atomic; the event-refactor lands
-/// separately.
+/// **Authoring (Ticket 050)** — hybrid event-driven + per-marker
+/// reconciliation. Insertion fires off `CubsBorn` events emitted by
+/// `wildlife.rs::breed_at_dens` at the moment of spawn so the marker
+/// is set the same frame the litter exists. Removal walks only foxes
+/// that *already* hold `HasCubs`: when the fox lost its den, or its
+/// den's `cubs_present` decayed to 0 (cub maturation / death), the
+/// marker drops. The full-fox scan retires — the reconciliation pass
+/// is `O(mothers)`, not `O(foxes)`.
 #[allow(clippy::type_complexity)]
 pub fn update_cub_marker(
     mut commands: Commands,
-    foxes: Query<(Entity, &FoxState, Has<markers::HasCubs>), (With<WildAnimal>, Without<Dead>)>,
-    dens: Query<&FoxDen, Without<FoxState>>,
+    mut cubs_born_r: bevy_ecs::message::MessageReader<
+        crate::messages::fox_lifecycle::CubsBorn,
+    >,
+    holders: Query<
+        (Entity, &FoxState, Has<markers::HasCubs>),
+        (With<WildAnimal>, Without<Dead>),
+    >,
+    dens: Query<&crate::components::wildlife::FoxDen, Without<FoxState>>,
 ) {
-    for (entity, fox_state, has_marker) in foxes.iter() {
-        let cubs_present = fox_state
+    // Insertion: every `CubsBorn` event names the mother directly.
+    for event in cubs_born_r.read() {
+        if holders.get(event.mother).is_ok() {
+            commands.entity(event.mother).insert(markers::HasCubs);
+        }
+    }
+
+    // Removal: walk only foxes currently flagged. A flagged fox loses
+    // the marker when its den is gone, or its den's cubs_present is 0
+    // (cub matured / cub died).
+    for (entity, fox_state, has_marker) in holders.iter() {
+        if !has_marker {
+            continue;
+        }
+        let want = fox_state
             .home_den
             .and_then(|e| dens.get(e).ok())
-            .map(|d| d.cubs_present)
-            .unwrap_or(0);
-        let want = cubs_present > 0;
-        toggle(&mut commands, entity, want, has_marker, markers::HasCubs);
+            .is_some_and(|d| d.cubs_present > 0);
+        if !want {
+            commands.entity(entity).remove::<markers::HasCubs>();
+        }
     }
 }
 
@@ -241,20 +263,42 @@ pub fn update_juvenile_dispersal_markers(
     }
 }
 
-/// Author `HasDen` per fox.
+/// Author `HasDen` per fox — event-driven (Ticket 050).
 ///
-/// **Predicate** — bit-for-bit mirror of
-/// `fox_goap.rs::build_scoring_context::has_den`:
-/// `fox_state.home_den.is_some()`. v1 is per-tick scan; event-driven
-/// (`DenClaimed` / `DenLost`) follow-on deferred.
+/// **Predicate** — `fox_state.home_den.is_some()`.
+///
+/// **Authoring** — Pure event-driven. `DenClaimed` events from
+/// `wildlife.rs` (initial pair spawn, cub birth, runtime adoption)
+/// insert the marker; `DenLost` events (cub maturation, fox death,
+/// future abandonment) remove it. The previous full-fox per-tick
+/// scan retires. Dead-fox guard remains on insertion to be defensive
+/// against an emit-after-death race.
 #[allow(clippy::type_complexity)]
 pub fn update_den_marker(
     mut commands: Commands,
-    foxes: Query<(Entity, &FoxState, Has<markers::HasDen>), (With<WildAnimal>, Without<Dead>)>,
+    mut den_claimed_r: bevy_ecs::message::MessageReader<
+        crate::messages::fox_lifecycle::DenClaimed,
+    >,
+    mut den_lost_r: bevy_ecs::message::MessageReader<
+        crate::messages::fox_lifecycle::DenLost,
+    >,
+    holders: Query<
+        Has<markers::HasDen>,
+        (With<WildAnimal>, With<FoxState>, Without<Dead>),
+    >,
 ) {
-    for (entity, fox_state, has_marker) in foxes.iter() {
-        let want = fox_state.home_den.is_some();
-        toggle(&mut commands, entity, want, has_marker, markers::HasDen);
+    for event in den_claimed_r.read() {
+        // Defensive: only insert on live fox entities; dead foxes that
+        // emitted `DenLost` in the same frame should not re-flag.
+        if holders.get(event.fox).is_ok() {
+            commands.entity(event.fox).insert(markers::HasDen);
+        }
+    }
+    for event in den_lost_r.read() {
+        // Removal is idempotent — `remove::<HasDen>` on an entity
+        // that's already despawned or already lacks the marker is a
+        // no-op.
+        commands.entity(event.fox).remove::<markers::HasDen>();
     }
 }
 
@@ -586,50 +630,85 @@ mod tests {
     use crate::components::wildlife::{FoxLifeStage, FoxSex};
 
     fn setup_cub_marker() -> (World, Schedule) {
-        let world = World::new();
+        let mut world = World::new();
+        // Ticket 050: event-driven authoring needs the Messages
+        // resource pre-registered. The production plugin
+        // (`SimulationPlugin::build`) calls `add_message::<CubsBorn>()`;
+        // unit tests bootstrap manually.
+        world.init_resource::<bevy_ecs::message::Messages<
+            crate::messages::fox_lifecycle::CubsBorn,
+        >>();
         let mut schedule = Schedule::default();
         schedule.add_systems(update_cub_marker);
         (world, schedule)
     }
 
-    #[test]
-    fn fox_no_den_no_has_cubs() {
-        let (mut world, mut schedule) = setup_cub_marker();
-        let fox = spawn_fox(&mut world, 0, 0);
-        schedule.run(&mut world);
-        assert!(!world.entity(fox).contains::<markers::HasCubs>());
+    fn write_cubs_born(world: &mut World, mother: Entity, den: Entity) {
+        world
+            .resource_mut::<bevy_ecs::message::Messages<
+                crate::messages::fox_lifecycle::CubsBorn,
+            >>()
+            .write(crate::messages::fox_lifecycle::CubsBorn {
+                mother,
+                den,
+                count: 1,
+                position: Position::new(0, 0),
+                tick: 0,
+            });
     }
 
     #[test]
-    fn fox_with_den_zero_cubs_no_marker() {
-        let (mut world, mut schedule) = setup_cub_marker();
-        let den = spawn_den(&mut world, 5, 5, 0);
-        let fox = spawn_fox_with_den(&mut world, 5, 5, den);
-        schedule.run(&mut world);
-        assert!(!world.entity(fox).contains::<markers::HasCubs>());
-    }
-
-    #[test]
-    fn fox_with_cubs_at_den_gets_marker() {
+    fn cubs_born_event_inserts_has_cubs() {
         let (mut world, mut schedule) = setup_cub_marker();
         let den = spawn_den(&mut world, 5, 5, 2);
         let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        write_cubs_born(&mut world, fox, den);
         schedule.run(&mut world);
         assert!(world.entity(fox).contains::<markers::HasCubs>());
     }
 
     #[test]
-    fn cubs_lost_clears_marker() {
+    fn no_cubs_born_event_no_marker() {
         let (mut world, mut schedule) = setup_cub_marker();
         let den = spawn_den(&mut world, 5, 5, 2);
         let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        // No event; no scan: the marker stays absent.
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::HasCubs>());
+    }
+
+    #[test]
+    fn cubs_present_decay_to_zero_removes_marker() {
+        let (mut world, mut schedule) = setup_cub_marker();
+        let den = spawn_den(&mut world, 5, 5, 2);
+        let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        write_cubs_born(&mut world, fox, den);
         schedule.run(&mut world);
         assert!(world.entity(fox).contains::<markers::HasCubs>());
+
+        // Den's cubs decay to zero (cub matured / died). The
+        // reconciliation pass over flagged foxes drops the marker.
         world
             .entity_mut(den)
             .get_mut::<FoxDen>()
             .unwrap()
             .cubs_present = 0;
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::HasCubs>());
+    }
+
+    #[test]
+    fn losing_home_den_removes_has_cubs() {
+        let (mut world, mut schedule) = setup_cub_marker();
+        let den = spawn_den(&mut world, 5, 5, 2);
+        let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        write_cubs_born(&mut world, fox, den);
+        schedule.run(&mut world);
+        assert!(world.entity(fox).contains::<markers::HasCubs>());
+
+        // Mother loses her den (abandoned / displaced); reconciliation
+        // pass clears HasCubs.
+        world.entity_mut(fox).get_mut::<FoxState>().unwrap().home_den = None;
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::HasCubs>());
     }
@@ -752,26 +831,73 @@ mod tests {
     }
 
     fn setup_has_den() -> (World, Schedule) {
-        let world = World::new();
+        let mut world = World::new();
+        world.init_resource::<bevy_ecs::message::Messages<
+            crate::messages::fox_lifecycle::DenClaimed,
+        >>();
+        world.init_resource::<bevy_ecs::message::Messages<
+            crate::messages::fox_lifecycle::DenLost,
+        >>();
         let mut schedule = Schedule::default();
         schedule.add_systems(update_den_marker);
         (world, schedule)
     }
 
+    fn write_den_claimed(world: &mut World, fox: Entity, den: Entity) {
+        world
+            .resource_mut::<bevy_ecs::message::Messages<
+                crate::messages::fox_lifecycle::DenClaimed,
+            >>()
+            .write(crate::messages::fox_lifecycle::DenClaimed {
+                fox,
+                den,
+                position: Position::new(0, 0),
+                tick: 0,
+            });
+    }
+
+    fn write_den_lost(world: &mut World, fox: Entity, den: Entity) {
+        world
+            .resource_mut::<bevy_ecs::message::Messages<
+                crate::messages::fox_lifecycle::DenLost,
+            >>()
+            .write(crate::messages::fox_lifecycle::DenLost {
+                fox,
+                den,
+                reason: crate::messages::fox_lifecycle::DenLostReason::Maturation,
+                tick: 0,
+            });
+    }
+
     #[test]
-    fn fox_with_home_den_gets_marker() {
+    fn den_claimed_event_inserts_marker() {
         let (mut world, mut schedule) = setup_has_den();
         let den = spawn_den(&mut world, 5, 5, 0);
         let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        write_den_claimed(&mut world, fox, den);
         schedule.run(&mut world);
         assert!(world.entity(fox).contains::<markers::HasDen>());
     }
 
     #[test]
-    fn fox_no_home_den_no_marker() {
+    fn den_lost_event_removes_marker() {
         let (mut world, mut schedule) = setup_has_den();
-        let fox = spawn_fox(&mut world, 0, 0);
+        let den = spawn_den(&mut world, 5, 5, 0);
+        let fox = spawn_fox_with_den(&mut world, 5, 5, den);
+        write_den_claimed(&mut world, fox, den);
+        schedule.run(&mut world);
+        assert!(world.entity(fox).contains::<markers::HasDen>());
+
+        write_den_lost(&mut world, fox, den);
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::HasDen>());
+    }
+
+    #[test]
+    fn no_events_no_marker() {
+        let (mut world, mut schedule) = setup_has_den();
+        let _fox = spawn_fox(&mut world, 0, 0);
+        // Without any DenClaimed event the marker stays absent.
+        schedule.run(&mut world);
     }
 }

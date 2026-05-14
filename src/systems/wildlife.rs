@@ -1384,6 +1384,29 @@ pub fn spawn_initial_fox_dens(world: &mut World, colony_center: Position) {
         if let Some(mut female_state) = world.get_mut::<FoxState>(female_entity) {
             female_state.mate = Some(male_entity);
         }
+
+        // Ticket 050: founder-pair den claim emits DenClaimed so
+        // `update_den_marker` can author HasDen event-driven from the
+        // very first tick (otherwise the per-tick scan would lag one
+        // tick behind the spawn). `Messages::write` is the
+        // exclusive-world equivalent of `MessageWriter::write`.
+        {
+            let mut messages = world.resource_mut::<bevy_ecs::message::Messages<
+                crate::messages::fox_lifecycle::DenClaimed,
+            >>();
+            messages.write(crate::messages::fox_lifecycle::DenClaimed {
+                fox: male_entity,
+                den: den_entity,
+                position: den_pos,
+                tick,
+            });
+            messages.write(crate::messages::fox_lifecycle::DenClaimed {
+                fox: female_entity,
+                den: den_entity,
+                position: den_pos,
+                tick,
+            });
+        }
     }
 }
 
@@ -1436,6 +1459,16 @@ pub fn fox_lifecycle_tick(
     constants: Res<SimConstants>,
     mut log: ResMut<NarrativeLog>,
     mut activation: ResMut<SystemActivation>,
+    // Ticket 050 — fox-lifecycle messages drive event-driven §4
+    // marker authoring (`fox_spatial::update_den_marker` /
+    // `update_cub_marker`).
+    mut den_claimed_w: bevy_ecs::message::MessageWriter<
+        crate::messages::fox_lifecycle::DenClaimed,
+    >,
+    mut den_lost_w: bevy_ecs::message::MessageWriter<crate::messages::fox_lifecycle::DenLost>,
+    mut cubs_born_w: bevy_ecs::message::MessageWriter<
+        crate::messages::fox_lifecycle::CubsBorn,
+    >,
 ) {
     let fc = &constants.fox_ecology;
     let cub_duration_ticks = fc.cub_duration.ticks(&time_scale);
@@ -1473,10 +1506,19 @@ pub fn fox_lifecycle_tick(
 
                 if let (FoxLifeStage::Cub, FoxLifeStage::Juvenile) = (old_stage, stage) {
                     // Detach from den, begin dispersing.
-                    if let Some(den_e) = fs.home_den {
+                    let den_e = fs.home_den;
+                    if let Some(den_e) = den_e {
                         if let Ok((_, mut den, _)) = dens.get_mut(den_e) {
                             den.cubs_present = den.cubs_present.saturating_sub(1);
                         }
+                        // Ticket 050: cub→juvenile is a DenLost emit
+                        // site (cub disperses from its birth den).
+                        den_lost_w.write(crate::messages::fox_lifecycle::DenLost {
+                            fox: *entity,
+                            den: den_e,
+                            reason: crate::messages::fox_lifecycle::DenLostReason::Maturation,
+                            tick: time.tick,
+                        });
                     }
                     fs.home_den = None;
                     activation.record(Feature::FoxCubMatured);
@@ -1516,8 +1558,19 @@ pub fn fox_lifecycle_tick(
             if let Ok((_, _, _, health)) = foxes.get(*entity) {
                 if health.current > 0.0 {
                     // Kill the fox.
-                    if let Ok((_, _, _, mut health)) = foxes.get_mut(*entity) {
+                    if let Ok((_, fs, _, mut health)) = foxes.get_mut(*entity) {
                         health.current = 0.0;
+                        // Ticket 050: fox death is a DenLost emit
+                        // site when the fox held a home_den. Marker
+                        // authors react on the next frame.
+                        if let Some(den_e) = fs.home_den {
+                            den_lost_w.write(crate::messages::fox_lifecycle::DenLost {
+                                fox: *entity,
+                                den: den_e,
+                                reason: crate::messages::fox_lifecycle::DenLostReason::Death,
+                                tick: time.tick,
+                            });
+                        }
                     }
                     let cause = if starving {
                         "starvation"
@@ -1559,9 +1612,9 @@ pub fn fox_lifecycle_tick(
                 && fs.mate.is_some()
         });
 
-        if female.is_none() {
+        let Some(&(mother_entity, _, _)) = female else {
             continue;
-        }
+        };
 
         let litter_size = rng
             .rng
@@ -1575,25 +1628,45 @@ pub fn fox_lifecycle_tick(
             };
             let cub_personality =
                 crate::components::fox_personality::FoxPersonality::random(&mut rng.rng);
-            commands.spawn((
-                WildAnimal::new(WildSpecies::Fox),
-                *den_pos,
-                Health::default(),
-                WildlifeAiState::Waiting,
-                FoxState::new_cub(sex, den_entity),
-                FoxAiPhase::DenGuarding,
-                crate::components::fox_personality::FoxNeeds::default(),
-                cub_personality,
-                crate::components::fox_spatial::FoxHuntingBeliefs::default_map(),
-                crate::components::fox_spatial::FoxThreatMemory::default_map(),
-                crate::components::fox_spatial::FoxExplorationMap::default_map(),
-                crate::components::SensorySpecies::Wild(WildSpecies::Fox),
-                crate::components::SensorySignature::WILDLIFE,
-            ));
+            let cub_entity = commands
+                .spawn((
+                    WildAnimal::new(WildSpecies::Fox),
+                    *den_pos,
+                    Health::default(),
+                    WildlifeAiState::Waiting,
+                    FoxState::new_cub(sex, den_entity),
+                    FoxAiPhase::DenGuarding,
+                    crate::components::fox_personality::FoxNeeds::default(),
+                    cub_personality,
+                    crate::components::fox_spatial::FoxHuntingBeliefs::default_map(),
+                    crate::components::fox_spatial::FoxThreatMemory::default_map(),
+                    crate::components::fox_spatial::FoxExplorationMap::default_map(),
+                    crate::components::SensorySpecies::Wild(WildSpecies::Fox),
+                    crate::components::SensorySignature::WILDLIFE,
+                ))
+                .id();
+            // Ticket 050: cub birth claims the cub's home_den. Event
+            // drives `update_den_marker` to insert HasDen on the cub
+            // without waiting for the next per-tick scan.
+            den_claimed_w.write(crate::messages::fox_lifecycle::DenClaimed {
+                fox: cub_entity,
+                den: den_entity,
+                position: *den_pos,
+                tick: time.tick,
+            });
         }
 
         den.cubs_present = litter_size;
         activation.record(Feature::FoxBred);
+        // Ticket 050: litter spawn is the CubsBorn emit site. Drives
+        // `update_cub_marker` to insert HasCubs on the mother.
+        cubs_born_w.write(crate::messages::fox_lifecycle::CubsBorn {
+            mother: mother_entity,
+            den: den_entity,
+            count: litter_size,
+            position: *den_pos,
+            tick: time.tick,
+        });
         log.push(
             time.tick,
             format!(

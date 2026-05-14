@@ -254,6 +254,14 @@ impl Plugin for SimulationPlugin {
         // update per-cat mental models. Action resolvers emit variants at
         // completion; the integrator finds witnesses by sensing-range query.
         app.add_message::<crate::messages::witnessable_event::WitnessableEvent>();
+        // 050 — fox-lifecycle mechanical events (no observer-side
+        // semantics). Consumed by `fox_spatial`'s §4 marker authors so
+        // `HasDen` / `HasCubs` author from event signals instead of
+        // (purely) per-tick scans. Emitted at fox-spawn / den-claim /
+        // cub-birth / den-loss sites in `wildlife.rs`.
+        app.add_message::<crate::messages::fox_lifecycle::DenClaimed>();
+        app.add_message::<crate::messages::fox_lifecycle::DenLost>();
+        app.add_message::<crate::messages::fox_lifecycle::CubsBorn>();
 
         // L2 substrate resources (§9 faction + §L2.10). FactionRelations
         // is a constant lookup — fine to insert at build time.

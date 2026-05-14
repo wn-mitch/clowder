@@ -683,9 +683,12 @@ impl WardNearbyFox {
     pub const KEY: &str = "WardNearbyFox";
 }
 
-/// Fox has ≥1 cub at its den. Per-tick author scan today
-/// (`fox_spatial.rs::update_cub_marker`); event-driven follow-on
-/// (`CubsBorn` / on-despawn) deferred to a separate ticket.
+/// Mother fox at a den whose `cubs_present > 0`. Hybrid
+/// event-driven + per-marker reconciliation
+/// (`fox_spatial.rs::update_cub_marker`): `CubsBorn` events insert
+/// the marker on the mother at the moment of spawn; a reconciliation
+/// pass over flagged foxes removes the marker when the den's
+/// cub count drops to 0 (cub maturation / cub death).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasCubs;
 impl HasCubs {
@@ -707,9 +710,10 @@ impl IsDispersingJuvenile {
     pub const KEY: &str = "IsDispersingJuvenile";
 }
 
-/// Fox has a home den. Per-tick author scan today
-/// (`fox_spatial.rs::update_den_marker`); event-driven follow-on
-/// (`DenClaimed` / `DenLost`) deferred to a separate ticket.
+/// Fox has a home den. Authored event-driven by
+/// `fox_spatial.rs::update_den_marker` from `DenClaimed` / `DenLost`
+/// messages emitted in `wildlife.rs` (initial pair spawn, cub birth,
+/// cub maturation, fox death).
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasDen;
 impl HasDen {
