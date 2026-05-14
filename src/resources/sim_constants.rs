@@ -2029,6 +2029,52 @@ pub struct ScoringConstants {
     /// walking the colony into rot.
     #[serde(default = "default_patrol_path_corruption_weight")]
     pub patrol_path_corruption_weight: f32,
+    /// 263: weight on Flee's 5th conditional axis `flee_affordance` —
+    /// reads `ActionAffordances::read(cat, nearest_threat, ActionKind::Flee)`
+    /// (substrate 261). The affordance heuristic composes proximity +
+    /// cover-self + my-health + perceived-violence-capability into one
+    /// `[0,1]` scalar. Pushed onto Flee's `CompensatedProduct` only
+    /// when the weight is non-zero (CP semantics: `c · 0 = 0` would
+    /// zero the whole product). Ships dormant at 0.0; activation in a
+    /// follow-on with the four-artifact methodology since the new
+    /// axis may shift the ShadowFoxAmbush canary.
+    #[serde(default = "default_flee_affordance_weight")]
+    pub flee_affordance_weight: f32,
+    /// 263: weight on Patrol's 6th conditional axis
+    /// `patrol_threat_recency` — reads `LocationBeliefs.recency_of_threat_cue`
+    /// at the cat's patrol perimeter anchor bucket (substrate 258).
+    /// Curve `Composite{Linear, Invert}` — high recency → low patrol
+    /// attractiveness. Pushed onto Patrol's `CompensatedProduct` only
+    /// when the weight is non-zero. Ships dormant at 0.0; activation
+    /// in a follow-on with the four-artifact methodology since
+    /// per-cat-subjective threat memory will shift Patrol's L3 share
+    /// and is the substrate-side fix for the L3 patrol-absorption
+    /// cascade (memory `project_l3_patrol_absorption_cascade`).
+    #[serde(default = "default_patrol_threat_recency_weight")]
+    pub patrol_threat_recency_weight: f32,
+    /// 263: weight on Hunt's per-target 5th axis
+    /// `hunt_best_predation_affordance` — reads
+    /// `max(Affordance(Stalk|Chase|Pounce))` for `(self, prey)` from
+    /// substrate 261. Encodes "is this prey actually catchable in any
+    /// predation form?" as an orthogonal axis to yield + alertness +
+    /// cooldown. WeightedSum composition: the other four axes are
+    /// scaled by `(1 - this weight)` to keep the sum at 1.0 when
+    /// activated. Ships dormant at 0.0.
+    #[serde(default = "default_hunt_best_predation_weight")]
+    pub hunt_best_predation_weight: f32,
+    /// 263: bias magnitude on the Hunt resolver's `stalk_start` band
+    /// threshold inside `resolve_engage_prey`. At bias `0.0` (default,
+    /// dormant) the threshold is unchanged from the distance-keyed
+    /// formula; at bias `b`, `stalk_start` is multiplied by
+    /// `(1 + b * (a_stalk - a_chase))` clamped to `±b`, where
+    /// `a_stalk` and `a_chase` are the affordances for the current
+    /// `(self, prey)` state. High stalk-affordance widens the stalk
+    /// band (cat starts stalking from farther out); high chase-
+    /// affordance narrows it (cat transitions to chase sooner).
+    /// `pounce_range` is NOT biased — the leap is a physics
+    /// invariant the catch math relies on.
+    #[serde(default = "default_hunt_stalk_chase_affordance_bias")]
+    pub hunt_stalk_chase_affordance_bias: f32,
     /// 220: weight on the `RecentAmbushMap` lift to ward-placement's
     /// threat term in `compute_ward_placement()`. Curve
     /// `Logistic(steepness=8.0, midpoint=0.5)` applied to the per-tile
@@ -2576,6 +2622,10 @@ impl Default for ScoringConstants {
             patrol_route_cost_weight: default_patrol_route_cost_weight(),
             patrol_path_fox_scent_weight: default_patrol_path_fox_scent_weight(),
             patrol_path_corruption_weight: default_patrol_path_corruption_weight(),
+            flee_affordance_weight: default_flee_affordance_weight(),
+            patrol_threat_recency_weight: default_patrol_threat_recency_weight(),
+            hunt_best_predation_weight: default_hunt_best_predation_weight(),
+            hunt_stalk_chase_affordance_bias: default_hunt_stalk_chase_affordance_bias(),
             ward_ambush_anchor_weight: default_ward_ambush_anchor_weight(),
             ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
             ward_placement_logistic_steepness: default_ward_placement_logistic_steepness(),
@@ -3974,6 +4024,32 @@ fn default_patrol_path_fox_scent_weight() -> f32 {
 /// `RouteCostField` construction.
 fn default_patrol_path_corruption_weight() -> f32 {
     1.5
+}
+
+/// 263: Flee `flee_affordance` axis weight. Ships dormant at 0.0;
+/// activation in a follow-on after concordance verification.
+fn default_flee_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 263: Patrol `patrol_threat_recency` axis weight. Ships dormant
+/// at 0.0; activation in a follow-on after concordance verification.
+fn default_patrol_threat_recency_weight() -> f32 {
+    0.0
+}
+
+/// 263: Hunt per-target `hunt_best_predation_affordance` axis weight.
+/// Ships dormant at 0.0; activation in a follow-on (recommended 0.15
+/// with the other four axes scaled by 0.85).
+fn default_hunt_best_predation_weight() -> f32 {
+    0.0
+}
+
+/// 263: Hunt resolver `stalk_start` band-threshold bias magnitude.
+/// Ships dormant at 0.0; activation in a follow-on (recommended
+/// 0.25 → ±25% width swing under maximum affordance asymmetry).
+fn default_hunt_stalk_chase_affordance_bias() -> f32 {
+    0.0
 }
 
 /// 256 R5: per-tick patrol deterrent deposit when a cat's

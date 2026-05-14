@@ -40,6 +40,14 @@ pub const BOLDNESS_INPUT: &str = "boldness";
 /// Ticket 087 — interoceptive perception axis. `health_deficit`
 /// gates Flee in a CompensatedProduct so wounded cats flee harder.
 pub const HEALTH_DEFICIT_INPUT: &str = "health_deficit";
+/// 263 — `Affordance(Flee, self, NearestThreat)` axis input. The
+/// `ctx_scalars` builder reads `ActionAffordances::read(cat,
+/// nearest_threat_entity, ActionKind::Flee)` and surfaces the
+/// scalar by this name. The substrate's affordance heuristic
+/// composes proximity + cover-self + my-health + perceived-violence-
+/// capability into one `[0,1]` scalar — a richer signal than the
+/// existing `flee_threat_distance` Power-Invert curve alone.
+pub const FLEE_AFFORDANCE_INPUT: &str = "flee_affordance";
 
 /// §L2.10.7 Flee range — Manhattan tiles for the nearest-threat
 /// anchor. 12 ≈ a wildlife detection radius; outside this the
@@ -116,20 +124,49 @@ impl FleeDse {
             intercept: 0.6,
         };
 
+        let mut considerations: Vec<Consideration> = vec![
+            Consideration::Scalar(ScalarConsideration::new(SAFETY_DEFICIT_INPUT, safety_curve)),
+            Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_invert)),
+            Consideration::Spatial(SpatialConsideration::new(
+                "flee_threat_distance",
+                LandmarkSource::Anchor(LandmarkAnchor::NearestThreat),
+                FLEE_THREAT_RANGE,
+                threat_distance,
+            )),
+            Consideration::Scalar(ScalarConsideration::new(HEALTH_DEFICIT_INPUT, health_curve)),
+        ];
+        let mut weights = vec![1.0_f32, 1.0, 1.0, 1.0];
+
+        // 263: conditional 5th axis `flee_affordance` reading the
+        // 261 substrate via `ActionAffordances::read(cat,
+        // nearest_threat, ActionKind::Flee)`. The affordance bakes
+        // proximity + cover-self + my-health + perceived-violence-
+        // capability into one composite — a richer signal than the
+        // pre-263 `flee_threat_distance` axis alone. Conditionally
+        // added because CP semantics `c · 0 = 0` would zero the
+        // whole product if pushed at weight 0; ships dormant at the
+        // default `flee_affordance_weight = 0.0`. Activation in a
+        // follow-on with the four-artifact methodology since the
+        // new axis may shift the ShadowFoxAmbush canary in either
+        // direction. The Linear curve over the already-normalized
+        // `[0,1]` affordance keeps the DSE-side shape neutral —
+        // the substrate's writer is the canonical shaping site.
+        let flee_aff_weight = scoring.flee_affordance_weight.clamp(0.0, 1.0);
+        if flee_aff_weight > 0.0 {
+            considerations.push(Consideration::Scalar(ScalarConsideration::new(
+                FLEE_AFFORDANCE_INPUT,
+                Curve::Linear {
+                    slope: 1.0,
+                    intercept: 0.0,
+                },
+            )));
+            weights.push(flee_aff_weight);
+        }
+
         Self {
             id: DseId("flee"),
-            considerations: vec![
-                Consideration::Scalar(ScalarConsideration::new(SAFETY_DEFICIT_INPUT, safety_curve)),
-                Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_invert)),
-                Consideration::Spatial(SpatialConsideration::new(
-                    "flee_threat_distance",
-                    LandmarkSource::Anchor(LandmarkAnchor::NearestThreat),
-                    FLEE_THREAT_RANGE,
-                    threat_distance,
-                )),
-                Consideration::Scalar(ScalarConsideration::new(HEALTH_DEFICIT_INPUT, health_curve)),
-            ],
-            composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
+            considerations,
+            composition: Composition::compensated_product(weights),
             // §9.3 DSE filter binding — Flee triggers on `Predator` stance.
             // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats — a
             // cat with an unhealed Severe injury can't flee, matching
@@ -337,8 +374,50 @@ mod tests {
     #[test]
     fn flee_has_four_axes_with_health() {
         // Ticket 087 — health_deficit axis added.
+        // Ticket 263 — `flee_affordance` 5th axis is conditional on
+        // `flee_affordance_weight > 0.0`; default-config behaviour
+        // remains 4 axes.
         let s = ScoringConstants::default();
         assert_eq!(FleeDse::new(&s).considerations().len(), 4);
+    }
+
+    #[test]
+    fn flee_affordance_axis_dormant_at_default() {
+        // Ticket 263 — `flee_affordance_weight` ships at 0.0; the
+        // 5th axis MUST NOT appear in the considerations list, since
+        // CP semantics `(c · 0) = 0` would zero the whole product.
+        let s = ScoringConstants::default();
+        assert_eq!(s.flee_affordance_weight, 0.0);
+        let dse = FleeDse::new(&s);
+        assert!(
+            dse.considerations()
+                .iter()
+                .all(|c| !matches!(c, Consideration::Scalar(sc) if sc.name == FLEE_AFFORDANCE_INPUT)),
+            "flee_affordance axis must be absent at dormant weight"
+        );
+    }
+
+    #[test]
+    fn flee_affordance_axis_present_when_weight_lifted() {
+        // Ticket 263 — when the activation follow-on lifts the weight,
+        // the 5th axis appears with a Linear curve and the
+        // composition picks up its weight.
+        let mut s = ScoringConstants::default();
+        s.flee_affordance_weight = 0.5;
+        let dse = FleeDse::new(&s);
+        assert_eq!(dse.considerations().len(), 5);
+        let aff = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(sc) if sc.name == FLEE_AFFORDANCE_INPUT => Some(&sc.curve),
+                _ => None,
+            })
+            .expect("flee_affordance axis must exist at non-zero weight");
+        // Linear identity over the substrate's normalized [0,1].
+        assert!((aff.evaluate(0.0) - 0.0).abs() < 1e-4);
+        assert!((aff.evaluate(0.5) - 0.5).abs() < 1e-4);
+        assert!((aff.evaluate(1.0) - 1.0).abs() < 1e-4);
     }
 
     #[test]
