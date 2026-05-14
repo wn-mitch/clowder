@@ -1,7 +1,7 @@
 ---
 id: 141
 title: combat_winnability perception scalar — sibling to escape_viability
-status: ready
+status: done
 cluster: belief-perception
 initiative: [full-sensory-perception]
 added: 2026-05-02
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: [046]
 related-systems: [ai-substrate-refactor.md, body-zones.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-13
 ---
 
 ## Why
@@ -201,3 +201,4 @@ Five-phase playbook mirroring 103:
   implementation, then 261 wraps it in the substrate; (b) close 141 as
   superseded and rebuild Fight estimator inside 261 from 141's design.
   Decision deferred to 261's implementation phase.
+- 2026-05-13: superseded by 261 — the dps-balance + ttk + ally-factor worked composition lands as the Affordance(Fight) heuristic estimator in the ActionAffordances substrate (src/systems/affordance_writer.rs::write_cat_vs_cat). No standalone perception scalar; consumers (post-263) read via read_affordance(ActionKind::Fight, ...).
