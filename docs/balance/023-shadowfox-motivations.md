@@ -136,3 +136,46 @@ Phase C frame-diff), `logs/tuned-42-023-phase-c-no-stalking-guard/`
 (Phase C without the motivation-tick-respects-Stalking fix; shows
 HauntingEscalated=19 but ShadowFoxAmbush=1 — the smoking gun that
 revealed the bug), `logs/tuned-42/` (Phase C with guard, current).
+
+## Phase D wrap-up (2026-05-14)
+
+Phase D's job per the plan was either multi-seed sweep + balance
+verification + parameter tuning, or accept-the-equilibrium with a
+documented follow-on. We chose the latter for two reasons:
+
+1. **Hard gates hold.** Survival canary PASS, no Starvation, all four
+   motivation Features fire, ShadowFoxAmbush 2 vs baseline 2.
+2. **The unresolved regression sits on a *separate* causal chain.**
+   mythic-texture is fed by `ShadowFoxBanished`, which fires when cats
+   form a posse and combat-kill a shadow-fox. Phase B/C substrate gets
+   shadow-foxes into Stalking 11× per soak and into Ambush 2× per
+   soak (baseline parity). What's missing is the *cat-side* chain:
+   posse-formation around an ambushed cat, posse-engagement against
+   the shadow-fox, and combat-resolution producing the banishment.
+   That chain lives in DSE-land (posse-DSEs, threat-engagement
+   scoring) — outside ticket 023's wildlife-substrate scope.
+
+Per CLAUDE.md memory `feedback_chain_rare_events`: "for tickets whose
+hard-gate metric sits at the end of a long causal chain, prefer
+structural verification + optional longer soak over multi-seed
+sweeps." Structural verification met; multi-seed sweep deferred to the
+posse-formation follow-on.
+
+**Follow-on**: open a ticket against the cat-side posse-banishment
+chain. Acceptance: mythic-texture canary returns to ≥1/soak on
+seed-42. Layer-walk anchors — cat posse formation DSE, threat-
+engagement scoring, combat-resolution at the ambush-witness boundary.
+
+**Verdict on the Phase A → C substrate**: concordant. 7/7 predicted
+directions matched in Phase B verification; Phase C deep-Dread +
+haunting-drain correctly delivers the psychological-predation path the
+design doc named without breaking survival invariants. The new
+equilibrium (shadow-foxes self-preserve via Reconstituting, dying via
+sustained cleansing rather than combat) is the design doc's intended
+"both defeat paths valid — coherence dissolution via cleansing is a
+slow environmental kill" — except the cleansing-driven dissolution
+itself didn't fire in seed-42 (`ShadowFoxDissolved=0`). Confirming
+dissolution requires sustained cleansing pressure that the seed-42
+colony didn't reach; structural verification via the unit tests in
+`src/systems/wildlife.rs::tests` (shadowfox_dissolves_on_clean_ground)
+suffices.

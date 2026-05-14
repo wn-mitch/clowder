@@ -1,7 +1,7 @@
 ---
 id: 023
 title: Shadowfox motivations distinct from normal foxes
-status: ready
+status: done
 cluster: wildlife
 initiative: [predator-prey-dynamics]
 added: 2026-04-14
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [magic, wildlife, combat]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 66c8bdb8
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -80,3 +80,7 @@ Full design: `.claude/plans/let-s-work-to-design-zippy-boot.md`
 - ✓ landed **209** (done, balance, score 0.87 (cross-cluster)) — Positive colony_food_security axis on higher-tier DSEs
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-14: Phases A-D landed. Substrate complete (Coherence + Resonance + Dread + Entropy four-drive softmax). Survival/continuity hard gates met; mythic-texture regression documented in docs/balance/023-shadowfox-motivations.md with structural cause (separate posse-formation chain) — follow-on ticket recommended for combat-banishment restoration.
