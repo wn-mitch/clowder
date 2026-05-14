@@ -481,6 +481,14 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert ward coverage map resource (ticket 045 — substrate-refactor §5.6.3).
     world.insert_resource(crate::resources::WardCoverageMap::default());
 
+    // 261: per-action success-affordance substrate. Allocated empty;
+    // populated each tick by `affordance_writer` (ticket 261 C3). Lands
+    // substrate-only — no DSE consumers wired at land, so the resource is
+    // present but unread, and `just verdict` shows null behavioural
+    // drift. Consumer tickets (263+) read via `read_affordance(...)`
+    // inside their `fetch_target` closures.
+    world.insert_resource(crate::resources::ActionAffordances::default());
+
     // 301: ward-placement intent map. Dormant at default
     // `SimConstants` (populator and reader both short-circuit on
     // their flags). Allocated unconditionally so the resource is

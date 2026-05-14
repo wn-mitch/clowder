@@ -1,3 +1,4 @@
+pub mod action_affordances;
 pub mod aspiration_registry;
 pub mod carcass_scent_map;
 pub mod cat_patrol_deterrent_map;
@@ -43,6 +44,16 @@ pub mod weather;
 pub mod wind;
 pub mod zodiac;
 
+pub use action_affordances::{
+    read_affordance, ActionAffordances, ActionKind, AFFORDANCE_AMBUSH_INPUT,
+    AFFORDANCE_BOLT_INPUT, AFFORDANCE_CARE_INPUT, AFFORDANCE_CHASE_INPUT, AFFORDANCE_DIVE_INPUT,
+    AFFORDANCE_FAWN_INPUT, AFFORDANCE_FEED_KITTEN_INPUT, AFFORDANCE_FIGHT_INPUT,
+    AFFORDANCE_FLEE_INPUT, AFFORDANCE_FREEZE_INPUT, AFFORDANCE_GROOM_OTHER_INPUT,
+    AFFORDANCE_HISS_INPUT, AFFORDANCE_MATE_INPUT, AFFORDANCE_MENTOR_INPUT,
+    AFFORDANCE_POSTURE_INPUT, AFFORDANCE_POUNCE_INPUT, AFFORDANCE_SCATTER_GROUP_INPUT,
+    AFFORDANCE_SOCIALIZE_INPUT, AFFORDANCE_STALK_INPUT, AFFORDANCE_STRIKE_INPUT,
+    AFFORDANCE_THREATEN_INPUT,
+};
 pub use aspiration_registry::AspirationRegistry;
 pub use carcass_scent_map::CarcassScentMap;
 pub use cat_patrol_deterrent_map::CatPatrolDeterrentMap;
