@@ -15,10 +15,10 @@ _Last generated: 2026-05-14._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 96 |
+| Ready | 95 |
 | Parked | 10 |
 | Blocked | 22 |
-| **Open total** | **134** |
+| **Open total** | **133** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -42,9 +42,9 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[wildlife] · score 0.92_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · score 0.91_
+- **[153](docs/open-work/tickets/153-150-r5a-balance-follow-on.md)** — 150 R5a balance follow-on — Resting score-mass and courtship recovery — _[ai-substrate] · score 0.91_
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _[ai-substrate] · score 0.90_
 
 ## Epic progress (3)
 
@@ -65,13 +65,12 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling-diagnostics-ui] · added 2026-05-08_
 
-## Ready by cluster (96)
+## Ready by cluster (95)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (25 ready, 4 blocked)
+### ai-substrate (24 ready, 4 blocked)
 
-- **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _[ai-substrate] · added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[008](docs/open-work/tickets/008-cluster-d-formalization-verification.md)** — Formalization and verification (Cluster D) — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -274,9 +273,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 
-## Ready (96)
+## Ready (95)
 
-- **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _[ai-substrate] · added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
 - **[008](docs/open-work/tickets/008-cluster-d-formalization-verification.md)** — Formalization and verification (Cluster D) — _[ai-substrate] · added 2026-04-20_
@@ -416,14 +414,15 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (202)
+## Landed archive (203)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (137)
+### 2026-05 (138)
 
 - **[051](docs/open-work/landed/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers _(2026-05-14)_
 - **[050](docs/open-work/landed/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den _(2026-05-14)_
+- **[002](docs/open-work/landed/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures _(2026-05-14)_
 - **[313](docs/open-work/landed/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) _(2026-05-13)_
 - **[312](docs/open-work/landed/312-fox-approach-corridor-perception-axis-for-ward-placement-301-fo-2.md)** — fox-approach-corridor perception axis for ward placement (301 FO-2) _(2026-05-13)_
 - **[311](docs/open-work/landed/311-scenario-fixture-chokepoint-isthmus-ward-corking-test-301-fo-1.md)** — scenario fixture — chokepoint isthmus ward-corking test (301 FO-1) _(2026-05-13)_

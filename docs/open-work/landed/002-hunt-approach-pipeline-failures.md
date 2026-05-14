@@ -1,7 +1,7 @@
 ---
 id: 002
 title: Hunt-approach pipeline failures
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-04-20
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Current state
@@ -32,6 +32,30 @@ during stalk/approach.
 weeks 1–3 settle (22/9/18), weeks 4+ oscillate 3–15. Not a flatline — the
 local depletion → recovery cycle works. The issue is conversion: 1,981
 Hunt plans created, ~11% convert to kills.
+
+## Closure (2026-05-14)
+
+Closing as **superseded by 184 + 176 + 150**. The hunt-pipeline
+symptoms this ticket characterized have substantially resolved
+without direct tuning of the candidate levers (stalk speed, approach
+speed, prey detect-of-cat). The intervening structural work fixed
+the upstream conversion-rate problem.
+
+Quantified state on canonical seed-42 15-min soak (commit 9fb5c96f,
+post-050):
+
+| Metric | Ticket baseline (2026-04-20) | Current (2026-05-14) | Delta |
+|---|---|---|---|
+| `EngagePrey: lost prey during approach` | 1,774 | 717 | −60% |
+| `EngagePrey: stuck while stalking` | 257–341 | 209 | −24% to −39% |
+| `SearchPrey: no scent found` | 9 | 2 | −78% |
+| Hunt `PlanCreated` count | 1,981 | 1,764 | −11% |
+| Hunt plan → `PreyKilled` conversion | ~11% (≈218) | ~31% (552) | 2.8× |
+
+If a future regression re-elevates these failure modes past the
+current baseline, open a fresh bugfix ticket against the new data
+rather than reopening 002 (the candidate levers and data here are
+stale enough that the layer-walk would need redoing).
 
 ## Related work
 
