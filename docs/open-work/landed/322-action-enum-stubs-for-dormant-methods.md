@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: pending
+landed-at: a8eeaaf9b43c
 landed-on: 2026-05-14
 ---
 
