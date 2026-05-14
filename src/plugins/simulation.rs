@@ -231,10 +231,23 @@ pub fn register_influence_maps_at_startup(mut registry: ResMut<InfluenceMapRegis
 /// with `id: MethodId("<slug>")` and `blocker: "<ticket-id>"` each on
 /// their own line. See `src/ai/methods/mod.rs` module doc for the full
 /// contract.
-pub fn populate_method_registry(_registry: &mut MethodRegistry) {
-    // Methods will be registered here by tickets 320 onward. The
-    // registry stays empty at 319 landing — see
-    // `src/ai/methods/mod.rs` module doc and `docs/systems/htn-methods.md`.
+pub fn populate_method_registry(registry: &mut MethodRegistry) {
+    // 322: Tier-2 dormant methods. Each is registered as
+    // `ApplicableWhen::PendingSubstrate { blocker }` pointing at its
+    // wiring ticket (#332/#333/#334). `MethodRegistry::lookup` filters
+    // them out unconditionally, so they exist for the type-system and
+    // the dormancy audit but never run at runtime. The wiring tickets
+    // flip them to `ApplicableWhen::Live` when they land.
+    use crate::ai::methods::acquire_stealth::{
+        acquire_stealth_via_commission, acquire_stealth_via_self_craft,
+    };
+    use crate::ai::methods::mourn_at_grave::mourn_at_grave;
+    use crate::ai::methods::rear_kitten::rear_kitten;
+
+    registry.push(mourn_at_grave());
+    registry.push(rear_kitten());
+    registry.push(acquire_stealth_via_self_craft());
+    registry.push(acquire_stealth_via_commission());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of

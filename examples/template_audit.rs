@@ -95,7 +95,19 @@ fn assert_all_actions_covers_action(a: Action) {
         | Action::Trash
         | Action::Handoff
         | Action::PickUp
-        | Action::Bury => {}
+        | Action::Bury
+        // 322: dormant HTN-method sub-goal Actions. Wired in
+        // #332/#333/#334; the audit arm matches them to keep the
+        // assertion exhaustive without forcing template authoring
+        // before substrate exists.
+        | Action::WearItem
+        | Action::Craft
+        | Action::PetitionCoordinator
+        | Action::Vigil
+        | Action::GriefSit
+        | Action::Wean
+        | Action::Teach
+        | Action::Release => {}
     }
 }
 

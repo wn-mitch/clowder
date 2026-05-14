@@ -108,7 +108,19 @@ fn assert_pick_pool_covers_action(a: Action) {
         | Action::Trash
         | Action::Handoff
         | Action::PickUp
-        | Action::Bury => {}
+        | Action::Bury
+        // 322: dormant HTN-method sub-goal Actions. Pick pool stays
+        // narrow until the wiring tickets (#332/#333/#334) author
+        // real templates; the variants exist so the pick-pool witness
+        // forces this decision rather than silently extending it.
+        | Action::WearItem
+        | Action::Craft
+        | Action::PetitionCoordinator
+        | Action::Vigil
+        | Action::GriefSit
+        | Action::Wean
+        | Action::Teach
+        | Action::Release => {}
     }
 }
 
@@ -174,6 +186,17 @@ fn main() {
             // existing template (mentor — solemn one-on-one prose
             // shape) so the template_prompt smoke run still renders.
             Action::Bury => "mentor.ron",
+            // 322: dormant HTN-method sub-goal Actions. No templates
+            // authored yet — wiring tickets (#332/#333/#334) author
+            // real prose when they flip the corresponding method to
+            // Live. Reuse the closest existing template per Action
+            // so the smoke run still renders something.
+            Action::WearItem => "forage.ron",
+            Action::Craft => "build.ron",
+            Action::PetitionCoordinator => "socialize.ron",
+            Action::Vigil => "mentor.ron",
+            Action::GriefSit => "idle.ron",
+            Action::Wean | Action::Teach | Action::Release => "mentor.ron",
         };
 
         let tier = match action {

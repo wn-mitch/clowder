@@ -442,6 +442,85 @@ pub fn generate_narrative(
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Significant)
             }
+
+            // 322: dormant HTN-method sub-goal narratives. Each Action
+            // is wired in #332/#333/#334; until then no Live method
+            // emits them so these arms are unreachable at runtime. The
+            // prose lands here following ticket 104 / 176 precedent
+            // ("land the narrative anchor early so the ticker has
+            // prose ready once lift activation wakes the method up").
+            Action::WearItem => {
+                let options = [
+                    format!("{cat} settles a piece of worn gear into place."),
+                    format!("{cat} pulls a wearable item snug across their fur."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Craft => {
+                let options = [
+                    format!("{cat} works carefully at the bench, shaping a piece by hand."),
+                    format!("{cat} bends to a craft project, gathering materials together."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::PetitionCoordinator => {
+                let options = [
+                    format!("{cat} approaches a coordinator with a quiet request."),
+                    format!("{cat} petitions one of the colony's coordinators for help."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Vigil => {
+                let options = [
+                    format!("{cat} sits beside a grave, keeping silent vigil."),
+                    format!("{cat} holds vigil at a fallen companion's resting place."),
+                    format!("{cat} stays near a grave, ears low, eyes half-closed."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Significant)
+            }
+
+            Action::GriefSit => {
+                let options = [
+                    format!("{cat} curls into themselves in the den, grieving quietly."),
+                    format!("{cat} sits with their grief, away from the colony's bustle."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Wean => {
+                let options = [
+                    format!("{cat} guides a kitten toward solid food, gentle but firm."),
+                    format!("{cat} eases a kitten away from nursing toward the next stage."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Teach => {
+                let options = [
+                    format!("{cat} demonstrates a careful skill to a watching kitten."),
+                    format!("{cat} patiently shows a young one how it's done."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::Release => {
+                let options = [
+                    format!("{cat} steps back, letting a grown kitten find their own path."),
+                    format!("{cat} releases a no-longer-dependent youngster to the colony at large."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Significant)
+            }
         };
 
         log.push(tick, text, tier);

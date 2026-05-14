@@ -1,7 +1,7 @@
 ---
 id: 322
 title: Action-enum stubs for dormant HTN methods
-status: ready
+status: done
 cluster: items-crafting
 initiative: [smarter-cats]
 added: 2026-05-14
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -92,3 +92,4 @@ intentionally-inert exit.
 
 - 2026-05-14: opened as 128 epic child #4 (Batch A infrastructure,
   parallel with #319).
+- 2026-05-14: landed. 8 dormant Action variants + 4 PendingSubstrate methods (mourn_at_grave / rear_kitten / acquire_stealth_via_self_craft / acquire_stealth_via_commission) registered. First real exercise of check_method_registry.sh's bidirectional gate; negative tests verified Pass A (blocker→open ticket) and Pass B (frontmatter wires-method back-ref). Placeholder resolvers under src/steps/disposition/ carry 5-heading contract; allowlist entries in scripts/substrate_stubs.allowlist anchor each resolver to its wiring ticket (#332/#333/#334).

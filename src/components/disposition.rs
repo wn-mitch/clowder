@@ -299,7 +299,25 @@ impl DispositionKind {
             // "remain still and hope" sibling valence; `Idle` is
             // the no-op fallback. Both stay headless until evidence
             // justifies promoting them.
-            Action::Idle | Action::Hide => None,
+            //
+            // 322: HTN-method sub-goal Primitives (WearItem / Craft /
+            // PetitionCoordinator / Vigil / GriefSit / Wean / Teach /
+            // Release) also return None. They're never L3-selectable —
+            // a Live HTN method emits them as method sub-goal leaves,
+            // not as winning actions from the per-tick DSE softmax.
+            // Their wiring tickets (#332/#333/#334) flip the
+            // corresponding PendingSubstrate method to Live; the
+            // Actions stay outside DispositionKind selection regardless.
+            Action::Idle
+            | Action::Hide
+            | Action::WearItem
+            | Action::Craft
+            | Action::PetitionCoordinator
+            | Action::Vigil
+            | Action::GriefSit
+            | Action::Wean
+            | Action::Teach
+            | Action::Release => None,
         }
     }
 

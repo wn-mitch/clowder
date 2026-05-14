@@ -6,7 +6,7 @@ cluster: items-crafting
 initiative: [smarter-cats, world-richness]
 added: 2026-05-14
 parked: null
-blocked-by: [320, 322]
+blocked-by: [320]
 wires-method: [acquire_stealth_via_self_craft, acquire_stealth_via_commission]
 supersedes: []
 related-systems: [htn-methods.md, slot-inventory.md, crafting.md]

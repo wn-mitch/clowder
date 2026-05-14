@@ -17,3 +17,22 @@
 
 HideEligible 170           # Hide-authoring system (extends ticket 104's Phase 1 dormancy)
 STUB:src/ai/planner/actions.rs:298:trashing 200    # Trashing routes through Wilds until PlannerZone::Midden lands (ticket 200) — line shifted by 035's burying_actions() insertion
+
+# 322: Action-enum dormant stubs for the 128 HTN-methods epic Tier-2
+# methods. Each placeholder step resolver in `src/steps/disposition/`
+# returns `StepResult::Fail` and is never invoked at runtime (the
+# corresponding HTN method is registered as PendingSubstrate, so
+# `MethodRegistry::lookup` filters it out). Documentation-only
+# convention per `docs/systems/htn-methods.md` §G / Action-enum stubs
+# — `check_substrate_stubs.sh` does not currently audit resolver
+# symbol names, so these entries anchor the dormant→wiring
+# relationship for grep / similar-search / code-review rather than
+# gating CI. Drop each entry when the named ticket lands.
+resolve_wear_item             334   # acquire_stealth_via_{self_craft,commission} don-gear sub-goal
+resolve_craft                 334   # acquire_stealth_via_self_craft crafting sub-goal
+resolve_petition_coordinator  334   # acquire_stealth_via_commission petition sub-goal
+resolve_vigil                 332   # mourn_at_grave vigil-at-grave sub-goal
+resolve_grief_sit             332   # mourn_at_grave grieve-in-den sub-goal
+resolve_wean                  333   # rear_kitten weaning sub-goal
+resolve_teach                 333   # rear_kitten teaching sub-goal
+resolve_release               333   # rear_kitten release sub-goal

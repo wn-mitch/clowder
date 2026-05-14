@@ -239,6 +239,20 @@ const PICK_UP: &str = "pick_up";
 // 035: bury DSE id. Single-action disposition (Burying); same
 // pattern as Mentor / GroomOther.
 const BURY: &str = "bury";
+// 322: dormant HTN-method sub-goal Action ids. No DSE is registered
+// against any of these keys today — they exist so the exhaustive
+// `dse_id_for_action` / `constituent_dses_for_action` matches stay
+// total. Their wiring tickets (#332/#333/#334) author the real DSE
+// authoring sites when they flip the corresponding PendingSubstrate
+// method to Live.
+const WEAR_ITEM: &str = "wear_item";
+const CRAFT: &str = "craft";
+const PETITION_COORDINATOR: &str = "petition_coordinator";
+const VIGIL: &str = "vigil";
+const GRIEF_SIT: &str = "grief_sit";
+const WEAN: &str = "wean";
+const TEACH: &str = "teach";
+const RELEASE: &str = "release";
 
 // Disposition-failure cooldown scalar keys, one per failure-prone
 // DispositionKind. 1.0 = no recent failure (no damp);
@@ -793,6 +807,17 @@ pub const fn dse_id_for_action(action: crate::ai::Action) -> &'static str {
         Action::Handoff => HANDOFF,
         Action::PickUp => PICK_UP,
         Action::Bury => BURY,
+        // 322: dormant HTN-method sub-goal Actions. No DSE scores
+        // these — they're never selectable via L3 — but the match must
+        // stay exhaustive. Wired in #332/#333/#334.
+        Action::WearItem => WEAR_ITEM,
+        Action::Craft => CRAFT,
+        Action::PetitionCoordinator => PETITION_COORDINATOR,
+        Action::Vigil => VIGIL,
+        Action::GriefSit => GRIEF_SIT,
+        Action::Wean => WEAN,
+        Action::Teach => TEACH,
+        Action::Release => RELEASE,
     }
 }
 
@@ -845,6 +870,19 @@ pub fn action_for_ordinal(ord: f32) -> Option<crate::ai::Action> {
         32 => Action::Handoff,
         33 => Action::PickUp,
         34 => Action::Bury,
+        // 322: dormant HTN-method sub-goal Actions. The directive-
+        // momentum modifier never targets them (no Live DSE emits the
+        // matching ordinal), but the ordinal decode stays exhaustive
+        // so a future Live wire-up in #332/#333/#334 doesn't reshuffle
+        // the discriminant table.
+        35 => Action::WearItem,
+        36 => Action::Craft,
+        37 => Action::PetitionCoordinator,
+        38 => Action::Vigil,
+        39 => Action::GriefSit,
+        40 => Action::Wean,
+        41 => Action::Teach,
+        42 => Action::Release,
         _ => return None,
     })
 }
@@ -4006,6 +4044,18 @@ mod tests {
                 // 035: Bury single-action mapping for the Patience
                 // modifier's ordinal table.
                 Action::Bury => &[BURY],
+                // 322: dormant HTN-method sub-goal Actions. Listed
+                // for exhaustivity; the Patience modifier never
+                // queries them (no Live DSE has them as constituent).
+                // Wired in #332/#333/#334.
+                Action::WearItem => &[WEAR_ITEM],
+                Action::Craft => &[CRAFT],
+                Action::PetitionCoordinator => &[PETITION_COORDINATOR],
+                Action::Vigil => &[VIGIL],
+                Action::GriefSit => &[GRIEF_SIT],
+                Action::Wean => &[WEAN],
+                Action::Teach => &[TEACH],
+                Action::Release => &[RELEASE],
             }
         }
 

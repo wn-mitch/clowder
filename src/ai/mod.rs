@@ -136,6 +136,43 @@ pub enum Action {
     /// `Feature::BurialPerformed` and `EventKind::BurialFired`, which
     /// tallies the `burial` continuity canary.
     Bury,
+    /// 322 / 334 — dormant stub for `acquire_stealth_via_*` methods.
+    /// `Action::WearItem` will be wired in #334 alongside the slot-
+    /// inventory substrate and the StealthCloak recipe. Until then no
+    /// Live HTN method emits it; the placeholder resolver returns
+    /// `StepResult::Fail` so accidental dispatch is observable.
+    WearItem,
+    /// 322 / 334 — dormant stub for `acquire_stealth_via_self_craft`.
+    /// `Action::Craft` will be wired in #334 alongside the StealthCloak
+    /// recipe + crafting substrate. Until then no Live HTN method emits
+    /// it; the placeholder resolver returns `StepResult::Fail`.
+    Craft,
+    /// 322 / 334 — dormant stub for `acquire_stealth_via_commission`.
+    /// `Action::PetitionCoordinator` will be wired in #334 (the
+    /// commission flow needs both this action and the coordinator-side
+    /// fulfillment substrate). Until then no Live HTN method emits it.
+    PetitionCoordinator,
+    /// 322 / 332 — dormant stub for `mourn_at_grave`. `Action::Vigil`
+    /// will be wired in #332 (grief-vigil action vocabulary) alongside
+    /// the Grave-target picker. Until then no Live HTN method emits it.
+    Vigil,
+    /// 322 / 332 — dormant stub for `mourn_at_grave`. `Action::GriefSit`
+    /// will be wired in #332 (grief-vigil action vocabulary). Until
+    /// then no Live HTN method emits it.
+    GriefSit,
+    /// 322 / 333 — dormant stub for `rear_kitten`. `Action::Wean` will
+    /// be wired in #333 (kitten-rearing action vocabulary) keyed to
+    /// `KittenDependency`. Until then no Live HTN method emits it.
+    Wean,
+    /// 322 / 333 — dormant stub for `rear_kitten`. `Action::Teach` will
+    /// be wired in #333 (kitten-rearing action vocabulary). Until then
+    /// no Live HTN method emits it.
+    Teach,
+    /// 322 / 333 — dormant stub for `rear_kitten`. `Action::Release`
+    /// will be wired in #333 (kitten-rearing action vocabulary —
+    /// terminal sub-goal that retires the rearing arc). Until then no
+    /// Live HTN method emits it.
+    Release,
 }
 
 // ---------------------------------------------------------------------------

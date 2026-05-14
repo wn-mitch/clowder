@@ -285,6 +285,17 @@ impl MethodRegistry {
     }
 }
 
+// 322: dormant HTN-method modules. Each file declares one or more
+// `ApplicableWhen::PendingSubstrate` methods whose `blocker` field
+// points at the open ticket that flips the method to Live. The
+// `scripts/check_method_registry.sh` lint walks every `Method { … }`
+// literal in these files and enforces the bidirectional dormancy
+// gate (blocker → open ticket → ticket's `wires-method:` references
+// the method id).
+pub mod acquire_stealth;
+pub mod mourn_at_grave;
+pub mod rear_kitten;
+
 // Tests live in `tests.rs` so the bash lint can exclude that path
 // while scanning `src/ai/methods/` for production `Method` literals.
 #[cfg(test)]

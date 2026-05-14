@@ -6,7 +6,7 @@ cluster: life-cycle
 initiative: [smarter-cats, generational-continuity]
 added: 2026-05-14
 parked: null
-blocked-by: [320, 322]
+blocked-by: [320]
 wires-method: [mourn_at_grave]
 supersedes: []
 related-systems: [htn-methods.md]
