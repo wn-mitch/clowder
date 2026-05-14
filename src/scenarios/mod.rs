@@ -25,6 +25,7 @@
 //! scenario runs are byte-deterministic per seed. The runner asserts this
 //! invariant in tests via stdout-diff.
 
+pub mod affordance_substrate;
 pub mod chokepoint_defense_isthmus;
 pub mod colony_reserves_belief;
 pub mod disposal_dispatch;
@@ -223,6 +224,16 @@ pub const ALL: &[&Scenario] = &[
     // saturating-ramp gate break the multi-wake ring-formation
     // behavior in surrounded-threat geometry?
     &surrounded_colony::SCENARIO,
+    // 261 — ActionAffordances substrate microexperiments. Six variants
+    // exercising the writer across all five families. Behavior-neutral
+    // assertions read directly from the `ActionAffordances` resource —
+    // L2/L3 trace assertions land in consumer tickets (263+).
+    &affordance_substrate::SCENARIO_FLEE_HIGH_COVER,
+    &affordance_substrate::SCENARIO_FLEE_OPEN_GROUND,
+    &affordance_substrate::SCENARIO_DIVE_HAWK,
+    &affordance_substrate::SCENARIO_CHASE_PREY,
+    &affordance_substrate::SCENARIO_FIGHT_CAPABILITY_MATCH,
+    &affordance_substrate::SCENARIO_SUPERSEDES_LEGACY_SCALARS,
 ];
 
 /// Look up a scenario by its `name` field.
