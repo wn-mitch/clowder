@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [301-ward-placement-decision-semantics.md, 297-fox-patrol-topology-axis.md, 298-ward-placement-cat-value-coefficient.md]
-landed-at: pending
+landed-at: cfa8e65d7e0f
 landed-on: 2026-05-13
 ---
 
