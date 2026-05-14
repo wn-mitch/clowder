@@ -53,6 +53,7 @@ pub mod picking_up_scavenging;
 pub mod preset;
 pub mod route_cost_decision;
 pub mod runner;
+pub mod surrounded_colony;
 pub mod ward_placement;
 pub mod wildlife_fight;
 pub mod wounded_cat_no_pickup;
@@ -212,6 +213,16 @@ pub const ALL: &[&Scenario] = &[
     // resulting low-reserve state via stagger-tick InventoryObserved
     // broadcasts; `HasLowWardReserve` marker fires.
     &colony_reserves_belief::SCENARIO,
+    // 313 (301 FO-3) — surrounded-colony ring-coverage fixture.
+    // 5 cats clustered at center, 8 ShadowFoxes static on the
+    // periphery. `mod tests` asserts that 4 successive
+    // `compute_ward_placement` wakes plant wards in all 4
+    // cardinal quadrants — under both the default `Additive`
+    // composition and the 313 `Gate` composition. The Gate test
+    // is 313's load-bearing compatibility check: does the
+    // saturating-ramp gate break the multi-wake ring-formation
+    // behavior in surrounded-threat geometry?
+    &surrounded_colony::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

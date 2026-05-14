@@ -131,6 +131,18 @@ fn setup(world: &mut World, seed: u64) {
     // run. Exercises the wiring (resource → scorer read path) even
     // though end-to-end `WardPlaced` emission requires colony-scale
     // dynamics outside 312's scope.
+    //
+    // 313 (FO-3) note: the `Gate` cat-value composition is NOT
+    // activated here. Chokepoint defense and the Gate composition
+    // are in architectural tension — Gate suppresses placement at
+    // tiles with low cat-scent (the "items are real" reachability
+    // gate), and chokepoints are precisely the tiles cats don't
+    // live on. Combining the two would zero the isthmus merit and
+    // break the corked-corridor assertion. The Gate composition is
+    // exercised in the dedicated `surrounded_colony` scenario,
+    // where the colony's cat-scent halo naturally reaches the
+    // fox-rich perimeter. See `docs/balance/301-ward-placement-decision-semantics.md`
+    // iter-3 for the architectural rationale.
     {
         let mut constants = world.resource_mut::<crate::resources::SimConstants>();
         constants.scoring.ward_fox_approach_corridor_weight = FIXTURE_CORRIDOR_WEIGHT;
@@ -396,6 +408,11 @@ mod tests {
 
         let mut constants = SimConstants::default();
         constants.scoring.ward_fox_approach_corridor_weight = FIXTURE_CORRIDOR_WEIGHT;
+        // 313 note: `ward_placement_cat_value_composition` is
+        // left at the `Additive` default here — see the setup()
+        // comment in this file for the architectural rationale
+        // (Gate suppresses placement where cat-scent is absent,
+        // and the isthmus IS such a tile).
 
         let building_positions = vec![Position::new(42, 22)];
         let ward_positions = vec![(Position::new(50, 22), 6.0)];

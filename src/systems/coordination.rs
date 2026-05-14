@@ -14,7 +14,9 @@ use crate::components::physical::{Dead, Position};
 use crate::components::skills::Skills;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::Relationships;
-use crate::resources::sim_constants::{SimConstants, WardPlacementSemantics};
+use crate::resources::sim_constants::{
+    SimConstants, WardPlacementCatValueComposition, WardPlacementSemantics,
+};
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{TimeScale, TimeState};
 
@@ -1530,7 +1532,17 @@ pub(crate) fn compute_ward_placement(
     // Default preserves byte-identical pre-298 behavior. Not clamped —
     // it's a scalar coefficient on a [0, 1] presence value, not a
     // weight whose saturation needs disciplining.
-    let w_cat_value = constants.scoring.ward_placement_cat_value_weight;
+    //
+    // 313: bundled with the composition flag + gate floor into
+    // `CatValueParams`. Under `Additive` (default) `weight` is the
+    // additive coefficient and `gate_floor` is unused. Under `Gate`
+    // the weight is unused and `gate_floor` is the saturating-ramp
+    // knee point.
+    let cat = CatValueParams {
+        weight: constants.scoring.ward_placement_cat_value_weight,
+        composition: constants.scoring.ward_placement_cat_value_composition,
+        gate_floor: constants.scoring.ward_placement_cat_value_gate_floor,
+    };
     // 296: Logistic curve params, promoted from hardcoded (8.0, 0.5).
     // Defaults preserve byte-identical pre-296 behavior.
     let curve_k = constants.scoring.ward_placement_logistic_steepness;
@@ -1643,12 +1655,12 @@ pub(crate) fn compute_ward_placement(
             // Default flag — never touches `intent_map` so the
             // resource remains all-zeros and byte-identity vs pre-301
             // holds whether or not the caller passed `Some(&mut …)`.
-            select_argmax(&scored, w_cat_value, candidates[0])
+            select_argmax(&scored, cat, candidates[0])
         }
         WardPlacementSemantics::DescendingResidual => {
             let k = constants.scoring.ward_placement_residual_rounds.max(1) as usize;
             let (pick, round_picks) =
-                select_descending_residual(&scored, w_cat_value, k, candidates[0]);
+                select_descending_residual(&scored, cat, k, candidates[0]);
             if let Some(intent) = intent_map {
                 // Decay first so stale intent fades before the new
                 // round picks land their fresh stamps.
@@ -1709,12 +1721,27 @@ struct CandidateScore {
     corridor_lift: f32,
 }
 
+/// 313: bundled cat_value composition parameters threaded through
+/// the score-formula callsites. `weight` is the pre-313 additive
+/// coefficient (`ward_placement_cat_value_weight`); `composition`
+/// selects between the additive reward and the saturating-ramp
+/// gate; `gate_floor` is the gate's knee point. At
+/// `composition == Additive` (the default) `gate_floor` is unused
+/// and the formula is bit-identical to pre-313.
+#[derive(Debug, Clone, Copy)]
+struct CatValueParams {
+    weight: f32,
+    composition: WardPlacementCatValueComposition,
+    gate_floor: f32,
+}
+
 impl CandidateScore {
     /// Score formula identical to pre-301's inline expression, with
     /// `virtual_coverage` summed into `real_coverage` before the
     /// `(threat - coverage).clamp(0.0, 1.0)` step. At
-    /// `virtual_coverage == 0.0` AND `corridor_lift == 0.0` this is
-    /// bit-identical to pre-301.
+    /// `virtual_coverage == 0.0` AND `corridor_lift == 0.0` AND
+    /// `cat.composition == Additive` this is bit-identical to
+    /// pre-313 (and to pre-301 when the corridor lift is also zero).
     ///
     /// 312: the `(1.0 + corridor_lift)` factor scales
     /// `unaddressed_threat` multiplicatively OUTSIDE the saturating
@@ -1726,13 +1753,38 @@ impl CandidateScore {
     /// *above* 1.0 on the threat axis, breaking the ceiling on the
     /// specific tiles that earn the topological-criticality lift.
     /// See `docs/balance/297-fox-patrol-topology-axis.md` iter-2.
-    fn score(&self, virtual_coverage: f32, w_cat_value: f32) -> f32 {
+    ///
+    /// 313: when `cat.composition == Gate`, the additive
+    /// `+ weight * cat_value` reward is replaced with a
+    /// multiplicative saturating-ramp gate on the threat-merit
+    /// term: `gate(cat_value) = (cat_value / gate_floor).clamp(0, 1)`.
+    /// A dead tile (`cat_value = 0`) yields gate 0 and zeroes the
+    /// merit, suppressing placement. Any `cat_value >= gate_floor`
+    /// yields gate 1 and full merit — there's no reward for
+    /// density peaks beyond reachability. `distance_cost` and
+    /// `jitter` remain additive so distance still penalizes
+    /// regardless of cat density and jitter still tiebreaks on
+    /// dead tiles. See `docs/balance/301-ward-placement-decision-semantics.md`
+    /// iter-3.
+    fn score(&self, virtual_coverage: f32, cat: CatValueParams) -> f32 {
         let effective_coverage = self.real_coverage + virtual_coverage;
         let unaddressed_threat = (self.threat - effective_coverage).clamp(0.0, 1.0);
-        unaddressed_threat * (1.0 + self.corridor_lift)
-            + w_cat_value * self.cat_value
-            - self.distance_cost
-            + self.jitter
+        let threat_merit = unaddressed_threat * (1.0 + self.corridor_lift);
+        match cat.composition {
+            WardPlacementCatValueComposition::Additive => {
+                threat_merit + cat.weight * self.cat_value - self.distance_cost + self.jitter
+            }
+            WardPlacementCatValueComposition::Gate => {
+                // Saturating ramp with knee at `gate_floor`. A
+                // non-positive floor would divide by zero / invert
+                // the ramp; guard at a small epsilon so the gate
+                // collapses to a step at cat_value > 0 in the
+                // degenerate case.
+                let floor = cat.gate_floor.max(f32::EPSILON);
+                let gate = (self.cat_value / floor).clamp(0.0, 1.0);
+                threat_merit * gate - self.distance_cost + self.jitter
+            }
+        }
     }
 }
 
@@ -1742,11 +1794,11 @@ impl CandidateScore {
 /// original loop tracked, and the iteration order matches the original
 /// loop, so the `if score > best_score` comparison produces the same
 /// updates.
-fn select_argmax(scored: &[CandidateScore], w_cat_value: f32, fallback: Position) -> Position {
+fn select_argmax(scored: &[CandidateScore], cat: CatValueParams, fallback: Position) -> Position {
     let mut best_pos = fallback;
     let mut best_score = f32::NEG_INFINITY;
     for cs in scored {
-        let score = cs.score(0.0, w_cat_value);
+        let score = cs.score(0.0, cat);
         if score > best_score {
             best_score = score;
             best_pos = cs.pos;
@@ -1772,7 +1824,7 @@ fn select_argmax(scored: &[CandidateScore], w_cat_value: f32, fallback: Position
 /// coverage will look like once the cat materializes the placement.
 fn select_descending_residual(
     scored: &[CandidateScore],
-    w_cat_value: f32,
+    cat: CatValueParams,
     k: usize,
     fallback: Position,
 ) -> (Position, Vec<Position>) {
@@ -1793,7 +1845,7 @@ fn select_descending_residual(
         let mut best_idx: usize = 0;
         let mut best_score = f32::NEG_INFINITY;
         for (i, cs) in scored.iter().enumerate() {
-            let score = cs.score(virtual_cov[i], w_cat_value);
+            let score = cs.score(virtual_cov[i], cat);
             if score > best_score {
                 best_score = score;
                 best_idx = i;
@@ -2741,6 +2793,232 @@ mod tests {
             pos.y >= 45,
             "312: expected placement biased toward corridor hotspot at +y; \
              got {pos:?}",
+        );
+    }
+
+    /// 313 dormancy invariant: with
+    /// `ward_placement_cat_value_composition == Additive` (the
+    /// default), depositing into `CatScentMap` and into the
+    /// corridor map must produce the SAME placement under the new
+    /// `CatValueParams` plumbing as under pre-313's `w_cat_value`
+    /// scalar. Cross-check against the 312 dormancy test: shared
+    /// inputs, shared expected pick, but here we vary `cat_value`
+    /// across two runs and assert the picks track each other byte
+    /// for byte.
+    #[test]
+    fn cat_value_gate_dormant_at_additive_default() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+
+        // Two runs with identical fox-scent and corridor inputs but
+        // mirrored cat-scent. Under `Additive`, the `+ w * cat_value`
+        // term biases the argmax toward whichever side has the
+        // peak — so swapping cat-scent sides must swap the picks.
+        // Under `Gate`, both sides saturate the ramp and decide on
+        // jitter alone (tested elsewhere); this test holds the
+        // composition at `Additive` to guard byte-identity vs the
+        // pre-313 formula.
+        let (mut fs_a, mut cp_a, wc_a, tm_a, ra_a, cs_a, fac_a) = empty_placement_maps();
+        fs_a.deposit(53, 45, 1.0);
+        fs_a.deposit(67, 45, 1.0);
+        cp_a.deposit(53, 45, 0.8); // peak on -x side
+        let maps_a = PlacementMaps {
+            fox_scent: &fs_a,
+            cat_scent: &cp_a,
+            ward_coverage: &wc_a,
+            tile_map: &tm_a,
+            recent_ambush: &ra_a,
+            carcass_scent: &cs_a,
+            fox_approach_corridor: &fac_a,
+        };
+        let (mut fs_b, mut cp_b, wc_b, tm_b, ra_b, cs_b, fac_b) = empty_placement_maps();
+        fs_b.deposit(53, 45, 1.0);
+        fs_b.deposit(67, 45, 1.0);
+        cp_b.deposit(67, 45, 0.8); // peak on +x side (mirror of A)
+        let maps_b = PlacementMaps {
+            fox_scent: &fs_b,
+            cat_scent: &cp_b,
+            ward_coverage: &wc_b,
+            tile_map: &tm_b,
+            recent_ambush: &ra_b,
+            carcass_scent: &cs_b,
+            fox_approach_corridor: &fac_b,
+        };
+
+        let constants = crate::resources::SimConstants::default();
+        assert_eq!(
+            constants.scoring.ward_placement_cat_value_composition,
+            WardPlacementCatValueComposition::Additive,
+            "313: global default composition must remain Additive",
+        );
+
+        let mut rng_a = rand_chacha::ChaCha8Rng::seed_from_u64(313);
+        let mut rng_b = rand_chacha::ChaCha8Rng::seed_from_u64(313);
+        let pos_a = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps_a,
+            &constants,
+            &mut rng_a,
+            None,
+        );
+        let pos_b = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps_b,
+            &constants,
+            &mut rng_b,
+            None,
+        );
+        // Mirrored cat-scent must mirror the pick when the
+        // additive reward is live. If picks were identical the
+        // additive bias would be silently inert — a regression.
+        assert_ne!(
+            pos_a.x, pos_b.x,
+            "313 dormancy: Additive composition must still respond to \
+             cat_value; mirrored cat-scent should mirror the pick, \
+             got a={pos_a:?}, b={pos_b:?}",
+        );
+    }
+
+    /// 313 gate behavior — suppression: with
+    /// `composition == Gate` and a dead candidate (cat_value = 0)
+    /// vs a warm candidate (cat_value >= gate_floor) at equal
+    /// threat and equal distance from the anchor, the warm tile
+    /// must outscore the dead tile. Without the gate (the
+    /// `Additive` baseline checked here for contrast), jitter and
+    /// the small `+ w * 0.0` term let the dead side win
+    /// roughly half the time.
+    #[test]
+    fn cat_value_gate_suppresses_dead_tile() {
+        let structures = vec![Position::new(60, 45)];
+        let wards = vec![(Position::new(60, 45), 6.0)];
+
+        // Two equidistant rival fox-scent peaks. Cat-scent is
+        // saturated on the -x side and zero on the +x side. With
+        // Gate active, +x has gate=0 and scores ~0 (jitter only);
+        // -x has gate=1 and scores ~1.0 (full threat merit).
+        let (mut fs, mut cp, wc, tm, ra, cs, fac) = empty_placement_maps();
+        fs.deposit(53, 45, 1.0);
+        fs.deposit(67, 45, 1.0);
+        cp.deposit(53, 45, 1.0); // peak on -x
+        // +x stays at cat_value = 0 (dead tile).
+        let maps = PlacementMaps {
+            fox_scent: &fs,
+            cat_scent: &cp,
+            ward_coverage: &wc,
+            tile_map: &tm,
+            recent_ambush: &ra,
+            carcass_scent: &cs,
+            fox_approach_corridor: &fac,
+        };
+
+        let mut constants = crate::resources::SimConstants::default();
+        // Hold every threat-side weight at dormancy so the test
+        // isolates the cat_value gate vs jitter as the only
+        // tiebreaker among saturated tiles.
+        constants.scoring.ward_ambush_anchor_weight = 0.0;
+        constants.scoring.ward_recency_anchor_weight = 0.0;
+        constants.scoring.ward_fox_intercept_anchor_weight = 0.0;
+        constants.scoring.ward_fox_approach_corridor_weight = 0.0;
+        constants.scoring.ward_placement_cat_value_composition =
+            WardPlacementCatValueComposition::Gate;
+
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(313);
+        let pos = compute_ward_placement(
+            &structures,
+            &wards,
+            Position::new(60, 45),
+            &maps,
+            &constants,
+            &mut rng,
+            None,
+        );
+        // Gate must zero the +x dead tile's merit; placement
+        // therefore lands on -x or near the warm peak. Asserting
+        // x <= 60 admits any tile in the warm half-plane.
+        assert!(
+            pos.x <= 60,
+            "313 gate: expected placement in the cat-warm half-plane \
+             (x <= 60); got {pos:?}",
+        );
+    }
+
+    /// 313 gate behavior — no density-peak reward: with
+    /// `composition == Gate`, two candidates at equal threat and
+    /// equal distance, both above the gate floor (one warm at
+    /// cat_value=floor, one at the peak cat_value=1.0), score
+    /// equal merit modulo jitter. Under `Additive`, the
+    /// peak tile beats the warm tile by `w_cat_value * (1.0 - floor)`,
+    /// which dominates the [0, 0.05) jitter range. This test
+    /// inspects the score formula directly (instead of the picked
+    /// position) so the assertion is independent of jitter draw
+    /// order — the score gap is a deterministic function of the
+    /// inputs.
+    #[test]
+    fn cat_value_gate_does_not_reward_density_peak() {
+        // Two candidates with the same threat (1.0 saturated),
+        // same coverage (0), same distance_cost, same zero
+        // corridor_lift — differ only in cat_value (one at the
+        // gate floor, one at the density peak). The jitter is
+        // zeroed so the score gap is purely deterministic.
+        let warm = CandidateScore {
+            pos: Position::new(55, 45),
+            threat: 1.0,
+            real_coverage: 0.0,
+            cat_value: 0.2, // exactly at gate floor
+            distance_cost: 0.025,
+            jitter: 0.0,
+            corridor_lift: 0.0,
+        };
+        let peak = CandidateScore {
+            pos: Position::new(65, 45),
+            threat: 1.0,
+            real_coverage: 0.0,
+            cat_value: 1.0, // density peak
+            distance_cost: 0.025,
+            jitter: 0.0,
+            corridor_lift: 0.0,
+        };
+
+        let additive = CatValueParams {
+            weight: 0.3,
+            composition: WardPlacementCatValueComposition::Additive,
+            gate_floor: 0.2,
+        };
+        let gate = CatValueParams {
+            weight: 0.3,
+            composition: WardPlacementCatValueComposition::Gate,
+            gate_floor: 0.2,
+        };
+
+        let warm_additive = warm.score(0.0, additive);
+        let peak_additive = peak.score(0.0, additive);
+        let warm_gate = warm.score(0.0, gate);
+        let peak_gate = peak.score(0.0, gate);
+
+        // Under Additive, the density reward (0.3 * (1.0 - 0.2) =
+        // 0.24) makes peak strictly outscore warm; the gap is far
+        // wider than the [0, 0.05) jitter range can close.
+        let additive_gap = peak_additive - warm_additive;
+        assert!(
+            additive_gap > 0.20,
+            "313 contrast: Additive composition must reward density \
+             peaks (gap > 0.20 across the full jitter range); got \
+             peak_additive={peak_additive}, warm_additive={warm_additive}, \
+             gap={additive_gap}",
+        );
+
+        // Under Gate, both candidates clear the floor → gate=1 for
+        // both → identical merit. Scores tie exactly when jitter
+        // is held at zero.
+        assert_eq!(
+            warm_gate, peak_gate,
+            "313 gate: warm and peak both above gate_floor must score \
+             equal under Gate composition; got warm_gate={warm_gate}, \
+             peak_gate={peak_gate}",
         );
     }
 

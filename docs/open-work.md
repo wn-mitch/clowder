@@ -15,10 +15,10 @@ _Last generated: 2026-05-13._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 93 |
+| Ready | 92 |
 | Parked | 10 |
 | Blocked | 27 |
-| **Open total** | **136** |
+| **Open total** | **135** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,10 +40,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[313](docs/open-work/tickets/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) — _[ai-substrate] · score 0.94_
 - **[261](docs/open-work/tickets/261-actionaffordances-substrate-per-action-success-scalars-actionkind-enum-heuristic-estimators.md)** — ActionAffordances substrate — per-action success scalars + ActionKind enum + heuristic estimators — _[ai-substrate] · score 0.92_
-- **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · score 0.92_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · score 0.92_
+- **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · score 0.92_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
 - **[120](docs/open-work/tickets/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) — _[wildlife] · score 0.91_
 
 ## Epic progress (3)
@@ -65,11 +65,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling-diagnostics-ui] · added 2026-05-08_
 
-## Ready by cluster (93)
+## Ready by cluster (92)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (25 ready, 4 blocked)
+### ai-substrate (24 ready, 4 blocked)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _[ai-substrate] · added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
@@ -95,7 +95,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[286](docs/open-work/tickets/286-lower-threatproximityadrenalineflee-viability-threshold-so-cornered-cats-receive-flee-lift.md)** — Lower ThreatProximityAdrenalineFlee viability threshold so cornered cats receive flee_lift — _[ai-substrate] · added 2026-05-11_
 - **[291](docs/open-work/tickets/291-colonyknowledge-restructure-promotion-via-mental-model-agreement-replaces-carrier-count-threshold-258-follow-on.md)** — ColonyKnowledge restructure — promotion-via-mental-model-agreement replaces carrier-count threshold (258 follow-on) — _[ai-substrate] · added 2026-05-11_
 - **[293](docs/open-work/tickets/293-huntingpriors-retirement-per-location-belief-moves-to-locationbeliefsperceived-violence-capability-colony-absorption-rebuild-258-follow-on.md)** — HuntingPriors retirement — per-location belief moves to LocationBeliefs.perceived_violence_capability + colony absorption rebuild (258 follow-on) — _[ai-substrate] · added 2026-05-11_
-- **[313](docs/open-work/tickets/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) — _[ai-substrate] · added 2026-05-13_
 
 ### belief-perception (15 ready, 2 blocked)
 
@@ -273,7 +272,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 
-## Ready (93)
+## Ready (92)
 
 - **[002](docs/open-work/tickets/002-hunt-approach-pipeline-failures.md)** — Hunt-approach pipeline failures — _[ai-substrate] · added 2026-04-20_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
@@ -367,7 +366,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[305](docs/open-work/tickets/305-corpus-projection-layer-split-cluster-into-clusterinitiative-render-two-axis-gate-open-time.md)** — Corpus projection layer — split cluster into cluster+initiative, render two-axis, gate open-time — _[process-discipline] · added 2026-05-13_
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
-- **[313](docs/open-work/tickets/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) — _[ai-substrate] · added 2026-05-13_
 
 ## Parked (10)
 
@@ -417,12 +415,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (196)
+## Landed archive (197)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (131)
+### 2026-05 (132)
 
+- **[313](docs/open-work/landed/313-re-examine-cat-value-and-distance-cost-in-ward-placement-scoring-301-fo-3.md)** — re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3) _(2026-05-13)_
 - **[312](docs/open-work/landed/312-fox-approach-corridor-perception-axis-for-ward-placement-301-fo-2.md)** — fox-approach-corridor perception axis for ward placement (301 FO-2) _(2026-05-13)_
 - **[311](docs/open-work/landed/311-scenario-fixture-chokepoint-isthmus-ward-corking-test-301-fo-1.md)** — scenario fixture — chokepoint isthmus ward-corking test (301 FO-1) _(2026-05-13)_
 - **[308](docs/open-work/landed/308-colony-reserves-belief-mental-model-facet-tracking-thornbriar-remedy-herb-stockpile-for-anticipatory-crafting.md)** — Colony reserves belief — mental-model facet tracking thornbriar / remedy-herb stockpile for anticipatory crafting _(2026-05-13)_

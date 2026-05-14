@@ -1,0 +1,84 @@
+# Ticket 313 (301 FO-3) — cat_value gate composition, primary spec (seed-42).
+#
+# 313 lands option (c) from the structural-option menu in the parent
+# ticket: replace the additive `+ w_cat_value * cat_value` reward with
+# a multiplicative saturating-ramp gate
+# `gate(cat_value) = (cat_value / gate_floor).clamp(0, 1)` on the
+# threat-merit term, default `gate_floor = 0.2`. Dead tiles (cat_value
+# = 0) score zero merit; any cat_value ≥ gate_floor scores full merit
+# with no extra reward for density peaks. Distance and jitter remain
+# additive so distance still penalizes regardless of cat density and
+# jitter still tiebreaks on dead tiles.
+#
+# Substrate ships dormant (`ward_placement_cat_value_composition =
+# Additive` by default — byte-identical pre-313). The companion
+# scenario `surrounded_colony` activates `Gate` at fixture level and
+# asserts ring formation. This spec is the soak-scale validation
+# under whole-colony dynamics, where cat movement, scent emission,
+# fox patrols, the corridor populator, the directive chain, and the
+# scorer all interact. The spec activates **both** the corridor
+# axis (FO-2, ship-level dormant at 0.0) AND Gate (FO-3, ship-level
+# dormant at Additive) — the post-FO-3 scoring shape composes them.
+#
+# Iteration policy:
+# - concordant lift on seed-42 (`shadow_foxes_avoided_ward_total`
+#   ≥ +30% from the 312 baseline) AND `wards_placed_total` within
+#   ±15% AND continuity canaries ≥ 1 AND hard gates pass → first-
+#   light succeeds. Decide on global default flip in a follow-on
+#   iter, after seed-99 / seed-7 sister specs.
+# - wrong-direction on seed-42 with seed-99 / seed-7 showing lift →
+#   land 313 findings-only and open a follow-up to investigate
+#   topology dependence (mirrors 297 / 312 precedent).
+# - wrong-direction across all three seeds → land 313 findings-only
+#   and open a follow-up to revisit option (b) (replace
+#   `distance_cost` anchor with fox-spawn-relative travel cost).
+# - any continuity-canary regression > 10% on any seed → stop; the
+#   composition change is buying placement at the cost of behavioral
+#   health.
+# - any survival-gate violation (Starvation > 0, ShadowFoxAmbush > 10)
+#   → stop; composition shift broke colony viability.
+#
+# Companion specs:
+# - hypothesis-313-cat-value-gate-composition-seed99.yaml
+# - hypothesis-313-cat-value-gate-composition-seed7.yaml
+
+hypothesis: |
+  At post-298 cat-value tiebreak coefficient (0.3) and post-312
+  corridor axis (substrate built, weight 0.0 at default), the
+  `+ 0.3 * cat_value` additive reward and the
+  `- DIST_PENALTY_PER_TILE * manhattan(anchor, candidate)` distance
+  penalty both pull ward placement toward the structure-centroid
+  and the cat-density peak. 301's first-light data localized these
+  terms as the dominant biases keeping placement off corridor
+  tiles even after 312's multiplicative-outside lift was available.
+  Activating `ward_placement_cat_value_composition = Gate` with
+  `gate_floor = 0.2` replaces the additive density reward with a
+  saturating-ramp gate: any cat_value ≥ 0.2 scores full threat
+  merit, but tiles with sparse cat-scent are suppressed
+  multiplicatively. Combined with the 312 corridor axis active at
+  `ward_fox_approach_corridor_weight = 0.3`, the colony's read on
+  "where foxes traverse to reach us" can drive the argmax onto
+  corridor tiles inside the cat-scent halo, without competing
+  against an additive bias that rewards density peaks. On seed-42
+  the combined activation should pull Path A ward placement onto
+  approach corridors near the cluster perimeter, materially
+  lifting `shadow_foxes_avoided_ward_total` from the 312 dormancy
+  baseline. `wards_placed_total` should stay within ±15% — the
+  rate at which Path A directives reach `WardPlaced` depends on
+  the dispatch chain, not the scoring composition.
+constants_patch:
+  scoring:
+    ward_fox_approach_corridor_weight: 0.3
+    ward_placement_cat_value_composition: Gate
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  # Ticket-acceptance band: ≥ +30% lift on seed-42 from the 312
+  # baseline (i.e. all weights at ship defaults). Wide upper band
+  # because the Gate composition's effect scales with how many
+  # cluster-perimeter tiles fall above the gate floor — strongly
+  # topology-dependent.
+  rough_magnitude_pct: [30, 400]
+seeds: [42]
+reps: 1
+duration: 900

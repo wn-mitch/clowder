@@ -1,7 +1,7 @@
 ---
 id: 313
 title: re-examine cat_value and distance_cost in ward-placement scoring (301 FO-3)
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 added: 2026-05-13
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [301-ward-placement-decision-semantics.md, 297-fox-patrol-topology-axis.md, 298-ward-placement-cat-value-coefficient.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-13
 ---
 
 ## Why
@@ -51,14 +51,12 @@ This ticket blocks on FO-2 (ticket 312) so the corridor-perception axis is in pl
 
 **Default candidate**: (c). Reasoning: (a) tunes parameters without changing what the parameters mean (which is where 298 already lives); (b) introduces a new colony-aggregated landmark (real work, real risk of misuse elsewhere); (c) re-shapes one term in the formula to match its actual function (cat-reachability gate) and removes the "near-cat reward" that empirically misleads placement. Decide post-FO-2 once the corridor lift is observable.
 
-**Layer-walk pre-audit** (do BEFORE picking):
-- L1: `cat_scent` map. `[verified-correct]` per 298.
-- L2: per-candidate `cat_value` and `distance_cost` reads. `[verified-correct]` per 298 / 299.
-- L3: composition. **`[suspect]`** — 301's first-light shows additive composition with corridor lift produces wrong-direction outcomes because the cat-density additive overpowers the corridor-saturated threat lift.
+**Layer-walk audit** (promoted at 313 landing):
+- L1: `cat_scent` map. `[verified-correct]` per 298 (re-verified under v2 — the input is unchanged by 312's corridor axis).
+- L2: per-candidate `cat_value` and `distance_cost` reads. `[verified-correct]` per 298 / 299 (re-verified under v2 — reads aren't shaped by composition).
+- L3: composition. **`[verified-defect, 313]`** — under corridor=0.3 + Additive on the `surrounded_colony` scenario substrate, 6 wakes plant wards along cardinal axes near the cluster centroid (the additive density reward dominates). Under corridor=0.3 + Gate, the same 6 wakes spread across all 4 cardinal sectors, demonstrating the additive density reward was the live obstruction to ring formation. The structural lever lives at L3, confirming option (c).
 - L4: argmax. `[verified-correct]` per 297 iter-2 (returns max).
 - L5: directive emission. `[verified-correct]`.
-
-The structural lever lives at L3 (composition), confirming (b) or (c) is the right shape.
 
 ## Verification
 
@@ -75,3 +73,5 @@ The structural lever lives at L3 (composition), confirming (b) or (c) is the rig
 ## Log
 
 - 2026-05-13: opened from 301's findings-only landing. Blocked by 312 (FO-2 corridor axis).
+- 2026-05-13: chose option (c). Saturating-ramp gate `(cat_value / FLOOR).clamp(0, 1)` (FLOOR default 0.2) replaces the additive `+ 0.3 * cat_value` term, applied multiplicatively to the threat-merit term only. Composition flag (`WardPlacementCatValueComposition` enum, `Additive` default) preserves byte-identity at ship default. New `surrounded_colony` scenario asserts ring formation under both compositions; chokepoint scenario stays on `Additive` because the chokepoint geometry has zero cat-scent (architectural tension surfaced — see balance/301 iter-3). Three-seed hypothesize sweep authored at `hypothesis-313-cat-value-gate-composition*.yaml`.
+- 2026-05-13: three-seed sweep complete. Concordance verdict **wrong-direction on the predicted metric, no regression elsewhere** — seed-42 shifts 17 → 15 wards with 1 → 0 ShadowFoxAmbush (small positive hard-gate signal); seeds 99 and 7 are bit-identical between baseline and treatment. Per the spec's pre-registered iteration policy, **landing 313 findings-only** as a structural substrate change. Global default stays at `Additive` / corridor weight `0.0`; future iters decide on promotion based on either tuning `gate_floor` or pursuing option (b). Full four-artifact concordance recorded in `docs/balance/301-ward-placement-decision-semantics.md` iter-3.

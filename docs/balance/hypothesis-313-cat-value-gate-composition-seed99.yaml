@@ -1,0 +1,32 @@
+# Ticket 313 (301 FO-3) — cat_value gate composition, seed-99.
+#
+# Companion to hypothesis-313-cat-value-gate-composition.yaml.
+# Three-seed validation per 285 / 297 / 312's iteration discipline.
+#
+# Seed-99's cat / fox spatial topology differs from seed-42's; if Gate
+# lifts seed-42 but not seed-99 (or vice versa), the composition
+# change is topology-dependent — useful information for the global
+# default flip decision but not by itself a substrate defect.
+#
+# Iteration policy: see hypothesis-313-cat-value-gate-composition.yaml.
+
+hypothesis: |
+  On seed-99 the cat-scent halo and fox approach corridors may
+  overlap differently than on seed-42 — the Gate composition's
+  effect is a function of how many cluster-perimeter tiles fall
+  above gate_floor AND see saturated threat from the corridor
+  axis. Preservation or modest lift is expected; a drop would
+  suggest the halo is too narrow on this seed and the Gate is
+  suppressing placement at high-threat corridor tiles the
+  Additive baseline reached via the additive cat_value reward.
+constants_patch:
+  scoring:
+    ward_fox_approach_corridor_weight: 0.3
+    ward_placement_cat_value_composition: Gate
+prediction:
+  metric: shadow_foxes_avoided_ward_total
+  direction: increase
+  rough_magnitude_pct: [-20, 200]
+seeds: [99]
+reps: 1
+duration: 900

@@ -1346,6 +1346,37 @@ pub enum WardPlacementSemantics {
     DescendingResidual,
 }
 
+/// 313: composition rule for the `CatScentMap` lift to ward-placement
+/// scoring. `Additive` (default) preserves the pre-313 formula
+/// `+ w_cat_value * cat_value` — proximity to cat-density peaks
+/// adds a reward. `Gate` (option (c) from ticket 313) replaces the
+/// additive reward with a multiplicative saturating-ramp gate
+/// `gate(cat_value) = (cat_value / gate_floor).clamp(0, 1)` on the
+/// threat-merit term, so a dead tile (cat_value ~ 0) is suppressed
+/// near zero while warm tiles (cat_value ≥ gate_floor) get full
+/// merit with no extra reward for density peaks.
+///
+/// Serde-serializes the variant as a JSON string into the
+/// events.jsonl header alongside `WardPlacementSemantics`. Variant
+/// names are stable identifiers; add new variants rather than
+/// renaming in place.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
+)]
+pub enum WardPlacementCatValueComposition {
+    /// Pre-313 behavior. `+ ward_placement_cat_value_weight *
+    /// cat_value` is added to the score. Rewards proximity to
+    /// cat-density peaks. Default.
+    #[default]
+    Additive,
+    /// 313 SPLIT option (c). The additive `+ w_cat_value * cat_value`
+    /// term is dropped. The threat-merit term is multiplied by a
+    /// saturating-ramp gate `(cat_value / gate_floor).clamp(0, 1)`,
+    /// suppressing dead tiles without rewarding density peaks.
+    /// Tunable via `ward_placement_cat_value_gate_floor`.
+    Gate,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ScoringConstants {
     pub jitter_range: f32,
@@ -2094,6 +2125,12 @@ pub struct ScoringConstants {
     /// saturates a sufficient number of tiles
     /// (`docs/balance/297-fox-patrol-topology-axis.md` iter-2). See
     /// `docs/balance/298-ward-placement-cat-value-coefficient.md`.
+    ///
+    /// 313: only used when
+    /// `ward_placement_cat_value_composition == Additive` (the
+    /// default). Under `Gate` the formula drops the additive
+    /// `+ W * cat_value` term entirely and uses
+    /// `ward_placement_cat_value_gate_floor` instead.
     #[serde(default = "default_ward_placement_cat_value_weight")]
     pub ward_placement_cat_value_weight: f32,
     /// 301: selection rule for the coordinator's ward-placement scorer
@@ -2173,6 +2210,31 @@ pub struct ScoringConstants {
     /// First-light global activation is FO-3 (separate ticket).
     #[serde(default = "default_ward_fox_approach_corridor_weight")]
     pub ward_fox_approach_corridor_weight: f32,
+    /// 313: composition rule for the `CatScentMap` lift to
+    /// ward-placement scoring. See
+    /// [`WardPlacementCatValueComposition`]. Default `Additive`
+    /// preserves the pre-313 score formula bit-for-bit. `Gate`
+    /// (option (c) from 301 FO-3) replaces the additive reward
+    /// with a saturating-ramp multiplicative gate on the
+    /// threat-merit term.
+    ///
+    /// FO-1 scenario (`chokepoint_defense_isthmus`) activates
+    /// `Gate` to assert the isthmus-corked outcome alongside
+    /// `ward_fox_approach_corridor_weight = 0.3`; three-seed
+    /// `just hypothesize` validates the same composition.
+    /// First-light global activation is deferred to a follow-on
+    /// iter once the four-artifact concordance is on paper.
+    #[serde(default = "default_ward_placement_cat_value_composition")]
+    pub ward_placement_cat_value_composition: WardPlacementCatValueComposition,
+    /// 313: knee point for the saturating-ramp gate when
+    /// `ward_placement_cat_value_composition == Gate`. The gate
+    /// is `(cat_value / floor).clamp(0, 1)`, so `cat_value = 0`
+    /// yields gate 0 (dead tile fully suppressed) and any
+    /// `cat_value >= floor` yields gate 1 (full merit, no
+    /// density-peak reward). Default `0.2` per ticket 313's
+    /// pseudocode. Ignored when composition is `Additive`.
+    #[serde(default = "default_ward_placement_cat_value_gate_floor")]
+    pub ward_placement_cat_value_gate_floor: f32,
     /// 256 R5: deposit per tick when a cat's current action is
     /// `Action::Patrol`. Lays a deterrent gradient that foxes read as
     /// routing cost via `CatPatrolDeterrentOverlay`. Default `0.05`
@@ -2519,6 +2581,8 @@ impl Default for ScoringConstants {
             ward_intent_dse_weight: default_ward_intent_dse_weight(),
             ward_intent_decay_per_wake: default_ward_intent_decay_per_wake(),
             ward_fox_approach_corridor_weight: default_ward_fox_approach_corridor_weight(),
+            ward_placement_cat_value_composition: default_ward_placement_cat_value_composition(),
+            ward_placement_cat_value_gate_floor: default_ward_placement_cat_value_gate_floor(),
             cat_patrol_deterrent_deposit_per_tick:
                 default_cat_patrol_deterrent_deposit_per_tick(),
             cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
@@ -3846,6 +3910,25 @@ fn default_ward_intent_decay_per_wake() -> f32 {
 /// First-light *global* activation is FO-3 (separate ticket).
 fn default_ward_fox_approach_corridor_weight() -> f32 {
     0.0
+}
+
+/// 313: default composition rule for the `CatScentMap` lift to
+/// ward-placement scoring. `Additive` reproduces the pre-313
+/// formula byte-for-byte. The new `Gate` composition is opt-in
+/// via fixtures and hypothesize specs until concordance promotes
+/// it globally in a follow-on iter.
+fn default_ward_placement_cat_value_composition() -> WardPlacementCatValueComposition {
+    WardPlacementCatValueComposition::Additive
+}
+
+/// 313: default knee point for the saturating-ramp cat_value
+/// gate under `WardPlacementCatValueComposition::Gate`. `0.2`
+/// matches ticket 313's pseudocode: dead tiles
+/// (cat_value = 0) score zero merit, warm tiles
+/// (cat_value >= 0.2) score full merit, no extra reward for
+/// peak density. Ignored under `Additive`.
+fn default_ward_placement_cat_value_gate_floor() -> f32 {
+    0.2
 }
 
 /// 228: Patrol `Consideration::Field` route-cost axis weight.
