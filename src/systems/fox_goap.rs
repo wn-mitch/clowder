@@ -139,16 +139,14 @@ fn build_scoring_context<'a>(
     let prey_nearby = prey_positions
         .iter()
         .any(|p| p.manhattan_distance(&fox_pos) <= 9);
-    // Ticket 051: `store_visible` / `store_guarded` /
-    // `cat_threatening_den` / `has_cubs` / `cubs_hungry` migrated
-    // from FoxScoringContext booleans to the §4 marker substrate
-    // authored by `fox_spatial`'s per-tick authoring systems. Each
-    // fox DSE's `EligibilityFilter::require/forbid` resolves through
-    // the snapshot populated below, so these build-context locals
-    // retired in lockstep.
-
-    let is_dispersing_juvenile =
-        fox_state.life_stage == FoxLifeStage::Juvenile && fox_state.home_den.is_none();
+    // Ticket 051: every fox DSE boolean field (`store_visible`,
+    // `store_guarded`, `cat_threatening_den`, `has_cubs`,
+    // `cubs_hungry`, `is_dispersing_juvenile`, `has_den`) migrated
+    // from FoxScoringContext into the §4 marker substrate authored
+    // by `fox_spatial`'s per-tick authoring systems. Each fox DSE's
+    // `EligibilityFilter::require/forbid` resolves through the
+    // snapshot populated below, so the build-context locals retired
+    // in lockstep.
 
     let local_prey_belief = hunting_beliefs
         .map(|hb| hb.get(fox_pos.x, fox_pos.y))
@@ -183,8 +181,6 @@ fn build_scoring_context<'a>(
         ward_nearby: false,
         local_threat_level: 0.0,
         local_exploration_coverage: 0.0,
-        is_dispersing_juvenile,
-        has_den: fox_state.home_den.is_some(),
         befriended_ally,
         ticks_since_patrol,
         day_phase,

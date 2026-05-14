@@ -21,6 +21,7 @@ use crate::ai::eval::evaluate_single;
 use crate::ai::fox_planner::FoxDispositionKind;
 use crate::ai::scoring::EvalInputs;
 use crate::components::fox_personality::{FoxNeeds, FoxPersonality};
+use crate::components::markers;
 use crate::components::physical::Position;
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::time::DayPhase;
@@ -59,12 +60,6 @@ pub struct FoxScoringContext<'a> {
     pub local_threat_level: f32,
     /// Exploration coverage around current position (from FoxExplorationMap).
     pub local_exploration_coverage: f32,
-
-    // --- Lifecycle state ---
-    /// Whether this fox is a homeless juvenile (forces Dispersing).
-    pub is_dispersing_juvenile: bool,
-    /// Whether this fox has a home den.
-    pub has_den: bool,
 
     // --- §9.2 faction overlay ---
     /// Whether this fox carries the `BefriendedAlly` marker. Suppresses
@@ -293,10 +288,21 @@ pub fn score_fox_dispositions(
     // --- Lifecycle override: dispersing juveniles ---
     // §2.3 row 1140: Dispersing is a Linear(intercept=2.0) lifecycle
     // override — intentionally above every other disposition's 1.0
-    // peer-group ceiling so it cannot be outvoted.
-    if ctx.is_dispersing_juvenile {
+    // peer-group ceiling so it cannot be outvoted. Ticket 051: the
+    // routing decision reads the `IsDispersingJuvenile` marker (single
+    // source of truth) instead of the retired
+    // `ctx.is_dispersing_juvenile` field. The lifecycle-routing block
+    // itself (early-return suppressing Tier 2/3) is load-bearing
+    // beyond pure eligibility filtering and stays as a follow-on
+    // substrate refactor.
+    if inputs
+        .markers
+        .has(markers::IsDispersingJuvenile::KEY, inputs.cat)
+    {
         let score = score_fox_dse_by_id("fox_dispersing", ctx, inputs);
-        scores.push((FoxDispositionKind::Dispersing, score + jitter(rng, j)));
+        if score > 0.0 {
+            scores.push((FoxDispositionKind::Dispersing, score + jitter(rng, j)));
+        }
 
         // Still allow hunting if starving.
         if needs.hunger < 0.3 {
@@ -354,8 +360,12 @@ pub fn score_fox_dispositions(
     // Resting: §2.3 WS of hunger + health_fraction + day_phase
     // (Piecewise on fox_rest_*_bonus knots). Diurnal foxes rest by
     // day even when comfort is low — the day_phase axis carries
-    // that signal independently (§3.1.1 row 1518 design note).
-    if ctx.has_den && needs.hunger > 0.5 {
+    // that signal independently (§3.1.1 row 1518 design note). The
+    // `has_den` gate retires with Ticket 051: FoxRestingDse already
+    // anchors against `LandmarkAnchor::OwnDen`, which scores 0 when
+    // the fox lacks a den, so the spatial axis drops Resting out of
+    // contention without an outer field read.
+    if needs.hunger > 0.5 {
         let score = score_fox_dse_by_id("fox_resting", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Resting, score + jitter(rng, j)));
@@ -379,8 +389,10 @@ pub fn score_fox_dispositions(
     // 0.5)) + ticks_since_patrol (saturating) + day_phase
     // (Piecewise on fox_patrol_*_bonus) + territoriality. Maslow
     // tier 2 pre-gate applied inside `evaluate_single` — the old
-    // `let l2 = needs.tier_suppression(2)` binding retires.
-    if ctx.has_den {
+    // `let l2 = needs.tier_suppression(2)` binding retires. Ticket
+    // 051 retires the `ctx.has_den` outer gate into
+    // `.require(HasDen)` on the DSE.
+    {
         let score = score_fox_dse_by_id("fox_patrolling", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Patrolling, score + jitter(rng, j)));
@@ -524,8 +536,6 @@ mod tests {
             ward_nearby: false,
             local_threat_level: 0.0,
             local_exploration_coverage: 0.0,
-            is_dispersing_juvenile: false,
-            has_den: true,
             befriended_ally: false,
             ticks_since_patrol: 0,
             day_phase: DayPhase::Night, // hunt-favorable default; tests override
@@ -645,7 +655,11 @@ mod tests {
         };
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        // Ticket 051: FoxPatrollingDse eligibility migrated to
+        // `.require(HasDen)` so denless foxes don't patrol.
+        let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+        let fox_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity(crate::components::markers::HasDen::KEY, fox_entity, true);
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
@@ -753,12 +767,20 @@ mod tests {
     fn juvenile_always_disperses() {
         let needs = FoxNeeds::default();
         let personality = FoxPersonality::balanced();
-        let mut ctx = default_context(&needs, &personality, &SCORING);
-        ctx.is_dispersing_juvenile = true;
-        ctx.has_den = false;
+        let ctx = default_context(&needs, &personality, &SCORING);
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        // Ticket 051: FoxDispersing eligibility migrated to the §4
+        // marker substrate. `IsDispersingJuvenile` toggles the
+        // lifecycle-override routing block; `HasDen` is forbidden on
+        // the DSE so a juvenile with a den (post-claim) drops out.
+        let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+        let fox_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity(
+            crate::components::markers::IsDispersingJuvenile::KEY,
+            fox_entity,
+            true,
+        );
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());

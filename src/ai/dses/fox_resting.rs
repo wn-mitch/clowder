@@ -33,6 +33,7 @@ use crate::ai::curves::{piecewise, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const HUNGER_INPUT: &str = "hunger";
@@ -103,7 +104,12 @@ impl FoxRestingDse {
             // Power-curve weight precedent. Original three weights
             // (0.25/0.25/0.5) renormalized by ×0.80 to keep sum=1.0.
             composition: Composition::weighted_sum(vec![0.20, 0.20, 0.40, 0.20]),
-            eligibility: EligibilityFilter::new(),
+            // Ticket 051: Resting needs a den. The `ctx.has_den` outer
+            // gate at `fox_scoring.rs::score_fox_dispositions` retires
+            // into `.require(HasDen)` here so denless foxes (juvenile
+            // dispersers, foxes that lost their den) score 0.0 for
+            // Resting.
+            eligibility: EligibilityFilter::new().require(markers::HasDen::KEY),
         }
     }
 }

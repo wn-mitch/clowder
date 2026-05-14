@@ -5,11 +5,16 @@
 //!
 //! Per §2.3 row 1140 + §3.1.1 row 1534: `CompensatedProduct` of 1
 //! axis — a `Linear(intercept=2.0)` lifecycle intercept. n=1 CP is
-//! degenerate but locks the peer-group contract. The juvenile-
-//! dispersal lifecycle marker serves as the §4 eligibility filter
-//! when markers land in Phase 3d — for now the outer
-//! `is_dispersing_juvenile` gate in `score_fox_dispositions` handles
-//! eligibility.
+//! degenerate but locks the peer-group contract.
+//!
+//! **Eligibility gate.** Ticket 051 promotes the
+//! `is_dispersing_juvenile` outer-read to the §4 marker substrate:
+//! `.require(IsDispersingJuvenile).forbid(HasDen)` on the filter. The
+//! lifecycle-override routing block in `score_fox_dispositions`
+//! still gates Tier 2/3 dispositions when the marker is set (that
+//! routing is load-bearing and stays as a follow-on substrate
+//! refactor); the eligibility filter is defense-in-depth so the DSE
+//! itself returns 0.0 outside the dispersing lifecycle stage.
 //!
 //! Maslow opt-out (`u8::MAX`) — dispersal is a lifecycle-stage
 //! instinct, unsuppressed by normal Maslow layering.
@@ -24,6 +29,7 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const ONE_INPUT: &str = "one";
 
@@ -82,7 +88,12 @@ impl FoxDispersingDse {
             // the eligibility filter (juvenile-homeless) gates the DSE
             // entirely so non-juveniles never see it.
             composition: Composition::compensated_product(vec![1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // Ticket 051: §4 marker substrate. Eligibility requires the
+            // juvenile-dispersal lifecycle marker and forbids HasDen for
+            // symmetry — a juvenile with a den has stopped dispersing.
+            eligibility: EligibilityFilter::new()
+                .require(markers::IsDispersingJuvenile::KEY)
+                .forbid(markers::HasDen::KEY),
         }
     }
 }

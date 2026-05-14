@@ -22,6 +22,7 @@ use crate::ai::curves::{piecewise, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 use crate::resources::sim_constants::ScoringConstants;
 
 pub const TERRITORY_SCENT_DEFICIT_INPUT: &str = "territory_scent_deficit";
@@ -111,7 +112,13 @@ impl FoxPatrollingDse {
             // toward the patrol arc. Original four weights renormalized
             // by ×0.80 to make room for the spatial axis at 0.20.
             composition: Composition::weighted_sum(vec![0.24, 0.20, 0.16, 0.20, 0.20]),
-            eligibility: EligibilityFilter::new(),
+            // Ticket 051: Patrolling defends a territory anchored on
+            // the fox's den. The `ctx.has_den` outer gate at
+            // `fox_scoring.rs::score_fox_dispositions` retires into
+            // `.require(HasDen)` here so denless foxes (juvenile
+            // dispersers, foxes that lost their den) score 0.0 for
+            // Patrolling.
+            eligibility: EligibilityFilter::new().require(markers::HasDen::KEY),
         }
     }
 }
