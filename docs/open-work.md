@@ -15,10 +15,10 @@ _Last generated: 2026-05-14._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 95 |
+| Ready | 96 |
 | Parked | 10 |
 | Blocked | 22 |
-| **Open total** | **133** |
+| **Open total** | **134** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -65,7 +65,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling-diagnostics-ui] · added 2026-05-08_
 
-## Ready by cluster (95)
+## Ready by cluster (96)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -191,11 +191,12 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[302](docs/open-work/tickets/302-investigate-just-soak-vs-just-sweep-non-determinism-on-identical-seedbinary.md)** — investigate just soak vs just sweep non-determinism on identical seed/binary — _[process-discipline] · added 2026-05-12_
 - **[305](docs/open-work/tickets/305-corpus-projection-layer-split-cluster-into-clusterinitiative-render-two-axis-gate-open-time.md)** — Corpus projection layer — split cluster into cluster+initiative, render two-axis, gate open-time — _[process-discipline] · added 2026-05-13_
 
-### tooling-diagnostics-ui (3 ready)
+### tooling-diagnostics-ui (4 ready)
 
 - **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _[tooling-diagnostics-ui] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[tooling-diagnostics-ui] · added 2026-05-07_
 - **[259](docs/open-work/tickets/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer — _[tooling-diagnostics-ui] · added 2026-05-10_
+- **[318](docs/open-work/tickets/318-just-epic-children-id-query-read-dashboard-roster-print-child-status-enforce-anti-staleness.md)** — just epic-children <id> query — read dashboard roster, print child status, enforce anti-staleness — _[tooling-diagnostics-ui] · added 2026-05-14_
 
 ## Ready by initiative (48 tag-memberships across 8 initiatives)
 
@@ -273,7 +274,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 
-## Ready (95)
+## Ready (96)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -370,6 +371,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
 - **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · added 2026-05-13_
 - **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
+- **[318](docs/open-work/tickets/318-just-epic-children-id-query-read-dashboard-roster-print-child-status-enforce-anti-staleness.md)** — just epic-children <id> query — read dashboard roster, print child status, enforce anti-staleness — _[tooling-diagnostics-ui] · added 2026-05-14_
 
 ## Parked (10)
 
