@@ -551,9 +551,10 @@ fn flee_step(pos: &mut Mut<Position>, threat: &Position, habitat: &[Terrain], ma
 /// directional plume, no terrain modulation on stamp) so cats get a
 /// usable scent read this phase; directional stamping is a
 /// follow-on balance pass.
+#[allow(clippy::type_complexity)] // Bevy query: data tuple + filter tuple
 pub fn prey_scent_tick(
-    prey: Query<&Position, (With<PreyAnimal>, Without<Dead>)>,
-    mut scent_map: ResMut<crate::resources::PreyScentMap>,
+    prey: Query<(&PreyConfig, &Position), (With<PreyAnimal>, Without<Dead>)>,
+    mut scent_maps: ResMut<crate::resources::PreyScentMaps>,
     constants: Res<SimConstants>,
     time_scale: Res<TimeScale>,
 ) {
@@ -561,9 +562,22 @@ pub fn prey_scent_tick(
     // Global decay first — prior-tick deposits fade before this tick's
     // stamps land, matching FoxScentMap's ordering. Activity-trail
     // semantics (~1 in-game day to detect threshold), not territorial.
-    scent_map.decay_all(p.scent_decay_rate.per_tick(&time_scale));
-    for pos in &prey {
-        scent_map.deposit(pos.x, pos.y, p.scent_deposit_per_tick);
+    // Decay rate is uniform across all five sub-maps (per-species decay
+    // tuning is out of scope for ticket 062).
+    scent_maps.decay_all(p.scent_decay_rate.per_tick(&time_scale));
+    // Per-species deposit: amount scales by emitter species' relative
+    // scent emission strength (base_range / normalizer). Bird tiles
+    // deposit at ~⅓ the rate of Rat tiles, matching the ecological
+    // profile in `SensoryConstants` defaults.
+    for (config, pos) in &prey {
+        scent_maps.deposit_for_kind(
+            config.kind,
+            pos.x,
+            pos.y,
+            p.scent_deposit_per_tick,
+            &constants.sensory,
+            p.scent_deposit_normalizer,
+        );
     }
 }
 

@@ -5,7 +5,9 @@ use crate::ai::modifier::default_modifier_pipeline;
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::SimConstants;
 use crate::systems;
-use crate::systems::influence_map::{CorruptionLens, InfluenceMap, InfluenceMapRegistry};
+use crate::systems::influence_map::{
+    CorruptionLens, InfluenceMap, InfluenceMapRegistry, PerSpeciesScentRef,
+};
 
 /// Populates a [`DseRegistry`] with the canonical 30 cat-DSE + 9
 /// fox-DSE catalog plus all target-taking DSEs, using the supplied
@@ -141,12 +143,29 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     use crate::resources::{
         CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, ConstructionSiteMap,
         ExplorationMap, FoodLocationMap, FoxApproachCorridorMap, FoxScentMap,
-        GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, PreyScentMap,
+        GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, PreyScentMaps,
         RecentAmbushMap, TileMap, WardCoverageMap, WardIntentMap,
     };
 
     registry.register::<FoxScentMap>();
-    registry.register::<PreyScentMap>();
+    // Ticket 062 — per-species prey scent. Five `PerSpeciesScentRef`
+    // borrow-adapters over `PreyScentMaps`, one per `PreyKind`. The
+    // aggregate `PreyScentMap` `Resource` is retired; `PreyScentMaps`
+    // itself is **not** registered (no aggregate `InfluenceMap` impl).
+    for kind in [
+        crate::components::prey::PreyKind::Mouse,
+        crate::components::prey::PreyKind::Rat,
+        crate::components::prey::PreyKind::Rabbit,
+        crate::components::prey::PreyKind::Fish,
+        crate::components::prey::PreyKind::Bird,
+    ] {
+        registry.register_with(move |world, pos| {
+            world.get_resource::<PreyScentMaps>().map(|maps| {
+                let adapter = PerSpeciesScentRef(maps.for_kind(kind), kind);
+                (adapter.metadata(), adapter.base_sample(pos))
+            })
+        });
+    }
     registry.register::<CarcassScentMap>();
     // 219: colony-shared recent-ambush event memory. Dormant in
     // scoring at land (no DSE reads it yet); registered so its samples

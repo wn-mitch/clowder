@@ -1,7 +1,7 @@
 ---
 id: 062
 title: Prey-species split — per-species scent maps (§5.6.3 row #5)
-status: ready
+status: done
 cluster: belief-perception
 initiative: [environmental-simulation, predator-prey-dynamics]
 added: 2026-04-27
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -401,3 +401,4 @@ All tests are inline (`#[cfg(test)]` mod) in the file under test.
 - 2026-05-07: 207 landed; `status: blocked` → `status: ready`,
   `blocked-by: [207]` → `blocked-by: []`. Step 8's registry path
   now exists.
+- 2026-05-14: Soak-trace 42 Simba: verdict pass vs pre-062 archive (zero footer drift, byte-identical Hunt/Hunting DSE distributions on the focal trace). HuntAttempted rate steady at 0.01000/tick across both runs. L1 surface live with all 5 prey_scent_<species> keys (bird 4787 / fish 381 / mouse 2889 / rabbit 798 / rat 1896 non-zero samples); aggregate prey_scent retired. Bird emission scaling (~0.33x) confirmed via L1 sample magnitudes. Concordance doc: docs/balance/prey-scent-emission-scaling.md.

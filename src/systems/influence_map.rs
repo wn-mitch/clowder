@@ -250,22 +250,37 @@ impl InfluenceMap for crate::resources::FoxScentMap {
     }
 }
 
-impl InfluenceMap for crate::resources::PreyScentMap {
+/// Borrow-based adapter that exposes one `PreyScentMap` sub-map (from
+/// `PreyScentMaps`) as an `InfluenceMap` with per-species metadata.
+///
+/// Per §5.6.3 row #5 (ticket 062), prey scent is no longer a single
+/// aggregate channel — each `PreyKind` carries its own sub-map and L1
+/// trace key (`prey_scent_mouse`, `prey_scent_rat`, …).
+///
+/// **Phase 3 readiness hook.** The
+/// `Faction::Species(SensorySpecies::Prey(kind))` tag lets the
+/// attenuation pipeline identify which emitter species produced this
+/// map's signal. `species_sensitivity` returns a binary gate today
+/// (Phase 2A decision); Phase 3+ can apply a per-emitter-species signal
+/// modifier via this faction tag without changing this type's
+/// interface — observer-side dietary specialization and per-species
+/// scent-detect threshold tuning both key on this tag.
+pub struct PerSpeciesScentRef<'a>(
+    pub &'a crate::resources::PreyScentMap,
+    pub crate::components::prey::PreyKind,
+);
+
+impl InfluenceMap for PerSpeciesScentRef<'_> {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {
-            // Single aggregate map across all prey species today
-            // (§5.6.3 row #1 lists per-species as the end-state —
-            // that's a follow-on once target-selection wants to
-            // discriminate). Faction::Neutral since the map covers
-            // multiple species.
-            name: "prey_scent",
+            name: crate::resources::scent_map_name(self.1),
             channel: ChannelKind::Scent,
-            faction: Faction::Neutral,
+            faction: Faction::Species(SensorySpecies::Prey(self.1)),
         }
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.0.get(pos.x, pos.y)
     }
 }
 
@@ -978,5 +993,32 @@ mod tests {
         // Out-of-bounds returns 0.0.
         assert_eq!(lens.base_sample(Position::new(-1, 0)), 0.0);
         assert_eq!(lens.base_sample(Position::new(100, 100)), 0.0);
+    }
+
+    #[test]
+    fn prey_scent_test_per_species_scent_ref_metadata() {
+        use crate::components::prey::PreyKind;
+        use crate::resources::PreyScentMap;
+        let map = PreyScentMap::new(10, 10, 1);
+        let cases: [(PreyKind, &str); 5] = [
+            (PreyKind::Mouse, "prey_scent_mouse"),
+            (PreyKind::Rat, "prey_scent_rat"),
+            (PreyKind::Rabbit, "prey_scent_rabbit"),
+            (PreyKind::Fish, "prey_scent_fish"),
+            (PreyKind::Bird, "prey_scent_bird"),
+        ];
+        for (kind, expected_name) in cases {
+            let adapter = PerSpeciesScentRef(&map, kind);
+            let md = adapter.metadata();
+            assert_eq!(md.name, expected_name);
+            assert_eq!(md.channel, ChannelKind::Scent);
+            match md.faction {
+                Faction::Species(SensorySpecies::Prey(k)) => assert_eq!(k, kind),
+                other => panic!(
+                    "expected Faction::Species(SensorySpecies::Prey({:?})), got {:?}",
+                    kind, other
+                ),
+            }
+        }
     }
 }

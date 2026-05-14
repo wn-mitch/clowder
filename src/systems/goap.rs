@@ -58,14 +58,17 @@ pub struct PreyHuntParams<'w, 's> {
     pub raid_writer: MessageWriter<'w, DenRaided>,
     pub exploration_map: ResMut<'w, crate::resources::ExplorationMap>,
     pub health_query: Query<'w, 's, &'static Health, With<PreyAnimal>>,
-    /// Phase 2B — scent-detection grid. Cats sample
-    /// `highest_nearby(pos, scent_search_radius)` to find prey-scent
-    /// source tiles rather than running point-to-point
-    /// `cat_smells_prey_windaware` against each prey entity.
-    pub prey_scent_map: Res<'w, crate::resources::PreyScentMap>,
+    /// Ticket 062 — per-species scent-detection registry. Cats sample
+    /// `highest_nearby_any(pos, scent_search_radius)` (max-aggregate
+    /// across all five sub-maps) to find prey-scent source tiles rather
+    /// than running point-to-point `cat_smells_prey_windaware` against
+    /// each prey entity. Per-species reads via
+    /// `highest_nearby_for(kind, …)` are the dietary-specialization
+    /// hook for future Hunt-DSE work.
+    pub prey_scent_maps: Res<'w, crate::resources::PreyScentMaps>,
     /// Ticket 223 — fox scent map, read by cat A* path-cost overlays so
     /// cats route around fox territory. Lives in `PreyHuntParams`
-    /// alongside `prey_scent_map` because both are wildlife-scent
+    /// alongside `prey_scent_maps` because both are wildlife-scent
     /// substrates consumed by the same cat-side resolvers and because
     /// `resolve_disposition_chains` is at Bevy's 16-param ceiling —
     /// bundling here avoids a SystemParam refactor at the use sites.
@@ -1821,8 +1824,8 @@ pub fn evaluate_and_plan(
         // CatAnchorPositions builder) so they share the same
         // replan-cadence as the field flood.
         let cat_nearest_prey = colony
-            .prey_scent_map
-            .highest_nearby(pos.x, pos.y, d.scent_search_radius)
+            .prey_scent_maps
+            .highest_nearby_any(pos.x, pos.y, d.scent_search_radius)
             .map(|(x, y)| Position::new(x, y));
         let cat_wander_target = {
             let radius = (8.0 + personality.curiosity.clamp(0.0, 1.0) * 12.0) as i32;
@@ -6993,16 +6996,17 @@ fn resolve_search_prey(
         }
     }
 
-    // Scent detection via PreyScentMap (Phase 2B — grid-sampled
-    // influence map). Finds the strongest-scent bucket within
-    // `scent_search_radius`; `min_by_key` resolves to the prey
-    // entity closest to that source tile.
+    // Scent detection via PreyScentMaps (ticket 062 — per-species
+    // grid-sampled influence map). Finds the strongest-scent bucket
+    // within `scent_search_radius` using the max-aggregate read across
+    // all five sub-maps; `min_by_key` resolves to the prey entity
+    // closest to that source tile.
     let scent_source =
         prey_params
-            .prey_scent_map
-            .highest_nearby(pos.x, pos.y, d.scent_search_radius);
+            .prey_scent_maps
+            .highest_nearby_any(pos.x, pos.y, d.scent_search_radius);
     let scent_above_threshold = scent_source
-        .map(|(sx, sy)| prey_params.prey_scent_map.get(sx, sy) >= d.scent_detect_threshold)
+        .map(|(sx, sy)| prey_params.prey_scent_maps.get_any(sx, sy) >= d.scent_detect_threshold)
         .unwrap_or(false);
     let scented_prey = if scent_above_threshold {
         let (sx, sy) = scent_source.unwrap();

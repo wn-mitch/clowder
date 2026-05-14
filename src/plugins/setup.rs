@@ -448,8 +448,11 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert fox scent map resource.
     world.insert_resource(crate::resources::FoxScentMap::default());
 
-    // Insert prey scent map resource (Phase 2B).
-    world.insert_resource(crate::resources::PreyScentMap::default());
+    // Insert per-prey-species scent maps (ticket 062 / §5.6.3 row #5).
+    // Five `PreyScentMap` sub-maps keyed by `PreyKind`; reads via
+    // `PreyScentMaps::get_any` / `highest_nearby_any` preserve aggregate
+    // semantics for current consumers.
+    world.insert_resource(crate::resources::PreyScentMaps::default_maps());
 
     // Insert carcass scent map resource (ticket 048 — Phase 2C
     // §5.6.3 row #6).

@@ -81,7 +81,7 @@ pub use kitten_cry_map::KittenCryMap;
 pub use map::{Terrain, Tile, TileMap};
 pub use narrative::{NarrativeEntry, NarrativeLog, NarrativeTier};
 pub use narrative_templates::TemplateRegistry;
-pub use prey_scent_map::PreyScentMap;
+pub use prey_scent_map::{scent_map_name, PreyScentMap, PreyScentMaps};
 pub use recent_ambush_map::RecentAmbushMap;
 pub use relationships::{BondType, Relationship, Relationships};
 pub use rng::SimRng;

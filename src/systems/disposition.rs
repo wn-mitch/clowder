@@ -42,14 +42,15 @@ pub struct PreyHuntParams<'w, 's> {
     /// Health lookup for FightThreat bail-out. Lives here to stay under the
     /// 16-system-param limit — conceptually unrelated to prey hunting.
     pub health_query: Query<'w, 's, &'static Health>,
-    /// Phase 2B — scent-detection grid. Cats sample
-    /// `highest_nearby(pos, scent_search_radius)` to find prey-scent
-    /// source tiles rather than running point-to-point
-    /// `cat_smells_prey_windaware` against each prey entity.
-    pub prey_scent_map: Res<'w, crate::resources::PreyScentMap>,
+    /// Ticket 062 — per-species scent-detection registry. Cats sample
+    /// `highest_nearby_any(pos, scent_search_radius)` (max-aggregate
+    /// across all five sub-maps) to find prey-scent source tiles rather
+    /// than running point-to-point `cat_smells_prey_windaware` against
+    /// each prey entity.
+    pub prey_scent_maps: Res<'w, crate::resources::PreyScentMaps>,
     /// Ticket 223 — fox scent map, read by cat A* path-cost overlays so
     /// cats route around fox territory. Lives in `PreyHuntParams`
-    /// alongside `prey_scent_map` because both are wildlife-scent
+    /// alongside `prey_scent_maps` because both are wildlife-scent
     /// substrates consumed by the same cat-side resolvers and because
     /// `resolve_disposition_chains` is at Bevy's 16-param ceiling —
     /// bundling here avoids a SystemParam refactor at the use sites.
@@ -3880,19 +3881,21 @@ fn dispatch_chain_step(
                 if let Some((prey_entity, _prey_pos_ref, _, _)) = visible_prey {
                     step.target_entity = Some(prey_entity);
                 } else {
-                    // Scan for prey scent via PreyScentMap (Phase 2B —
-                    // grid-sampled influence map). Finds the strongest-
-                    // scent bucket within `scent_search_radius`; the
-                    // `min_by_key` below resolves to the prey entity
-                    // closest to that source tile.
-                    let scent_source = prey_params.prey_scent_map.highest_nearby(
+                    // Scan for prey scent via PreyScentMaps (ticket 062 —
+                    // per-species grid-sampled influence map). Finds the
+                    // strongest-scent bucket within `scent_search_radius`
+                    // using the max-aggregate read across all five
+                    // sub-maps; the `min_by_key` below resolves to the
+                    // prey entity closest to that source tile.
+                    let scent_source = prey_params.prey_scent_maps.highest_nearby_any(
                         pos.x,
                         pos.y,
                         d.scent_search_radius,
                     );
                     let scent_above_threshold = scent_source
                         .map(|(sx, sy)| {
-                            prey_params.prey_scent_map.get(sx, sy) >= d.scent_detect_threshold
+                            prey_params.prey_scent_maps.get_any(sx, sy)
+                                >= d.scent_detect_threshold
                         })
                         .unwrap_or(false);
                     let scented_prey = if scent_above_threshold {

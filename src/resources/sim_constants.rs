@@ -1125,6 +1125,21 @@ pub struct PreyConstants {
         default = "default_prey_scent_decay_rate"
     )]
     pub scent_decay_rate: RatePerDay,
+
+    /// Denominator for per-species scent emission scaling on
+    /// `PreyScentMaps::deposit_for_kind`. Each tick a live prey deposits
+    /// `scent_deposit_per_tick × (profile.scent.base_range / normalizer)`,
+    /// clamped to `[0.0, 1.0]`.
+    ///
+    /// Set to the maximum prey scent `base_range` (Rat = 6.0) so Rat
+    /// deposits at 1.0× and Bird at ~0.33×, matching the ecological
+    /// profile already encoded in `SensoryConstants` defaults. Changing
+    /// this value rescales all five emission strengths proportionally
+    /// without touching per-species sensory constants — useful for a
+    /// uniform "less prey scent everywhere" tuning sweep without
+    /// invalidating per-species ecology.
+    #[serde(default = "default_prey_scent_deposit_normalizer")]
+    pub scent_deposit_normalizer: f32,
 }
 
 fn default_prey_scent_deposit_per_tick() -> f32 {
@@ -1133,6 +1148,10 @@ fn default_prey_scent_deposit_per_tick() -> f32 {
 
 fn default_prey_scent_decay_rate() -> RatePerDay {
     RatePerDay::new(1.0)
+}
+
+fn default_prey_scent_deposit_normalizer() -> f32 {
+    6.0
 }
 
 impl Default for PreyConstants {
@@ -1192,6 +1211,7 @@ impl Default for PreyConstants {
             initial_den_count_bird: 2,
             scent_deposit_per_tick: default_prey_scent_deposit_per_tick(),
             scent_decay_rate: default_prey_scent_decay_rate(),
+            scent_deposit_normalizer: default_prey_scent_deposit_normalizer(),
         }
     }
 }

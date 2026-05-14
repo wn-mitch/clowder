@@ -6,7 +6,7 @@ cluster: wildlife
 initiative: [predator-prey-dynamics, environmental-simulation]
 added: 2026-05-01
 parked: null
-blocked-by: [062]
+blocked-by: []
 supersedes: []
 related-systems: [sensory.md, ai-substrate-refactor.md]
 related-balance: []

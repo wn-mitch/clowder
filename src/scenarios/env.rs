@@ -95,7 +95,7 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
 
     // Influence maps — same set `build_new_world` inserts at lines 351-386.
     world.insert_resource(crate::resources::FoxScentMap::default());
-    world.insert_resource(crate::resources::PreyScentMap::default());
+    world.insert_resource(crate::resources::PreyScentMaps::default_maps());
     world.insert_resource(crate::resources::CarcassScentMap::default());
     // 219: colony-shared recent-ambush event memory.
     world.insert_resource(crate::resources::RecentAmbushMap::default());
