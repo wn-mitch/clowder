@@ -275,6 +275,110 @@ pub fn wildlife_ai(
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
                 }
             }
+            // ---- Ticket 023 Phase B: motivation-driven states ----
+            // These variants are only written by `shadowfox_motivation_tick`
+            // and only ever appear on entities with `ShadowFoxDrives`.
+            WildlifeAiState::Reconstituting { tile_x, tile_y } => {
+                // Move one step toward the high-corruption recovery tile;
+                // stay put once on it. Coherence recovery continues to
+                // run through `shadowfox_coherence_tick`, which already
+                // gives a multiplier for `tile_corruption > recovery_threshold`.
+                if pos.x == tile_x && pos.y == tile_y {
+                    // Already on target — hold position.
+                } else {
+                    let dx = (tile_x - pos.x).signum();
+                    let dy = (tile_y - pos.y).signum();
+                    let next = Position::new(pos.x + dx, pos.y + dy);
+                    if map.in_bounds(next.x, next.y)
+                        && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                    {
+                        *pos = next;
+                    }
+                }
+            }
+            WildlifeAiState::Tending {
+                ward_x,
+                ward_y,
+                ref mut angle,
+            } => {
+                // Orbit the ward's perimeter at the corruption-deposit
+                // rate. Distinct from `EncirclingWard` siege (which uses
+                // the much-faster `ward_siege_corruption_rate`); Tending
+                // is the slow corruption-gardener pass that re-stamps
+                // perimeter tiles cats have cleansed.
+                *angle += c.circling_angle_step;
+                if *angle > std::f32::consts::TAU {
+                    *angle -= std::f32::consts::TAU;
+                }
+                let orbit_radius = ward_positions
+                    .iter()
+                    .find(|(wp, _)| wp.x == ward_x && wp.y == ward_y)
+                    .map(|(_, r)| *r + 1.0)
+                    .unwrap_or(4.0);
+                let tx = ward_x + (angle.cos() * orbit_radius) as i32;
+                let ty = ward_y + (angle.sin() * orbit_radius) as i32;
+                let dx = (tx - pos.x).signum();
+                let dy = (ty - pos.y).signum();
+                let next = Position::new(pos.x + dx, pos.y + dy);
+                if map.in_bounds(next.x, next.y)
+                    && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                {
+                    *pos = next;
+                }
+                // The corruption deposit happens via the existing
+                // shadow-fox-step deposit further down — keeps
+                // Tending's per-tick rate consistent with patrol.
+            }
+            WildlifeAiState::Haunting {
+                target_x,
+                target_y,
+                edge_distance,
+            } => {
+                // Pace at edge_distance from the target. If we're
+                // closer than edge_distance, step away; if we're
+                // farther, step toward. Phase B is detection-only;
+                // Phase C wires the safety/mood drain when within
+                // haunting_drain_radius.
+                let dx_t = target_x - pos.x;
+                let dy_t = target_y - pos.y;
+                let dist = dx_t.abs() + dy_t.abs();
+                let (step_dx, step_dy) = if dist < edge_distance {
+                    // Too close — step directly away.
+                    (-dx_t.signum(), -dy_t.signum())
+                } else if dist > edge_distance {
+                    // Too far — step toward.
+                    (dx_t.signum(), dy_t.signum())
+                } else {
+                    // At the edge — orbit slowly (perpendicular step
+                    // along the larger axis).
+                    if dx_t.abs() >= dy_t.abs() {
+                        (0, 1)
+                    } else {
+                        (1, 0)
+                    }
+                };
+                let next = Position::new(pos.x + step_dx, pos.y + step_dy);
+                if map.in_bounds(next.x, next.y)
+                    && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                {
+                    *pos = next;
+                }
+            }
+            WildlifeAiState::Seeding {
+                frontier_x,
+                frontier_y,
+            } => {
+                // Move one step toward the frontier tile, depositing
+                // corruption via the existing shadow-fox-step deposit.
+                let dx = (frontier_x - pos.x).signum();
+                let dy = (frontier_y - pos.y).signum();
+                let next = Position::new(pos.x + dx, pos.y + dy);
+                if map.in_bounds(next.x, next.y)
+                    && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                {
+                    *pos = next;
+                }
+            }
         }
 
         // ShadowFox spreads corruption to tiles it crosses.
@@ -926,6 +1030,305 @@ pub fn shadowfox_coherence_tick(
             commands.entity(entity).despawn();
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// shadowfox_motivation_tick — ticket 023 Phase B
+// ---------------------------------------------------------------------------
+
+/// Re-elect each shadow-fox's `WildlifeAiState` from a softmax over four
+/// drive pressures (Coherence, Resonance, Dread, Entropy). Fires every
+/// `shadow_fox_motivation_tick_cadence` ticks (default 16) — between
+/// elections the existing `wildlife_ai` movement loop drives the
+/// shadow-fox according to its current state.
+///
+/// Phase B uses shallow pressure scoring (nearest-tile/cat heuristics);
+/// Phase C deepens Dread to read cat mood/safety/ally counts and wires
+/// the per-tick haunting drain. Stored drive fields on `ShadowFoxDrives`
+/// reflect the most-recent election's pressures, surfacing the
+/// motivation landscape in the focal-cat trace.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub fn shadowfox_motivation_tick(
+    mut query: Query<
+        (&Position, &mut WildlifeAiState, &mut ShadowFoxDrives),
+        Without<crate::components::wildlife::Carcass>,
+    >,
+    wards: Query<(&Ward, &Position), Without<WildAnimal>>,
+    cat_positions: Query<
+        &Position,
+        (
+            With<Needs>,
+            Without<Dead>,
+            Without<PreyAnimal>,
+            Without<WildAnimal>,
+        ),
+    >,
+    map: Res<TileMap>,
+    ward_coverage: Res<crate::resources::WardCoverageMap>,
+    constants: Res<SimConstants>,
+    time: Res<TimeState>,
+    mut rng: ResMut<SimRng>,
+    mut activation: ResMut<SystemActivation>,
+    mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
+) {
+    let c = &constants.wildlife;
+    let cadence = c.shadow_fox_motivation_tick_cadence.max(1);
+    if !time.tick.is_multiple_of(cadence) {
+        return;
+    }
+
+    let scan_radius = c.shadow_fox_motivation_scan_radius;
+    let resonance_weight = c.shadow_fox_resonance_weight;
+    let entropy_scale = c.shadow_fox_entropy_distance_scale;
+    let temp = c.shadow_fox_motivation_softmax_temp.max(1e-3);
+    let jitter = c.shadow_fox_motivation_jitter;
+    let haunt_edge = c.shadow_fox_haunting_edge_distance;
+
+    // Pre-collect ward positions + repel radii once per cadence; reused
+    // by every shadow-fox iteration below.
+    let ward_anchors: Vec<(Position, f32)> = wards
+        .iter()
+        .filter(|(w, _)| !w.inverted && w.strength > 0.01)
+        .map(|(w, p)| (*p, w.repel_radius()))
+        .collect();
+    let cat_anchors: Vec<Position> = cat_positions.iter().copied().collect();
+
+    for (pos, mut state, mut drives) in &mut query {
+        // ---- Coherence pressure (state-derived, no scan) ----
+        let coherence_pressure = (1.0 - drives.coherence).max(0.0).powi(2);
+
+        // ---- Resonance pressure: corrupt tiles adjacent to ward zones ----
+        // Walks the scan-radius bounding box and counts cells where
+        // corruption > recovery_threshold AND ward_coverage > 0. Cheap
+        // O(scan_radius²) — at default 12 that's 625 cells per shadow-
+        // fox per cadence.
+        let mut nearest_threatened: Option<Position> = None;
+        let mut nearest_threatened_dist = i32::MAX;
+        let mut threatened_count: u32 = 0;
+        let mut nearest_frontier: Option<Position> = None;
+        let mut nearest_frontier_dist = i32::MAX;
+        let mut best_corruption_tile: Option<Position> = None;
+        let mut best_corruption_value: f32 = -1.0;
+        for dy in -scan_radius..=scan_radius {
+            for dx in -scan_radius..=scan_radius {
+                let tx = pos.x + dx;
+                let ty = pos.y + dy;
+                if !map.in_bounds(tx, ty) {
+                    continue;
+                }
+                let tile_corruption = map.get(tx, ty).corruption;
+                let dist = dx.abs() + dy.abs();
+
+                // Reconstituting target: highest-corruption tile in scan.
+                if tile_corruption > best_corruption_value {
+                    best_corruption_value = tile_corruption;
+                    best_corruption_tile = Some(Position::new(tx, ty));
+                }
+
+                // Resonance: corrupt tile under ward pressure.
+                if tile_corruption > c.shadow_fox_coherence_recovery_threshold
+                    && ward_coverage.get(tx, ty) > 0.0
+                {
+                    threatened_count += 1;
+                    if dist < nearest_threatened_dist {
+                        nearest_threatened_dist = dist;
+                        nearest_threatened = Some(Position::new(tx, ty));
+                    }
+                }
+
+                // Entropy: frontier tile (corrupt with a clean neighbor).
+                if tile_corruption > c.shadow_fox_coherence_recovery_threshold {
+                    let has_clean_neighbor = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                        .iter()
+                        .any(|(ndx, ndy)| {
+                            let nx = tx + ndx;
+                            let ny = ty + ndy;
+                            map.in_bounds(nx, ny) && map.get(nx, ny).corruption < 0.05
+                        });
+                    if has_clean_neighbor && dist < nearest_frontier_dist {
+                        nearest_frontier_dist = dist;
+                        nearest_frontier = Some(Position::new(tx, ty));
+                    }
+                }
+            }
+        }
+        let resonance_pressure =
+            (threatened_count as f32 * resonance_weight).min(1.0);
+
+        // ---- Dread pressure (Phase B shallow form: inverse distance) ----
+        let nearest_cat = cat_anchors
+            .iter()
+            .filter(|cp| pos.manhattan_distance(cp) <= scan_radius)
+            .min_by_key(|cp| pos.manhattan_distance(cp));
+        let dread_pressure = nearest_cat
+            .map(|cp| {
+                let d = pos.manhattan_distance(cp).max(0) as f32;
+                1.0 / (1.0 + d)
+            })
+            .unwrap_or(0.0);
+
+        // ---- Entropy pressure: inverse distance to nearest frontier ----
+        let entropy_pressure = nearest_frontier
+            .map(|fp| {
+                let d = pos.manhattan_distance(&fp).max(0) as f32;
+                1.0 / (1.0 + entropy_scale * d)
+            })
+            .unwrap_or(0.0);
+
+        // Store the latest pressures on the component for trace observability.
+        drives.resonance = resonance_pressure;
+        drives.dread = dread_pressure;
+        drives.entropy = entropy_pressure;
+        drives.age_ticks = drives.age_ticks.saturating_add(0); // no-op; tick advanced by coherence system
+
+        // ---- Pressure floor: only transition when a drive is genuinely
+        // pressured. Without this guard, Phase B's softmax monotonically
+        // pulls shadow-foxes out of Patrolling and the existing
+        // Stalking → Ambush → Banishment chain (mythic-texture canary)
+        // never fires. Falls through to leave the current state alone.
+        let max_pressure = coherence_pressure
+            .max(resonance_pressure)
+            .max(dread_pressure)
+            .max(entropy_pressure);
+        if max_pressure < c.shadow_fox_motivation_min_pressure {
+            continue;
+        }
+
+        // ---- Softmax with jitter ----
+        let mut scores = [
+            coherence_pressure,
+            resonance_pressure,
+            dread_pressure,
+            entropy_pressure,
+        ];
+        for s in scores.iter_mut() {
+            // Symmetric uniform jitter; clamp so noisy ties never go negative.
+            *s = (*s + rng.rng.random::<f32>() * 2.0 * jitter - jitter).max(0.0);
+        }
+        let max = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let mut exps = [0.0f32; 4];
+        let mut sum = 0.0f32;
+        for (i, &s) in scores.iter().enumerate() {
+            exps[i] = ((s - max) / temp).exp();
+            sum += exps[i];
+        }
+        let sample = rng.rng.random::<f32>() * sum;
+        let mut cum = 0.0f32;
+        let mut winner = 0usize;
+        for (i, &e) in exps.iter().enumerate() {
+            cum += e;
+            if sample <= cum {
+                winner = i;
+                break;
+            }
+        }
+
+        // ---- Apply winning state if it actually changes ----
+        let next_state: Option<WildlifeAiState> = match winner {
+            0 => best_corruption_tile.map(|t| WildlifeAiState::Reconstituting {
+                tile_x: t.x,
+                tile_y: t.y,
+            }),
+            1 => nearest_threatened
+                .zip(ward_anchors.iter().min_by_key(|(wp, _)| {
+                    nearest_threatened
+                        .map(|t| t.manhattan_distance(wp))
+                        .unwrap_or(i32::MAX)
+                }))
+                .map(|(_threatened_tile, (ward_pos, _))| WildlifeAiState::Tending {
+                    ward_x: ward_pos.x,
+                    ward_y: ward_pos.y,
+                    angle: 0.0,
+                }),
+            2 => nearest_cat.map(|cp| WildlifeAiState::Haunting {
+                target_x: cp.x,
+                target_y: cp.y,
+                edge_distance: haunt_edge,
+            }),
+            3 => nearest_frontier.map(|fp| WildlifeAiState::Seeding {
+                frontier_x: fp.x,
+                frontier_y: fp.y,
+            }),
+            _ => None,
+        };
+
+        // Only transition + emit when the chosen variant *kind* differs
+        // from the current one. Re-entering the same kind is the no-op
+        // case (continued pacing on the same drive).
+        if let Some(new_state) = next_state {
+            let changed = !same_motivation_kind(&state, &new_state);
+            if changed {
+                let feature = match new_state {
+                    WildlifeAiState::Reconstituting { .. } => {
+                        Some(Feature::ShadowFoxReconstitutingEntered)
+                    }
+                    WildlifeAiState::Tending { .. } => Some(Feature::ShadowFoxTendingEntered),
+                    WildlifeAiState::Haunting { .. } => Some(Feature::ShadowFoxHauntingEntered),
+                    WildlifeAiState::Seeding { .. } => Some(Feature::ShadowFoxSeedingEntered),
+                    _ => None,
+                };
+                if let Some(f) = feature {
+                    activation.record(f);
+                }
+                if let Some(ref mut elog) = event_log {
+                    let kind = match new_state {
+                        WildlifeAiState::Reconstituting { .. } => {
+                            Some(crate::resources::event_log::EventKind::ShadowFoxReconstitutingEntered {
+                                location: (pos.x, pos.y),
+                                coherence: drives.coherence,
+                            })
+                        }
+                        WildlifeAiState::Tending { ward_x, ward_y, .. } => {
+                            Some(crate::resources::event_log::EventKind::ShadowFoxTendingEntered {
+                                location: (pos.x, pos.y),
+                                ward_location: (ward_x, ward_y),
+                            })
+                        }
+                        WildlifeAiState::Haunting { target_x, target_y, .. } => {
+                            Some(crate::resources::event_log::EventKind::ShadowFoxHauntingEntered {
+                                location: (pos.x, pos.y),
+                                target: (target_x, target_y),
+                            })
+                        }
+                        WildlifeAiState::Seeding { frontier_x, frontier_y } => {
+                            Some(crate::resources::event_log::EventKind::ShadowFoxSeedingEntered {
+                                location: (pos.x, pos.y),
+                                frontier: (frontier_x, frontier_y),
+                            })
+                        }
+                        _ => None,
+                    };
+                    if let Some(k) = kind {
+                        elog.push(time.tick, k);
+                    }
+                }
+                *state = new_state;
+            }
+        }
+    }
+}
+
+/// True when two `WildlifeAiState` values are the *same Phase-B
+/// motivation variant* (ignoring inner payload like ward angle).
+/// Used by `shadowfox_motivation_tick` to suppress redundant Feature
+/// emissions when re-electing the same drive.
+fn same_motivation_kind(a: &WildlifeAiState, b: &WildlifeAiState) -> bool {
+    matches!(
+        (a, b),
+        (
+            WildlifeAiState::Reconstituting { .. },
+            WildlifeAiState::Reconstituting { .. }
+        ) | (
+            WildlifeAiState::Tending { .. },
+            WildlifeAiState::Tending { .. }
+        ) | (
+            WildlifeAiState::Haunting { .. },
+            WildlifeAiState::Haunting { .. }
+        ) | (
+            WildlifeAiState::Seeding { .. },
+            WildlifeAiState::Seeding { .. }
+        )
+    )
 }
 
 // ---------------------------------------------------------------------------

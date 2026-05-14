@@ -35,6 +35,17 @@ pub static SCENARIO: Scenario = Scenario {
 fn setup(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);
 
+    // Ticket 023 Phase B: disable the shadow-fox motivation tick so
+    // this scenario tests the pre-023 ward-channel contract.
+    // Otherwise the motivation softmax may pick Reconstituting (toward
+    // the highest-corruption tile in scan), bypassing the patrol-step
+    // branch where `ShadowFoxAvoidedWard` fires.
+    {
+        let mut constants =
+            world.resource_mut::<crate::resources::sim_constants::SimConstants>();
+        constants.wildlife.shadow_fox_motivation_tick_cadence = u64::MAX;
+    }
+
     // Durable ward — repel_radius ≈ 9 tiles, stamps a meaningful
     // `WardCoverageMap` gradient that crosses the fox's path.
     world.spawn((crate::components::magic::Ward::durable(), WARD_POS));

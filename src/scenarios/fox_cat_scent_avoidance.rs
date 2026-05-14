@@ -35,6 +35,18 @@ pub static SCENARIO: Scenario = Scenario {
 fn setup(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);
 
+    // Ticket 023 Phase B: disable the shadow-fox motivation tick for
+    // this scenario. Phase B's motivation softmax routinely picks
+    // Haunting when cats are in scent range, bypassing the patrol-step
+    // branch where `ShadowFoxAvoidedCatScent` fires. Keeping cadence
+    // huge keeps this scenario testing the pre-023 magic/scent-channel
+    // avoidance contract.
+    {
+        let mut constants =
+            world.resource_mut::<crate::resources::sim_constants::SimConstants>();
+        constants.wildlife.shadow_fox_motivation_tick_cadence = u64::MAX;
+    }
+
     // Four adult cats stacked at the cluster tile. The
     // `cat_scent_tick` system deposits both the steady-state base
     // amount and (when the cat's action is Patrol/Fight/Explore) the

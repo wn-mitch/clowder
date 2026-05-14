@@ -4707,6 +4707,75 @@ pub struct WildlifeConstants {
     /// hysteresis band.
     #[serde(default = "default_shadow_fox_coherence_dissolution_threshold")]
     pub shadow_fox_coherence_dissolution_threshold: f32,
+
+    // ----- Ticket 023 Phase B: Motivation softmax + 4 drives -----
+    /// How often the motivation tick re-elects a shadow-fox's state.
+    /// Default `16` ticks balances responsiveness with cost: cats see
+    /// continuous shadow-fox motion (16 ticks ≈ 1/8th of a sim-second
+    /// at default scale), while keeping the O(N²) cat-proximity reads
+    /// in the Dread scorer cheap.
+    #[serde(default = "default_shadow_fox_motivation_tick_cadence")]
+    pub shadow_fox_motivation_tick_cadence: u64,
+    /// Softmax temperature for selecting the winning drive. Lower
+    /// values produce sharper picks (clear winner dominates), higher
+    /// values produce more stochastic exploration. Design doc default
+    /// `0.3` keeps coherence dominance reliable when the drive is
+    /// pressured while letting Resonance/Dread/Entropy occasionally
+    /// fire when scores are close.
+    #[serde(default = "default_shadow_fox_motivation_softmax_temp")]
+    pub shadow_fox_motivation_softmax_temp: f32,
+    /// Additive uniform jitter on each drive's pre-softmax score.
+    /// Range is symmetric (`-jitter ..= +jitter`). Prevents two
+    /// shadow-foxes with identical state from picking identical
+    /// drives every motivation tick (which would produce visible
+    /// lockstep behavior).
+    #[serde(default = "default_shadow_fox_motivation_jitter")]
+    pub shadow_fox_motivation_jitter: f32,
+    /// Weight applied to the Resonance drive's raw pressure score.
+    /// Resonance pressure scales with the count of corrupt tiles
+    /// inside a ward's repel zone; weight calibrates that count
+    /// against the other drives' [0, 1] pressure ranges.
+    #[serde(default = "default_shadow_fox_resonance_weight")]
+    pub shadow_fox_resonance_weight: f32,
+    /// Falloff scale for Entropy's distance-to-frontier signal. The
+    /// raw score is `1.0 / (1.0 + distance_scale * dist)`, so larger
+    /// values push attention toward the nearest frontier tile,
+    /// smaller values let the shadow-fox roam farther in search of
+    /// more promising frontier gaps.
+    #[serde(default = "default_shadow_fox_entropy_distance_scale")]
+    pub shadow_fox_entropy_distance_scale: f32,
+    /// Manhattan distance the Haunting state tries to maintain from
+    /// its target cat. At this distance the cat detects the shadow-
+    /// fox at sensory threshold but no combat occurs (combat
+    /// requires adjacency). Phase B is detection-only; Phase C wires
+    /// the per-tick safety/mood drain.
+    #[serde(default = "default_shadow_fox_haunting_edge_distance")]
+    pub shadow_fox_haunting_edge_distance: i32,
+    /// While Reconstituting (sitting on a high-corruption tile),
+    /// coherence recovers at `recovery_corrupt × this` per tick.
+    /// Default `3.0` makes recovery decisive — a shadow-fox that
+    /// retreats to its origin patch can recover meaningfully fast.
+    #[serde(default = "default_shadow_fox_reconstituting_recovery_multiplier")]
+    pub shadow_fox_reconstituting_recovery_multiplier: f32,
+    /// Radius (Manhattan) within which the motivation tick scans for
+    /// cats / wards / frontier tiles when scoring drives. Default
+    /// `12` matches the shadow-fox sensory range; lifted here so a
+    /// future change can tune perception scope without recompiling
+    /// the sensory profile.
+    #[serde(default = "default_shadow_fox_motivation_scan_radius")]
+    pub shadow_fox_motivation_scan_radius: i32,
+    /// Minimum drive-pressure required for the motivation tick to
+    /// transition out of the current state. When all four drives'
+    /// pressures fall below this, the tick declines to transition —
+    /// the existing `wildlife_ai` Patrolling/Stalking pipeline keeps
+    /// running unchanged. Without this guard, Phase B's softmax
+    /// monotonically pulls shadow-foxes out of Patrolling forever,
+    /// suppressing the Stalking → Ambush → Banishment chain that
+    /// drives the mythic-texture continuity canary. Default `0.05`
+    /// — empirically the noise floor above which a drive is
+    /// genuinely pressured rather than jitter-driven.
+    #[serde(default = "default_shadow_fox_motivation_min_pressure")]
+    pub shadow_fox_motivation_min_pressure: f32,
 }
 
 impl Default for WildlifeConstants {
@@ -4769,8 +4838,54 @@ impl Default for WildlifeConstants {
                 default_shadow_fox_coherence_recovery_threshold(),
             shadow_fox_coherence_dissolution_threshold:
                 default_shadow_fox_coherence_dissolution_threshold(),
+            shadow_fox_motivation_tick_cadence: default_shadow_fox_motivation_tick_cadence(),
+            shadow_fox_motivation_softmax_temp: default_shadow_fox_motivation_softmax_temp(),
+            shadow_fox_motivation_jitter: default_shadow_fox_motivation_jitter(),
+            shadow_fox_resonance_weight: default_shadow_fox_resonance_weight(),
+            shadow_fox_entropy_distance_scale: default_shadow_fox_entropy_distance_scale(),
+            shadow_fox_haunting_edge_distance: default_shadow_fox_haunting_edge_distance(),
+            shadow_fox_reconstituting_recovery_multiplier:
+                default_shadow_fox_reconstituting_recovery_multiplier(),
+            shadow_fox_motivation_scan_radius: default_shadow_fox_motivation_scan_radius(),
+            shadow_fox_motivation_min_pressure: default_shadow_fox_motivation_min_pressure(),
         }
     }
+}
+
+fn default_shadow_fox_motivation_tick_cadence() -> u64 {
+    16
+}
+
+fn default_shadow_fox_motivation_softmax_temp() -> f32 {
+    0.3
+}
+
+fn default_shadow_fox_motivation_jitter() -> f32 {
+    0.05
+}
+
+fn default_shadow_fox_resonance_weight() -> f32 {
+    0.15
+}
+
+fn default_shadow_fox_entropy_distance_scale() -> f32 {
+    0.1
+}
+
+fn default_shadow_fox_haunting_edge_distance() -> i32 {
+    4
+}
+
+fn default_shadow_fox_reconstituting_recovery_multiplier() -> f32 {
+    3.0
+}
+
+fn default_shadow_fox_motivation_scan_radius() -> i32 {
+    12
+}
+
+fn default_shadow_fox_motivation_min_pressure() -> f32 {
+    0.05
 }
 
 fn default_shadow_fox_coherence_decay_clean() -> f32 {

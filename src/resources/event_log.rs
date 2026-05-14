@@ -318,6 +318,34 @@ pub enum EventKind {
         age_ticks: u64,
         final_corruption: f32,
     },
+    /// Ticket 023 Phase B — a shadow-fox transitioned into the
+    /// Reconstituting state. Logged with the chosen recovery tile so
+    /// post-hoc tooling can attribute coherence-recovery clusters.
+    ShadowFoxReconstitutingEntered {
+        location: (i32, i32),
+        coherence: f32,
+    },
+    /// Ticket 023 Phase B — a shadow-fox transitioned into the Tending
+    /// state at a ward perimeter. The drive's role is "corruption
+    /// gardener" — see the design doc for the feedback loop.
+    ShadowFoxTendingEntered {
+        location: (i32, i32),
+        ward_location: (i32, i32),
+    },
+    /// Ticket 023 Phase B — a shadow-fox transitioned into the Haunting
+    /// state. The target cell tracks the cat being haunted; Phase C
+    /// adds the per-tick mood/safety drain wiring.
+    ShadowFoxHauntingEntered {
+        location: (i32, i32),
+        target: (i32, i32),
+    },
+    /// Ticket 023 Phase B — a shadow-fox transitioned into the Seeding
+    /// state at the corruption frontier (boundary between corrupt
+    /// and clean tiles).
+    ShadowFoxSeedingEntered {
+        location: (i32, i32),
+        frontier: (i32, i32),
+    },
 
     // -------------------------------------------------------------------
     // Continuity-canary events (§11.3 — "Emit events for: grooming fires,

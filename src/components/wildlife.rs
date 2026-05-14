@@ -156,6 +156,47 @@ pub enum WildlifeAiState {
         angle: f32,
         ticks: u64,
     },
+    // ---- Ticket 023 Phase B: shadow-fox motivation states ----
+    // These variants are gated by `Has<ShadowFoxDrives>` — only the
+    // shadow-fox motivation tick writes them. `wildlife_ai`'s state
+    // machine reads them via the same query but only because shadow-
+    // foxes also flow through that loop; non-shadow-fox wildlife will
+    // never carry these variants.
+    /// Reconstituting: hold position on a high-corruption tile while
+    /// `shadowfox_coherence_tick` recovers coherence at the
+    /// `reconstituting_recovery_multiplier`. Picked when the
+    /// Coherence drive dominates the motivation softmax.
+    Reconstituting { tile_x: i32, tile_y: i32 },
+    /// Tending: orbit a ward's perimeter laying down corruption.
+    /// Distinct from `EncirclingWard` (which is the siege pattern that
+    /// pre-Phase-B triggered from the patrol-step branch). Tending
+    /// is driven by the Resonance drive — corruption is *losing
+    /// ground* near the ward and the shadow-fox shores it up. The
+    /// siege state can still emerge from `wildlife_ai`'s patrol
+    /// branch when the fox stumbles into ward coverage.
+    Tending {
+        ward_x: i32,
+        ward_y: i32,
+        angle: f32,
+    },
+    /// Haunting: pace at the detection-edge distance around a target
+    /// cat, applying psychological pressure without combat. Phase B
+    /// stores the target position only — re-elect each motivation
+    /// tick. Phase C wires the safety/mood drain and the haunt-
+    /// escalation-to-stalking transition.
+    Haunting {
+        target_x: i32,
+        target_y: i32,
+        edge_distance: i32,
+    },
+    /// Seeding: move toward and extend the corruption frontier
+    /// (boundary between corrupt and clean tiles), depositing at
+    /// `seed_corruption_rate`. Picked when the Entropy drive
+    /// dominates.
+    Seeding {
+        frontier_x: i32,
+        frontier_y: i32,
+    },
 }
 
 // ---------------------------------------------------------------------------

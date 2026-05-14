@@ -129,6 +129,19 @@ pub enum Feature {
     /// event paired with `ShadowFoxBanished`; rare-legend category so
     /// it returns `false` from `expected_to_fire_per_soak()`.
     ShadowFoxDissolved,
+    /// Ticket 023 Phase B — a shadow-fox entered the Reconstituting
+    /// state to recover coherence on a high-corruption tile.
+    ShadowFoxReconstitutingEntered,
+    /// Ticket 023 Phase B — a shadow-fox entered the Tending state
+    /// to reinforce corruption near a ward perimeter.
+    ShadowFoxTendingEntered,
+    /// Ticket 023 Phase B — a shadow-fox entered the Haunting state
+    /// to apply psychological pressure on a target cat. Phase C
+    /// wires the per-tick safety/mood drain.
+    ShadowFoxHauntingEntered,
+    /// Ticket 023 Phase B — a shadow-fox entered the Seeding state
+    /// to extend the corruption frontier.
+    ShadowFoxSeedingEntered,
     DirectiveDelivered,
     // --- Corruption & carcass systems ---
     CarcassSpawned,
@@ -482,6 +495,10 @@ impl Feature {
         Feature::ShadowFoxAvoidedWard,
         Feature::ShadowFoxAvoidedCatScent,
         Feature::ShadowFoxDissolved,
+        Feature::ShadowFoxReconstitutingEntered,
+        Feature::ShadowFoxTendingEntered,
+        Feature::ShadowFoxHauntingEntered,
+        Feature::ShadowFoxSeedingEntered,
         Feature::DirectiveDelivered,
         // Corruption & carcass systems
         Feature::CarcassSpawned,
@@ -719,6 +736,14 @@ impl Feature {
             Feature::FoxDenDefense => Neutral,
             Feature::FoxAvoidedWard => Neutral,
             Feature::FoxAvoidedPresence => Neutral,
+            // Ticket 023 Phase B — shadow-fox motivation state entries
+            // are observability signals: state transitions, not harm
+            // events. The harm (corruption deposit / mood drain) is
+            // tallied separately by its own per-tick emitters in Phase C.
+            Feature::ShadowFoxReconstitutingEntered => Neutral,
+            Feature::ShadowFoxTendingEntered => Neutral,
+            Feature::ShadowFoxHauntingEntered => Neutral,
+            Feature::ShadowFoxSeedingEntered => Neutral,
             Feature::CommitmentDropTriggered => Neutral,
             Feature::CommitmentDropBlind => Neutral,
             Feature::CommitmentDropSingleMinded => Neutral,
@@ -765,6 +790,14 @@ impl Feature {
             // may not produce. Pair with `ShadowFoxBanished` in the
             // rare-legend exemption set.
             Feature::ShadowFoxDissolved => false,
+            // Ticket 023 Phase B — motivation-state entries depend on
+            // the shadow-fox population and corruption substrate; exempt
+            // by category (Neutral features don't gate the canary), but
+            // listed here for documentation and easy promotion later.
+            Feature::ShadowFoxReconstitutingEntered => false,
+            Feature::ShadowFoxTendingEntered => false,
+            Feature::ShadowFoxHauntingEntered => false,
+            Feature::ShadowFoxSeedingEntered => false,
             Feature::FateAwakened => false,
             Feature::SpiritCommunion => false,
             Feature::ShadowFoxAvoidedWard => false,
@@ -1036,6 +1069,10 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ShadowFoxAvoidedWard => "ShadowFoxAvoidedWard",
         Feature::ShadowFoxAvoidedCatScent => "ShadowFoxAvoidedCatScent",
         Feature::ShadowFoxDissolved => "ShadowFoxDissolved",
+        Feature::ShadowFoxReconstitutingEntered => "ShadowFoxReconstitutingEntered",
+        Feature::ShadowFoxTendingEntered => "ShadowFoxTendingEntered",
+        Feature::ShadowFoxHauntingEntered => "ShadowFoxHauntingEntered",
+        Feature::ShadowFoxSeedingEntered => "ShadowFoxSeedingEntered",
         Feature::DirectiveDelivered => "DirectiveDelivered",
         Feature::CarcassSpawned => "CarcassSpawned",
         Feature::WardSiegeStarted => "WardSiegeStarted",
@@ -1362,9 +1399,12 @@ mod tests {
         // slow-environmental defeat paired with ShadowFoxBanished;
         // exempt from the seed-42 canary as it depends on sustained
         // cleansing pressure that a healthy 15-min soak may not produce).
+        // Ticket 023 Phase B added 4 Neutral (state-entry signals for
+        // the four motivation states — Reconstituting/Tending/Haunting/
+        // Seeding; observability not harm).
         assert_eq!(positive, 56);
         assert_eq!(negative, 23);
-        assert_eq!(neutral, 35);
+        assert_eq!(neutral, 39);
     }
 
     #[test]
@@ -1441,6 +1481,7 @@ mod tests {
         // scent-channel sibling of ShadowFoxAvoidedWard).
         // Ticket 023 Phase A: +1 Positive (ShadowFoxDissolved — slow-
         // environmental defeat paired with ShadowFoxBanished).
+        // Ticket 023 Phase B: +4 Neutral (motivation-state entries).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
             56
@@ -1451,7 +1492,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            35
+            39
         );
     }
 

@@ -377,6 +377,15 @@ impl Plugin for SimulationPlugin {
                         // to avoid creating a new top-level schedule edge
                         // (ticket 061 precedent).
                         systems::wildlife::shadowfox_coherence_tick,
+                        // Ticket 023 Phase B — motivation tick re-elects
+                        // each shadow-fox's WildlifeAiState every
+                        // `shadow_fox_motivation_tick_cadence` ticks
+                        // (default 16). Runs after coherence so a
+                        // shadow-fox that dissolves this tick won't be
+                        // assigned a state it can't act on, and before
+                        // `wildlife_ai` so the new state takes effect
+                        // immediately.
+                        systems::wildlife::shadowfox_motivation_tick,
                         systems::wildlife::spawn_wildlife,
                         systems::wildlife::wildlife_ai,
                         systems::wildlife::fox_movement,
