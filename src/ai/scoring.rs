@@ -190,6 +190,15 @@ pub struct CatAnchorPositions {
     pub own_injury_site: Option<Position>,
     /// `LandmarkAnchor::NearestThreat` — Flee (B15).
     pub nearest_threat: Option<Position>,
+    /// 263: entity id of the same threat surfaced in `nearest_threat`.
+    /// The Position is anchor-resolvable on its own; the Entity is the
+    /// per-pair key required for `ActionAffordances::read(perceiver,
+    /// target, kind)` reads on Flee / Hunt / Fight / Freeze axes.
+    /// Plumbed alongside `nearest_threat` so consumers can ask both
+    /// "where is the threat" (spatial axis) and "how does this action
+    /// score against *that* threat" (entity-pair affordance axis)
+    /// without re-deriving the entity from a fresh wildlife scan.
+    pub nearest_threat_entity: Option<Entity>,
     /// `LandmarkAnchor::NearestCorruptedTile` — Cleanse (B1) +
     /// DurableWard (B11).
     pub nearest_corrupted_tile: Option<Position>,
@@ -464,6 +473,20 @@ pub struct ScoringContext<'a> {
     /// ticket adds proper cross-cat aggregation (e.g., from
     /// `SystemActivation::interrupts_by_reason` flee-preemption count).
     pub colony_tension_recent: f32,
+    /// 263: per-cat `LocationBeliefs.recency_of_threat_cue` facet
+    /// sampled at the cat's `TerritoryPerimeterAnchor` bucket.
+    /// Populated at `ScoringContext` construction by reading the cat's
+    /// per-tick `LocationBeliefs` Component (258 substrate) at
+    /// `bucket_position(territory_perimeter_anchor)`. Defaults to
+    /// `0.0` when the cat has no entry for that bucket — the
+    /// substrate's "I have no memory of threats here" reading.
+    /// Surfaced in `ctx_scalars` as `"patrol_threat_recency"`.
+    /// Dormant in DSE scoring at land — `patrol_threat_recency_weight`
+    /// is `0.0` until the activation follow-on lifts it. Mirrors the
+    /// `recent_ambush_at_position` precomputed-scalar pattern; ticket
+    /// 294 will eventually fold the colony-shared `RecentAmbushMap`
+    /// into this per-cat facet at the source side.
+    pub patrol_threat_recency: f32,
     // --- Corruption/carcass/siege context ---
     /// Whether uncleansed/unharvested carcasses are within detection range.
     pub carcass_nearby: bool,
@@ -502,6 +525,17 @@ pub struct ScoringContext<'a> {
     /// ~0.0 under closer-is-better curves — same dormant behavior as
     /// "out of range" Spatial landmarks.
     pub route_cost_field: Option<&'a crate::components::RouteCostField>,
+    /// 263: borrow of the `ActionAffordances` resource (261 substrate)
+    /// for entity-pair affordance reads inside DSE consideration
+    /// closures. Required (not `Option`) — the resource is registered
+    /// in `SimulationPlugin::build()` and lives for the full app
+    /// lifetime; both production construction sites pass `&affordances`
+    /// from a `Res<ActionAffordances>` system parameter. The 263
+    /// consumer axes (Flee, Hunt-best-predation) read via
+    /// `ctx.action_affordances.read(cat, target, kind)`; missing
+    /// entries return `0.0` per the resource's own gate signal so the
+    /// closure stays branch-free.
+    pub action_affordances: &'a crate::resources::action_affordances::ActionAffordances,
     // --- Disposition-failure cooldown signals: 1.0 = no recent failure
     // (no damp), 0.0 = just failed (full damp). One per failure-prone
     // `DispositionKind`. Read by `DispositionFailureCooldown` in
@@ -903,6 +937,31 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert(
         "recent_ambush_at_position",
         ctx.recent_ambush_at_position.clamp(0.0, 1.0),
+    );
+    // 263: per-cat `LocationBeliefs.recency_of_threat_cue` facet at
+    // the cat's patrol perimeter anchor bucket. Dormant in DSE
+    // scoring at land (patrol_threat_recency_weight = 0.0); emitted
+    // here so the scalar surfaces in trace-*.jsonl regardless of
+    // whether Patrol's 6th axis is pushed onto the consideration
+    // list this tick. Consumer activation lives in a follow-on.
+    m.insert(
+        "patrol_threat_recency",
+        ctx.patrol_threat_recency.clamp(0.0, 1.0),
+    );
+    // 263: Affordance(Flee, self, NearestThreat) — entity-pair
+    // success scalar from the 261 substrate. Reads `0.0` when the
+    // cat has no nearest-threat entity (no threat in range). Dormant
+    // in DSE scoring at land (flee_affordance_weight = 0.0); emitted
+    // for trace observability. The Flee DSE's 5th conditional axis
+    // pushes onto the consideration list only when the weight is
+    // non-zero.
+    m.insert(
+        "flee_affordance",
+        ctx.cat_anchors
+            .nearest_threat_entity
+            .map(|t| ctx.action_affordances.read(inputs.cat, t, crate::resources::action_affordances::ActionKind::Flee))
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0),
     );
     // 220: per-tile carcass-scent sample. Dormant in DSE scoring;
     // emitted for trace observability. The placement consumer in
@@ -2869,6 +2928,17 @@ mod tests {
         C.get_or_init(crate::resources::CorruptionLandmarks::default)
     }
 
+    /// 263: empty `ActionAffordances` resource for tests that build
+    /// `ScoringContext` literals. Reads return `0.0` for every
+    /// `(perceiver, target, kind)` triple — the substrate's dormant
+    /// gate signal, which keeps tests that don't exercise affordance
+    /// axes byte-identical pre-263.
+    fn cached_action_affordances() -> &'static crate::resources::action_affordances::ActionAffordances {
+        static A: OnceLock<crate::resources::action_affordances::ActionAffordances> =
+            OnceLock::new();
+        A.get_or_init(crate::resources::action_affordances::ActionAffordances::default)
+    }
+
     fn test_eval_inputs() -> EvalInputs<'static> {
         EvalInputs {
             cat: Entity::from_raw_u32(1).unwrap(),
@@ -3006,6 +3076,7 @@ mod tests {
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
                 nearest_corrupted_tile: Some(Position::new(0, 0)),
                 nearest_threat: Some(Position::new(0, 0)),
+                nearest_threat_entity: None,
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
@@ -3036,6 +3107,8 @@ mod tests {
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            patrol_threat_recency: 0.0,
+            action_affordances: cached_action_affordances(),
         }
     }
 
@@ -3205,6 +3278,7 @@ mod tests {
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
                 nearest_corrupted_tile: Some(Position::new(0, 0)),
                 nearest_threat: Some(Position::new(0, 0)),
+                nearest_threat_entity: None,
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
@@ -3235,6 +3309,8 @@ mod tests {
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            patrol_threat_recency: 0.0,
+            action_affordances: cached_action_affordances(),
         };
         // §L2.10.7: this test sets `food_available: false`,
         // `has_functional_kitchen: false`, etc. on the context, but
@@ -3427,6 +3503,7 @@ mod tests {
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
                 nearest_corrupted_tile: Some(Position::new(0, 0)),
                 nearest_threat: Some(Position::new(0, 0)),
+                nearest_threat_entity: None,
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
@@ -3457,6 +3534,8 @@ mod tests {
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            patrol_threat_recency: 0.0,
+            action_affordances: cached_action_affordances(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let socialize_score = scores
@@ -3713,6 +3792,7 @@ mod tests {
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
                 nearest_corrupted_tile: Some(Position::new(0, 0)),
                 nearest_threat: Some(Position::new(0, 0)),
+                nearest_threat_entity: None,
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
@@ -3743,6 +3823,8 @@ mod tests {
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            patrol_threat_recency: 0.0,
+            action_affordances: cached_action_affordances(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let best = select_best_action(&scores);
@@ -3860,6 +3942,7 @@ mod tests {
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
                 nearest_corrupted_tile: Some(Position::new(0, 0)),
                 nearest_threat: Some(Position::new(0, 0)),
+                nearest_threat_entity: None,
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
@@ -3890,6 +3973,8 @@ mod tests {
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            patrol_threat_recency: 0.0,
+            action_affordances: cached_action_affordances(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let fight_score = scores.iter().find(|(a, _)| *a == Action::Fight).unwrap().1;
@@ -4012,6 +4097,7 @@ mod tests {
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
                 nearest_corrupted_tile: Some(Position::new(0, 0)),
                 nearest_threat: Some(Position::new(0, 0)),
+                nearest_threat_entity: None,
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
@@ -4042,6 +4128,8 @@ mod tests {
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            patrol_threat_recency: 0.0,
+            action_affordances: cached_action_affordances(),
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
         // this cat (the cached shared snapshot only carries colony
@@ -4344,6 +4432,7 @@ mod tests {
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
                 nearest_corrupted_tile: Some(Position::new(0, 0)),
                 nearest_threat: Some(Position::new(0, 0)),
+                nearest_threat_entity: None,
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
@@ -4374,6 +4463,8 @@ mod tests {
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            patrol_threat_recency: 0.0,
+            action_affordances: cached_action_affordances(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
         let wander = scores.iter().find(|(a, _)| *a == Action::Wander).unwrap().1;
@@ -4473,6 +4564,7 @@ mod tests {
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
                 nearest_corrupted_tile: Some(Position::new(0, 0)),
                 nearest_threat: Some(Position::new(0, 0)),
+                nearest_threat_entity: None,
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
@@ -4503,6 +4595,8 @@ mod tests {
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            patrol_threat_recency: 0.0,
+            action_affordances: cached_action_affordances(),
         };
 
         let scores_full = score_actions(&base, &test_eval_inputs(), &mut rng_full).scores;

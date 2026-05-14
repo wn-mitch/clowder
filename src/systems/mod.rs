@@ -58,6 +58,16 @@ pub struct ColonyContext<'w> {
     /// sample reads 0.0 everywhere and the dormant weight makes the
     /// DSE score byte-identical pre-301.
     pub ward_intent_map: Res<'w, crate::resources::WardIntentMap>,
+    /// 263 — `ActionAffordances` resource borrow for `ScoringContext`
+    /// population. The substrate (261) is colony-wide and read by
+    /// both production scoring paths (`evaluate_and_plan` and the
+    /// currently-unscheduled `evaluate_dispositions`); bundling here
+    /// keeps the per-system 16-param ceiling intact for both. Consumer
+    /// DSEs at 263 (Flee `flee_affordance`, Hunt per-target
+    /// `hunt_best_predation_affordance`) read through
+    /// `ctx.action_affordances.read(cat, target, kind)` inside
+    /// their consideration closures.
+    pub action_affordances: Res<'w, crate::resources::action_affordances::ActionAffordances>,
 }
 
 pub mod actions;

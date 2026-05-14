@@ -968,6 +968,13 @@ pub fn evaluate_dispositions(
             // 209: per-cat proxy for colony-tension; see goap.rs
             // construction site for rationale.
             colony_tension_recent: (1.0 - needs.safety).clamp(0.0, 1.0),
+            // 263: `evaluate_dispositions` is unscheduled and doesn't
+            // carry a `LocationBeliefs` query (would require expanding
+            // the per-cat tuple past Bevy's nested-tuple ergonomics for
+            // a non-firing path). Defaults to 0.0 — matches the "no
+            // belief entry for this bucket" reading, which is the
+            // dormant scoring outcome anyway.
+            patrol_threat_recency: 0.0,
             // Ticket 014 §4 sensing batch — read via marker. Disposition
             // path doesn't carry a carcass-count snapshot; the marker
             // is the truthful source. `nearby_carcass_count` stays 0
@@ -1042,6 +1049,11 @@ pub fn evaluate_dispositions(
                 // §L2.10.7 Flee anchor: position of the nearest
                 // wildlife threat already scanned for allies_fighting.
                 nearest_threat: nearest_threat.map(|(_, p)| *p),
+                // 263: paired entity id (mirror of the goap.rs site).
+                // `evaluate_dispositions` is unscheduled; the field is
+                // populated here for type-correctness so 263's consumer
+                // axes don't read a stale `None` on a future re-enable.
+                nearest_threat_entity: nearest_threat.map(|(e, _)| *e),
                 // §L2.10.7 Coordinate anchor: colony center. The
                 // coordinator's perch is approximated as the colony
                 // origin tile — single-perch model. Future refinement
@@ -1093,6 +1105,9 @@ pub fn evaluate_dispositions(
             intention_held_action_ordinal: 0.0,
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
+            // 263: mirror of the goap.rs site. Reads the same resource
+            // handle through `ColonyContext`.
+            action_affordances: &colony.action_affordances,
         };
 
         // §11 trace plumbing — dormant except when running headless

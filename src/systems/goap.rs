@@ -261,6 +261,17 @@ pub struct WorldStateQueries<'w, 's> {
     /// both are read-only on the same archetype, permitted by Bevy's
     /// borrow checker.
     pub held_intentions: Query<'w, 's, &'static crate::components::HeldIntention>,
+    /// 263 — read-only `LocationBeliefs` lookup for the
+    /// `patrol_threat_recency` precomputed scalar at `ScoringContext`
+    /// construction. Reads the cat's per-location facet at the patrol
+    /// perimeter anchor bucket so the Patrol DSE (and any future
+    /// location-keyed consumer) doesn't have to thread a separate
+    /// query. Disjoint from the cats query because `&LocationBeliefs`
+    /// is read-only here and the cats query never writes the
+    /// component on the same iteration tick (the `belief_integrator`
+    /// system writes once per tick before scoring).
+    pub location_beliefs:
+        Query<'w, 's, &'static crate::components::beliefs::LocationBeliefs>,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -1947,6 +1958,41 @@ pub fn evaluate_and_plan(
             // `TensionDefusionGroomLift` modifier (dormant at 0.0).
             // Follow-on: aggregate across colony.
             colony_tension_recent: (1.0 - needs.safety).clamp(0.0, 1.0),
+            // 263: per-cat `LocationBeliefs.recency_of_threat_cue`
+            // sampled at the cat's patrol perimeter anchor bucket. Reads
+            // 0.0 when the cat has no belief entry for that bucket OR
+            // the cat is missing the `LocationBeliefs` component
+            // entirely (test paths, freshly spawned). Mirrors
+            // `recent_ambush_at_position` (which reads the colony-shared
+            // RecentAmbushMap) but per-cat-subjective.
+            patrol_threat_recency: world_state
+                .location_beliefs
+                .get(entity)
+                .ok()
+                .and_then(|lb| {
+                    let anchor = colony
+                        .ward_coverage_map
+                        .sector_centroid(
+                            crate::resources::ward_coverage_map::patrol_sector_id(
+                                res.time.tick,
+                                entity,
+                                d.patrol_sector_grid_w,
+                                d.patrol_sector_grid_h,
+                                d.patrol_sector_rotation_ticks,
+                            ),
+                            d.patrol_sector_grid_w,
+                            d.patrol_sector_grid_h,
+                        )
+                        .unwrap_or_else(|| {
+                            crate::components::physical::Position::new(
+                                res.colony_center.0.x + d.patrol_perimeter_offset,
+                                res.colony_center.0.y,
+                            )
+                        });
+                    let key = crate::components::beliefs::bucket_position(anchor.x, anchor.y);
+                    lb.models.get(&key).map(|m| m.recency_of_threat_cue.value)
+                })
+                .unwrap_or(0.0),
             // Ticket 014 §4 sensing batch — read via marker. The
             // marker's predicate is "any uncleansed-or-unharvested
             // carcass within carcass_detection_range" (matches the
@@ -2031,6 +2077,10 @@ pub fn evaluate_and_plan(
                 // §L2.10.7 Flee anchor: position of the nearest
                 // wildlife threat already scanned for allies_fighting.
                 nearest_threat: nearest_threat.map(|&(_, p)| p),
+                // 263: paired entity id for entity-pair affordance reads.
+                // Same source as `nearest_threat` (the wildlife scan
+                // tuple); both Some/None together.
+                nearest_threat_entity: nearest_threat.map(|&(e, _)| e),
                 // §L2.10.7 Coordinate anchor: colony center as the
                 // coordinator's perch (single-perch model).
                 coordinator_perch: Some(res.colony_center.0),
@@ -2163,6 +2213,14 @@ pub fn evaluate_and_plan(
                 .ok()
                 .map(|h| h.source.ordinal() as f32)
                 .unwrap_or(0.0),
+            // 263: borrow the per-tick ActionAffordances resource so
+            // entity-pair affordance reads inside `ctx_scalars` and
+            // future consideration closures route through one source
+            // of truth. `affordance_writer` rebuilds the resource each
+            // tick before scoring runs. Sourced from `ColonyContext`
+            // so the disposition-pipeline mirror site can read the
+            // same handle without separately bundling it.
+            action_affordances: &colony.action_affordances,
         };
 
         let focal_cat = res.focal_target.as_deref().and_then(|t| t.entity);
