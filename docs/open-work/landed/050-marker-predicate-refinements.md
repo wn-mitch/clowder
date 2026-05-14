@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, sensory.md]
 related-balance: []
-landed-at: pending
+landed-at: 7dfa2796b964
 landed-on: 2026-05-14
 ---
 
