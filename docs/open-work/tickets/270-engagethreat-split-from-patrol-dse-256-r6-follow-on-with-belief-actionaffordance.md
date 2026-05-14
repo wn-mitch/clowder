@@ -1,12 +1,12 @@
 ---
 id: 270
 title: EngageThreat split from Patrol DSE (256 R6 follow-on with Belief + ActionAffordance)
-status: blocked
+status: ready
 cluster: combat-threat
 initiative: []
 added: 2026-05-10
 parked: null
-blocked-by: [261]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

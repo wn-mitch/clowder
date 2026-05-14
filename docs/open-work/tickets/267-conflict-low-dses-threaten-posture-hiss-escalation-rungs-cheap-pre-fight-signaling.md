@@ -1,12 +1,12 @@
 ---
 id: 267
 title: Conflict-low DSEs — Threaten / Posture / Hiss escalation rungs (cheap pre-Fight signaling)
-status: blocked
+status: ready
 cluster: combat-threat
 initiative: []
 added: 2026-05-10
 parked: null
-blocked-by: [261]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

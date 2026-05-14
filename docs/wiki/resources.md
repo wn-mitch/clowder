@@ -2,7 +2,7 @@
 
 # Resources
 
-44 resource types derived from `#[derive(Resource)]`.
+51 resource types derived from `#[derive(Resource)]`.
 
 ## `src/components/coordination.rs`
 
@@ -15,6 +15,16 @@
 ### PreyDensity (struct)
 
 > Per-species population density (pop / cap), updated once per tick in `prey_population`. Read by the pounce formula for density-dependent vulnerability.
+
+## `src/resources/action_affordances.rs`
+
+### ActionAffordances (struct)
+
+> Per-`(perceiver, target, action_kind)` success scalar in `[0, 1]`.  Rebuilt each tick by `affordance_writer`. Missing entries read as `0.0` (the action is gated — either species-ineligible, out of sensing range, or below `min_eligibility_threshold` for this kind).  `#[serde(skip)]` on the inner map mirrors the precedent for entity-keyed substrate state (`CatBeliefs.models`, `pairing.rs`, `held_intention.rs`) — raw `Entity` ids don't round-trip across saves, so the substrate rebuilds from fresh observations on load.
+
+| Field | Type |
+|-------|------|
+| `scalars` | `HashMap<(Entity, Entity, ActionKind), f32>` |
 
 ## `src/resources/aspiration_registry.rs`
 
@@ -35,11 +45,24 @@
 | `grid_h` | `usize` |
 | `bucket_size` | `i32` |
 
-## `src/resources/cat_presence_map.rs`
+## `src/resources/cat_patrol_deterrent_map.rs`
 
-### CatPresenceMap (struct)
+### CatPatrolDeterrentMap (struct)
 
-> Spatial grid tracking cat territorial presence via patrol activity.  Mirrors `FoxScentMap` — same bucketed overlay pattern. Cats deposit presence during patrol actions; all buckets decay globally each tick. Foxes read high-presence areas to avoid cat territory, creating the push-pull territorial boundary dynamic.
+> Spatial grid tracking cat patrol presence as a deterrent gradient for foxes (ticket 256 R5).  Symmetric counterpart to `FoxScentMap`: cats deposit when their `current_action == Action::Patrol`; foxes read this map as routing cost via `CatPatrolDeterrentOverlay`. The deterrent decays globally each tick so passing patrols don't permanently lock foxes out of corridors — only sustained patrol presence creates a meaningful detour for foxes.  Distinct from `CatScentMap`: the presence map deposits unconditionally from any active cat, including idle / foraging / sleeping. The deterrent map is patrol-only — sleeping cats are vulnerable, not threatening.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/cat_scent_map.rs`
+
+### CatScentMap (struct)
+
+> Spatial grid tracking cat territorial scent — the scent residue cats leave on the world.  Mirrors `FoxScentMap` — same bucketed overlay pattern. Two emission rates: every adult cat deposits a small base amount each tick (steady-state scent presence), and active territorial actions (`Patrol`/`Fight`/`Explore`) add a larger bonus. All buckets decay globally each tick. Foxes read high-scent areas to avoid cat territory, creating the push-pull territorial boundary dynamic; the signpost render overlay surfaces the gradient to the player.  The map is registered as an `InfluenceMap` on the `Scent` channel with `Faction::Colony`, distinct from `CatPatrolDeterrentMap` (a Sight-channel routing-cost gradient deposited only during `Action::Patrol`).
 
 | Field | Type |
 |-------|------|
@@ -97,6 +120,17 @@
 |-------|------|
 | `active` | `Option<PriorityKind>` |
 
+## `src/resources/colony_reserves.rs`
+
+### ColonyReserves (struct)
+
+> Ground-truth aggregator of colony-wide reserve resource counts (ticket 308).  Recomputed each tick by `sync_colony_reserves` from a sum of every cat's `Inventory` slots plus every `Stores` building's `StoredItems`. The per-cat `ColonyReservesBelief` substrate is the **subjective** view of these quantities; this resource is the ground truth that the aggregator emits and that downstream debug / canary code may inspect.  `RemedyHerb` aggregates `HealingMoss + Moonpetal + Calmroot` — same classification as `Inventory::has_remedy_herb()` and `ResourceKind`.
+
+| Field | Type |
+|-------|------|
+| `thornbriar_count` | `u32` |
+| `remedy_herb_count` | `u32` |
+
 ## `src/resources/colony_score.rs`
 
 ### ColonyScore (struct)
@@ -114,7 +148,7 @@
 | `aspirations_completed` | `u64` |
 | `structures_built` | `u64` |
 | `kittens_born` | `u64` |
-| `kittens_surviving` | `u64` |
+| `kittens_matured` | `u64` |
 | `prey_dens_discovered` | `u64` |
 | `banishments` | `u64` |
 | `last_recorded_season` | `u64` |
@@ -204,6 +238,19 @@
 |-------|------|
 | `weather` | `Option<Weather>` |
 
+## `src/resources/fox_approach_corridor_map.rs`
+
+### FoxApproachCorridorMap (struct)
+
+> Colony-shared spatial memory of fox-approach corridors.  Each tile carries a 0.0–1.0 intensity that bumps when an active (patrolling) `ShadowFox` advances through it and exponentially decays each tick. The signal accumulates on tiles foxes *traverse* on their way to cats — distinct from `FoxScentMap` (territorial mark, decays in days), `RecentAmbushMap` (event-echo at attack site, decays in ~one day), and the inline fox-spawn-vicinity halo (computed from corruption sources, not observed routes).  301's first-light soak named the substrate gap: `compute_ward_placement` had no input for *topological criticality* — which tiles foxes actually walk on to reach the colony. `fox_scent` decays too fast; `corruption` lights spawn sources; `cat_value` and `-distance_cost` both pull placement *toward cats*. Without this map, any selection-rule change just moves wards within the cat cluster.  **Per-tile resolution** (bucket_size = 1) — diverges from sibling maps' 5-tile bucketing. Corridors are linear topological features (a 2-tile-wide isthmus is the canonical test case): bucket=5 would alias the corridor signal onto neighboring non-corridor tiles, defeating the architectural intent. Memory cost is ~43KB (120×90 f32) and decay is O(grid) per tick — both negligible at the simulation's scale. The mirror of `RecentAmbushMap`'s shape otherwise: same `deposit` / `decay_all` / `get` / `bucket_index` API, same exponential-decay semantics.  **Substrate posture (per ticket 312):** ships dormant — the scorer's `ward_fox_approach_corridor_weight` defaults to 0.0, so no behavior changes at land. The FO-1 scenario (`chokepoint_defense_isthmus`) activates it at fixture level (`weight = 0.3`) to assert the isthmus-corked outcome. Three-seed `just hypothesize` validates at `weight = 0.3` per the four-artifact methodology. FO-4 will migrate the signal into the 258 belief layer once 263–270 establishes the belief-DSE consumer surface.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
 ## `src/resources/fox_scent_map.rs`
 
 ### FoxScentMap (struct)
@@ -222,6 +269,19 @@
 ### GardenLocationMap (struct)
 
 > Spatial influence map of colony garden buildings.  §5.6.3 row #10 of `docs/systems/ai-substrate-refactor.md` — sight × colony. Re-stamped each tick from live `Structure` entities whose `kind` is `Garden`. Each functional garden paints a linear-falloff disc of radius `garden_location_sense_range` weighted by effectiveness so a `SpatialConsideration` consumer reads a continuous "near garden infrastructure" gradient.  Producer-only landing per ticket 006. Consumer cutover (Tend / Harvest target ranking via `SpatialConsideration`) is owned by ticket 052.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/grave_aura_map.rs`
+
+### GraveAuraMap (struct)
+
+> Spatial grid tracking grave-aura intensity across the map.  Recomputed each tick from live `Grave` entities. Each grave stamps a linear falloff into nearby buckets; overlapping graves sum (clamped to 1.0). Same bucketed-overlay pattern as `WardCoverageMap` (see `src/resources/ward_coverage_map.rs`).
 
 | Field | Type |
 |-------|------|
@@ -296,6 +356,19 @@
 | `grid_h` | `usize` |
 | `bucket_size` | `i32` |
 
+## `src/resources/recent_ambush_map.rs`
+
+### RecentAmbushMap (struct)
+
+> Colony-shared spatial memory of recent ambush events.  Each tile carries a 0.0–1.0 intensity that bumps to 1.0 when a predator ambushes a cat there and exponentially decays each tick. 210's closeout showed ambushes cluster spatially (60–70% of attacks land in 2–3 tile zones near colony center) and temporally (3–5 hits per cat over ~2–3k ticks before death) — neither `FoxScentMap` nor `colony_tension_recent` anchors on *where ambushes have actually happened*. `RecentAmbushMap` fills that gap as the colony-shared, event-typed-failure substrate.  Bucketed-grid layout follows the `FoxScentMap` / `PreyScentMap` pattern (120×90 world with 5-tile buckets → 24×18 = 432 cells).  **Substrate posture (per ticket 219):** ships dormant — no DSE scores against it yet. The value is sampled into `ScoringContext` and emitted via `ctx_scalars` so it shows up in `trace-*.jsonl`, keeping the substrate observable. Future tickets 220 (ward-placement) and 221 (caretake-relocate) consume it. Per §12.1 of `docs/systems/ai-substrate-refactor.md`, this joins `RecentDispositionFailures` / `RecentTargetFailures` / `HuntingPriors::record_failed_search` as a temporary typed-failure proxy that folds into the unified `Memory.LocationModel.last_threat` facet when Talk-of-the-Town cluster C3 (ticket 007) lands.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
 ## `src/resources/relationships.rs`
 
 ### Relationships (struct)
@@ -343,9 +416,11 @@
 | `fertility` | `FertilityConstants` |
 | `fulfillment` | `FulfillmentConstants` |
 | `influence_maps` | `InfluenceMapConstants` |
-| `pairing` | `PairingConstants` |
+| `practices` | `PracticeConstants` |
 | `planning_substrate` | `PlanningSubstrateConstants` |
 | `escape_viability` | `EscapeViabilityConstants` |
+| `beliefs` | `BeliefsConstants` |
+| `affordances` | `AffordancesConstants` |
 
 ## `src/resources/snapshot_config.rs`
 
@@ -429,7 +504,7 @@
 
 ### FocalScoreCapture (struct)
 
-> Per-tick focal-cat scoring capture. Populated during `evaluate_and_plan` / `cat_presence_tick` (whichever system's scoring pass runs for a given cat); drained and cleared by `emit_focal_trace`.  The `Mutex` wrapper lets `EvalInputs` carry an immutable reference that nonetheless mutates the capture — Bevy's `Resource` trait requires `Send + Sync`, which rules out `RefCell`. The mutex is uncontended in the single-threaded scoring path (no second writer within a tick); the lock cost is negligible relative to the scoring it guards. Making this a `Resource` means the plugin / main.rs insert it once per run (alongside `FocalTraceTarget` + `TraceLog`) and the capture persists across the system boundary from scoring to emission.
+> Per-tick focal-cat scoring capture. Populated during `evaluate_and_plan` / `cat_scent_tick` (whichever system's scoring pass runs for a given cat); drained and cleared by `emit_focal_trace`.  The `Mutex` wrapper lets `EvalInputs` carry an immutable reference that nonetheless mutates the capture — Bevy's `Resource` trait requires `Send + Sync`, which rules out `RefCell`. The mutex is uncontended in the single-threaded scoring path (no second writer within a tick); the lock cost is negligible relative to the scoring it guards. Making this a `Resource` means the plugin / main.rs insert it once per run (alongside `FocalTraceTarget` + `TraceLog`) and the capture persists across the system boundary from scoring to emission.
 
 | Field | Type |
 |-------|------|
@@ -451,7 +526,20 @@
 
 ### WardCoverageMap (struct)
 
-> Spatial grid tracking ward repulsion coverage across the map.  Mirrors the bucketed-overlay pattern used by `FoxScentMap` and `CatPresenceMap`. Unlike scent maps (cumulative deposit + global decay), ward coverage is a *current* property — it's recomputed each tick from live `Ward` entities. Each ward stamps a radial falloff `ward.strength * (1 - dist/repel_radius)` into nearby buckets; overlapping wards sum (clamped to 1.0).  Consumers: ward-placement DSEs sample this map to express anti-clustering — high coverage on a candidate tile means a new ward there is redundant. Listed as Absent in §5.6.3 of the AI substrate refactor spec; ticket 045 brings it online.
+> Spatial grid tracking ward repulsion coverage across the map.  Mirrors the bucketed-overlay pattern used by `FoxScentMap` and `CatScentMap`. Unlike scent maps (cumulative deposit + global decay), ward coverage is a *current* property — it's recomputed each tick from live `Ward` entities. Each ward stamps a radial falloff `ward.strength * (1 - dist/repel_radius)` into nearby buckets; overlapping wards sum (clamped to 1.0).  Consumers: ward-placement DSEs sample this map to express anti-clustering — high coverage on a candidate tile means a new ward there is redundant. Listed as Absent in §5.6.3 of the AI substrate refactor spec; ticket 045 brings it online.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/ward_intent_map.rs`
+
+### WardIntentMap (struct)
+
+> 301: spatial grid carrying coordinator-stamped ward-placement intent.  Populated by [`compute_ward_placement`] when `ward_placement_semantics == DescendingResidual`: each K-round pick stamps a radial intent contribution at its winning tile, so the field encodes "the colony's spread logic wants a ward here." Consumed at score time by the Path-B `HerbcraftWardDse` (`src/ai/dses/herbcraft_ward.rs`) via a substrate-dormant scalar consideration gated on `ward_intent_dse_weight`: when a cat is standing on (or near) a stamped intent tile and the weight is lifted off 0.0, the DSE scores higher there. The cat's own choice of *whether* to set a ward is unchanged, but its propensity to commit when already on an intent tile is biased upward.  Bucketed pattern mirrors `WardCoverageMap` / `FoxScentMap`. Unlike `WardCoverageMap` (rebuilt every tick from live `Ward` entities), `WardIntentMap` is a *slowly-decaying accumulator*: stamps land during coordinator wakes (every ~20 ticks), and `decay_all` applies a per-tick decay so an intent fades over ~tens of ticks if no cat plants there.  **Dormancy invariant.** At default `SimConstants` the populator short-circuits (semantics is `SingleShotArgmax`) and the reader's weight is `0.0`, so the resource is allocated but never written to or read for behavior. Existence is for substrate-trace observability; activation is via the two ticket-301 flags.
 
 | Field | Type |
 |-------|------|

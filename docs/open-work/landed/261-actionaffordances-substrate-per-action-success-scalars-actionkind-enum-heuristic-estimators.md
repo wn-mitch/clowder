@@ -1,7 +1,7 @@
 ---
 id: 261
 title: ActionAffordances substrate — per-action success scalars + ActionKind enum + heuristic estimators
-status: ready
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats]
 added: 2026-05-10
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: [141]
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-13
 ---
 
 ## Why
@@ -116,3 +116,4 @@ After substrate scaffolds (no consumers wired), `just soak 42` + `just verdict` 
 ## Log
 
 - 2026-05-10: opened sibling-to-258. Generalizes 103 (done) and supersedes 141 (ready) once consumers migrate. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
+- 2026-05-13: Landed across 5 commits: 86aaf30a (resource skeleton) → 248f1f13 (perceived_hostility + perceived_receptivity facets) → f7258ea0 (affordance_writer + AffordancesConstants + Chain 2b schedule) → 5b363037 (six microexperiment scenarios) → c8648f48 (141 supersede). 141 closed as superseded by 261 — Affordance(Fight) heuristic absorbs the dps-balance + ttk + ally-factor composition. Substrate lands behavior-neutral: zero DSE consumers, null behavioural drift expected on next soak. Consumer wiring → 263+.

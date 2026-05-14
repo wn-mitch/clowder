@@ -1,11 +1,11 @@
 ---
 id: 264
 title: Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten)
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-10
 parked: null
-blocked-by: [261]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

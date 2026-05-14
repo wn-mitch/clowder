@@ -9,7 +9,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | System | Status | Registered Functions | Design Doc |
 |--------|--------|---------------------|------------|
 | Collective Memory | **[Built]** | `memory::decay_memories`, `colony_knowledge::update_colony_knowledge` | [doc](../systems/collective-memory.md) |
-| Corpse Handling | **[Built]** | `death::check_death`, `death::cleanup_dead` | [doc](../systems/corpse-handling.md) |
+| Corpse Handling | **[Built]** | `death::check_death`, `death::cleanup_dead`, `death::update_grave_aura_map` | [doc](../systems/corpse-handling.md) |
 | Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::update_ward_coverage_map`, `magic::herb_seasonal_check` (+14 more) | [doc](../systems/magic.md) |
 | Weather — Living Climate System | **[Built]** | `weather::update_weather`, `wind::update_wind` | [doc](../systems/weather.md) |
 
@@ -56,7 +56,9 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 
 System modules with registered functions but no design doc:
 
+- **affordance_writer**: affordance_writer
 - **aspirations**: update_training_markers, update_mentoring_target_markers, select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
+- **belief_integrator**: gossip_inventory_observations, integrate_beliefs
 - **colony_score**: emit_colony_score
 - **fate**: assign_fated_connections, awaken_fated_connections
 - **fertility**: handle_post_partum_reinsert, update_fertility_phase
@@ -74,5 +76,5 @@ System modules with registered functions but no design doc:
 - **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
 - **task_chains**: resolve_task_chains
 - **trace_emit**: emit_focal_trace
-- **wildlife**: spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
+- **wildlife**: spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, update_recent_ambush_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
 

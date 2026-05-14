@@ -9,7 +9,7 @@
 | Enum | Variants | Source |
 |------|----------|--------|
 | [ItemKind](#itemkind) | 30 | `src/components/items.rs` |
-| [DispositionKind](#dispositionkind) | 22 | `src/components/disposition.rs` |
+| [DispositionKind](#dispositionkind) | 23 | `src/components/disposition.rs` |
 | [Weather](#weather) | 8 | `src/resources/weather.rs` |
 | [Terrain](#terrain) | 21 | `src/resources/map.rs` |
 | [StructureType](#structuretype) | 11 | `src/components/building.rs` |
@@ -25,11 +25,11 @@
 | [PreyKind](#preykind) | 5 | `src/components/prey.rs` |
 | [FleeStrategy](#fleestrategy) | 4 | `src/components/prey.rs` |
 | [WildSpecies](#wildspecies) | 4 | `src/components/wildlife.rs` |
-| [EventKind](#eventkind) | 217 | `src/resources/event_log.rs` |
+| [EventKind](#eventkind) | 218 | `src/resources/event_log.rs` |
 | [NarrativeTier](#narrativetier) | 6 | `src/resources/narrative.rs` |
 | [PriorityKind](#prioritykind) | 4 | `src/resources/colony_priority.rs` |
 | [DirectiveKind](#directivekind) | 10 | `src/components/coordination.rs` |
-| [StepKind](#stepkind) | 35 | `src/components/task_chain.rs` |
+| [StepKind](#stepkind) | 36 | `src/components/task_chain.rs` |
 | [ZoneKind](#zonekind) | 3 | `src/components/zone.rs` |
 | [AspirationDomain](#aspirationdomain) | 7 | `src/components/aspirations.rs` |
 
@@ -105,6 +105,7 @@
 | `Handing` |
 | `PickingUp` |
 | `Fleeing` |
+| `Burying` |
 
 ## Weather
 
@@ -390,6 +391,7 @@
 | `ward_kind` |
 | `location` |
 | `strength` |
+| `via_directive` |
 | `WardDespawned` |
 | `ward_kind` |
 | `location` |
@@ -609,6 +611,7 @@
 | `RetrieveFromStores` |
 | `kind` |
 | `RetrieveAnyFoodFromStores` |
+| `Bury` |
 
 ## ZoneKind
 

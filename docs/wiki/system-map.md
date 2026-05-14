@@ -12,8 +12,10 @@ graph TD
         items_prune_stored_items["items::prune_stored_items"]
         items_sync_food_stores["items::sync_food_stores"]
         items_prune_stored_items --> items_sync_food_stores
+        items_sync_colony_reserves["items::sync_colony_reserves"]
+        items_sync_food_stores --> items_sync_colony_reserves
         prey_update_den_pressure["prey::update_den_pressure"]
-        items_sync_food_stores --> prey_update_den_pressure
+        items_sync_colony_reserves --> prey_update_den_pressure
         prey_apply_den_raids["prey::apply_den_raids"]
         prey_update_den_pressure --> prey_apply_den_raids
         prey_orphan_prey_adopt_or_found["prey::orphan_prey_adopt_or_found"]
@@ -105,8 +107,16 @@ graph TD
         mood_mood_contagion --> mood_bond_proximity_mood
         memory_decay_memories["memory::decay_memories"]
         mood_bond_proximity_mood --> memory_decay_memories
+        belief_integrator_gossip_inventory_observations["belief_integrator::gossip_inventory_observations"]
+        memory_decay_memories --> belief_integrator_gossip_inventory_observations
+        belief_integrator_integrate_beliefs["belief_integrator::integrate_beliefs"]
+        belief_integrator_gossip_inventory_observations --> belief_integrator_integrate_beliefs
+        affordance_writer_affordance_writer["affordance_writer::affordance_writer"]
+        belief_integrator_integrate_beliefs --> affordance_writer_affordance_writer
+        items_update_low_ward_reserve_markers["items::update_low_ward_reserve_markers"]
+        affordance_writer_affordance_writer --> items_update_low_ward_reserve_markers
         coordination_evaluate_coordinators["coordination::evaluate_coordinators"]
-        memory_decay_memories --> coordination_evaluate_coordinators
+        items_update_low_ward_reserve_markers --> coordination_evaluate_coordinators
         coordination_assess_colony_needs["coordination::assess_colony_needs"]
         coordination_evaluate_coordinators --> coordination_assess_colony_needs
         coordination_dispatch_urgent_directives["coordination::dispatch_urgent_directives"]
@@ -155,8 +165,10 @@ graph TD
         coordination_flag_coordinator_death --> coordination_expire_directives
         death_cleanup_dead["death::cleanup_dead"]
         coordination_expire_directives --> death_cleanup_dead
+        death_update_grave_aura_map["death::update_grave_aura_map"]
+        death_cleanup_dead --> death_update_grave_aura_map
         wildlife_cleanup_wildlife["wildlife::cleanup_wildlife"]
-        death_cleanup_dead --> wildlife_cleanup_wildlife
+        death_update_grave_aura_map --> wildlife_cleanup_wildlife
         narrative_generate_narrative["narrative::generate_narrative"]
         wildlife_cleanup_wildlife --> narrative_generate_narrative
         goap_check_modifier_preemption["goap::check_modifier_preemption"]
@@ -206,6 +218,8 @@ graph TD
         fox_goap_resolve_paired_confrontations["fox_goap::resolve_paired_confrontations"]
         wildlife_fox_ai_decision["wildlife::fox_ai_decision"]
         wildlife_fox_scent_tick["wildlife::fox_scent_tick"]
+        wildlife_update_fox_approach_corridor_map["wildlife::update_fox_approach_corridor_map"]
+        wildlife_update_recent_ambush_map["wildlife::update_recent_ambush_map"]
         wildlife_predator_hunt_prey["wildlife::predator_hunt_prey"]
         wildlife_carcass_decay["wildlife::carcass_decay"]
         wildlife_carcass_scent_tick["wildlife::carcass_scent_tick"]
@@ -223,7 +237,8 @@ graph TD
         buildings_update_garden_location_map["buildings::update_garden_location_map"]
         buildings_update_construction_site_map["buildings::update_construction_site_map"]
         items_decay_items["items::decay_items"]
-        disposition_cat_presence_tick["disposition::cat_presence_tick"]
+        disposition_cat_scent_tick["disposition::cat_scent_tick"]
+        disposition_cat_patrol_deterrent_tick["disposition::cat_patrol_deterrent_tick"]
         personality_events_emit_personality_events["personality_events::emit_personality_events"]
         ai_emit_periodic_events["ai::emit_periodic_events"]
         snapshot_emit_cat_snapshots["snapshot::emit_cat_snapshots"]

@@ -6,7 +6,7 @@ cluster: combat-threat
 initiative: []
 added: 2026-05-10
 parked: null
-blocked-by: [145, 261]
+blocked-by: [145]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

@@ -2,7 +2,7 @@
 
 # Components
 
-149 component types derived from `#[derive(Component)]`.
+160 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspirations.rs`
 
@@ -26,6 +26,48 @@
 ### AspirationsInitialized (struct)
 
 > Inserted after a cat's aspirations and preferences have been initialised. Systems use `Without<AspirationsInitialized>` to detect cats needing setup.
+
+## `src/components/beliefs.rs`
+
+### CatBeliefs (struct)
+
+> Per-cat mental models of other cats. Entity-keyed; entries for despawned cats are cleaned by `belief_integrator`'s liveness sweep.  `#[serde(skip)]` per the `pairing.rs` / `held_intention.rs` precedent — raw `Entity` ids don't round-trip across saves, so the substrate rebuilds state from fresh observations on load.
+
+| Field | Type |
+|-------|------|
+| `models` | `HashMap<Entity, MentalModel>` |
+
+### LocationBeliefs (struct)
+
+> Per-cat mental models of bucketed locations. Fully serializable — keys are stable across saves.
+
+| Field | Type |
+|-------|------|
+| `models` | `HashMap<LocationKey, MentalModel>` |
+
+### PredatorBeliefs (struct)
+
+> Per-cat mental models of predator entities. Entity-keyed, same serialization shape as [`CatBeliefs`]. Species priors for the four v1 predator kinds (Fox, Hawk, Snake, ShadowFox) seed the `perceived_violence_capability` facet at first-encounter time via the `Implant` evidence kind.
+
+| Field | Type |
+|-------|------|
+| `models` | `HashMap<Entity, MentalModel>` |
+
+### ContextBeliefs (struct)
+
+> Per-cat mental models of environmental contexts. Keyed on [`EnvironmentalContextKey`]; fully serializable.
+
+| Field | Type |
+|-------|------|
+| `models` | `HashMap<EnvironmentalContextKey, MentalModel>` |
+
+### ColonyReservesBelief (struct)
+
+> Per-cat mental models of colony-wide reserve stockpiles. Keyed on [`ResourceKind`]; fully serializable. Authored by `belief_integrator` (ticket 308); the consumer is the Herbcraft DSE consideration in ticket 309.
+
+| Field | Type |
+|-------|------|
+| `reserves` | `HashMap<ResourceKind, ReserveBelief>` |
 
 ## `src/components/building.rs`
 
@@ -309,11 +351,39 @@
 |-------|------|
 | `needs` | `Vec<UrgentNeed>` |
 
+## `src/components/grave.rs`
+
+### Grave (struct)
+
+> A buried colony-member's resting place. Spawned at the corpse tile when `resolve_bury` completes; despawned never (foundation scope). Carries the deceased's identity + cause for downstream rituals + memorialization.
+
+| Field | Type |
+|-------|------|
+| `deceased_name` | `String` |
+| `tick_buried` | `u64` |
+| `cause` | `DeathCause` |
+
 ## `src/components/grooming.rs`
 
 ### GroomingCondition (struct)
 
 > Physical grooming condition. 0.0 = matted/filthy, 1.0 = pristine.  A physical property — not a Maslow need. Decays passively and is restored by grooming actions. Other systems read it to modulate social and esteem outcomes.
+
+## `src/components/held_intention.rs`
+
+### HeldIntention (struct)
+
+> Per-cat goal-shaped commitment. §126 substrate.  Only `Serialize` is derived (not `Deserialize`): `target: Option<Entity>` has no `Default` and the component is runtime state — no save/load path round-trips it. Mirrors `JointIntention`'s precedent.
+
+| Field | Type |
+|-------|------|
+| `intention` | `Intention` |
+| `held_action` | `Action` |
+| `target` | `Option<Entity>` |
+| `adopted_tick` | `u64` |
+| `commitment_strength` | `f32` |
+| `expiry_tick` | `Option<u64>` |
+| `source` | `IntentionSource` |
 
 ## `src/components/hunting_priors.rs`
 
@@ -380,6 +450,22 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `condition` | `f32` |
 | `location` | `ItemLocation` |
 | `modifiers` | `ItemModifiers` |
+
+## `src/components/joint_intention.rs`
+
+### JointIntention (struct)
+
+> L2 JointIntention Component persisted on the cat. Ticket 127.  Inserted by `crate::ai::joint_intention::author_joint_intentions` on a matched candidate; removed by the same system on any `JointDropBranch` trigger. The component is the source of truth — there is no parallel ZST marker. Bias readers query `Option<&JointIntention>` directly.  Only `Serialize` is derived (not `Deserialize`) because `partner: Entity` has no `Default` and the component is pure runtime state — no save/load path round-trips it. The trace pipeline reads it via `Serialize` only.  All seven fields are observable practice-state per §Field discipline. Notably absent: `commitment_strength`, `expiry_tick`, `source` — those live on the actor's `HeldIntention`, which a cat in a joint practice ALSO holds.
+
+| Field | Type |
+|-------|------|
+| `practice` | `PracticeKind` |
+| `partner` | `Entity` |
+| `role` | `PracticeRole` |
+| `stage` | `PracticeStage` |
+| `adopted_tick` | `u64` |
+| `stage_entered_tick` | `u64` |
+| `last_interaction_tick` | `u64` |
 
 ## `src/components/kitten.rs`
 
@@ -534,6 +620,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 > Ticket 104 — Hide/Freeze DSE eligibility gate. Authored when the cat has a threat in sight AND a low-cover tile within sprint range (the "remain still and hope" predator-response valence is viable here — fleeing is too risky, fighting unwinnable). **Phase 1: no authoring system exists** — the marker is defined so the DSE can gate against it, but never fires until a Phase-2/3 authoring system lands alongside the 105 modifier's lift activation. With the marker never authored, Hide is never eligible, so the DSE is dormant and score-bit-identical to baseline.
 
+### Buried (struct)
+
+> 035: corpse has been buried. Inserted on the deceased entity by `goap.rs::resolve_goap_plans`'s post-loop drain immediately before `commands.entity(...).despawn()`, so a freshly-buried corpse is invisible to `update_target_existence_markers`'s `HasUnburiedCorpse` author scan within the same tick. Defensive against double-fire when two cats path-equally to the same corpse. Read: `sensing.rs::update_target_existence_markers` filters dead cats via `Without<Buried>`.
+
 ### CanHunt (struct)
 
 > Authoring for all four: `src/ai/capabilities.rs::update_capability_markers` (new file in Phase 3d). Predicates are conjunctions over life-stage, injury state, inventory, and nearby-tile checks — see §4.3 rows.
@@ -551,6 +641,14 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 ### HasRemedyHerbs (struct)
 
 ### HasWardHerbs (struct)
+
+### HasLowWardReserve (struct)
+
+> Per-cat: this cat *believes* the colony's thornbriar reserve is at or below `BeliefsConstants::low_ward_reserve_threshold`. Authored from `ColonyReservesBelief` (not raw colony state) — reflects subjective anticipation, so cats with no belief evidence don't fire the marker.  Writer: `items.rs::update_low_ward_reserve_markers` (ticket 308). Reader: Herbcraft DSE consideration (ticket 309, blocks 308). Allowlisted in `scripts/substrate_stubs.allowlist` with ticket 309 until the reader lands.
+
+### HasFreeSlot (struct)
+
+> 231: per-cat marker indicating the cat has at least one empty inventory slot (`!Inventory::is_full()`). Authored by `items.rs::update_inventory_markers`.  Read on the substrate-path variant of the four pickup-class plan actions (`PickUpItemFromGround` / `RetrieveRawFood` / `RetrieveFoodForKitten` / `GatherHerb`). When absent, the planner's substrate path fails its precondition and only the plan-path variant (gated on `HasFreeSlotThisPlan(true)` after a DropItem-as- prefix step) remains expandable — A* composes `[DropItem, PickUp]` automatically when the cat is full. Mirrors the ticket-096 Construct dual-branch precedent.
 
 ### ColonyState (struct)
 
@@ -612,6 +710,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 > ≥1 other cat has a skill below 0.3 where this cat has the same skill above 0.6 (per-cat relative predicate). `aspirations.rs::update_mentoring_target_markers`.
 
+### HasUnburiedCorpse (struct)
+
+> 035: ≥1 unburied colony-mate corpse (entity with `Dead`, without `Buried`) within `disposition.burial_sense_range` Manhattan tiles of this cat. Authored by `sensing.rs::update_target_existence_markers` in the same per-cat pass that authors `HasSocialTarget` and `CarcassNearby`. Read by `bury_dse`'s `EligibilityFilter::require(HasUnburiedCorpse::KEY)` — when absent, the burial DSE is skipped and the corpse-target picker is never called.
+
 ### HasEligibleMate (struct)
 
 > Orientation-compatible partner with Partners+ bond exists. `mating.rs::update_mate_eligibility_markers`.
@@ -638,7 +740,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### BornInSim (struct)
 
-> Cat was born during this simulation run (not a founding member). Inserted once at the kitten-spawn site in `pregnancy.rs` alongside `KittenDependency::new(...)`; never removed. Survives maturation and persists until `cleanup_dead` despawns the entity.  **Why a born-once marker, not derived from `Age::born_tick`** — founding cats also carry `born_tick` (set to `start_tick - age_ticks` in `world_gen/colony.rs::generate_starting_cats`), and at the canonical `start_tick = 0` they collapse to `born_tick = 0` indistinguishably from in-sim-born cats. `KittenDependency` is removed at maturation so it can't serve either. The marker is the canonical "born in this run" substrate.  **Consumer:** `colony_score.kittens_surviving` increments on maturation (`growth.rs::tick_kitten_growth`) and decrements on the death of a matured in-sim-born cat (`death.rs::check_death`, gate `With<BornInSim> + Without<KittenDependency>`). Ticket 166.
+> Cat was born during this simulation run (not a founding member). Inserted once at the kitten-spawn site in `pregnancy.rs` alongside `KittenDependency::new(...)`; never removed. Survives maturation and persists until `cleanup_dead` despawns the entity.  **Why a born-once marker, not derived from `Age::born_tick`** — founding cats also carry `born_tick` (set to `start_tick - age_ticks` in `world_gen/colony.rs::generate_starting_cats`), and at the canonical `start_tick = 0` they collapse to `born_tick = 0` indistinguishably from in-sim-born cats. `KittenDependency` is removed at maturation so it can't serve either. The marker is the canonical "born in this run" substrate.  **Consumer:** `colony_score.kittens_matured` increments on maturation (`growth.rs::tick_kitten_growth`) and decrements on the death of a matured in-sim-born cat (`death.rs::check_death`, gate `With<BornInSim> + Without<KittenDependency>`). Ticket 166.
 
 ### StoreVisible (struct)
 
@@ -717,18 +819,6 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | Field | Type |
 |-------|------|
 | `last_pride_crisis_tick` | `Option<u64>` |
-
-## `src/components/pairing.rs`
-
-### PairingActivity (struct)
-
-> L2 PairingActivity Intention persisted on the cat. §7.M.1.  Inserted by `crate::ai::pairing::author_pairing_intentions` on a matched candidate; removed by the same system on any `PairingDropBranch` trigger. The component is the source of truth — there is no parallel ZST marker. Bias readers query `Option<&PairingActivity>` directly.  Only `Serialize` is derived (not `Deserialize`) because `partner: Entity` has no `Default` and the component is pure runtime state — no save/load path round-trips it. The trace pipeline at `trace_log.rs` (Commit C) reads it via `Serialize` only.
-
-| Field | Type |
-|-------|------|
-| `partner` | `Entity` |
-| `adopted_tick` | `u64` |
-| `last_interaction_tick` | `u64` |
 
 ## `src/components/personality.rs`
 

@@ -1,11 +1,11 @@
 ---
 id: 263
 title: 256-cluster DSE consumers wire belief + affordance axes (Flee, Patrol, Hunt with Stalk/Chase/Pounce sub-actions)
-status: blocked
+status: ready
 cluster: ai-substrate
 added: 2026-05-10
 parked: null
-blocked-by: [261]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
