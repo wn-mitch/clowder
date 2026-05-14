@@ -138,6 +138,21 @@ pub enum Priority {
     Tertiary = 2,
 }
 
+/// Conflict class between two concurrent aspirations (spec §7.7.1).
+/// Only the hard classes appear in the runtime matrix; soft-resource
+/// is the matrix default (absence from `incompatible_with`). Soft-
+/// emotional drops via §7.7 reconsideration events (ticket 055), not
+/// at the adoption gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictClass {
+    /// Mutually-exclusive end-states — e.g. "warrior path" vs
+    /// "pacifist mentor". Spec §7.7.1's first canonical example.
+    HardLogical,
+    /// Incompatible life-paths — e.g. "solitary wanderer" vs
+    /// "colony coordinator". Spec §7.7.1's second canonical example.
+    HardIdentity,
+}
+
 /// One row in a milestone's `emits` table. Names a candidate
 /// `Intention::Goal` label, a per-cat applicability predicate, the
 /// `CommitmentStrategy` the emitted Intention carries, and the tier.
@@ -183,6 +198,12 @@ pub struct AspirationChain {
     pub domain: AspirationDomain,
     pub milestones: &'static [Milestone],
     pub completion_narrative: &'static str,
+    /// Spec §7.7.1 hard-pair list — chain names this chain cannot be
+    /// held alongside. Sparse: only genuinely-contradictory pairs need
+    /// listing; matrix default is *compatible*. Authored one direction
+    /// per pair (no symmetry requirement); the runtime walks both
+    /// directions in [`can_adopt`].
+    pub incompatible_with: &'static [(&'static str, ConflictClass)],
 }
 
 // ---------------------------------------------------------------------------
@@ -208,3 +229,187 @@ pub const ALL_CHAINS: &[&AspirationChain] = &[
     &leadership::VOICE_OF_THE_COLONY,
     &leadership::THE_UNIFIER,
 ];
+
+// ---------------------------------------------------------------------------
+// §7.7.1 adoption gate
+// ---------------------------------------------------------------------------
+
+/// Spec §7.7.1 adoption gate. Returns `None` if `candidate` is
+/// compatible with every chain in `existing`; returns
+/// `Some((blocker_name, class))` if a hard-conflict pair blocks
+/// adoption.
+///
+/// Walks both directions of the sparse matrix: `candidate.incompatible_with`
+/// AND each existing chain's `incompatible_with` for `candidate`. This
+/// makes one-sided declaration sufficient — authoring the pair on
+/// either chain blocks adoption from both directions. Spec §7.7.1
+/// (`docs/systems/ai-substrate-refactor.md:4810`).
+pub fn can_adopt(
+    existing: &[crate::components::aspirations::ActiveAspiration],
+    candidate: &AspirationChain,
+    registry: &crate::resources::aspiration_registry::AspirationRegistry,
+) -> Option<(&'static str, ConflictClass)> {
+    for active in existing {
+        // Direction 1: candidate declares the conflict.
+        if let Some(&(_, class)) = candidate
+            .incompatible_with
+            .iter()
+            .find(|(name, _)| *name == active.chain_name.as_str())
+        {
+            let blocker = registry
+                .chain_by_name(&active.chain_name)
+                .map(|c| c.name)
+                .unwrap_or("(unknown)");
+            return Some((blocker, class));
+        }
+        // Direction 2: the existing chain declares the conflict.
+        if let Some(active_chain) = registry.chain_by_name(&active.chain_name) {
+            if let Some(&(_, class)) = active_chain
+                .incompatible_with
+                .iter()
+                .find(|(name, _)| *name == candidate.name)
+            {
+                return Some((active_chain.name, class));
+            }
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod compatibility_tests {
+    use super::*;
+    use crate::components::aspirations::{ActiveAspiration, AspirationDomain};
+    use crate::resources::aspiration_registry::AspirationRegistry;
+
+    fn registry() -> AspirationRegistry {
+        AspirationRegistry::build_static()
+    }
+
+    /// Helper: build a one-element `existing` slice for a chain by name.
+    fn existing_with(name: &str, domain: AspirationDomain) -> Vec<ActiveAspiration> {
+        vec![ActiveAspiration {
+            chain_name: name.to_string(),
+            domain,
+            current_milestone: 0,
+            progress: 0,
+            adopted_tick: 0,
+            last_progress_tick: 0,
+        }]
+    }
+
+    #[test]
+    fn warriors_path_blocks_healers_calling_hard_logical() {
+        let r = registry();
+        let healers = r.chain_by_name("Healer's Calling").unwrap();
+        let existing = existing_with("Warrior's Path", AspirationDomain::Combat);
+        let outcome = can_adopt(&existing, healers, &r);
+        let (blocker, class) = outcome.expect("expected hard-logical conflict");
+        assert_eq!(blocker, "Warrior's Path");
+        assert_eq!(class, ConflictClass::HardLogical);
+    }
+
+    #[test]
+    fn healers_calling_blocks_warriors_path_by_reverse_walk() {
+        // Pair is authored on WARRIORS_PATH only; the reverse-direction
+        // walk in `can_adopt` must still fire when Healer's Calling is
+        // held first.
+        let r = registry();
+        let warriors = r.chain_by_name("Warrior's Path").unwrap();
+        let existing = existing_with("Healer's Calling", AspirationDomain::Herbcraft);
+        let outcome = can_adopt(&existing, warriors, &r);
+        let (blocker, class) = outcome.expect("reverse-direction walk should fire");
+        assert_eq!(blocker, "Healer's Calling");
+        assert_eq!(class, ConflictClass::HardLogical);
+    }
+
+    #[test]
+    fn beyond_the_border_blocks_voice_of_the_colony_hard_identity() {
+        let r = registry();
+        let voice = r.chain_by_name("Voice of the Colony").unwrap();
+        let existing = existing_with("Beyond the Border", AspirationDomain::Exploration);
+        let outcome = can_adopt(&existing, voice, &r);
+        let (blocker, class) = outcome.expect("expected hard-identity conflict");
+        assert_eq!(blocker, "Beyond the Border");
+        assert_eq!(class, ConflictClass::HardIdentity);
+    }
+
+    #[test]
+    fn voice_of_the_colony_blocks_beyond_the_border_by_reverse_walk() {
+        let r = registry();
+        let border = r.chain_by_name("Beyond the Border").unwrap();
+        let existing = existing_with("Voice of the Colony", AspirationDomain::Leadership);
+        let outcome = can_adopt(&existing, border, &r);
+        let (blocker, class) = outcome.expect("reverse-direction walk should fire");
+        assert_eq!(blocker, "Voice of the Colony");
+        assert_eq!(class, ConflictClass::HardIdentity);
+    }
+
+    #[test]
+    fn all_chains_have_no_self_conflict() {
+        let r = registry();
+        for chain in r.all_chains() {
+            let existing = existing_with(chain.name, chain.domain);
+            assert!(
+                can_adopt(&existing, chain, &r).is_none(),
+                "chain '{}' conflicts with itself",
+                chain.name,
+            );
+        }
+    }
+
+    #[test]
+    fn unrelated_pair_is_compatible() {
+        // Pins the matrix-default-is-compatible contract: an unrelated
+        // cross-domain pair must produce no conflict.
+        let r = registry();
+        let mapmaker = r.chain_by_name("Mapmaker").unwrap();
+        let existing = existing_with("Den Shaper", AspirationDomain::Building);
+        assert!(can_adopt(&existing, mapmaker, &r).is_none());
+    }
+
+    #[test]
+    fn incompatible_with_strings_resolve_to_real_chains() {
+        // Catches typos like `"Warriors' Path"` vs `"Warrior's Path"`.
+        let r = registry();
+        for chain in r.all_chains() {
+            for (other_name, _) in chain.incompatible_with {
+                assert!(
+                    r.chain_by_name(other_name).is_some(),
+                    "chain '{}' lists unknown chain '{}' in incompatible_with",
+                    chain.name,
+                    other_name,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn symmetric_pairs_agree_on_class() {
+        // One-sided declaration is legal (the reverse-walk in
+        // `can_adopt` handles it). But if BOTH sides happen to list
+        // each other, the class must agree — otherwise the gate is
+        // direction-dependent and inconsistent.
+        let r = registry();
+        for a in r.all_chains() {
+            for &(b_name, a_class) in a.incompatible_with {
+                let Some(b) = r.chain_by_name(b_name) else {
+                    continue;
+                };
+                if let Some(&(_, b_class)) =
+                    b.incompatible_with.iter().find(|(n, _)| *n == a.name)
+                {
+                    assert_eq!(
+                        a_class, b_class,
+                        "symmetric pair ('{}', '{}') disagrees on class",
+                        a.name, b_name,
+                    );
+                }
+            }
+        }
+    }
+}

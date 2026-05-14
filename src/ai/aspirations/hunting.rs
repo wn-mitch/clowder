@@ -74,6 +74,7 @@ pub const MASTER_OF_THE_HUNT: AspirationChain = AspirationChain {
     ],
     completion_narrative:
         "{name} has walked the full path of the hunt. The Leaping Flame blazes bright.",
+    incompatible_with: &[],
 };
 
 pub const PROVIDER_OF_THE_COLONY: AspirationChain = AspirationChain {
@@ -112,4 +113,5 @@ pub const PROVIDER_OF_THE_COLONY: AspirationChain = AspirationChain {
         },
     ],
     completion_narrative: "{name} is the Provider -- the one who feeds the many.",
+    incompatible_with: &[],
 };

@@ -5,7 +5,7 @@ status: blocked
 cluster: ai-substrate
 added: 2026-04-27
 parked: null
-blocked-by: [056]
+blocked-by: [344]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -68,3 +68,7 @@ per-arc expected-valence targets.
 - 2026-04-27: opened from ticket 013 retirement (spec-follow-on debts
   umbrella decomposition). Original sub-task 13.4 in spec
   `docs/systems/ai-substrate-refactor.md` §7.7.d.
+- 2026-05-14: `blocked-by` flipped from `[056]` to `[344]` when 056
+  landed. 056 enumerated the §7.7.1 hard-pair conflict matrix but
+  split the per-arc `expected_valence_target` work into ticket 344
+  (the actual dependency this ticket needs).

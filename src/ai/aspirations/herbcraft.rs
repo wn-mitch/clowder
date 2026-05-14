@@ -63,6 +63,7 @@ pub const WHISKERWEAVERS_APPRENTICE: AspirationChain = AspirationChain {
     ],
     completion_narrative:
         "{name} has earned the title Whiskerweaver. The colony's hurts mend faster for it.",
+    incompatible_with: &[],
 };
 
 pub const HEALERS_CALLING: AspirationChain = AspirationChain {
@@ -104,4 +105,7 @@ pub const HEALERS_CALLING: AspirationChain = AspirationChain {
     ],
     completion_narrative:
         "{name} has answered the Healer's Calling. {Subject} is the colony's remedy against the dark.",
+    // Pair with WARRIORS_PATH authored on that side (one-direction
+    // authoring per §7.7.1; reverse-walk in `can_adopt` handles it).
+    incompatible_with: &[],
 };

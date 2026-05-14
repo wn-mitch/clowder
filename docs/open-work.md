@@ -16,9 +16,9 @@ _Last generated: 2026-05-14._
 |---|---|
 | In progress | 7 |
 | Ready | 108 |
-| Parked | 12 |
+| Parked | 14 |
 | Blocked | 23 |
-| **Open total** | **150** |
+| **Open total** | **152** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -53,7 +53,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 1 | 32 (1 / 24 / 5 / 2) | `▱▱▱▱▱▱▱▱▱▱` 3% |
+| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 2 | 31 (1 / 23 / 5 / 2) | `▰▱▱▱▱▱▱▱▱▱` 6% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
@@ -76,7 +76,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[008](docs/open-work/tickets/008-cluster-d-formalization-verification.md)** — Formalization and verification (Cluster D) — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
-- **[056](docs/open-work/tickets/056-aspiration-compatibility-matrix.md)** — §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration — _[ai-substrate] · added 2026-04-27_
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · added 2026-05-02_
 - **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · blocked-by 135 · added 2026-05-02_
@@ -102,6 +101,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[330](docs/open-work/tickets/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[331](docs/open-work/tickets/331-aspiration-milestone-wrapper-leadership.md)** — Leadership aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
 
 ### belief-perception (13 ready, 2 blocked)
 
@@ -316,7 +316,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _[items-crafting] · added 2026-04-26_
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _[items-crafting] · added 2026-04-26_
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
-- **[056](docs/open-work/tickets/056-aspiration-compatibility-matrix.md)** — §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration — _[ai-substrate] · added 2026-04-27_
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _[buildings-zones] · added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _[belief-perception] · added 2026-04-27_
 - **[095](docs/open-work/tickets/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species — _[life-cycle] · added 2026-05-01_
@@ -414,8 +413,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
+- **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
 
-## Parked (12)
+## Parked (14)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _[life-cycle] · parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _[ai-substrate] · parked 2026-04-30 · added 2026-04-27_
@@ -429,6 +429,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[273](docs/open-work/tickets/273-caretake-plans-complete-but-kittenfed-never-fires-kitten-starvation-chronic.md)** — Caretake plans complete but KittenFed never fires — kitten starvation chronic — _[life-cycle] · parked 2026-05-11 · added 2026-05-11_
 - **[342](docs/open-work/tickets/342-phase-2-unordered-method-bodies-partial-order.md)** — Phase-2 :unordered method bodies + partial-order — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[343](docs/open-work/tickets/343-emit-cooldown-discipline-per-emit-cooldown-ticks.md)** — Emit-cooldown discipline — per-emit cooldown_ticks — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
+- **[345](docs/open-work/tickets/345-771-aspiration-soft-class-per-pair-weights.md)** — §7.7.1 aspiration soft-class per-pair weights — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
+- **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 
 ## Blocked (23)
 
@@ -438,7 +440,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[019](docs/open-work/tickets/019-happy-paths-usage-worn-trails.md)** — Happy paths — usage-worn trails — _[buildings-zones] · blocked-by 020 · added 2026-04-22_
 - **[021](docs/open-work/tickets/021-monuments.md)** — Monuments — civic & memorial structures — _[buildings-zones] · blocked-by 020 · added 2026-04-22_
 - **[026](docs/open-work/tickets/026-apprenticeship-xp-boost.md)** — Apprenticeship XP-boost on per-skill Skills component — _[life-cycle] · blocked-by mastery-restoration iteration 2 · added 2026-04-24_
-- **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _[ai-substrate] · blocked-by 056 · added 2026-04-27_
+- **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _[ai-substrate] · blocked-by 344 · added 2026-04-27_
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _[social-coordination] · blocked-by 128 · added 2026-04-27_
 - **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[social-coordination] · blocked-by 057 · added 2026-05-02_
 - **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[ai-substrate] · blocked-by 139 · added 2026-05-02_
@@ -461,11 +463,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (212)
+## Landed archive (213)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (147)
+### 2026-05 (148)
 
 - **[322](docs/open-work/landed/322-action-enum-stubs-for-dormant-methods.md)** — Action-enum stubs for dormant HTN methods _(2026-05-14)_
 - **[321](docs/open-work/landed/321-aspirations-milestones-emits-table-l1-l2-picker.md)** — Aspirations milestones gain emits table + L1→L2 picker _(2026-05-14)_
@@ -474,6 +476,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[153](docs/open-work/landed/153-150-r5a-balance-follow-on.md)** — 150 R5a balance follow-on — Resting score-mass and courtship recovery _(2026-05-14)_
 - **[120](docs/open-work/landed/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) _(2026-05-14)_
 - **[062](docs/open-work/landed/062-prey-species-split-maps.md)** — Prey-species split — per-species scent maps (§5.6.3 row #5) _(2026-05-14)_
+- **[056](docs/open-work/landed/056-aspiration-compatibility-matrix.md)** — §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration _(2026-05-14)_
 - **[054](docs/open-work/landed/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence _(2026-05-14)_
 - **[051](docs/open-work/landed/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers _(2026-05-14)_
 - **[050](docs/open-work/landed/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den _(2026-05-14)_

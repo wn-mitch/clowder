@@ -53,6 +53,7 @@ pub const HEART_OF_THE_COLONY: AspirationChain = AspirationChain {
     ],
     completion_narrative:
         "{name} has become the Heart of the Colony. Everyone knows {possessive} warmth.",
+    incompatible_with: &[],
 };
 
 pub const THE_BELOVED: AspirationChain = AspirationChain {
@@ -91,4 +92,5 @@ pub const THE_BELOVED: AspirationChain = AspirationChain {
     ],
     completion_narrative:
         "{name} is The Beloved. The colony would be a colder place without {object}.",
+    incompatible_with: &[],
 };

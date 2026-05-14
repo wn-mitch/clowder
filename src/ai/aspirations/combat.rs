@@ -2,7 +2,9 @@
 //! Ported 1:1 from `assets/narrative/aspirations/combat.ron` (retired
 //! at 321). Empty `emits` on every milestone — #327 fills them.
 
-use super::{always_true, AspirationChain, Milestone, ProgressTracker, SkillKind};
+use super::{
+    always_true, AspirationChain, ConflictClass, Milestone, ProgressTracker, SkillKind,
+};
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
 
@@ -56,6 +58,11 @@ pub const WARRIORS_PATH: AspirationChain = AspirationChain {
     ],
     completion_narrative:
         "{name} has walked the Warrior's Path. Nothing enters the colony without {possessive} knowing.",
+    // §7.7.1 canonical hard-logical pair. WARRIORS_PATH milestones
+    // count `Action::Fight`; HEALERS_CALLING is fever-watches and
+    // remedy-pressing. Simultaneous active state is coherence-
+    // incoherent (warrior-path vs pacifist-mentor, spec verbatim).
+    incompatible_with: &[("Healer's Calling", ConflictClass::HardLogical)],
 };
 
 pub const SHADOW_FIGHTER: AspirationChain = AspirationChain {
@@ -95,4 +102,5 @@ pub const SHADOW_FIGHTER: AspirationChain = AspirationChain {
         },
     ],
     completion_narrative: "They call {name} the Shadow Fighter. The borders have never been safer.",
+    incompatible_with: &[],
 };

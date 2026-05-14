@@ -1,0 +1,85 @@
+---
+id: 344
+title: §7.7.1 aspiration arc per-chain expected_valence_target field
+status: ready
+cluster: ai-substrate
+initiative: []
+added: 2026-05-14
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [ai-substrate-refactor.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Ticket 055 (mood drift-threshold detection) needs a per-arc
+expected-valence target to compare a cat's sustained mood against —
+"valence below X for N seasons AND **misalignment with active-arc
+expected-mood**" is the §7.7.d trigger. Today no such target exists on
+`AspirationChain`; without it, mood-driven aspiration reconsideration
+can't fire. Originally bundled into 056 in spec language; split out
+during 056's planning because the conflict-class enumeration and the
+valence-target field are orthogonal — one is per-pair, the other is
+per-arc.
+
+## Scope
+
+- Add `expected_valence_target: f32` field to `AspirationChain`
+  (`src/ai/aspirations/mod.rs`).
+- Author 14 default values, one per chain, matching the arc's
+  emotional tone (e.g. `MASTER_OF_THE_HUNT` → moderately positive
+  baseline; `WARRIORS_PATH` → near-zero / tension baseline;
+  `HEALERS_CALLING` → positive caregiving baseline; etc.).
+- Reader contract: surface the field on a small accessor so ticket
+  055's hysteresis layer can pull it without round-tripping through
+  `AspirationRegistry`.
+
+## Out of scope
+
+- Tuning the 14 default values. First land uses author-time best
+  guesses; balance work post-056 refines.
+- The hysteresis + reconsideration trigger itself — that's 055.
+
+## Current state
+
+- 056 (compatibility matrix) lands `incompatible_with` on
+  `AspirationChain` and the `can_adopt` gate. No valence work in 056.
+- 055 currently has `blocked-by: [344]` (flipped from `[056]` when 056
+  landed).
+
+## Approach
+
+Mirror the encoding shape 056 used — straight `&'static`-shaped field
+on each chain const in `src/ai/aspirations/{domain}.rs`. Defaults can
+be informed by the chain's `completion_narrative` tone + the
+`Personality` axis the domain maps to in
+`systems/aspirations.rs::domain_personality_axis`.
+
+Reader: a free function `expected_valence_for(chain_name: &str,
+registry: &AspirationRegistry) -> Option<f32>` so 055's hysteresis
+system can fetch without coupling to chain-const knowledge.
+
+## Verification
+
+- Unit tests: per-chain field value sanity (in `[-1.0, 1.0]`).
+- Unit test: `expected_valence_for` resolves for every chain in
+  `ALL_CHAINS`.
+- `just check` green.
+- No soak verification needed for this ticket — the field is read by
+  055, not by any current consumer. 055's soak verifies the integration.
+
+## Related work
+
+- 056 — sister ticket; split out from the same §7.7.1 scope.
+- 055 — direct consumer; flips `blocked-by` from 056 → 344 on this
+  ticket's land.
+
+## Log
+
+- 2026-05-14: opened as a 056 follow-on (split-out per CLAUDE.md
+  antipattern-migration discipline). 055's `blocked-by` flipped from
+  `[056]` to `[344]` in the same commit.

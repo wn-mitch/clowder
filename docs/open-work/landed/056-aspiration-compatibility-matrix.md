@@ -1,7 +1,7 @@
 ---
 id: 056
 title: §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-04-27
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -75,3 +75,34 @@ from intent.
 - 2026-04-27: opened from ticket 013 retirement (spec-follow-on debts
   umbrella decomposition). Original sub-task 13.5 in spec
   `docs/systems/ai-substrate-refactor.md` §7.7.1.
+- 2026-05-14: landed sparse hard-pair matrix per §7.7.1. Authored 2
+  pairs (WARRIORS_PATH↔HEALERS_CALLING `HardLogical`,
+  BEYOND_THE_BORDER↔VOICE_OF_THE_COLONY `HardIdentity`) — both spec-
+  canonical, both cross-domain (survive the existing domain-skip
+  filter). Per-chain `incompatible_with` encoding; `can_adopt` walks
+  both directions. Wired at `check_second_aspiration_slot`
+  (`select_aspirations` skipped — query has no `&Aspirations`, gate
+  would be a no-op). Soft-class weights and per-arc valence targets
+  split out (CLAUDE.md antipattern-migration discipline):
+    - 344 (ready) — per-arc `expected_valence_target` field; 055's
+      `blocked-by` flipped from `[056]` to `[344]` in this commit.
+    - 345 (parked) — soft-class per-pair weights; no consumer.
+    - 346 (parked) — conflict-rejection structured event; awaiting
+      balance-investigation need.
+  Soak verdict (logs/tuned-42 vs post-321 baseline): `concern`.
+  Survival canaries pass (0 starvation, 1 ShadowFoxAmbush << 10
+  threshold). Aggregate colony_score +3.5%, welfare +3.8%, happiness
+  +11.2%, fulfillment +21.0% — all positive direction.
+  Negative-band drift on peak_population -10%, structures_built
+  -28.6%, bonds_formed -16.2%, deaths_injury 0→1 — **all attributable
+  to a single founder-cat death via ShadowFox ambush, downstream of
+  RNG-sequencing perturbation from the gate firing**. Narrative diff
+  confirmed: day-1201 founder aspirations identical, day-1202
+  Calcifer's second-slot picks shifted Hunting → Building (Calcifer
+  has Leadership primary; BEYOND_THE_BORDER got gated out by the
+  HardIdentity pair, skipping one `score_chain` RNG draw). This is
+  the documented seed-42 perturbation cascade pattern
+  (memory `learning_bevy_schedule_edge_perturbation`), not a
+  substrate-broken signal — the gate worked as designed. Continuity
+  canary `mythic-texture=0` matches baseline (same 0; not a
+  regression).

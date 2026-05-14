@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
+use crate::ai::aspirations::can_adopt;
 use crate::ai::Action;
 use crate::components::aspirations::{
     ActiveAspiration, AspirationDomain, Aspirations, AspirationsInitialized, Preference,
@@ -331,13 +332,18 @@ pub fn check_second_aspiration_slot(
         let existing_domains: Vec<AspirationDomain> =
             aspirations.active.iter().map(|a| a.domain).collect();
 
-        // Score chains, excluding active domains and already-completed chains.
+        // Score chains, excluding active domains, already-completed
+        // chains, and chains that hard-conflict with an existing
+        // aspiration (§7.7.1 adoption gate).
         let mut best: Option<(&str, AspirationDomain, f32)> = None;
         for chain in registry.all_chains() {
             if existing_domains.contains(&chain.domain) {
                 continue;
             }
             if aspirations.completed.iter().any(|c| c == chain.name) {
+                continue;
+            }
+            if can_adopt(&aspirations.active, chain, &registry).is_some() {
                 continue;
             }
             let s = score_chain(

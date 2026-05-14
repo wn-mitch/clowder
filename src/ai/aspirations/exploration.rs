@@ -2,7 +2,7 @@
 //! Ported 1:1 from `assets/narrative/aspirations/exploration.ron`
 //! (retired at 321). Empty `emits` on every milestone — #329 fills them.
 
-use super::{always_true, AspirationChain, Milestone, ProgressTracker};
+use super::{always_true, AspirationChain, ConflictClass, Milestone, ProgressTracker};
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
 
@@ -52,6 +52,7 @@ pub const MAPMAKER: AspirationChain = AspirationChain {
         },
     ],
     completion_narrative: "{name} is the Mapmaker. The world is larger because {subject} walked it.",
+    incompatible_with: &[],
 };
 
 pub const BEYOND_THE_BORDER: AspirationChain = AspirationChain {
@@ -93,4 +94,11 @@ pub const BEYOND_THE_BORDER: AspirationChain = AspirationChain {
     ],
     completion_narrative:
         "{name} has gone Beyond the Border. The unknown is just another path to {object}.",
+    // §7.7.1 canonical hard-identity pair. BEYOND_THE_BORDER narratives
+    // are "always looks toward the horizon when others look toward the
+    // den" — explicit absence. VOICE_OF_THE_COLONY requires colony
+    // presence ("when {name} calls, the colony moves"). Identity-
+    // incoherent (solitary-wanderer vs colony-coordinator, spec
+    // verbatim).
+    incompatible_with: &[("Voice of the Colony", ConflictClass::HardIdentity)],
 };

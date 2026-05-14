@@ -43,6 +43,7 @@ pub const DEN_SHAPER: AspirationChain = AspirationChain {
     ],
     completion_narrative:
         "{name} is the Den Shaper. The colony stands stronger because {subject} built it.",
+    incompatible_with: &[],
 };
 
 pub const THE_ARCHITECT: AspirationChain = AspirationChain {
@@ -81,4 +82,5 @@ pub const THE_ARCHITECT: AspirationChain = AspirationChain {
         },
     ],
     completion_narrative: "{name} is The Architect. The colony is {possessive} monument.",
+    incompatible_with: &[],
 };
