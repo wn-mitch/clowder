@@ -159,6 +159,57 @@ pub enum WildlifeAiState {
 }
 
 // ---------------------------------------------------------------------------
+// ShadowFoxDrives — four-drive scored motivation substrate (ticket 023)
+// ---------------------------------------------------------------------------
+
+/// Per-shadowfox motivational pressures. Phase A wires only `coherence`
+/// (self-preservation via corruption — decays on clean ground, recovers on
+/// corrupted ground, dissolves at 0). Phase B uses all four to softmax-select
+/// the next `WildlifeAiState` variant; Phase C deepens the targeting reads.
+///
+/// Doubles as a marker component: presence of `ShadowFoxDrives` is the
+/// canonical "this entity is a shadow-fox" test (see ticket 023 plan §3).
+/// Hawks, snakes, and normal foxes never carry this component.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ShadowFoxDrives {
+    /// 0.0 = dissolving, 1.0 = fully manifested. Decays on clean tiles,
+    /// recovers on corrupted tiles. Reaching 0.0 despawns the shadow-fox
+    /// and emits `EventKind::ShadowFoxDissolved`.
+    pub coherence: f32,
+    /// Pressure to defend corruption that is losing ground (near wards,
+    /// recently cleansed). Unused in Phase A; populated in Phase B.
+    pub resonance: f32,
+    /// Pressure to terrorize psychologically vulnerable cats. Unused in
+    /// Phase A; populated in Phase B (shallow) / Phase C (deep targeting).
+    pub dread: f32,
+    /// Pressure to extend the corruption frontier (probing ward gaps).
+    /// Unused in Phase A; populated in Phase B.
+    pub entropy: f32,
+    /// Ticks since spawn — narrative attribution + balance histograms.
+    pub age_ticks: u64,
+    /// Tile-corruption value at spawn, retained for narrative + balance
+    /// attribution (does this shadow-fox arise from heavy-corruption
+    /// substrate vs marginal-threshold spawn).
+    pub origin_corruption: f32,
+}
+
+impl ShadowFoxDrives {
+    /// Spawn a freshly-manifested shadow-fox with full coherence and no
+    /// motivational pressure yet. Phase B will populate drives on the
+    /// motivation tick.
+    pub fn newly_manifested(origin_corruption: f32) -> Self {
+        Self {
+            coherence: 1.0,
+            resonance: 0.0,
+            dread: 0.0,
+            entropy: 0.0,
+            age_ticks: 0,
+            origin_corruption,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Carcass — left behind by shadow fox kills
 // ---------------------------------------------------------------------------
 

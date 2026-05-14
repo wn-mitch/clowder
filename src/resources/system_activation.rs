@@ -124,6 +124,11 @@ pub enum Feature {
     FoxAvoidedPresence,
     ShadowFoxAvoidedWard,
     ShadowFoxAvoidedCatScent,
+    /// Ticket 023 Phase A — a shadow-fox dissolved when sustained
+    /// clean-ground exposure drove `coherence` to zero. Mythic-register
+    /// event paired with `ShadowFoxBanished`; rare-legend category so
+    /// it returns `false` from `expected_to_fire_per_soak()`.
+    ShadowFoxDissolved,
     DirectiveDelivered,
     // --- Corruption & carcass systems ---
     CarcassSpawned,
@@ -476,6 +481,7 @@ impl Feature {
         Feature::FoxAvoidedPresence,
         Feature::ShadowFoxAvoidedWard,
         Feature::ShadowFoxAvoidedCatScent,
+        Feature::ShadowFoxDissolved,
         Feature::DirectiveDelivered,
         // Corruption & carcass systems
         Feature::CarcassSpawned,
@@ -602,6 +608,10 @@ impl Feature {
             Feature::CorruptionPushback => Positive,
             Feature::ShadowFoxAvoidedWard => Positive,
             Feature::ShadowFoxAvoidedCatScent => Positive,
+            // Ticket 023 Phase A — dissolution via sustained cleansing
+            // is the slow-environmental defeat path. Counts as a
+            // colony-defensive win, same valence class as `ShadowFoxBanished`.
+            Feature::ShadowFoxDissolved => Positive,
             // §Phase 5a silent-advance audit — healthy-subsystem activity
             Feature::FoodEaten => Positive,
             Feature::Socialized => Positive,
@@ -750,6 +760,11 @@ impl Feature {
         match self {
             // --- Rare legend / colony-defining events — exempt ---
             Feature::ShadowFoxBanished => false,
+            // Ticket 023 Phase A — dissolution depends on sustained
+            // colony cleansing pressure, which a healthy 15-min soak
+            // may not produce. Pair with `ShadowFoxBanished` in the
+            // rare-legend exemption set.
+            Feature::ShadowFoxDissolved => false,
             Feature::FateAwakened => false,
             Feature::SpiritCommunion => false,
             Feature::ShadowFoxAvoidedWard => false,
@@ -1020,6 +1035,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::FoxAvoidedPresence => "FoxAvoidedPresence",
         Feature::ShadowFoxAvoidedWard => "ShadowFoxAvoidedWard",
         Feature::ShadowFoxAvoidedCatScent => "ShadowFoxAvoidedCatScent",
+        Feature::ShadowFoxDissolved => "ShadowFoxDissolved",
         Feature::DirectiveDelivered => "DirectiveDelivered",
         Feature::CarcassSpawned => "CarcassSpawned",
         Feature::WardSiegeStarted => "WardSiegeStarted",
@@ -1342,7 +1358,11 @@ mod tests {
         // ShadowFoxAvoidedWard magic-channel feature; both are
         // exempt from the seed-42 canary because firing depends on
         // ShadowFox/ward/colony spatial overlap).
-        assert_eq!(positive, 55);
+        // Ticket 023 Phase A added 1 Positive (ShadowFoxDissolved —
+        // slow-environmental defeat paired with ShadowFoxBanished;
+        // exempt from the seed-42 canary as it depends on sustained
+        // cleansing pressure that a healthy 15-min soak may not produce).
+        assert_eq!(positive, 56);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 35);
     }
@@ -1419,9 +1439,11 @@ mod tests {
         // Ticket 288: +1 Neutral (CommitmentDropMoraleBreak).
         // Ticket 260: +1 Positive (ShadowFoxAvoidedCatScent — the
         // scent-channel sibling of ShadowFoxAvoidedWard).
+        // Ticket 023 Phase A: +1 Positive (ShadowFoxDissolved — slow-
+        // environmental defeat paired with ShadowFoxBanished).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            55
+            56
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -1547,6 +1569,11 @@ mod tests {
         );
         // Rare-legend events must be exempted.
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
+        assert!(!Feature::ShadowFoxDissolved.expected_to_fire_per_soak());
+        assert!(
+            Feature::ShadowFoxDissolved.category() == FeatureCategory::Positive,
+            "ShadowFoxDissolved pairs with ShadowFoxBanished as a defensive win",
+        );
         assert!(!Feature::FateAwakened.expected_to_fire_per_soak());
         assert!(!Feature::ScryCompleted.expected_to_fire_per_soak());
         // 250: burial is conditional on death; post-247 / 248

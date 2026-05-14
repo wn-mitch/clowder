@@ -369,6 +369,14 @@ impl Plugin for SimulationPlugin {
                     systems::magic::update_corruption_landmarks,
                     systems::magic::spawn_shadow_fox_from_corruption,
                     (
+                        // Ticket 023 Phase A — coherence tick must run
+                        // before `wildlife_ai` so a dissolving shadow-fox
+                        // gets despawned (well, queued) before downstream
+                        // shadowfox-bearing systems take decisions. Lives
+                        // inside the existing wildlife `.chain()` block
+                        // to avoid creating a new top-level schedule edge
+                        // (ticket 061 precedent).
+                        systems::wildlife::shadowfox_coherence_tick,
                         systems::wildlife::spawn_wildlife,
                         systems::wildlife::wildlife_ai,
                         systems::wildlife::fox_movement,

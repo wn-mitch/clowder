@@ -43,11 +43,15 @@ fn setup(world: &mut World, seed: u64) {
     // `update_ward_coverage_map` system runs each tick to populate
     // the coverage grid; `wildlife_ai`'s 260 read fires when the
     // fox's next-step coverage crosses `shadow_fox_ward_avoid_threshold`.
+    // Ticket 023 Phase A: `ShadowFoxDrives` is the canonical marker
+    // for the shadow-fox-only branches; without it the entity bypasses
+    // the 260 magic-channel and the avoidance feature never records.
     world.spawn((
         WildAnimal::new(WildSpecies::ShadowFox),
         FOX_START,
         crate::components::physical::Health::default(),
         WildlifeAiState::Patrolling { dx: -1, dy: 0 },
+        crate::components::wildlife::ShadowFoxDrives::newly_manifested(0.9),
         crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
         crate::components::SensorySignature::WILDLIFE,
     ));

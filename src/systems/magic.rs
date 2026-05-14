@@ -730,6 +730,12 @@ pub fn spawn_shadow_fox_from_corruption(
                     WildAnimal::new(WildSpecies::ShadowFox),
                     Position::new(x, y),
                     WildlifeAiState::Patrolling { dx: 1, dy: 0 },
+                    // Ticket 023 Phase A — four-drive motivation substrate.
+                    // Coherence starts full; Resonance/Dread/Entropy are
+                    // populated each motivation tick (Phase B).
+                    crate::components::wildlife::ShadowFoxDrives::newly_manifested(
+                        corruption_at_spawn,
+                    ),
                     Health {
                         current: 1.0,
                         max: 1.0,

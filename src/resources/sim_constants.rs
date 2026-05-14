@@ -4667,6 +4667,46 @@ pub struct WildlifeConstants {
     /// signal the ward placement scorer needs.
     #[serde(default = "default_fox_approach_corridor_half_life_ticks")]
     pub fox_approach_corridor_half_life_ticks: u32,
+
+    // ----- Ticket 023 Phase A: ShadowFox Coherence drive -----
+    /// Coherence loss per tick on tiles whose corruption is at or below
+    /// `shadow_fox_coherence_decay_threshold`. With the default
+    /// `0.0005` and a freshly-manifested shadow-fox (coherence 1.0), a
+    /// continuously-clean tile dissolves the entity in ~2000 ticks
+    /// (~1/30th of a sim-day). Matches the design doc's intent:
+    /// aggressive cleansing is a viable defeat path measured in
+    /// sim-minutes, not sim-seconds. (Initial soak with `0.002`
+    /// — 4x steeper — produced a +463% shadow_fox_spawn churn and a
+    /// continuity mythic-texture canary failure on seed-42; the
+    /// gentler rate keeps populations stable while still letting
+    /// sustained cleansing dissolve them.)
+    #[serde(default = "default_shadow_fox_coherence_decay_clean")]
+    pub shadow_fox_coherence_decay_clean: f32,
+    /// Coherence gain per tick on tiles whose corruption is above
+    /// `shadow_fox_coherence_recovery_threshold`. Net-positive vs
+    /// `shadow_fox_coherence_decay_clean` so a shadow-fox sitting on
+    /// dark ground reconstitutes faster than it dissolves on clean
+    /// ground — the corruption substrate genuinely sustains it.
+    #[serde(default = "default_shadow_fox_coherence_recovery_corrupt")]
+    pub shadow_fox_coherence_recovery_corrupt: f32,
+    /// Tile-corruption ceiling at or below which decay applies. Tiles
+    /// with corruption between `decay_threshold` and
+    /// `recovery_threshold` produce neither decay nor recovery — the
+    /// "flicker band" the design doc calls out. Hysteresis prevents
+    /// shadow-foxes from oscillating across a single decay/recovery
+    /// boundary as they patrol the corruption gradient.
+    #[serde(default = "default_shadow_fox_coherence_decay_threshold")]
+    pub shadow_fox_coherence_decay_threshold: f32,
+    /// Tile-corruption floor at or above which recovery applies. See
+    /// `shadow_fox_coherence_decay_threshold` for the hysteresis band.
+    #[serde(default = "default_shadow_fox_coherence_recovery_threshold")]
+    pub shadow_fox_coherence_recovery_threshold: f32,
+    /// Coherence floor at or below which the shadow-fox dissolves
+    /// (despawn + `EventKind::ShadowFoxDissolved`). Default `0.0`;
+    /// surfaced as a knob for balance experiments that want a
+    /// hysteresis band.
+    #[serde(default = "default_shadow_fox_coherence_dissolution_threshold")]
+    pub shadow_fox_coherence_dissolution_threshold: f32,
 }
 
 impl Default for WildlifeConstants {
@@ -4720,8 +4760,37 @@ impl Default for WildlifeConstants {
                 default_fox_approach_corridor_deposit_per_tick(),
             fox_approach_corridor_half_life_ticks:
                 default_fox_approach_corridor_half_life_ticks(),
+            shadow_fox_coherence_decay_clean: default_shadow_fox_coherence_decay_clean(),
+            shadow_fox_coherence_recovery_corrupt:
+                default_shadow_fox_coherence_recovery_corrupt(),
+            shadow_fox_coherence_decay_threshold:
+                default_shadow_fox_coherence_decay_threshold(),
+            shadow_fox_coherence_recovery_threshold:
+                default_shadow_fox_coherence_recovery_threshold(),
+            shadow_fox_coherence_dissolution_threshold:
+                default_shadow_fox_coherence_dissolution_threshold(),
         }
     }
+}
+
+fn default_shadow_fox_coherence_decay_clean() -> f32 {
+    0.0005
+}
+
+fn default_shadow_fox_coherence_recovery_corrupt() -> f32 {
+    0.002
+}
+
+fn default_shadow_fox_coherence_decay_threshold() -> f32 {
+    0.2
+}
+
+fn default_shadow_fox_coherence_recovery_threshold() -> f32 {
+    0.5
+}
+
+fn default_shadow_fox_coherence_dissolution_threshold() -> f32 {
+    0.0
 }
 
 fn default_recent_ambush_half_life_ticks() -> u32 {

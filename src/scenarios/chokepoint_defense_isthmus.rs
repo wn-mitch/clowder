@@ -324,6 +324,8 @@ fn spawn_shadow_fox(world: &mut World) {
         Position::new(15, 20),
         Health::default(),
         WildlifeAiState::Patrolling { dx: 1, dy: 0 },
+        // Ticket 023 Phase A — canonical shadow-fox marker.
+        crate::components::wildlife::ShadowFoxDrives::newly_manifested(0.9),
         SensorySpecies::Wild(WildSpecies::ShadowFox),
         SensorySignature::WILDLIFE,
     ));

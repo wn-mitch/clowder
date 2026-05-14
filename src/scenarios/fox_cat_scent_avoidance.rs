@@ -56,11 +56,16 @@ fn setup(world: &mut World, seed: u64) {
     // Single ShadowFox heading west toward the cluster. Without a
     // FoxState it falls into `wildlife_ai`'s patrol-state branch,
     // where the 260 cat-scent check now fires.
+    // Ticket 023 Phase A: `ShadowFoxDrives` is the canonical marker
+    // for the shadow-fox-only branches in `wildlife_ai` and
+    // `predator_stalk_cats`. Without it the entity is invisible to the
+    // 260 scent-channel and the avoidance feature never records.
     world.spawn((
         WildAnimal::new(WildSpecies::ShadowFox),
         FOX_START,
         crate::components::physical::Health::default(),
         WildlifeAiState::Patrolling { dx: -1, dy: 0 },
+        crate::components::wildlife::ShadowFoxDrives::newly_manifested(0.9),
         crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
         crate::components::SensorySignature::WILDLIFE,
     ));

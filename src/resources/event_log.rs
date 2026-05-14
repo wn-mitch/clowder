@@ -307,6 +307,17 @@ pub enum EventKind {
         posse: Vec<String>,
         location: (i32, i32),
     },
+    /// Ticket 023 Phase A — a shadow-fox dissolved when its `coherence`
+    /// dropped to or below `shadow_fox_coherence_dissolution_threshold`,
+    /// the slow-environmental defeat path that pairs with the fast
+    /// heroic `ShadowFoxBanished` path. Recorded at the dissolution
+    /// tile so downstream tooling can correlate dissolutions with
+    /// recent cleansing activity.
+    ShadowFoxDissolved {
+        location: (i32, i32),
+        age_ticks: u64,
+        final_corruption: f32,
+    },
 
     // -------------------------------------------------------------------
     // Continuity-canary events (§11.3 — "Emit events for: grooming fires,

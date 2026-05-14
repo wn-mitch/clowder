@@ -11,8 +11,8 @@ use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModif
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::prey::{PreyAnimal, PreyConfig};
 use crate::components::wildlife::{
-    BehaviorType, FoxAiPhase, FoxDen, FoxLifeStage, FoxSex, FoxState, WildAnimal, WildSpecies,
-    WildlifeAiState,
+    BehaviorType, FoxAiPhase, FoxDen, FoxLifeStage, FoxSex, FoxState, ShadowFoxDrives, WildAnimal,
+    WildSpecies, WildlifeAiState,
 };
 use crate::resources::cat_scent_map::CatScentMap;
 use crate::resources::food::FoodStores;
@@ -43,7 +43,15 @@ pub struct DetectionCooldowns {
 /// Move each wild animal according to its behavior pattern.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn wildlife_ai(
-    mut query: Query<(&WildAnimal, &mut Position, &mut WildlifeAiState), Without<FoxState>>,
+    mut query: Query<
+        (
+            &WildAnimal,
+            &mut Position,
+            &mut WildlifeAiState,
+            Has<ShadowFoxDrives>,
+        ),
+        Without<FoxState>,
+    >,
     wards: Query<(&Ward, &Position), Without<WildAnimal>>,
     cat_positions: Query<
         &Position,
@@ -79,7 +87,7 @@ pub fn wildlife_ai(
         .map(|(w, p)| (*p, w.repel_radius() * ward_multiplier))
         .collect();
 
-    for (animal, mut pos, mut ai_state) in &mut query {
+    for (animal, mut pos, mut ai_state, is_shadow_fox) in &mut query {
         match *ai_state {
             WildlifeAiState::Patrolling { dx, dy } => {
                 // 260: shadow-fox orthogonal-axis avoidance.
@@ -88,7 +96,7 @@ pub fn wildlife_ai(
                 // Both fire independently; ward triggers the siege
                 // roll, scent only reverses (cat scent isn't a thing
                 // to siege).
-                if animal.species == WildSpecies::ShadowFox {
+                if is_shadow_fox {
                     let next = Position::new(pos.x + dx, pos.y + dy);
                     if ward_coverage.get(next.x, next.y) >= ward_avoid_threshold {
                         // For siege geometry we still need the ward's
@@ -243,7 +251,7 @@ pub fn wildlife_ai(
                 // enter a ward-covered tile (260: was a hardcoded
                 // `ward_positions` distance check; now reads the same
                 // `WardCoverageMap` threshold as the patrol-step branch).
-                if animal.species == WildSpecies::ShadowFox {
+                if is_shadow_fox {
                     let dx = (target_x - pos.x).signum();
                     let dy = (target_y - pos.y).signum();
                     let next = Position::new(pos.x + dx, pos.y + dy);
@@ -270,7 +278,7 @@ pub fn wildlife_ai(
         }
 
         // ShadowFox spreads corruption to tiles it crosses.
-        if animal.species == WildSpecies::ShadowFox && map.in_bounds(pos.x, pos.y) {
+        if is_shadow_fox && map.in_bounds(pos.x, pos.y) {
             let tile = map.get_mut(pos.x, pos.y);
             tile.corruption = (tile.corruption + c.shadow_fox_corruption_deposit).min(1.0);
         }
@@ -848,6 +856,79 @@ pub fn carcass_scent_tick(
 }
 
 // ---------------------------------------------------------------------------
+// shadowfox_coherence_tick — ticket 023 Phase A
+// ---------------------------------------------------------------------------
+
+/// Tick each shadow-fox's `coherence` drive: decay on clean ground,
+/// recovery on corrupted ground, dissolution at zero.
+///
+/// The slow-environmental defeat path that pairs with combat banishment.
+/// A colony that aggressively cleanses corruption can starve shadow-foxes
+/// without ever fighting one — they dissolve back into the substrate they
+/// rose from.
+///
+/// Coherence-zero dissolution emits `EventKind::ShadowFoxDissolved` and
+/// records `Feature::ShadowFoxDissolved` (rare-legend; not on the never-fired
+/// canary). The mythic-register narrative line uses the design-doc phrasing.
+#[allow(clippy::too_many_arguments)]
+pub fn shadowfox_coherence_tick(
+    mut query: Query<(Entity, &Position, &WildAnimal, &mut ShadowFoxDrives)>,
+    map: Res<TileMap>,
+    constants: Res<SimConstants>,
+    time: Res<TimeState>,
+    mut commands: Commands,
+    mut activation: ResMut<SystemActivation>,
+    mut narrative: ResMut<NarrativeLog>,
+    mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
+) {
+    let c = &constants.wildlife;
+    for (entity, pos, _animal, mut drives) in &mut query {
+        drives.age_ticks = drives.age_ticks.saturating_add(1);
+
+        let tile_corruption = if map.in_bounds(pos.x, pos.y) {
+            map.get(pos.x, pos.y).corruption
+        } else {
+            // Off-map shadow-foxes are about to be despawned by
+            // `cleanup_wildlife`; treat as clean ground so coherence
+            // decays one final time rather than spuriously recovering.
+            0.0
+        };
+
+        // Hysteresis band: tiles between `decay_threshold` and
+        // `recovery_threshold` produce no net change — keeps shadow-foxes
+        // patrolling moderate-corruption corridors from oscillating
+        // across a single boundary every tick. Design doc §"Coherence
+        // mechanics" calls this the "flicker band" (0.2 / 0.5 default).
+        if tile_corruption >= c.shadow_fox_coherence_recovery_threshold {
+            drives.coherence =
+                (drives.coherence + c.shadow_fox_coherence_recovery_corrupt).min(1.0);
+        } else if tile_corruption <= c.shadow_fox_coherence_decay_threshold {
+            drives.coherence = (drives.coherence - c.shadow_fox_coherence_decay_clean).max(0.0);
+        }
+
+        if drives.coherence <= c.shadow_fox_coherence_dissolution_threshold {
+            activation.record(Feature::ShadowFoxDissolved);
+            narrative.push(
+                time.tick,
+                "The shadow-fox flickers once, twice, and is gone — the corruption could not hold it together.".to_string(),
+                NarrativeTier::Nature,
+            );
+            if let Some(ref mut elog) = event_log {
+                elog.push(
+                    time.tick,
+                    crate::resources::event_log::EventKind::ShadowFoxDissolved {
+                        location: (pos.x, pos.y),
+                        age_ticks: drives.age_ticks,
+                        final_corruption: tile_corruption,
+                    },
+                );
+            }
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // predator_stalk_cats — foxes actively hunt nearby cats
 // ---------------------------------------------------------------------------
 
@@ -863,7 +944,11 @@ pub fn predator_stalk_cats(
             &mut WildlifeAiState,
             &mut Health,
         ),
-        (Without<Dead>, Without<crate::components::wildlife::Carcass>),
+        (
+            With<ShadowFoxDrives>,
+            Without<Dead>,
+            Without<crate::components::wildlife::Carcass>,
+        ),
     >,
     mut cats: Query<
         (Entity, &Position, &mut Health, &mut Needs, &mut Mood, &Name),
@@ -894,10 +979,9 @@ pub fn predator_stalk_cats(
         cats.iter().map(|(e, p, _, _, _, _)| (e, *p)).collect();
 
     for (mut animal, wl_pos, mut ai_state, _health) in &mut wildlife {
-        // Only shadow foxes stalk via this system. Regular foxes use fox_ai_decision.
-        if animal.species != WildSpecies::ShadowFox {
-            continue;
-        }
+        // Query filter `With<ShadowFoxDrives>` gates this loop to shadow
+        // foxes only (regular foxes use fox_ai_decision; hawks/snakes
+        // don't carry the drives substrate). Ticket 023 Phase A.
 
         // Tick down ambush cooldown.
         if animal.ambush_cooldown > 0 {
@@ -2748,5 +2832,117 @@ mod tests {
                 colony.y
             );
         }
+    }
+
+    // ---- Ticket 023 Phase A: shadowfox_coherence_tick ----
+
+    fn setup_coherence_world() -> (World, Schedule) {
+        let mut world = World::new();
+        world.insert_resource(TileMap::new(20, 20, Terrain::Grass));
+        world.insert_resource(SimRng::new(42));
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(SystemActivation::default());
+        world.insert_resource(NarrativeLog::default());
+        world.insert_resource(TimeState::default());
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(shadowfox_coherence_tick);
+        (world, schedule)
+    }
+
+    fn spawn_shadowfox_at(world: &mut World, pos: Position, coherence: f32) -> Entity {
+        world
+            .spawn((
+                WildAnimal::new(WildSpecies::ShadowFox),
+                pos,
+                Health::default(),
+                WildlifeAiState::Patrolling { dx: 1, dy: 0 },
+                ShadowFoxDrives {
+                    coherence,
+                    resonance: 0.0,
+                    dread: 0.0,
+                    entropy: 0.0,
+                    age_ticks: 0,
+                    origin_corruption: 0.9,
+                },
+            ))
+            .id()
+    }
+
+    #[test]
+    fn shadowfox_dissolves_on_clean_ground() {
+        let (mut world, mut schedule) = setup_coherence_world();
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
+        // Tile is plain Grass with corruption 0.0 — below the recovery
+        // threshold (0.3), so coherence decays at `decay_clean` (0.002).
+        // Dissolution at coherence <= 0.0 → ~500 ticks.
+
+        let decay = world
+            .resource::<crate::resources::SimConstants>()
+            .wildlife
+            .shadow_fox_coherence_decay_clean;
+        let expected_dissolve_at = (1.0_f32 / decay).ceil() as u32;
+
+        let mut ticks_until_despawn = 0_u32;
+        for tick in 1..=(expected_dissolve_at + 5) {
+            schedule.run(&mut world);
+            if world.get::<ShadowFoxDrives>(entity).is_none() {
+                ticks_until_despawn = tick;
+                break;
+            }
+        }
+        assert!(
+            ticks_until_despawn > 0,
+            "shadowfox should have dissolved within {} ticks",
+            expected_dissolve_at + 5,
+        );
+        assert!(
+            ticks_until_despawn.abs_diff(expected_dissolve_at) <= 1,
+            "expected dissolution within ±1 of {} ticks, got {}",
+            expected_dissolve_at,
+            ticks_until_despawn,
+        );
+        // Feature recorded for the canary footer.
+        let activation = world.resource::<SystemActivation>();
+        assert!(
+            activation
+                .counts
+                .get(&Feature::ShadowFoxDissolved)
+                .copied()
+                .unwrap_or(0)
+                >= 1,
+            "ShadowFoxDissolved feature should have been recorded on dissolution",
+        );
+    }
+
+    #[test]
+    fn shadowfox_recovers_on_corrupted_ground() {
+        let (mut world, mut schedule) = setup_coherence_world();
+        // Saturate the spawn tile with corruption so it sits well above
+        // the recovery threshold (0.3).
+        {
+            let mut map = world.resource_mut::<TileMap>();
+            map.get_mut(5, 5).corruption = 0.9;
+        }
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 0.5);
+
+        for _ in 0..10 {
+            schedule.run(&mut world);
+        }
+
+        let drives = world.get::<ShadowFoxDrives>(entity).expect(
+            "shadowfox should not have dissolved while sitting on heavily-corrupted ground",
+        );
+        assert!(
+            drives.coherence > 0.5,
+            "coherence should have recovered above 0.5; got {}",
+            drives.coherence,
+        );
+        assert!(
+            drives.coherence <= 1.0,
+            "coherence must clamp at 1.0; got {}",
+            drives.coherence,
+        );
+        assert!(drives.age_ticks >= 10, "age_ticks should have advanced");
     }
 }
