@@ -1,12 +1,36 @@
 //! Combat domain — two chains (Warrior's Path, Shadow Fighter).
 //! Ported 1:1 from `assets/narrative/aspirations/combat.ron` (retired
-//! at 321). Empty `emits` on every milestone — #327 fills them.
+//! at 321). #327 fills WARRIORS_PATH emits; SHADOW_FIGHTER emits land
+//! in a follow-on ticket alongside its Patrol primitive method.
 
 use super::{
-    always_true, AspirationChain, ConflictClass, Milestone, ProgressTracker, SkillKind,
+    always_true, AspirationChain, ConflictClass, Emit, Milestone, Priority, ProgressTracker,
+    SkillKind,
 };
+use crate::ai::dse::CommitmentStrategy;
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
+
+/// WARRIORS_PATH emit table — applies uniformly to all four
+/// milestones. Primary `engage_threat` catches `fight_method`; Tertiary
+/// `flee_to_safety` catches `flee_method` as a survival fallback when
+/// the picker's per-row `applicable_when` (currently `always_true`,
+/// tightened in a follow-on balance pass) starts gating Fight on
+/// threat-in-range and Flee on wounded.
+const WARRIOR_EMITS: &[Emit] = &[
+    Emit {
+        label: "engage_threat",
+        applicable_when: always_true,
+        strategy: CommitmentStrategy::SingleMinded,
+        priority: Priority::Primary,
+    },
+    Emit {
+        label: "flee_to_safety",
+        applicable_when: always_true,
+        strategy: CommitmentStrategy::SingleMinded,
+        priority: Priority::Tertiary,
+    },
+];
 
 pub const WARRIORS_PATH: AspirationChain = AspirationChain {
     name: "Warrior's Path",
@@ -19,7 +43,7 @@ pub const WARRIORS_PATH: AspirationChain = AspirationChain {
                 actions: &[Action::Fight],
                 count: 1,
             },
-            emits: &[],
+            emits: WARRIOR_EMITS,
             narrative_on_complete:
                 "{name} bares {possessive} claws for the first time and means it.",
         },
@@ -30,7 +54,7 @@ pub const WARRIORS_PATH: AspirationChain = AspirationChain {
                 actions: &[Action::Fight],
                 count: 10,
             },
-            emits: &[],
+            emits: WARRIOR_EMITS,
             narrative_on_complete: "{name} wears {possessive} scars without shame.",
         },
         Milestone {
@@ -40,7 +64,7 @@ pub const WARRIORS_PATH: AspirationChain = AspirationChain {
                 actions: &[Action::Fight],
                 count: 25,
             },
-            emits: &[],
+            emits: WARRIOR_EMITS,
             narrative_on_complete:
                 "The younger cats fall silent when {name} speaks of fighting.",
         },
@@ -51,7 +75,7 @@ pub const WARRIORS_PATH: AspirationChain = AspirationChain {
                 actions: &[Action::Fight],
                 count: 50,
             },
-            emits: &[],
+            emits: WARRIOR_EMITS,
             narrative_on_complete:
                 "{name} has become the blade the colony reaches for in the dark.",
         },

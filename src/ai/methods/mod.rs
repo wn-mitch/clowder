@@ -64,6 +64,16 @@ pub enum TargetHint {
     /// (Hunt-DSE's existing target resolution). Used by `hunt_method`
     /// as the combine-and-test slice's primitive target hint.
     Prey,
+    /// 327 — primitive sub-goal binds to the cat's threat-target picker
+    /// (Fight-DSE's existing target resolution: nearest hostile creature
+    /// within engagement range, mediated by `HasThreatNearby` marker).
+    /// Used by `fight_method` as WARRIORS_PATH's primary emit target.
+    Threat,
+    /// 327 — primitive sub-goal binds to the cat's safe-ground picker
+    /// (Flee-DSE's existing target resolution: nearest tile satisfying
+    /// the safety axis). Used by `flee_method` as WARRIORS_PATH's
+    /// survival-fallback emit target.
+    SafeGround,
 }
 
 // ---------------------------------------------------------------------------
@@ -365,6 +375,13 @@ pub mod acquire_stealth;
 // `hunt_method` carries `ApplicableWhen::Live`, distinguishing it
 // from the dormant Tier-2 modules below.
 pub mod hunt;
+// 327: Live HTN method modules — combine-and-test slice for the
+// Combat chain. `fight_method` catches `engage_threat`; `flee_method`
+// catches `flee_to_safety`. Both are Tier-1 Live primitives, mirroring
+// `hunt_method`'s 321 shape. WARRIORS_PATH emits both labels;
+// SHADOW_FIGHTER (Patrol-based) lands in a follow-on ticket.
+pub mod fight;
+pub mod flee;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
 

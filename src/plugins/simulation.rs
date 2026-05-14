@@ -257,6 +257,19 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // fires. The production gating + multi-step decomposition lands
     // with #325.
     registry.push(crate::ai::methods::hunt::hunt_method());
+
+    // 327: Tier-1 Live methods — combine-and-test slice for the Combat
+    // chain. `fight_method` catches `engage_threat` (Primary emit on
+    // every WARRIORS_PATH milestone); `flee_method` catches
+    // `flee_to_safety` (Tertiary survival fallback). Both carry
+    // `applicable_when: Live(always_true)` and one primitive sub-goal
+    // each (Action::Fight + TargetHint::Threat; Action::Flee +
+    // TargetHint::SafeGround). Production gating (threat-in-range belief
+    // check, wounded-cat predicate) lands as a follow-on balance pass.
+    // SHADOW_FIGHTER (Patrol-based) emits are deferred to a follow-on
+    // ticket alongside its Patrol primitive method.
+    registry.push(crate::ai::methods::fight::fight_method());
+    registry.push(crate::ai::methods::flee::flee_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of

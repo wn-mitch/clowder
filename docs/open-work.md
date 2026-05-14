@@ -41,11 +41,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[327](docs/open-work/tickets/327-aspiration-milestone-wrapper-combat.md)** — Combat aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.92_
-- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.92_
-- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
-- **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
+- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.93_
+- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.92_
+- **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.92_
+- **[330](docs/open-work/tickets/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
+- **[331](docs/open-work/tickets/331-aspiration-milestone-wrapper-leadership.md)** — Leadership aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
 
 ## Epic progress (3)
 
@@ -96,12 +96,12 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
-- **[327](docs/open-work/tickets/327-aspiration-milestone-wrapper-combat.md)** — Combat aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[328](docs/open-work/tickets/328-aspiration-milestone-wrapper-herbcraft.md)** — Herbcraft aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[330](docs/open-work/tickets/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[331](docs/open-work/tickets/331-aspiration-milestone-wrapper-leadership.md)** — Leadership aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
+- **[347](docs/open-work/tickets/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method — _[ai-substrate] · added 2026-05-14_
 
 ### belief-perception (13 ready, 2 blocked)
 
@@ -216,14 +216,13 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
-### smarter-cats (19 open, 8 landed)
+### smarter-cats (19 open, 9 landed)
 
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
 - **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
-- **[327](docs/open-work/tickets/327-aspiration-milestone-wrapper-combat.md)** — Combat aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[328](docs/open-work/tickets/328-aspiration-milestone-wrapper-herbcraft.md)** — Herbcraft aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[330](docs/open-work/tickets/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
@@ -237,6 +236,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
+- **[347](docs/open-work/tickets/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method — _[ai-substrate] · added 2026-05-14_
 
 ### full-sensory-perception (13 open, 3 landed)
 
@@ -399,7 +399,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
-- **[327](docs/open-work/tickets/327-aspiration-milestone-wrapper-combat.md)** — Combat aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[328](docs/open-work/tickets/328-aspiration-milestone-wrapper-herbcraft.md)** — Herbcraft aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[330](docs/open-work/tickets/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
@@ -414,6 +413,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
+- **[347](docs/open-work/tickets/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method — _[ai-substrate] · added 2026-05-14_
 
 ## Parked (14)
 
@@ -463,12 +463,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (213)
+## Landed archive (214)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (148)
+### 2026-05 (149)
 
+- **[327](docs/open-work/landed/327-aspiration-milestone-wrapper-combat.md)** — Combat aspiration_milestone_wrapper + emits tables _(2026-05-14)_
 - **[322](docs/open-work/landed/322-action-enum-stubs-for-dormant-methods.md)** — Action-enum stubs for dormant HTN methods _(2026-05-14)_
 - **[321](docs/open-work/landed/321-aspirations-milestones-emits-table-l1-l2-picker.md)** — Aspirations milestones gain emits table + L1→L2 picker _(2026-05-14)_
 - **[320](docs/open-work/landed/320-heldgoalstack-component-l2-evaluator-integration.md)** — HeldGoalStack Component + L2 evaluator integration _(2026-05-14)_

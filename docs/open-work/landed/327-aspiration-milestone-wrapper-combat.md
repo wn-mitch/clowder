@@ -1,7 +1,7 @@
 ---
 id: 327
 title: Combat aspiration_milestone_wrapper + emits tables
-status: ready
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats]
 added: 2026-05-14
@@ -11,8 +11,8 @@ wires-method: [aspiration_milestone_wrapper.combat]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -70,3 +70,4 @@ predicates and emit lever set.
 
 - 2026-05-14: opened as 128 epic child #9 (Batch C chain
   follow-on).
+- 2026-05-14: 2026-05-14: landed. Authored fight_method (engage_threat) + flee_method (flee_to_safety) as Tier-1 Live primitives mirroring 321's hunt_method. WARRIORS_PATH milestones now emit Primary engage_threat + Tertiary flee_to_safety; SHADOW_FIGHTER stays empty per ticket-347 follow-on. Verified via just headless 30s focal-trace on Wren (WARRIORS_PATH at milestone 0): 123/686 emit_walk rows populated, engage_threat method_live+applicable+emitted, flee_to_safety method_live but lost to Primary. Full 15-min verdict vs tuned-42-484d9f60 baseline: survival canaries PASS (0 deaths), continuity FAIL on mythic-texture=0 (also 0 in baseline so non-regression), constants_drift clean, colony_score concern: fulfillment -87.7%, welfare -16.9%, nourishment -20.7%, peak_pop +20%, kittens_born +100%. Drift narrative: new Combat goals enter L2 pool every applicable tick with always_true gating, shifting action distribution. Production gating (threat-in-range / wounded predicates) deferred to follow-on balance pass per ticket Approach; combined with 347 SHADOW_FIGHTER wiring will replace always_true with belief-driven gates. Doctrine note: wires-method frontmatter cites aspiration_milestone_wrapper.combat (htn-methods.md §H category name); the literal method ids are fight_method and flee_method — registry script enforces PendingSubstrate→ticket direction only, so live-side drift is documentation, not a CI gate. SHADOW_FIGHTER follow-on opened as 347.
