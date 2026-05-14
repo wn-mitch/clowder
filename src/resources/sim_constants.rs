@@ -6162,6 +6162,16 @@ pub struct BeliefsConstants {
     pub perceived_violence_capability: BeliefAxisTunables,
     pub affiliation_history: BeliefAxisTunables,
     pub predictability: BeliefAxisTunables,
+    /// 261: state-flavored read on "is this subject hostile to me right
+    /// now". Fast-timescale — observed aggression updates quickly and
+    /// decays quickly; bond reputation (slow) lives on
+    /// `affiliation_history`.
+    pub perceived_hostility: BeliefAxisTunables,
+    /// 261: how open this subject is to affiliative practice right now
+    /// (grooming, courtship, mentoring). Slow-timescale — receptivity
+    /// is a stable disposition modulated by current life-stage, not a
+    /// per-tick reactive read.
+    pub perceived_receptivity: BeliefAxisTunables,
     pub species_violence_priors: SpeciesViolencePriors,
     /// Passive-decay pass runs every Nth tick, with per-cat phase staggered
     /// by `entity.index() % period`. Default 20 — amortizes cost; missing
@@ -6194,6 +6204,8 @@ impl Default for BeliefsConstants {
             perceived_violence_capability: BeliefAxisTunables::slow(),
             affiliation_history: BeliefAxisTunables::slow(),
             predictability: BeliefAxisTunables::slow(),
+            perceived_hostility: BeliefAxisTunables::fast(),
+            perceived_receptivity: BeliefAxisTunables::slow(),
             species_violence_priors: SpeciesViolencePriors::default(),
             decay_stagger_period: 20,
             low_ward_reserve_threshold: 2,

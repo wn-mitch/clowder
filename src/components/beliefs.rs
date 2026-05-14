@@ -150,6 +150,31 @@ pub struct MentalModel {
     pub perceived_violence_capability: Facet,
     pub affiliation_history: Facet,
     pub predictability: Facet,
+    /// How hostile does the subject appear toward the perceiver? Range
+    /// `[0.0, 1.0]`. Authored by ticket 261's integrator path on
+    /// `WitnessableEvent::Attack` — direct observation of aggression
+    /// against me (or against any cat in my model) is the v1 source.
+    /// Consumed by the `Fawn`, `Threaten`, `Posture`, `Hiss`, and social
+    /// `Socialize` / `GroomOther` affordance estimators.
+    ///
+    /// Distinct from `affiliation_history`: hostility is a fast,
+    /// state-flavored read on *aggressive intent right now*; affiliation
+    /// is a slow reputational summary of historical bond. A friendly
+    /// cat that suddenly attacks reads high hostility AND positive
+    /// affiliation — both signals coexist.
+    pub perceived_hostility: Facet,
+    /// How receptive does the subject appear to affiliative overtures?
+    /// Range `[0.0, 1.0]`. Authored on `Groom`, `Mate`, and `Care` events
+    /// (witnessed affiliative practice is the signal). Consumed by the
+    /// `Mate`, `Mentor`, `Socialize`, `GroomOther`, and `FeedKitten`
+    /// affordance estimators.
+    ///
+    /// Distinct from `affiliation_history`: receptivity is "is this cat
+    /// open *right now* to courtship / grooming / mentoring"; affiliation
+    /// is the long-run bond. A cat with strong affiliation but low
+    /// receptivity (e.g., busy hunting, or recently widowed) reads
+    /// correctly: high bond, low affordance.
+    pub perceived_receptivity: Facet,
     pub last_updated_tick: u64,
     pub evidence_count: u32,
     pub candidates: Vec<CandidateFacet>,
@@ -177,6 +202,8 @@ pub enum FacetSlot {
     PerceivedViolenceCapability,
     AffiliationHistory,
     Predictability,
+    PerceivedHostility,
+    PerceivedReceptivity,
 }
 
 // ---------------------------------------------------------------------------

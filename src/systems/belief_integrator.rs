@@ -247,6 +247,15 @@ fn apply_observation(
                 tick,
                 &cfg.recency_of_threat_cue,
             );
+            // 261: observed aggression updates witness's hostility-belief
+            // about the actor. Scale by severity so a glancing nip lifts
+            // less than a deep bite; clamped to [0, 1] by `update_facet`.
+            update_facet(
+                &mut actor_model.perceived_hostility,
+                *severity,
+                tick,
+                &cfg.perceived_hostility,
+            );
             actor_model.last_updated_tick = tick;
             actor_model.evidence_count = actor_model.evidence_count.saturating_add(1);
 
@@ -273,35 +282,75 @@ fn apply_observation(
             loc_model.evidence_count = loc_model.evidence_count.saturating_add(1);
         }
 
-        WitnessableEvent::Groom { actor, .. }
-        | WitnessableEvent::Mate { actor, .. } => {
-            if *actor == witness {
-                return;
+        WitnessableEvent::Groom { actor, target, .. }
+        | WitnessableEvent::Mate { actor, target, .. } => {
+            // Both participants are visibly engaged in affiliative
+            // practice: the actor initiated, the target accepted. The
+            // witness lifts affiliation_history on the actor (the
+            // existing 258 signal) AND lifts perceived_receptivity on
+            // *both* participants — 261's addition. Skipping self-witness
+            // entries preserves the 258 invariant that own-action
+            // declarations don't update own beliefs.
+            if *actor != witness {
+                let model = cats.models.entry(*actor).or_default();
+                update_facet(
+                    &mut model.affiliation_history,
+                    OBSERVED_MAX,
+                    tick,
+                    &cfg.affiliation_history,
+                );
+                update_facet(
+                    &mut model.perceived_receptivity,
+                    OBSERVED_MAX,
+                    tick,
+                    &cfg.perceived_receptivity,
+                );
+                model.last_updated_tick = tick;
+                model.evidence_count = model.evidence_count.saturating_add(1);
             }
-            let model = cats.models.entry(*actor).or_default();
-            update_facet(
-                &mut model.affiliation_history,
-                OBSERVED_MAX,
-                tick,
-                &cfg.affiliation_history,
-            );
-            model.last_updated_tick = tick;
-            model.evidence_count = model.evidence_count.saturating_add(1);
+            if *target != witness {
+                let model = cats.models.entry(*target).or_default();
+                update_facet(
+                    &mut model.perceived_receptivity,
+                    OBSERVED_MAX,
+                    tick,
+                    &cfg.perceived_receptivity,
+                );
+                model.last_updated_tick = tick;
+                model.evidence_count = model.evidence_count.saturating_add(1);
+            }
         }
 
-        WitnessableEvent::Care { caregiver, .. } => {
-            if *caregiver == witness {
-                return;
+        WitnessableEvent::Care { caregiver, kitten, .. } => {
+            if *caregiver != witness {
+                let model = cats.models.entry(*caregiver).or_default();
+                update_facet(
+                    &mut model.affiliation_history,
+                    OBSERVED_MAX,
+                    tick,
+                    &cfg.affiliation_history,
+                );
+                update_facet(
+                    &mut model.perceived_receptivity,
+                    OBSERVED_MAX,
+                    tick,
+                    &cfg.perceived_receptivity,
+                );
+                model.last_updated_tick = tick;
+                model.evidence_count = model.evidence_count.saturating_add(1);
             }
-            let model = cats.models.entry(*caregiver).or_default();
-            update_facet(
-                &mut model.affiliation_history,
-                OBSERVED_MAX,
-                tick,
-                &cfg.affiliation_history,
-            );
-            model.last_updated_tick = tick;
-            model.evidence_count = model.evidence_count.saturating_add(1);
+            // 261: kitten accepting care is itself a receptivity signal.
+            if *kitten != witness {
+                let model = cats.models.entry(*kitten).or_default();
+                update_facet(
+                    &mut model.perceived_receptivity,
+                    OBSERVED_MAX,
+                    tick,
+                    &cfg.perceived_receptivity,
+                );
+                model.last_updated_tick = tick;
+                model.evidence_count = model.evidence_count.saturating_add(1);
+            }
         }
 
         WitnessableEvent::FleeFrom {
@@ -517,6 +566,8 @@ fn decay_models<K: std::hash::Hash + Eq + Copy>(
         );
         decay_facet(&mut model.affiliation_history, &cfg.affiliation_history, period);
         decay_facet(&mut model.predictability, &cfg.predictability, period);
+        decay_facet(&mut model.perceived_hostility, &cfg.perceived_hostility, period);
+        decay_facet(&mut model.perceived_receptivity, &cfg.perceived_receptivity, period);
         model.last_updated_tick = tick;
         let max_strength = [
             model.perceived_injury_level.strength,
@@ -525,6 +576,8 @@ fn decay_models<K: std::hash::Hash + Eq + Copy>(
             model.perceived_violence_capability.strength,
             model.affiliation_history.strength,
             model.predictability.strength,
+            model.perceived_hostility.strength,
+            model.perceived_receptivity.strength,
         ]
         .into_iter()
         .fold(0.0f32, f32::max);
@@ -785,6 +838,117 @@ mod tests {
         assert!(
             threat_model.perceived_violence_capability.value > 0.0,
             "FleeFrom should lift threat's perceived_violence_capability on witnesses"
+        );
+    }
+
+    // 261 — perceived_hostility + perceived_receptivity emit-site coverage.
+
+    #[test]
+    fn attack_event_lifts_hostility_on_actor() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let target = spawn_cat(&mut world, Position::new(11, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Attack {
+            actor,
+            target,
+            position: Position::new(10, 10),
+            severity: 0.8,
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        let model = cats
+            .models
+            .get(&actor)
+            .expect("witness holds belief on attacker");
+        assert!(
+            model.perceived_hostility.value > 0.0,
+            "Attack should lift actor's perceived_hostility on witnesses; got {}",
+            model.perceived_hostility.value
+        );
+        assert_eq!(model.perceived_hostility.last_source, EvidenceKind::Observation);
+    }
+
+    #[test]
+    fn groom_event_lifts_receptivity_on_both_participants() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let target = spawn_cat(&mut world, Position::new(11, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Groom {
+            actor,
+            target,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        let actor_model = cats.models.get(&actor).expect("belief on actor");
+        let target_model = cats.models.get(&target).expect("belief on target");
+        assert!(
+            actor_model.perceived_receptivity.value > 0.0,
+            "Groom should lift actor receptivity; got {}",
+            actor_model.perceived_receptivity.value
+        );
+        assert!(
+            target_model.perceived_receptivity.value > 0.0,
+            "Groom should lift target receptivity; got {}",
+            target_model.perceived_receptivity.value
+        );
+    }
+
+    #[test]
+    fn mate_event_lifts_receptivity_on_both_participants() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let target = spawn_cat(&mut world, Position::new(11, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Mate {
+            actor,
+            target,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        assert!(cats.models.get(&actor).unwrap().perceived_receptivity.value > 0.0);
+        assert!(cats.models.get(&target).unwrap().perceived_receptivity.value > 0.0);
+    }
+
+    #[test]
+    fn care_event_lifts_receptivity_on_caregiver_and_kitten() {
+        let (mut world, mut schedule) = test_world(100);
+        let caregiver = spawn_cat(&mut world, Position::new(10, 10));
+        let kitten = spawn_cat(&mut world, Position::new(11, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Care {
+            caregiver,
+            kitten,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        assert!(
+            cats.models.get(&caregiver).unwrap().perceived_receptivity.value > 0.0,
+            "Care should lift caregiver receptivity"
+        );
+        assert!(
+            cats.models.get(&kitten).unwrap().perceived_receptivity.value > 0.0,
+            "Care should lift kitten receptivity"
         );
     }
 
