@@ -237,7 +237,7 @@ pub fn select_aspirations(
                 &mut rng.rng,
             );
             if best.as_ref().is_none_or(|(_, _, bs)| s > *bs) {
-                best = Some((&chain.name, chain.domain, s));
+                best = Some((chain.name, chain.domain, s));
             }
         }
 
@@ -337,7 +337,7 @@ pub fn check_second_aspiration_slot(
             if existing_domains.contains(&chain.domain) {
                 continue;
             }
-            if aspirations.completed.contains(&chain.name) {
+            if aspirations.completed.iter().any(|c| c == chain.name) {
                 continue;
             }
             let s = score_chain(
@@ -349,7 +349,7 @@ pub fn check_second_aspiration_slot(
                 &mut rng.rng,
             );
             if best.as_ref().is_none_or(|(_, _, bs)| s > *bs) {
-                best = Some((&chain.name, chain.domain, s));
+                best = Some((chain.name, chain.domain, s));
             }
         }
 
@@ -465,83 +465,49 @@ pub fn track_milestones(
             }
             let milestone = &chain.milestones[asp.current_milestone];
 
-            let met = match &milestone.condition {
-                crate::components::aspirations::MilestoneCondition::ActionCount {
-                    action,
-                    count,
-                } => {
-                    // Increment progress when the matching action completes.
-                    if current.ticks_remaining == 1 {
-                        let action_name = format!("{:?}", current.action);
-                        if action_name == *action {
-                            asp.progress += 1;
-                            asp.last_progress_tick = time.tick;
-                        }
+            let met = match &milestone.progress_tracker {
+                crate::components::aspirations::ProgressTracker::ActionCount { actions, count } => {
+                    // Increment progress when any matching action completes.
+                    if current.ticks_remaining == 1 && actions.contains(&current.action) {
+                        asp.progress += 1;
+                        asp.last_progress_tick = time.tick;
                     }
                     asp.progress >= *count
                 }
-                crate::components::aspirations::MilestoneCondition::SkillLevel { skill, level } => {
-                    let current_level = match skill.as_str() {
-                        "hunting" => skills.hunting,
-                        "foraging" => skills.foraging,
-                        "herbcraft" => skills.herbcraft,
-                        "building" => skills.building,
-                        "combat" => skills.combat,
-                        "magic" => skills.magic,
-                        _ => 0.0,
-                    };
+                crate::components::aspirations::ProgressTracker::SkillLevel { skill, level } => {
+                    let current_level = skill.value(skills);
                     if current_level >= *level {
                         asp.last_progress_tick = time.tick;
                     }
                     current_level >= *level
                 }
-                crate::components::aspirations::MilestoneCondition::FormBond { bond_type } => {
-                    use crate::resources::relationships::BondType;
-                    let target_bond = match bond_type.as_str() {
-                        "Friends" => Some(BondType::Friends),
-                        "Partners" => Some(BondType::Partners),
-                        "Mates" => Some(BondType::Mates),
-                        _ => None,
-                    };
-                    let has_bond = target_bond.is_some_and(|target| {
-                        relationships
-                            .all_for(cat_entity)
-                            .iter()
-                            .any(|(_, rel)| rel.bond.is_some_and(|b| b >= target))
-                    });
+                crate::components::aspirations::ProgressTracker::FormBond { bond_type } => {
+                    let target = *bond_type;
+                    let has_bond = relationships
+                        .all_for(cat_entity)
+                        .iter()
+                        .any(|(_, rel)| rel.bond.is_some_and(|b| b >= target));
                     if has_bond {
                         asp.last_progress_tick = time.tick;
                     }
                     has_bond
                 }
-                crate::components::aspirations::MilestoneCondition::WitnessEvent {
+                crate::components::aspirations::ProgressTracker::WitnessEvent {
                     event_type,
                     count,
                 } => {
-                    let mem_type = match event_type.as_str() {
-                        "ThreatSeen" => Some(MemoryType::ThreatSeen),
-                        "Death" => Some(MemoryType::Death),
-                        "ResourceFound" => Some(MemoryType::ResourceFound),
-                        "MagicEvent" => Some(MemoryType::MagicEvent),
-                        "Injury" => Some(MemoryType::Injury),
-                        "SocialEvent" => Some(MemoryType::SocialEvent),
-                        _ => None,
-                    };
-                    if let Some(mt) = mem_type {
-                        let witnessed = memory
-                            .events
-                            .iter()
-                            .filter(|e| e.event_type == mt && e.tick >= asp.adopted_tick)
-                            .count();
-                        if witnessed > 0 {
-                            asp.last_progress_tick = time.tick;
-                        }
-                        witnessed as u32 >= *count
-                    } else {
-                        false
+                    let mt = *event_type;
+                    let witnessed = memory
+                        .events
+                        .iter()
+                        .filter(|e| e.event_type == mt && e.tick >= asp.adopted_tick)
+                        .count();
+                    if witnessed > 0 {
+                        asp.last_progress_tick = time.tick;
                     }
+                    witnessed as u32 >= *count
                 }
-                crate::components::aspirations::MilestoneCondition::Mentor { count } => {
+                crate::components::aspirations::ProgressTracker::Mentor { count } => {
                     // Mentor actions tracked same as ActionCount.
                     if current.ticks_remaining == 1 && current.action == Action::Mentor {
                         asp.progress += 1;

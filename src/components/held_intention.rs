@@ -56,38 +56,62 @@ use crate::ai::Action;
 
 /// Where this intention came from. Self-formed dispositions carry
 /// `SelfMotivated`; intentions adopted in response to a coordinator's
-/// directive carry the coordinator's `Entity` so downstream consumers
-/// (ticket 081 compliance demotion, ticket 130 trust-weighted
-/// directive momentum) can read provenance. This ticket commits the
-/// field and the read-site only — no live writer for
-/// `CoordinatorDirective` ships in 126 (ticket 057 will).
-#[derive(Debug, Clone, Copy, serde::Serialize)]
+/// directive carry the coordinator's `Entity`; intentions emitted by
+/// the L1→L2 aspiration picker (ticket 321) carry the aspiration's
+/// chain name. Downstream consumers (ticket 081 compliance demotion,
+/// ticket 130 trust-weighted directive momentum, the 320 HTN goal-
+/// stack's `GoalFrame.source`) read provenance through this enum.
+/// 126 committed the field + `SelfMotivated` / `CoordinatorDirective`
+/// variants; 320 added the `AspirationEmitted` variant for the HTN
+/// emission path; 321 wires the picker that authors it.
+///
+/// `chain` carries a `&'static str` (post-321) — every aspiration
+/// chain's name lives in `crate::ai::aspirations`'s const
+/// [`crate::ai::aspirations::AspirationChain::name`] field, so the
+/// emitter site never allocates. Pre-321 the variant carried `String`;
+/// flipping to `&'static str` restores `Copy`-derivability for the
+/// non-`CoordinatorDirective` variants (the enum itself isn't `Copy`
+/// because `CoordinatorDirective` carries `Entity` which is `Copy` —
+/// but the variant constructor takes `serde(skip)`, so for the trace
+/// emitter's purposes the enum-level `Clone` suffices).
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum IntentionSource {
     SelfMotivated,
     CoordinatorDirective {
         #[serde(skip)]
         coordinator: Entity,
     },
+    /// Ticket 320 (variant) / 321 (writer) — emitted by the L1→L2
+    /// picker from an aspiration's per-milestone `emits` table.
+    /// `chain` matches `ActiveAspiration.chain_name` for the source
+    /// aspiration (e.g. `"Master of the Hunt"`); the picker copies
+    /// the `&'static str` from the matched
+    /// `crate::ai::aspirations::AspirationChain.name`.
+    AspirationEmitted {
+        chain: &'static str,
+    },
 }
 
 impl IntentionSource {
     /// Stable ordinal for the scalar surface used by
     /// `IntentionMomentum`. `0` = `SelfMotivated`, `1` =
-    /// `CoordinatorDirective`. Kept dense and small so the f32 round-
-    /// trip through the scalar table preserves the discriminant
-    /// exactly.
-    pub const fn ordinal(self) -> u8 {
+    /// `CoordinatorDirective`, `2` = `AspirationEmitted`. Kept dense
+    /// and small so the f32 round-trip through the scalar table
+    /// preserves the discriminant exactly.
+    pub fn ordinal(&self) -> u8 {
         match self {
             Self::SelfMotivated => 0,
             Self::CoordinatorDirective { .. } => 1,
+            Self::AspirationEmitted { .. } => 2,
         }
     }
 
     /// Stable slug for trace serialization.
-    pub const fn as_str(self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             Self::SelfMotivated => "self_motivated",
             Self::CoordinatorDirective { .. } => "coordinator_directive",
+            Self::AspirationEmitted { .. } => "aspiration_emitted",
         }
     }
 }
@@ -267,11 +291,19 @@ mod tests {
     fn ordinal_round_trips_through_f32() {
         // The scalar surface stores ordinals as f32. Defend against
         // a future addition that adds a non-round-trippable variant.
-        let cases = [(IntentionSource::SelfMotivated, 0u8)];
+        let cases: &[(IntentionSource, u8)] = &[
+            (IntentionSource::SelfMotivated, 0),
+            (
+                IntentionSource::AspirationEmitted {
+                    chain: "Master of the Hunt",
+                },
+                2,
+            ),
+        ];
         for (source, expected) in cases {
             let f = source.ordinal() as f32;
-            assert_eq!(f as u8, expected);
-            assert_eq!(source.ordinal(), expected);
+            assert_eq!(f as u8, *expected);
+            assert_eq!(source.ordinal(), *expected);
         }
     }
 

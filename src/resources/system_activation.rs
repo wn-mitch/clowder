@@ -437,6 +437,38 @@ pub enum Feature {
     /// (matches `PairingDropped`'s precedent). `expected_to_fire_per_soak()
     /// => false`.
     IntentionAbandoned,
+
+    // --- Ticket 320 — HTN method-stack lifecycle ---
+    /// Ticket 320 — the L2 evaluator pushed a `GoalFrame` onto a
+    /// cat's `HeldGoalStack` after a winning DSE's `Intention::Goal`
+    /// matched a Live method in `MethodRegistry`. Positive — every
+    /// adoption is a multi-step arc that registry-walking surfaces
+    /// (trace / inspect / footer). `expected_to_fire_per_soak() =>
+    /// false` at 320's land (registry is empty of Live methods; no
+    /// path to fire). **Promote to `true` in ticket 323** when
+    /// `courtship_method` registers as the first Live Tier-1 method.
+    MethodAdopted,
+    /// Ticket 320 — the active leaf sub-goal fulfilled and the L2
+    /// evaluator advanced the cursor to the next sub-goal (or popped
+    /// the frame on completion). Positive — the substrate-driven
+    /// version of "multi-step plan made forward progress."
+    /// `expected_to_fire_per_soak() => false` at 320's land; **promote
+    /// to `true` in 323** alongside `MethodAdopted`.
+    SubGoalAdvanced,
+    /// Ticket 320 — a leaf abandoned with `BecameImpossible` or
+    /// `TargetInvalid` and the top frame's `MethodFailure::Backtrack`
+    /// strategy fired, walking the registry for the next applicable
+    /// method. Neutral — backtracks are alternative-pursuit signals,
+    /// not adverse events. `expected_to_fire_per_soak() => false`
+    /// (depends on substrate-driven plan failure cadence; promote
+    /// after the post-323 baseline stabilizes if reliable).
+    MethodBacktracked,
+    /// Ticket 320 — the stack hit `MAX_GOAL_STACK_DEPTH` and the L2
+    /// evaluator fell back to the no-method adoption path. Neutral —
+    /// authoring-loop canary; chronic counts indicate a method-
+    /// registry cycle or a method whose sub-goals nest beyond the
+    /// cap. `expected_to_fire_per_soak() => false` (rare-event class).
+    MethodDepthExceeded,
 }
 
 impl Feature {
@@ -587,6 +619,13 @@ impl Feature {
         Feature::IntentionAdopted,
         Feature::IntentionFulfilled,
         Feature::IntentionAbandoned,
+        // 320: HTN method-stack lifecycle. Ship dormant (expected:
+        // false) until 323's courtship_method registers Live; flip
+        // MethodAdopted + SubGoalAdvanced to expected: true in 323.
+        Feature::MethodAdopted,
+        Feature::SubGoalAdvanced,
+        Feature::MethodBacktracked,
+        Feature::MethodDepthExceeded,
     ];
 
     /// The valence of this feature.
@@ -679,6 +718,15 @@ impl Feature {
             Feature::IntentionAdopted => Positive,
             Feature::IntentionFulfilled => Positive,
             Feature::IntentionAbandoned => Neutral,
+
+            // 320: HTN method-stack lifecycle. Adoption + sub-goal
+            // advance are Positive (substrate-driven multi-step
+            // progress); backtrack + depth-exceeded are Neutral
+            // (state transitions / authoring-loop canary).
+            Feature::MethodAdopted => Positive,
+            Feature::SubGoalAdvanced => Positive,
+            Feature::MethodBacktracked => Neutral,
+            Feature::MethodDepthExceeded => Neutral,
 
             // 176: inventory-disposal completions are state-transition
             // signals — neither a colony win nor a loss, just "the cat
@@ -998,6 +1046,34 @@ impl Feature {
             // precedent). Adoption + fulfilment fall through to the
             // `_ => true` default and are canary-validated.
             Feature::IntentionAbandoned => false,
+            // 320 / 321: HTN method-stack Features. 320 introduced
+            // them as `false` (registry held no Live methods); 321's
+            // combine-and-test slice registers `hunt_method` Live +
+            // adds an Emit row on Hunting "First Blood" that points
+            // at it. Every cat that adopts the Hunting chain at
+            // milestone 0 emits `Intention::Goal { hunt_prey }` each
+            // tick → L2 author wraps as Goal → 320's HTN frame-push
+            // gate catches → `MethodAdopted` fires. Promote it to
+            // `true` so the canary catches a regression where the
+            // wiring breaks.
+            //
+            // `SubGoalAdvanced` stays `false`: 320's existing
+            // `resolve_goap_plans` lifecycle clears the entire stack
+            // on intention end rather than walking `sub_goal_index`
+            // forward. The picker also currently emits no method
+            // with > 1 primitive sub-goal at 321 land, so even with
+            // per-frame advance wired the Feature would never trip.
+            // 323's `courtship_method` (4 sub-goals) is the first
+            // ticket that actually exercises advance; promote there.
+            //
+            // `MethodBacktracked` and `MethodDepthExceeded` stay
+            // `false` — backtrack requires sibling methods sharing a
+            // goal_label (none at 321 land) and depth-exceeded is
+            // an authoring-loop canary (rare-event class).
+            Feature::MethodAdopted => true,
+            Feature::SubGoalAdvanced => false,
+            Feature::MethodBacktracked => false,
+            Feature::MethodDepthExceeded => false,
             // Ticket 127 — JointIntention: drops are bursty (mirrors
             // `PairingDropped`); stage mismatch is healthy-sometimes-
             // zero. Both stay opt-out. Emitted / BiasApplied /
@@ -1166,6 +1242,11 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::IntentionAdopted => "IntentionAdopted",
         Feature::IntentionFulfilled => "IntentionFulfilled",
         Feature::IntentionAbandoned => "IntentionAbandoned",
+        // 320: HTN method-stack lifecycle.
+        Feature::MethodAdopted => "MethodAdopted",
+        Feature::SubGoalAdvanced => "SubGoalAdvanced",
+        Feature::MethodBacktracked => "MethodBacktracked",
+        Feature::MethodDepthExceeded => "MethodDepthExceeded",
     }
 }
 
@@ -1435,9 +1516,12 @@ mod tests {
         // Ticket 023 Phase C added 2 Neutral (cadenced haunting-drain
         // + escalation; harm signal lives in cat Mood/Safety, not the
         // activation count).
-        assert_eq!(positive, 56);
+        // Ticket 320 added 2 Positive (MethodAdopted, SubGoalAdvanced)
+        // and 2 Neutral (MethodBacktracked, MethodDepthExceeded) for
+        // the HTN method-stack lifecycle.
+        assert_eq!(positive, 58);
         assert_eq!(negative, 23);
-        assert_eq!(neutral, 41);
+        assert_eq!(neutral, 43);
     }
 
     #[test]
@@ -1516,9 +1600,12 @@ mod tests {
         // environmental defeat paired with ShadowFoxBanished).
         // Ticket 023 Phase B: +4 Neutral (motivation-state entries).
         // Ticket 023 Phase C: +2 Neutral (haunting-drain + escalation).
+        // Ticket 320: +2 Positive (MethodAdopted, SubGoalAdvanced) /
+        // +2 Neutral (MethodBacktracked, MethodDepthExceeded) for the
+        // HTN method-stack lifecycle.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            56
+            58
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -1526,7 +1613,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            41
+            43
         );
     }
 

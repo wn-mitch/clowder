@@ -3,6 +3,22 @@ use bevy_ecs::prelude::*;
 use crate::ai::Action;
 
 // ---------------------------------------------------------------------------
+// Re-exports — `&'static`-shaped aspiration substrate
+// ---------------------------------------------------------------------------
+//
+// Ticket 321 retired the RON-deserialized `Milestone` / `MilestoneCondition`
+// / `AspirationChain` shapes in favor of code-defined const data in
+// `crate::ai::aspirations`. The two type names that remain in heavy
+// use across the codebase (`AspirationChain`, `Milestone`) are
+// re-exported here so existing `use crate::components::aspirations::…`
+// import paths keep compiling. `MilestoneCondition` is retired
+// entirely; `ProgressTracker` is the replacement.
+
+pub use crate::ai::aspirations::{
+    AspirationChain, Emit, Milestone, Priority, ProgressTracker, SkillKind,
+};
+
+// ---------------------------------------------------------------------------
 // Aspiration Domain
 // ---------------------------------------------------------------------------
 
@@ -37,46 +53,6 @@ impl AspirationDomain {
             Self::Leadership => &[Action::Coordinate],
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Milestone conditions
-// ---------------------------------------------------------------------------
-
-/// Conditions that can gate milestone completion.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum MilestoneCondition {
-    /// Accumulate N successful actions of a type.
-    ActionCount { action: String, count: u32 },
-    /// Reach a skill level threshold.
-    SkillLevel { skill: String, level: f32 },
-    /// Form a bond of a specific type.
-    FormBond { bond_type: String },
-    /// Witness N events of a specific type.
-    WitnessEvent { event_type: String, count: u32 },
-    /// Teach/mentor another cat N times.
-    Mentor { count: u32 },
-}
-
-/// A single milestone within an aspiration chain.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Milestone {
-    pub name: String,
-    pub condition: MilestoneCondition,
-    pub narrative_on_complete: String,
-}
-
-// ---------------------------------------------------------------------------
-// Aspiration chain (data definition — loaded from RON)
-// ---------------------------------------------------------------------------
-
-/// A full aspiration chain loaded from RON data files.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AspirationChain {
-    pub name: String,
-    pub domain: AspirationDomain,
-    pub milestones: Vec<Milestone>,
-    pub completion_narrative: String,
 }
 
 // ---------------------------------------------------------------------------

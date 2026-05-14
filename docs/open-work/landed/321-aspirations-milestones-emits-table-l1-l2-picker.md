@@ -1,7 +1,7 @@
 ---
 id: 321
 title: Aspirations milestones gain emits table + L1→L2 picker
-status: ready
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats]
 added: 2026-05-14
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -85,3 +85,4 @@ layer.
 ## Log
 
 - 2026-05-14: opened as 128 epic child #3 (Batch A infrastructure).
+- 2026-05-14: Combine-and-test deviation from original scope: Hunting First Blood emits hunt_prey + Live hunt_method (one primitive sub-goal). MethodAdopted=16978 on seed-42 soak verifies the picker→L2-wrap→320-gate path end-to-end. verdict: concern — survival pass, mythic-texture=0, fox-spawn -93%, duration -17%. SingleMinded strategy lock-in is the leading hypothesis for the drift; tuning deferred.

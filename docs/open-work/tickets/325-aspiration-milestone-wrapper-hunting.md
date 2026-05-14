@@ -1,12 +1,12 @@
 ---
 id: 325
 title: Hunting aspiration_milestone_wrapper + emits tables
-status: blocked
+status: ready
 cluster: ai-substrate
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null
-blocked-by: [321]
+blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []

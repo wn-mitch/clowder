@@ -38,7 +38,7 @@ use crate::ai::Action;
 /// `&'static str` newtype, parallel to [`crate::ai::dse::DseId`].
 /// Adding a method is writing a string constant, not extending a
 /// closed enum.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 pub struct MethodId(pub &'static str);
 
 impl std::fmt::Display for MethodId {
@@ -60,6 +60,10 @@ impl std::fmt::Display for MethodId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetHint {
     Partner,
+    /// 321 — primitive sub-goal binds to the cat's prey-target picker
+    /// (Hunt-DSE's existing target resolution). Used by `hunt_method`
+    /// as the combine-and-test slice's primitive target hint.
+    Prey,
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +204,17 @@ pub struct Method {
     pub sub_goals: &'static [SubGoal],
     /// What happens when a sub-goal abandons.
     pub failure_strategy: MethodFailure,
+    /// Ticket 321 — optional aspiration-domain tag. Read by the L1→L2
+    /// picker's domain-affinity fallback (§H step 3): when a cat's
+    /// active aspiration has no `Emit` row whose label matches a Live
+    /// method, the picker iterates `MethodRegistry` for any Live
+    /// method whose `domain == Some(aspiration.domain)` and uses the
+    /// first match's `goal_label` as the fallback emission.
+    /// `None` means "this method has no aspiration affinity"; it
+    /// can still be emitted via an authored `Emit` row but never
+    /// catches the fallback path. PendingSubstrate methods authored
+    /// pre-321 carry `None` by default.
+    pub domain: Option<crate::components::aspirations::AspirationDomain>,
 }
 
 impl std::fmt::Debug for Method {
@@ -283,6 +298,58 @@ impl MethodRegistry {
     pub fn iter(&self) -> impl Iterator<Item = &Method> {
         self.methods.iter()
     }
+
+    /// Ticket 320 caller: return a [`MethodPushSpec`] for the first
+    /// matching method whose `applicable_when` is not
+    /// `PendingSubstrate`. Skips the `Live(check)` predicate
+    /// invocation — `check` requires `&World`, and 320's L2 author
+    /// site is a non-exclusive system that cannot accept `&World`.
+    /// At 320's land the registry contains zero `Live` methods, so
+    /// this function is unreachable in production; it exists so the
+    /// wiring compiles end-to-end and the gate becomes hot at 321's
+    /// picker land (which authors the first `Intention::Goal` with
+    /// a label) and 323's `courtship_method` land (the first `Live`
+    /// method). 323 (or a follow-on) revisits this site to invoke
+    /// `check` properly — either by promoting the L2 author to an
+    /// exclusive system or by routing the check through a sibling
+    /// world-aware system.
+    pub fn lookup_spec_dormant_filtered(
+        &self,
+        goal_label: &str,
+    ) -> Option<MethodPushSpec> {
+        self.methods
+            .iter()
+            .find(|m| {
+                m.goal_label == goal_label
+                    && matches!(m.applicable_when, ApplicableWhen::Live(_))
+            })
+            .map(MethodPushSpec::from_method)
+    }
+}
+
+/// Plain-old-data slice of a [`Method`] sufficient for the 320 L2
+/// author site to push a [`crate::components::GoalFrame`] without
+/// holding a borrow on the `MethodRegistry` resource. The fields are
+/// copies of the `'static` references on `Method`, so the spec is
+/// `'static`-lifetime and cheap to copy across the recursion frames
+/// when the L2 gate walks compound sub-goals.
+#[derive(Debug, Clone, Copy)]
+pub struct MethodPushSpec {
+    pub id: MethodId,
+    pub goal_label: &'static str,
+    pub sub_goals: &'static [SubGoal],
+    pub failure_strategy: MethodFailure,
+}
+
+impl MethodPushSpec {
+    fn from_method(m: &Method) -> Self {
+        Self {
+            id: m.id,
+            goal_label: m.goal_label,
+            sub_goals: m.sub_goals,
+            failure_strategy: m.failure_strategy,
+        }
+    }
 }
 
 // 322: dormant HTN-method modules. Each file declares one or more
@@ -293,6 +360,11 @@ impl MethodRegistry {
 // gate (blocker → open ticket → ticket's `wires-method:` references
 // the method id).
 pub mod acquire_stealth;
+// 321: Live HTN method module — the combine-and-test slice that
+// exercises the picker→L2-wrap→320-gate path end-to-end at 321 land.
+// `hunt_method` carries `ApplicableWhen::Live`, distinguishing it
+// from the dormant Tier-2 modules below.
+pub mod hunt;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
 

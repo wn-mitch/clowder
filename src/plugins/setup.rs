@@ -564,15 +564,10 @@ fn load_zodiac_data(world: &mut World) {
 }
 
 fn load_aspiration_data(world: &mut World) {
-    let path = std::path::Path::new("assets/narrative/aspirations");
-    match crate::resources::AspirationRegistry::load_from_dir(path) {
-        Ok(registry) => {
-            world.insert_resource(registry);
-        }
-        Err(e) => {
-            eprintln!("Warning: failed to load aspiration data: {e}");
-        }
-    }
+    // 321: aspiration chains migrated from RON to code-defined const
+    // data in `crate::ai::aspirations`; `build_static` wraps the const
+    // `ALL_CHAINS` table behind the existing registry surface. No I/O.
+    world.insert_resource(crate::resources::AspirationRegistry::build_static());
 }
 
 fn load_log_file(world: &mut World, path: &std::path::Path) -> Result<(), std::io::Error> {

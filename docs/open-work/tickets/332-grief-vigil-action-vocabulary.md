@@ -1,12 +1,12 @@
 ---
 id: 332
 title: Grief-vigil action vocabulary — flip mourn_at_grave to Live
-status: blocked
+status: ready
 cluster: life-cycle
 initiative: [smarter-cats, generational-continuity]
 added: 2026-05-14
 parked: null
-blocked-by: [320]
+blocked-by: []
 wires-method: [mourn_at_grave]
 supersedes: []
 related-systems: [htn-methods.md]

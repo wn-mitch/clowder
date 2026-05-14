@@ -1,3 +1,4 @@
+pub mod aspiration_emission;
 pub mod aspirations;
 pub mod beliefs;
 pub mod building;
@@ -12,6 +13,7 @@ pub mod fulfillment;
 pub mod goap_plan;
 pub mod grave;
 pub mod grooming;
+pub mod held_goal_stack;
 pub mod held_intention;
 pub mod hunting_priors;
 pub mod joint_intention;
@@ -38,9 +40,10 @@ pub mod wildlife;
 pub mod zodiac;
 pub mod zone;
 
+pub use aspiration_emission::{AspirationEmissions, EmissionRow};
 pub use aspirations::{
-    ActiveAspiration, AspirationChain, AspirationDomain, Aspirations, AspirationsInitialized,
-    Milestone, MilestoneCondition, Preference, Preferences,
+    ActiveAspiration, AspirationChain, AspirationDomain, Aspirations, AspirationsInitialized, Emit,
+    Milestone, Preference, Preferences, Priority, ProgressTracker, SkillKind,
 };
 pub use beliefs::{
     bucket_position as bucket_location_position, CandidateFacet, CatBeliefs, ContextBeliefs,
@@ -62,6 +65,7 @@ pub use goap_plan::{
 };
 pub use grave::Grave;
 pub use grooming::GroomingCondition;
+pub use held_goal_stack::{GoalFrame, HeldGoalStack, MAX_GOAL_STACK_DEPTH};
 pub use held_intention::{
     commitment_strength_from_margin, HeldIntention, IntentionAbandonReason, IntentionSource,
 };

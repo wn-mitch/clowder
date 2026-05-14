@@ -60,5 +60,6 @@ pub fn mourn_at_grave() -> Method {
             // The terminal `release` sub-goal lands with #332.
         ],
         failure_strategy: MethodFailure::Backtrack,
+        domain: None,
     }
 }

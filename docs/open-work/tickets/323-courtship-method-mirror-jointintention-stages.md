@@ -1,12 +1,12 @@
 ---
 id: 323
 title: courtship_method — mirror JointIntention stages
-status: blocked
+status: ready
 cluster: social-coordination
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null
-blocked-by: [320]
+blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []

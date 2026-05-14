@@ -248,6 +248,15 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     registry.push(rear_kitten());
     registry.push(acquire_stealth_via_self_craft());
     registry.push(acquire_stealth_via_commission());
+
+    // 321: Tier-1 Live method — combine-and-test slice. Catches the
+    // `hunt_prey` label that Hunting "First Blood"'s sole Emit row
+    // produces. With `applicable_when: Live(always_true)` and one
+    // primitive sub-goal, every Hunting cat at milestone 0 hits the
+    // L2 wrap site this tick → picker emits → 320 frame-push gate
+    // fires. The production gating + multi-step decomposition lands
+    // with #325.
+    registry.push(crate::ai::methods::hunt::hunt_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of
@@ -816,11 +825,28 @@ impl Plugin for SimulationPlugin {
                 .after(systems::magic::update_ward_siege_marker)
                 .before(systems::goap::evaluate_and_plan),
         );
+        // Ticket 321 — L1→L2 aspiration emission picker. Exclusive
+        // system (needs `&World` for `Method.applicable_when` and
+        // `MethodRegistry.lookup`). Runs after the L1 marker authors
+        // flush (the `ApplyDeferred` above) and before
+        // `evaluate_and_plan`, so its `AspirationEmissions`
+        // Component is visible to the L2 wrap site within the same
+        // tick. Per memory `learning_bevy_schedule_edge_perturbation`
+        // the Chain-sibling addition can perturb seed-42; at 321
+        // land emissions are sparse (Hunting cats at "First Blood"
+        // only), so drift is bounded.
+        app.add_systems(
+            FixedUpdate,
+            systems::aspiration_picker::pick_aspiration_emissions
+                .after(systems::magic::update_ward_siege_marker)
+                .before(systems::goap::evaluate_and_plan),
+        );
         app.add_systems(
             FixedUpdate,
             systems::goap::evaluate_and_plan
                 .after(systems::goap::check_modifier_preemption)
-                .after(systems::items::sync_food_stores),
+                .after(systems::items::sync_food_stores)
+                .after(systems::aspiration_picker::pick_aspiration_emissions),
         );
         // Flush commands so GoapPlan inserted by evaluate_and_plan is
         // visible to resolve_goap_plans in the same tick.

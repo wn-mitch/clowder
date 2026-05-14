@@ -366,6 +366,51 @@ pub enum TraceRecord {
         /// `{health_ratio, critical_threshold, preempted_step}`.
         detail: serde_json::Value,
     },
+    /// Ticket 321 — per active aspiration per focal-cat tick. The
+    /// picker (`crate::systems::aspiration_picker`) emits one record
+    /// per `ActiveAspiration` after walking its current milestone's
+    /// `emits[]` table. `emit_walk` carries one row per `Emit` row
+    /// the picker considered before settling on the result; at 321's
+    /// land most rows are emitted with `emit_walk: vec![]` (because
+    /// most milestones declare `emits: &[]`). #338 enriches the
+    /// record with the full registry-walked walk per
+    /// `docs/systems/htn-methods.md` §Trace + inspection surface.
+    L1Aspiration {
+        /// Chain name (matches `ActiveAspiration.chain_name`).
+        aspiration: String,
+        /// Index into the chain's `milestones` slice that owned the
+        /// `emits[]` table this record reports on.
+        milestone: usize,
+        /// One row per `Emit` row the picker considered. Populated
+        /// only when the chosen milestone has authored emits;
+        /// otherwise `vec![]`.
+        emit_walk: Vec<EmitWalkRow>,
+        /// `true` when the row reported in `emit_walk` (or the
+        /// emission itself, if any) came from the §H step-3
+        /// domain-affinity fallback rather than the milestone's
+        /// own `emits[]` table.
+        fallback_used: bool,
+    },
+}
+
+/// One row in the [`TraceRecord::L1Aspiration::emit_walk`] list — the
+/// picker's per-`Emit`-row verdict. `applicable && method_live`
+/// implies the row was eligible to emit; `emitted` names the row the
+/// picker actually picked (at most one per aspiration per tick).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EmitWalkRow {
+    /// The `Emit.label` this row reports on.
+    pub label: String,
+    /// `true` when `Emit.applicable_when(world, entity)` returned
+    /// true for the focal cat at this tick.
+    pub applicable: bool,
+    /// `true` when `MethodRegistry.lookup(label, world, entity)`
+    /// returned `Some(_)` (a `Live`, currently-applicable method
+    /// exists for this label).
+    pub method_live: bool,
+    /// `true` when this is the row the picker selected. At most one
+    /// row per aspiration per tick carries `emitted: true`.
+    pub emitted: bool,
 }
 
 // ---------------------------------------------------------------------------

@@ -1,12 +1,12 @@
 ---
 id: 335
 title: Coordinator directives as HTN method seeds — 057 integration
-status: blocked
+status: ready
 cluster: social-coordination
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null
-blocked-by: [320]
+blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, strategist-coordinator.md]
 related-balance: []

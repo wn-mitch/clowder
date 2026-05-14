@@ -301,6 +301,15 @@ pub struct PlanResources<'w> {
     /// register the resource; matches `NarrativeEmitter`'s pattern in
     /// `resolve_goap_plans`.
     pub activation: Option<ResMut<'w, SystemActivation>>,
+    /// Ticket 320 — HTN method registry. Read when the winning DSE's
+    /// emitted `Intention::Goal { state }` matches a Live method's
+    /// `goal_label`, in which case the L2 author site pushes a
+    /// `GoalFrame` onto the cat's `HeldGoalStack`. At 320's land the
+    /// registry holds only `PendingSubstrate` entries and the gate
+    /// never fires; 321's picker (which authors the first `Goal`-
+    /// shaped intentions) and 323's `courtship_method` (the first
+    /// `Live` method) are the tickets that exercise this path.
+    pub method_registry: Res<'w, crate::ai::methods::MethodRegistry>,
     /// 258 — `WitnessableEvent` emit from the
     /// `make_plan → None` site. Bundled here rather than as a separate
     /// SystemParam to keep `evaluate_and_plan` under Bevy's 16-param
@@ -448,6 +457,22 @@ pub struct TargetMarkerQueries<'w, 's> {
     /// own-kitten-anywhere fallback when the per-tick range gate
     /// would otherwise filter every candidate out.
     pub parent_hungry_kitten_q: Query<'w, 's, Has<markers::IsParentOfHungryKitten>>,
+    /// Ticket 321 — per-cat L1→L2 picker output. When the cat carries
+    /// a non-empty `AspirationEmissions`, the L2 author site replaces
+    /// the default `Intention::Activity { Idle }` wrap with
+    /// `Intention::Goal { state: { label, achieved: |_, _| false },
+    /// strategy }` from the highest-`Priority` emission row. 320's
+    /// HTN frame-push gate downstream catches the Goal shape. The
+    /// picker removes the Component entirely when no emission
+    /// applies, so `q.get(entity)` returns `Err(_)` and the wrap
+    /// defaults to the 126 Activity-Idle shape. Bundled here rather
+    /// than as a standalone `evaluate_and_plan` parameter to keep
+    /// the parent system under Bevy's 16-param limit.
+    pub aspiration_emissions_q: Query<
+        'w,
+        's,
+        &'static crate::components::aspiration_emission::AspirationEmissions,
+    >,
 }
 
 #[allow(clippy::type_complexity)]
@@ -2577,18 +2602,74 @@ pub fn evaluate_and_plan(
             // intention_momentum_lift × decay_factor through the
             // scalar surface; ScoringContext construction in the next
             // tick will populate those scalars from this Component.
+            //
+            // Ticket 321 — when the L1→L2 picker
+            // (`crate::systems::aspiration_picker`) authored an
+            // `AspirationEmissions` Component for this cat this
+            // tick, the highest-`Priority` emission row replaces the
+            // default `Intention::Activity { Idle }` wrap with
+            // `Intention::Goal { state, strategy }`. 320's HTN
+            // frame-push gate immediately below catches the Goal
+            // shape and walks `MethodRegistry`. The picker removes
+            // the Component entirely when no emission applies, so
+            // `get(entity)` returns `Err(_)` and the wrap defaults
+            // to the 126 Activity-Idle shape (byte-identical to
+            // pre-321 behavior).
+            //
+            // Per `docs/systems/ai-substrate-refactor.md` §L2.10.6
+            // the full mechanism is softmax-over-Intentions across
+            // the combined `{DSE-Activity-default} ∪ {emitted-Goals}`
+            // pool; that formal resolution lives in §8.2 and is a
+            // follow-on ticket. 321 ships the producer interface +
+            // a priority-based override at the wrap site — at land
+            // the emissions pool is degenerate (Hunting "First Blood"
+            // is the only Live emission slice), so the priority
+            // override and the formal softmax converge.
             let strategy =
                 crate::ai::commitment::strategy_for_disposition(chosen);
-            let held_intention = crate::ai::dse::Intention::Activity {
-                // 126: placeholder Intention shape — the held DSE's
-                // identity rides on `held_action` for the modifier's
-                // round-trip, and `source` records provenance. Future
-                // tickets (128 HTN, 127 joint-intentions) will refine
-                // the Intention contents from each DSE's emit().
-                kind: crate::ai::dse::ActivityKind::Idle,
-                termination: crate::ai::dse::Termination::UntilInterrupt,
-                strategy,
-            };
+            let (held_intention, intention_source) =
+                match marker_qs
+                    .aspiration_emissions_q
+                    .get(entity)
+                    .ok()
+                    .and_then(|e| e.winner().cloned())
+                {
+                    Some(row) => {
+                        let goal = crate::ai::dse::Intention::Goal {
+                            state: crate::ai::dse::GoalState {
+                                label: row.label,
+                                // §Future deferred: auto-derived
+                                // `achieved` predicate. Until then,
+                                // fulfillment fires via 320's
+                                // frame-pop on leaf completion, not
+                                // via this predicate.
+                                achieved: |_world, _entity| false,
+                            },
+                            strategy: row.strategy,
+                        };
+                        let source =
+                            crate::components::IntentionSource::AspirationEmitted {
+                                chain: row.chain,
+                            };
+                        (goal, source)
+                    }
+                    None => {
+                        let activity = crate::ai::dse::Intention::Activity {
+                            // 126: placeholder Intention shape — the
+                            // held DSE's identity rides on
+                            // `held_action` for the modifier's
+                            // round-trip, and `source` records
+                            // provenance. Future tickets (128 HTN,
+                            // 127 joint-intentions) will refine the
+                            // Intention contents from each DSE's
+                            // emit().
+                            kind: crate::ai::dse::ActivityKind::Idle,
+                            termination: crate::ai::dse::Termination::UntilInterrupt,
+                            strategy,
+                        };
+                        (activity, crate::components::IntentionSource::SelfMotivated)
+                    }
+                };
             let commitment_strength =
                 crate::components::held_intention::commitment_strength_from_margin(
                     softmax_outcome.margin(),
@@ -2601,8 +2682,81 @@ pub fn evaluate_and_plan(
                 res.time.tick,
                 commitment_strength,
                 None,
-                crate::components::IntentionSource::SelfMotivated,
+                intention_source,
             );
+
+            // Ticket 320 — HTN method-stack authorship. If the held
+            // intention is `Intention::Goal { state, .. }` AND the
+            // registry has a non-dormant method for `state.label`,
+            // push a `GoalFrame` per visited method (recursing into
+            // compound sub-goals) and insert a `HeldGoalStack`
+            // alongside the `HeldIntention`. Cap recursion at
+            // `MAX_GOAL_STACK_DEPTH`; emit `Feature::MethodAdopted`
+            // per frame and `Feature::MethodDepthExceeded` on cap.
+            //
+            // At 320's land this branch is reachable but never taken
+            // in production: the registry contains no `Live` methods
+            // (only `PendingSubstrate` entries that the dormant
+            // filter rejects), and the L2 author above wraps the
+            // chosen action in `Intention::Activity { Idle, .. }` —
+            // never `Goal`. 321 (picker emits `Goal`-shaped
+            // intentions) and 323 (first Live method) are the
+            // tickets that exercise this path.
+            if let crate::ai::dse::Intention::Goal { state, .. } = &held.intention
+            {
+                let mut stack = crate::components::HeldGoalStack::empty();
+                let mut next_label: Option<&'static str> = Some(state.label);
+                let mut depth_exceeded = false;
+                while let Some(label) = next_label {
+                    let Some(spec) = res
+                        .method_registry
+                        .lookup_spec_dormant_filtered(label)
+                    else {
+                        // No method for this label; the gate stops
+                        // expanding. If at least one frame was
+                        // already pushed (a parent method whose
+                        // compound sub-goal had no method), the
+                        // stack carries the partial decomposition;
+                        // the leaf is held via `HeldIntention` per
+                        // the 126 no-method fallback.
+                        break;
+                    };
+                    let frame = crate::components::GoalFrame::new(
+                        spec.id,
+                        spec.goal_label,
+                        spec.sub_goals.len(),
+                        res.time.tick,
+                        None,
+                        held.source.clone(),
+                    );
+                    if stack.push(frame).is_err() {
+                        depth_exceeded = true;
+                        break;
+                    }
+                    if let Some(activation) = res.activation.as_deref_mut() {
+                        activation.record(Feature::MethodAdopted);
+                    }
+                    // Step into sub_goals[0]. Compound entries
+                    // recurse via the registry; primitive entries
+                    // terminate the walk — the primitive is held via
+                    // `HeldIntention`.
+                    next_label = match spec.sub_goals.first() {
+                        Some(crate::ai::methods::SubGoal::Goal(g)) => {
+                            Some(g.label)
+                        }
+                        _ => None,
+                    };
+                }
+                if depth_exceeded {
+                    if let Some(activation) = res.activation.as_deref_mut() {
+                        activation.record(Feature::MethodDepthExceeded);
+                    }
+                }
+                if !stack.is_empty() {
+                    commands.entity(entity).insert(stack);
+                }
+            }
+
             commands.entity(entity).insert(held);
             // Ticket 248 — surgically apply the IntentionMomentum
             // modifier's lift to `current.last_scores[chosen_action]`.
@@ -4088,6 +4242,34 @@ pub fn resolve_goap_plans(
         commands
             .entity(entity)
             .remove::<crate::components::HeldIntention>();
+        // Ticket 320 — clear `HeldGoalStack` in lock-step with the
+        // 126 `HeldIntention` removal. At 320's land the registry
+        // holds zero Live methods and the L2 author never inserts
+        // a `HeldGoalStack`, so this removal is a no-op in
+        // production; the wiring exists so the substrate doesn't
+        // leak orphaned stacks once 321's picker lands (authors
+        // `Intention::Goal`) and 323's `courtship_method` lands
+        // (first Live method).
+        //
+        // **Phase-1 lifecycle scope.** This handler clears the
+        // entire stack on every ending — Fulfilled and Abandoned
+        // alike. The §Lifecycle design doc names richer behavior
+        // (Fulfilled → increment cursor, recurse, pop on overflow;
+        // Abandoned → consult `failure_strategy` for Backtrack /
+        // Abandon / Retry). 320 explicitly defers per-frame
+        // advance + backtrack to a follow-on ticket because the
+        // right architectural shape of "re-author `HeldIntention`
+        // from the next sub-goal in the same tick" is easier to
+        // pin against the first concrete multi-step Live method
+        // (323's `courtship_method`) than against an empty
+        // registry. The four new Features (`MethodAdopted`,
+        // `SubGoalAdvanced`, `MethodBacktracked`,
+        // `MethodDepthExceeded`) are registered and emit-ready;
+        // 323 wires the per-frame Feature emissions when it
+        // exercises the multi-step path.
+        commands
+            .entity(entity)
+            .remove::<crate::components::HeldGoalStack>();
         if let Some(activation) = narr.activation.as_deref_mut() {
             match ending {
                 IntentionEnding::Fulfilled => {

@@ -1,12 +1,12 @@
 ---
 id: 333
 title: Kitten-rearing action vocabulary — flip rear_kitten to Live
-status: blocked
+status: ready
 cluster: life-cycle
 initiative: [smarter-cats, generational-continuity]
 added: 2026-05-14
 parked: null
-blocked-by: [320]
+blocked-by: []
 wires-method: [rear_kitten]
 supersedes: []
 related-systems: [htn-methods.md]

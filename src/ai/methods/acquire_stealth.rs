@@ -76,6 +76,7 @@ pub fn acquire_stealth_via_self_craft() -> Method {
             },
         ],
         failure_strategy: MethodFailure::Backtrack,
+        domain: None,
     }
 }
 
@@ -111,5 +112,6 @@ pub fn acquire_stealth_via_commission() -> Method {
             // both new Action variants.
         ],
         failure_strategy: MethodFailure::Backtrack,
+        domain: None,
     }
 }

@@ -74,6 +74,7 @@ pub struct ColonyContext<'w> {
 pub mod actions;
 pub mod affordance_writer;
 pub mod ai;
+pub mod aspiration_picker;
 pub mod aspirations;
 pub mod belief_integrator;
 pub mod buildings;

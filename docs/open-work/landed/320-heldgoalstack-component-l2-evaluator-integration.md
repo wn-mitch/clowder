@@ -1,7 +1,7 @@
 ---
 id: 320
 title: HeldGoalStack Component + L2 evaluator integration
-status: ready
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats]
 added: 2026-05-14
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -84,3 +84,4 @@ with `Entity` targets `serde(skip)` per 126 + 127 precedent.
 ## Log
 
 - 2026-05-14: opened as 128 epic child #2 (Batch A infrastructure).
+- 2026-05-14: Landed alongside 321 — combine-and-test slice (hunt_method Live + Hunting First Blood emit) exercises the picker→L2-wrap→320-gate path end-to-end on seed-42 soak (MethodAdopted=16978, 0 deaths, colony survived 5 seasons).

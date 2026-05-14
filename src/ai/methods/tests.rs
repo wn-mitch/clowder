@@ -38,6 +38,7 @@ fn pending_substrate_method_is_filtered() {
         },
         sub_goals: &[],
         failure_strategy: MethodFailure::Abandon,
+        domain: None,
     });
     let mut world = World::new();
     let entity = world.spawn_empty().id();
@@ -56,6 +57,7 @@ fn live_method_matches_goal_label_first_applicable() {
         applicable_when: ApplicableWhen::Live(always_false),
         sub_goals: &[],
         failure_strategy: MethodFailure::Backtrack,
+        domain: None,
     });
     registry.push(Method {
         id: MethodId("applicable"),
@@ -63,6 +65,7 @@ fn live_method_matches_goal_label_first_applicable() {
         applicable_when: ApplicableWhen::Live(always_true),
         sub_goals: &[],
         failure_strategy: MethodFailure::Backtrack,
+        domain: None,
     });
     let mut world = World::new();
     let entity = world.spawn_empty().id();

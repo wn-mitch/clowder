@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::ai::CurrentAction;
-use crate::components::aspirations::{Aspirations, MilestoneCondition, Preference, Preferences};
+use crate::components::aspirations::{Aspirations, Preference, Preferences, ProgressTracker};
 use crate::components::coordination::{ActiveDirective, Coordinator};
 use crate::components::disposition::ActionHistory;
 use crate::components::fate::{FatedLove, FatedRival};
@@ -417,8 +417,8 @@ pub fn update_cat_inspect_panel(
                     .and_then(|reg| reg.chain_by_name(&asp.chain_name))
                     .and_then(|chain| chain.milestones.get(asp.current_milestone))
                     .map(|ms| {
-                        let t = milestone_target(&ms.condition);
-                        (ms.name.clone(), t)
+                        let t = milestone_target(&ms.progress_tracker);
+                        (ms.name.to_string(), t)
                     })
                     .unwrap_or_else(|| (format!("milestone {}", asp.current_milestone), 1));
 
@@ -529,13 +529,13 @@ pub fn update_cat_inspect_panel(
 // Helper spawners
 // ---------------------------------------------------------------------------
 
-fn milestone_target(condition: &MilestoneCondition) -> u32 {
-    match condition {
-        MilestoneCondition::ActionCount { count, .. } => *count,
-        MilestoneCondition::WitnessEvent { count, .. } => *count,
-        MilestoneCondition::Mentor { count } => *count,
+fn milestone_target(tracker: &ProgressTracker) -> u32 {
+    match tracker {
+        ProgressTracker::ActionCount { count, .. } => *count,
+        ProgressTracker::WitnessEvent { count, .. } => *count,
+        ProgressTracker::Mentor { count } => *count,
         // Skill level and bond formation are binary — either met or not.
-        MilestoneCondition::SkillLevel { .. } | MilestoneCondition::FormBond { .. } => 1,
+        ProgressTracker::SkillLevel { .. } | ProgressTracker::FormBond { .. } => 1,
     }
 }
 

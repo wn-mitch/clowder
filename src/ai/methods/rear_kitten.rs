@@ -63,5 +63,6 @@ pub fn rear_kitten() -> Method {
         // methods (e.g., a future `mourn_at_grave` if the kitten
         // died) rather than abandoning silently.
         failure_strategy: MethodFailure::Backtrack,
+        domain: None,
     }
 }
