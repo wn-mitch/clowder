@@ -1,7 +1,7 @@
 ---
 id: 051
 title: Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers
-status: ready
+status: done
 cluster: wildlife
 initiative: [predator-prey-dynamics]
 added: 2026-04-27
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -104,3 +104,28 @@ final filter before DSE scoring — but watch the soak `wards_placed_total`
   eligibility migration was deferred from Commit 5/6 to keep those
   commits focused on author + snapshot plumbing without changing
   the eligibility surface.
+- 2026-05-14: landed across four commits — FoxRaiding (xromrwmq,
+  by parallel session), FoxFeeding (opyynokk), FoxDenDefense +
+  shared-field retirement (snxrsomu), FoxDispersing +
+  Resting/Patrolling + remaining-field retirement (vskqtspw). All
+  seven boolean fields retired from `FoxScoringContext`
+  (`store_visible`, `store_guarded`, `cat_threatening_den`,
+  `has_cubs`, `cubs_hungry`, `is_dispersing_juvenile`, `has_den`);
+  `ward_nearby` stays (no consumer; 050 promotes the predicate).
+  `score_fox_dse_by_id`'s `has_marker` closure now routes through
+  `inputs.markers.has` so every `.require/.forbid` resolves
+  correctly (commit 1 fix).
+- 2026-05-14: scope expansion documented — FoxRestingDse and
+  FoxPatrollingDse picked up `.require(HasDen)` to allow the
+  `has_den` field retirement without dropping the gate (both are
+  WS DSEs whose non-spatial axes would still score for denless
+  foxes). Out-of-scope follow-on parked: the FoxDispersing
+  lifecycle-override routing block at `fox_scoring.rs:297-321`
+  (early-return suppressing Tier 2/3) still lives as call-site
+  code; a future ticket can rebind this as a uniform
+  `LifecycleSuppression` marker that forbids Tier 2/3 DSEs and
+  retires the routing block. Markers now wired correctly so a
+  juvenile fox with `IsDispersingJuvenile` set scores Dispersing
+  via the lifecycle-override anchor (intercept=2.0).
+- 2026-05-14: full lib suite passing (2153/2153) on the last
+  commit. Soak verdict on canonical seed-42 follows in commit 5.
