@@ -4524,6 +4524,10 @@ fn dispatch_step_action(
                 needs,
                 d,
                 ec.event_log.as_deref_mut(),
+                // 263: ActionAffordances borrow for the C5 stalk-start
+                // phase-band bias. Dormant by default; reads only fire
+                // when the bias knob is non-zero.
+                &ec.action_affordances,
             )
         }
 
@@ -7155,6 +7159,13 @@ fn resolve_engage_prey(
     needs: &mut Needs,
     d: &DispositionConstants,
     mut event_log: Option<&mut EventLog>,
+    // 263: ActionAffordances borrow for the C5 stalk_start phase-band
+    // bias. The bias is dormant by default (`hunt_stalk_chase_affordance_bias
+    // = 0.0`); at non-zero values, the stalk_start threshold is
+    // multiplied by `(1 + bias * (a_stalk - a_chase))` clamped to
+    // `±bias`. `pounce_range` is NOT biased — the leap is a physics
+    // invariant the catch math relies on.
+    affordances: &crate::resources::action_affordances::ActionAffordances,
 ) -> crate::steps::StepResult {
     use crate::components::magic::ItemSlot;
     use crate::components::prey::PreyAiState;
@@ -7254,7 +7265,34 @@ fn resolve_engage_prey(
         return crate::steps::StepResult::Fail("prey teleported".into());
     }
 
-    let stalk_start = (prey_cfg.alert_radius + d.stalk_start_buffer).max(d.stalk_start_minimum);
+    let stalk_start_base = (prey_cfg.alert_radius + d.stalk_start_buffer).max(d.stalk_start_minimum);
+    // 263: affordance-biased stalk-start. Bias is dormant by default;
+    // at non-zero `hunt_stalk_chase_affordance_bias`, high stalk
+    // affordance widens the stalk band (cat begins stalking from
+    // farther out); high chase affordance narrows it (cat transitions
+    // to chase sooner). The bias factor is bounded to `±bias` so the
+    // band can never collapse or balloon beyond a controlled fraction
+    // of its physical base.
+    let stalk_start = {
+        let bias = scoring.hunt_stalk_chase_affordance_bias.clamp(0.0, 1.0);
+        if bias > 0.0 {
+            let a_stalk = affordances.read(
+                cat_entity,
+                target_entity,
+                crate::resources::action_affordances::ActionKind::Stalk,
+            );
+            let a_chase = affordances.read(
+                cat_entity,
+                target_entity,
+                crate::resources::action_affordances::ActionKind::Chase,
+            );
+            let raw = bias * (a_stalk - a_chase);
+            let factor = (1.0 + raw.clamp(-bias, bias)).max(0.0);
+            ((stalk_start_base as f32) * factor).round() as i32
+        } else {
+            stalk_start_base
+        }
+    };
     let pounce_range: i32 = if personality.patience > 0.7 {
         d.pounce_range_patient
     } else if personality.patience < 0.3 {
