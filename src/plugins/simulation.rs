@@ -386,6 +386,14 @@ impl Plugin for SimulationPlugin {
                         // `wildlife_ai` so the new state takes effect
                         // immediately.
                         systems::wildlife::shadowfox_motivation_tick,
+                        // Ticket 023 Phase C — haunting-drain runs every
+                        // tick to apply per-tick mood/safety drain on
+                        // nearby cats and to tick the haunting-to-stalk
+                        // escalation counter. Runs after motivation_tick
+                        // (which writes the Haunting state) and before
+                        // wildlife_ai (which executes the orbit-at-edge
+                        // movement).
+                        systems::wildlife::shadowfox_haunting_drain,
                         systems::wildlife::spawn_wildlife,
                         systems::wildlife::wildlife_ai,
                         systems::wildlife::fox_movement,

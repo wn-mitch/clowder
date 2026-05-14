@@ -180,14 +180,17 @@ pub enum WildlifeAiState {
         angle: f32,
     },
     /// Haunting: pace at the detection-edge distance around a target
-    /// cat, applying psychological pressure without combat. Phase B
-    /// stores the target position only — re-elect each motivation
-    /// tick. Phase C wires the safety/mood drain and the haunt-
-    /// escalation-to-stalking transition.
+    /// cat, applying psychological pressure without combat. The
+    /// `ticks` counter is reset to 0 each time the motivation tick
+    /// re-elects Haunting and incremented by
+    /// `shadowfox_haunting_drain` while the state persists; once it
+    /// crosses `shadow_fox_haunting_escalation_ticks` the haunt is
+    /// promoted to Stalking (the existing pre-023 combat path).
     Haunting {
         target_x: i32,
         target_y: i32,
         edge_distance: i32,
+        ticks: u64,
     },
     /// Seeding: move toward and extend the corruption frontier
     /// (boundary between corrupt and clean tiles), depositing at

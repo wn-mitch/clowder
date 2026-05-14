@@ -333,6 +333,7 @@ pub fn wildlife_ai(
                 target_x,
                 target_y,
                 edge_distance,
+                ticks: _,
             } => {
                 // Pace at edge_distance from the target. If we're
                 // closer than edge_distance, step away; if we're
@@ -1054,8 +1055,12 @@ pub fn shadowfox_motivation_tick(
         Without<crate::components::wildlife::Carcass>,
     >,
     wards: Query<(&Ward, &Position), Without<WildAnimal>>,
-    cat_positions: Query<
-        &Position,
+    cats: Query<
+        (
+            &Position,
+            &Mood,
+            Option<&crate::components::prev_safety_deficit::PrevSafetyDeficit>,
+        ),
         (
             With<Needs>,
             Without<Dead>,
@@ -1083,6 +1088,9 @@ pub fn shadowfox_motivation_tick(
     let temp = c.shadow_fox_motivation_softmax_temp.max(1e-3);
     let jitter = c.shadow_fox_motivation_jitter;
     let haunt_edge = c.shadow_fox_haunting_edge_distance;
+    let isolation_radius = c.shadow_fox_dread_isolation_radius;
+    let group_threshold = c.shadow_fox_dread_group_threshold;
+    let group_suppression = c.shadow_fox_dread_group_suppression;
 
     // Pre-collect ward positions + repel radii once per cadence; reused
     // by every shadow-fox iteration below.
@@ -1091,9 +1099,38 @@ pub fn shadowfox_motivation_tick(
         .filter(|(w, _)| !w.inverted && w.strength > 0.01)
         .map(|(w, p)| (*p, w.repel_radius()))
         .collect();
-    let cat_anchors: Vec<Position> = cat_positions.iter().copied().collect();
+    // Ticket 023 Phase C — deep Dread reads each cat's mood + safety
+    // deficit alongside position so the motivation tick can pick the
+    // psychologically vulnerable target rather than just the closest.
+    // The isolation factor below is computed per-candidate against the
+    // position list (O(N²) — cheap because cap=2 shadow-foxes × ~12
+    // cats × cadence=16).
+    let cat_data: Vec<(Position, f32, f32)> = cats
+        .iter()
+        .map(|(p, mood, prev_safety)| {
+            let safety_deficit = prev_safety.map(|s| s.0).unwrap_or(0.0).clamp(0.0, 1.0);
+            (*p, mood.valence, safety_deficit)
+        })
+        .collect();
+    let cat_anchors: Vec<Position> = cat_data.iter().map(|(p, _, _)| *p).collect();
 
     for (pos, mut state, mut drives) in &mut query {
+        // Ticket 023 Phase C: leave active Stalking + EncirclingWard
+        // alone. Both states are pre-Phase-B chains driven by
+        // `predator_stalk_cats` / `wildlife_ai`'s siege branch — they
+        // run to natural completion (ambush + cooldown, or siege
+        // timeout). Without this guard, the motivation tick at every
+        // cadence overwrites Stalking, preventing the chain from
+        // reaching the adjacent-cell combat threshold and suppressing
+        // ShadowFoxAmbush / ShadowFoxBanished — the mythic-texture
+        // canary the Phase C iteration is trying to restore.
+        if matches!(
+            *state,
+            WildlifeAiState::Stalking { .. } | WildlifeAiState::EncirclingWard { .. }
+        ) {
+            continue;
+        }
+
         // ---- Coherence pressure (state-derived, no scan) ----
         let coherence_pressure = (1.0 - drives.coherence).max(0.0).powi(2);
 
@@ -1155,17 +1192,44 @@ pub fn shadowfox_motivation_tick(
         let resonance_pressure =
             (threatened_count as f32 * resonance_weight).min(1.0);
 
-        // ---- Dread pressure (Phase B shallow form: inverse distance) ----
-        let nearest_cat = cat_anchors
-            .iter()
-            .filter(|cp| pos.manhattan_distance(cp) <= scan_radius)
-            .min_by_key(|cp| pos.manhattan_distance(cp));
-        let dread_pressure = nearest_cat
-            .map(|cp| {
-                let d = pos.manhattan_distance(cp).max(0) as f32;
-                1.0 / (1.0 + d)
-            })
-            .unwrap_or(0.0);
+        // ---- Dread pressure (Phase C: vulnerability targeting) ----
+        // Per-cat score = `(0.5 - 0.5 * mood.valence) * safety_deficit * isolation_factor`,
+        // where isolation_factor is 1.0 when the cat has < group_threshold
+        // allies nearby and `group_suppression` (e.g. 0.2) otherwise. The
+        // best (most vulnerable) candidate's score becomes the Dread
+        // pressure, and that cat's position is the Haunting target.
+        // Phase B's shallow nearest-cat heuristic is retired; Phase C
+        // makes Dread distinguish "easy psychological prey" from "well-
+        // defended cat" in the substrate's L2 trace.
+        let mut best_target: Option<Position> = None;
+        let mut dread_pressure: f32 = 0.0;
+        for (cat_pos, mood, safety_deficit) in cat_data.iter() {
+            let dist = pos.manhattan_distance(cat_pos);
+            if dist > scan_radius {
+                continue;
+            }
+            // Mood term: 0.0 when valence == +1, 1.0 when valence == -1.
+            let mood_term = (0.5 - 0.5 * mood.clamp(-1.0, 1.0)).clamp(0.0, 1.0);
+            // Isolation: count allies (other cats) within isolation_radius.
+            let ally_count = cat_anchors
+                .iter()
+                .filter(|other| {
+                    let od = cat_pos.manhattan_distance(other);
+                    od > 0 && od <= isolation_radius
+                })
+                .count() as u32;
+            let isolation_factor = if ally_count >= group_threshold {
+                group_suppression
+            } else {
+                1.0
+            };
+            let score = mood_term * safety_deficit * isolation_factor;
+            if score > dread_pressure {
+                dread_pressure = score;
+                best_target = Some(*cat_pos);
+            }
+        }
+        let nearest_cat = best_target;
 
         // ---- Entropy pressure: inverse distance to nearest frontier ----
         let entropy_pressure = nearest_frontier
@@ -1244,6 +1308,7 @@ pub fn shadowfox_motivation_tick(
                 target_x: cp.x,
                 target_y: cp.y,
                 edge_distance: haunt_edge,
+                ticks: 0,
             }),
             3 => nearest_frontier.map(|fp| WildlifeAiState::Seeding {
                 frontier_x: fp.x,
@@ -1304,6 +1369,111 @@ pub fn shadowfox_motivation_tick(
                 }
                 *state = new_state;
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// shadowfox_haunting_drain — ticket 023 Phase C
+// ---------------------------------------------------------------------------
+
+/// Per-tick mood/safety drain for cats within `haunting_drain_radius` of
+/// a shadow-fox in `WildlifeAiState::Haunting`. Also runs the haunting-
+/// escalation timer: once `ticks` exceeds
+/// `shadow_fox_haunting_escalation_ticks`, the haunt is promoted to
+/// `WildlifeAiState::Stalking` (the existing pre-023 combat-approach
+/// path), giving the cat a chance to flee or seek allies before
+/// physical attack commits.
+///
+/// Phase C's job per the design doc: wire the psychological-pressure
+/// drive so a Haunting shadow-fox can actually erode a cat's welfare
+/// without combat. Pairs with the Phase C deep Dread targeting in
+/// `shadowfox_motivation_tick`.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub fn shadowfox_haunting_drain(
+    mut shadowfoxes: Query<
+        (&Position, &mut WildlifeAiState),
+        (
+            With<ShadowFoxDrives>,
+            Without<crate::components::wildlife::Carcass>,
+        ),
+    >,
+    mut cats: Query<
+        (&Position, &mut Needs, &mut Mood),
+        (
+            With<Needs>,
+            Without<Dead>,
+            Without<PreyAnimal>,
+            Without<WildAnimal>,
+        ),
+    >,
+    constants: Res<SimConstants>,
+    time: Res<TimeState>,
+    mut activation: ResMut<SystemActivation>,
+) {
+    let c = &constants.wildlife;
+    let drain_radius = c.shadow_fox_haunting_drain_radius;
+    let mood_drain = c.shadow_fox_haunting_mood_drain;
+    let safety_drain = c.shadow_fox_haunting_safety_drain;
+    let feature_cadence = c.shadow_fox_haunting_feature_cadence.max(1);
+    let escalation_ticks = c.shadow_fox_haunting_escalation_ticks;
+    let haunt_edge = c.shadow_fox_haunting_edge_distance;
+
+    for (fox_pos, mut state) in &mut shadowfoxes {
+        // Only operate on shadow-foxes currently in Haunting.
+        let (target_x, target_y, current_ticks) = match *state {
+            WildlifeAiState::Haunting {
+                target_x,
+                target_y,
+                ticks,
+                ..
+            } => (target_x, target_y, ticks),
+            _ => continue,
+        };
+
+        // Escalation check: enough cumulative haunting → promote to
+        // Stalking. The existing pre-023 `predator_stalk_cats` system
+        // will then handle the cat-vs-fox combat resolution.
+        if current_ticks >= escalation_ticks {
+            *state = WildlifeAiState::Stalking { target_x, target_y };
+            activation.record(Feature::ShadowFoxHauntingEscalated);
+            continue;
+        }
+
+        // Increment tick counter. Re-borrow the variant via assignment
+        // since `*state` is a mutable destructure target.
+        if let WildlifeAiState::Haunting { ticks, .. } = &mut *state {
+            *ticks = ticks.saturating_add(1);
+        }
+
+        // Apply drain to any cat within `drain_radius` of this shadow-
+        // fox. The drain is positional, not target-bound: a haunting
+        // shadow-fox in detection range of the entire colony will
+        // pressure every nearby cat, not just the target. Consistent
+        // with the design doc's "the cat cannot shake the feeling of
+        // eyes in the dark" framing.
+        let mut drained_any = false;
+        for (cat_pos, mut needs, mut mood) in cats.iter_mut() {
+            if fox_pos.manhattan_distance(cat_pos) > drain_radius {
+                continue;
+            }
+            needs.safety = (needs.safety - safety_drain).max(0.0);
+            mood.valence = (mood.valence - mood_drain).max(-1.0);
+            drained_any = true;
+
+            // Suppress combat by maintaining the haunt-edge distance
+            // contract: when the fox is at edge_distance (or closer
+            // than it intends), don't escalate via this code path —
+            // the per-tick escalation timer above is the only path to
+            // combat from Haunting. Drain happens regardless of
+            // edge-distance overlap.
+            let _ = haunt_edge; // retained for future Phase D tuning
+            let _ = target_x;
+            let _ = target_y;
+        }
+
+        if drained_any && time.tick.is_multiple_of(feature_cadence) {
+            activation.record(Feature::ShadowFoxHaunting);
         }
     }
 }

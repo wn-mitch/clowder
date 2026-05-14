@@ -4776,6 +4776,71 @@ pub struct WildlifeConstants {
     /// genuinely pressured rather than jitter-driven.
     #[serde(default = "default_shadow_fox_motivation_min_pressure")]
     pub shadow_fox_motivation_min_pressure: f32,
+
+    // ----- Ticket 023 Phase C: deep Dread + haunting drain -----
+    /// Manhattan radius around each cat that counts toward isolation
+    /// scoring. Cats with ≥ `shadow_fox_dread_group_threshold` allies
+    /// inside this radius receive a Dread-pressure multiplier of
+    /// `shadow_fox_dread_group_suppression` (suppression). Default
+    /// `8` matches the lower end of the cat-scent gradient — beyond
+    /// 8 tiles cats are effectively isolated from each other for
+    /// shadow-fox perception purposes.
+    #[serde(default = "default_shadow_fox_dread_isolation_radius")]
+    pub shadow_fox_dread_isolation_radius: i32,
+    /// Minimum number of nearby allies (within
+    /// `shadow_fox_dread_isolation_radius`) that triggers Dread
+    /// group-suppression. Default `2` — a cat with at least 2 allies
+    /// nearby is meaningfully *not* alone; the shadow-fox should
+    /// hunt easier prey.
+    #[serde(default = "default_shadow_fox_dread_group_threshold")]
+    pub shadow_fox_dread_group_threshold: u32,
+    /// Dread-pressure multiplier when the target cat has ≥
+    /// `group_threshold` allies nearby. Range [0, 1]. Default `0.2`
+    /// reduces the haunt-pressure to 20% of solo-cat baseline —
+    /// shadow-foxes still consider grouped cats but strongly prefer
+    /// isolated ones.
+    #[serde(default = "default_shadow_fox_dread_group_suppression")]
+    pub shadow_fox_dread_group_suppression: f32,
+    /// Manhattan radius around a Haunting shadow-fox within which
+    /// `shadowfox_haunting_drain` applies per-tick safety/mood drain
+    /// to the target cat. Default `5` — close enough to be
+    /// psychologically present, far enough to not trigger the
+    /// adjacent-cell combat threshold.
+    #[serde(default = "default_shadow_fox_haunting_drain_radius")]
+    pub shadow_fox_haunting_drain_radius: i32,
+    /// Per-tick negative mood-valence delta applied to a cat being
+    /// haunted (additive on `Mood.valence`, clamped at -1). Default
+    /// `0.002` — over a 150-tick haunting episode the cat's mood
+    /// drops by ~0.3, which is meaningful but recoverable.
+    #[serde(default = "default_shadow_fox_haunting_mood_drain")]
+    pub shadow_fox_haunting_mood_drain: f32,
+    /// Per-tick safety drain applied to a cat being haunted (drops
+    /// `Needs.safety`, clamped at 0.0). Default `0.003` — paired
+    /// with the mood drain, gives an isolated cat an unmistakable
+    /// "something is wrong" signal before any combat occurs.
+    #[serde(default = "default_shadow_fox_haunting_safety_drain")]
+    pub shadow_fox_haunting_safety_drain: f32,
+    /// Cadence (in ticks) at which `Feature::ShadowFoxHaunting`
+    /// records a haunting-pressure event. Drain happens every tick,
+    /// but Feature emission is rate-limited so the activation footer
+    /// doesn't get inundated. Default `30` ticks ≈ 1 emission per
+    /// 1/4 sim-second.
+    #[serde(default = "default_shadow_fox_haunting_feature_cadence")]
+    pub shadow_fox_haunting_feature_cadence: u64,
+    /// Ticks of continuous Haunting before the motivation tick will
+    /// promote the Haunting target to Stalking (the existing
+    /// pre-Phase-A combat path). Default `30` — about 1/4 sim-second
+    /// at default scale. Provides a "haunting first, attack second"
+    /// rhythm: the cat has time to flee or seek allies before combat
+    /// commits.
+    #[serde(default = "default_shadow_fox_haunting_escalation_ticks")]
+    pub shadow_fox_haunting_escalation_ticks: u64,
+    /// Manhattan range within which the Entropy drive's deep scan
+    /// looks for corruption-frontier tiles. Default `12` matches
+    /// the motivation scan radius; lifted as a knob in case Entropy
+    /// should range farther than the other drives.
+    #[serde(default = "default_shadow_fox_frontier_detection_range")]
+    pub shadow_fox_frontier_detection_range: i32,
 }
 
 impl Default for WildlifeConstants {
@@ -4848,6 +4913,15 @@ impl Default for WildlifeConstants {
                 default_shadow_fox_reconstituting_recovery_multiplier(),
             shadow_fox_motivation_scan_radius: default_shadow_fox_motivation_scan_radius(),
             shadow_fox_motivation_min_pressure: default_shadow_fox_motivation_min_pressure(),
+            shadow_fox_dread_isolation_radius: default_shadow_fox_dread_isolation_radius(),
+            shadow_fox_dread_group_threshold: default_shadow_fox_dread_group_threshold(),
+            shadow_fox_dread_group_suppression: default_shadow_fox_dread_group_suppression(),
+            shadow_fox_haunting_drain_radius: default_shadow_fox_haunting_drain_radius(),
+            shadow_fox_haunting_mood_drain: default_shadow_fox_haunting_mood_drain(),
+            shadow_fox_haunting_safety_drain: default_shadow_fox_haunting_safety_drain(),
+            shadow_fox_haunting_feature_cadence: default_shadow_fox_haunting_feature_cadence(),
+            shadow_fox_haunting_escalation_ticks: default_shadow_fox_haunting_escalation_ticks(),
+            shadow_fox_frontier_detection_range: default_shadow_fox_frontier_detection_range(),
         }
     }
 }
@@ -4886,6 +4960,42 @@ fn default_shadow_fox_motivation_scan_radius() -> i32 {
 
 fn default_shadow_fox_motivation_min_pressure() -> f32 {
     0.05
+}
+
+fn default_shadow_fox_dread_isolation_radius() -> i32 {
+    8
+}
+
+fn default_shadow_fox_dread_group_threshold() -> u32 {
+    2
+}
+
+fn default_shadow_fox_dread_group_suppression() -> f32 {
+    0.2
+}
+
+fn default_shadow_fox_haunting_drain_radius() -> i32 {
+    5
+}
+
+fn default_shadow_fox_haunting_mood_drain() -> f32 {
+    0.002
+}
+
+fn default_shadow_fox_haunting_safety_drain() -> f32 {
+    0.003
+}
+
+fn default_shadow_fox_haunting_feature_cadence() -> u64 {
+    30
+}
+
+fn default_shadow_fox_haunting_escalation_ticks() -> u64 {
+    30
+}
+
+fn default_shadow_fox_frontier_detection_range() -> i32 {
+    12
 }
 
 fn default_shadow_fox_coherence_decay_clean() -> f32 {

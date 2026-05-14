@@ -142,6 +142,17 @@ pub enum Feature {
     /// Ticket 023 Phase B — a shadow-fox entered the Seeding state
     /// to extend the corruption frontier.
     ShadowFoxSeedingEntered,
+    /// Ticket 023 Phase C — `shadowfox_haunting_drain` applied a
+    /// per-tick mood/safety drain to a cat in haunting range. Records
+    /// at `shadow_fox_haunting_feature_cadence` (not every tick) to
+    /// keep the activation footer readable. Positive valence — the
+    /// substrate's psychological-predation drive is alive.
+    ShadowFoxHaunting,
+    /// Ticket 023 Phase C — a Haunting shadow-fox crossed the
+    /// `shadow_fox_haunting_escalation_ticks` threshold and the
+    /// motivation tick promoted the haunt to Stalking (the existing
+    /// pre-023 combat-approach path).
+    ShadowFoxHauntingEscalated,
     DirectiveDelivered,
     // --- Corruption & carcass systems ---
     CarcassSpawned,
@@ -499,6 +510,8 @@ impl Feature {
         Feature::ShadowFoxTendingEntered,
         Feature::ShadowFoxHauntingEntered,
         Feature::ShadowFoxSeedingEntered,
+        Feature::ShadowFoxHaunting,
+        Feature::ShadowFoxHauntingEscalated,
         Feature::DirectiveDelivered,
         // Corruption & carcass systems
         Feature::CarcassSpawned,
@@ -744,6 +757,14 @@ impl Feature {
             Feature::ShadowFoxTendingEntered => Neutral,
             Feature::ShadowFoxHauntingEntered => Neutral,
             Feature::ShadowFoxSeedingEntered => Neutral,
+            // Ticket 023 Phase C — haunting-drain cadenced emission and
+            // escalation-to-Stalking. Neutral: the actual harm is the
+            // cat's Mood/Safety drain (visible in welfare metrics);
+            // these Features are activation-footer breadcrumbs so
+            // `negative_events_total` doesn't get ballooned by ambient
+            // psychological pressure.
+            Feature::ShadowFoxHaunting => Neutral,
+            Feature::ShadowFoxHauntingEscalated => Neutral,
             Feature::CommitmentDropTriggered => Neutral,
             Feature::CommitmentDropBlind => Neutral,
             Feature::CommitmentDropSingleMinded => Neutral,
@@ -798,6 +819,13 @@ impl Feature {
             Feature::ShadowFoxTendingEntered => false,
             Feature::ShadowFoxHauntingEntered => false,
             Feature::ShadowFoxSeedingEntered => false,
+            // Ticket 023 Phase C — haunting drain + escalation. Cadenced
+            // emission means firing depends on a Haunting shadow-fox
+            // being persistently in drain-radius of a cat; a healthy
+            // soak may not produce this if the colony's defenses keep
+            // shadow-foxes off vulnerable targets.
+            Feature::ShadowFoxHaunting => false,
+            Feature::ShadowFoxHauntingEscalated => false,
             Feature::FateAwakened => false,
             Feature::SpiritCommunion => false,
             Feature::ShadowFoxAvoidedWard => false,
@@ -1073,6 +1101,8 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ShadowFoxTendingEntered => "ShadowFoxTendingEntered",
         Feature::ShadowFoxHauntingEntered => "ShadowFoxHauntingEntered",
         Feature::ShadowFoxSeedingEntered => "ShadowFoxSeedingEntered",
+        Feature::ShadowFoxHaunting => "ShadowFoxHaunting",
+        Feature::ShadowFoxHauntingEscalated => "ShadowFoxHauntingEscalated",
         Feature::DirectiveDelivered => "DirectiveDelivered",
         Feature::CarcassSpawned => "CarcassSpawned",
         Feature::WardSiegeStarted => "WardSiegeStarted",
@@ -1402,9 +1432,12 @@ mod tests {
         // Ticket 023 Phase B added 4 Neutral (state-entry signals for
         // the four motivation states — Reconstituting/Tending/Haunting/
         // Seeding; observability not harm).
+        // Ticket 023 Phase C added 2 Neutral (cadenced haunting-drain
+        // + escalation; harm signal lives in cat Mood/Safety, not the
+        // activation count).
         assert_eq!(positive, 56);
         assert_eq!(negative, 23);
-        assert_eq!(neutral, 39);
+        assert_eq!(neutral, 41);
     }
 
     #[test]
@@ -1482,6 +1515,7 @@ mod tests {
         // Ticket 023 Phase A: +1 Positive (ShadowFoxDissolved — slow-
         // environmental defeat paired with ShadowFoxBanished).
         // Ticket 023 Phase B: +4 Neutral (motivation-state entries).
+        // Ticket 023 Phase C: +2 Neutral (haunting-drain + escalation).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
             56
@@ -1492,7 +1526,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            39
+            41
         );
     }
 

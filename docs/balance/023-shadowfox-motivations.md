@@ -99,3 +99,40 @@ Run archive: `logs/tuned-42-023-phase-b-no-fallback/` (pre-fallback) and
   a balance issue — long-lived shadow-foxes simply trigger the avoidance
   feature every patrol step. Phase D should consider rate-limiting this
   Feature emission (record once per ward-avoidance entry, not per tick).
+
+## Phase C iteration (2026-05-14)
+
+Phase C added deep Dread targeting (cat mood + safety deficit + ally
+isolation), the per-tick `shadowfox_haunting_drain` system, and the
+haunt-to-stalk escalation pipeline. A first soak revealed a coupling bug:
+the motivation tick at every cadence was overwriting `Stalking` (which
+HauntingEscalated promotes to), preventing the existing pre-023
+ambush-completion chain from running. A "respect active combat states"
+guard now makes the motivation tick skip re-election when the current
+state is `Stalking` or `EncirclingWard`. With the guard:
+
+| Field | Baseline | Phase B | Phase C |
+|---|---|---|---|
+| `deaths_by_cause.ShadowFoxAmbush` | 2 | 1 | 2 |
+| `ShadowFoxHauntingEscalated` | — | — | 11 |
+| `ShadowFoxHaunting` (drain emissions) | — | — | 8 |
+| `ShadowFoxAvoidedCatScent` | 0 | 419 | 2507 |
+| `ShadowFoxAvoidedWard` | 2 | 3485 | 1157 |
+| `continuity.mythic-texture` | 43 | 0 | 0 |
+
+**Phase C verdict:** substrate-fires gate met. ShadowFoxAmbush back to
+baseline parity, but no banishments. The mythic-texture regression
+persists — Phase C correctly delivers the haunt-to-stalk chain, but the
+cat-side posse-formation that converts ambushes into banishments fires
+much less often than baseline. That's a separate causal chain (cat
+group cohesion + posse-banishment DSE) outside ticket 023's substrate
+scope; Phase D's balance verification will either accept the new
+equilibrium (combat banishment is genuinely rarer because shadow-foxes
+self-preserve via Reconstituting) or revisit drive weights to push
+shadow-foxes more aggressively into cat-engaging states.
+
+Run archive: `logs/tuned-42-023-phase-b-landed/` (Phase B baseline for
+Phase C frame-diff), `logs/tuned-42-023-phase-c-no-stalking-guard/`
+(Phase C without the motivation-tick-respects-Stalking fix; shows
+HauntingEscalated=19 but ShadowFoxAmbush=1 — the smoking gun that
+revealed the bug), `logs/tuned-42/` (Phase C with guard, current).
