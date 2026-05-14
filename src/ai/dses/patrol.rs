@@ -33,6 +33,11 @@ use crate::resources::sim_constants::ScoringConstants;
 pub const SAFETY_DEFICIT_INPUT: &str = "safety_deficit";
 pub const BOLDNESS_INPUT: &str = "boldness";
 pub const SAFETY_UPPER_BOUND_INPUT: &str = "safety";
+/// 263 — `LocationBeliefs.recency_of_threat_cue` at the cat's patrol
+/// perimeter anchor bucket. Surfaced by `ctx_scalars` (precomputed
+/// at `ScoringContext` construction so the consideration closure
+/// doesn't need to thread a per-cat Component query).
+pub const PATROL_THREAT_RECENCY_INPUT: &str = "patrol_threat_recency";
 
 /// §L2.10.7 Patrol range — Manhattan tiles for the territory
 /// perimeter anchor. 25 ≈ same scale as HerbcraftWard's perimeter
@@ -125,6 +130,35 @@ impl PatrolDse {
                 },
             )));
             weights.push(route_cost_weight);
+        }
+
+        // 263: conditional 6th axis `patrol_threat_recency` reads the
+        // cat's per-location subjective belief facet at the patrol
+        // perimeter anchor bucket (258 substrate). High recency_of_
+        // threat_cue → low patrol attractiveness; the Linear-Invert
+        // curve over the already-normalized `[0,1]` facet value keeps
+        // the DSE-side shape neutral (the integrator's EMA is the
+        // canonical shaping site). Conditionally added because CP
+        // semantics `c · 0 = 0` would zero the whole product if
+        // pushed at weight 0; ships dormant at the default
+        // `patrol_threat_recency_weight = 0.0`. Activation in a
+        // follow-on with the four-artifact methodology — this axis
+        // is the substrate-side fix for the L3 patrol-absorption
+        // cascade (`project_l3_patrol_absorption_cascade`), so its
+        // landing needs a per-axis hypothesis-and-soak.
+        let threat_recency_weight = scoring.patrol_threat_recency_weight.clamp(0.0, 1.0);
+        if threat_recency_weight > 0.0 {
+            considerations.push(Consideration::Scalar(ScalarConsideration::new(
+                PATROL_THREAT_RECENCY_INPUT,
+                Curve::Composite {
+                    inner: Box::new(Curve::Linear {
+                        slope: 1.0,
+                        intercept: 0.0,
+                    }),
+                    post: PostOp::Invert,
+                },
+            )));
+            weights.push(threat_recency_weight);
         }
 
         Self {
@@ -237,6 +271,54 @@ mod tests {
             Consideration::Field(f) => f.name == "patrol_route_cost",
             _ => false,
         }));
+    }
+
+    #[test]
+    fn patrol_threat_recency_axis_dormant_at_default() {
+        // 263: `patrol_threat_recency_weight` ships dormant at 0.0; the
+        // 6th axis MUST NOT appear in considerations (CP semantics
+        // `c · 0 = 0` would zero the whole product).
+        let s = ScoringConstants::default();
+        assert_eq!(s.patrol_threat_recency_weight, 0.0);
+        let dse = PatrolDse::new(&s);
+        assert!(
+            dse.considerations()
+                .iter()
+                .all(|c| !matches!(
+                    c,
+                    Consideration::Scalar(sc) if sc.name == PATROL_THREAT_RECENCY_INPUT
+                )),
+            "patrol_threat_recency axis must be absent at dormant weight"
+        );
+    }
+
+    #[test]
+    fn patrol_threat_recency_axis_present_when_weight_lifted() {
+        // 263: when the activation follow-on lifts the weight, the 6th
+        // axis appears as a Linear-Invert scalar and the CP picks up
+        // its weight. High recency_of_threat_cue → low patrol score.
+        let mut s = ScoringConstants::default();
+        s.patrol_threat_recency_weight = 1.0;
+        let dse = PatrolDse::new(&s);
+        // Default config has patrol_route_cost active at 0.6, so the
+        // pre-263 baseline is 5 axes — the new axis brings it to 6.
+        assert_eq!(dse.considerations().len(), 6);
+        assert_eq!(dse.composition().weights.len(), 6);
+        assert!((dse.composition().weights[5] - 1.0).abs() < 1e-4);
+        let curve = dse
+            .considerations()
+            .iter()
+            .find_map(|c| match c {
+                Consideration::Scalar(sc) if sc.name == PATROL_THREAT_RECENCY_INPUT => {
+                    Some(&sc.curve)
+                }
+                _ => None,
+            })
+            .expect("patrol_threat_recency axis must exist at non-zero weight");
+        // Linear-Invert over [0,1]: no threat memory → 1.0; saturated
+        // → 0.0. Patrol score scales accordingly.
+        assert!((curve.evaluate(0.0) - 1.0).abs() < 1e-4, "no threat → 1.0");
+        assert!((curve.evaluate(1.0) - 0.0).abs() < 1e-4, "saturated → 0.0");
     }
 
     #[test]
