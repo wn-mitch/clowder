@@ -260,26 +260,43 @@ pub fn update_den_marker(
 
 /// Author `WardNearbyFox` per fox.
 ///
-/// **Predicate** — currently hardcoded `false` to mirror today's
-/// `FoxScoringContext.ward_nearby` stub at
-/// `fox_goap.rs::build_scoring_context`. The marker is wired up so
-/// future predicate-refinement work (truthful "ward within fox
-/// detection radius" check) flips the value at this single site.
-/// Today's call sites read `false` either way; the marker is
-/// behavior-neutral.
+/// **Predicate** — Ticket 050: any ward whose `repel_radius()`
+/// reaches the fox's tile. Reads each ward's per-kind base radius
+/// scaled by its current `strength`, so a decayed ward stops
+/// asserting the marker even before it despawns. Inverted wards
+/// (predator-attracting) still emit a detectable signal, so they
+/// also flip the marker — semantically, the fox can sense the
+/// magical presence either way; fox-side behavior responding to
+/// the ward (flee vs. approach) is left to future DSE wiring
+/// (no DSE consumes `WardNearbyFox` today).
+///
+/// **v1 is per-tick scan.** Event-driven authoring (`WardPlaced` /
+/// `WardDespawned`) is a future refinement; per-tick scan keeps
+/// the slice atomic.
 #[allow(clippy::type_complexity)]
 pub fn update_ward_detection_markers(
     mut commands: Commands,
     foxes: Query<
-        (Entity, Has<markers::WardNearbyFox>),
+        (Entity, &Position, Has<markers::WardNearbyFox>),
         (With<WildAnimal>, With<FoxState>, Without<Dead>),
     >,
+    wards: Query<
+        (&crate::components::magic::Ward, &Position),
+        (Without<WildAnimal>, Without<FoxState>),
+    >,
 ) {
-    for (entity, has_marker) in foxes.iter() {
-        // Stubbed predicate to match the existing
-        // `FoxScoringContext.ward_nearby = false` baseline. When a
-        // truthful predicate lands, swap this to a Ward-position scan.
-        let want = false;
+    // Snapshot ward positions + per-ward effective radii (Manhattan
+    // tiles, rounded up so a ward with a 0.8-strength durable kind
+    // still asserts on the integer boundary).
+    let ward_snapshot: Vec<(Position, i32)> = wards
+        .iter()
+        .map(|(w, p)| (*p, w.repel_radius().ceil() as i32))
+        .collect();
+
+    for (entity, fox_pos, has_marker) in foxes.iter() {
+        let want = ward_snapshot
+            .iter()
+            .any(|(wp, radius)| fox_pos.manhattan_distance(wp) <= *radius);
         toggle(
             &mut commands,
             entity,
@@ -482,13 +499,61 @@ mod tests {
         (world, schedule)
     }
 
+    fn spawn_ward(world: &mut World, x: i32, y: i32, kind: crate::components::magic::WardKind) -> Entity {
+        let ward = match kind {
+            crate::components::magic::WardKind::Thornward => crate::components::magic::Ward::thornward(),
+            crate::components::magic::WardKind::DurableWard => crate::components::magic::Ward::durable(),
+        };
+        world.spawn((ward, Position::new(x, y))).id()
+    }
+
     #[test]
-    fn ward_nearby_fox_starts_false() {
-        // The author currently mirrors the pre-existing `false` stub.
-        // This test pins that behavior so any future change of the
-        // predicate is intentional.
+    fn no_wards_no_marker() {
         let (mut world, mut schedule) = setup_ward_detection();
         let fox = spawn_fox(&mut world, 0, 0);
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::WardNearbyFox>());
+    }
+
+    #[test]
+    fn fox_inside_thornward_repel_radius_gets_marker() {
+        let (mut world, mut schedule) = setup_ward_detection();
+        let fox = spawn_fox(&mut world, 0, 0);
+        // Thornward repel_radius == 6.0 at full strength.
+        let _ward = spawn_ward(&mut world, 5, 0, crate::components::magic::WardKind::Thornward);
+        schedule.run(&mut world);
+        assert!(world.entity(fox).contains::<markers::WardNearbyFox>());
+    }
+
+    #[test]
+    fn fox_outside_thornward_repel_radius_no_marker() {
+        let (mut world, mut schedule) = setup_ward_detection();
+        let fox = spawn_fox(&mut world, 0, 0);
+        // Thornward repel_radius == 6.0; fox at distance 7 is outside.
+        let _ward = spawn_ward(&mut world, 7, 0, crate::components::magic::WardKind::Thornward);
+        schedule.run(&mut world);
+        assert!(!world.entity(fox).contains::<markers::WardNearbyFox>());
+    }
+
+    #[test]
+    fn durable_ward_reaches_further_than_thornward() {
+        let (mut world, mut schedule) = setup_ward_detection();
+        let fox = spawn_fox(&mut world, 0, 0);
+        // DurableWard repel_radius == 9.0; fox at distance 8 is inside.
+        let _ward = spawn_ward(&mut world, 8, 0, crate::components::magic::WardKind::DurableWard);
+        schedule.run(&mut world);
+        assert!(world.entity(fox).contains::<markers::WardNearbyFox>());
+    }
+
+    #[test]
+    fn decayed_ward_loses_marker_reach() {
+        let (mut world, mut schedule) = setup_ward_detection();
+        let fox = spawn_fox(&mut world, 0, 0);
+        // Hand-spawn a thornward with strength 0.3 → repel_radius 1.8
+        // (ceil to 2 tiles). Fox at distance 5 is well outside.
+        let mut decayed = crate::components::magic::Ward::thornward();
+        decayed.strength = 0.3;
+        world.spawn((decayed, Position::new(5, 0)));
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::WardNearbyFox>());
     }
@@ -507,6 +572,8 @@ mod tests {
                 },
             ))
             .id();
+        // Even with a ward right next door, dead foxes are excluded.
+        let _ward = spawn_ward(&mut world, 0, 1, crate::components::magic::WardKind::Thornward);
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::WardNearbyFox>());
     }

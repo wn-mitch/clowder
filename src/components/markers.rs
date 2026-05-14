@@ -673,9 +673,10 @@ impl CatThreateningDen {
     pub const KEY: &str = "CatThreateningDen";
 }
 
-/// Ward within fox detection radius (stubbed in
-/// `FoxScoringContext.ward_nearby` today — promote to ECS marker).
-/// `fox_spatial.rs::update_ward_detection_markers`.
+/// Ward within fox detection radius — truthful per-tick scan: any
+/// ward whose `repel_radius()` reaches the fox's tile. Authored by
+/// `fox_spatial.rs::update_ward_detection_markers`. No DSE consumer
+/// today; fox flee-from-wards behavior is a future ticket.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct WardNearbyFox;
 impl WardNearbyFox {
