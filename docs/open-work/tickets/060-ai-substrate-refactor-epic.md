@@ -45,7 +45,7 @@ this file.
 | Phase 2 | §5 InfluenceMap substrate | ✅ landed (substrate + Cluster B closeout); 🔄 §5.6.3 follow-ons | 006 ✅ landed (10989775), 061 ✅ landed; in flight: [062](062-prey-species-split-maps.md), [063](063-ward-strength-promotion.md), [064](064-carcass-scent-consumer-cutover.md) |
 | Phase 3a–3d | §2–§3 / §4 / §9 L2 substrate | ✅ landed | (retired 005) |
 | Phase 4 | §6 target-taking DSEs | ✅ landed | (retired 014) |
-| Phase 4 follow-ons | §4 / §6.5 residue | 🔄 in flight | 049 ✅ landed (384bf25), 052 ✅ landed (acccdc7), 065 ✅ landed; in flight: [050](050-marker-predicate-refinements.md), [051](051-fox-dse-eligibility-migration.md) |
+| Phase 4 follow-ons | §4 / §6.5 residue | ✅ landed | 049 ✅ landed (384bf25), 050 ✅ landed (7dfa2796), 051 ✅ landed (238524ea), 052 ✅ landed (acccdc7), 065 ✅ landed |
 | Phase 5 | scattered sites + silent-advance audit | ✅ landed | (retired 005) |
 | Phase 6a | §7 commitment gate | ✅ landed | (retired 005) |
 | Phase 6b | §7.7 aspiration reconsideration | 🔄 in flight | [053](053-death-event-grief-emission.md), [054](054-fate-event-vocabulary-expansion.md), [055](055-mood-drift-threshold-detection.md), [056](056-aspiration-compatibility-matrix.md), [057](057-coordinator-directive-intention-strategy-row.md), [058](058-tradition-unfiltered-loop-fix.md) |
@@ -73,8 +73,6 @@ substrate's vocabulary and were tracked alongside it:
 | [008](008-cluster-d-formalization-verification.md) | ready | Cluster D | Formalization vocabulary (CA / Markov / Markov) |
 | [009](009-cluster-e-worldgen-richness.md) | ready | Cluster E | Pre-sim history fast-forward |
 | [027](027-mating-cadence-three-bug-cascade.md) | in-progress | §7.M | Mating cascade — Bugs 1+2 landed, Bug 3 partial |
-| [050](050-marker-predicate-refinements.md) | ready | §4 | Marker predicate refinements (3 promotions) |
-| [051](051-fox-dse-eligibility-migration.md) | ready | §4 / fox | Fox DSE `.require()` / `.forbid()` cutover |
 | [053](053-death-event-grief-emission.md) | blocked-by 007 | §7.7.b | Death-event grief emission |
 | [054](054-fate-event-vocabulary-expansion.md) | ready | §7.7.c | Fate event vocabulary expansion |
 | [055](055-mood-drift-threshold-detection.md) | blocked-by 056 | §7.7.d | Mood drift detection |
@@ -91,7 +89,7 @@ substrate's vocabulary and were tracked alongside it:
 | [129](129-care-dses-perceivable-intentions.md) | blocked-by 126 | Cluster C | Care DSEs over perceivable intentions |
 | [130](130-trust-weighted-coordinator-momentum.md) | blocked-by 126, 057 | Cluster C | Trust-weighted coordinator directive momentum |
 
-**Total open: 21** (10 ready, 1 in-progress, 8 blocked, 2 parked).
+**Total open: 19** (9 ready, 1 in-progress, 7 blocked, 2 parked).
 
 ### Critical path
 
@@ -116,7 +114,8 @@ opening — `052 → 065 → 006 → 059` — has all landed except 059
 substrate) is the unblocked head; 127/128/129/130 unblock as 126
 lands. The §7.7 aspiration cluster (053–058) is partial, gated
 mostly on 007's narrative scope. The §5.6.3 follow-ons (062/063/064)
-and §4 follow-ons (050/051) are independent ready work.
+are independent ready work. §4 follow-ons closed out 2026-05-14
+with 050 + 051 landing.
 
 Other tickets parallelize off this. 027 is mating-specific and
 runs independently. Cluster C/D/E (007–009) are large epics
@@ -139,14 +138,17 @@ in 126.
 
 ## Current state
 
-As of 2026-05-08 — the substrate spine (052/065/006) has
+As of 2026-05-14 — the substrate spine (052/065/006) has
 structurally landed; only 059's cleanup pass remains, and it's
 parked with no blocker. Phase 6a/6b/6c/6d landed via separate
-ticket threads. The remaining shape of the program is
-*horizontal*, not *spinal*:
+ticket threads. **§4 follow-ons closed** with 050 + 051 landing
+2026-05-14 (the fox DSE eligibility cutover retires every redundant
+`FoxScoringContext` boolean, and the three §4 marker predicates —
+WardNearbyFox, HasDen/HasCubs event-driven, HasThreatNearby
+sensory-pipeline — are now truthful). The remaining shape of the
+program is *horizontal*, not *spinal*:
 
 - **§5.6.3 follow-ons** — 062/063/064 (061 ✅ landed)
-- **§4 follow-ons** — 050/051
 - **§7.7 aspiration** — partial: 054/056 ready; 053/055/057 blocked; 058 parked
 - **Cluster C (deliberation)** — entry-point 126 ready; 127/128/129/130 gated on it
 - **Adjacent epics** — 007 (C narrative), 008 (D), 009 (E) all ready; 027 (§7.M mating) in progress
@@ -227,3 +229,17 @@ retirement.
   cluster-table row points at 126 explicitly as the
   implementation entry-point so future readers don't have to
   re-derive it from 007's narrative body.
+- 2026-05-14: §4 follow-ons closeout. Landed 050 (7dfa2796) and
+  051 (238524ea) in tandem — every fox DSE eligibility now flows
+  through the §4 marker substrate (`.require()` / `.forbid()`),
+  every redundant `FoxScoringContext` boolean retired (seven
+  fields), three predicate stubs promoted to truthful form
+  (WardNearbyFox per-tick ward scan, HasDen pure event-driven,
+  HasCubs hybrid event-driven + reconciliation, HasThreatNearby
+  through `observer_sees_at`). Phase 4 follow-ons row flipped
+  🔄 in flight → ✅ landed; 050/051 dropped from roster. Roster
+  21 → 19 (9 ready, 1 in-progress, 7 blocked, 2 parked).
+  Post-050 vs post-051 archive comparison: +141% wards placed,
+  −80% ShadowFox ambush deaths, +661% colony health, 0→156
+  shadow-fox ward-avoidance events — substrate alignment paid
+  off in colony outcomes, not just structural cleanup.
