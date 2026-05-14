@@ -48,7 +48,7 @@ this file.
 | Phase 4 follow-ons | §4 / §6.5 residue | ✅ landed | 049 ✅ landed (384bf25), 050 ✅ landed (7dfa2796), 051 ✅ landed (238524ea), 052 ✅ landed (acccdc7), 065 ✅ landed |
 | Phase 5 | scattered sites + silent-advance audit | ✅ landed | (retired 005) |
 | Phase 6a | §7 commitment gate | ✅ landed | (retired 005) |
-| Phase 6b | §7.7 aspiration reconsideration | 🔄 in flight | [054](054-fate-event-vocabulary-expansion.md), [056](056-aspiration-compatibility-matrix.md), [055](055-mood-drift-threshold-detection.md), [058](058-tradition-unfiltered-loop-fix.md); 053 ready ([053](053-death-event-grief-emission.md)); 057 gated on 128 ([057](057-coordinator-directive-intention-strategy-row.md)) |
+| Phase 6b | §7.7 aspiration reconsideration | 🔄 in flight | [056](056-aspiration-compatibility-matrix.md), [055](055-mood-drift-threshold-detection.md), [058](058-tradition-unfiltered-loop-fix.md); 053 ready ([053](053-death-event-grief-emission.md)); 057 gated on 128 ([057](057-coordinator-directive-intention-strategy-row.md)); 054 retired 2026-05-14 ([landed/054](../landed/054-fate-event-vocabulary-expansion.md)) |
 | Phase 6c | §8 softmax-over-Intentions | ✅ landed | (Phase 4a, retired 014) |
 | Phase 6d | §7.W Fulfillment + axis-capture | ✅ landed | (retired 024 + 012) |
 | Phase 7 | cleanup pass | 💤 parked | [059](059-phase-7-substrate-cleanup.md) |
@@ -75,7 +75,6 @@ substrate's vocabulary and were tracked alongside it:
 | [008](008-cluster-d-formalization-verification.md) | ready | Cluster D | Formalization vocabulary (CA / Markov / Markov) |
 | [009](009-cluster-e-worldgen-richness.md) | ready | Cluster E | Pre-sim history fast-forward |
 | [053](053-death-event-grief-emission.md) | ready | §7.7.b | Death-event grief emission (007 landed, now unblocked) |
-| [054](054-fate-event-vocabulary-expansion.md) | ready | §7.7.c | Fate event vocabulary expansion |
 | [055](055-mood-drift-threshold-detection.md) | blocked-by 056 | §7.7.d | Mood drift detection |
 | [056](056-aspiration-compatibility-matrix.md) | ready | §7.7.1 | Aspiration compatibility matrix |
 | [057](057-coordinator-directive-intention-strategy-row.md) | blocked-by 128 | §7.3 | Coordinator-directive Intention strategy row |
@@ -167,7 +166,7 @@ roughly equal weight now that Cluster C substrate has landed:
   load-bearing four-artifact activation pass).
 
 Independent ready work: §5.6.3 follow-ons (062/063/064), §7.7
-aspiration (053/054/056), Cluster D (008), Cluster E (009),
+aspiration (053/056), Cluster D (008), Cluster E (009),
 HTN/Care/Trust (128/129/130).
 
 ## Out of scope
@@ -206,7 +205,9 @@ queues."* What remains is wide rather than deep:
   unblocked by 127.
 - **§5.6.3 follow-ons** — 062/063/064 (prey scent split, ward
   strength promotion, carcass scent cutover).
-- **§7.7 aspiration** — 053/054/056 ready (007 unblocked 053);
+- **§7.7 aspiration** — 053/056 ready (007 unblocked 053); 054
+  retired 2026-05-14 (umbrella whose three children have divergent
+  natural homes — see [landed/054](../landed/054-fate-event-vocabulary-expansion.md));
   055 still gated on 056; 057 now gated on 128 (was 007).
 - **Cluster D + Cluster E** — 008, 009 (both ready, large epics).
 - **HTN/Care/Trust** — 128/129 unblocked by 126; 130 still gated

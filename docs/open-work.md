@@ -15,10 +15,10 @@ _Last generated: 2026-05-14._
 | Status | Count |
 |---|---|
 | In progress | 7 |
-| Ready | 109 |
+| Ready | 108 |
 | Parked | 12 |
 | Blocked | 23 |
-| **Open total** | **151** |
+| **Open total** | **150** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -53,7 +53,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 34 | 1 | 33 (1 / 25 / 5 / 2) | `▱▱▱▱▱▱▱▱▱▱` 3% |
+| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 1 | 32 (1 / 24 / 5 / 2) | `▱▱▱▱▱▱▱▱▱▱` 3% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/tickets/095-body-zones-epic.md)** Body zones | ready | 0 | — | — | _no roster_ |
 
@@ -67,7 +67,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 - **[229](docs/open-work/tickets/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose — _[tooling-diagnostics-ui] · added 2026-05-08_
 
-## Ready by cluster (109)
+## Ready by cluster (108)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -190,14 +190,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
 
-### magic-mythic (5 ready, 2 blocked)
-
-- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
-- **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
-- **[054](docs/open-work/tickets/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence — _[magic-mythic] · added 2026-04-27_
-- **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
-- **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
-
 ### process-discipline (5 ready, 2 blocked)
 
 - **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
@@ -206,6 +198,13 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[305](docs/open-work/tickets/305-corpus-projection-layer-split-cluster-into-clusterinitiative-render-two-axis-gate-open-time.md)** — Corpus projection layer — split cluster into cluster+initiative, render two-axis, gate open-time — _[process-discipline] · added 2026-05-13_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 
+### magic-mythic (4 ready, 2 blocked)
+
+- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
+- **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
+- **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
+- **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
+
 ### wildlife (4 ready, 1 blocked)
 
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _[wildlife] · added 2026-05-01_
@@ -213,7 +212,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
 
-## Ready by initiative (65 tag-memberships across 8 initiatives)
+## Ready by initiative (64 tag-memberships across 8 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -255,17 +254,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 
-### mythic-texture (8 open, 0 landed)
-
-- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
-- **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
-- **[054](docs/open-work/tickets/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence — _[magic-mythic] · added 2026-04-27_
-- **[236](docs/open-work/tickets/236-body-preparation-tiers-dragshroudmummify-gated-by-tech-markers.md)** — Body preparation tiers — drag/shroud/mummify gated by tech markers — _[life-cycle] · added 2026-05-08_
-- **[237](docs/open-work/tickets/237-gravesite-selection-corpse-transport-plan-multi-axis-site-scoring-proximate-to-other-graves-safe-low-corruption-beautiful.md)** — Gravesite selection — corpse transport plan + multi-axis site scoring (proximate to other graves, safe, low-corruption, beautiful) — _[buildings-zones] · added 2026-05-08_
-- **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
-- **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
-- **[276](docs/open-work/tickets/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) — _[social-coordination] · added 2026-05-11_
-
 ### generational-continuity (7 open, 0 landed)
 
 - **[187](docs/open-work/tickets/187-kitten-starvation-under-active-mating-pipeline.md)** — Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate — _[life-cycle] · added 2026-05-06_
@@ -275,6 +263,16 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
 - **[332](docs/open-work/tickets/332-grief-vigil-action-vocabulary.md)** — Grief-vigil action vocabulary — flip mourn_at_grave to Live — _[life-cycle] · added 2026-05-14_
 - **[333](docs/open-work/tickets/333-kitten-rearing-action-vocabulary.md)** — Kitten-rearing action vocabulary — flip rear_kitten to Live — _[life-cycle] · added 2026-05-14_
+
+### mythic-texture (7 open, 1 landed)
+
+- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
+- **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
+- **[236](docs/open-work/tickets/236-body-preparation-tiers-dragshroudmummify-gated-by-tech-markers.md)** — Body preparation tiers — drag/shroud/mummify gated by tech markers — _[life-cycle] · added 2026-05-08_
+- **[237](docs/open-work/tickets/237-gravesite-selection-corpse-transport-plan-multi-axis-site-scoring-proximate-to-other-graves-safe-low-corruption-beautiful.md)** — Gravesite selection — corpse transport plan + multi-axis site scoring (proximate to other graves, safe, low-corruption, beautiful) — _[buildings-zones] · added 2026-05-08_
+- **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
+- **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
+- **[276](docs/open-work/tickets/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) — _[social-coordination] · added 2026-05-11_
 
 ### welfare-fidelity (7 open, 1 landed)
 
@@ -306,7 +304,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 
-## Ready (109)
+## Ready (108)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -318,7 +316,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _[items-crafting] · added 2026-04-26_
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _[items-crafting] · added 2026-04-26_
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
-- **[054](docs/open-work/tickets/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence — _[magic-mythic] · added 2026-04-27_
 - **[056](docs/open-work/tickets/056-aspiration-compatibility-matrix.md)** — §7.7.1 aspiration compatibility matrix — hard/soft conflict enumeration — _[ai-substrate] · added 2026-04-27_
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _[buildings-zones] · added 2026-04-27_
 - **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _[belief-perception] · added 2026-04-27_
@@ -464,11 +461,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (211)
+## Landed archive (212)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (146)
+### 2026-05 (147)
 
 - **[322](docs/open-work/landed/322-action-enum-stubs-for-dormant-methods.md)** — Action-enum stubs for dormant HTN methods _(2026-05-14)_
 - **[321](docs/open-work/landed/321-aspirations-milestones-emits-table-l1-l2-picker.md)** — Aspirations milestones gain emits table + L1→L2 picker _(2026-05-14)_
@@ -477,6 +474,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[153](docs/open-work/landed/153-150-r5a-balance-follow-on.md)** — 150 R5a balance follow-on — Resting score-mass and courtship recovery _(2026-05-14)_
 - **[120](docs/open-work/landed/120-shadow-fox-spawn-vs-cat-presence-coupling.md)** — Characterize shadow-fox spawn-rate coupling to cat-presence (047 Phase 3 surfaced +93%) _(2026-05-14)_
 - **[062](docs/open-work/landed/062-prey-species-split-maps.md)** — Prey-species split — per-species scent maps (§5.6.3 row #5) _(2026-05-14)_
+- **[054](docs/open-work/landed/054-fate-event-vocabulary-expansion.md)** — §7.7.c Fate event-vocabulary expansion — Calling, destiny, fated-pair convergence _(2026-05-14)_
 - **[051](docs/open-work/landed/051-fox-dse-eligibility-migration.md)** — Fox DSE eligibility migration — `.require()`/`.forbid()` cutover for §4 fox markers _(2026-05-14)_
 - **[050](docs/open-work/landed/050-marker-predicate-refinements.md)** — §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den _(2026-05-14)_
 - **[023](docs/open-work/landed/023-shadowfox-distinct-motivations.md)** — Shadowfox motivations distinct from normal foxes _(2026-05-14)_
