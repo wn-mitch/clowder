@@ -1,7 +1,7 @@
 ---
 id: 153
 title: 150 R5a balance follow-on — Resting score-mass and courtship recovery
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-05-03
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -132,3 +132,4 @@ desire, ambient anxiety — rather than as a side effect of hunger.
 - 2026-05-03: Opened as 150-landing balance follow-on. The
   structural R5a split is correct; tuning the L3 score-mass
   redistribution is the open work.
+- 2026-05-14: 2026-05-14: resolved by absorption. Named regressions all recovered or exceeded pre-150 levels on current tuned-42 (courtship 0→3884; colony aggregate 830→2370; bonds_formed 2→38; health 0.10→0.96). Investigation steps in §Investigation steps never executed; closing on observed outcome, attributing recovery to 127 (JointIntention substrate, primary courtship driver), 126 (BDI prerequisite), 117 (social-warmth/self-care), 154 (mentoring extraction). Mythic-texture=0 stays open as the named out-of-scope pre-existing failure.
