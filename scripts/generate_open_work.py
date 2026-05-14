@@ -26,150 +26,17 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
-# ---------------------------------------------------------------------------
-# Frontmatter parsing (minimal YAML subset — scalars, null, lists)
-# ---------------------------------------------------------------------------
-
-
-def _parse_scalar(value: str):
-    value = value.strip()
-    if value in ("null", "~", ""):
-        return None
-    if value in ("true", "True"):
-        return True
-    if value in ("false", "False"):
-        return False
-    # Flow-style list: [a, b, c] or []
-    if value.startswith("[") and value.endswith("]"):
-        inner = value[1:-1].strip()
-        if not inner:
-            return []
-        return [_unquote(x.strip()) for x in inner.split(",") if x.strip()]
-    # Try int
-    try:
-        return int(value)
-    except ValueError:
-        pass
-    return _unquote(value)
-
-
-def _unquote(value: str) -> str:
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
-        return value[1:-1]
-    return value
-
-
-def parse_frontmatter(text: str) -> dict:
-    """Parse minimal YAML frontmatter at the top of a markdown file.
-
-    Supports scalars, nulls, flow-style lists, and block-style lists:
-        key: value
-        key: null
-        key: [a, b, c]
-        key:
-          - a
-          - b
-    """
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return {}
-    end = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end = i
-            break
-    if end is None:
-        return {}
-
-    result: dict = {}
-    current_list_key: str | None = None
-    for raw in lines[1:end]:
-        line = raw.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        # Continuation of block-style list
-        stripped = line.lstrip()
-        if current_list_key is not None and stripped.startswith("- "):
-            result[current_list_key].append(_unquote(stripped[2:].strip()))
-            continue
-        current_list_key = None
-        # key: value
-        m = re.match(r"^([A-Za-z0-9_-]+):\s*(.*)$", line)
-        if not m:
-            continue
-        key, value = m.group(1), m.group(2)
-        if value == "":
-            # Block-style list starts on next line
-            result[key] = []
-            current_list_key = key
-        else:
-            result[key] = _parse_scalar(value)
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class Ticket:
-    path: Path
-    frontmatter: dict
-    body: str
-
-    @property
-    def id(self) -> str:
-        raw = self.frontmatter.get("id", "???")
-        if isinstance(raw, int):
-            return f"{raw:03d}"
-        return str(raw)
-
-    @property
-    def title(self) -> str:
-        return str(self.frontmatter.get("title", "(untitled)"))
-
-    @property
-    def status(self) -> str:
-        return str(self.frontmatter.get("status", "ready"))
-
-    @property
-    def cluster(self):
-        return self.frontmatter.get("cluster")
-
-    @property
-    def initiative(self) -> list:
-        val = self.frontmatter.get("initiative") or []
-        return val if isinstance(val, list) else [val]
-
-    @property
-    def parked(self):
-        return self.frontmatter.get("parked")
-
-    @property
-    def blocked_by(self) -> list:
-        val = self.frontmatter.get("blocked-by") or []
-        return val if isinstance(val, list) else [val]
-
-    @property
-    def added(self):
-        return self.frontmatter.get("added")
-
-
-def load_tickets(tickets_dir: Path) -> list[Ticket]:
-    tickets = []
-    if not tickets_dir.exists():
-        return tickets
-    for p in sorted(tickets_dir.glob("*.md")):
-        if p.name.startswith("_") or p.name.lower() == "readme.md":
-            continue
-        text = p.read_text(encoding="utf-8")
-        fm = parse_frontmatter(text)
-        # Body starts after the closing --- of frontmatter (we don't need it
-        # for the index, but keep it for future features).
-        tickets.append(Ticket(path=p, frontmatter=fm, body=""))
-    return tickets
+# Shared frontmatter / index helpers (also used by epic_children.py).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _ticket_frontmatter import (  # noqa: E402
+    Ticket,
+    _CHILD_LINK_RE,
+    _format_id,
+    _normalize_child_id,
+    build_ticket_index,
+    load_tickets,
+    parse_frontmatter,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -194,15 +61,6 @@ STATUS_LABEL = {
 OPEN_STATUSES = ("in-progress", "ready", "parked", "blocked")
 
 
-def _format_id(raw) -> str:
-    if isinstance(raw, int):
-        return f"{raw:03d}"
-    try:
-        return f"{int(str(raw)):03d}"
-    except (TypeError, ValueError):
-        return str(raw)
-
-
 # ---------------------------------------------------------------------------
 # Epic progress
 # ---------------------------------------------------------------------------
@@ -220,13 +78,6 @@ def _format_id(raw) -> str:
 
 
 _EPIC_FILENAME_SUFFIX = "-epic.md"
-
-# Match a markdown link target whose filename starts with NNN- (1-3 digits +
-# optional single letter) and ends in .md. Anchored to `(` or `/` so we
-# never grab the year prefix on date-named landed files (`2026-04-19-...`).
-_CHILD_LINK_RE = re.compile(
-    r"(?:\(|/)(\d{1,3}[a-z]?)-[A-Za-z0-9_-]+\.md(?=\))"
-)
 
 _ROSTER_HEADING_RE = re.compile(
     r"^(#{2,6})\s+open child tickets\b", re.IGNORECASE
@@ -289,16 +140,6 @@ def _extract_roster_segment(body: str) -> tuple[str, str]:
     return "\n".join(lines[start:end]), "explicit"
 
 
-def _normalize_child_id(raw: str) -> str:
-    """Pad numeric prefix to 3 digits, preserving any letter suffix
-    (`27b` -> `027b`)."""
-    m = re.match(r"^(\d+)([a-z]?)$", raw)
-    if not m:
-        return raw
-    num, suffix = m.group(1), m.group(2)
-    return f"{int(num):03d}{suffix}"
-
-
 def discover_epics(repo_root: Path) -> list[Ticket]:
     """Return all epics across tickets/ and landed/, sorted by id."""
     epics: list[Ticket] = []
@@ -335,19 +176,6 @@ def compute_epic_progress(
         children.append(child)
     children.sort(key=lambda t: t.id)
     return EpicProgress(epic=epic, roster_kind=kind, children=children, missing_ids=missing)
-
-
-def build_ticket_index(repo_root: Path) -> dict[str, Ticket]:
-    """Merge tickets/ + landed/ + pre-existing/ into a single id → Ticket map."""
-    out: dict[str, Ticket] = {}
-    for sub in ("tickets", "landed", "pre-existing"):
-        d = repo_root / "docs" / "open-work" / sub
-        for t in load_tickets(d):
-            # First-write-wins: open tickets shadow landed if both exist
-            # (shouldn't happen in practice — land_ticket.py moves files —
-            # but `tickets/` order comes first so open wins by default).
-            out.setdefault(t.id, t)
-    return out
 
 
 def render_ticket_line(t: Ticket, repo_root: Path) -> str:

@@ -210,6 +210,29 @@ frame-diff BASELINE NEW HYPOTHESIS="":
 verdict *ARGS:
     @uv run scripts/verdict.py {{ARGS}}
 
+# Audit an epic dashboard's child-ticket roster against frontmatter
+# truth (ticket 318). Surfaces drift between the dashboard's claim and
+# each child's actual `status` / `blocked-by` / landed sha. Default
+# target is the substrate-refactor epic (060); pass `<id>` or a path
+# to audit a different dashboard.
+#
+# Drift kinds: consistent · landed-but-marked-active · landed-but-sha-stale
+# · status-mismatch · blocker-mismatch · missing-file · link-mismatch ·
+# unparseable-status. The first four are mechanically rewritten by
+# `--fix`; the rest need editorial attention.
+#
+# Exit codes: 0 consistent, 1 drift detected (or rewritten under --fix),
+# 2 epic not found / parse error. Hooked into `just check` via
+# `scripts/check_epic_children.sh`.
+#
+# Examples:
+#   just epic-children                                # default: 060
+#   just epic-children 060 --text                     # human summary
+#   just epic-children 060 --fix                      # rewrite drift rows
+#   just epic-children docs/open-work/tickets/060-...md
+epic-children *ARGS:
+    @uv run scripts/epic_children.py {{ARGS}}
+
 # Run a balance hypothesis end-to-end: baseline + treatment sweeps,
 # concordance check, draft balance doc. Formalizes the four-artifact
 # methodology (hypothesis / prediction / observation / concordance).
@@ -377,9 +400,9 @@ build:
 test:
     cargo test
 
-# Check + clippy + step-resolver contract lint + time-unit lint + IAUS-coherence lint + substrate-stub lint + items-are-real lint + influence-map-registry lint
+# Check + clippy + step-resolver contract lint + time-unit lint + IAUS-coherence lint + substrate-stub lint + items-are-real lint + influence-map-registry lint + epic-children roster drift (ticket 318)
 check:
-    cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh && bash scripts/check_time_units.sh && bash scripts/check_iaus_coherence.sh && bash scripts/check_substrate_stubs.sh && bash scripts/check_item_transfers.sh && bash scripts/check_influence_map_registry.sh
+    cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh && bash scripts/check_time_units.sh && bash scripts/check_iaus_coherence.sh && bash scripts/check_substrate_stubs.sh && bash scripts/check_item_transfers.sh && bash scripts/check_influence_map_registry.sh && bash scripts/check_epic_children.sh
 
 # Generate a random template authoring prompt
 template-prompt:
