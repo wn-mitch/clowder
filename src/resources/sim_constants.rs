@@ -62,6 +62,14 @@ pub struct SimConstants {
     /// `<Predator>` initialization, and the passive-decay stagger period.
     #[serde(default)]
     pub beliefs: BeliefsConstants,
+    /// Ticket 261 — ActionAffordances substrate. Per-action heuristic
+    /// weights + min-eligibility threshold + global sensing range. Five
+    /// family-grouped sub-structs; each kind carries an `AffordanceWeights`
+    /// quad. Lands as a behavior-neutral substrate (no DSE consumers at
+    /// land) — defaults are plausible v1 placeholders; tuning belongs to
+    /// the consumer tickets (263+) per the four-artifact methodology.
+    #[serde(default)]
+    pub affordances: AffordancesConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -6211,6 +6219,173 @@ impl Default for BeliefsConstants {
             low_ward_reserve_threshold: 2,
             reserve_strength_per_observation: 0.3,
             reserve_decay_per_stagger: 0.05,
+        }
+    }
+}
+
+// ---------- AffordancesConstants (ticket 261) ----------
+
+/// Per-action heuristic-input weights + eligibility floor. Each
+/// `ActionKind` heuristic in `affordance_writer` interprets the four
+/// weight slots in its own (documented) way; this uniform shape keeps the
+/// `SimConstants` footprint bounded while still letting balance work
+/// retune individual kinds. `min_eligibility` floors the raw heuristic —
+/// values below it write `0.0` so consumers see a hard gate, not a faint
+/// signal.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct AffordanceWeights {
+    /// Slot 1 — typically "proximity / distance closeness" or the primary
+    /// spatial input.
+    pub w1: f32,
+    /// Slot 2 — typically a belief-facet read (intent_clarity, hostility,
+    /// affiliation, receptivity, violence_capability, …).
+    pub w2: f32,
+    /// Slot 3 — typically a capability axis (speed differential, my health,
+    /// my inventory, cover at my position).
+    pub w3: f32,
+    /// Slot 4 — typically a context modifier (allies nearby, fox-scent
+    /// territory, ward coverage, age-stage relevance).
+    pub w4: f32,
+    /// Heuristic outputs below this threshold are written as `0.0`. The
+    /// hard gate makes "action not afforded" visible to consumers as a
+    /// distinct signal from "afforded but weakly".
+    pub min_eligibility: f32,
+}
+
+impl AffordanceWeights {
+    /// Plausible v1 default — four equal slots and a 0.10 floor.
+    /// Consumer tickets retune per-kind during their drift methodology.
+    pub fn default_quartet() -> Self {
+        Self {
+            w1: 0.25,
+            w2: 0.25,
+            w3: 0.25,
+            w4: 0.25,
+            min_eligibility: 0.10,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct PredationAffordanceConstants {
+    pub stalk: AffordanceWeights,
+    pub chase: AffordanceWeights,
+    pub pounce: AffordanceWeights,
+    pub dive: AffordanceWeights,
+    pub strike: AffordanceWeights,
+    pub ambush: AffordanceWeights,
+}
+
+impl Default for PredationAffordanceConstants {
+    fn default() -> Self {
+        Self {
+            stalk: AffordanceWeights::default_quartet(),
+            chase: AffordanceWeights::default_quartet(),
+            pounce: AffordanceWeights::default_quartet(),
+            dive: AffordanceWeights::default_quartet(),
+            strike: AffordanceWeights::default_quartet(),
+            ambush: AffordanceWeights::default_quartet(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct ThreatResponseAffordanceConstants {
+    pub flee: AffordanceWeights,
+    pub fight: AffordanceWeights,
+    pub freeze: AffordanceWeights,
+    pub fawn: AffordanceWeights,
+}
+
+impl Default for ThreatResponseAffordanceConstants {
+    fn default() -> Self {
+        Self {
+            flee: AffordanceWeights::default_quartet(),
+            fight: AffordanceWeights::default_quartet(),
+            freeze: AffordanceWeights::default_quartet(),
+            fawn: AffordanceWeights::default_quartet(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct ConflictLowAffordanceConstants {
+    pub threaten: AffordanceWeights,
+    pub posture: AffordanceWeights,
+    pub hiss: AffordanceWeights,
+}
+
+impl Default for ConflictLowAffordanceConstants {
+    fn default() -> Self {
+        Self {
+            threaten: AffordanceWeights::default_quartet(),
+            posture: AffordanceWeights::default_quartet(),
+            hiss: AffordanceWeights::default_quartet(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct SocialAffordanceConstants {
+    pub socialize: AffordanceWeights,
+    pub groom_other: AffordanceWeights,
+    pub mate: AffordanceWeights,
+    pub mentor: AffordanceWeights,
+    pub care: AffordanceWeights,
+    pub feed_kitten: AffordanceWeights,
+}
+
+impl Default for SocialAffordanceConstants {
+    fn default() -> Self {
+        Self {
+            socialize: AffordanceWeights::default_quartet(),
+            groom_other: AffordanceWeights::default_quartet(),
+            mate: AffordanceWeights::default_quartet(),
+            mentor: AffordanceWeights::default_quartet(),
+            care: AffordanceWeights::default_quartet(),
+            feed_kitten: AffordanceWeights::default_quartet(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct PreySideAffordanceConstants {
+    pub bolt: AffordanceWeights,
+    pub scatter_group: AffordanceWeights,
+}
+
+impl Default for PreySideAffordanceConstants {
+    fn default() -> Self {
+        Self {
+            bolt: AffordanceWeights::default_quartet(),
+            scatter_group: AffordanceWeights::default_quartet(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct AffordancesConstants {
+    /// Manhattan-distance sensing radius for affordance writes. Pairs of
+    /// `(perceiver, target)` beyond this range are not written; consumers
+    /// see the `0.0` default. Mirrors the belief-substrate `WITNESS_RANGE`
+    /// of 10 tiles by default.
+    pub sensing_range: i32,
+    pub predation: PredationAffordanceConstants,
+    pub threat_response: ThreatResponseAffordanceConstants,
+    pub conflict_low: ConflictLowAffordanceConstants,
+    pub social: SocialAffordanceConstants,
+    pub prey_side: PreySideAffordanceConstants,
+}
+
+impl Default for AffordancesConstants {
+    fn default() -> Self {
+        Self {
+            sensing_range: 10,
+            predation: PredationAffordanceConstants::default(),
+            threat_response: ThreatResponseAffordanceConstants::default(),
+            conflict_low: ConflictLowAffordanceConstants::default(),
+            social: SocialAffordanceConstants::default(),
+            prey_side: PreySideAffordanceConstants::default(),
         }
     }
 }

@@ -584,6 +584,16 @@ impl Plugin for SimulationPlugin {
                         // priors for nearby predators and decays facets
                         // toward priors on each cat's stagger tick.
                         systems::belief_integrator::integrate_beliefs,
+                        // 261 — ActionAffordances substrate writer. Reads
+                        // facets the integrator authored this tick (within
+                        // a single `.chain()` block so the ordering is
+                        // strict). Lands behavior-neutral: the resource
+                        // populates but no DSE reads from it. Folded into
+                        // Chain 2b (not a new top-level sibling) per the
+                        // schedule-edge perturbation memory — adding a
+                        // sibling can reshuffle Bevy's topological sort
+                        // and perturb seed-42 on unrelated systems.
+                        systems::affordance_writer::affordance_writer,
                         // 308 — author per-cat `HasLowWardReserve` from
                         // the just-updated `ColonyReservesBelief`. Runs
                         // after `integrate_beliefs` so the marker

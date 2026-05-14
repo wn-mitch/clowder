@@ -107,6 +107,13 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     // 256 R5: cat patrol deterrent map (read by fox A* via overlay).
     world.insert_resource(crate::resources::CatPatrolDeterrentMap::default());
     world.insert_resource(crate::resources::WardCoverageMap::default());
+    // 261: per-action success-affordance substrate. Populated by
+    // `affordance_writer` which is registered in Chain 2b of
+    // SimulationPlugin. Empty at scenario start; the writer (run by
+    // `runner`) fills it each tick. Behavior-neutral at land — no DSE
+    // consumers read it, so scenario assertions that don't reference
+    // affordances pass unchanged.
+    world.insert_resource(crate::resources::ActionAffordances::default());
     // 301: ward-placement intent map. Dormant at default
     // `SimConstants`; the populator short-circuits and the DSE
     // reader weight is 0.0. Inserted unconditionally because the
