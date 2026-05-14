@@ -51,10 +51,6 @@ pub struct FoxScoringContext<'a> {
     pub prey_nearby: bool,
     /// Prey belief at the fox's current location (from FoxHuntingBeliefs).
     pub local_prey_belief: f32,
-    /// Whether a colony store is visible and within raid range.
-    pub store_visible: bool,
-    /// Whether the visible store is guarded by cats.
-    pub store_guarded: bool,
     /// Number of cats within avoidance range.
     pub cats_nearby: usize,
     /// Whether a cat is within den defense range (and cubs are present).
@@ -230,7 +226,12 @@ pub fn score_fox_dse_by_id(dse_id: &str, ctx: &FoxScoringContext, inputs: &EvalI
     };
     let scalars = fox_ctx_scalars(ctx);
     let fetch_scalar = |name: &str, _: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
-    let has_marker = |_: &str, _: Entity| false;
+    // Ticket 051: route fox-side marker queries through `inputs.markers`
+    // so `EligibilityFilter::require` / `forbid` resolve correctly for
+    // `FoxRaidingDse`'s `StoreVisible` / `StoreGuarded` gates. The
+    // marker snapshot is authored per-tick by
+    // `fox_spatial::update_store_awareness_markers`.
+    let has_marker = |name: &str, entity: Entity| inputs.markers.has(name, entity);
     let entity_position = |_: Entity| -> Option<Position> { None };
     // §L2.10.7 fox-side anchor resolution. Reads the seven anchor
     // positions populated by `fox_goap.rs::build_scoring_context` once
@@ -344,12 +345,14 @@ pub fn score_fox_dispositions(
     }
 
     // Raiding: §2.3 fox row — CP of (hunger_urgency, cunning) via
-    // `FoxRaidingDse`. The `store_visible && !store_guarded` gate stays
-    // outer (same pattern as cat `Eat`'s `food_available` outer gate
-    // through Phase 3c.1a); Phase 3d flips it to marker-driven
-    // eligibility inside `EligibilityFilter`. §9.2 BefriendedAlly
-    // suppresses the gate — a befriended fox does not raid.
-    if ctx.store_visible && !ctx.store_guarded && !ctx.befriended_ally {
+    // `FoxRaidingDse`. Ticket 051: the `store_visible &&
+    // !store_guarded` outer gate retired into
+    // `.require(StoreVisible).forbid(StoreGuarded)` on the DSE; the
+    // `if score > 0.0` keeps the action out of the L3 pool when
+    // eligibility fails (preserving seed-42 pool size). §9.2
+    // `BefriendedAlly` suppression remains at the call site — a
+    // befriended fox does not raid.
+    if !ctx.befriended_ally {
         let score = score_fox_dse_by_id("fox_raiding", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Raiding, score + jitter(rng, j)));
@@ -518,8 +521,6 @@ mod tests {
             personality,
             prey_nearby: true,
             local_prey_belief: 0.5,
-            store_visible: false,
-            store_guarded: false,
             cats_nearby: 0,
             cat_threatening_den: false,
             ward_nearby: false,
@@ -773,12 +774,16 @@ mod tests {
             ..FoxPersonality::balanced()
         };
         let mut ctx = default_context(&needs, &personality, &SCORING);
-        ctx.store_visible = true;
-        ctx.store_guarded = false;
         ctx.prey_nearby = false;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        // Ticket 051: `store_visible`/`store_guarded` migrated from
+        // FoxScoringContext fields to §4 markers consumed by the
+        // `FoxRaidingDse`'s `EligibilityFilter`. Set the markers on
+        // the test fox entity instead of mutating ctx fields.
+        let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+        let fox_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity(crate::components::markers::StoreVisible::KEY, fox_entity, true);
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
@@ -808,13 +813,16 @@ mod tests {
             ..FoxPersonality::balanced()
         };
         let mut ctx = default_context(&needs, &personality, &SCORING);
-        ctx.store_visible = true;
-        ctx.store_guarded = false;
         ctx.prey_nearby = false;
         ctx.befriended_ally = true;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        // Ticket 051: marker substrate. The DSE-eligibility test runs
+        // even with markers set; the §9.2 `BefriendedAlly` suppression
+        // intercepts at the `score_fox_dispositions` call site.
+        let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+        let fox_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity(crate::components::markers::StoreVisible::KEY, fox_entity, true);
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());

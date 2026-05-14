@@ -10,13 +10,14 @@
 //! either axis at 0 zeroes the DSE — a cunning but well-fed fox won't
 //! raid; a starving but dim fox won't raid either.
 //!
-//! **Eligibility gate.** The old inline block requires
-//! `store_visible && !store_guarded`. §2.3 formalizes this as a
-//! context-tag filter (§4) — markers like `HasVisibleStore` +
-//! `!StoreGuarded`. Phase 3c.1b keeps the gate at the outer
-//! `score_fox_dispositions` level (same pattern as Eat's
-//! `food_available` outer gate through 3c.1a); Phase 3d flips it to
-//! marker-driven eligibility when the authoring systems land.
+//! **Eligibility gate.** Ticket 051 migrates the old inline
+//! `store_visible && !store_guarded` outer gate to the §4 marker
+//! substrate: `.require(StoreVisible).forbid(StoreGuarded)` on the
+//! filter, with `StoreVisible` / `StoreGuarded` authored per-tick by
+//! `fox_spatial::update_store_awareness_markers`. The §9.2
+//! `BefriendedAlly` suppression remains at the
+//! `score_fox_dispositions` call site (per-fox coarsening orthogonal
+//! to the §4 marker layer).
 //!
 //! **Magnitude delta vs. inline.** Old formula:
 //! `hunger_urgency × cunning × 1.2 × l1` — the `× 1.2` amplifier
@@ -37,6 +38,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::ai::faction::StanceRequirement;
+use crate::components::markers;
 
 pub const HUNGER_INPUT: &str = "hunger_urgency";
 pub const CUNNING_INPUT: &str = "cunning";
@@ -98,9 +100,13 @@ impl FoxRaidingDse {
             // natural per-axis ceilings dominate.
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
             // §9.3 DSE filter binding — FoxRaid treats colony stores /
-            // cats as `Prey` per the fox→cat row (`StoreVisible` marker
-            // refinement remains an outer gate — §4 port is Phase 3d).
-            eligibility: EligibilityFilter::new().with_stance(StanceRequirement::hunt()),
+            // cats as `Prey` per the fox→cat row. Ticket 051: the
+            // `store_visible && !store_guarded` outer gate retires into
+            // `.require(StoreVisible).forbid(StoreGuarded)` here.
+            eligibility: EligibilityFilter::new()
+                .with_stance(StanceRequirement::hunt())
+                .require(markers::StoreVisible::KEY)
+                .forbid(markers::StoreGuarded::KEY),
         }
     }
 }

@@ -140,14 +140,12 @@ fn build_scoring_context<'a>(
     let prey_nearby = prey_positions
         .iter()
         .any(|p| p.manhattan_distance(&fox_pos) <= 9);
-    let store_visible = store_positions
-        .iter()
-        .any(|p| p.manhattan_distance(&fox_pos) <= 12);
-    let store_guarded = store_positions.iter().any(|sp| {
-        cat_positions
-            .iter()
-            .any(|cp| cp.manhattan_distance(sp) <= 5)
-    });
+    // Ticket 051: `store_visible` / `store_guarded` migrated from
+    // FoxScoringContext booleans to the §4 marker substrate authored
+    // by `fox_spatial::update_store_awareness_markers`. The DSE's
+    // `EligibilityFilter::require(StoreVisible).forbid(StoreGuarded)`
+    // resolves through the snapshot, so the build-context local
+    // computations retired in lockstep.
 
     // Cat threatening the den if any cat is within 5 tiles AND cubs are present.
     let cat_threatening_den = cubs_present_count > 0
@@ -190,8 +188,6 @@ fn build_scoring_context<'a>(
         personality,
         prey_nearby,
         local_prey_belief,
-        store_visible,
-        store_guarded,
         cats_nearby,
         cat_threatening_den,
         ward_nearby: false,
