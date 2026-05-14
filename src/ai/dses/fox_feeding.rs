@@ -6,7 +6,12 @@
 //! threshold; gentler than adult hangry at 8/0.75 because adults
 //! buffer the gap) and `protectiveness` via Linear. Both gate.
 //!
-//! Eligibility: `has_cubs && cubs_hungry` (outer gate).
+//! **Eligibility gate.** Ticket 051 migrates the old `has_cubs &&
+//! cubs_hungry` outer gate to the §4 marker substrate:
+//! `.require(HasCubs).require(CubsHungry)` on the filter, with both
+//! markers authored per-tick by `fox_spatial::update_cub_marker` /
+//! `update_cub_hunger_markers` (semantics-preserving — see ticket 050
+//! for the event-driven follow-on).
 
 use bevy::prelude::*;
 
@@ -18,6 +23,7 @@ use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::components::markers;
 
 pub const CUB_SATIATION_DEFICIT_INPUT: &str = "cub_satiation_deficit";
 pub const PROTECTIVENESS_INPUT: &str = "protectiveness";
@@ -70,7 +76,12 @@ impl FoxFeedingDse {
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0]),
-            eligibility: EligibilityFilter::new(),
+            // Ticket 051: the `has_cubs && cubs_hungry` outer gate at
+            // `fox_scoring.rs::score_fox_dispositions` retires into
+            // `.require(HasCubs).require(CubsHungry)` here.
+            eligibility: EligibilityFilter::new()
+                .require(markers::HasCubs::KEY)
+                .require(markers::CubsHungry::KEY),
         }
     }
 }

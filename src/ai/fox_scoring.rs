@@ -417,8 +417,12 @@ pub fn score_fox_dispositions(
 
     // Feeding: §2.3 CP of cub_satiation_deficit (Logistic(7, 0.6))
     // + protectiveness (Linear). Maslow tier 3 pre-gate applied
-    // inside evaluate_single.
-    if ctx.has_cubs && ctx.cubs_hungry {
+    // inside evaluate_single. Ticket 051: the `has_cubs &&
+    // cubs_hungry` outer gate retired into
+    // `.require(HasCubs).require(CubsHungry)` on the DSE; `if score
+    // > 0.0` keeps the action out of the L3 pool when eligibility
+    // fails (preserves seed-42 pool size).
+    {
         let score = score_fox_dse_by_id("fox_feeding", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Feeding, score + jitter(rng, j)));
@@ -676,7 +680,14 @@ mod tests {
         ctx.cubs_hungry = true;
         let registry = test_fox_registry(&SCORING);
         let modifiers = ModifierPipeline::new();
-        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        // Ticket 051: FoxFeedingDse eligibility migrated to the §4
+        // marker substrate (`HasCubs` + `CubsHungry`). Set the
+        // markers on the test fox entity so the DSE's eligibility
+        // filter resolves truthfully.
+        let mut markers = crate::ai::scoring::MarkerSnapshot::new();
+        let fox_entity = Entity::from_raw_u32(1).unwrap();
+        markers.set_entity(crate::components::markers::HasCubs::KEY, fox_entity, true);
+        markers.set_entity(crate::components::markers::CubsHungry::KEY, fox_entity, true);
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
