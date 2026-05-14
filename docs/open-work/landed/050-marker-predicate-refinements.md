@@ -1,7 +1,7 @@
 ---
 id: 050
 title: §4 marker predicate refinements — species-attenuated threat, ward-near-fox truth, event-driven cubs/den
-status: ready
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats]
 added: 2026-04-27
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, sensory.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-14
 ---
 
 ## Why
@@ -105,3 +105,49 @@ hypothesis. Soak verdict expected:
   large-fill). Three predicate-refinement follow-ons surfaced
   during the marker port: species-attenuated threat detection,
   truthful ward-near-fox predicate, event-driven cub/den authoring.
+- 2026-05-14: landed across three commits paired with 051's fox DSE
+  eligibility migration. **(6) WardNearbyFox** (ukvzvqnt): per-tick
+  scan over wards using each ward's `repel_radius()` (per-kind base
+  × current strength) — decayed wards lose marker reach before they
+  despawn; inverted (predator-attracting) wards still emit a
+  detectable signal. No DSE consumes the marker yet (future
+  fox-flee-from-wards work); the `FoxScoringContext.ward_nearby`
+  field stays unread for now. **(7) Event-driven HasDen / HasCubs**
+  (wvkwmotu): new `src/messages/fox_lifecycle.rs` with `DenClaimed`,
+  `DenLost { Maturation | Death | Abandoned }`, and `CubsBorn`
+  message types. Emit sites: `spawn_initial_fox_dens` (founder
+  pair), `breed_at_dens` (CubsBorn + per-cub DenClaimed),
+  `fox_lifecycle_tick` cub-maturation (DenLost{Maturation}) and
+  fox-death paths (DenLost{Death}). `update_den_marker` becomes
+  pure event-driven; `update_cub_marker` is hybrid (CubsBorn inserts
+  on the mother, an O(marked-foxes) reconciliation removes when
+  cubs_present decays to 0 or the den is lost). Predicate semantics
+  unchanged. **(8) HasThreatNearby sensory pipeline** (opovwmrm):
+  the flat `wildlife_threat_range` Manhattan-scan retires;
+  `update_target_existence_markers` flows threat detection through
+  `observer_sees_at` with the cat's `SensoryProfile` × the
+  `SensorySignature::WILDLIFE` per-channel factors, capped by the
+  existing 10-tile outer bound. Wildlife snapshot carries
+  `(WildSpecies, Position)` so the per-target-species signature
+  refinement (different Fox vs Hawk vs Snake vs ShadowFox signatures)
+  can drop in without re-shaping this author.
+- 2026-05-14: scope notes — the "species-attenuated" framing in (8)
+  is partially realized: per-channel detection respects the cat's
+  profile (sight 10×0.8 / hearing 8×0.5 / scent 15×0.9 capped at 10).
+  Per-target-species `SensorySignature` (varying visual / auditory /
+  olfactory / tremor factors per wildlife type) is parked as a
+  follow-on once the per-species signatures are designed. The
+  HasCubs event-driven path uses a hybrid (event-insert +
+  per-flagged-fox reconciliation-remove) because the data model has
+  no mother→cub linkage; full event-driven HasCubs would require
+  adding `mother: Option<Entity>` to `FoxDen` or threading a per-cub
+  `mother: Entity` field on `FoxState`. Either change is non-trivial
+  and out of scope here.
+- 2026-05-14: full lib suite passing (2158/2158); `just check`
+  green per commit. Survival + continuity canaries pass on the
+  post-051 soak (seed-42, 15min, Simba focal). Footer drift versus
+  the promoted `tuned-42-post-297-substrate-dormant` baseline is
+  material but inherits substrate landings between 297 and 051
+  (the 263 dormant axes, 261 ActionAffordances, etc.); a fresh
+  post-050 baseline comparison against the post-051 archive
+  isolates 050's marginal drift.
