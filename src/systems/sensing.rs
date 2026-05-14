@@ -809,7 +809,10 @@ pub fn update_target_existence_markers(
             Without<markers::Buried>,
         ),
     >,
-    wildlife_q: Query<&Position, (With<crate::components::wildlife::WildAnimal>, Without<Dead>)>,
+    wildlife_q: Query<
+        (&crate::components::wildlife::WildAnimal, &Position),
+        Without<Dead>,
+    >,
     herb_q: Query<
         &Position,
         (
@@ -835,7 +838,13 @@ pub fn update_target_existence_markers(
 
     let cat_positions: Vec<(Entity, Position)> =
         cat_positions_q.iter().map(|(e, p)| (e, *p)).collect();
-    let wildlife_positions: Vec<Position> = wildlife_q.iter().copied().collect();
+    // Ticket 050: collect (species, position) so the sensory-aware
+    // detection path can attenuate by per-target-species signature in
+    // a follow-on (today every wildlife emits `SensorySignature::WILDLIFE`,
+    // but the species is carried so future per-species signatures can
+    // land without re-shaping the snapshot).
+    let wildlife_positions: Vec<(crate::components::wildlife::WildSpecies, Position)> =
+        wildlife_q.iter().map(|(w, p)| (w.species, *p)).collect();
     let herb_positions: Vec<Position> = herb_q.iter().copied().collect();
     let prey_positions: Vec<Position> = prey_q.iter().copied().collect();
     let carcass_positions: Vec<Position> = carcass_q
@@ -855,9 +864,27 @@ pub fn update_target_existence_markers(
     for (entity, pos, cur_threat, cur_social, cur_herbs, cur_prey, cur_carcass, cur_unburied) in
         cats.iter()
     {
-        let want_threat = wildlife_positions
-            .iter()
-            .any(|wp| pos.manhattan_distance(wp) <= threat_range);
+        // Ticket 050: the flat Manhattan-distance scan retires; threat
+        // detection now flows through the cat's `SensoryProfile`
+        // (channel ranges × `SensorySignature::WILDLIFE` per-channel
+        // factors), capped by the existing `wildlife_threat_range`
+        // outer bound. Behavior-equivalent in the steady state (the
+        // strongest channel — scent at 15 — is capped by the 10-tile
+        // outer bound), but routes through the sensing pipeline so a
+        // future per-target-species `SensorySignature` can drop in
+        // without re-shaping this author. Wildlife species is carried
+        // alongside the position so the per-species refinement can
+        // land cleanly.
+        let want_threat = wildlife_positions.iter().any(|(_species, wp)| {
+            crate::systems::sensing::observer_sees_at(
+                crate::components::SensorySpecies::Cat,
+                *pos,
+                cat_profile,
+                *wp,
+                crate::components::SensorySignature::WILDLIFE,
+                threat_range as f32,
+            )
+        });
 
         // The existence-check uses a no-op stance overlay closure: a
         // pre-check that returns "yes, candidate exists" for a Banished
