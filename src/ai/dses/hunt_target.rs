@@ -65,6 +65,8 @@ use crate::ai::target_dse::{
 use crate::components::physical::Position;
 use crate::components::prey::PreyKind;
 use crate::components::RecentTargetFailures;
+use crate::resources::action_affordances::{ActionAffordances, ActionKind};
+use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::systems::plan_substrate::{
     cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
@@ -72,6 +74,13 @@ use crate::systems::plan_substrate::{
 
 pub const PREY_YIELD_INPUT: &str = "prey_yield";
 pub const PREY_CALM_INPUT: &str = "prey_calm";
+/// 263 — `max(Affordance(Stalk|Chase|Pounce))` for `(self, prey)`
+/// from substrate 261. Encodes "is this prey actually catchable in
+/// any predation form?" as an orthogonal axis to yield + alertness +
+/// cooldown. Belief reads (intent_clarity, etc.) live at the
+/// affordance layer per the architectural rule — Hunt does NOT add
+/// a direct `perceived_intent_clarity` axis.
+pub const BEST_PREDATION_AFFORDANCE_INPUT: &str = "hunt_best_predation_affordance";
 
 /// Candidate-pool range in Manhattan tiles. Matches the cat sensory
 /// profile's visual detection range (15) — the same outer gate that
@@ -100,7 +109,14 @@ pub struct PreyCandidate {
 }
 
 /// §6.5.5 `Hunt` target-taking DSE factory.
-pub fn hunt_target_dse() -> TargetTakingDse {
+///
+/// 263: takes `&ScoringConstants` so the 5th per-target axis
+/// `hunt_best_predation_affordance` is conditionally added when
+/// `hunt_best_predation_weight > 0.0`. At dormant default (0.0) the
+/// composition is byte-identical to pre-263 (four weights, no
+/// affordance axis). At non-zero weight the other four are scaled by
+/// `(1 - w)` so the WeightedSum stays at 1.0.
+pub fn hunt_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
     let linear = Curve::Linear {
         slope: 1.0,
         intercept: 0.0,
@@ -118,41 +134,60 @@ pub fn hunt_target_dse() -> TargetTakingDse {
         post: PostOp::Invert,
     };
 
+    let mut considerations: Vec<Consideration> = vec![
+        Consideration::Spatial(SpatialConsideration::new(
+            "hunt_pursuit_cost",
+            LandmarkSource::TargetPosition,
+            HUNT_TARGET_RANGE,
+            pursuit_cost_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(PREY_YIELD_INPUT, linear.clone())),
+        Consideration::Scalar(ScalarConsideration::new(PREY_CALM_INPUT, linear.clone())),
+        // Ticket 073 — recently-failed target cooldown (audit gap #2).
+        // Hunting amplification: Mocha's 109× `HarvestCarcass` failure
+        // pattern came from a stuck loop where the dead-or-blocked
+        // carcass kept winning the candidate set. The cooldown breaks
+        // the loop by penalizing the same-target re-pick.
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_RECENT_FAILURE_INPUT,
+            cooldown_curve(),
+        )),
+    ];
+    // Pre-263 weights — three §6.5.5 axes renormalized ×(3/4) plus
+    // cooldown at 1/4. Sums to ~1.0.
+    let base_weights = [0.357 * 3.0 / 4.0, 0.357 * 3.0 / 4.0, 0.286 * 3.0 / 4.0, 1.0 / 4.0];
+    let aff_w = scoring.hunt_best_predation_weight.clamp(0.0, 1.0);
+    let mut weights: Vec<f32> = if aff_w > 0.0 {
+        // Renormalize the four pre-263 weights by (1 - aff_w) so the
+        // WeightedSum still sums to 1.0 with the new 5th axis.
+        let scale = 1.0 - aff_w;
+        base_weights.iter().map(|w| w * scale).collect()
+    } else {
+        base_weights.to_vec()
+    };
+    if aff_w > 0.0 {
+        // 263: `hunt_best_predation_affordance` per-target axis. The
+        // `fetch_target` closure computes max(Affordance(Stalk),
+        // Affordance(Chase), Affordance(Pounce)) for this (self,
+        // target). Linear over [0,1] — the substrate writer is the
+        // canonical shaping site.
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            BEST_PREDATION_AFFORDANCE_INPUT,
+            linear,
+        )));
+        weights.push(aff_w);
+    }
+
     TargetTakingDse {
         id: DseId("hunt_target"),
         candidate_query: hunt_candidate_query_doc,
-        per_target_considerations: vec![
-            Consideration::Spatial(SpatialConsideration::new(
-                "hunt_pursuit_cost",
-                LandmarkSource::TargetPosition,
-                HUNT_TARGET_RANGE,
-                pursuit_cost_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(PREY_YIELD_INPUT, linear.clone())),
-            Consideration::Scalar(ScalarConsideration::new(PREY_CALM_INPUT, linear)),
-            // Ticket 073 — recently-failed target cooldown (audit gap #2).
-            // Hunting amplification: Mocha's 109× `HarvestCarcass` failure
-            // pattern came from a stuck loop where the dead-or-blocked
-            // carcass kept winning the candidate set. The cooldown breaks
-            // the loop by penalizing the same-target re-pick.
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_RECENT_FAILURE_INPUT,
-                cooldown_curve(),
-            )),
-        ],
+        per_target_considerations: considerations,
         // WeightedSum — matches the §6.1-Critical spec decision that
         // no axis should null a candidate (a loud rabbit is still
         // huntable). CompensatedProduct would gate alertness at 1.0,
         // and the spec explicitly wants alertness as a linear bias,
         // not a multiplicative lock-out.
-        // Original three weights (0.357/0.357/0.286) renormalized
-        // ×(3/4) to make room for the cooldown axis at 1/4. Sums to ~1.0.
-        composition: Composition::weighted_sum(vec![
-            0.357 * 3.0 / 4.0,
-            0.357 * 3.0 / 4.0,
-            0.286 * 3.0 / 4.0,
-            1.0 / 4.0,
-        ]),
+        composition: Composition::weighted_sum(weights),
         aggregation: TargetAggregation::Best,
         intention: hunt_intention,
         // §9.3 Hunt accepts `Prey` only. Migrated from the cat-action
@@ -224,6 +259,11 @@ pub fn resolve_hunt_target(
     recent: Option<&RecentTargetFailures>,
     cooldown_ticks: u64,
     activation: Option<&mut SystemActivation>,
+    // 263 — ActionAffordances resource for the 5th per-target axis
+    // (`hunt_best_predation_affordance`). Reads return `0.0` for any
+    // `(cat, target, kind)` not populated by the writer this tick,
+    // which is also the dormant-axis outcome.
+    affordances: &ActionAffordances,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -285,7 +325,7 @@ pub fn resolve_hunt_target(
 
     let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
-    let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
+    let fetch_target = |name: &str, perceiver: Entity, target: Entity| -> f32 {
         match name {
             PREY_YIELD_INPUT => kind_map
                 .get(&target)
@@ -305,6 +345,20 @@ pub fn resolve_hunt_target(
                     cooldown_was_applied.set(true);
                 }
                 signal
+            }
+            // 263: max-of-three predation affordances. The substrate
+            // writer's heuristic already composes proximity + cover +
+            // belief facets (intent_clarity, etc.) per ActionKind,
+            // so the DSE-side read is one branch-free max() that
+            // picks "the most-afforded predation approach". Returns
+            // 0.0 for any (cat, target, kind) the writer didn't
+            // populate this tick (out of sensing range, species-gated,
+            // below min_eligibility) — the substrate's gate signal.
+            BEST_PREDATION_AFFORDANCE_INPUT => {
+                let stalk = affordances.read(perceiver, target, ActionKind::Stalk);
+                let chase = affordances.read(perceiver, target, ActionKind::Chase);
+                let pounce = affordances.read(perceiver, target, ActionKind::Pounce);
+                stalk.max(chase).max(pounce)
             }
             _ => 0.0,
         }
@@ -377,29 +431,66 @@ mod tests {
 
     #[test]
     fn hunt_target_dse_id_stable() {
-        assert_eq!(hunt_target_dse().id().0, "hunt_target");
+        assert_eq!(hunt_target_dse(&ScoringConstants::default()).id().0, "hunt_target");
     }
 
     #[test]
     fn hunt_target_has_four_axes() {
         // Ticket 073 — three legacy axes + the cooldown axis = four.
-        assert_eq!(hunt_target_dse().per_target_considerations().len(), 4);
+        // Ticket 263 — affordance 5th axis is conditional on
+        // `hunt_best_predation_weight > 0.0`; dormant default keeps
+        // the axis count at 4.
+        assert_eq!(hunt_target_dse(&ScoringConstants::default()).per_target_considerations().len(), 4);
     }
 
     #[test]
     fn hunt_target_weights_sum_to_one() {
-        let sum: f32 = hunt_target_dse().composition().weights.iter().sum();
+        let sum: f32 = hunt_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-3);
     }
 
     #[test]
+    fn hunt_best_predation_axis_dormant_at_default() {
+        // 263: `hunt_best_predation_weight` ships at 0.0; the 5th
+        // axis MUST NOT appear. The four base weights are unchanged.
+        let s = ScoringConstants::default();
+        assert_eq!(s.hunt_best_predation_weight, 0.0);
+        let dse = hunt_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 4);
+        assert!(dse.per_target_considerations().iter().all(|c| !matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == BEST_PREDATION_AFFORDANCE_INPUT
+        )));
+        // WeightedSum still totals ~1.0 at dormant.
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn hunt_best_predation_axis_present_and_renormalized_when_active() {
+        // 263: when the activation follow-on lifts the weight, the 5th
+        // axis appears and the other four are scaled by `(1 - w)` so
+        // the WeightedSum stays at 1.0.
+        let mut s = ScoringConstants::default();
+        s.hunt_best_predation_weight = 0.15;
+        let dse = hunt_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 5);
+        assert_eq!(dse.composition().weights.len(), 5);
+        // Last weight is the affordance weight verbatim.
+        assert!((dse.composition().weights[4] - 0.15).abs() < 1e-4);
+        // Total still sums to 1.0.
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    #[test]
     fn hunt_target_uses_best_aggregation() {
-        assert_eq!(hunt_target_dse().aggregation(), TargetAggregation::Best);
+        assert_eq!(hunt_target_dse(&ScoringConstants::default()).aggregation(), TargetAggregation::Best);
     }
 
     #[test]
     fn intention_is_hunt_prey_goal() {
-        let dse = hunt_target_dse();
+        let dse = hunt_target_dse(&ScoringConstants::default());
         let target = Entity::from_raw_u32(10).unwrap();
         let intention = (dse.intention)(target);
         match intention {
@@ -453,6 +544,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert!(out.is_none());
     }
@@ -460,7 +552,7 @@ mod tests {
     #[test]
     fn resolver_returns_none_with_empty_candidates() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse());
+        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let out = resolve_hunt_target(
             &registry,
@@ -474,6 +566,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert!(out.is_none());
     }
@@ -483,7 +576,7 @@ mod tests {
         // §6.1 Partial fix demo: Rabbit (yield=0.8125) wins over Mouse
         // (yield=0.625) when distance and alertness are tied.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse());
+        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let mouse = candidate(2, 3, 0, PreyKind::Mouse, 0.2);
         let rabbit = candidate(3, 0, 3, PreyKind::Rabbit, 0.2);
@@ -500,6 +593,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert_eq!(out, Some(rabbit.entity));
     }
@@ -513,7 +607,7 @@ mod tests {
         //       Mouse score  = 1.0*0.357 + 0.625*0.357 + 1.0*0.286
         //                    ≈ 0.357 + 0.223 + 0.286 = 0.866
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse());
+        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let alert_rabbit = candidate(2, 1, 0, PreyKind::Rabbit, 0.95);
         let relaxed_mouse = candidate(3, 0, 1, PreyKind::Mouse, 0.0);
@@ -530,6 +624,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert_eq!(out, Some(relaxed_mouse.entity));
     }
@@ -537,7 +632,7 @@ mod tests {
     #[test]
     fn close_prey_outscores_distant_same_species() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse());
+        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = candidate(2, 2, 0, PreyKind::Rabbit, 0.2);
         let far = candidate(3, 12, 0, PreyKind::Rabbit, 0.2);
@@ -554,6 +649,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert_eq!(out, Some(close.entity));
     }
@@ -567,7 +663,7 @@ mod tests {
         // (its distance crosses the midpoint=range/2) while the Mouse
         // sits near 1.0 (well below the midpoint).
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse());
+        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let near_mouse = candidate(2, 1, 0, PreyKind::Mouse, 0.1);
         let far_rat = candidate(3, 10, 0, PreyKind::Rat, 0.1);
@@ -584,6 +680,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert_eq!(out, Some(near_mouse.entity));
     }
@@ -597,7 +694,7 @@ mod tests {
         // still wins when the quadratic nearness gap is smaller than
         // the yield gap. Verified by the higher-yield test above.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse());
+        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let near = candidate(2, 1, 0, PreyKind::Mouse, 0.2);
         let far = candidate(3, 5, 0, PreyKind::Mouse, 0.2);
@@ -614,6 +711,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert_eq!(out, Some(near.entity));
     }
@@ -621,7 +719,7 @@ mod tests {
     #[test]
     fn hunt_target_stance_requirement_is_prey_only() {
         use crate::ai::faction::FactionStance;
-        let req = hunt_target_dse()
+        let req = hunt_target_dse(&ScoringConstants::default())
             .required_stance
             .expect("§9.3 binding must populate required_stance");
         assert!(req.accepts(FactionStance::Prey));
@@ -639,9 +737,9 @@ mod tests {
         // distance 1 vs distance 14 — the close one wins, and its
         // aggregated score is meaningfully larger than the far one's
         // (not just argmax different).
-        let dse = hunt_target_dse();
+        let dse = hunt_target_dse(&ScoringConstants::default());
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse());
+        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = candidate(2, 1, 0, PreyKind::Rabbit, 0.2);
         let far = candidate(3, 14, 0, PreyKind::Rabbit, 0.2);
@@ -658,6 +756,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert_eq!(out, Some(close.entity));
 
@@ -678,7 +777,7 @@ mod tests {
         // Prey, so a befriended prey candidate should be filtered out
         // before evaluate_target_taking.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse());
+        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let befriended = candidate(2, 1, 0, PreyKind::Mouse, 0.2);
         let normal = candidate(3, 0, 1, PreyKind::Mouse, 0.2);
@@ -704,6 +803,7 @@ mod tests {
             None,
             8000,
             None,
+            &ActionAffordances::default(),
         );
         assert_eq!(
             out,

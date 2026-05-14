@@ -599,6 +599,14 @@ pub struct ExecutorContext<'w, 's> {
     /// mutable `cats` query because cats are filtered `Without<Dead>`
     /// and we read `Has<Dead>` rather than `&Dead`).
     pub target_validity: crate::systems::plan_substrate::target::TargetValidityQuery<'w, 's>,
+    /// 263 — `ActionAffordances` resource borrow for the
+    /// SearchPrey path's per-target affordance read
+    /// (`hunt_best_predation_affordance` axis) and the EngagePrey
+    /// resolver's phase-band bias (C5). Threaded here so step
+    /// resolvers reach the substrate through the existing context
+    /// instead of needing a new SystemParam slot.
+    pub action_affordances:
+        Res<'w, crate::resources::action_affordances::ActionAffordances>,
 }
 
 impl<'w, 's> ExecutorContext<'w, 's> {
@@ -4476,6 +4484,7 @@ fn dispatch_step_action(
             ec.constants
                 .planning_substrate
                 .target_failure_cooldown_ticks,
+            &ec.action_affordances,
         ),
 
         GoapActionKind::EngagePrey => {
@@ -6793,6 +6802,11 @@ fn resolve_search_prey(
     // ticks from `SimConstants::planning_substrate`.
     recent_failures: Option<&crate::components::RecentTargetFailures>,
     cooldown_ticks: u64,
+    // 263: ActionAffordances resource for the hunt-target 5th
+    // per-target axis (`hunt_best_predation_affordance`). Threaded
+    // from `ColonyContext.action_affordances` at the
+    // `GoapActionKind::SearchPrey` arm.
+    action_affordances: &crate::resources::action_affordances::ActionAffordances,
 ) -> crate::steps::StepResult {
     use crate::components::magic::ItemSlot;
 
@@ -6964,6 +6978,10 @@ fn resolve_search_prey(
             // canary; revisit if hunt-cooldown observability becomes a
             // live diagnostic question.
             None,
+            // 263: ActionAffordances borrow for the 5th per-target
+            // axis. Dormant at default — reads return 0.0 and the
+            // axis is omitted from the composition anyway.
+            action_affordances,
         );
         if let Some(prey_entity) = picked {
             state.target_entity = Some(prey_entity);
