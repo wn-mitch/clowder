@@ -1,12 +1,12 @@
 ---
 id: 129
 title: Care DSEs over perceivable intentions
-status: ready
+status: blocked
 cluster: social-coordination
 initiative: []
 added: 2026-05-02
 parked: null
-blocked-by: []
+blocked-by: [242, 243]
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -16,21 +16,29 @@ landed-on: null
 
 ## Why
 
-Spun out of 126 (`## Out of scope`). 126 makes per-cat
-`HeldIntention` visible to other cats' DSEs via standard Bevy
-queries. The helper-side consumer DSEs that *read* other cats'
-intentions and adopt their own intentions in response — "Hazel
-intends to rest because injured → I form an intention to make her
-soup" — are the next layer up.
+Spun out of 126 (`## Out of scope`). The helper-side consumer DSEs
+that perceive another cat's need-state and adopt their own care
+intentions in response — "Hazel is injured and resting → I form an
+intention to make her soup" — are the next layer up.
+
+Per 126's narrative-discipline framing, the helper does **not** read
+the target's `HeldIntention` directly (that's actor-private; reading
+it would be mind-reading). Instead the helper perceives the practice
+through observable cues — `Injured + HeadDownCurled`, distress
+calls, witnessed events — and through reverse-engineered belief
+facets on `MentalModel<Cat>` (258). The fallibility of body-cue
+reads (`HeadDownCurled` is also Mourning, also Resting-uninjured) is
+first-class narrative texture, not noise to engineer out.
 
 The shape this ticket has to commit:
 
 - A `Caretake_target` (or named per care archetype: `Comfort`,
   `Provision`, `Defend`) target-taking DSE following the §6
-  pattern, whose candidate query includes cats holding
-  `HeldIntention { intention: Goal { state: rest, .. }, .. }`
-  alongside `Injured`/`LowHealth`/`HungryAndImmobile`/etc.
-  markers.
+  pattern, whose candidate query consumes 243's target-side
+  body-cue + physical-marker read surface (`Injured`,
+  `LowHealth`, `HungryAndImmobile`, `HeadDownCurled`, …) and
+  258's `MentalModel<Cat>` belief facets (`perceived_injury_level`,
+  `perceived_intent_clarity`, `recency_of_threat_cue`).
 - Care-task HTN composition (or, pre-128, a hand-authored
   decomposition): "make soup for Hazel" → `[forage-ingredients,
   return-to-firepit, cook, deliver]`.
@@ -41,17 +49,28 @@ The shape this ticket has to commit:
   `Caretake_target` weight curve so role differentiation emerges
   without a director.
 
+Naming note: `src/ai/dses/caretake_target.rs` already exists for
+kitten-feeding (hunger + kinship); the adult-care sibling here will
+need a disambiguating name (or partition the existing DSE) at
+implementation time.
+
 Not in scope here; this is the placeholder for the design.
 
 ## Dependencies
 
-- Blocked by 126 (`HeldIntention` perceivability is the
-  prerequisite).
+- Blocked by 242 (body-cue substrate — authors the observable
+  markers the helper reads) and 243 (target-side L1 read channel —
+  shared surface that 129 / 245 / 127 all consume).
+- 126 + 258 already landed and define the framing: 126 makes
+  `HeldIntention` actor-private and routes perception through
+  observables; 258 provides `MentalModel<Cat>` belief facets.
 - Pairs with 080 (Reserved soft-claim primitive — extend to
   goal-level claims).
 - Pairs with 128 (HTN methods would author the care decomposition
   cleanly, but this ticket can ship pre-128 with a
   hand-authored sequence).
+- Future composition with 244 (audible-cue substrate) once that
+  lands — distress calls extend the care-perception channel.
 
 ## Related work
 
@@ -67,3 +86,15 @@ Not in scope here; this is the placeholder for the design.
 
 - 2026-05-02: opened as 126 follow-on per CLAUDE.md
   antipattern-migration rule.
+- 2026-05-15: reframed. 126 (landed 2026-05-08) made `HeldIntention`
+  actor-private and explicitly forbade cross-cat reads as
+  mind-reading; 258 (landed 2026-05-11) provided `MentalModel<Cat>`
+  belief facets reverse-engineered from observables; 243 names this
+  ticket as a consumer of the shared body-cue read channel
+  (alongside 245 predator/prey and 127 joint-intention). Updated
+  `blocked-by` to `[242, 243]`; rewrote §Why and §Dependencies to
+  read body cues + belief facets via the 243 surface rather than
+  the target's `HeldIntention` directly. Deliverable (helper-side
+  Care DSE for adults + goal-granularity soft-claim + compassion
+  personality bias) unchanged and still uncovered by any landed
+  ticket.
