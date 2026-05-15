@@ -63,3 +63,9 @@ __pycache__/
 !.claude/skills/*/
 .claude/skills/*/*
 !.claude/skills/*/SKILL.md
+
+# Polecat workspace artifacts (foreman.sh runtime state — per-workspace PID
+# files, captured stream-json, wallclock sentinel deadline). These belong
+# under ~/clowder-sessions/<slug>/ and never on main.
+.polecat-*
+.session-info.json
