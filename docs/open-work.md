@@ -17,8 +17,8 @@ _Last generated: 2026-05-15._
 | In progress | 5 |
 | Ready | 113 |
 | Parked | 14 |
-| Blocked | 24 |
-| **Open total** | **156** |
+| Blocked | 25 |
+| **Open total** | **157** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -39,11 +39,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
+- **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.92_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.92_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
-- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
+- **[330](docs/open-work/tickets/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
 
 ## Epic progress (3)
 
@@ -128,7 +128,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[332](docs/open-work/tickets/332-grief-vigil-action-vocabulary.md)** — Grief-vigil action vocabulary — flip mourn_at_grave to Live — _[life-cycle] · added 2026-05-14_
 - **[333](docs/open-work/tickets/333-kitten-rearing-action-vocabulary.md)** — Kitten-rearing action vocabulary — flip rear_kitten to Live — _[life-cycle] · added 2026-05-14_
 
-### tooling-diagnostics-ui (11 ready)
+### tooling-diagnostics-ui (11 ready, 1 blocked)
 
 - **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _[tooling-diagnostics-ui] · added 2026-05-07_
 - **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[tooling-diagnostics-ui] · added 2026-05-07_
@@ -213,7 +213,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
 
-## Ready by initiative (64 tag-memberships across 8 initiatives)
+## Ready by initiative (72 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -254,6 +254,17 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[292](docs/open-work/tickets/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
+
+### htn-method-composition (8 open, 0 landed)
+
+- **[328](docs/open-work/tickets/328-aspiration-milestone-wrapper-herbcraft.md)** — Herbcraft aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[329](docs/open-work/tickets/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[330](docs/open-work/tickets/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[331](docs/open-work/tickets/331-aspiration-milestone-wrapper-leadership.md)** — Leadership aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[332](docs/open-work/tickets/332-grief-vigil-action-vocabulary.md)** — Grief-vigil action vocabulary — flip mourn_at_grave to Live — _[life-cycle] · added 2026-05-14_
+- **[333](docs/open-work/tickets/333-kitten-rearing-action-vocabulary.md)** — Kitten-rearing action vocabulary — flip rear_kitten to Live — _[life-cycle] · added 2026-05-14_
+- **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
+- **[347](docs/open-work/tickets/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method — _[ai-substrate] · added 2026-05-14_
 
 ### generational-continuity (7 open, 0 landed)
 
@@ -438,7 +449,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[345](docs/open-work/tickets/345-771-aspiration-soft-class-per-pair-weights.md)** — §7.7.1 aspiration soft-class per-pair weights — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 
-## Blocked (24)
+## Blocked (25)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -464,6 +475,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · blocked-by 314 · added 2026-05-13_
 - **[317](docs/open-work/tickets/317-retire-flee-threat-distance-power-invert-if-frame-diff-shows-redundancy-with-affordanceflee.md)** — retire flee_threat_distance Power-Invert if frame-diff shows redundancy with Affordance(Flee) — _[ai-substrate] · blocked-by 315 · added 2026-05-13_
 - **[340](docs/open-work/tickets/340-port-mating-l3-chain-onto-htn-method.md)** — Port Mating L3 chain onto HTN method — _[ai-substrate] · blocked-by 323 · added 2026-05-14_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · blocked-by 354 · added 2026-05-15_
 
 ## Pre-existing (2)
 

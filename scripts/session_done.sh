@@ -75,7 +75,8 @@ except Exception:
         for tid in "${tids[@]}"; do
             tid_trimmed=$(echo "$tid" | tr -d ' ')
             [[ -z "$tid_trimmed" ]] && continue
-            padded=$(printf "%03d" "$tid_trimmed" 2>/dev/null || echo "$tid_trimmed")
+            unpadded=$(echo "$tid_trimmed" | sed 's/^0*//'); [[ -z "$unpadded" ]] && unpadded="0"
+            padded=$(printf "%03d" "$unpadded" 2>/dev/null || echo "$tid_trimmed")
             tfile=$(ls "$REPO_ROOT/docs/open-work/tickets/${padded}-"*.md 2>/dev/null | head -1)
             [[ -z "$tfile" ]] && tfile=$(ls "$REPO_ROOT/docs/open-work/tickets/${tid_trimmed}-"*.md 2>/dev/null | head -1)
             if [[ -n "$tfile" ]]; then

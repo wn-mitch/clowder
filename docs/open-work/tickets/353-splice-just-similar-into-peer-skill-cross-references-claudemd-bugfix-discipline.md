@@ -3,7 +3,7 @@ id: 353
 title: splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline
 status: ready
 cluster: tooling-diagnostics-ui
-orchestration: substrate-sensitive
+orchestration: swarm-safe
 initiative: []
 added: 2026-05-15
 parked: null

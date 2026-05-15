@@ -49,8 +49,12 @@ done
 [[ -z "$track" && -z "$unset_anchor" && -z "$unset_block" && -z "$initiative_add" && "$anchor" == "false" && -z "$block" ]] && {
     echo "ERROR: nothing to do (pass --track / --block / --anchor / --initiative)" >&2; usage; }
 
-# Locate the file (id may have leading zeros; tolerate either form)
-padded=$(printf "%03d" "$ticket_id" 2>/dev/null || echo "$ticket_id")
+# Locate the file (id may have leading zeros; tolerate either form).
+# Strip leading zeros before printf %03d to avoid octal interpretation
+# (printf '%03d' '057' = '047' under the C locale).
+unpadded=$(echo "$ticket_id" | sed 's/^0*//')
+[[ -z "$unpadded" ]] && unpadded="0"
+padded=$(printf "%03d" "$unpadded" 2>/dev/null || echo "$ticket_id")
 file=$(ls "$TICKETS_DIR/${padded}-"*.md 2>/dev/null | head -1)
 if [[ -z "$file" ]]; then
     file=$(ls "$TICKETS_DIR/${ticket_id}-"*.md 2>/dev/null | head -1)

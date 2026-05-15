@@ -3,7 +3,7 @@ id: 338
 title: L1Aspiration trace record — emit-walk per aspiration
 status: ready
 cluster: tooling-diagnostics-ui
-orchestration: substrate-sensitive
+orchestration: swarm-safe
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null

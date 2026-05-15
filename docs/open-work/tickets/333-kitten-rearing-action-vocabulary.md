@@ -3,8 +3,9 @@ id: 333
 title: Kitten-rearing action vocabulary — flip rear_kitten to Live
 status: ready
 cluster: life-cycle
-orchestration: substrate-sensitive
-initiative: [smarter-cats, generational-continuity]
+orchestration: coherent-block
+block: htn-method-composition
+initiative: [smarter-cats, generational-continuity, htn-method-composition]
 added: 2026-05-14
 parked: null
 blocked-by: []

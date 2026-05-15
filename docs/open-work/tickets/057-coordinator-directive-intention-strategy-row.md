@@ -3,8 +3,9 @@ id: 057
 title: §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override
 status: blocked
 cluster: social-coordination
-orchestration: substrate-sensitive
-initiative: []
+orchestration: coherent-block
+block: htn-method-composition
+initiative: [htn-method-composition]
 added: 2026-04-27
 parked: null
 blocked-by: [128]

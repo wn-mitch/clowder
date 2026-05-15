@@ -3,8 +3,9 @@ id: 328
 title: Herbcraft aspiration_milestone_wrapper + emits tables
 status: ready
 cluster: ai-substrate
-orchestration: substrate-sensitive
-initiative: [smarter-cats]
+orchestration: coherent-block
+block: htn-method-composition
+initiative: [smarter-cats, htn-method-composition]
 added: 2026-05-14
 parked: null
 blocked-by: []

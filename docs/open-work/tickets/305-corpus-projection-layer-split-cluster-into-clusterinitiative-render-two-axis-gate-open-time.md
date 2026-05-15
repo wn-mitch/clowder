@@ -3,7 +3,7 @@ id: 305
 title: Corpus projection layer — split cluster into cluster+initiative, render two-axis, gate open-time
 status: ready
 cluster: process-discipline
-orchestration: substrate-sensitive
+orchestration: swarm-safe
 initiative: []
 added: 2026-05-13
 parked: null

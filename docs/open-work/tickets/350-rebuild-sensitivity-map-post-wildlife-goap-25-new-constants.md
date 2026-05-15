@@ -3,7 +3,7 @@ id: 350
 title: Rebuild sensitivity-map post-wildlife-GOAP (25 new constants)
 status: ready
 cluster: tooling-diagnostics-ui
-orchestration: substrate-sensitive
+orchestration: swarm-safe
 initiative: []
 added: 2026-05-15
 parked: null

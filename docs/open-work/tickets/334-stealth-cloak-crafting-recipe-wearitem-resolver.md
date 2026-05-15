@@ -3,8 +3,9 @@ id: 334
 title: Stealth-cloak crafting recipe + WearItem resolver
 status: ready
 cluster: items-crafting
-orchestration: substrate-sensitive
-initiative: [smarter-cats, world-richness]
+orchestration: coherent-block
+block: htn-method-composition
+initiative: [smarter-cats, world-richness, htn-method-composition]
 added: 2026-05-14
 parked: null
 blocked-by: []

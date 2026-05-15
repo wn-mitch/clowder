@@ -3,7 +3,7 @@ id: 259
 title: L1 to L3 activation visualization in log viewer
 status: ready
 cluster: tooling-diagnostics-ui
-orchestration: substrate-sensitive
+orchestration: swarm-safe
 initiative: []
 added: 2026-05-10
 parked: null

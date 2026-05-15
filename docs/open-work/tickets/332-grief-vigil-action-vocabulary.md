@@ -3,8 +3,9 @@ id: 332
 title: Grief-vigil action vocabulary — flip mourn_at_grave to Live
 status: ready
 cluster: life-cycle
-orchestration: substrate-sensitive
-initiative: [smarter-cats, generational-continuity]
+orchestration: coherent-block
+block: htn-method-composition
+initiative: [smarter-cats, generational-continuity, htn-method-composition]
 added: 2026-05-14
 parked: null
 blocked-by: []

@@ -3,7 +3,7 @@ id: 336
 title: just inspect renders the goal stack + aspiration set
 status: ready
 cluster: tooling-diagnostics-ui
-orchestration: substrate-sensitive
+orchestration: swarm-safe
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null

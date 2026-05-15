@@ -3,7 +3,7 @@ id: 208
 title: Per-cat Action overlay for the windowed UI
 status: ready
 cluster: tooling-diagnostics-ui
-orchestration: substrate-sensitive
+orchestration: swarm-safe
 initiative: []
 added: 2026-05-07
 parked: null

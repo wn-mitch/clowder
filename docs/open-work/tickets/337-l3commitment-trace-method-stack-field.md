@@ -3,7 +3,7 @@ id: 337
 title: L3Commitment trace gains method_stack field
 status: ready
 cluster: tooling-diagnostics-ui
-orchestration: substrate-sensitive
+orchestration: swarm-safe
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null
