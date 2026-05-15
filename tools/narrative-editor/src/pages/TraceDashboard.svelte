@@ -4,7 +4,7 @@
     activeTraceRun, runsWithTraces, frameIndex, currentFrame,
     focalTick, selectedDse,
   } from '../stores/trace'
-  import { stepDecisionTick, decisionTickIndex } from '../lib/logs/trace'
+  import { stepDecisionTick, stepActionChangeTick, decisionTickIndex } from '../lib/logs/trace'
   import FileDropZone from '../components/logs/FileDropZone.svelte'
   import TimelineStrip from '../components/trace/TimelineStrip.svelte'
   import L1Panel from '../components/trace/L1Panel.svelte'
@@ -31,6 +31,26 @@
     focalTick.set(stepDecisionTick($frameIndex, current, delta))
   }
 
+  function jumpActionChange(delta: number) {
+    if (!$frameIndex) return
+    const current = $focalTick ?? $frameIndex.decisionTicks[0]
+    if (current === undefined) return
+    focalTick.set(stepActionChangeTick($frameIndex, current, delta))
+  }
+
+  /** Maps that the currently-expanded L2 DSE reads via its `spatial`
+   *  consideration fields. Passed to L1Panel for heatmap highlighting. */
+  let highlightedMaps = $derived.by((): Set<string> => {
+    if (!$selectedDse || !$currentFrame) return new Set()
+    const row = $currentFrame.l2.find(r => r.dse === $selectedDse)
+    if (!row) return new Set()
+    const maps = new Set<string>()
+    for (const c of row.considerations) {
+      if (c.spatial?.map) maps.add(c.spatial.map)
+    }
+    return maps
+  })
+
   function submitTickInput() {
     if (!$frameIndex) return
     const n = Number.parseInt(tickInput, 10)
@@ -41,6 +61,8 @@
     if (e.target instanceof HTMLInputElement) return
     if (e.key === 'ArrowLeft')  { e.preventDefault(); step(e.shiftKey ? -10 : -1) }
     if (e.key === 'ArrowRight') { e.preventDefault(); step(e.shiftKey ?  10 :  1) }
+    if (e.key === '[') { e.preventDefault(); jumpActionChange(-1) }
+    if (e.key === ']') { e.preventDefault(); jumpActionChange(1) }
   }
 
   function runLabel(run: typeof $runs[number]): string {
@@ -196,6 +218,22 @@
             <button type="button" class="text-xs px-2 py-1" onclick={() => step( 1)}>›</button>
             <button type="button" class="text-xs px-2 py-1" onclick={() => step( 10)}>»</button>
           </div>
+          {#if $frameIndex.chosenChangeTicks.length > 1}
+            <div class="flex items-center gap-1 border-l border-border pl-2">
+              <button
+                type="button"
+                class="text-xs px-2 py-1 text-muted"
+                title="Jump to previous action change ([)"
+                onclick={() => jumpActionChange(-1)}
+              >[‹ change</button>
+              <button
+                type="button"
+                class="text-xs px-2 py-1 text-muted"
+                title="Jump to next action change (])"
+                onclick={() => jumpActionChange(1)}
+              >change ›]</button>
+            </div>
+          {/if}
           <span class="text-xs text-muted">
             {decisionIndex >= 0 ? decisionIndex + 1 : '?'} / {$frameIndex.decisionTicks.length}
             decision ticks
@@ -216,7 +254,7 @@
       <div class="grid gap-3 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1fr)]">
         <div class="min-w-0">
           <h2 class="m-0 mb-2 text-sm uppercase tracking-wider text-muted">L1 · Perception</h2>
-          <L1Panel frame={$currentFrame} index={$frameIndex} />
+          <L1Panel frame={$currentFrame} index={$frameIndex} {highlightedMaps} />
         </div>
         <div class="min-w-0">
           <h2 class="m-0 mb-2 text-sm uppercase tracking-wider text-muted">L2 · DSE scoring</h2>

@@ -6,8 +6,12 @@
     /** Used for the per-map sparkline — we look back over recent frames
      *  to show how perception evolved into this tick. */
     index: FrameIndex
+    /** Maps that the currently-expanded L2 DSE reads via its spatial
+     *  considerations. When non-empty, those map cards are outlined in
+     *  accent so the L1 → L2 signal flow is legible at a glance. */
+    highlightedMaps?: Set<string>
   }
-  let { frame, index }: Props = $props()
+  let { frame, index, highlightedMaps = new Set() }: Props = $props()
 
   /** If the current tick has no L1 records (can happen when a decision
    *  tick didn't coincide with a perception tick), fall back to the
@@ -93,7 +97,8 @@
 
     {#each l1.records as r (r.map + ':' + r.channel + ':' + r.faction)}
       {@const hist = perceivedHistory(r.map)}
-      <div class="bg-surface border border-border rounded-md p-2.5 text-xs">
+      {@const isLinked = highlightedMaps.has(r.map)}
+      <div class="bg-surface border rounded-md p-2.5 text-xs {isLinked ? 'border-accent ring-1 ring-accent/30' : 'border-border'}">
         <div class="flex items-baseline gap-2 mb-1">
           <span class="font-mono font-semibold text-txt">{r.map}</span>
           <span class="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider {factionBadgeColor(r.faction)}">{r.faction}</span>

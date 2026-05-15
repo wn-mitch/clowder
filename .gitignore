@@ -68,4 +68,5 @@ __pycache__/
 # files, captured stream-json, wallclock sentinel deadline). These belong
 # under ~/clowder-sessions/<slug>/ and never on main.
 .polecat-*
+.polecat.pid
 .session-info.json

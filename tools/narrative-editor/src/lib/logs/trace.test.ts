@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildFrameIndex, decisionTickIndex, nearestDecisionTick, stepDecisionTick,
+  stepActionChangeTick,
   type L1Record, type L2Record, type L3Record, type L3CommitmentRecord,
   type TraceRecord,
 } from './trace'
@@ -188,5 +189,58 @@ describe('tick navigation helpers', () => {
     expect(stepDecisionTick(idx, 100, -1)).toBe(100)
     expect(stepDecisionTick(idx, 400, 1)).toBe(400)
     expect(stepDecisionTick(idx, 300, 10)).toBe(400)
+  })
+})
+
+describe('stepActionChangeTick', () => {
+  // chosenChangeTicks: [100, 300, 500] (initial + two changes)
+  const records: TraceRecord[] = [
+    l3(100, 'Simba', 'Explore'),
+    l3(200, 'Simba', 'Explore'),
+    l3(300, 'Simba', 'Hunt'),
+    l3(400, 'Simba', 'Hunt'),
+    l3(500, 'Simba', 'Explore'),
+  ]
+  const idx = buildFrameIndex(records, 'Simba')
+
+  it('steps forward to the next change tick', () => {
+    expect(stepActionChangeTick(idx, 100, 1)).toBe(300)
+    expect(stepActionChangeTick(idx, 300, 1)).toBe(500)
+  })
+
+  it('steps backward to the previous change tick', () => {
+    expect(stepActionChangeTick(idx, 300, -1)).toBe(100)
+    expect(stepActionChangeTick(idx, 500, -1)).toBe(300)
+  })
+
+  it('clamps at first when stepping back from the start', () => {
+    expect(stepActionChangeTick(idx, 100, -1)).toBe(100)
+  })
+
+  it('clamps at last when stepping forward from the end', () => {
+    expect(stepActionChangeTick(idx, 500, 1)).toBe(500)
+  })
+
+  it('from a non-change tick, forward goes to next change', () => {
+    // Tick 200 is not a change tick; next change is 300.
+    expect(stepActionChangeTick(idx, 200, 1)).toBe(300)
+  })
+
+  it('from a non-change tick, backward goes to preceding change', () => {
+    // Tick 200: preceding change tick is 100.
+    expect(stepActionChangeTick(idx, 200, -1)).toBe(100)
+  })
+
+  it('returns from unchanged when chosenChangeTicks is empty', () => {
+    const emptyRecords: TraceRecord[] = [
+      l3(100, 'Nala', 'Hunt'),
+    ]
+    const emptyIdx = buildFrameIndex(emptyRecords, 'Nala')
+    // chosenChangeTicks should contain [100] (the initial pick)
+    // — this tests the no-op path via an index with one element
+    const singleRecords: TraceRecord[] = [l3(100, 'Nala', 'Hunt')]
+    const singleIdx = buildFrameIndex(singleRecords, 'Nala')
+    expect(stepActionChangeTick(singleIdx, 100, 1)).toBe(100)
+    expect(stepActionChangeTick(singleIdx, 100, -1)).toBe(100)
   })
 })

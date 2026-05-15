@@ -1,7 +1,7 @@
 ---
 id: 259
 title: L1 to L3 activation visualization in log viewer
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: swarm-safe
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: dec05d5c
+landed-on: 2026-05-15
 ---
 
 ## Why

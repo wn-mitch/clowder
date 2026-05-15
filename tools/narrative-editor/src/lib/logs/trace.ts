@@ -365,3 +365,28 @@ export function stepDecisionTick(
   const next = Math.max(0, Math.min(index.decisionTicks.length - 1, i + delta))
   return index.decisionTicks[next]
 }
+
+/** Jump to the next (delta > 0) or previous (delta < 0) action-change
+ *  tick from `chosenChangeTicks`. Useful for skipping directly to points
+ *  where the winning disposition changed rather than stepping every tick.
+ *  Returns `from` unchanged when the array is empty. Clamps at both ends. */
+export function stepActionChangeTick(
+  index: FrameIndex, from: number, delta: number,
+): number {
+  const ticks = index.chosenChangeTicks
+  if (ticks.length === 0) return from
+  // Binary search: lo = first index where ticks[lo] >= from.
+  let lo = 0, hi = ticks.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (ticks[mid] < from) lo = mid + 1
+    else hi = mid
+  }
+  if (delta > 0) {
+    const next = ticks[lo] === from ? lo + 1 : lo
+    return ticks[Math.min(ticks.length - 1, next)]
+  } else {
+    const prev = lo - 1
+    return prev >= 0 ? ticks[prev] : ticks[0]
+  }
+}
