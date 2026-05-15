@@ -301,6 +301,15 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // (tile-confidence threshold, fatigue cap) lands as a follow-on
     // balance pass.
     registry.push(crate::ai::methods::explore::explore_method());
+
+    // 330: Tier-1 Live method — Building chain wrapper. `build_method`
+    // catches `construct` (Primary emit on every milestone of DEN_SHAPER
+    // and THE_ARCHITECT). Carries `applicable_when: Live(always_true)`
+    // with one primitive sub-goal (Action::Build +
+    // TargetHint::ConstructionSite). Strategist-coordinator alignment
+    // is #335 territory; production gating (site-claimed predicate,
+    // materials-on-hand) lands as a follow-on balance pass.
+    registry.push(crate::ai::methods::build::build_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of

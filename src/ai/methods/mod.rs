@@ -89,6 +89,11 @@ pub enum TargetHint {
     /// unmapped / low-confidence tile). Used by `explore_method`
     /// as the Exploration chains' primary emit target.
     UnexploredTile,
+    /// 330 — primitive sub-goal binds to the cat's construction-site
+    /// picker (Build-DSE's existing target resolution: nearest
+    /// planned-but-unfinished structure or open building slot). Used
+    /// by `build_method` as the Building chains' primary emit target.
+    ConstructionSite,
 }
 
 // ---------------------------------------------------------------------------
@@ -410,6 +415,11 @@ pub mod prepare_remedy;
 // MAPMAKER and BEYOND_THE_BORDER). Tier-1 Live primitive mirroring
 // `fight_method`'s 327 shape.
 pub mod explore;
+// 330: Live HTN method module — Building chain wrapper.
+// `build_method` catches `construct` (Primary emit on both DEN_SHAPER
+// and THE_ARCHITECT). Tier-1 Live primitive mirroring `fight_method`'s
+// 327 shape.
+pub mod build;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
 
