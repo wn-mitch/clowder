@@ -446,9 +446,13 @@ session-list *ARGS:
 sessions *ARGS:
     python3 scripts/session_list.py {{ARGS}}
 
-# [session] Clean up a session after its work has landed (or been abandoned). cargo clean → jj workspace forget → rm -rf + bookmark forget. Refuses on uncommitted edits unless --force; --keep-bookmark preserves the bookmark.
+# [session] Clean up a session after its work has landed (or been abandoned). cargo clean → jj workspace forget → rm -rf. Bookmark disposition (ticket 362): default `auto` forgets IFF the bookmark tip is on main, preserves it otherwise (prevents orphaning). --keep-bookmark preserves always; --forget-bookmark forces forget (pair with --orphan-ok if tip is NOT on main). Refuses on uncommitted edits unless --force.
 session-done SLUG *ARGS:
     bash scripts/session_done.sh {{SLUG}} {{ARGS}}
+
+# [session] Surface bookmarks + orphan commits whose work is NOT on main@origin. Walks every local session/* bookmark and the recent op-log for `feat:`/`fix:`/`land:` commits that match active ticket ids, reporting any whose ancestors don't reach main. Use to triage abandoned polecat work BEFORE running session-done on stale workspaces. Ticket 362.
+orphan-scan *ARGS:
+    bash scripts/orphan_scan.sh {{ARGS}}
 
 # [refinery] Gated lander. Walks all session/* bookmarks; reports rebase / conflict status. `just refinery` reports the table; `just refinery --json` for /work + /foreman skills; `just refinery --land <slug>` lands one session into main (any track, manual gate); `just refinery --auto [--dry-run]` drains swarm-safe queue gated on working-copy clean + `just check && just test` in each workspace. `--auto` is whitelisted in code to track=swarm-safe; coherent-block + substrate-sensitive always land via `--land <slug>`.
 refinery *ARGS:

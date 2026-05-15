@@ -25,7 +25,7 @@ Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (5 in-progress · 0 ready blockers · 0 next-recommended)
+## Active focus (5 in-progress · 0 ready blockers · 5 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
@@ -36,6 +36,14 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
+
+### Next-recommended (from `just next`)
+
+- **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · score 0.91_
+- **[357](docs/open-work/tickets/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives — _[ai-substrate] · score 0.91_
+- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.91_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.89_
 
 ## Epic progress (3)
 
@@ -442,12 +450,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (233)
+## Landed archive (234)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (168)
+### 2026-05 (169)
 
+- **[362](docs/open-work/landed/362-session-donesh-orphans-unpushed-bookmarks-invert-keep-bookmark-default-add-landed-on-main-precondition.md)** — session_done.sh orphans unpushed bookmarks — invert --keep-bookmark default + add landed-on-main precondition _(2026-05-15)_
 - **[361](docs/open-work/landed/361-gitignore-polecat-workspace-artifacts-and-clean-up-repo-root-pollution.md)** — Gitignore polecat workspace artifacts and clean up repo-root pollution _(2026-05-15)_
 - **[360](docs/open-work/landed/360-polecat-prompt-replace-requires-gui-abandon-with-screenshotplaywright-primer.md)** — Polecat prompt — replace requires-gui abandon with screenshot/Playwright primer _(2026-05-15)_
 - **[359](docs/open-work/landed/359-refinery-awaiting-anchor-status-discourages-landing-coherent-block-intermediates.md)** — refinery awaiting-anchor status discourages landing coherent-block intermediates _(2026-05-15)_
