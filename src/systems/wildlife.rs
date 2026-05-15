@@ -10,9 +10,11 @@ use crate::components::magic::Ward;
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::prey::{PreyAnimal, PreyConfig};
+use crate::ai::hawk_scoring::{HawkNeeds, HawkPersonality};
+use crate::ai::snake_scoring::{SnakeNeeds, SnakePersonality};
 use crate::components::wildlife::{
-    BehaviorType, FoxAiPhase, FoxDen, FoxLifeStage, FoxSex, FoxState, ShadowFoxDrives, WildAnimal,
-    WildSpecies, WildlifeAiState,
+    BehaviorType, FoxAiPhase, FoxDen, FoxLifeStage, FoxSex, FoxState, HawkAiPhase, HawkState,
+    ShadowFoxDrives, SnakeAiPhase, SnakeState, WildAnimal, WildSpecies, WildlifeAiState,
 };
 use crate::resources::cat_scent_map::CatScentMap;
 use crate::resources::food::FoodStores;
@@ -41,6 +43,14 @@ pub struct DetectionCooldowns {
 // ---------------------------------------------------------------------------
 
 /// Move each wild animal according to its behavior pattern.
+///
+/// Ticket 025 Phase 2 — `Without<FoxState>` was the legacy fox-cutover
+/// filter; the cutover commit widens it to also exclude
+/// `HawkState` / `SnakeState` so post-cutover hawks and snakes flow
+/// through their own GOAP loops (`hawk_goap.rs` / `snake_goap.rs`).
+/// ShadowFox (which carries `ShadowFoxDrives` and none of the
+/// `*State` markers) still uses this legacy `Circling`/`Waiting`
+/// state machine.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn wildlife_ai(
     mut query: Query<
@@ -50,7 +60,7 @@ pub fn wildlife_ai(
             &mut WildlifeAiState,
             Has<ShadowFoxDrives>,
         ),
-        Without<FoxState>,
+        (Without<FoxState>, Without<HawkState>, Without<SnakeState>),
     >,
     wards: Query<(&Ward, &Position), Without<WildAnimal>>,
     cat_positions: Query<
@@ -458,14 +468,54 @@ pub fn spawn_wildlife(
             activation.record(Feature::WildlifeSpawned);
             let animal = WildAnimal::new(species);
             let ai_state = initial_ai_state(species, &spawn_pos, &map, &mut rng.rng);
-            commands.spawn((
-                animal,
-                spawn_pos,
-                Health::default(),
-                ai_state,
-                crate::components::SensorySpecies::Wild(species),
-                crate::components::SensorySignature::WILDLIFE,
-            ));
+            // Ticket 025 Phase 2 — hawks and snakes now spawn with their
+            // GOAP runtime state attached. Foxes and ShadowFoxes keep
+            // their existing component sets (foxes via dens; ShadowFox
+            // via corruption spawn).
+            match species {
+                WildSpecies::Hawk => {
+                    commands.spawn((
+                        animal,
+                        spawn_pos,
+                        Health::default(),
+                        ai_state,
+                        crate::components::SensorySpecies::Wild(species),
+                        crate::components::SensorySignature::WILDLIFE,
+                        HawkState::new_adult(),
+                        HawkAiPhase::Soaring {
+                            center_x: spawn_pos.x,
+                            center_y: spawn_pos.y,
+                            angle: 0.0,
+                        },
+                        HawkNeeds::default(),
+                        HawkPersonality::random(&mut rng.rng),
+                    ));
+                }
+                WildSpecies::Snake => {
+                    commands.spawn((
+                        animal,
+                        spawn_pos,
+                        Health::default(),
+                        ai_state,
+                        crate::components::SensorySpecies::Wild(species),
+                        crate::components::SensorySignature::WILDLIFE,
+                        SnakeState::new_adult(),
+                        SnakeAiPhase::Waiting,
+                        SnakeNeeds::default(),
+                        SnakePersonality::random(&mut rng.rng),
+                    ));
+                }
+                _ => {
+                    commands.spawn((
+                        animal,
+                        spawn_pos,
+                        Health::default(),
+                        ai_state,
+                        crate::components::SensorySpecies::Wild(species),
+                        crate::components::SensorySignature::WILDLIFE,
+                    ));
+                }
+            }
 
             // Rate-limited spawn narrative.
             let on_cooldown = cooldowns
@@ -772,13 +822,28 @@ pub fn detect_threats(
 
 /// Predators (fox, hawk, snake) hunt nearby prey entities.
 /// When a predator kills prey, the prey entity is despawned immediately.
-/// Foxes with `FoxState` only hunt when in `HuntingPrey` phase and gain satiation.
-#[allow(clippy::too_many_arguments)]
+/// Predators with their GOAP-side state component (`FoxState` /
+/// `HawkState` / `SnakeState`) only hunt when their AiPhase indicates
+/// active predation; on a successful kill they receive species-specific
+/// satiation (ticket 025 Phase 2).
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn predator_hunt_prey(
     mut commands: Commands,
-    predators: Query<(Entity, &WildAnimal, &Position, Option<&FoxAiPhase>), Without<PreyAnimal>>,
+    predators: Query<
+        (
+            Entity,
+            &WildAnimal,
+            &Position,
+            Option<&FoxAiPhase>,
+            Option<&HawkAiPhase>,
+            Option<&SnakeAiPhase>,
+        ),
+        Without<PreyAnimal>,
+    >,
     prey: Query<(Entity, &PreyConfig, &Position), With<PreyAnimal>>,
     mut fox_states: Query<&mut FoxState>,
+    mut hawk_states: Query<&mut HawkState>,
+    mut snake_states: Query<&mut SnakeState>,
     mut rng: ResMut<SimRng>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
@@ -789,11 +854,27 @@ pub fn predator_hunt_prey(
 ) {
     let c = &constants.wildlife;
     let fc = &constants.fox_ecology;
+    let hc = &constants.hawk_ecology;
+    let snc = &constants.snake_ecology;
     let satiation_prey_kill = fc.satiation_after_prey_kill.ticks(&time_scale);
-    for (pred_entity, predator, pred_pos, fox_phase) in predators.iter() {
+    let satiation_dive_kill = hc.satiation_after_dive_kill.ticks(&time_scale);
+    let satiation_strike_kill = snc.satiation_after_strike_kill.ticks(&time_scale);
+    for (pred_entity, predator, pred_pos, fox_phase, hawk_phase, snake_phase) in predators.iter() {
         // Foxes with ecology: only hunt when in HuntingPrey phase.
         if let Some(phase) = fox_phase {
             if !matches!(phase, FoxAiPhase::HuntingPrey { .. }) {
+                continue;
+            }
+        }
+        // Hawks with ecology: only hunt when diving.
+        if let Some(phase) = hawk_phase {
+            if !matches!(phase, HawkAiPhase::HuntingPrey { .. }) {
+                continue;
+            }
+        }
+        // Snakes with ecology: only hunt when striking.
+        if let Some(phase) = snake_phase {
+            if !matches!(phase, SnakeAiPhase::Striking { .. }) {
                 continue;
             }
         }
@@ -865,6 +946,20 @@ pub fn predator_hunt_prey(
                         fox_state.satiation_ticks = satiation_prey_kill;
                         fox_state.hunger = (fox_state.hunger - 0.3).max(0.0);
                         activation.record(Feature::FoxHuntedPrey);
+                    }
+                    // Ticket 025 Phase 2 — hawk/snake satiation parallels
+                    // the fox branch. The dive/strike *event* Features
+                    // (`HawkDiveLanded` / `SnakeStruckPrey`) fire from
+                    // the step resolvers when the predator arrives in
+                    // range; this site handles the *kill outcome*. We do
+                    // not double-emit those Features here.
+                    if let Ok(mut hawk_state) = hawk_states.get_mut(pred_entity) {
+                        hawk_state.satiation_ticks = satiation_dive_kill;
+                        hawk_state.hunger = (hawk_state.hunger - 0.3).max(0.0);
+                    }
+                    if let Ok(mut snake_state) = snake_states.get_mut(pred_entity) {
+                        snake_state.satiation_ticks = satiation_strike_kill;
+                        snake_state.hunger = (snake_state.hunger - 0.4).max(0.0);
                     }
 
                     // Rate-limited logging.
@@ -1891,15 +1986,61 @@ pub fn spawn_initial_wildlife(world: &mut World, colony_center: Position) {
     }
 
     // Spawn entities outside the borrow.
+    // Ticket 025 Phase 2 — hawks/snakes get their GOAP runtime state
+    // attached at world-gen time, matching the edge-spawn path.
     for (species, pos, ai) in spawn_positions {
-        world.spawn((
-            WildAnimal::new(species),
-            pos,
-            Health::default(),
-            ai,
-            crate::components::SensorySpecies::Wild(species),
-            crate::components::SensorySignature::WILDLIFE,
-        ));
+        match species {
+            WildSpecies::Hawk => {
+                let personality = {
+                    let rng = &mut world.resource_mut::<SimRng>().rng;
+                    HawkPersonality::random(rng)
+                };
+                world.spawn((
+                    WildAnimal::new(species),
+                    pos,
+                    Health::default(),
+                    ai,
+                    crate::components::SensorySpecies::Wild(species),
+                    crate::components::SensorySignature::WILDLIFE,
+                    HawkState::new_adult(),
+                    HawkAiPhase::Soaring {
+                        center_x: pos.x,
+                        center_y: pos.y,
+                        angle: 0.0,
+                    },
+                    HawkNeeds::default(),
+                    personality,
+                ));
+            }
+            WildSpecies::Snake => {
+                let personality = {
+                    let rng = &mut world.resource_mut::<SimRng>().rng;
+                    SnakePersonality::random(rng)
+                };
+                world.spawn((
+                    WildAnimal::new(species),
+                    pos,
+                    Health::default(),
+                    ai,
+                    crate::components::SensorySpecies::Wild(species),
+                    crate::components::SensorySignature::WILDLIFE,
+                    SnakeState::new_adult(),
+                    SnakeAiPhase::Waiting,
+                    SnakeNeeds::default(),
+                    personality,
+                ));
+            }
+            _ => {
+                world.spawn((
+                    WildAnimal::new(species),
+                    pos,
+                    Health::default(),
+                    ai,
+                    crate::components::SensorySpecies::Wild(species),
+                    crate::components::SensorySignature::WILDLIFE,
+                ));
+            }
+        }
     }
 }
 
