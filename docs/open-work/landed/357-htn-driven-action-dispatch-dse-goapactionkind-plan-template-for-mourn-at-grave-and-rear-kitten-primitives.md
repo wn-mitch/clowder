@@ -13,7 +13,7 @@ supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
 wires-method: [mourn_at_grave, rear_kitten]
-landed-at: pending
+landed-at: ec85114961b3
 landed-on: 2026-05-15
 ---
 
