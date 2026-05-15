@@ -50,6 +50,7 @@ doesn't push other axes around).
   lifts in food-secure phases.
 - Continuity canary `grooming` within healthy band.
 - Survival gates pass.
+- **Multi-focal trace (ticket-227 convention):** `FoodSecurityGroomLift` applies colony-wide to any cat with `colony_food_security >= 0.5` — no narrow per-cat marker gate, so the default focal (Simba) will surface the lift if food-secure phases occur. Confirm the `colony_food_security` axis appears with non-zero values in at least one L2 record for the focal cat; if it never appears, food-secure phases are absent and the lift is untestable on that focal cat's trace.
 
 ## Related work
 

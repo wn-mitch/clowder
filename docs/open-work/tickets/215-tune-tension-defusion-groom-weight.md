@@ -57,6 +57,7 @@ so a slightly larger weight is safer).
   `multiplier` in some L2 records during high-tension phases.
 - `grooming` canary in healthy band.
 - Survival gates pass.
+- **Multi-focal trace (ticket-227 convention):** `TensionDefusionGroomLift` fires on any cat with `HasSocialTarget` when `colony_tension_recent >= 0.4` — no narrow persistent per-cat marker gate. Bracket high-tension windows via `just q events <run-dir> ShadowFoxSpotted`; focal-cat L2 records in those ticks should show non-zero `tension_defusion_groom_lift` multipliers. If no high-tension windows exist in the soak the lift is untestable on the default focal cat's trace.
 
 ## Related work
 

@@ -39,6 +39,7 @@ value. Single-seed soak + `just verdict`.
 - `just verdict` exit 0 or 1.
 - `just frame-diff` shows Caretake's per-cat |Δ mean| score lifts.
 - Survival gates pass; six continuity canaries non-zero.
+- **Multi-focal trace (ticket-227 convention):** Caretake's eligibility gate is `hungry_kitten_urgency > 0.0`; the focal cat must have a hungry kitten nearby for the per-cat Caretake L2 row to appear in `frame-diff`. Currently parked because no hungry-kitten windows exist post-256 — this is exactly the structural bottleneck ticket 227 documents: without an eligible focal cat the gated DSE's `frame-diff` row is absent, not zero.
 
 ## Related work
 

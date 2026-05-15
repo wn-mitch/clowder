@@ -29,7 +29,7 @@ A colony sim about a clowder of cats living in a world with its own weight — h
 ### Inspecting one cat / one knob
 - `just inspect <name>` — cat personality + decision history from the event log
 - `just explain <constants.path>` — doc-comment + current value (from a recent run header) + every read-site + (if rebuilt) Spearman rho per metric
-- `just soak-trace <seed> <cat>` — focal-cat L1/L2/L3 trace sidecar (per §11 of the substrate-refactor spec). Multi-focal sweeps probe the full DSE catalog: marker-gated DSEs stay silent on cats without the marker.
+- `just soak-trace <seed> <cat>` — focal-cat L1/L2/L3 trace sidecar (per §11 of the substrate-refactor spec). Multi-focal sweeps probe the full DSE catalog: marker-gated DSEs stay silent on cats without the marker. **Multi-focal convention (ticket 227):** when the tuning ticket targets a marker-gated or eligibility-filtered DSE, run a second `soak-trace` on a cat that satisfies the gate alongside the default generalist (Simba). Find the eligible cat name before writing the balance doc: use `just q events <run-dir> CoordinatorElected` for Coordinate; filter for `hungry_kitten_urgency > 0` presence for Caretake. Without an eligible focal cat, the gated DSE's per-cat `frame-diff` row is structurally absent (not scored zero), making per-cat verification impossible.
 - `just frame-diff <baseline> <new> [hypothesis.md]` — per-DSE drift ranked by |Δ mean|; hypothesis classifies each DSE as ok / drift / wrong-direction
 
 Also: `just logs` · `just trace` · `just narrative-editor` (Writer's Toolkit — drop JSONL onto the page) · `just template-audit` · `just wiki`.

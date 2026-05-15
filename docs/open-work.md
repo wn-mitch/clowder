@@ -15,10 +15,10 @@ _Last generated: 2026-05-15._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 108 |
+| Ready | 107 |
 | Parked | 14 |
 | Blocked | 25 |
-| **Open total** | **152** |
+| **Open total** | **151** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -55,7 +55,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (108)
+## Ready by cluster (107)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -115,20 +115,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[332](docs/open-work/tickets/332-grief-vigil-action-vocabulary.md)** — Grief-vigil action vocabulary — flip mourn_at_grave to Live — _[life-cycle] · added 2026-05-14_
 - **[333](docs/open-work/tickets/333-kitten-rearing-action-vocabulary.md)** — Kitten-rearing action vocabulary — flip rear_kitten to Live — _[life-cycle] · added 2026-05-14_
 
-### tooling-diagnostics-ui (11 ready, 1 blocked)
-
-- **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _[tooling-diagnostics-ui] · added 2026-05-07_
-- **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[tooling-diagnostics-ui] · added 2026-05-07_
-- **[259](docs/open-work/tickets/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer — _[tooling-diagnostics-ui] · added 2026-05-10_
-- **[318](docs/open-work/tickets/318-just-epic-children-id-query-read-dashboard-roster-print-child-status-enforce-anti-staleness.md)** — just epic-children <id> query — read dashboard roster, print child status, enforce anti-staleness — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[336](docs/open-work/tickets/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · added 2026-05-15_
-
 ### combat-threat (10 ready, 2 blocked)
 
 - **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[combat-threat] · added 2026-05-02_
@@ -154,6 +140,19 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[280](docs/open-work/tickets/280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md)** — Mental model of partner JointIntention (compose 127 with 258 C3 mental models) — _[social-coordination] · added 2026-05-11_
 - **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
+
+### tooling-diagnostics-ui (10 ready, 1 blocked)
+
+- **[208](docs/open-work/tickets/208-per-cat-action-overlay-for-the-windowed-ui.md)** — Per-cat Action overlay for the windowed UI — _[tooling-diagnostics-ui] · added 2026-05-07_
+- **[259](docs/open-work/tickets/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer — _[tooling-diagnostics-ui] · added 2026-05-10_
+- **[318](docs/open-work/tickets/318-just-epic-children-id-query-read-dashboard-roster-print-child-status-enforce-anti-staleness.md)** — just epic-children <id> query — read dashboard roster, print child status, enforce anti-staleness — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[336](docs/open-work/tickets/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · added 2026-05-15_
 
 ### items-crafting (8 ready, 1 blocked)
 
@@ -293,7 +292,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 
-## Ready (108)
+## Ready (107)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -336,7 +335,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · added 2026-05-07_
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
-- **[227](docs/open-work/tickets/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity — _[tooling-diagnostics-ui] · added 2026-05-07_
 - **[233](docs/open-work/tickets/233-subscribe-non-pickup-work-dses-hunt-forage-cook-wander-explore-to-body-state-perception.md)** — Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception — _[ai-substrate] · added 2026-05-08_
 - **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
 - **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · added 2026-05-08_
@@ -454,11 +452,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (223)
+## Landed archive (224)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (158)
+### 2026-05 (159)
 
 - **[356](docs/open-work/landed/356-foreman-polecat-abandon-archive-early-abandon-triage-close-the-silent-waste-loop.md)** — foreman polecat-abandon archive + early-abandon triage (close the silent-waste loop) _(2026-05-15)_
 - **[347](docs/open-work/landed/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method _(2026-05-15)_
@@ -467,6 +465,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[329](docs/open-work/landed/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables _(2026-05-15)_
 - **[328](docs/open-work/landed/328-aspiration-milestone-wrapper-herbcraft.md)** — Herbcraft aspiration_milestone_wrapper + emits tables _(2026-05-15)_
 - **[229](docs/open-work/landed/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose _(2026-05-15)_
+- **[227](docs/open-work/landed/227-coordinator-eligible-focal-cat-for-coordinate-frame-diff-parity.md)** — coordinator-eligible focal-cat for Coordinate frame-diff parity _(2026-05-15)_
 - **[025](docs/open-work/landed/025-hawk-snake-goap.md)** — Hawk and snake GOAP planner domains _(2026-05-15)_
 - **[008](docs/open-work/landed/008-cluster-d-formalization-verification.md)** — Formalization and verification (Cluster D) _(2026-05-15)_
 - **[327](docs/open-work/landed/327-aspiration-milestone-wrapper-combat.md)** — Combat aspiration_milestone_wrapper + emits tables _(2026-05-14)_
