@@ -385,6 +385,19 @@ impl GoapActionKind {
             Self::PickFleeTarget | Self::Flee | Self::HoldUntilSafe => Action::Flee,
             // 035: Bury — single-action burial step.
             Self::Bury => Action::Bury,
+            // 357: rear_kitten HTN method primitives — each step is its
+            // own Action label; the dispatch closure pins chosen_action
+            // from the held frame's sub-goal, so to_action returns the
+            // primitive directly.
+            Self::Wean => Action::Wean,
+            Self::Teach => Action::Teach,
+            Self::Release => Action::Release,
+            // 357: mourn_at_grave HTN method primitives — scaffold.
+            // Never reached at runtime today (no Mourning writer; §7.7.b
+            // out of scope), but kept exhaustive for the type system.
+            Self::Vigil => Action::Vigil,
+            Self::GriefSit => Action::GriefSit,
+            Self::ReleaseGrief => Action::ReleaseGrief,
         }
     }
 }

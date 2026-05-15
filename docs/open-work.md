@@ -15,10 +15,10 @@ _Last generated: 2026-05-15._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 105 |
+| Ready | 104 |
 | Parked | 14 |
 | Blocked | 23 |
-| **Open total** | **147** |
+| **Open total** | **146** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (105)
+## Ready by cluster (104)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -180,9 +180,8 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · added 2026-05-15_
 
-### tooling-diagnostics-ui (7 ready, 1 blocked)
+### tooling-diagnostics-ui (6 ready, 1 blocked)
 
-- **[336](docs/open-work/tickets/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
@@ -205,7 +204,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
 
-## Ready by initiative (58 tag-memberships across 9 initiatives)
+## Ready by initiative (57 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -225,7 +224,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 
-### smarter-cats (13 open, 16 landed)
+### smarter-cats (12 open, 17 landed)
 
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
@@ -234,7 +233,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[336](docs/open-work/tickets/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
@@ -294,7 +292,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 
-## Ready (105)
+## Ready (104)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -386,7 +384,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[336](docs/open-work/tickets/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
@@ -450,11 +447,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (235)
+## Landed archive (236)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (170)
+### 2026-05 (171)
 
 - **[362](docs/open-work/landed/362-session-donesh-orphans-unpushed-bookmarks-invert-keep-bookmark-default-add-landed-on-main-precondition.md)** — session_done.sh orphans unpushed bookmarks — invert --keep-bookmark default + add landed-on-main precondition _(2026-05-15)_
 - **[361](docs/open-work/landed/361-gitignore-polecat-workspace-artifacts-and-clean-up-repo-root-pollution.md)** — Gitignore polecat workspace artifacts and clean up repo-root pollution _(2026-05-15)_
@@ -463,6 +460,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[358](docs/open-work/landed/358-refinery-dry-run-silently-ignored-in-land-mode-executes-destructively.md)** — refinery --dry-run silently ignored in --land mode, executes destructively _(2026-05-15)_
 - **[356](docs/open-work/landed/356-foreman-polecat-abandon-archive-early-abandon-triage-close-the-silent-waste-loop.md)** — foreman polecat-abandon archive + early-abandon triage (close the silent-waste loop) _(2026-05-15)_
 - **[347](docs/open-work/landed/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method _(2026-05-15)_
+- **[336](docs/open-work/landed/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set _(2026-05-15)_
 - **[333](docs/open-work/landed/333-kitten-rearing-action-vocabulary.md)** — Kitten-rearing action vocabulary — flip rear_kitten to Live _(2026-05-15)_
 - **[332](docs/open-work/landed/332-grief-vigil-action-vocabulary.md)** — Grief-vigil action vocabulary — flip mourn_at_grave to Live _(2026-05-15)_
 - **[331](docs/open-work/landed/331-aspiration-milestone-wrapper-leadership.md)** — Leadership aspiration_milestone_wrapper + emits tables _(2026-05-15)_

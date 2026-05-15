@@ -288,6 +288,36 @@ pub enum GoapActionKind {
     /// `ZoneIs(CorpseTarget)` precondition + `SetInteractionDone(true)`
     /// effect. Mirrors `MentorCat` / `GroomOther` shape.
     Bury,
+    /// 357: advance a dependent kitten's `KittenDependency.maturity`
+    /// past the weaning floor. Sub-goal 0 of the `rear_kitten` HTN
+    /// method. Pattern B single-action plan template with
+    /// `ZoneIs(SocialTarget)` precondition (kittens are alive cats,
+    /// present in the canonical `cat_positions` snapshot) +
+    /// `SetInteractionDone(true)` effect. Mirrors `MentorCat` shape.
+    Wean,
+    /// 357: advance a dependent kitten's `KittenDependency.maturity`
+    /// past the teaching floor. Sub-goal 1 of the `rear_kitten` HTN
+    /// method. Same plan-template shape as `Wean`.
+    Teach,
+    /// 357: terminal sub-goal of `rear_kitten` — removes
+    /// `KittenDependency` from a fully-matured kitten, signalling
+    /// independence. Same plan-template shape as `Wean`.
+    Release,
+    /// 357: scaffold for the `mourn_at_grave` HTN method's first
+    /// sub-goal. Dispatch wiring lands here but the `Mourning`
+    /// Component writer is §7.7.b debt (out of scope) — until that
+    /// writer ships, `has_active_mourning` is always false, so this
+    /// variant is structurally Live but never invoked at runtime.
+    /// Pattern B shape; routes through `SocialTarget` as a stub until
+    /// a `GraveTarget` zone is authored alongside the §7.7.b writer.
+    Vigil,
+    /// 357: scaffold for `mourn_at_grave` sub-goal 1. Same caveats as
+    /// `Vigil`.
+    GriefSit,
+    /// 357: scaffold for `mourn_at_grave` terminal sub-goal — removes
+    /// the `Mourning` Component, ending the grief arc. Same caveats
+    /// as `Vigil`.
+    ReleaseGrief,
 }
 
 // ---------------------------------------------------------------------------

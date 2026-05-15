@@ -78,6 +78,7 @@ fn main() -> io::Result<()> {
     print_score_breakdown(&snapshots);
     print_needs_timeline(&snapshots);
     print_relationships(&snapshots);
+    print_aspirations(&cat_name, &snapshots);
     print_key_decisions(&actions);
     if let Some(ref d) = death {
         print_death(d, &snapshots);
@@ -454,6 +455,185 @@ fn print_relationships(snapshots: &[Value]) {
         );
     }
     println!();
+}
+
+// ---------------------------------------------------------------------------
+// Aspirations & Goal Stack (HTN substrate — ticket 336)
+// ---------------------------------------------------------------------------
+
+/// Renders the cat's aspiration set, current goal stack, and method history
+/// derived from snapshot transitions. Reads `goal_stack` and
+/// `active_aspirations` fields added to `CatSnapshot` by ticket 339; shows
+/// a short notice if the run predates those fields or if no Tier-1 methods
+/// were Live.
+fn print_aspirations(name: &str, snapshots: &[Value]) {
+    let has_aspirations = snapshots.iter().any(|s| {
+        s.get("active_aspirations")
+            .and_then(|v| v.as_array())
+            .is_some_and(|a| !a.is_empty())
+    });
+    let has_goal_stack = snapshots.iter().any(|s| {
+        s.get("goal_stack")
+            .and_then(|v| v.as_array())
+            .is_some_and(|a| !a.is_empty())
+    });
+
+    println!("=== {name} — Aspirations & Goal Stack ===");
+    println!();
+
+    if !has_aspirations && !has_goal_stack {
+        println!("  (No HTN data in snapshots — Tier-1 methods not Live in this run)");
+        println!();
+        return;
+    }
+
+    // --- Active aspirations ---
+    println!("  Active aspirations:");
+    let last_asp = snapshots.iter().rev().find(|s| {
+        s.get("active_aspirations")
+            .and_then(|v| v.as_array())
+            .is_some_and(|a| !a.is_empty())
+    });
+    match last_asp {
+        None => println!("    (none active)"),
+        Some(snap) => {
+            let tick = snap.get("tick").and_then(|v| v.as_u64()).unwrap_or(0);
+            let asps = snap.get("active_aspirations").and_then(|v| v.as_array()).unwrap();
+            println!("    (at tick {tick})");
+            for (i, asp) in asps.iter().enumerate() {
+                let chain = asp.get("chain_name").and_then(|v| v.as_str()).unwrap_or("?");
+                let domain = asp.get("domain").and_then(|v| v.as_str()).unwrap_or("?");
+                let milestone = asp.get("current_milestone").and_then(|v| v.as_u64()).unwrap_or(0);
+                let progress = asp.get("progress").and_then(|v| v.as_u64()).unwrap_or(0);
+                let adopted = asp.get("adopted_tick").and_then(|v| v.as_u64()).unwrap_or(0);
+                println!(
+                    "    [{i}] {chain:<24}  domain:{domain:<12}  milestone:{milestone}  progress:{progress:>4}  adopted:tick {adopted}"
+                );
+            }
+        }
+    }
+    println!();
+
+    // --- Current goal stack ---
+    println!("  Goal stack (most recent):");
+    let last_stack = snapshots.iter().rev().find(|s| {
+        s.get("goal_stack")
+            .and_then(|v| v.as_array())
+            .is_some_and(|a| !a.is_empty())
+    });
+    match last_stack {
+        None => println!("    (stack empty — no active method)"),
+        Some(snap) => {
+            let tick = snap.get("tick").and_then(|v| v.as_u64()).unwrap_or(0);
+            let frames = snap.get("goal_stack").and_then(|v| v.as_array()).unwrap();
+            let current_action = snap.get("current_action").and_then(|v| v.as_str()).unwrap_or("?");
+            println!("    (at tick {tick}  leaf action: {current_action})");
+            for (depth, frame) in frames.iter().enumerate() {
+                let method = frame.get("method").and_then(|v| v.as_str()).unwrap_or("?");
+                let goal = frame.get("goal_label").and_then(|v| v.as_str()).unwrap_or("?");
+                let sub_i = frame.get("sub_goal_index").and_then(|v| v.as_u64()).unwrap_or(0);
+                let sub_n = frame.get("sub_goal_count").and_then(|v| v.as_u64()).unwrap_or(0);
+                let source = frame.get("source").and_then(|v| v.as_str()).unwrap_or("?");
+                let marker = if depth + 1 == frames.len() { " ← active" } else { "" };
+                println!(
+                    "    [{depth}] {method:<26}  goal:{goal:<20}  {sub_i}/{sub_n}  src:{source}{marker}"
+                );
+            }
+        }
+    }
+    println!();
+
+    // --- Method history derived from snapshot transitions ---
+    //
+    // MethodAdopted / SubGoalAdvanced / MethodBacktracked are Feature
+    // activation counters, not EventKind log entries, so they are not
+    // directly readable from events.jsonl. We infer them by comparing
+    // consecutive snapshots: stack-top changes reveal adoptions and
+    // backtracks; sub_goal_index increments reveal sub-goal advances.
+    println!("  Method history (from snapshot transitions):");
+    let history = derive_method_history(snapshots);
+    if history.is_empty() {
+        println!("    (no method transitions in snapshot window)");
+    } else {
+        let max_show = 20;
+        let start = history.len().saturating_sub(max_show);
+        if start > 0 {
+            println!("    ... ({start} earlier events not shown)");
+        }
+        for (tick, event, detail) in &history[start..] {
+            println!("    tick {:>7}  {:<24}  {}", tick, event, detail);
+        }
+    }
+    println!();
+}
+
+/// Derives a coarse method-event timeline by diffing consecutive CatSnapshot
+/// entries. Returns `(tick, event_label, detail)` triples in chronological
+/// order. Only snapshots that carry a `goal_stack` field participate.
+fn derive_method_history(snapshots: &[Value]) -> Vec<(u64, &'static str, String)> {
+    let mut history: Vec<(u64, &'static str, String)> = Vec::new();
+    let mut prev_method: Option<String> = None;
+    let mut prev_sub_i: usize = 0;
+    let mut prev_depth: usize = 0;
+
+    for snap in snapshots {
+        let frames = match snap.get("goal_stack").and_then(|v| v.as_array()) {
+            Some(f) => f,
+            None => continue,
+        };
+        let tick = snap.get("tick").and_then(|v| v.as_u64()).unwrap_or(0);
+        let cur_depth = frames.len();
+        let top = frames.last();
+        let cur_method = top
+            .and_then(|f| f.get("method"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let cur_sub_i = top
+            .and_then(|f| f.get("sub_goal_index"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
+        let sub_n = top
+            .and_then(|f| f.get("sub_goal_count"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+
+        match (&prev_method, &cur_method) {
+            (None, Some(m)) => {
+                history.push((tick, "MethodAdopted", m.clone()));
+            }
+            (Some(prev), None) => {
+                history.push((tick, "MethodComplete/Abandoned", prev.clone()));
+            }
+            (Some(prev), Some(cur)) if cur != prev => {
+                // Stack top changed to a different method.
+                let prev_still_present = frames
+                    .iter()
+                    .any(|f| f.get("method").and_then(|v| v.as_str()) == Some(prev.as_str()));
+                if !prev_still_present && cur_depth < prev_depth {
+                    history.push((tick, "MethodBacktracked", format!("{prev} → {cur}")));
+                } else {
+                    history.push((tick, "MethodAdopted", cur.clone()));
+                }
+            }
+            (Some(_), Some(cur)) => {
+                // Same top method — check for sub-goal advance.
+                if cur_sub_i > prev_sub_i {
+                    history.push((
+                        tick,
+                        "SubGoalAdvanced",
+                        format!("{cur} [{cur_sub_i}/{sub_n}]"),
+                    ));
+                }
+            }
+            _ => {}
+        }
+
+        prev_method = cur_method;
+        prev_sub_i = cur_sub_i;
+        prev_depth = cur_depth;
+    }
+
+    history
 }
 
 // ---------------------------------------------------------------------------

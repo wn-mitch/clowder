@@ -1,7 +1,7 @@
 ---
 id: 336
 title: just inspect renders the goal stack + aspiration set
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: swarm-safe
 initiative: [smarter-cats]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 1d40076edebb
+landed-on: 2026-05-15
 ---
 
 ## Why

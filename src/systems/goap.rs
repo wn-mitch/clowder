@@ -6716,6 +6716,22 @@ fn dispatch_step_action(
             );
             outcome.result
         }
+        // 357: HTN-driven primitives. The dispatch closure (D1) pins
+        // chosen_action from `HeldGoalStack.frames[top].sub_goals[idx]`
+        // at the evaluate_and_plan author site; the plan-template
+        // emits a single-action plan that lands here. The resolver
+        // functions currently return `StepResult::Fail` (recovered as
+        // dormant stubs from the 332/333 substrate restore — see
+        // 4c211d5b); landing real maturity / mourning side-effects is
+        // a follow-on per the substrate-vs-balance separation.
+        // Failure is informative — the held method backtracks per its
+        // `MethodFailure` strategy.
+        GoapActionKind::Wean => crate::steps::disposition::resolve_wean().result,
+        GoapActionKind::Teach => crate::steps::disposition::resolve_teach().result,
+        GoapActionKind::Release => crate::steps::disposition::resolve_release().result,
+        GoapActionKind::Vigil => crate::steps::disposition::resolve_vigil().result,
+        GoapActionKind::GriefSit => crate::steps::disposition::resolve_grief_sit().result,
+        GoapActionKind::ReleaseGrief => crate::steps::disposition::resolve_release_grief().result,
     }
 }
 
