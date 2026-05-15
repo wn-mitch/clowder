@@ -8,11 +8,11 @@ You operate one "master" Claude Code session at `~/clowder`. Other sessions run 
 
 Three orchestration tracks govern how a session is treated:
 
-| Track | Verdict cadence | Session lifetime | Polecat-eligible (Stage 2) |
+| Track | Verdict cadence | Session lifetime | Polecat-eligible |
 |---|---|---|---|
 | `substrate-sensitive` (default) | per-ticket, human-gated | short, careful | no |
 | `coherent-block` | block-level at verdict-anchor | long, spans context windows | no |
-| `swarm-safe` | per-ticket; refinery may auto | ephemeral | yes |
+| `swarm-safe` | per-ticket; `refinery --auto` whitelisted in code | ephemeral | **yes (Stage 2 live)** |
 
 Every active ticket carries `orchestration: <track>` in its frontmatter. The default is `substrate-sensitive` (safest). Promote tickets to `swarm-safe` (faster cadence, polecat-eligible) or `coherent-block` (block-level orchestration) explicitly via `/retag` or `just retag <id> --track <name>`.
 
@@ -113,7 +113,99 @@ Use for: docs, frontmatter migrations, mechanical refactors, atomic bugfixes wit
 
 **Verdict cadence:** per-ticket. The refinery `--auto` flag (Stage 2; not yet implemented) lands these in batches when verdict-pass + no-conflict. The whitelist is **in code**, not by convention — `scripts/refinery.sh` refuses `--auto` on anything other than `swarm-safe`.
 
-**Sessions:** ephemeral polecats (Stage 2). One ticket per session, push and exit. Stage 1 of the orchestration ships only the manual path; `/foreman` (Stage 2) ships the polecat dispatcher.
+**Sessions:** ephemeral polecats. One ticket per session, push and exit. The master foreman auto-lands their bookmarks via `just refinery --auto` (whitelisted in code to track==swarm-safe).
+
+## Stage 2 — polecats (master-orchestrator)
+
+`/foreman` is the master-orchestrator entry. It spawns headless child `claude` CLI processes (polecats) against pre-created swarm-safe workspaces, watches them, and auto-lands their bookmarks via `just refinery --auto` when they exit.
+
+### Mental model
+
+The master Claude session at `~/clowder` is the foreman. Each polecat is a `claude -p` subprocess in its own jj workspace under `~/clowder-sessions/swarmpole-<id>/`. The foreman:
+
+1. **Picks** the top ready swarm-safe ticket(s).
+2. **Claims + workspaces** via `just session-new swarmpole-<id> --tickets <id> --track swarm-safe` (atomic flock-gated claim; reuses Stage 1 primitive).
+3. **Spawns** the polecat: `claude -p --output-format stream-json --permission-mode bypassPermissions --model sonnet --name polecat-<slug> --session-id $(uuidgen) --no-session-persistence`. Output streamed to `~/clowder-sessions/<slug>/.polecat-stream.jsonl`.
+4. **Wall-clock sentinel**: a background sleeper that SIGTERMs the polecat if it's still alive after the deadline (default 30m; macOS doesn't ship `timeout(1)`, so this is the portable workaround).
+5. **Poll loop**: every 30s checks if all polecats have exited; when they have, runs `just refinery --auto` to land bookmarks that passed the gate.
+
+The polecat is given a stricter prompt than `session-new --print-prompt` (which is for human sessions). It's instructed to:
+- Never ask the user a question. If anything's ambiguous, abandon and log via `/agent-feedback`, exit without pushing.
+- Run `just check && just test` before pushing. If they fail, abandon — never commit broken state.
+- Exit ceremony: `just check && just test` → `jj describe -m "..."` → `just land <id>` → `jj git push --bookmark session/<slug> --allow-new` → print `polecat-done: <slug>` and exit.
+
+### The `[foreman]` recipe group
+
+| Recipe | What it does |
+|---|---|
+| `just foreman` | Report polecats + ready queue (default) |
+| `just foreman --json` | Machine-readable for `/foreman` skill |
+| `just foreman-spawn N` | Spawn N polecats (default N=3, wallclock 30m); enters auto-poll-and-land loop |
+| `just foreman-spawn N --dry-run` | Plans without spawning; rolls back its session-new claims |
+| `just foreman-watch` | One-shot heartbeat — alive/exited, last-edit, deadline-remaining |
+| `just foreman-log <slug>` | `tail -f` the polecat's stream-json |
+| `just foreman-shutdown [--hard]` | SIGTERM (or SIGKILL with `--hard`) every tracked polecat |
+
+Discover via `just --list | grep '\[foreman\]'`.
+
+### Spawn → watch → land cycle
+
+```text
+just foreman-spawn 3
+  ├─ pick 3 ready swarm-safe tickets (avoiding already-claimed)
+  ├─ for each: just session-new swarmpole-<id> --tickets <id> --track swarm-safe
+  │  └─ atomically claims, creates ~/clowder-sessions/swarmpole-<id>/, sets session/swarmpole-<id>
+  ├─ spawn claude -p subprocess (PID → .polecat.pid; stream → .polecat-stream.jsonl)
+  ├─ spawn wallclock sentinel (PID → .polecat-watchdog.pid; SIGTERMs after Mm)
+  └─ enter poll loop:
+       while any polecat alive:
+         sleep 30s
+       just refinery --auto       ← drains the queue: gate = working-copy clean + just check && just test
+       for each polecat that didn't push:
+         archive_abandoned_polecat ← cp stream/stderr/cmdline + REASON to logs/polecat-abandoned/<stamp>-<slug>/
+         session_done.sh --force  ← releases the ticket claim back to ready (now safe — artifacts archived)
+```
+
+### Artifacts (per polecat, in `~/clowder-sessions/<slug>/`)
+
+| File | Written by | Use |
+|---|---|---|
+| `.session-info.json` | `session_new.sh` | slug · track · tickets · bookmark · created_at |
+| `.polecat.pid` | `foreman.sh::spawn_one_polecat` | PID of the `claude` child |
+| `.polecat-watchdog.pid` | same | PID of the wallclock sentinel |
+| `.polecat-stream.jsonl` | `claude --output-format stream-json` | full structured stream |
+| `.polecat-stderr.log` | shell redirect | stderr from `claude` |
+| `.polecat-cmdline` | `foreman.sh` | exact invocation (post-mortem) |
+| `.polecat-prompt` | `foreman.sh` | the prompt sent to `claude` |
+| `.polecat-deadline` | `foreman.sh` | UNIX timestamp when wallclock fires |
+| `.polecat-exit` | spawn subshell | exit code on natural termination |
+| `.refinery-gate.log` | `refinery.sh::auto_gate` | `just check && just test` output if the gate ran |
+
+After a successful land, the workspace is removed via `session_done.sh --no-release`. After an abandoned/dead polecat, the foreman first copies the diagnostic artifacts to `logs/polecat-abandoned/<YYYYMMDD-HHMMSS>-<slug>/` (with a one-line `REASON` file extracted from the polecat's final `polecat-abandoned: <slug> <reason>` stdout), THEN runs `session_done.sh --force` to remove the workspace AND release the ticket-claim back to `ready`. Canonical abandon reasons (from the prompt's verifiability-triage block): `requires-gui` · `requires-long-soak` · `requires-substrate-judgment`.
+
+### `refinery --auto` (the gate)
+
+`refinery --auto` is the lander that foreman invokes after its polecats exit. Per session bookmark:
+
+1. **Whitelist** — track must be `swarm-safe` (enforced at flag parse AND inside the loop; substrate-sensitive + coherent-block always require explicit `--land <slug>`).
+2. **Fast-forward** — bookmark must be ahead of main with no commits behind. Conflicts → never auto-landed.
+3. **Working-copy clean** — `jj status` in the workspace shows no `[AM]` edits.
+4. **Gate** — `cd <workspace> && just check && just test` exits 0 for both.
+5. **Land** — reuse the existing `land()` (rebase if needed → `jj bookmark set main` → forget bookmark → `session_done.sh --no-release`).
+
+`--dry-run` runs steps 1-4 but skips landing. Outcomes per row: `landed` / `gate-pass` (dry-run) / `wrong-track` / `not-fast-forward` / `dirty-working-copy` / `check-fail` / `test-fail` / `no-changes` / `no-workspace` / `land-failed`.
+
+### Recovering a stuck polecat
+
+A "stuck" polecat is alive (PID up) but its bookmark hasn't advanced past main for >20min. Indicators in `just foreman-watch`: `alive` + `last-edit` growing large + `deadline-in` shrinking.
+
+Options:
+1. **Wait** — the wallclock sentinel will SIGTERM at the deadline.
+2. **Tail the stream** — `just foreman-log <slug>` to see what `claude` is doing.
+3. **Shutdown** — `just foreman-shutdown` (SIGTERM, gives `/handoff` a chance) or `just foreman-shutdown --hard` (SIGKILL, drops mid-flight state).
+4. **Drain** — after shutdown, `just refinery --auto` lands any bookmarks that managed to push before death; failed ones get `session_done.sh --force` to release their ticket claims.
+
+A "dead" polecat (PID gone) that didn't push its bookmark is handled automatically by the foreman's poll loop — it releases the ticket back to `ready` via `session_done.sh --force` after the `refinery --auto` step.
 
 ## Frontmatter invariants (enforced by `just check`)
 
