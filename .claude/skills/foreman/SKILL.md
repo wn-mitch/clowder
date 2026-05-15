@@ -86,7 +86,8 @@ Then dispatch: `just foreman-spawn N --wallclock M` (or with `--dry-run`).
 
 **Important:** after spawn, the recipe enters the auto-poll-and-land loop. It blocks until all polecats exit or wallclock-fire. Tell the user:
 - Ctrl-C is safe — polecats keep running (they're detached via nohup); resume with `just foreman-watch` or `just refinery --auto`.
-- Each polecat prints `polecat-done: <slug> ticket-<id>` on success or `polecat-abandoned: <slug> <reason>` on graceful abandonment (refuses to push broken state).
+- Each polecat prints `polecat-done: <slug> ticket-<id>` on success or `polecat-abandoned: <slug> <reason>` on graceful abandonment (refuses to push broken state). Canonical reasons: `requires-gui` · `requires-long-soak` · `requires-substrate-judgment` · free-form for everything else.
+- Abandoned polecats have their workspace artifacts copied to `logs/polecat-abandoned/<YYYYMMDD-HHMMSS>-<slug>/` (stream, stderr, cmdline, REASON) **before** `session_done.sh --force` removes the workspace. Read `REASON` first; fall back to `polecat-stream.jsonl` for the full trace.
 
 ### 6. Action 3 — Drain (refinery --auto)
 
@@ -105,7 +106,7 @@ After landing, summarize: which slugs landed → main, which were skipped + why.
 - **Never spawn against a non-swarm-safe track.** The whitelist is enforced in code (`scripts/refinery.sh` refuses `--auto` for any non-swarm-safe row even with explicit `--track <other>`); this skill is the third defense. If the user asks to "spawn a polecat against ticket 145 (substrate-sensitive)", explain that polecats are headless and substrate-sensitive needs the layer-walk discipline — route to `/work` Action 4 (Start a new session) instead.
 - **Never auto-confirm `--shutdown --hard`.** SIGKILL drops `/handoff` mid-flight; the polecat's session state may not flush. Always ask first.
 - **Read state freshly** every invocation. Polecats can die between menu presentation and dispatch.
-- **Always print where artifacts live.** When confirming a spawn or surfacing a failure, name the workspace path (`~/clowder-sessions/<slug>/`) and the relevant artifacts (`.polecat-stream.jsonl`, `.polecat-stderr.log`, `.polecat-cmdline`, `.refinery-gate.log`) so the user can post-mortem without asking.
+- **Always print where artifacts live.** When confirming a spawn or surfacing a failure, name the workspace path (`~/clowder-sessions/<slug>/`) and the relevant artifacts (`.polecat-stream.jsonl`, `.polecat-stderr.log`, `.polecat-cmdline`, `.refinery-gate.log`) so the user can post-mortem without asking. For abandoned polecats, the workspace is gone — point at `logs/polecat-abandoned/<stamp>-<slug>/REASON` (one-line cause) and `polecat-stream.jsonl` (full trace) under the repo root.
 
 ## Reference
 

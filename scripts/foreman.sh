@@ -175,6 +175,26 @@ Constraints (load-bearing):
 - \`just check && just test\` must pass before you push. If they don't,
   abandon — do not commit broken state.
 
+Verifiability triage (do this FIRST, before reading any source code or
+running \`cargo\`):
+Read the ticket body below. Decide *how* you would prove correctness:
+- If verification needs visually inspecting a rendered window, screenshot,
+  or log-viewer chart (windowed UI overlay, render-pipeline change,
+  visualization widget) → abandon NOW:
+    print "polecat-abandoned: $slug requires-gui"
+- If verification needs running a full \`just soak\` > 5 min and comparing
+  footers / continuity canaries → abandon NOW:
+    print "polecat-abandoned: $slug requires-long-soak"
+- If verification needs substrate-sensitive judgment (promoting a
+  [suspect] layer-walk row, ECS-schedule reasoning, balance call) →
+  abandon NOW:
+    print "polecat-abandoned: $slug requires-substrate-judgment"
+- If verification is \`just check && just test\` + reading a deterministic
+  \`just\` recipe output (\`just inspect\`, \`just q\`, \`just explain\`,
+  \`just similar\`) → proceed to the exit ceremony.
+Reason: abandoning at prompt-read time burns ~1 minute; abandoning after
+\`cargo build\` burns 5-10 minutes. Triage cheap, then commit.
+
 Exit ceremony (non-optional, in this exact order):
   1. Run \`just check && just test\` inside this workspace. If either fails,
      abandon (do NOT proceed to step 2).
@@ -405,6 +425,49 @@ spawn_mode() {
     auto_poll_and_land "${spawned[@]}"
 }
 
+archive_abandoned_polecat() {
+    # Copy a non-landing polecat's diagnostic artifacts to logs/polecat-abandoned/
+    # BEFORE session_done.sh --force removes the workspace. Extracts the
+    # `polecat-abandoned: <slug> <reason>` line (if present) and writes it to a
+    # one-line REASON file. Echoes the reason on stdout for the caller to log
+    # (empty if the polecat exited without printing the abandon line).
+    local slug="$1"
+    local workspace="$SESSIONS_ROOT/$slug"
+    local stream="$workspace/.polecat-stream.jsonl"
+    local stderr_log="$workspace/.polecat-stderr.log"
+    local cmdline="$workspace/.polecat-cmdline"
+
+    local stamp; stamp=$(date -u +"%Y%m%d-%H%M%S")
+    local archive_dir="$REPO_ROOT/logs/polecat-abandoned/${stamp}-${slug}"
+    mkdir -p "$archive_dir"
+
+    [[ -f "$stream" ]] && cp "$stream" "$archive_dir/polecat-stream.jsonl"
+    [[ -f "$stderr_log" ]] && cp "$stderr_log" "$archive_dir/polecat-stderr.log"
+    [[ -f "$cmdline" ]] && cp "$cmdline" "$archive_dir/polecat-cmdline"
+
+    # Extract the abandon reason. The polecat is supposed to print
+    # `polecat-abandoned: <slug> <reason>` as its final stdout. In stream-json
+    # mode that lands inside an assistant text event; grep -o pulls it out.
+    local reason=""
+    if [[ -f "$stream" ]]; then
+        reason=$(grep -o "polecat-abandoned: $slug [^\"\\\\]*" "$stream" 2>/dev/null \
+            | tail -1 | sed -E "s/^polecat-abandoned: $slug //")
+    fi
+    if [[ -z "$reason" && -f "$stderr_log" ]]; then
+        reason=$(grep -o "polecat-abandoned: $slug .*" "$stderr_log" 2>/dev/null \
+            | tail -1 | sed -E "s/^polecat-abandoned: $slug //")
+    fi
+    [[ -z "$reason" ]] && reason="(no abandon-line found — see polecat-stream.jsonl)"
+    echo "$reason" > "$archive_dir/REASON"
+
+    # Echo to stdout for caller (without the placeholder fallback)
+    if [[ "$reason" == "(no abandon-line found"* ]]; then
+        echo ""
+    else
+        echo "$reason"
+    fi
+}
+
 auto_poll_and_land() {
     local watched=("$@")
     while true; do
@@ -424,10 +487,17 @@ auto_poll_and_land() {
             (cd "$REPO_ROOT" && just refinery --auto)
 
             # For any session whose bookmark didn't advance (polecat abandoned
-            # or died), release the ticket-claim back to ready via session_done.
+            # or died), archive the abandon reason + diagnostic artifacts first,
+            # THEN release the ticket-claim back to ready via session_done.
             for slug in "${watched[@]}"; do
                 if [[ -d "$SESSIONS_ROOT/$slug" ]]; then
-                    echo "foreman: polecat $slug did not land (abandoned/dead); releasing claim..."
+                    local reason
+                    reason=$(archive_abandoned_polecat "$slug")
+                    if [[ -n "$reason" ]]; then
+                        echo "foreman: polecat $slug abandoned — $reason; releasing claim..."
+                    else
+                        echo "foreman: polecat $slug did not land (no abandon-line found); releasing claim..."
+                    fi
                     (cd "$REPO_ROOT" && bash scripts/session_done.sh "$slug" --force) || \
                         echo "  WARN: session_done.sh $slug failed; manual cleanup needed" >&2
                 fi
