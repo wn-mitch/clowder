@@ -1,7 +1,8 @@
 //! Combat domain — two chains (Warrior's Path, Shadow Fighter).
 //! Ported 1:1 from `assets/narrative/aspirations/combat.ron` (retired
-//! at 321). #327 fills WARRIORS_PATH emits; SHADOW_FIGHTER emits land
-//! in a follow-on ticket alongside its Patrol primitive method.
+//! at 321). #327 filled WARRIORS_PATH emits with `fight_method` /
+//! `flee_method` Live wiring; #347 finishes the domain by filling
+//! SHADOW_FIGHTER emits with `patrol_method` + re-used `flee_method`.
 
 use super::{
     always_true, AspirationChain, ConflictClass, Emit, Milestone, Priority, ProgressTracker,
@@ -20,6 +21,29 @@ use crate::components::aspirations::AspirationDomain;
 const WARRIOR_EMITS: &[Emit] = &[
     Emit {
         label: "engage_threat",
+        applicable_when: always_true,
+        strategy: CommitmentStrategy::SingleMinded,
+        priority: Priority::Primary,
+    },
+    Emit {
+        label: "flee_to_safety",
+        applicable_when: always_true,
+        strategy: CommitmentStrategy::SingleMinded,
+        priority: Priority::Tertiary,
+    },
+];
+
+/// 347 — SHADOW_FIGHTER emit table — applies uniformly to all three
+/// milestones. Primary `patrol_route` catches `patrol_method` (this
+/// ticket); Tertiary `flee_to_safety` re-uses the already-Live
+/// `flee_method` from 327 as the survival fallback — same survival
+/// logic whether the Combat cat's track is Fight- or Patrol-based. The
+/// per-row `applicable_when` gate is `always_true` at 347 land; a
+/// follow-on balance pass tightens Patrol on a perimeter-unwatched
+/// predicate and Flee on a wounded predicate.
+const SHADOW_FIGHTER_EMITS: &[Emit] = &[
+    Emit {
+        label: "patrol_route",
         applicable_when: always_true,
         strategy: CommitmentStrategy::SingleMinded,
         priority: Priority::Primary,
@@ -100,7 +124,7 @@ pub const SHADOW_FIGHTER: AspirationChain = AspirationChain {
                 actions: &[Action::Patrol],
                 count: 5,
             },
-            emits: &[],
+            emits: SHADOW_FIGHTER_EMITS,
             narrative_on_complete:
                 "{name} volunteers for the night patrol. No one asks why.",
         },
@@ -111,7 +135,7 @@ pub const SHADOW_FIGHTER: AspirationChain = AspirationChain {
                 actions: &[Action::Patrol],
                 count: 20,
             },
-            emits: &[],
+            emits: SHADOW_FIGHTER_EMITS,
             narrative_on_complete: "{name} hears the threats before they arrive.",
         },
         Milestone {
@@ -121,7 +145,7 @@ pub const SHADOW_FIGHTER: AspirationChain = AspirationChain {
                 skill: SkillKind::Combat,
                 level: 1.5,
             },
-            emits: &[],
+            emits: SHADOW_FIGHTER_EMITS,
             narrative_on_complete: "{name} fights like {possessive} shadow has claws of its own.",
         },
     ],

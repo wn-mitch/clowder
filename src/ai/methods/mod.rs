@@ -99,6 +99,11 @@ pub enum TargetHint {
     /// of cats receptive to direction). Used by `coordinate_method`
     /// as the Leadership chains' primary emit target.
     Audience,
+    /// 347 — primitive sub-goal binds to the cat's patrol-route picker
+    /// (Patrol-DSE's existing target resolution: next waypoint on the
+    /// colony perimeter circuit). Used by `patrol_method` as
+    /// SHADOW_FIGHTER's primary emit target.
+    PatrolRoute,
 }
 
 // ---------------------------------------------------------------------------
@@ -430,6 +435,12 @@ pub mod build;
 // VOICE_OF_THE_COLONY and THE_UNIFIER). Tier-1 Live primitive
 // mirroring `fight_method`'s 327 shape.
 pub mod coordinate;
+// 347: Live HTN method module — Combat-domain Patrol-based wrapper.
+// `patrol_method` catches `patrol_route` (Primary emit on every
+// SHADOW_FIGHTER milestone). Finishes Combat-domain wiring alongside
+// the already-Live `flee_method` (re-used as the Tertiary survival
+// fallback for SHADOW_FIGHTER).
+pub mod patrol;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
 

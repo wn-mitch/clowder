@@ -15,10 +15,10 @@ _Last generated: 2026-05-15._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 109 |
+| Ready | 108 |
 | Parked | 14 |
 | Blocked | 25 |
-| **Open total** | **153** |
+| **Open total** | **152** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -55,11 +55,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (109)
+## Ready by cluster (108)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (24 ready, 5 blocked)
+### ai-substrate (23 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -84,7 +84,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
-- **[347](docs/open-work/tickets/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method — _[ai-substrate] · added 2026-05-14_
 
 ### belief-perception (13 ready, 2 blocked)
 
@@ -201,11 +200,11 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
 
-## Ready by initiative (64 tag-memberships across 9 initiatives)
+## Ready by initiative (62 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
-### smarter-cats (15 open, 13 landed)
+### smarter-cats (14 open, 14 landed)
 
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
@@ -221,7 +220,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
-- **[347](docs/open-work/tickets/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method — _[ai-substrate] · added 2026-05-14_
 
 ### full-sensory-perception (13 open, 3 landed)
 
@@ -278,25 +276,24 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
 
-### htn-method-composition (4 open, 4 landed)
-
-- **[332](docs/open-work/tickets/332-grief-vigil-action-vocabulary.md)** — Grief-vigil action vocabulary — flip mourn_at_grave to Live — _[life-cycle] · added 2026-05-14_
-- **[333](docs/open-work/tickets/333-kitten-rearing-action-vocabulary.md)** — Kitten-rearing action vocabulary — flip rear_kitten to Live — _[life-cycle] · added 2026-05-14_
-- **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
-- **[347](docs/open-work/tickets/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method — _[ai-substrate] · added 2026-05-14_
-
 ### environmental-simulation (3 open, 1 landed)
 
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _[wildlife] · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
+### htn-method-composition (3 open, 5 landed)
+
+- **[332](docs/open-work/tickets/332-grief-vigil-action-vocabulary.md)** — Grief-vigil action vocabulary — flip mourn_at_grave to Live — _[life-cycle] · added 2026-05-14_
+- **[333](docs/open-work/tickets/333-kitten-rearing-action-vocabulary.md)** — Kitten-rearing action vocabulary — flip rear_kitten to Live — _[life-cycle] · added 2026-05-14_
+- **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
+
 ### world-richness (2 open, 0 landed)
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 
-## Ready (109)
+## Ready (108)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -399,7 +396,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
-- **[347](docs/open-work/tickets/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method — _[ai-substrate] · added 2026-05-14_
 - **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
@@ -458,13 +454,14 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (222)
+## Landed archive (223)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (157)
+### 2026-05 (158)
 
 - **[356](docs/open-work/landed/356-foreman-polecat-abandon-archive-early-abandon-triage-close-the-silent-waste-loop.md)** — foreman polecat-abandon archive + early-abandon triage (close the silent-waste loop) _(2026-05-15)_
+- **[347](docs/open-work/landed/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method _(2026-05-15)_
 - **[331](docs/open-work/landed/331-aspiration-milestone-wrapper-leadership.md)** — Leadership aspiration_milestone_wrapper + emits tables _(2026-05-15)_
 - **[330](docs/open-work/landed/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables _(2026-05-15)_
 - **[329](docs/open-work/landed/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables _(2026-05-15)_

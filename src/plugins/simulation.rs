@@ -320,6 +320,17 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // (mentor-relationships / role-acceptance predicates) lands as
     // a follow-on balance pass.
     registry.push(crate::ai::methods::coordinate::coordinate_method());
+
+    // 347: Tier-1 Live method — Combat-domain Patrol-based wrapper.
+    // `patrol_method` catches `patrol_route` (Primary emit on every
+    // SHADOW_FIGHTER milestone). Carries `applicable_when:
+    // Live(always_true)` with one primitive sub-goal (Action::Patrol +
+    // TargetHint::PatrolRoute). SHADOW_FIGHTER's Tertiary survival
+    // fallback re-uses the existing `flee_method` (327) — same
+    // survival logic whether the Combat cat's track is Fight- or
+    // Patrol-based. Production gating (perimeter-unwatched predicate)
+    // lands in a follow-on balance pass alongside 327's similar pass.
+    registry.push(crate::ai::methods::patrol::patrol_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of
