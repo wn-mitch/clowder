@@ -1,7 +1,7 @@
 ---
 id: 333
 title: Kitten-rearing action vocabulary — flip rear_kitten to Live
-status: ready
+status: done
 cluster: life-cycle
 orchestration: coherent-block
 block: htn-method-composition
@@ -13,8 +13,8 @@ wires-method: [rear_kitten]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 ## Why
