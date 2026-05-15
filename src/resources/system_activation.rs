@@ -500,6 +500,47 @@ pub enum Feature {
     /// registry cycle or a method whose sub-goals nest beyond the
     /// cap. `expected_to_fire_per_soak() => false` (rare-event class).
     MethodDepthExceeded,
+
+    // --- Ticket 332 — `mourn_at_grave` HTN method primitives ---
+    /// Ticket 332 — a cat performed a vigil tick at a colony-mate's
+    /// grave (real-world effect: mourning-cycle counter advanced).
+    /// Positive — substrate-driven grief processing is alive.
+    /// `expected_to_fire_per_soak() => false` until the dispatch
+    /// follow-on (named in #332's landing Log) wires DSE /
+    /// GoapActionKind / plan template / resolver call site so this
+    /// resolver actually fires.
+    VigilHeld,
+    /// Ticket 332 — a cat performed a grief-sit tick (in-den grief
+    /// processing). Positive — substrate-driven grief processing is
+    /// alive. `expected_to_fire_per_soak() => false` until dispatch
+    /// follow-on lands.
+    GriefProcessed,
+    /// Ticket 332 — a cat retired their `Mourning` Component, ending
+    /// the mourning arc. Positive — colony grief-cycle completion
+    /// is observable. `expected_to_fire_per_soak() => false` until
+    /// dispatch follow-on lands.
+    GriefReleased,
+
+    // --- Ticket 333 — `rear_kitten` HTN method primitives ---
+    /// Ticket 333 — a queen advanced a dependent kitten past the
+    /// wean threshold. Positive — substrate-driven kitten-rearing
+    /// arc is alive. `expected_to_fire_per_soak() => false` until
+    /// dispatch follow-on (named in #333's landing Log) wires DSE /
+    /// GoapActionKind / plan template / resolver call site.
+    KittenWeaned,
+    /// Ticket 333 — a queen demonstrated a skill to a dependent
+    /// kitten. Positive — substrate-driven mentoring of next
+    /// generation is alive. `expected_to_fire_per_soak() => false`
+    /// until dispatch follow-on lands.
+    SkillTaught,
+    /// Ticket 333 — a queen released a now-independent kitten,
+    /// retiring the kitten's `KittenDependency` Component. Positive
+    /// — generational continuity is observable beyond the existing
+    /// `KittenMatured` Feature (which fires on the kitten side from
+    /// the maturity tick; this one fires on the mother side from
+    /// the rearing-arc completion). `expected_to_fire_per_soak()
+    /// => false` until dispatch follow-on lands.
+    KittenReleased,
 }
 
 impl Feature {
@@ -672,6 +713,16 @@ impl Feature {
         Feature::SubGoalAdvanced,
         Feature::MethodBacktracked,
         Feature::MethodDepthExceeded,
+        // 332: `mourn_at_grave` HTN method primitives. Ship dormant
+        // (expected: false) until the dispatch follow-on lands.
+        Feature::VigilHeld,
+        Feature::GriefProcessed,
+        Feature::GriefReleased,
+        // 333: `rear_kitten` HTN method primitives. Ship dormant
+        // (expected: false) until the dispatch follow-on lands.
+        Feature::KittenWeaned,
+        Feature::SkillTaught,
+        Feature::KittenReleased,
     ];
 
     /// The valence of this feature.
@@ -788,6 +839,18 @@ impl Feature {
             Feature::SubGoalAdvanced => Positive,
             Feature::MethodBacktracked => Neutral,
             Feature::MethodDepthExceeded => Neutral,
+
+            // 332/333: HTN method primitive completions. All Positive
+            // — substrate-driven grief-processing and rearing-arc
+            // progress are colony wins. Each ships dormant via
+            // `expected_to_fire_per_soak() => false` until the
+            // dispatch follow-on lands.
+            Feature::VigilHeld => Positive,
+            Feature::GriefProcessed => Positive,
+            Feature::GriefReleased => Positive,
+            Feature::KittenWeaned => Positive,
+            Feature::SkillTaught => Positive,
+            Feature::KittenReleased => Positive,
 
             // 176: inventory-disposal completions are state-transition
             // signals — neither a colony win nor a loss, just "the cat
@@ -1135,6 +1198,20 @@ impl Feature {
             Feature::SubGoalAdvanced => false,
             Feature::MethodBacktracked => false,
             Feature::MethodDepthExceeded => false,
+            // 332/333: HTN method primitive completions. All ship
+            // dormant — the methods register Live in #332/#333 but
+            // `chosen_action` dispatch isn't wired yet (the HTN
+            // substrate doesn't override the L2 evaluator's softmax
+            // winner). The dispatch follow-on (named in each ticket's
+            // landing Log) flips these to `true` once the resolvers
+            // can actually fire under realistic Mourning insertion +
+            // KittenDependency presence.
+            Feature::VigilHeld => false,
+            Feature::GriefProcessed => false,
+            Feature::GriefReleased => false,
+            Feature::KittenWeaned => false,
+            Feature::SkillTaught => false,
+            Feature::KittenReleased => false,
             // Ticket 127 — JointIntention: drops are bursty (mirrors
             // `PairingDropped`); stage mismatch is healthy-sometimes-
             // zero. Both stay opt-out. Emitted / BiasApplied /
@@ -1340,6 +1417,13 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::SubGoalAdvanced => "SubGoalAdvanced",
         Feature::MethodBacktracked => "MethodBacktracked",
         Feature::MethodDepthExceeded => "MethodDepthExceeded",
+        // 332/333: HTN method primitive completions.
+        Feature::VigilHeld => "VigilHeld",
+        Feature::GriefProcessed => "GriefProcessed",
+        Feature::GriefReleased => "GriefReleased",
+        Feature::KittenWeaned => "KittenWeaned",
+        Feature::SkillTaught => "SkillTaught",
+        Feature::KittenReleased => "KittenReleased",
     }
 }
 
@@ -1615,7 +1699,12 @@ mod tests {
         // Ticket 025 Phase 2 added 10 Positive (5 hawk + 5 snake GOAP
         // features). All ship dormant; the four trunks are promoted
         // in commit 6 after the cutover soak.
-        assert_eq!(positive, 68);
+        // Ticket 332/333 added 6 Positive (VigilHeld, GriefProcessed,
+        // GriefReleased, KittenWeaned, SkillTaught, KittenReleased)
+        // for the `mourn_at_grave` and `rear_kitten` HTN method
+        // primitive completions. All ship dormant; promotion is the
+        // dispatch follow-on named in each ticket's landing Log.
+        assert_eq!(positive, 74);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -1701,9 +1790,13 @@ mod tests {
         // HTN method-stack lifecycle.
         // Ticket 025 Phase 2: +10 Positive (5 hawk + 5 snake GOAP
         // features; ship dormant, four trunks promoted in commit 6).
+        // Ticket 332/333: +6 Positive (VigilHeld, GriefProcessed,
+        // GriefReleased, KittenWeaned, SkillTaught, KittenReleased)
+        // for the `mourn_at_grave` and `rear_kitten` HTN method
+        // primitive completions. All ship dormant.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            68
+            74
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

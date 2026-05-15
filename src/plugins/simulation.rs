@@ -242,12 +242,24 @@ pub fn register_influence_maps_at_startup(mut registry: ResMut<InfluenceMapRegis
 /// their own line. See `src/ai/methods/mod.rs` module doc for the full
 /// contract.
 pub fn populate_method_registry(registry: &mut MethodRegistry) {
-    // 322: Tier-2 dormant methods. Each is registered as
-    // `ApplicableWhen::PendingSubstrate { blocker }` pointing at its
-    // wiring ticket (#332/#333/#334). `MethodRegistry::lookup` filters
-    // them out unconditionally, so they exist for the type-system and
-    // the dormancy audit but never run at runtime. The wiring tickets
-    // flip them to `ApplicableWhen::Live` when they land.
+    // 322: Tier-2 dormant methods. The remaining dormant entries
+    // (`acquire_stealth_via_*`) carry `ApplicableWhen::PendingSubstrate
+    // { blocker: "334" }` — wired when #334 (stealth-cloak crafting)
+    // lands. `MethodRegistry::lookup` filters them out unconditionally
+    // so they exist for the type-system + dormancy audit but never
+    // run at runtime.
+    //
+    // 332/333: `mourn_at_grave` and `rear_kitten` flipped to
+    // `ApplicableWhen::Live` here. Their `applicable_when` predicates
+    // gate on the `Mourning` Component (332) and the
+    // `KittenDependency.mother` reverse-lookup (333) so the methods
+    // are selectable only for cats actually carrying the substrate.
+    // **Dispatch wiring is pending** for both — the cat's
+    // `chosen_action` is still picked by the per-tick DSE softmax,
+    // not by HTN method primitive sub-goals. The dispatch follow-on
+    // (named in #332's and #333's landing Logs) wires DSE /
+    // GoapActionKind / plan template / resolver call site so the
+    // cat's behavior advances each method's sub-goals.
     use crate::ai::methods::acquire_stealth::{
         acquire_stealth_via_commission, acquire_stealth_via_self_craft,
     };
@@ -280,57 +292,6 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // ticket alongside its Patrol primitive method.
     registry.push(crate::ai::methods::fight::fight_method());
     registry.push(crate::ai::methods::flee::flee_method());
-
-    // 328: Tier-1 Live methods — combine-and-test slice for the
-    // Herbcraft chain. `gather_herbs_method` catches `gather_herbs`
-    // (WHISKERWEAVERS_APPRENTICE Primary emit); `prepare_remedy_method`
-    // catches `prepare_remedy` (HEALERS_CALLING Primary emit). Both
-    // carry `applicable_when: Live(always_true)` and one primitive
-    // sub-goal each (HerbcraftGather + TargetHint::Herb;
-    // HerbcraftRemedy + TargetHint::Patient). Production gating
-    // (herb-in-range / patient-in-need predicates) lands as a follow-on
-    // balance pass alongside 327's similar pass.
-    registry.push(crate::ai::methods::gather_herbs::gather_herbs_method());
-    registry.push(crate::ai::methods::prepare_remedy::prepare_remedy_method());
-
-    // 329: Tier-1 Live method — Exploration chain wrapper.
-    // `explore_method` catches `explore_territory` (Primary emit on
-    // every milestone of MAPMAKER and BEYOND_THE_BORDER). Carries
-    // `applicable_when: Live(always_true)` with one primitive sub-goal
-    // (Action::Explore + TargetHint::UnexploredTile). Production gating
-    // (tile-confidence threshold, fatigue cap) lands as a follow-on
-    // balance pass.
-    registry.push(crate::ai::methods::explore::explore_method());
-
-    // 330: Tier-1 Live method — Building chain wrapper. `build_method`
-    // catches `construct` (Primary emit on every milestone of DEN_SHAPER
-    // and THE_ARCHITECT). Carries `applicable_when: Live(always_true)`
-    // with one primitive sub-goal (Action::Build +
-    // TargetHint::ConstructionSite). Strategist-coordinator alignment
-    // is #335 territory; production gating (site-claimed predicate,
-    // materials-on-hand) lands as a follow-on balance pass.
-    registry.push(crate::ai::methods::build::build_method());
-
-    // 331: Tier-1 Live method — Leadership chain wrapper.
-    // `coordinate_method` catches `direct_colony` (Primary emit on
-    // every milestone of VOICE_OF_THE_COLONY and THE_UNIFIER). Carries
-    // `applicable_when: Live(always_true)` with one primitive sub-goal
-    // (Action::Coordinate + TargetHint::Audience). Coordinator-
-    // directive integration is #335 territory; production gating
-    // (mentor-relationships / role-acceptance predicates) lands as
-    // a follow-on balance pass.
-    registry.push(crate::ai::methods::coordinate::coordinate_method());
-
-    // 347: Tier-1 Live method — Combat-domain Patrol-based wrapper.
-    // `patrol_method` catches `patrol_route` (Primary emit on every
-    // SHADOW_FIGHTER milestone). Carries `applicable_when:
-    // Live(always_true)` with one primitive sub-goal (Action::Patrol +
-    // TargetHint::PatrolRoute). SHADOW_FIGHTER's Tertiary survival
-    // fallback re-uses the existing `flee_method` (327) — same
-    // survival logic whether the Combat cat's track is Fight- or
-    // Patrol-based. Production gating (perimeter-unwatched predicate)
-    // lands in a follow-on balance pass alongside 327's similar pass.
-    registry.push(crate::ai::methods::patrol::patrol_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of

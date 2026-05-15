@@ -495,6 +495,15 @@ pub fn generate_narrative(
                 (options[idx].clone(), NarrativeTier::Action)
             }
 
+            Action::ReleaseGrief => {
+                let options = [
+                    format!("{cat} lifts their head, the worst of the grief behind them."),
+                    format!("{cat} steps away from a grave with the weight a little lighter."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Significant)
+            }
+
             Action::Wean => {
                 let options = [
                     format!("{cat} guides a kitten toward solid food, gentle but firm."),

@@ -74,36 +74,18 @@ pub enum TargetHint {
     /// the safety axis). Used by `flee_method` as WARRIORS_PATH's
     /// survival-fallback emit target.
     SafeGround,
-    /// 328 — primitive sub-goal binds to the cat's herb-target picker
-    /// (Herbcraft-Gather DSE's existing target resolution: nearest
-    /// gatherable herb tile / plant). Used by `gather_herbs_method`
-    /// as WHISKERWEAVERS_APPRENTICE's primary emit target.
-    Herb,
-    /// 328 — primitive sub-goal binds to the cat's patient-target
-    /// picker (Herbcraft-Remedy DSE's existing target resolution:
-    /// nearest cat in need of a remedy). Used by
-    /// `prepare_remedy_method` as HEALERS_CALLING's primary emit target.
-    Patient,
-    /// 329 — primitive sub-goal binds to the cat's unexplored-tile
-    /// picker (Explore-DSE's existing target resolution: nearest
-    /// unmapped / low-confidence tile). Used by `explore_method`
-    /// as the Exploration chains' primary emit target.
-    UnexploredTile,
-    /// 330 — primitive sub-goal binds to the cat's construction-site
-    /// picker (Build-DSE's existing target resolution: nearest
-    /// planned-but-unfinished structure or open building slot). Used
-    /// by `build_method` as the Building chains' primary emit target.
-    ConstructionSite,
-    /// 331 — primitive sub-goal binds to the cat's audience picker
-    /// (Coordinate-DSE's existing target resolution: nearest cluster
-    /// of cats receptive to direction). Used by `coordinate_method`
-    /// as the Leadership chains' primary emit target.
-    Audience,
-    /// 347 — primitive sub-goal binds to the cat's patrol-route picker
-    /// (Patrol-DSE's existing target resolution: next waypoint on the
-    /// colony perimeter circuit). Used by `patrol_method` as
-    /// SHADOW_FIGHTER's primary emit target.
-    PatrolRoute,
+    /// 332 — primitive sub-goal binds to the cat's grave-target picker
+    /// (`pick_grave_for_mourner` — the cat's mourned `Grave` entity,
+    /// looked up by `Mourning.deceased_name == Grave.deceased_name`).
+    /// Used by `mourn_at_grave`'s three primitive sub-goals
+    /// (vigil_at_grave / grieve_in_den / release_grief).
+    Grave,
+    /// 333 — primitive sub-goal binds to the cat's dependent-kitten
+    /// picker (`pick_dependent_kitten_for_mother` — any kitten Entity
+    /// whose `KittenDependency.mother == Some(self)`, scored by
+    /// maturity for the wean/teach/release stage gate). Used by
+    /// `rear_kitten`'s three primitive sub-goals.
+    DependentKitten,
 }
 
 // ---------------------------------------------------------------------------
@@ -412,35 +394,6 @@ pub mod hunt;
 // SHADOW_FIGHTER (Patrol-based) lands in a follow-on ticket.
 pub mod fight;
 pub mod flee;
-// 328: Live HTN method modules — Herbcraft chain wrappers.
-// `gather_herbs_method` catches `gather_herbs` (Apprentice Primary);
-// `prepare_remedy_method` catches `prepare_remedy` (Healer Primary).
-// Both Tier-1 Live primitives, mirroring `fight_method`'s 327 shape;
-// chain-level routing distinguishes apprentice from healer rather than
-// per-action gating, which lands in a follow-on balance pass.
-pub mod gather_herbs;
-pub mod prepare_remedy;
-// 329: Live HTN method module — Exploration chain wrapper.
-// `explore_method` catches `explore_territory` (Primary emit on both
-// MAPMAKER and BEYOND_THE_BORDER). Tier-1 Live primitive mirroring
-// `fight_method`'s 327 shape.
-pub mod explore;
-// 330: Live HTN method module — Building chain wrapper.
-// `build_method` catches `construct` (Primary emit on both DEN_SHAPER
-// and THE_ARCHITECT). Tier-1 Live primitive mirroring `fight_method`'s
-// 327 shape.
-pub mod build;
-// 331: Live HTN method module — Leadership chain wrapper.
-// `coordinate_method` catches `direct_colony` (Primary emit on both
-// VOICE_OF_THE_COLONY and THE_UNIFIER). Tier-1 Live primitive
-// mirroring `fight_method`'s 327 shape.
-pub mod coordinate;
-// 347: Live HTN method module — Combat-domain Patrol-based wrapper.
-// `patrol_method` catches `patrol_route` (Primary emit on every
-// SHADOW_FIGHTER milestone). Finishes Combat-domain wiring alongside
-// the already-Live `flee_method` (re-used as the Tertiary survival
-// fallback for SHADOW_FIGHTER).
-pub mod patrol;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
 

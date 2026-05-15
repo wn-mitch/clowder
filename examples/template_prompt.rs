@@ -118,6 +118,7 @@ fn assert_pick_pool_covers_action(a: Action) {
         | Action::PetitionCoordinator
         | Action::Vigil
         | Action::GriefSit
+        | Action::ReleaseGrief
         | Action::Wean
         | Action::Teach
         | Action::Release => {}
@@ -196,6 +197,7 @@ fn main() {
             Action::PetitionCoordinator => "socialize.ron",
             Action::Vigil => "mentor.ron",
             Action::GriefSit => "idle.ron",
+            Action::ReleaseGrief => "mentor.ron",
             Action::Wean | Action::Teach | Action::Release => "mentor.ron",
         };
 

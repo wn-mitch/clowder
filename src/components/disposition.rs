@@ -315,6 +315,7 @@ impl DispositionKind {
             | Action::PetitionCoordinator
             | Action::Vigil
             | Action::GriefSit
+            | Action::ReleaseGrief
             | Action::Wean
             | Action::Teach
             | Action::Release => None,

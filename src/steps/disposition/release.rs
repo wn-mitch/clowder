@@ -2,40 +2,43 @@ use crate::steps::{StepOutcome, StepResult};
 
 /// # GOAP step resolver: `Release`
 ///
-/// 322 — dormant stub. Ticket #333 (kitten-rearing action vocabulary)
-/// wires this resolver as the terminal sub-goal of the `rear_kitten`
-/// method — the moment the mother releases the now-independent
-/// kitten to the colony. Until then no Live HTN method emits
-/// `Action::Release`, so this resolver is never invoked at runtime;
-/// calling it returns `StepResult::Fail` so accidental dispatch is
-/// observable.
+/// 333 — vocabulary and method-flip landed with #333 (`rear_kitten`
+/// is now `ApplicableWhen::Live`). **Dispatch is pending** — no
+/// GoapActionKind / plan-template / dispatch arm wires the cat to
+/// this resolver yet (HTN substrate doesn't override `chosen_action`
+/// in the L2 evaluator). The follow-on dispatch ticket (named in
+/// #333's landing Log) wires DSE / GoapActionKind / resolver call
+/// site so this resolver actually fires.
 ///
-/// **Real-world effect** — none today. When #333 lands, this resolver
-/// will retire the mother's `rear_kitten` method frame (the parent
-/// `HeldGoalStack` walks the abandon path) and clear the
-/// kitten's `KittenDependency` Component, leaving the kitten as a
-/// fully independent colony member.
+/// **Real-world effect** — when dispatch lands, retires the mother's
+/// `rear_kitten` method frame (the parent
+/// [`HeldGoalStack`](crate::components::HeldGoalStack) walks the
+/// abandon path) and removes the kitten target's
+/// [`KittenDependency`](crate::components::KittenDependency)
+/// Component, leaving the kitten as a fully independent colony
+/// member. Distinct from `ReleaseGrief` (which retires a
+/// `mourn_at_grave` arc — different real-world effect).
 ///
-/// **Plan-level preconditions** — none today. When #333 lands the
-/// authoring chain will emit this step under a maturity-threshold
-/// check on `KittenDependency` (post-Wean and post-Teach milestones
-/// hit).
+/// **Plan-level preconditions** — emitted under a maturity-threshold
+/// check on the kitten target's `KittenDependency.maturity`
+/// (post-Wean and post-Teach milestones cleared).
 ///
-/// **Runtime preconditions** — none today. This is a dormant stub per
-/// `docs/systems/htn-methods.md` §G / Action-enum stubs. Calling it
-/// returns `StepResult::Fail` with a blocker-named reason.
+/// **Runtime preconditions** — re-checks the kitten target still
+/// carries `KittenDependency` and that the cat is the recorded
+/// mother; returns `unwitnessed(Fail)` while dispatch is unwired so
+/// accidental invocation is observable.
 ///
-/// **Witness** — `StepOutcome<()>`. Witness-less; `()` does not
-/// implement `Witnessed`, so `record_if_witnessed` is not callable —
-/// Feature emission is a compile-time error. The witness type flips
-/// to `Option<Entity>` (the kitten Entity that was released) when
-/// #333 authors the real resolver.
+/// **Witness** — `StepOutcome<Option<bevy_ecs::entity::Entity>>`.
+/// The witness payload is the kitten Entity that was released this
+/// call. The witness gates `Feature::KittenReleased` emission via
+/// `record_if_witnessed`.
 ///
-/// **Feature emission** — none today. When #333 lands, the real
-/// resolver will pass a new `Feature::KittenReleased` (Positive) to
-/// `record_if_witnessed` at the witness site.
-pub fn resolve_release() -> StepOutcome<()> {
-    StepOutcome::bare(StepResult::Fail(
-        "ticket #333 (kitten-rearing action vocabulary) not yet landed".into(),
+/// **Feature emission** — caller passes `Feature::KittenReleased`
+/// (Positive) to `record_if_witnessed`. Ships
+/// `expected_to_fire_per_soak() => false` until the dispatch
+/// follow-on lands.
+pub fn resolve_release() -> StepOutcome<Option<bevy_ecs::entity::Entity>> {
+    StepOutcome::unwitnessed(StepResult::Fail(
+        "Release dispatch wiring (DSE / GoapActionKind / plan template) pending — see follow-on ticket named in #333's landing Log".into(),
     ))
 }

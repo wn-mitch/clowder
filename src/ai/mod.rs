@@ -161,6 +161,14 @@ pub enum Action {
     /// will be wired in #332 (grief-vigil action vocabulary). Until
     /// then no Live HTN method emits it.
     GriefSit,
+    /// 332 — terminal sub-goal of the `mourn_at_grave` HTN method.
+    /// Distinct from `Action::Release` (which retires a `rear_kitten`
+    /// arc — different real-world effect, different witness shape).
+    /// The resolver retires the cat's `Mourning` Component when the
+    /// arc concludes; HTN-driven action dispatch (DSE, GoapActionKind,
+    /// plan template, dispatch arm) is a follow-on per #332's landing
+    /// Log.
+    ReleaseGrief,
     /// 322 / 333 — dormant stub for `rear_kitten`. `Action::Wean` will
     /// be wired in #333 (kitten-rearing action vocabulary) keyed to
     /// `KittenDependency`. Until then no Live HTN method emits it.

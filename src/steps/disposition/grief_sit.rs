@@ -2,37 +2,38 @@ use crate::steps::{StepOutcome, StepResult};
 
 /// # GOAP step resolver: `GriefSit`
 ///
-/// 322 — dormant stub. Ticket #332 (grief-vigil action vocabulary)
-/// wires this resolver as the "grieve-in-den" sub-goal of the
-/// `mourn_at_grave` method. Until then no Live HTN method emits
-/// `Action::GriefSit`, so this resolver is never invoked at runtime;
-/// calling it returns `StepResult::Fail` so accidental dispatch is
-/// observable.
+/// 332 — vocabulary, substrate (`Mourning` Component), and method-flip
+/// landed with #332. **Dispatch is pending** — no GoapActionKind /
+/// plan-template / dispatch arm wires the cat to this resolver yet
+/// (HTN substrate doesn't override `chosen_action` in the L2
+/// evaluator). The follow-on dispatch ticket (named in #332's
+/// landing Log) wires DSE / GoapActionKind / resolver call site so
+/// this resolver actually fires.
 ///
-/// **Real-world effect** — none today. When #332 lands, this resolver
-/// will hold the cat in their den, advancing the mourning-cycle
-/// counter while suppressing the higher-tier Maslow needs for one
-/// tick (mirrors the way Sleep's resolver handles in-place rest).
+/// **Real-world effect** — when dispatch lands, holds the cat in
+/// their den for `grief_sit_duration_ticks`, advancing the
+/// mourning-cycle counter on the cat's
+/// [`Mourning`](crate::components::Mourning) Component while
+/// suppressing higher-tier Maslow needs for the duration (mirrors
+/// the way `Sleep`'s resolver handles in-place rest). Counter shape
+/// settled at dispatch time.
 ///
-/// **Plan-level preconditions** — none today. When #332 lands the
-/// authoring chain will emit this step under a den-proximity
-/// predicate alongside the `Mourning` Component check.
+/// **Plan-level preconditions** — emitted under a den-proximity
+/// predicate plus `StatePredicate::HasMarker(Mourning::KEY)`.
 ///
-/// **Runtime preconditions** — none today. This is a dormant stub per
-/// `docs/systems/htn-methods.md` §G / Action-enum stubs. Calling it
-/// returns `StepResult::Fail` with a blocker-named reason.
+/// **Runtime preconditions** — re-checks `Mourning` presence on the
+/// cat; returns `unwitnessed(Fail)` while dispatch is unwired so
+/// accidental invocation is observable.
 ///
-/// **Witness** — `StepOutcome<()>`. Witness-less; `()` does not
-/// implement `Witnessed`, so `record_if_witnessed` is not callable —
-/// Feature emission is a compile-time error. The witness type flips
-/// to `bool` (grief-sit tick performed) when #332 authors the real
-/// resolver.
+/// **Witness** — `StepOutcome<bool>`. `true` iff the cat performed a
+/// grief-sit tick this call (counter advanced).
 ///
-/// **Feature emission** — none today. When #332 lands, the real
-/// resolver will pass a new `Feature::GriefProcessed` (Positive) to
-/// `record_if_witnessed` at the witness site.
-pub fn resolve_grief_sit() -> StepOutcome<()> {
-    StepOutcome::bare(StepResult::Fail(
-        "ticket #332 (grief-vigil action vocabulary) not yet landed".into(),
+/// **Feature emission** — caller passes `Feature::GriefProcessed`
+/// (Positive) to `record_if_witnessed`. Ships
+/// `expected_to_fire_per_soak() => false` until the dispatch
+/// follow-on lands.
+pub fn resolve_grief_sit() -> StepOutcome<bool> {
+    StepOutcome::unwitnessed(StepResult::Fail(
+        "GriefSit dispatch wiring (DSE / GoapActionKind / plan template) pending — see follow-on ticket named in #332's landing Log".into(),
     ))
 }
