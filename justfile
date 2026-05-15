@@ -450,6 +450,10 @@ sessions *ARGS:
 session-done SLUG *ARGS:
     bash scripts/session_done.sh {{SLUG}} {{ARGS}}
 
+# [refinery] Verdict-gated lander. Walks all session/* bookmarks; reports rebase / conflict status. `just refinery` reports the table; `just refinery --json` for /work skill; `just refinery --land <slug>` lands one session into main; `--track <name>` filters. `--auto` is reserved for verdict-integrated swarm-safe landing (not yet implemented; coherent-block + substrate-sensitive always land manually).
+refinery *ARGS:
+    bash scripts/refinery.sh {{ARGS}}
+
 # Generate a random template authoring prompt
 template-prompt:
     cargo run --example template_prompt
