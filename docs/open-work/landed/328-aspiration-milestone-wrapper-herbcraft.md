@@ -13,7 +13,7 @@ wires-method: [aspiration_milestone_wrapper.herbcraft]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: pending
+landed-at: e7f9d0f0bb48
 landed-on: 2026-05-15
 ---
 
