@@ -1,7 +1,7 @@
 ---
 id: 208
 title: Per-cat Action overlay for the windowed UI
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: swarm-safe
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: b9be0b7d
+landed-on: 2026-05-15
 ---
 
 ## Why

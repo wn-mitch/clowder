@@ -1,3 +1,4 @@
+pub mod action_overlay;
 pub mod camera;
 pub mod day_night;
 pub mod debug_grid;
@@ -20,6 +21,7 @@ impl Plugin for RenderingPlugin {
         app.add_plugins(TilemapPlugin)
             .init_resource::<crate::resources::RenderTickProgress>()
             .init_resource::<scent_signpost::ScentSignpostsEnabled>()
+            .init_resource::<action_overlay::ActionOverlayEnabled>()
             .add_systems(
                 Startup,
                 (
@@ -64,6 +66,20 @@ impl Plugin for RenderingPlugin {
                     weather_vfx::sync_weather_overlay_positions,
                 )
                     .chain(),
+            )
+            // Separate set to avoid overflowing the 20-tuple chain limit.
+            .add_systems(
+                Update,
+                (
+                    action_overlay::spawn_action_overlay_labels,
+                    action_overlay::update_action_overlay_labels,
+                )
+                    .chain()
+                    .after(entity_sprites::attach_entity_sprites),
+            )
+            .add_systems(
+                Update,
+                action_overlay::toggle_action_overlay,
             );
     }
 }

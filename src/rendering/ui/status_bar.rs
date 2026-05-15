@@ -72,7 +72,7 @@ pub fn update_status_bar(
     let pause_str = if time_state.paused { " PAUSED" } else { "" };
 
     **text = format!(
-        "Day {} | {} {} | {} {} | Speed: {}{} | [P]ause []] Speed [L]og [R]oster [I]nventory [Tab] Inspect",
+        "Day {} | {} {} | {} {} | Speed: {}{} | [P]ause []] Speed [L]og [R]oster [I]nventory [Tab] Inspect [F9] Actions",
         day,
         season.label(),
         phase.label(),
