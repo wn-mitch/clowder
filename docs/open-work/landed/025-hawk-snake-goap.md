@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: [wildlife]
 related-balance: []
-landed-at: pending
+landed-at: 8bc95c5303e9
 landed-on: 2026-05-15
 ---
 
