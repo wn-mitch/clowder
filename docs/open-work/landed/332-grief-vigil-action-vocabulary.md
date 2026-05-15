@@ -13,7 +13,7 @@ wires-method: [mourn_at_grave]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: pending
+landed-at: a6566b6d1f3b
 landed-on: 2026-05-15
 ---
 
