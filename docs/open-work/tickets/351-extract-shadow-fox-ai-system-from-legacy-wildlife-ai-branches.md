@@ -1,12 +1,12 @@
 ---
 id: 351
 title: Extract shadow_fox_ai system from legacy wildlife_ai branches
-status: blocked
+status: ready
 cluster: wildlife
 initiative: []
 added: 2026-05-15
 parked: null
-blocked-by: [25]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

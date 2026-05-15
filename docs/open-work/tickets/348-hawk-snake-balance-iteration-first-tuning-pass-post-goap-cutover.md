@@ -1,12 +1,12 @@
 ---
 id: 348
 title: Hawk + snake balance iteration — first tuning pass post-GOAP cutover
-status: blocked
+status: ready
 cluster: wildlife
 initiative: []
 added: 2026-05-15
 parked: null
-blocked-by: [25]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

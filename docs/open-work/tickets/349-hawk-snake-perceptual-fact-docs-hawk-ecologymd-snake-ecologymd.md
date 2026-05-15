@@ -1,12 +1,12 @@
 ---
 id: 349
 title: Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md)
-status: blocked
+status: ready
 cluster: wildlife
 initiative: []
 added: 2026-05-15
 parked: null
-blocked-by: [25]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

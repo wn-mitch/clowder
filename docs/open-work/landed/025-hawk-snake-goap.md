@@ -1,7 +1,7 @@
 ---
 id: 025
 title: Hawk and snake GOAP planner domains
-status: in-progress
+status: done
 cluster: wildlife
 initiative: [predator-prey-dynamics]
 added: 2026-04-24
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [wildlife]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 ## Why
@@ -389,3 +389,7 @@ Each commit must leave `just check` and `cargo nextest run --features all` green
 - ✓ landed **209** (done, balance, score 0.87 (cross-cluster)) — Positive colony_food_security axis on higher-tier DSEs
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-15: Phase 2 runtime wiring complete. Hawks/snakes now flow through species-specific GOAP loops (sync_*_needs + *_evaluate_and_plan + *_resolve_goap_plans + *_lifecycle_tick) instead of the legacy Circling/Waiting wildlife_ai branches; ShadowFox keeps the legacy state machine. New SimConstants sub-structs (hawk_ecology, snake_ecology) force a comparability break — re-baseline via just promote logs/tuned-42 wildlife-goap-cutover after the first post-cutover soak. 10 new Feature variants ship dormant (expected_to_fire_per_soak=false); promote the four trunks once soak confirms firing. Follow-ons opened: 348, 349, 350, 351, 352.

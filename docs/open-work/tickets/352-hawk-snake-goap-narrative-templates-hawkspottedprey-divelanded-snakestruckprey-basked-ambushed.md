@@ -1,12 +1,12 @@
 ---
 id: 352
 title: Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed)
-status: blocked
+status: ready
 cluster: wildlife
 initiative: []
 added: 2026-05-15
 parked: null
-blocked-by: [25]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

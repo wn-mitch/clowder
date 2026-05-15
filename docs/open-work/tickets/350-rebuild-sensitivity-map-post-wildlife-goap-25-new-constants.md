@@ -1,12 +1,12 @@
 ---
 id: 350
 title: Rebuild sensitivity-map post-wildlife-GOAP (25 new constants)
-status: blocked
+status: ready
 cluster: tooling-diagnostics-ui
 initiative: []
 added: 2026-05-15
 parked: null
-blocked-by: [25]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
