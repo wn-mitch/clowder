@@ -1,50 +1,66 @@
 #!/usr/bin/env bash
-# Refinery — the verdict-gated lander for parallel sessions.
-# Stage 1.4 of ticket 354.
+# Refinery — the gated lander for parallel sessions.
+# Stage 1.4 (manual landing) + Stage 2.1 (--auto gate) of ticket 354.
 #
 # Walks every session/<slug> bookmark, reports rebase / conflict status,
-# and (with --land) merges a session's work into main.
+# and (with --land or --auto) merges a session's work into main.
 #
 # Modes:
 #   refinery.sh                       report all session bookmarks
-#   refinery.sh --json                machine-readable for /work skill
-#   refinery.sh --track <name>        filter the report
-#   refinery.sh --land <slug>         land one session (any track)
+#   refinery.sh --json                machine-readable for /work + /foreman
+#   refinery.sh --track <name>        filter the report (any track)
+#   refinery.sh --land <slug>         land one session (any track, manual gate)
+#   refinery.sh --auto [--dry-run]    drain swarm-safe queue, gated on
+#                                     working-copy clean + just check && just test
 #
-# Landing pipeline (per session):
+# Landing pipeline (per session, both --land and --auto):
 #   1. verify session/<slug> bookmark exists + is ahead of main
-#   2. verify rebase onto main is conflict-free
-#   3. set main to the session's head (effectively a fast-forward / rebase merge)
+#   2. rebase onto main if needed (refuses on conflict)
+#   3. set main to the session's head (effectively a fast-forward)
 #   4. forget session/<slug> bookmark
-#   5. session-done.sh <slug> --no-release (tickets are 'done' via just land)
+#   5. session_done.sh <slug> --no-release (tickets are 'done' via just land)
 #
-# --auto is intentionally NOT implemented in this commit. Verdict-gated
-# auto-land needs explicit verdict integration; that lands in a follow-on.
-# For now every land is per-bookmark and human-decided (via /work).
+# --auto gate (run per session BEFORE step 1):
+#   a. track == swarm-safe (whitelist enforced HERE and at flag-parse)
+#   b. jj status shows no uncommitted working-copy edits in the workspace
+#   c. cd <workspace> && just check && just test exits 0
+# Sessions that fail the gate are reported (gate-fail) but not landed.
+# --dry-run runs the gate but skips steps 1-5.
 
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SESSIONS_ROOT="$HOME/clowder-sessions"
+AUTO_WHITELIST_TRACK="swarm-safe"
 
 mode="report"
 filter_track=""
 target_slug=""
 emit_json="false"
+dry_run="false"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --json) emit_json="true"; shift ;;
-        --track) filter_track="$2"; shift 2 ;;
+        --track)
+            filter_track="$2"; shift 2 ;;
         --land) mode="land"; target_slug="$2"; shift 2 ;;
-        --auto)
-            echo "ERROR: --auto not yet implemented (verdict integration pending). Use --land <slug>." >&2
-            exit 2 ;;
-        -h|--help) sed -n '/^# Modes:/,/^# Landing/p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        --auto) mode="auto"; shift ;;
+        --dry-run) dry_run="true"; shift ;;
+        -h|--help) sed -n '/^# Modes:/,/^# --dry-run/p' "$0" | sed 's/^# \?//'; exit 0 ;;
         --*) echo "Unknown flag: $1" >&2; exit 2 ;;
         *) echo "Unexpected positional: $1" >&2; exit 2 ;;
     esac
 done
+
+# Whitelist enforcement, layer 1: refuse --auto --track <not-swarm-safe>
+# (The per-row filter inside auto() is layer 2 — even without --track, only
+# swarm-safe rows land.)
+if [[ "$mode" == "auto" && -n "$filter_track" && "$filter_track" != "$AUTO_WHITELIST_TRACK" ]]; then
+    echo "ERROR: --auto is whitelisted to track=$AUTO_WHITELIST_TRACK only (got --track $filter_track)." >&2
+    echo "       Substrate-sensitive and coherent-block sessions land via --land <slug>." >&2
+    exit 2
+fi
 
 cd "$REPO_ROOT"
 
@@ -189,7 +205,133 @@ land() {
     echo "refinery: landed $slug → main"
 }
 
+auto_gate() {
+    # Runs the swarm-safe auto-land gate for one session bookmark.
+    # Prints a single tab-separated outcome line:
+    #   <slug>\t<outcome>\t<detail>
+    # where outcome ∈ {gate-pass, wrong-track, not-fast-forward, dirty-working-copy,
+    #                  no-workspace, check-fail, test-fail}
+    local bm="$1"
+    local slug="${bm#session/}"
+    local workspace="$SESSIONS_ROOT/$slug"
+
+    local info_file="$workspace/.session-info.json"
+    local track="unknown"
+    if [[ -f "$info_file" ]]; then
+        track=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('track', 'unknown'))" "$info_file" 2>/dev/null || echo "unknown")
+    fi
+
+    # Layer 2 of the whitelist: per-row track filter.
+    if [[ "$track" != "$AUTO_WHITELIST_TRACK" ]]; then
+        printf '%s\t%s\t%s\n' "$slug" "wrong-track" "track=$track (auto allowed only on $AUTO_WHITELIST_TRACK)"
+        return 0
+    fi
+
+    # Must be fast-forwardable (no rebase needed for auto-land; conflict resolution
+    # is human-only).
+    local ahead behind
+    ahead=$(jj log -r "main..bookmarks(\"$bm\")" --no-graph -T 'change_id ++ "\n"' 2>/dev/null | grep -c . || true)
+    behind=$(jj log -r "bookmarks(\"$bm\")..main" --no-graph -T 'change_id ++ "\n"' 2>/dev/null | grep -c . || true)
+    if (( ahead == 0 )); then
+        printf '%s\t%s\t%s\n' "$slug" "no-changes" "bookmark has no commits ahead of main"
+        return 0
+    fi
+    if (( behind > 0 )); then
+        printf '%s\t%s\t%s\n' "$slug" "not-fast-forward" "behind=$behind (rebase required; manual --land only)"
+        return 0
+    fi
+
+    if [[ ! -d "$workspace" ]]; then
+        printf '%s\t%s\t%s\n' "$slug" "no-workspace" "$workspace missing"
+        return 0
+    fi
+
+    # Working-copy clean preflight: no uncommitted [AM] edits.
+    if (cd "$workspace" && jj status 2>/dev/null) | grep -qE '^[AM] '; then
+        printf '%s\t%s\t%s\n' "$slug" "dirty-working-copy" "uncommitted edits in $workspace"
+        return 0
+    fi
+
+    # Gate: just check && just test inside the workspace. Output redirected to a
+    # per-session log so the master report stays scannable.
+    local gate_log="$workspace/.refinery-gate.log"
+    : > "$gate_log"
+    if ! (cd "$workspace" && just check >> "$gate_log" 2>&1); then
+        printf '%s\t%s\t%s\n' "$slug" "check-fail" "see $gate_log"
+        return 0
+    fi
+    if ! (cd "$workspace" && just test >> "$gate_log" 2>&1); then
+        printf '%s\t%s\t%s\n' "$slug" "test-fail" "see $gate_log"
+        return 0
+    fi
+
+    printf '%s\t%s\t%s\n' "$slug" "gate-pass" "just check && just test passed in $workspace"
+    return 0
+}
+
+auto() {
+    local rows=()
+    while read -r bm; do
+        [[ -z "$bm" ]] && continue
+        rows+=("$(auto_gate "$bm")")
+    done < <(list_session_bookmarks)
+
+    local rows_out=()
+    local landed_count=0
+    if (( ${#rows[@]} > 0 )); then
+        for row in "${rows[@]}"; do
+            IFS=$'\t' read -r slug outcome detail <<< "$row"
+            if [[ "$outcome" == "gate-pass" && "$dry_run" == "false" ]]; then
+                if land "$slug" >/dev/null 2>&1; then
+                    row="$slug"$'\t'"landed"$'\t'"main advanced to session/$slug head"
+                    landed_count=$((landed_count + 1))
+                else
+                    row="$slug"$'\t'"land-failed"$'\t'"land step errored after gate passed (rerun manually with --land $slug)"
+                fi
+            fi
+            rows_out+=("$row")
+        done
+    fi
+
+    if [[ "$emit_json" == "true" ]]; then
+        echo "["
+        local i n
+        n=${#rows_out[@]}
+        for ((i=0; i<n; i++)); do
+            IFS=$'\t' read -r slug outcome detail <<< "${rows_out[$i]}"
+            local comma=","
+            (( i == n - 1 )) && comma=""
+            local detail_json
+            detail_json=$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$detail")
+            printf '  {"slug":"%s","outcome":"%s","detail":%s}%s\n' \
+                "$slug" "$outcome" "$detail_json" "$comma"
+        done
+        echo "]"
+        return
+    fi
+
+    if (( ${#rows_out[@]} == 0 )); then
+        echo "refinery --auto: no session/* bookmarks (queue empty)"
+        return
+    fi
+
+    if [[ "$dry_run" == "true" ]]; then
+        echo "refinery --auto --dry-run: gate-only (no landings)"
+    fi
+    printf '%-28s %-22s %s\n' "SLUG" "OUTCOME" "DETAIL"
+    for row in "${rows_out[@]}"; do
+        IFS=$'\t' read -r slug outcome detail <<< "$row"
+        printf '%-28s %-22s %s\n' "$slug" "$outcome" "$detail"
+    done
+
+    if (( landed_count > 0 )); then
+        echo
+        echo "refinery --auto: landed $landed_count session(s) → main"
+    fi
+}
+
 case "$mode" in
     report) report ;;
     land) land "$target_slug" ;;
+    auto) auto ;;
 esac
