@@ -25,7 +25,7 @@
 | [PreyKind](#preykind) | 5 | `src/components/prey.rs` |
 | [FleeStrategy](#fleestrategy) | 4 | `src/components/prey.rs` |
 | [WildSpecies](#wildspecies) | 4 | `src/components/wildlife.rs` |
-| [EventKind](#eventkind) | 218 | `src/resources/event_log.rs` |
+| [EventKind](#eventkind) | 234 | `src/resources/event_log.rs` |
 | [NarrativeTier](#narrativetier) | 6 | `src/resources/narrative.rs` |
 | [PriorityKind](#prioritykind) | 4 | `src/resources/colony_priority.rs` |
 | [DirectiveKind](#directivekind) | 10 | `src/components/coordination.rs` |
@@ -426,6 +426,22 @@
 | `ShadowFoxBanished` |
 | `posse` |
 | `location` |
+| `ShadowFoxDissolved` |
+| `location` |
+| `age_ticks` |
+| `final_corruption` |
+| `ShadowFoxReconstitutingEntered` |
+| `location` |
+| `coherence` |
+| `ShadowFoxTendingEntered` |
+| `location` |
+| `ward_location` |
+| `ShadowFoxHauntingEntered` |
+| `location` |
+| `target` |
+| `ShadowFoxSeedingEntered` |
+| `location` |
+| `frontier` |
 | `GroomingFired` |
 | `cat` |
 | `target` |

@@ -183,8 +183,10 @@ graph TD
         magic_update_ward_coverage_markers --> magic_update_ward_siege_marker
         goap_evaluate_and_plan["goap::evaluate_and_plan"]
         magic_update_ward_siege_marker --> goap_evaluate_and_plan
+        aspiration_picker_pick_aspiration_emissions["aspiration_picker::pick_aspiration_emissions"]
+        goap_evaluate_and_plan --> aspiration_picker_pick_aspiration_emissions
         goap_resolve_goap_plans["goap::resolve_goap_plans"]
-        goap_evaluate_and_plan --> goap_resolve_goap_plans
+        aspiration_picker_pick_aspiration_emissions --> goap_resolve_goap_plans
         goap_emit_plan_narrative["goap::emit_plan_narrative"]
         goap_resolve_goap_plans --> goap_emit_plan_narrative
         plan_substrate_update_prev_safety_deficit["plan_substrate::update_prev_safety_deficit"]
@@ -207,6 +209,9 @@ graph TD
         magic_apply_corruption_pushback["magic::apply_corruption_pushback"]
         magic_update_corruption_landmarks["magic::update_corruption_landmarks"]
         magic_spawn_shadow_fox_from_corruption["magic::spawn_shadow_fox_from_corruption"]
+        wildlife_shadowfox_coherence_tick["wildlife::shadowfox_coherence_tick"]
+        wildlife_shadowfox_motivation_tick["wildlife::shadowfox_motivation_tick"]
+        wildlife_shadowfox_haunting_drain["wildlife::shadowfox_haunting_drain"]
         wildlife_spawn_wildlife["wildlife::spawn_wildlife"]
         wildlife_wildlife_ai["wildlife::wildlife_ai"]
         wildlife_fox_movement["wildlife::fox_movement"]
@@ -214,6 +219,14 @@ graph TD
         fox_goap_sync_fox_needs["fox_goap::sync_fox_needs"]
         fox_goap_fox_evaluate_and_plan["fox_goap::fox_evaluate_and_plan"]
         fox_goap_fox_resolve_goap_plans["fox_goap::fox_resolve_goap_plans"]
+        hawk_goap_hawk_needs_tick["hawk_goap::hawk_needs_tick"]
+        hawk_goap_sync_hawk_needs["hawk_goap::sync_hawk_needs"]
+        hawk_goap_hawk_evaluate_and_plan["hawk_goap::hawk_evaluate_and_plan"]
+        hawk_goap_hawk_resolve_goap_plans["hawk_goap::hawk_resolve_goap_plans"]
+        snake_goap_snake_needs_tick["snake_goap::snake_needs_tick"]
+        snake_goap_sync_snake_needs["snake_goap::sync_snake_needs"]
+        snake_goap_snake_evaluate_and_plan["snake_goap::snake_evaluate_and_plan"]
+        snake_goap_snake_resolve_goap_plans["snake_goap::snake_resolve_goap_plans"]
         fox_goap_feed_cubs_at_dens["fox_goap::feed_cubs_at_dens"]
         fox_goap_resolve_paired_confrontations["fox_goap::resolve_paired_confrontations"]
         wildlife_fox_ai_decision["wildlife::fox_ai_decision"]
@@ -224,6 +237,8 @@ graph TD
         wildlife_carcass_decay["wildlife::carcass_decay"]
         wildlife_carcass_scent_tick["wildlife::carcass_scent_tick"]
         wildlife_predator_stalk_cats["wildlife::predator_stalk_cats"]
+        hawk_goap_hawk_lifecycle_tick["hawk_goap::hawk_lifecycle_tick"]
+        snake_goap_snake_lifecycle_tick["snake_goap::snake_lifecycle_tick"]
         prey_prey_population["prey::prey_population"]
         prey_prey_hunger["prey::prey_hunger"]
         prey_prey_ai["prey::prey_ai"]

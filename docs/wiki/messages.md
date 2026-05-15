@@ -9,6 +9,10 @@ Inter-system messages (Bevy 0.18 `#[derive(Message)]`).
 | **PlanNarrative** | `entity: Entity`, `kind: DispositionKind`, `event: PlanEvent`, `completions: u32` | `src/components/goap_plan.rs` |
 | **PreyKilled** | `kind: PreyKind`, `position: Position` | `src/components/prey.rs` |
 | **DenRaided** | `den_entity: Entity`, `kills: u32`, `item_kind: ItemKind`, `position: Position`, `den_name: &'static str` | `src/components/prey.rs` |
+| **HawkDiveLanded** | `hawk: Entity`, `prey: Option<Entity>`, `position: (i32, i32)` | `src/components/wildlife.rs` |
+| **SnakeStrikeLanded** | `snake: Entity`, `prey: Option<Entity>`, `position: (i32, i32)` | `src/components/wildlife.rs` |
+| **HawkDied** | `hawk: Entity`, `cause: WildlifeDeathCause` | `src/components/wildlife.rs` |
+| **SnakeDied** | `snake: Entity`, `cause: WildlifeDeathCause` | `src/components/wildlife.rs` |
 
 ### Details
 
@@ -43,4 +47,42 @@ Inter-system messages (Bevy 0.18 `#[derive(Message)]`).
 | `item_kind` | `ItemKind` |
 | `position` | `Position` |
 | `den_name` | `&'static str` |
+
+#### HawkDiveLanded
+
+> A hawk completed a dive — emitted by `resolve_dive_attack`. `prey` is `Some` when the dive struck a prey entity this tick and `None` for near-misses; kill-attribution itself stays in `predator_hunt_prey`.
+
+| Field | Type |
+|-------|------|
+| `hawk` | `Entity` |
+| `prey` | `Option<Entity>` |
+| `position` | `(i32, i32)` |
+
+#### SnakeStrikeLanded
+
+> A snake executed a strike — emitted by `resolve_strike`. Same strike/kill separation as [`HawkDiveLanded`].
+
+| Field | Type |
+|-------|------|
+| `snake` | `Entity` |
+| `prey` | `Option<Entity>` |
+| `position` | `(i32, i32)` |
+
+#### HawkDied
+
+> A hawk died this tick. Emitted by `hawk_lifecycle_tick`.
+
+| Field | Type |
+|-------|------|
+| `hawk` | `Entity` |
+| `cause` | `WildlifeDeathCause` |
+
+#### SnakeDied
+
+> A snake died this tick. Emitted by `snake_lifecycle_tick`.
+
+| Field | Type |
+|-------|------|
+| `snake` | `Entity` |
+| `cause` | `WildlifeDeathCause` |
 

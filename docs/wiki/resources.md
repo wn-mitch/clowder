@@ -30,7 +30,7 @@
 
 ### AspirationRegistry (struct)
 
-> All aspiration chains available in the simulation, loaded from RON files.
+> All aspiration chains available in the simulation. Ticket 321 retired RON loading in favor of [`ALL_CHAINS`] (code-defined const data); the registry is a thin walkable wrapper around that table.
 
 ## `src/resources/carcass_scent_map.rs`
 
@@ -345,16 +345,9 @@
 
 ## `src/resources/prey_scent_map.rs`
 
-### PreyScentMap (struct)
+### PreyScentMaps (struct)
 
-> Spatial grid tracking prey scent. The grid-based sibling of `FoxScentMap`, introduced in Phase 2B of the AI substrate refactor (§5.6.3 row #1). Prey entities deposit scent on the tiles they occupy each tick; cats sample the grid to decide whether prey-scent is present at their position rather than running a point-to-point wind-aware formula against every prey entity.  **Behavioral change from the pre-Phase-2B path:** detection no longer uses the wind-direction dot-product test in `cat_smells_prey_windaware`. Scent diffuses symmetrically via the deposit pattern (for now — a directional plume under wind is a natural follow-up tuning). Range is carried implicitly in the decay rate + deposit intensity rather than as a per-read distance check.  One aggregate map covers all prey species (mouse / rat / rabbit / fish / bird). Per-species maps are a follow-up if target-selection needs to discriminate "smelled a mouse vs a rabbit."
-
-| Field | Type |
-|-------|------|
-| `marks` | `Vec<f32>` |
-| `grid_w` | `usize` |
-| `grid_h` | `usize` |
-| `bucket_size` | `i32` |
+> Per-`PreyKind` registry of scent maps. Indexed by `kind as usize`.  Replaces the pre-062 aggregate `PreyScentMap` `Resource` so cats can (a) discriminate which species' scent is on a tile and (b) eventually attenuate per emitter species (Phase 3 readiness hook — see `PerSpeciesScentRef` in `src/systems/influence_map.rs`).  `get_any` / `highest_nearby_any` fold across all five sub-maps via `f32::max`, preserving the aggregate read semantics of the pre-062 path for existing consumers; `highest_nearby_for` and `for_kind` give species-discriminating access for future dietary-specialization consumers.
 
 ## `src/resources/recent_ambush_map.rs`
 
@@ -406,6 +399,8 @@
 | `colony_score` | `ColonyScoreConstants` |
 | `wildlife` | `WildlifeConstants` |
 | `fox_ecology` | `FoxEcologyConstants` |
+| `hawk_ecology` | `HawkEcologyConstants` |
+| `snake_ecology` | `SnakeEcologyConstants` |
 | `fate` | `FateConstants` |
 | `coordination` | `CoordinationConstants` |
 | `aspirations` | `AspirationConstants` |

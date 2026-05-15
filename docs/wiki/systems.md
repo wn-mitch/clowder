@@ -11,6 +11,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Collective Memory | **[Built]** | `memory::decay_memories`, `colony_knowledge::update_colony_knowledge` | [doc](../systems/collective-memory.md) |
 | Corpse Handling | **[Built]** | `death::check_death`, `death::cleanup_dead`, `death::update_grave_aura_map` | [doc](../systems/corpse-handling.md) |
 | Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::update_ward_coverage_map`, `magic::herb_seasonal_check` (+14 more) | [doc](../systems/magic.md) |
+| Mood | **[Built]** | `mood::update_mood`, `mood::mood_contagion`, `mood::bond_proximity_mood` | [doc](../systems/mood.md) |
 | Weather — Living Climate System | **[Built]** | `weather::update_weather`, `wind::update_wind` | [doc](../systems/weather.md) |
 
 ## Partial
@@ -31,6 +32,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Disease | *[Aspirational]* | — | [doc](../systems/disease.md) |
 | Distress modifiers — lurch vs. pressure | *[Aspirational]* | — | [doc](../systems/distress-modifiers.md) |
 | Environmental Quality | *[Aspirational]* | — | [doc](../systems/environmental-quality.md) |
+| HTN method composition (design note) | *[Aspirational]* | — | [doc](../systems/htn-methods.md) |
 | Log Analytics Dashboard | *[Aspirational]* | — | [doc](../systems/log-analytics-dashboard.md) |
 | Mental Breaks | *[Aspirational]* | — | [doc](../systems/mental-breaks.md) |
 | Monuments — Civic & Memorial Structures | *[Aspirational]* | — | [doc](../systems/monuments.md) |
@@ -57,6 +59,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 System modules with registered functions but no design doc:
 
 - **affordance_writer**: affordance_writer
+- **aspiration_picker**: pick_aspiration_emissions
 - **aspirations**: update_training_markers, update_mentoring_target_markers, select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
 - **belief_integrator**: gossip_inventory_observations, integrate_beliefs
 - **colony_score**: emit_colony_score
@@ -67,14 +70,16 @@ System modules with registered functions but no design doc:
 - **fulfillment**: decay_fulfillment, bond_proximity_social_warmth, update_body_condition
 - **goap**: check_modifier_preemption, evaluate_and_plan, resolve_goap_plans, emit_plan_narrative
 - **growth**: update_life_stage_markers, update_parent_markers, tick_kitten_growth, kitten_mood_aura, update_kitten_cry_map
+- **hawk_goap**: hawk_needs_tick, sync_hawk_needs, hawk_evaluate_and_plan, hawk_resolve_goap_plans, hawk_lifecycle_tick
 - **incapacitation**: update_incapacitation
 - **interoception**: author_self_markers
 - **plan_substrate**: expire_reservations, sensors, update_prev_safety_deficit
 - **pregnancy**: tick_pregnancy
 - **prey**: prey_population, prey_hunger, prey_ai, prey_scent_tick, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
 - **sensing**: update_terrain_markers, update_target_existence_markers
+- **snake_goap**: snake_needs_tick, sync_snake_needs, snake_evaluate_and_plan, snake_resolve_goap_plans, snake_lifecycle_tick
 - **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
 - **task_chains**: resolve_task_chains
 - **trace_emit**: emit_focal_trace
-- **wildlife**: spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, update_recent_ambush_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
+- **wildlife**: shadowfox_coherence_tick, shadowfox_motivation_tick, shadowfox_haunting_drain, spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, update_recent_ambush_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
 

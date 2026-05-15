@@ -2,7 +2,17 @@
 
 # Components
 
-160 component types derived from `#[derive(Component)]`.
+169 component types derived from `#[derive(Component)]`.
+
+## `src/components/aspiration_emission.rs`
+
+### AspirationEmissions (struct)
+
+> Per-cat ephemeral substrate carrying every emission this picker tick produced for this cat. Empty `rows` means the L2 author falls through to the default `Intention::Activity { Idle, .. }` wrap; the picker removes the Component entirely when no emission applies so the L2 query's `get` returns `None`.
+
+| Field | Type |
+|-------|------|
+| `rows` | `Vec<EmissionRow>` |
 
 ## `src/components/aspirations.rs`
 
@@ -368,6 +378,35 @@
 ### GroomingCondition (struct)
 
 > Physical grooming condition. 0.0 = matted/filthy, 1.0 = pristine.  A physical property — not a Maslow need. Decays passively and is restored by grooming actions. Other systems read it to modulate social and esteem outcomes.
+
+## `src/components/hawk_goap_plan.rs`
+
+### HawkGoapPlan (struct)
+
+> Active GOAP plan for a hawk. Inserted by `hawk_evaluate_and_plan` and ticked by `hawk_resolve_goap_plans` until exhausted or interrupted.
+
+| Field | Type |
+|-------|------|
+| `steps` | `Vec<PlannedStep<HawkDomain>>` |
+| `current_step` | `usize` |
+| `kind` | `HawkDispositionKind` |
+| `adopted_tick` | `u64` |
+| `trips_done` | `u32` |
+| `target_trips` | `u32` |
+| `step_state` | `Vec<HawkStepState>` |
+| `replan_count` | `u32` |
+| `max_replans` | `u32` |
+| `failed_actions` | `HashSet<HawkGoapActionKind>` |
+
+## `src/components/held_goal_stack.rs`
+
+### HeldGoalStack (struct)
+
+> Per-cat goal-stack. Top of the stack is the *active* frame whose `sub_goal_index` names the leaf currently being pursued; deeper frames are the chain of parent methods waiting for the active leaf to fulfill.  Capped at [`MAX_GOAL_STACK_DEPTH`] — the L2 evaluator emits `Feature::MethodDepthExceeded` and falls back to the no-method path before pushing the 9th frame.
+
+| Field | Type |
+|-------|------|
+| `frames` | `Vec<GoalFrame>` |
 
 ## `src/components/held_intention.rs`
 
@@ -754,11 +793,11 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### WardNearbyFox (struct)
 
-> Ward within fox detection radius (stubbed in `FoxScoringContext.ward_nearby` today — promote to ECS marker). `fox_spatial.rs::update_ward_detection_markers`.
+> Ward within fox detection radius — truthful per-tick scan: any ward whose `repel_radius()` reaches the fox's tile. Authored by `fox_spatial.rs::update_ward_detection_markers`. No DSE consumer today; fox flee-from-wards behavior is a future ticket.
 
 ### HasCubs (struct)
 
-> Fox has ≥1 cub at its den. Per-tick author scan today (`fox_spatial.rs::update_cub_marker`); event-driven follow-on (`CubsBorn` / on-despawn) deferred to a separate ticket.
+> Mother fox at a den whose `cubs_present > 0`. Hybrid event-driven + per-marker reconciliation (`fox_spatial.rs::update_cub_marker`): `CubsBorn` events insert the marker on the mother at the moment of spawn; a reconciliation pass over flagged foxes removes the marker when the den's cub count drops to 0 (cub maturation / cub death).
 
 ### CubsHungry (struct)
 
@@ -770,7 +809,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### HasDen (struct)
 
-> Fox has a home den. Per-tick author scan today (`fox_spatial.rs::update_den_marker`); event-driven follow-on (`DenClaimed` / `DenLost`) deferred to a separate ticket.
+> Fox has a home den. Authored event-driven by `fox_spatial.rs::update_den_marker` from `DenClaimed` / `DenLost` messages emitted in `wildlife.rs` (initial pair spawn, cub birth, cub maturation, fox death).
 
 ### Visitor (struct)
 
@@ -1084,6 +1123,25 @@ Variants: `Cat`, `Wild`, `Prey`
 | `mentor` | `Option<Entity>` |
 | `apprentice` | `Option<Entity>` |
 
+## `src/components/snake_goap_plan.rs`
+
+### SnakeGoapPlan (struct)
+
+> Active GOAP plan for a snake. Inserted by `snake_evaluate_and_plan` and ticked by `snake_resolve_goap_plans` until exhausted or interrupted.
+
+| Field | Type |
+|-------|------|
+| `steps` | `Vec<PlannedStep<SnakeDomain>>` |
+| `current_step` | `usize` |
+| `kind` | `SnakeDispositionKind` |
+| `adopted_tick` | `u64` |
+| `trips_done` | `u32` |
+| `target_trips` | `u32` |
+| `step_state` | `Vec<SnakeStepState>` |
+| `replan_count` | `u32` |
+| `max_replans` | `u32` |
+| `failed_actions` | `HashSet<SnakeGoapActionKind>` |
+
 ## `src/components/task_chain.rs`
 
 ### TaskChain (struct)
@@ -1114,7 +1172,20 @@ Variants: `Cat`, `Wild`, `Prey`
 
 > Mutable AI state for wildlife movement decisions.
 
-Variants: `Patrolling`, `Circling`, `center_x`, `center_y`, `angle`, `Waiting`, `Fleeing`, `Stalking`, `EncirclingWard`, `ward_x`, `ward_y`, `angle`, `ticks`
+Variants: `Patrolling`, `Circling`, `center_x`, `center_y`, `angle`, `Waiting`, `Fleeing`, `Stalking`, `EncirclingWard`, `ward_x`, `ward_y`, `angle`, `ticks`, `Reconstituting`, `Tending`, `ward_x`, `ward_y`, `angle`, `Haunting`, `target_x`, `target_y`, `edge_distance`, `ticks`, `Seeding`, `frontier_x`, `frontier_y`
+
+### ShadowFoxDrives (struct)
+
+> Per-shadowfox motivational pressures. Phase A wires only `coherence` (self-preservation via corruption — decays on clean ground, recovers on corrupted ground, dissolves at 0). Phase B uses all four to softmax-select the next `WildlifeAiState` variant; Phase C deepens the targeting reads.  Doubles as a marker component: presence of `ShadowFoxDrives` is the canonical "this entity is a shadow-fox" test (see ticket 023 plan §3). Hawks, snakes, and normal foxes never carry this component.
+
+| Field | Type |
+|-------|------|
+| `coherence` | `f32` |
+| `resonance` | `f32` |
+| `dread` | `f32` |
+| `entropy` | `f32` |
+| `age_ticks` | `u64` |
+| `origin_corruption` | `f32` |
 
 ### Carcass (struct)
 
@@ -1163,6 +1234,47 @@ Variants: `PatrolTerritory`, `HuntingPrey`, `Returning`, `Resting`, `Dispersing`
 | `scent_strength` | `f32` |
 | `established_tick` | `u64` |
 | `last_fed_tick` | `u64` |
+
+### HawkAiPhase (enum)
+
+> High-level behavioral phase for hawk AI decision-making.  Mirrors the [`FoxAiPhase`] role: sits above [`WildlifeAiState`] (physical movement). The hawk GOAP resolver writes both each tick.
+
+Variants: `Soaring`, `center_x`, `center_y`, `angle`, `HuntingPrey`, `Perched`, `Fleeing`
+
+### HawkState (struct)
+
+> Per-hawk mutable state: needs, age, action cooldowns.  Attached alongside [`WildAnimal`] when the species is `Hawk`. Systems query `With<HawkState>` for hawk-specific behavior; the GOAP planner consumes the needs into [`HawkNeeds`](crate::ai::hawk_scoring::HawkNeeds) each tick via `sync_hawk_needs`.  Hunger semantics here are `0.0 = full, 1.0 = starving` to match [`FoxState::hunger`]. The matching `HawkNeeds::hunger` is the inverse (1.0 = recently fed); `sync_hawk_needs` does the inversion.
+
+| Field | Type |
+|-------|------|
+| `hunger` | `f32` |
+| `satiation_ticks` | `u64` |
+| `age_ticks` | `u64` |
+| `post_action_cooldown` | `u64` |
+| `starvation_ticks` | `u64` |
+| `last_perch_tick` | `u64` |
+| `last_dive_tick` | `u64` |
+
+### SnakeAiPhase (enum)
+
+> High-level behavioral phase for snake AI decision-making.  Mirrors the [`FoxAiPhase`] role for snakes. The snake GOAP resolver writes both this and [`WildlifeAiState`] each tick.
+
+Variants: `Waiting`, `Stalking`, `Striking`, `Basking`, `Fleeing`
+
+### SnakeState (struct)
+
+> Per-snake mutable state with thermoregulation tier.  Attached alongside [`WildAnimal`] when the species is `Snake`. Systems query `With<SnakeState>`; the GOAP planner consumes the needs into [`SnakeNeeds`](crate::ai::snake_scoring::SnakeNeeds) each tick.  `warmth` decays each tick the snake is off warm terrain and resets to `1.0` on a successful `Bask`.
+
+| Field | Type |
+|-------|------|
+| `hunger` | `f32` |
+| `satiation_ticks` | `u64` |
+| `warmth` | `f32` |
+| `age_ticks` | `u64` |
+| `post_action_cooldown` | `u64` |
+| `starvation_ticks` | `u64` |
+| `last_strike_tick` | `u64` |
+| `last_bask_tick` | `u64` |
 
 ### ActiveConfrontation (struct)
 
