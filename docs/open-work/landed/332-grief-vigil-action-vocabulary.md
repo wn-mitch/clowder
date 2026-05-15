@@ -1,7 +1,7 @@
 ---
 id: 332
 title: Grief-vigil action vocabulary — flip mourn_at_grave to Live
-status: ready
+status: done
 cluster: life-cycle
 orchestration: coherent-block
 block: htn-method-composition
@@ -13,8 +13,8 @@ wires-method: [mourn_at_grave]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 ## Why
@@ -84,3 +84,34 @@ is the back-reference the enforcement script verifies.
 ## Log
 
 - 2026-05-14: opened as 128 epic child #14 (Batch D Tier 2 glue).
+- 2026-05-15: layer-walk surfaced a dispatch gap. Flipping the
+  method to Live makes `MethodRegistry::lookup` return it for
+  `process_grief`, but the cat's actual `chosen_action` is still
+  picked by the per-tick DSE softmax — the HTN substrate
+  (`HeldGoalStack`) doesn't override the L2 evaluator's softmax
+  winner. So `Action::Vigil` / `Action::GriefSit` / `Action::ReleaseGrief`
+  resolvers can't fire even after this lands. The same gap
+  affects #333. Verification step ("Feature counts for vigil /
+  grief-sit non-zero") is structurally deferred under the
+  coherent-block discipline (intermediates land verdict-skipped;
+  verdict fires at the #128 anchor). A consolidated dispatch
+  follow-on covering both #332 and #333 (HTN-driven action
+  dispatch: DSE per primitive, GoapActionKind variants, plan
+  templates, resolver dispatch arms, and the §7.7.b emission
+  path for `process_grief` / `kitten_reared`) opens immediately
+  after #333 lands.
+- 2026-05-15: lands with: `Mourning` Component
+  (`src/components/mourning.rs`); `Action::ReleaseGrief` enum
+  variant + `resolve_release_grief` stub (witness-typed);
+  `TargetHint::Grave` variant; method literal flipped to
+  `ApplicableWhen::Live(has_active_mourning)` with three
+  sub-goals (`vigil_at_grave` → `grieve_in_den` →
+  `release_grief`); resolver upgrades to `StepOutcome<bool>`
+  shape with the five rustdoc headings; three new `Feature::*`
+  variants (`VigilHeld`, `GriefProcessed`, `GriefReleased`,
+  all Positive valence, `expected_to_fire_per_soak() => false`
+  pending dispatch follow-on). Out-of-scope per §Scope:
+  Mourning insertion on death (the §7.7.b grief-event-emission
+  debt, tracked under 060 Phase 6b); the Grave-target DSE
+  bundle (placed as a `TargetHint` slot only — actual picker
+  authored alongside dispatch follow-on).

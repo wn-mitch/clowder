@@ -74,6 +74,18 @@ pub enum TargetHint {
     /// the safety axis). Used by `flee_method` as WARRIORS_PATH's
     /// survival-fallback emit target.
     SafeGround,
+    /// 332 — primitive sub-goal binds to the cat's grave-target picker
+    /// (`pick_grave_for_mourner` — the cat's mourned `Grave` entity,
+    /// looked up by `Mourning.deceased_name == Grave.deceased_name`).
+    /// Used by `mourn_at_grave`'s three primitive sub-goals
+    /// (vigil_at_grave / grieve_in_den / release_grief).
+    Grave,
+    /// 333 — primitive sub-goal binds to the cat's dependent-kitten
+    /// picker (`pick_dependent_kitten_for_mother` — any kitten Entity
+    /// whose `KittenDependency.mother == Some(self)`, scored by
+    /// maturity for the wean/teach/release stage gate). Used by
+    /// `rear_kitten`'s three primitive sub-goals.
+    DependentKitten,
 }
 
 // ---------------------------------------------------------------------------

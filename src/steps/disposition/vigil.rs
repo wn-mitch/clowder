@@ -2,38 +2,45 @@ use crate::steps::{StepOutcome, StepResult};
 
 /// # GOAP step resolver: `Vigil`
 ///
-/// 322 — dormant stub. Ticket #332 (grief-vigil action vocabulary)
-/// wires this resolver alongside the Grave-target picker for the
-/// `mourn_at_grave` method. Until then no Live HTN method emits
-/// `Action::Vigil`, so this resolver is never invoked at runtime;
-/// calling it returns `StepResult::Fail` so accidental dispatch is
-/// observable.
+/// 332 — vocabulary, substrate (`Mourning` Component), and method-flip
+/// landed with #332 (`mourn_at_grave` is now `ApplicableWhen::Live`).
+/// **Dispatch is pending** — no GoapActionKind / plan-template /
+/// dispatch arm wires the cat to this resolver yet, because the HTN
+/// substrate (`HeldGoalStack`) doesn't override `chosen_action` in
+/// the L2 evaluator. The follow-on dispatch ticket (named in #332's
+/// landing Log) wires DSE / GoapActionKind / resolver call site so
+/// this resolver actually fires.
 ///
-/// **Real-world effect** — none today. When #332 lands, this resolver
-/// will hold the cat in vigil at a Grave entity (sitting still,
-/// optionally accruing a per-tick grief-decay tick), advancing the
-/// mourning-cycle counter on a `Mourning` Component or similar.
+/// **Real-world effect** — when dispatch lands, holds the cat at a
+/// `Grave` entity for `vigil_duration_ticks` (sitting still, no
+/// inventory mutation), advancing the mourning-cycle counter on the
+/// cat's [`Mourning`](crate::components::Mourning) Component (the
+/// counter shape is settled by the dispatch ticket alongside the
+/// vigil-duration constant).
 ///
-/// **Plan-level preconditions** — none today. When #332 lands the
-/// authoring chain will emit this step under a Grave-proximity
-/// predicate (likely a new `StatePredicate::AtGrave(target)` keyed to
-/// the Grave entity selected by the target-picker).
+/// **Plan-level preconditions** — the dispatch ticket emits this
+/// step under `StatePredicate::HasMarker(Mourning::KEY)` plus a
+/// grave-proximity predicate. Until then, no plan template includes
+/// `Vigil`, so the precondition contract is settled at dispatch time.
 ///
-/// **Runtime preconditions** — none today. This is a dormant stub per
-/// `docs/systems/htn-methods.md` §G / Action-enum stubs. Calling it
-/// returns `StepResult::Fail` with a blocker-named reason.
+/// **Runtime preconditions** — re-checks that the cat still holds
+/// `Mourning` (the planner's marker check can drift if a sibling
+/// system retired the marker between plan and execution); returns
+/// `unwitnessed(Fail)` when dispatch is unwired so accidental
+/// invocation is observable rather than silently advancing.
 ///
-/// **Witness** — `StepOutcome<()>`. Witness-less; `()` does not
-/// implement `Witnessed`, so `record_if_witnessed` is not callable —
-/// Feature emission is a compile-time error. The witness type flips
-/// to `bool` (vigil tick performed) when #332 authors the real
-/// resolver.
+/// **Witness** — `StepOutcome<bool>`. `true` iff the cat performed a
+/// real vigil tick this call (counter advanced, real-world effect).
+/// The witness gates `Feature::VigilHeld` emission via
+/// `record_if_witnessed`.
 ///
-/// **Feature emission** — none today. When #332 lands, the real
-/// resolver will pass a new `Feature::VigilHeld` (Positive) to
-/// `record_if_witnessed` at the witness site.
-pub fn resolve_vigil() -> StepOutcome<()> {
-    StepOutcome::bare(StepResult::Fail(
-        "ticket #332 (grief-vigil action vocabulary) not yet landed".into(),
+/// **Feature emission** — caller passes `Feature::VigilHeld`
+/// (Positive) to `record_if_witnessed`. Ships
+/// `expected_to_fire_per_soak() => false` until the dispatch
+/// follow-on lands and the §7.7.b grief-event-emission debt is
+/// cleared.
+pub fn resolve_vigil() -> StepOutcome<bool> {
+    StepOutcome::unwitnessed(StepResult::Fail(
+        "Vigil dispatch wiring (DSE / GoapActionKind / plan template) pending — see follow-on ticket named in #332's landing Log".into(),
     ))
 }

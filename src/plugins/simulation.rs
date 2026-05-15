@@ -242,12 +242,24 @@ pub fn register_influence_maps_at_startup(mut registry: ResMut<InfluenceMapRegis
 /// their own line. See `src/ai/methods/mod.rs` module doc for the full
 /// contract.
 pub fn populate_method_registry(registry: &mut MethodRegistry) {
-    // 322: Tier-2 dormant methods. Each is registered as
-    // `ApplicableWhen::PendingSubstrate { blocker }` pointing at its
-    // wiring ticket (#332/#333/#334). `MethodRegistry::lookup` filters
-    // them out unconditionally, so they exist for the type-system and
-    // the dormancy audit but never run at runtime. The wiring tickets
-    // flip them to `ApplicableWhen::Live` when they land.
+    // 322: Tier-2 dormant methods. The remaining dormant entries
+    // (`acquire_stealth_via_*`) carry `ApplicableWhen::PendingSubstrate
+    // { blocker: "334" }` — wired when #334 (stealth-cloak crafting)
+    // lands. `MethodRegistry::lookup` filters them out unconditionally
+    // so they exist for the type-system + dormancy audit but never
+    // run at runtime.
+    //
+    // 332/333: `mourn_at_grave` and `rear_kitten` flipped to
+    // `ApplicableWhen::Live` here. Their `applicable_when` predicates
+    // gate on the `Mourning` Component (332) and the
+    // `KittenDependency.mother` reverse-lookup (333) so the methods
+    // are selectable only for cats actually carrying the substrate.
+    // **Dispatch wiring is pending** for both — the cat's
+    // `chosen_action` is still picked by the per-tick DSE softmax,
+    // not by HTN method primitive sub-goals. The dispatch follow-on
+    // (named in #332's and #333's landing Logs) wires DSE /
+    // GoapActionKind / plan template / resolver call site so the
+    // cat's behavior advances each method's sub-goals.
     use crate::ai::methods::acquire_stealth::{
         acquire_stealth_via_commission, acquire_stealth_via_self_craft,
     };

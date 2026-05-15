@@ -250,6 +250,7 @@ const CRAFT: &str = "craft";
 const PETITION_COORDINATOR: &str = "petition_coordinator";
 const VIGIL: &str = "vigil";
 const GRIEF_SIT: &str = "grief_sit";
+const RELEASE_GRIEF: &str = "release_grief";
 const WEAN: &str = "wean";
 const TEACH: &str = "teach";
 const RELEASE: &str = "release";
@@ -815,6 +816,7 @@ pub const fn dse_id_for_action(action: crate::ai::Action) -> &'static str {
         Action::PetitionCoordinator => PETITION_COORDINATOR,
         Action::Vigil => VIGIL,
         Action::GriefSit => GRIEF_SIT,
+        Action::ReleaseGrief => RELEASE_GRIEF,
         Action::Wean => WEAN,
         Action::Teach => TEACH,
         Action::Release => RELEASE,
@@ -880,9 +882,10 @@ pub fn action_for_ordinal(ord: f32) -> Option<crate::ai::Action> {
         37 => Action::PetitionCoordinator,
         38 => Action::Vigil,
         39 => Action::GriefSit,
-        40 => Action::Wean,
-        41 => Action::Teach,
-        42 => Action::Release,
+        40 => Action::ReleaseGrief,
+        41 => Action::Wean,
+        42 => Action::Teach,
+        43 => Action::Release,
         _ => return None,
     })
 }
@@ -4053,6 +4056,7 @@ mod tests {
                 Action::PetitionCoordinator => &[PETITION_COORDINATOR],
                 Action::Vigil => &[VIGIL],
                 Action::GriefSit => &[GRIEF_SIT],
+                Action::ReleaseGrief => &[RELEASE_GRIEF],
                 Action::Wean => &[WEAN],
                 Action::Teach => &[TEACH],
                 Action::Release => &[RELEASE],

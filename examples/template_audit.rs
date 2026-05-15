@@ -105,6 +105,7 @@ fn assert_all_actions_covers_action(a: Action) {
         | Action::PetitionCoordinator
         | Action::Vigil
         | Action::GriefSit
+        | Action::ReleaseGrief
         | Action::Wean
         | Action::Teach
         | Action::Release => {}

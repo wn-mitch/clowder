@@ -76,3 +76,34 @@ method frame per kitten the mother is rearing. Frontmatter
 ## Log
 
 - 2026-05-14: opened as 128 epic child #15 (Batch D Tier 2 glue).
+- 2026-05-15: same dispatch gap as #332 (which see). The HTN
+  substrate doesn't override `chosen_action`, so the
+  `Action::Wean` / `Action::Teach` / `Action::Release` resolvers
+  can't fire even after this lands; the verification step
+  ("`rear_kitten` method frame on the stack") is structurally
+  deferred under the coherent-block discipline (verdict-skipped
+  intermediate; verdict fires at the #128 anchor). A
+  consolidated dispatch follow-on covering both #332 and #333
+  opens immediately after this lands.
+- 2026-05-15: per §Scope's "TBD design choice" — no
+  `RearKittenIntent` Component is introduced. The §4.7 classifier
+  flags it as additive substrate that `KittenDependency.mother`
+  already covers (the durable, mutually-public link is the
+  fact; the HTN method frame on the mother's `HeldGoalStack`
+  carries the commitment).
+- 2026-05-15: lands with: `Action::Wean` / `Action::Teach` /
+  `Action::Release` resolver upgrades to
+  `StepOutcome<Option<Entity>>` (Wean, Release) and
+  `StepOutcome<bool>` (Teach) with the five rustdoc headings;
+  `TargetHint::DependentKitten` variant; method literal flipped
+  to `ApplicableWhen::Live(cat_is_alive)` with the precise
+  reverse-lookup gate moved to the dispatch follow-on
+  (`fn(&World, Entity) -> bool` can't enumerate archetypes from
+  `&World` in Bevy 0.18; the kitten-target picker authored in
+  the dispatch ticket owns the same lookup); three new
+  `Feature::*` variants (`KittenWeaned`, `SkillTaught`,
+  `KittenReleased`, all Positive valence,
+  `expected_to_fire_per_soak() => false` pending dispatch
+  follow-on). Out-of-scope per §Scope: kitten-side perception
+  of mother's intent (banned by 126 actor-private discipline);
+  tuning rearing duration / yield (balance-thread work).
