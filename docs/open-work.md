@@ -15,10 +15,10 @@ _Last generated: 2026-05-15._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 106 |
+| Ready | 105 |
 | Parked | 14 |
 | Blocked | 23 |
-| **Open total** | **148** |
+| **Open total** | **147** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (106)
+## Ready by cluster (105)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -159,17 +159,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 
-### tooling-diagnostics-ui (8 ready, 1 blocked)
-
-- **[318](docs/open-work/tickets/318-just-epic-children-id-query-read-dashboard-roster-print-child-status-enforce-anti-staleness.md)** — just epic-children <id> query — read dashboard roster, print child status, enforce anti-staleness — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[336](docs/open-work/tickets/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · added 2026-05-15_
-
 ### wildlife (8 ready, 1 blocked)
 
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _[wildlife] · added 2026-05-01_
@@ -190,6 +179,16 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[307](docs/open-work/tickets/307-clusterinitiative-filter-recipes-epic-rollup-lint-for-open-work-index.md)** — Cluster/initiative filter recipes + epic-rollup lint for open-work index — _[process-discipline] · added 2026-05-13_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · added 2026-05-15_
+
+### tooling-diagnostics-ui (7 ready, 1 blocked)
+
+- **[336](docs/open-work/tickets/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · added 2026-05-15_
 
 ### buildings-zones (5 ready, 2 blocked)
 
@@ -295,7 +294,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 
-## Ready (106)
+## Ready (105)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -381,7 +380,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
 - **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · added 2026-05-13_
 - **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
-- **[318](docs/open-work/tickets/318-just-epic-children-id-query-read-dashboard-roster-print-child-status-enforce-anti-staleness.md)** — just epic-children <id> query — read dashboard roster, print child status, enforce anti-staleness — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
 - **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
@@ -452,11 +450,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (234)
+## Landed archive (235)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (169)
+### 2026-05 (170)
 
 - **[362](docs/open-work/landed/362-session-donesh-orphans-unpushed-bookmarks-invert-keep-bookmark-default-add-landed-on-main-precondition.md)** — session_done.sh orphans unpushed bookmarks — invert --keep-bookmark default + add landed-on-main precondition _(2026-05-15)_
 - **[361](docs/open-work/landed/361-gitignore-polecat-workspace-artifacts-and-clean-up-repo-root-pollution.md)** — Gitignore polecat workspace artifacts and clean up repo-root pollution _(2026-05-15)_
@@ -471,6 +469,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[330](docs/open-work/landed/330-aspiration-milestone-wrapper-building.md)** — Building aspiration_milestone_wrapper + emits tables _(2026-05-15)_
 - **[329](docs/open-work/landed/329-aspiration-milestone-wrapper-exploration.md)** — Exploration aspiration_milestone_wrapper + emits tables _(2026-05-15)_
 - **[328](docs/open-work/landed/328-aspiration-milestone-wrapper-herbcraft.md)** — Herbcraft aspiration_milestone_wrapper + emits tables _(2026-05-15)_
+- **[318](docs/open-work/landed/318-just-epic-children-id-query-read-dashboard-roster-print-child-status-enforce-anti-staleness.md)** — just epic-children <id> query — read dashboard roster, print child status, enforce anti-staleness _(2026-05-15)_
 - **[305](docs/open-work/landed/305-corpus-projection-layer-split-cluster-into-clusterinitiative-render-two-axis-gate-open-time.md)** — Corpus projection layer — split cluster into cluster+initiative, render two-axis, gate open-time _(2026-05-15)_
 - **[259](docs/open-work/landed/259-l1-to-l3-activation-visualization-in-log-viewer.md)** — L1 to L3 activation visualization in log viewer _(2026-05-15)_
 - **[229](docs/open-work/landed/229-add-just-similar-semantic-retrieval-over-clowder-prose.md)** — add just similar — semantic retrieval over Clowder prose _(2026-05-15)_
