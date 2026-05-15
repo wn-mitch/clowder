@@ -84,6 +84,11 @@ pub enum TargetHint {
     /// nearest cat in need of a remedy). Used by
     /// `prepare_remedy_method` as HEALERS_CALLING's primary emit target.
     Patient,
+    /// 329 — primitive sub-goal binds to the cat's unexplored-tile
+    /// picker (Explore-DSE's existing target resolution: nearest
+    /// unmapped / low-confidence tile). Used by `explore_method`
+    /// as the Exploration chains' primary emit target.
+    UnexploredTile,
 }
 
 // ---------------------------------------------------------------------------
@@ -400,6 +405,11 @@ pub mod flee;
 // per-action gating, which lands in a follow-on balance pass.
 pub mod gather_herbs;
 pub mod prepare_remedy;
+// 329: Live HTN method module — Exploration chain wrapper.
+// `explore_method` catches `explore_territory` (Primary emit on both
+// MAPMAKER and BEYOND_THE_BORDER). Tier-1 Live primitive mirroring
+// `fight_method`'s 327 shape.
+pub mod explore;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
 

@@ -1,10 +1,27 @@
 //! Exploration domain — two chains (Mapmaker, Beyond the Border).
 //! Ported 1:1 from `assets/narrative/aspirations/exploration.ron`
-//! (retired at 321). Empty `emits` on every milestone — #329 fills them.
+//! (retired at 321). #329 fills `emits` on every milestone.
 
-use super::{always_true, AspirationChain, ConflictClass, Milestone, ProgressTracker};
+use super::{
+    always_true, AspirationChain, ConflictClass, Emit, Milestone, Priority, ProgressTracker,
+};
+use crate::ai::dse::CommitmentStrategy;
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
+
+/// 329 — Exploration Primary emit. Routes to `explore_method`
+/// (Tier-1 Live), which binds `Action::Explore`. Shared across both
+/// Exploration chains because at combine-and-test land the chains
+/// differ in milestone gating (tile-discovery vs unique-region) but
+/// not in their primitive action. Per-row `applicable_when` is
+/// `always_true`; a follow-on balance pass refines it with
+/// tile-confidence / fatigue predicates.
+const EXPLORATION_EMITS: &[Emit] = &[Emit {
+    label: "explore_territory",
+    applicable_when: always_true,
+    strategy: CommitmentStrategy::SingleMinded,
+    priority: Priority::Primary,
+}];
 
 pub const MAPMAKER: AspirationChain = AspirationChain {
     name: "Mapmaker",
@@ -17,7 +34,7 @@ pub const MAPMAKER: AspirationChain = AspirationChain {
                 actions: &[Action::Explore],
                 count: 3,
             },
-            emits: &[],
+            emits: EXPLORATION_EMITS,
             narrative_on_complete: "{name} wanders past the tree line and comes back different.",
         },
         Milestone {
@@ -27,7 +44,7 @@ pub const MAPMAKER: AspirationChain = AspirationChain {
                 actions: &[Action::Explore],
                 count: 12,
             },
-            emits: &[],
+            emits: EXPLORATION_EMITS,
             narrative_on_complete: "{name} finds paths where others see only brambles.",
         },
         Milestone {
@@ -37,7 +54,7 @@ pub const MAPMAKER: AspirationChain = AspirationChain {
                 actions: &[Action::Explore],
                 count: 25,
             },
-            emits: &[],
+            emits: EXPLORATION_EMITS,
             narrative_on_complete: "{name} knows the land by scent, by shadow, by the angle of light.",
         },
         Milestone {
@@ -47,7 +64,7 @@ pub const MAPMAKER: AspirationChain = AspirationChain {
                 actions: &[Action::Explore],
                 count: 40,
             },
-            emits: &[],
+            emits: EXPLORATION_EMITS,
             narrative_on_complete: "The colony's borders grow wherever {name} treads.",
         },
     ],
@@ -66,7 +83,7 @@ pub const BEYOND_THE_BORDER: AspirationChain = AspirationChain {
                 actions: &[Action::Wander],
                 count: 10,
             },
-            emits: &[],
+            emits: EXPLORATION_EMITS,
             narrative_on_complete:
                 "{name} always looks toward the horizon when others look toward the den.",
         },
@@ -77,7 +94,7 @@ pub const BEYOND_THE_BORDER: AspirationChain = AspirationChain {
                 actions: &[Action::Explore],
                 count: 15,
             },
-            emits: &[],
+            emits: EXPLORATION_EMITS,
             narrative_on_complete: "{name} has been places none of them have names for.",
         },
         Milestone {
@@ -87,7 +104,7 @@ pub const BEYOND_THE_BORDER: AspirationChain = AspirationChain {
                 actions: &[Action::Explore],
                 count: 35,
             },
-            emits: &[],
+            emits: EXPLORATION_EMITS,
             narrative_on_complete:
                 "{name} returns from beyond the border with stories no one quite believes.",
         },

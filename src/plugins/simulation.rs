@@ -292,6 +292,15 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // balance pass alongside 327's similar pass.
     registry.push(crate::ai::methods::gather_herbs::gather_herbs_method());
     registry.push(crate::ai::methods::prepare_remedy::prepare_remedy_method());
+
+    // 329: Tier-1 Live method — Exploration chain wrapper.
+    // `explore_method` catches `explore_territory` (Primary emit on
+    // every milestone of MAPMAKER and BEYOND_THE_BORDER). Carries
+    // `applicable_when: Live(always_true)` with one primitive sub-goal
+    // (Action::Explore + TargetHint::UnexploredTile). Production gating
+    // (tile-confidence threshold, fatigue cap) lands as a follow-on
+    // balance pass.
+    registry.push(crate::ai::methods::explore::explore_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of
