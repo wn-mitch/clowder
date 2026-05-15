@@ -39,8 +39,8 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
+- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · score 0.93_
 - **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · score 0.91_
-- **[357](docs/open-work/tickets/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives — _[ai-substrate] · score 0.91_
 - **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
 - **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · score 0.90_
@@ -92,7 +92,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
-- **[357](docs/open-work/tickets/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives — _[ai-substrate] · added 2026-05-15_
+- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 
 ### belief-perception (13 ready, 2 blocked)
 
@@ -224,7 +224,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 
-### smarter-cats (12 open, 17 landed)
+### smarter-cats (12 open, 18 landed)
 
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
@@ -237,7 +237,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
-- **[357](docs/open-work/tickets/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives — _[ai-substrate] · added 2026-05-15_
+- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 
 ### mythic-texture (7 open, 1 landed)
 
@@ -282,10 +282,10 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-### htn-method-composition (2 open, 7 landed)
+### htn-method-composition (2 open, 8 landed)
 
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
-- **[357](docs/open-work/tickets/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives — _[ai-substrate] · added 2026-05-15_
+- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 
 ### world-richness (2 open, 0 landed)
 
@@ -396,8 +396,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 - **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[357](docs/open-work/tickets/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives — _[ai-substrate] · added 2026-05-15_
 - **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · added 2026-05-15_
+- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 
 ## Parked (14)
 
@@ -447,17 +447,18 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (236)
+## Landed archive (237)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (171)
+### 2026-05 (172)
 
 - **[362](docs/open-work/landed/362-session-donesh-orphans-unpushed-bookmarks-invert-keep-bookmark-default-add-landed-on-main-precondition.md)** — session_done.sh orphans unpushed bookmarks — invert --keep-bookmark default + add landed-on-main precondition _(2026-05-15)_
 - **[361](docs/open-work/landed/361-gitignore-polecat-workspace-artifacts-and-clean-up-repo-root-pollution.md)** — Gitignore polecat workspace artifacts and clean up repo-root pollution _(2026-05-15)_
 - **[360](docs/open-work/landed/360-polecat-prompt-replace-requires-gui-abandon-with-screenshotplaywright-primer.md)** — Polecat prompt — replace requires-gui abandon with screenshot/Playwright primer _(2026-05-15)_
 - **[359](docs/open-work/landed/359-refinery-awaiting-anchor-status-discourages-landing-coherent-block-intermediates.md)** — refinery awaiting-anchor status discourages landing coherent-block intermediates _(2026-05-15)_
 - **[358](docs/open-work/landed/358-refinery-dry-run-silently-ignored-in-land-mode-executes-destructively.md)** — refinery --dry-run silently ignored in --land mode, executes destructively _(2026-05-15)_
+- **[357](docs/open-work/landed/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives _(2026-05-15)_
 - **[356](docs/open-work/landed/356-foreman-polecat-abandon-archive-early-abandon-triage-close-the-silent-waste-loop.md)** — foreman polecat-abandon archive + early-abandon triage (close the silent-waste loop) _(2026-05-15)_
 - **[347](docs/open-work/landed/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method _(2026-05-15)_
 - **[336](docs/open-work/landed/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set _(2026-05-15)_

@@ -1,7 +1,7 @@
 ---
 id: 357
 title: HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: coherent-block
 block: htn-method-composition
@@ -13,8 +13,8 @@ supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
 wires-method: [mourn_at_grave, rear_kitten]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 ## Why
