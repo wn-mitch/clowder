@@ -25,7 +25,10 @@
 #   b. jj status shows no uncommitted working-copy edits in the workspace
 #   c. cd <workspace> && just check && just test exits 0
 # Sessions that fail the gate are reported (gate-fail) but not landed.
-# --dry-run runs the gate but skips steps 1-5.
+#
+# --dry-run semantics:
+#   --auto --dry-run    runs the gate but skips steps 1-5 per row
+#   --land --dry-run    prints the steps that would run, no mutations
 
 set -euo pipefail
 
@@ -47,7 +50,7 @@ while [[ $# -gt 0 ]]; do
         --land) mode="land"; target_slug="$2"; shift 2 ;;
         --auto) mode="auto"; shift ;;
         --dry-run) dry_run="true"; shift ;;
-        -h|--help) sed -n '/^# Modes:/,/^# --dry-run/p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        -h|--help) sed -n '/^# Modes:/,/^$/p' "$0" | sed 's/^# \?//'; exit 0 ;;
         --*) echo "Unknown flag: $1" >&2; exit 2 ;;
         *) echo "Unexpected positional: $1" >&2; exit 2 ;;
     esac
@@ -169,6 +172,29 @@ land() {
     local ahead behind
     ahead=$(jj log -r "main..bookmarks(\"$bm\")" --no-graph -T 'change_id ++ "\n"' 2>/dev/null | grep -c . || true)
     behind=$(jj log -r "bookmarks(\"$bm\")..main" --no-graph -T 'change_id ++ "\n"' 2>/dev/null | grep -c . || true)
+
+    if [[ "$dry_run" == "true" ]]; then
+        echo "refinery --land $slug --dry-run (no mutations):"
+        if (( ahead == 0 )); then
+            echo "  - $bm has no new commits over main"
+            echo "  - would: forget bookmark $bm"
+            if [[ -d "$SESSIONS_ROOT/$slug" ]]; then
+                echo "  - would: run session_done.sh $slug --no-release (removes $SESSIONS_ROOT/$slug)"
+            fi
+        else
+            if (( behind > 0 )); then
+                echo "  - $bm is $behind commit(s) behind main"
+                echo "  - would: rebase $bm onto main (may produce conflicts)"
+            fi
+            echo "  - $bm is $ahead commit(s) ahead of main"
+            echo "  - would: advance main bookmark to $bm head"
+            echo "  - would: forget bookmark $bm"
+            if [[ -d "$SESSIONS_ROOT/$slug" ]]; then
+                echo "  - would: run session_done.sh $slug --no-release (removes $SESSIONS_ROOT/$slug)"
+            fi
+        fi
+        return
+    fi
 
     if (( ahead == 0 )); then
         echo "refinery: $bm has no new commits over main — forgetting bookmark only"
