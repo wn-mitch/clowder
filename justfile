@@ -450,9 +450,29 @@ sessions *ARGS:
 session-done SLUG *ARGS:
     bash scripts/session_done.sh {{SLUG}} {{ARGS}}
 
-# [refinery] Verdict-gated lander. Walks all session/* bookmarks; reports rebase / conflict status. `just refinery` reports the table; `just refinery --json` for /work skill; `just refinery --land <slug>` lands one session into main; `--track <name>` filters. `--auto` is reserved for verdict-integrated swarm-safe landing (not yet implemented; coherent-block + substrate-sensitive always land manually).
+# [refinery] Gated lander. Walks all session/* bookmarks; reports rebase / conflict status. `just refinery` reports the table; `just refinery --json` for /work + /foreman skills; `just refinery --land <slug>` lands one session into main (any track, manual gate); `just refinery --auto [--dry-run]` drains swarm-safe queue gated on working-copy clean + `just check && just test` in each workspace. `--auto` is whitelisted in code to track=swarm-safe; coherent-block + substrate-sensitive always land via `--land <slug>`.
 refinery *ARGS:
     bash scripts/refinery.sh {{ARGS}}
+
+# [foreman] Report polecats + ready swarm-safe queue (default mode). `just foreman` for the text table; `--json` for /foreman skill consumption.
+foreman *ARGS:
+    bash scripts/foreman.sh {{ARGS}}
+
+# [foreman] Spawn N swarm-safe polecats (default N=3, wallclock 30m/each). Atomically claims tickets + creates workspaces via session-new, spawns `claude -p` subprocesses, then enters the auto-poll-and-land loop that drains via `just refinery --auto` when all polecats exit. `--dry-run` plans without spawning. Subscription-billed; wallclock is the only runaway cap.
+foreman-spawn N="3" *ARGS:
+    bash scripts/foreman.sh --spawn {{N}} {{ARGS}}
+
+# [foreman] One-shot heartbeat — PIDs, alive/exited, last edit, deadline remaining for every tracked polecat. Wrap in `watch -n 5 just foreman-watch` for live updates.
+foreman-watch *ARGS:
+    bash scripts/foreman.sh --watch {{ARGS}}
+
+# [foreman] Tail one polecat's stream-json log. Usage: `just foreman-log swarmpole-301`.
+foreman-log SLUG:
+    bash scripts/foreman.sh --log {{SLUG}}
+
+# [foreman] SIGTERM (or --hard SIGKILL) every tracked polecat. Workspace artifacts remain for post-mortem; call `just refinery --auto` afterwards to drain any that managed to push their bookmark.
+foreman-shutdown *ARGS:
+    bash scripts/foreman.sh --shutdown {{ARGS}}
 
 # [block] List all coherent-block initiatives in the corpus — ticket count, verdict-anchor, status rollup. --json for skill consumption.
 block-list *ARGS:
