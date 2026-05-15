@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use bevy_ecs::prelude::Entity;
+use bevy_ecs::prelude::{Component, Entity};
 use rand::Rng;
 
 use crate::ai::considerations::LandmarkAnchor;
@@ -21,7 +21,7 @@ use crate::components::physical::Position;
 // ---------------------------------------------------------------------------
 
 /// Hawks have only survival-tier needs. No territory, no offspring.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HawkNeeds {
     /// 1.0 = recently fed, 0.0 = starving.
     pub hunger: f32,
@@ -50,7 +50,7 @@ impl HawkNeeds {
 // ---------------------------------------------------------------------------
 
 /// Personality axes relevant to aerial predators.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HawkPersonality {
     /// Risk-taking: approach cats, dive in contested areas.
     pub boldness: f32,

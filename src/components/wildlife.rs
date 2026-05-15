@@ -424,6 +424,186 @@ impl FoxDen {
 }
 
 // ---------------------------------------------------------------------------
+// Hawk ecology — per-entity state, AI phase, and lifecycle (ticket 025 Phase 2)
+// ---------------------------------------------------------------------------
+
+/// High-level behavioral phase for hawk AI decision-making.
+///
+/// Mirrors the [`FoxAiPhase`] role: sits above [`WildlifeAiState`]
+/// (physical movement). The hawk GOAP resolver writes both each tick.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum HawkAiPhase {
+    /// Default airborne loiter — circle a center point at altitude.
+    Soaring {
+        center_x: i32,
+        center_y: i32,
+        angle: f32,
+    },
+    /// Diving on a target prey animal.
+    HuntingPrey { target: Option<u64> },
+    /// Perched on terrain — passive rest.
+    Perched { ticks: u64 },
+    /// Retreating from a threat toward the map edge.
+    Fleeing { dx: i32, dy: i32 },
+}
+
+/// Per-hawk mutable state: needs, age, action cooldowns.
+///
+/// Attached alongside [`WildAnimal`] when the species is `Hawk`. Systems
+/// query `With<HawkState>` for hawk-specific behavior; the GOAP planner
+/// consumes the needs into [`HawkNeeds`](crate::ai::hawk_scoring::HawkNeeds)
+/// each tick via `sync_hawk_needs`.
+///
+/// Hunger semantics here are `0.0 = full, 1.0 = starving` to match
+/// [`FoxState::hunger`]. The matching `HawkNeeds::hunger` is the inverse
+/// (1.0 = recently fed); `sync_hawk_needs` does the inversion.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HawkState {
+    /// 0.0 = full, 1.0 = starving.
+    pub hunger: f32,
+    /// Ticks remaining before hunger resumes decaying. Set on a successful dive.
+    pub satiation_ticks: u64,
+    /// Ticks since spawn. Hawks are mono-stage adults — no life stage.
+    pub age_ticks: u64,
+    /// Ticks before another dive or flee.
+    pub post_action_cooldown: u64,
+    /// Consecutive ticks at `hunger >= 1.0`. Death at `hawk.starvation_death_duration`.
+    pub starvation_ticks: u64,
+    /// Tick of last perch. Drives Resting scoring pressure.
+    pub last_perch_tick: u64,
+    /// Tick of last dive. Drives Hunting scoring + patience curve.
+    pub last_dive_tick: u64,
+}
+
+impl HawkState {
+    /// Edge-spawned adult hawk with mid-range hunger and no cooldowns.
+    pub fn new_adult() -> Self {
+        Self {
+            hunger: 0.5,
+            satiation_ticks: 0,
+            age_ticks: 0,
+            post_action_cooldown: 0,
+            starvation_ticks: 0,
+            last_perch_tick: 0,
+            last_dive_tick: 0,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snake ecology — per-entity state, AI phase, and thermoregulation
+// ---------------------------------------------------------------------------
+
+/// High-level behavioral phase for snake AI decision-making.
+///
+/// Mirrors the [`FoxAiPhase`] role for snakes. The snake GOAP resolver
+/// writes both this and [`WildlifeAiState`] each tick.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum SnakeAiPhase {
+    /// Default ambush posture — stationary, watching for prey.
+    Waiting,
+    /// Closing in on a prey position before striking.
+    Stalking { target_x: i32, target_y: i32 },
+    /// Strike attempt this tick.
+    Striking { target: Option<u64> },
+    /// Thermoregulating — basking on warm terrain restores `warmth`.
+    Basking { ticks: u64 },
+    /// Retreating toward cover or the map edge.
+    Fleeing { dx: i32, dy: i32 },
+}
+
+/// Per-snake mutable state with thermoregulation tier.
+///
+/// Attached alongside [`WildAnimal`] when the species is `Snake`. Systems
+/// query `With<SnakeState>`; the GOAP planner consumes the needs into
+/// [`SnakeNeeds`](crate::ai::snake_scoring::SnakeNeeds) each tick.
+///
+/// `warmth` decays each tick the snake is off warm terrain and resets to
+/// `1.0` on a successful `Bask`.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SnakeState {
+    /// 0.0 = full, 1.0 = starving.
+    pub hunger: f32,
+    /// Ticks remaining before hunger resumes decaying. Set on a successful strike.
+    pub satiation_ticks: u64,
+    /// 0.0..=1.0. Decays when `!on_warm_terrain`; restored by `Bask`.
+    pub warmth: f32,
+    /// Ticks since spawn.
+    pub age_ticks: u64,
+    /// Ticks before another strike or flee.
+    pub post_action_cooldown: u64,
+    /// Consecutive ticks at `hunger >= 1.0`. Death at `snake.starvation_death_duration`.
+    pub starvation_ticks: u64,
+    /// Tick of last successful strike.
+    pub last_strike_tick: u64,
+    /// Tick of last completed bask. Drives Basking scoring pressure.
+    pub last_bask_tick: u64,
+}
+
+impl SnakeState {
+    /// Edge-spawned adult snake with mid-range hunger and partial warmth.
+    pub fn new_adult() -> Self {
+        Self {
+            hunger: 0.5,
+            satiation_ticks: 0,
+            warmth: 0.7,
+            age_ticks: 0,
+            post_action_cooldown: 0,
+            starvation_ticks: 0,
+            last_strike_tick: 0,
+            last_bask_tick: 0,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Wildlife death causes + GOAP-side messages (ticket 025 Phase 2)
+// ---------------------------------------------------------------------------
+
+/// Why a non-fox wild animal died this tick. Attached to [`HawkDied`] /
+/// [`SnakeDied`] messages so the event log can attribute the death.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum WildlifeDeathCause {
+    Starvation,
+    OldAge,
+    Combat,
+    Other,
+}
+
+/// A hawk completed a dive — emitted by `resolve_dive_attack`. `prey` is
+/// `Some` when the dive struck a prey entity this tick and `None` for
+/// near-misses; kill-attribution itself stays in `predator_hunt_prey`.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct HawkDiveLanded {
+    pub hawk: Entity,
+    pub prey: Option<Entity>,
+    pub position: (i32, i32),
+}
+
+/// A snake executed a strike — emitted by `resolve_strike`. Same
+/// strike/kill separation as [`HawkDiveLanded`].
+#[derive(Message, Debug, Clone, Copy)]
+pub struct SnakeStrikeLanded {
+    pub snake: Entity,
+    pub prey: Option<Entity>,
+    pub position: (i32, i32),
+}
+
+/// A hawk died this tick. Emitted by `hawk_lifecycle_tick`.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct HawkDied {
+    pub hawk: Entity,
+    pub cause: WildlifeDeathCause,
+}
+
+/// A snake died this tick. Emitted by `snake_lifecycle_tick`.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct SnakeDied {
+    pub snake: Entity,
+    pub cause: WildlifeDeathCause,
+}
+
+// ---------------------------------------------------------------------------
 // ActiveConfrontation — shared state for paired standoffs
 // ---------------------------------------------------------------------------
 
@@ -536,5 +716,69 @@ mod tests {
         assert_eq!(den.territory_radius, 18);
         assert_eq!(den.cubs_present, 0);
         assert!(den.scent_strength > 0.0);
+    }
+
+    #[test]
+    fn hawk_state_new_adult_defaults() {
+        let state = HawkState::new_adult();
+        assert!((state.hunger - 0.5).abs() < f32::EPSILON);
+        assert_eq!(state.satiation_ticks, 0);
+        assert_eq!(state.age_ticks, 0);
+        assert_eq!(state.post_action_cooldown, 0);
+        assert_eq!(state.starvation_ticks, 0);
+    }
+
+    #[test]
+    fn snake_state_new_adult_defaults() {
+        let state = SnakeState::new_adult();
+        assert!((state.hunger - 0.5).abs() < f32::EPSILON);
+        assert!((state.warmth - 0.7).abs() < f32::EPSILON);
+        assert_eq!(state.satiation_ticks, 0);
+        assert_eq!(state.age_ticks, 0);
+        assert_eq!(state.starvation_ticks, 0);
+    }
+
+    #[test]
+    fn hawk_ai_phase_variants_construct() {
+        let phases = [
+            HawkAiPhase::Soaring {
+                center_x: 5,
+                center_y: 5,
+                angle: 0.0,
+            },
+            HawkAiPhase::HuntingPrey { target: None },
+            HawkAiPhase::Perched { ticks: 0 },
+            HawkAiPhase::Fleeing { dx: 1, dy: 0 },
+        ];
+        assert_eq!(phases.len(), 4);
+    }
+
+    #[test]
+    fn snake_ai_phase_variants_construct() {
+        let phases = [
+            SnakeAiPhase::Waiting,
+            SnakeAiPhase::Stalking {
+                target_x: 0,
+                target_y: 0,
+            },
+            SnakeAiPhase::Striking { target: None },
+            SnakeAiPhase::Basking { ticks: 0 },
+            SnakeAiPhase::Fleeing { dx: 0, dy: 0 },
+        ];
+        assert_eq!(phases.len(), 5);
+    }
+
+    #[test]
+    fn wildlife_death_cause_round_trips() {
+        for cause in [
+            WildlifeDeathCause::Starvation,
+            WildlifeDeathCause::OldAge,
+            WildlifeDeathCause::Combat,
+            WildlifeDeathCause::Other,
+        ] {
+            let s = serde_json::to_string(&cause).expect("serialize");
+            let back: WildlifeDeathCause = serde_json::from_str(&s).expect("deserialize");
+            assert_eq!(back, cause);
+        }
     }
 }

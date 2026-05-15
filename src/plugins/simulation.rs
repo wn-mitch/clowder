@@ -346,6 +346,15 @@ impl Plugin for SimulationPlugin {
         app.add_message::<crate::messages::fox_lifecycle::DenClaimed>();
         app.add_message::<crate::messages::fox_lifecycle::DenLost>();
         app.add_message::<crate::messages::fox_lifecycle::CubsBorn>();
+        // 025 Phase 2 — hawk/snake GOAP messages. `*DiveLanded` /
+        // `*StrikeLanded` are emitted by the dive/strike step resolvers
+        // (the *attempt* event); kill-attribution stays in
+        // `predator_hunt_prey` per ticket §12. Lifecycle messages are
+        // emitted by `hawk_lifecycle_tick` / `snake_lifecycle_tick`.
+        app.add_message::<crate::components::wildlife::HawkDiveLanded>();
+        app.add_message::<crate::components::wildlife::SnakeStrikeLanded>();
+        app.add_message::<crate::components::wildlife::HawkDied>();
+        app.add_message::<crate::components::wildlife::SnakeDied>();
 
         // L2 substrate resources (§9 faction + §L2.10). FactionRelations
         // is a constant lookup — fine to insert at build time.

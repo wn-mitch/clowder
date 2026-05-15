@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use bevy_ecs::prelude::Entity;
+use bevy_ecs::prelude::{Component, Entity};
 use rand::Rng;
 
 use crate::ai::considerations::LandmarkAnchor;
@@ -21,7 +21,7 @@ use crate::components::physical::Position;
 // ---------------------------------------------------------------------------
 
 /// Tier 1: survival (hunger, health). Tier 2: thermoregulation (warmth).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SnakeNeeds {
     /// 1.0 = recently fed, 0.0 = starving.
     pub hunger: f32,
@@ -61,7 +61,7 @@ impl SnakeNeeds {
 // ---------------------------------------------------------------------------
 
 /// Personality axes relevant to ambush predators.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SnakePersonality {
     /// Active vs. passive hunter. High aggression favors Foraging over
     /// Ambushing.
