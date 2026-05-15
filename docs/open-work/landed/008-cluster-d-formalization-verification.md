@@ -1,7 +1,7 @@
 ---
 id: 008
 title: Formalization and verification (Cluster D)
-status: ready
+status: done
 cluster: ai-substrate
 added: 2026-04-20
 parked: null
@@ -9,8 +9,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, refactor-plan.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 **Why this is a cluster:** D1–D3 are each half-day investigations that
@@ -71,3 +71,7 @@ formal pattern name where applicable.
 - · **  9** (ready, E, score 0.82 (cross-cluster)) — World-generation richness (Cluster E)
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-15: Three docs/systems/*.md stubs now carry their formal pattern label (D1/D2/D3). No code changes; verification revealed mood is a continuous-scalar accumulator (not the Markov-vs-cascade dichotomy the ticket suggested) and weather is a season-conditioned categorical sampler (not Markov — no autocorrelation).

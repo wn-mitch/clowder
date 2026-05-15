@@ -49,6 +49,14 @@ the ordered portion of the current. When wards fail the gradient collapses and d
 inward. This is mechanically identical to the existing `corruption_spread` system — the territory
 is not being invaded, it is going unmanaged.
 
+> **Pattern:** corruption spread (`src/systems/magic.rs::corruption_spread`) is a *discrete
+> cellular automaton* — 4-neighbor von-Neumann neighborhood on the tile grid, synchronous update
+> (sources are snapshotted to a `Vec` before any neighbor is mutated). Equivalently, a
+> diffusion-only reaction-diffusion discretization; the decay term lives in separate systems
+> (`apply_corruption_pushback`, `ward_decay`), not in `corruption_spread` itself. New territory-
+> spread features should be expressed as CA-style local rules (neighborhood, threshold, transition)
+> rather than global scalars or radial-from-source falloffs.
+
 ---
 
 ## Personal corruption: exposure, not contamination

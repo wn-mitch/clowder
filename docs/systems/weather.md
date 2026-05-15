@@ -6,6 +6,16 @@ A continuous, physically-grounded climate simulation that the cats experience as
 ## Current Implementation
 8 weather types (Clear, Overcast, LightRain, HeavyRain, Snow, Fog, Wind, Storm) cycling via seasonal probability tables. Affects warmth drain and building decay. `movement_multiplier()` and `comfort_modifier()` are defined but **not wired up**.
 
+> **Pattern:** weather transitions (`src/resources/weather.rs::WeatherState::next_weather`) form a
+> *season-conditioned categorical sampler* — at each transition tick the next state is sampled from
+> `P(weather | season)`. **Current weather does not condition the next state**, so this is *not* a
+> Markov chain in the strict sense (`P(X_{n+1} | X_n)` is degenerate — only `season` matters).
+> Consequence: there is no autocorrelation between consecutive weather states; the long-run mix is
+> controlled by the per-season table marginals plus the inter-transition countdown
+> (`random_range(30..80)`), not by any persistence in the model. Adding "sunny days cluster"-style
+> persistence would require conditioning on the current weather as well — a real design change,
+> not a tuning knob.
+
 ---
 
 ## 1. Temperature — Continuous Variable
