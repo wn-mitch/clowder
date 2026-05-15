@@ -15,10 +15,10 @@ _Last generated: 2026-05-15._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 105 |
+| Ready | 106 |
 | Parked | 14 |
 | Blocked | 23 |
-| **Open total** | **147** |
+| **Open total** | **148** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -43,7 +43,7 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[357](docs/open-work/tickets/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives — _[ai-substrate] · score 0.91_
 - **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.89_
+- **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · score 0.90_
 
 ## Epic progress (3)
 
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (105)
+## Ready by cluster (106)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -181,7 +181,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 
-### process-discipline (6 ready)
+### process-discipline (7 ready)
 
 - **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
 - **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
@@ -189,6 +189,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[306](docs/open-work/tickets/306-corpus-tagging-pass-backfill-clusterinitiative-across-active-and-landed-tickets.md)** — Corpus tagging pass — backfill cluster+initiative across active and landed tickets — _[process-discipline] · added 2026-05-13_
 - **[307](docs/open-work/tickets/307-clusterinitiative-filter-recipes-epic-rollup-lint-for-open-work-index.md)** — Cluster/initiative filter recipes + epic-rollup lint for open-work index — _[process-discipline] · added 2026-05-13_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
+- **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · added 2026-05-15_
 
 ### buildings-zones (5 ready, 2 blocked)
 
@@ -294,7 +295,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations — _[items-crafting] · added 2026-04-22_
 - **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · added 2026-05-14_
 
-## Ready (105)
+## Ready (106)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -401,6 +402,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[357](docs/open-work/tickets/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives — _[ai-substrate] · added 2026-05-15_
+- **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · added 2026-05-15_
 
 ## Parked (14)
 
