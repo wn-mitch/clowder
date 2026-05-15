@@ -13,7 +13,7 @@ wires-method: [patrol_method]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: pending
+landed-at: e66eb4c09d96
 landed-on: 2026-05-15
 ---
 
