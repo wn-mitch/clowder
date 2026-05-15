@@ -100,6 +100,16 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry.fox_dses.push(dses::fox_resting_dse(scoring));
     registry.fox_dses.push(dses::fox_feeding_dse());
     registry.fox_dses.push(dses::fox_dispersing_dse());
+    // Ticket 025 Phase 2 — hawk + snake GOAP DSEs. Soaring is the
+    // implicit hawk fallback (no DSE per Phase 1 design); the snake
+    // fallback (Ambushing in scoring.rs) is registered as its own DSE.
+    registry.hawk_dses.push(dses::hawk_hunting_dse());
+    registry.hawk_dses.push(dses::hawk_fleeing_dse());
+    registry.hawk_dses.push(dses::hawk_resting_dse());
+    registry.snake_dses.push(dses::snake_ambushing_dse());
+    registry.snake_dses.push(dses::snake_foraging_dse());
+    registry.snake_dses.push(dses::snake_fleeing_dse());
+    registry.snake_dses.push(dses::snake_basking_dse());
 }
 
 /// Startup system that populates [`DseRegistry`] and the §3.5
@@ -480,10 +490,37 @@ impl Plugin for SimulationPlugin {
                         systems::wildlife::spawn_wildlife,
                         systems::wildlife::wildlife_ai,
                         systems::wildlife::fox_movement,
-                        systems::wildlife::fox_needs_tick,
-                        systems::fox_goap::sync_fox_needs,
-                        systems::fox_goap::fox_evaluate_and_plan,
-                        systems::fox_goap::fox_resolve_goap_plans,
+                        // Ticket 025 Phase 2 — per-species per-tick
+                        // needs decay, scheduled as a nested sub-chain
+                        // to keep the outer wildlife tuple at exactly
+                        // 20 entries (Bevy's `.chain()` limit). Pre-025
+                        // the chain had 20 entries already after the
+                        // ticket-023 shadow-fox systems landed; adding
+                        // 10 hawk/snake systems without nesting would
+                        // overflow. Per-species ordering inside each
+                        // sub-chain follows needs → sync → evaluate →
+                        // resolve, matching the fox precedent.
+                        (
+                            systems::wildlife::fox_needs_tick,
+                            systems::fox_goap::sync_fox_needs,
+                            systems::fox_goap::fox_evaluate_and_plan,
+                            systems::fox_goap::fox_resolve_goap_plans,
+                        )
+                            .chain(),
+                        (
+                            systems::hawk_goap::hawk_needs_tick,
+                            systems::hawk_goap::sync_hawk_needs,
+                            systems::hawk_goap::hawk_evaluate_and_plan,
+                            systems::hawk_goap::hawk_resolve_goap_plans,
+                        )
+                            .chain(),
+                        (
+                            systems::snake_goap::snake_needs_tick,
+                            systems::snake_goap::sync_snake_needs,
+                            systems::snake_goap::snake_evaluate_and_plan,
+                            systems::snake_goap::snake_resolve_goap_plans,
+                        )
+                            .chain(),
                         systems::fox_goap::feed_cubs_at_dens,
                         systems::fox_goap::resolve_paired_confrontations,
                         systems::wildlife::fox_ai_decision,
@@ -501,6 +538,15 @@ impl Plugin for SimulationPlugin {
                         systems::wildlife::carcass_decay,
                         systems::wildlife::carcass_scent_tick,
                         systems::wildlife::predator_stalk_cats,
+                        // Hawk + snake lifecycle (starvation death +
+                        // age tick + HawkDied/SnakeDied messages).
+                        // Sub-chain to stay within the 20-tuple limit
+                        // for the outer wildlife chain.
+                        (
+                            systems::hawk_goap::hawk_lifecycle_tick,
+                            systems::snake_goap::snake_lifecycle_tick,
+                        )
+                            .chain(),
                     )
                         .chain(),
                     systems::prey::prey_population,

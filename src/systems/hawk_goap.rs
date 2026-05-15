@@ -1,0 +1,419 @@
+//! Hawk GOAP systems — evaluate, plan, and resolve hawk actions.
+//!
+//! Ticket 025 Phase 2 mirror of `fox_goap.rs` for hawks. Each tick:
+//! 1. `hawk_needs_tick` decays hunger and ages the hawk.
+//! 2. `sync_hawk_needs` copies `HawkState` + `Health` into `HawkNeeds`.
+//! 3. `hawk_evaluate_and_plan` scores dispositions, softmaxes a choice,
+//!    builds an A* plan, and inserts `HawkGoapPlan`.
+//! 4. `hawk_resolve_goap_plans` dispatches the current step to a
+//!    resolver under `src/steps/hawk/` and applies the witness Feature.
+//! 5. `hawk_lifecycle_tick` writes `HawkDied` on starvation.
+//!
+//! Hawks lack the fox's territory / breeding tiers, so the scoring
+//! context is much simpler. Commit 5 lifts the tuning values into
+//! `HawkEcologyConstants`; this commit hardcodes them.
+
+use bevy_ecs::prelude::*;
+
+use crate::ai::eval::{DseRegistry, ModifierPipeline};
+use crate::ai::hawk_planner::actions::actions_for_disposition;
+use crate::ai::hawk_planner::goals::goal_for_disposition;
+use crate::ai::hawk_planner::{
+    HawkDomain, HawkGoapActionKind, HawkPlannerState, HawkZone,
+};
+use crate::ai::hawk_scoring::{
+    score_hawk_dispositions, select_hawk_disposition_softmax, HawkNeeds, HawkPersonality,
+    HawkScoringContext,
+};
+use crate::ai::planner::core::make_plan;
+use crate::ai::scoring::{EvalInputs, MarkerSnapshot};
+use crate::components::hawk_goap_plan::HawkGoapPlan;
+use crate::components::physical::{Dead, DeathCause, Health, Position};
+use crate::components::prey::PreyAnimal;
+use crate::components::wildlife::{
+    HawkAiPhase, HawkDied, HawkState, WildAnimal, WildlifeAiState, WildlifeDeathCause,
+};
+use crate::resources::map::TileMap;
+use crate::resources::rng::SimRng;
+use crate::resources::system_activation::{Feature, SystemActivation};
+use crate::resources::time::TimeState;
+use crate::steps::{hawk as hawk_steps, StepResult};
+
+// Tuning placeholders — replaced in commit 5 by `HawkEcologyConstants`.
+const HAWK_SOFTMAX_TEMPERATURE: f32 = 0.15;
+const HAWK_HUNGER_DECAY_PER_TICK: f32 = 0.000_15;
+const HAWK_STARVATION_DEATH_TICKS: u64 = 60 * 60 * 24 * 2; // 2 in-game days at 60 tps
+const HAWK_DIVE_RANGE: i32 = 6;
+const HAWK_DETECTION_RANGE: i32 = 12;
+const HAWK_REST_TICKS: u64 = 200;
+
+// ---------------------------------------------------------------------------
+// hawk_needs_tick — per-tick hunger decay + age + cooldown
+// ---------------------------------------------------------------------------
+
+/// Per-tick hawk-state maintenance: hunger decay, satiation countdown,
+/// post-action cooldown, age. Mirrors `fox_needs_tick` (`wildlife.rs`).
+pub fn hawk_needs_tick(mut hawks: Query<&mut HawkState>) {
+    for mut hawk in &mut hawks {
+        hawk.age_ticks += 1;
+        if hawk.satiation_ticks > 0 {
+            hawk.satiation_ticks -= 1;
+        } else {
+            hawk.hunger = (hawk.hunger + HAWK_HUNGER_DECAY_PER_TICK).min(1.0);
+        }
+        hawk.post_action_cooldown = hawk.post_action_cooldown.saturating_sub(1);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// sync_hawk_needs — bridge HawkState/Health → HawkNeeds
+// ---------------------------------------------------------------------------
+
+/// Populate [`HawkNeeds`] from the hawk's `HawkState` + `Health`. Runs
+/// before scoring so the L2 evaluator reads fresh values.
+pub fn sync_hawk_needs(
+    mut hawks: Query<(&HawkState, &Health, &mut HawkNeeds), With<WildAnimal>>,
+) {
+    for (hawk_state, health, mut needs) in &mut hawks {
+        // `HawkState::hunger` is `0.0 = full, 1.0 = starving`; the L2
+        // evaluator reads `HawkNeeds::hunger` with inverse semantics.
+        needs.hunger = (1.0 - hawk_state.hunger).clamp(0.0, 1.0);
+        needs.health_fraction = (health.current / health.max).clamp(0.0, 1.0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// hawk_evaluate_and_plan — insert HawkGoapPlan for planless hawks
+// ---------------------------------------------------------------------------
+
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+pub fn hawk_evaluate_and_plan(
+    mut commands: Commands,
+    hawks: Query<
+        (Entity, &HawkState, &Position, &HawkNeeds, &HawkPersonality),
+        (With<WildAnimal>, Without<HawkGoapPlan>, Without<Dead>),
+    >,
+    map: Res<TileMap>,
+    cats: Query<
+        &Position,
+        (
+            Without<WildAnimal>,
+            Without<HawkState>,
+            With<Health>,
+            Without<Dead>,
+        ),
+    >,
+    prey: Query<&Position, (With<PreyAnimal>, Without<HawkState>)>,
+    mut rng: ResMut<SimRng>,
+    time: Res<TimeState>,
+    dse_registry: Res<DseRegistry>,
+    modifier_pipeline: Res<ModifierPipeline>,
+) {
+    let cat_positions: Vec<Position> = cats.iter().copied().collect();
+    let prey_positions: Vec<Position> = prey.iter().copied().collect();
+    let markers = MarkerSnapshot::new();
+
+    for (hawk_entity, hawk_state, hawk_pos, needs, personality) in &hawks {
+        let _ = hawk_state; // unused here; reserved for §L2.10.7 anchors when wired
+        let cats_nearby = cat_positions
+            .iter()
+            .filter(|p| p.manhattan_distance(hawk_pos) <= 6)
+            .count();
+        let prey_nearby = prey_positions
+            .iter()
+            .any(|p| p.manhattan_distance(hawk_pos) <= HAWK_DETECTION_RANGE);
+
+        let ctx = HawkScoringContext {
+            needs,
+            personality,
+            prey_nearby,
+            cats_nearby,
+            self_position: *hawk_pos,
+            jitter_range: 0.05,
+        };
+
+        let inputs = EvalInputs {
+            cat: hawk_entity,
+            position: *hawk_pos,
+            tick: time.tick,
+            dse_registry: &dse_registry,
+            modifier_pipeline: &modifier_pipeline,
+            markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
+            focal_cat: None,
+            focal_capture: None,
+        };
+
+        let scoring_result = score_hawk_dispositions(&ctx, &inputs, &mut rng.rng);
+        let Some(chosen) =
+            select_hawk_disposition_softmax(&scoring_result, &mut rng.rng, HAWK_SOFTMAX_TEMPERATURE)
+        else {
+            continue;
+        };
+
+        let planner_state = build_planner_state(hawk_state, hawk_pos, &prey_positions);
+        let actions = actions_for_disposition(chosen);
+        let goal = goal_for_disposition(chosen);
+
+        let Some(steps) = make_plan::<HawkDomain>(planner_state, &actions, &goal, 8, 500) else {
+            continue;
+        };
+
+        let _ = map; // currently unused; reserved for zone-resolution at plan-build time
+        let plan = HawkGoapPlan::new(chosen, time.tick, steps);
+        commands.entity(hawk_entity).insert(plan);
+    }
+}
+
+fn build_planner_state(
+    hawk_state: &HawkState,
+    hawk_pos: &Position,
+    prey_positions: &[Position],
+) -> HawkPlannerState {
+    let prey_visible = prey_positions
+        .iter()
+        .any(|p| p.manhattan_distance(hawk_pos) <= HAWK_DETECTION_RANGE);
+    HawkPlannerState {
+        zone: HawkZone::Sky,
+        prey_spotted: prey_visible,
+        hunger_ok: hawk_state.hunger < 0.4,
+        trips_done: 0,
+    }
+}
+
+fn resolve_zone_position(
+    zone: HawkZone,
+    hawk_pos: Position,
+    prey_positions: &[Position],
+    map: &TileMap,
+) -> Option<Position> {
+    match zone {
+        HawkZone::Sky => Some(Position::new(map.width / 2, map.height / 2)),
+        HawkZone::HuntingGround => prey_positions
+            .iter()
+            .min_by_key(|p| hawk_pos.manhattan_distance(p))
+            .copied(),
+        HawkZone::Perch => Some(Position::new(
+            (hawk_pos.x + 5).min(map.width - 1),
+            (hawk_pos.y + 5).min(map.height - 1),
+        )),
+        HawkZone::MapEdge => {
+            let edge_x = if hawk_pos.x < map.width / 2 {
+                0
+            } else {
+                map.width - 1
+            };
+            let edge_y = if hawk_pos.y < map.height / 2 {
+                0
+            } else {
+                map.height - 1
+            };
+            Some(Position::new(edge_x, edge_y))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// hawk_resolve_goap_plans — dispatch current step
+// ---------------------------------------------------------------------------
+
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+pub fn hawk_resolve_goap_plans(
+    mut commands: Commands,
+    mut hawks: Query<
+        (
+            Entity,
+            &mut HawkGoapPlan,
+            &mut HawkState,
+            &mut Position,
+            &mut HawkAiPhase,
+            &mut WildlifeAiState,
+        ),
+        (With<WildAnimal>, Without<Dead>),
+    >,
+    prey: Query<(Entity, &Position), (With<PreyAnimal>, Without<HawkState>)>,
+    map: Res<TileMap>,
+    time: Res<TimeState>,
+    mut activation: Option<ResMut<SystemActivation>>,
+) {
+    let prey_positions: Vec<Position> = prey.iter().map(|(_, p)| *p).collect();
+    let prey_entities: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
+
+    for (hawk_entity, mut plan, mut hawk_state, mut pos, mut phase, mut ai_state) in &mut hawks {
+        if plan.is_exhausted() {
+            commands.entity(hawk_entity).remove::<HawkGoapPlan>();
+            continue;
+        }
+        let Some(current_step) = plan.current().cloned() else {
+            commands.entity(hawk_entity).remove::<HawkGoapPlan>();
+            continue;
+        };
+
+        // Lazy target resolution on first tick of each step.
+        if let Some(step_state) = plan.current_state_mut() {
+            if step_state.target_position.is_none() {
+                step_state.target_position = match current_step.action {
+                    HawkGoapActionKind::SoarTo(zone) => {
+                        resolve_zone_position(zone, *pos, &prey_positions, &map)
+                    }
+                    _ => None,
+                };
+            }
+        }
+
+        // Set phase + WildlifeAiState mirrors so rendering follows.
+        *phase = phase_for_action(current_step.action);
+        if let HawkAiPhase::Soaring {
+            center_x,
+            center_y,
+            angle,
+        } = *phase
+        {
+            *ai_state = WildlifeAiState::Circling {
+                center_x,
+                center_y,
+                angle,
+            };
+        }
+
+        let step_state = plan.current_state_mut().unwrap();
+        let result = match current_step.action {
+            HawkGoapActionKind::SoarTo(_) => {
+                let outcome = hawk_steps::resolve_soar_to(&mut pos, step_state, &map);
+                outcome.result
+            }
+            HawkGoapActionKind::SpotPrey => {
+                let outcome = hawk_steps::resolve_spot_prey(
+                    &pos,
+                    &prey_positions,
+                    step_state,
+                    HAWK_DETECTION_RANGE,
+                );
+                outcome.record_if_witnessed(activation.as_deref_mut(), Feature::HawkSpottedPrey);
+                outcome.result
+            }
+            HawkGoapActionKind::DiveAttack => {
+                let outcome = hawk_steps::resolve_dive_attack(
+                    &mut pos,
+                    step_state,
+                    &prey_entities,
+                    HAWK_DIVE_RANGE,
+                );
+                outcome.record_if_witnessed(activation.as_deref_mut(), Feature::HawkDiveLanded);
+                if outcome.witness.is_some() {
+                    // Note: kill-attribution lives in `predator_hunt_prey`.
+                    hawk_state.last_dive_tick = time.tick;
+                }
+                outcome.result
+            }
+            HawkGoapActionKind::Rest => {
+                let outcome = hawk_steps::resolve_rest(step_state, HAWK_REST_TICKS);
+                outcome.record_if_witnessed(activation.as_deref_mut(), Feature::HawkPerched);
+                if outcome.witness {
+                    hawk_state.last_perch_tick = time.tick;
+                }
+                outcome.result
+            }
+            HawkGoapActionKind::FleeSky => {
+                let outcome = hawk_steps::resolve_flee_sky(&mut pos, step_state, &map);
+                outcome.record_if_witnessed(activation.as_deref_mut(), Feature::HawkFled);
+                outcome.result
+            }
+        };
+
+        match result {
+            StepResult::Advance => plan.advance(),
+            StepResult::Continue => {}
+            StepResult::Fail(_) => {
+                // Drop the plan so the evaluator builds a fresh one next tick.
+                commands.entity(hawk_entity).remove::<HawkGoapPlan>();
+            }
+        }
+    }
+}
+
+fn phase_for_action(action: HawkGoapActionKind) -> HawkAiPhase {
+    match action {
+        HawkGoapActionKind::SoarTo(_) => HawkAiPhase::Soaring {
+            center_x: 0,
+            center_y: 0,
+            angle: 0.0,
+        },
+        HawkGoapActionKind::SpotPrey | HawkGoapActionKind::DiveAttack => {
+            HawkAiPhase::HuntingPrey { target: None }
+        }
+        HawkGoapActionKind::Rest => HawkAiPhase::Perched { ticks: 0 },
+        HawkGoapActionKind::FleeSky => HawkAiPhase::Fleeing { dx: 0, dy: 0 },
+    }
+}
+
+// ---------------------------------------------------------------------------
+// hawk_lifecycle_tick — starvation death + HawkDied message
+// ---------------------------------------------------------------------------
+
+pub fn hawk_lifecycle_tick(
+    mut commands: Commands,
+    mut hawks: Query<(Entity, &mut HawkState), Without<Dead>>,
+    mut died_w: MessageWriter<HawkDied>,
+    mut activation: Option<ResMut<SystemActivation>>,
+    time: Res<TimeState>,
+) {
+    for (entity, mut hawk_state) in &mut hawks {
+        if hawk_state.hunger >= 1.0 {
+            hawk_state.starvation_ticks += 1;
+            if hawk_state.starvation_ticks >= HAWK_STARVATION_DEATH_TICKS {
+                if let Some(act) = activation.as_deref_mut() {
+                    act.record(Feature::HawkDied);
+                }
+                died_w.write(HawkDied {
+                    hawk: entity,
+                    cause: WildlifeDeathCause::Starvation,
+                });
+                commands.entity(entity).insert(Dead {
+                    tick: time.tick,
+                    cause: DeathCause::Starvation,
+                });
+            }
+        } else {
+            hawk_state.starvation_ticks = 0;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hawk_needs_tick_decays_hunger() {
+        let mut app = bevy::prelude::App::new();
+        app.add_systems(bevy::prelude::Update, hawk_needs_tick);
+        let id = app.world_mut().spawn(HawkState::new_adult()).id();
+        let baseline = app.world().get::<HawkState>(id).unwrap().hunger;
+        app.update();
+        let after = app.world().get::<HawkState>(id).unwrap().hunger;
+        assert!(after > baseline);
+    }
+
+    #[test]
+    fn hawk_needs_tick_advances_age() {
+        let mut app = bevy::prelude::App::new();
+        app.add_systems(bevy::prelude::Update, hawk_needs_tick);
+        let id = app.world_mut().spawn(HawkState::new_adult()).id();
+        app.update();
+        let age = app.world().get::<HawkState>(id).unwrap().age_ticks;
+        assert_eq!(age, 1);
+    }
+
+    #[test]
+    fn phase_for_action_maps_each_variant() {
+        // Smoke check: every action kind produces a valid HawkAiPhase.
+        let _ = phase_for_action(HawkGoapActionKind::SoarTo(HawkZone::Sky));
+        let _ = phase_for_action(HawkGoapActionKind::SpotPrey);
+        let _ = phase_for_action(HawkGoapActionKind::DiveAttack);
+        let _ = phase_for_action(HawkGoapActionKind::Rest);
+        let _ = phase_for_action(HawkGoapActionKind::FleeSky);
+    }
+}
