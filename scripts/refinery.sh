@@ -109,13 +109,11 @@ print(','.join(str(t) for t in info.get('tickets', [])) or '—')
         action="landable-manual"
     fi
 
-    # Coherent-block intermediates require anchor verdict — never landable-auto
-    # (and currently never landable-manual without explicit override).
-    if [[ "$track" == "coherent-block" ]]; then
-        if [[ "$action" == "landable-manual" ]]; then
-            action="awaiting-anchor"
-        fi
-    fi
+    # NOTE: coherent-block intermediates land like any other session.
+    # Per CLAUDE.md, intermediates land verdict-skipped; verdict fires at
+    # the anchor's landing, not at intermediate landing. The verdict-skip
+    # semantics live in the land commit message convention and in the
+    # verdict tooling, not in this report's action column.
 
     printf '%s\t%s\t%s\t%s\t%s\t%d\t%d\n' "$bm" "$slug" "$track" "$tickets" "$rebase_state:$action" "$ahead" "$behind"
 }
