@@ -13,7 +13,7 @@ wires-method: [rear_kitten]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: pending
+landed-at: e2be73158a57
 landed-on: 2026-05-15
 ---
 
