@@ -434,6 +434,22 @@ retag-suggest *ARGS:
 retag-audit *ARGS:
     python3 scripts/retag_audit.py {{ARGS}}
 
+# [session] Create an isolated parallel-session workspace + bookmark + atomic ticket claim. Creates ~/clowder-sessions/<slug>/, sets bookmark session/<slug>, writes .session-info.json. Usage: just session-new <slug> [--tickets <ids>] [--track <name>] [--pick] [--print-prompt]. Ticket claim uses flock on docs/open-work/.claim-lock to prevent races.
+session-new SLUG *ARGS:
+    bash scripts/session_new.sh {{SLUG}} {{ARGS}}
+
+# [session] Dashboard of all active sessions — slug, track, tickets, bookmark head, last edit, optional disk usage. --json for skill consumption.
+session-list *ARGS:
+    python3 scripts/session_list.py {{ARGS}}
+
+# [session] Alias for session-list (the conversational shorthand).
+sessions *ARGS:
+    python3 scripts/session_list.py {{ARGS}}
+
+# [session] Clean up a session after its work has landed (or been abandoned). cargo clean → jj workspace forget → rm -rf + bookmark forget. Refuses on uncommitted edits unless --force; --keep-bookmark preserves the bookmark.
+session-done SLUG *ARGS:
+    bash scripts/session_done.sh {{SLUG}} {{ARGS}}
+
 # Generate a random template authoring prompt
 template-prompt:
     cargo run --example template_prompt
