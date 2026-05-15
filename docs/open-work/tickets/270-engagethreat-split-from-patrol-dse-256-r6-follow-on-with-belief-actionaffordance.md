@@ -3,6 +3,7 @@ id: 270
 title: EngageThreat split from Patrol DSE (256 R6 follow-on with Belief + ActionAffordance)
 status: ready
 cluster: combat-threat
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-10
 parked: null

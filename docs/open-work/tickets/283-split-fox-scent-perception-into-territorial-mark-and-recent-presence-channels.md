@@ -3,6 +3,7 @@ id: 283
 title: Split fox-scent perception into territorial-mark and recent-presence channels
 status: ready
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics, full-sensory-perception]
 added: 2026-05-11
 parked: null

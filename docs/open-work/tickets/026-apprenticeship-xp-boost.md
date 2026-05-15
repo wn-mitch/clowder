@@ -3,6 +3,7 @@ id: 026
 title: Apprenticeship XP-boost on per-skill Skills component
 status: blocked
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [generational-continuity]
 added: 2026-04-24
 parked: null

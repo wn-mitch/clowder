@@ -3,6 +3,7 @@ id: 240
 title: Anti-corruption-from-graves balance pass — tune grave_aura strength and radius
 status: ready
 cluster: magic-mythic
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-08
 parked: null

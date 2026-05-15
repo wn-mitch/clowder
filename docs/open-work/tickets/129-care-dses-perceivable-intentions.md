@@ -3,6 +3,7 @@ id: 129
 title: Care DSEs over perceivable intentions
 status: blocked
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-02
 parked: null

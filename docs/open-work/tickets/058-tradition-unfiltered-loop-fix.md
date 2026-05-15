@@ -3,6 +3,7 @@ id: 058
 title: §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port
 status: parked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-04-27
 parked: 2026-04-30

@@ -3,6 +3,7 @@ id: 347
 title: Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null

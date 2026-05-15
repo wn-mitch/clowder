@@ -3,6 +3,7 @@ id: 315
 title: activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias)
 status: blocked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-13
 parked: null

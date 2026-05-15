@@ -3,6 +3,7 @@ id: 041
 title: Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling
 status: ready
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-04-26
 parked: null

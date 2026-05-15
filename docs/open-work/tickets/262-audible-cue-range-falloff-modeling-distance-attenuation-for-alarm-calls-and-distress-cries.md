@@ -3,6 +3,7 @@ id: 262
 title: Audible-cue range falloff modeling — distance attenuation for alarm calls and distress cries
 status: blocked
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-05-10
 parked: null

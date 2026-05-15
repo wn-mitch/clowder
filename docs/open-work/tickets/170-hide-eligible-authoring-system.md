@@ -3,6 +3,7 @@ id: 170
 title: HideEligible authoring system (Hide DSE Phase 2)
 status: ready
 cluster: combat-threat
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-05
 parked: null

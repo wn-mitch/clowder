@@ -3,6 +3,7 @@ id: 053
 title: §7.7.b death-event grief emission — relationship-classified survivors payload
 status: ready
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
 added: 2026-04-27
 parked: null

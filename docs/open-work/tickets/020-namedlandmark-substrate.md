@@ -3,6 +3,7 @@ id: 020
 title: NamedLandmark substrate (cross-consumer naming)
 status: ready
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-04-22
 parked: null

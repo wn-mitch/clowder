@@ -3,6 +3,7 @@ id: 236
 title: Body preparation tiers — drag/shroud/mummify gated by tech markers
 status: ready
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [mythic-texture]
 added: 2026-05-08
 parked: null

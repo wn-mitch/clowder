@@ -3,6 +3,7 @@ id: 316
 title: Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on)
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-13
 parked: null

@@ -3,6 +3,7 @@ id: 323
 title: courtship_method — mirror JointIntention stages
 status: ready
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null

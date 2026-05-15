@@ -3,6 +3,7 @@ id: 354
 title: Parallel-session orchestration: /work skill + three-track partition + refinery
 status: ready
 cluster: tooling-diagnostics-ui
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-15
 parked: null

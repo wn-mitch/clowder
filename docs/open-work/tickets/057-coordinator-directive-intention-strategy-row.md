@@ -3,6 +3,7 @@ id: 057
 title: §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override
 status: blocked
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-04-27
 parked: null

@@ -3,6 +3,7 @@ id: 237
 title: Gravesite selection — corpse transport plan + multi-axis site scoring (proximate to other graves, safe, low-corruption, beautiful)
 status: ready
 cluster: buildings-zones
+orchestration: substrate-sensitive
 initiative: [mythic-texture]
 added: 2026-05-08
 parked: null

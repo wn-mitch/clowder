@@ -3,6 +3,7 @@ id: 242
 title: Body-cue substrate (Disposition → observable markers)
 status: ready
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-05-08
 parked: null

@@ -3,6 +3,7 @@ id: 307
 title: Cluster/initiative filter recipes + epic-rollup lint for open-work index
 status: blocked
 cluster: process-discipline
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-13
 parked: null

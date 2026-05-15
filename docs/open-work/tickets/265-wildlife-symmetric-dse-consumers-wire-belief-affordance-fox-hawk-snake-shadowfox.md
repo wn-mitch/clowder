@@ -3,6 +3,7 @@ id: 265
 title: Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox)
 status: ready
 cluster: wildlife
+orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
 added: 2026-05-10
 parked: null

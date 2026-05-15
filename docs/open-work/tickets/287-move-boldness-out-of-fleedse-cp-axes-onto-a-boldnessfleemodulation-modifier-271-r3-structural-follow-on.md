@@ -3,6 +3,7 @@ id: 287
 title: Move boldness out of FleeDse CP axes onto a BoldnessFleeModulation modifier (271 R3 structural follow-on)
 status: ready
 cluster: combat-threat
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-11
 parked: null

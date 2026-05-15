@@ -3,6 +3,7 @@ id: 019
 title: Happy paths — usage-worn trails
 status: blocked
 cluster: buildings-zones
+orchestration: substrate-sensitive
 initiative: [world-richness, environmental-simulation]
 added: 2026-04-22
 parked: null

@@ -3,6 +3,7 @@ id: 221
 title: caretake gates on ambush-recency at kitten tile
 status: ready
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [generational-continuity]
 added: 2026-05-07
 parked: null

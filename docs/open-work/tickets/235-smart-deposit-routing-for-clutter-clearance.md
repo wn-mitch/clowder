@@ -3,6 +3,7 @@ id: 235
 title: Smart deposit routing for clutter clearance
 status: ready
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-08
 parked: null

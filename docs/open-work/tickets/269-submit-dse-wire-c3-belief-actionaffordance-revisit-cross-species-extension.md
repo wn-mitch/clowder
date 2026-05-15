@@ -3,6 +3,7 @@ id: 269
 title: Submit DSE — wire C3 Belief + ActionAffordance + revisit cross-species extension
 status: blocked
 cluster: combat-threat
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-10
 parked: null

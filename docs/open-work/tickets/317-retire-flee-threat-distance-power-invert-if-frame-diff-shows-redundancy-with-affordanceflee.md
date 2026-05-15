@@ -3,6 +3,7 @@ id: 317
 title: retire flee_threat_distance Power-Invert if frame-diff shows redundancy with Affordance(Flee)
 status: blocked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-13
 parked: null

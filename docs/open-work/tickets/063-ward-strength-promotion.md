@@ -3,6 +3,7 @@ id: 063
 title: Ward-strength promotion — first-class spatial axis (§5.6.3 row #3)
 status: ready
 cluster: buildings-zones
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-04-27
 parked: null

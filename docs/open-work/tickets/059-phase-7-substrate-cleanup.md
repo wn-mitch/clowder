@@ -3,6 +3,7 @@ id: 059
 title: Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile
 status: parked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-04-27
 parked: 2026-04-27

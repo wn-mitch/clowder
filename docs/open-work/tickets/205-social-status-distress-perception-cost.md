@@ -3,6 +3,7 @@ id: 205
 title: social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 added: 2026-05-07
 parked: null
 blocked-by: []

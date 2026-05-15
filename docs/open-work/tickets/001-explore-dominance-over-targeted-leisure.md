@@ -3,6 +3,7 @@ id: 001
 title: Explore dominance over targeted leisure
 status: in-progress
 cluster: ai-substrate
+orchestration: substrate-sensitive
 added: 2026-04-20
 parked: 2026-04-21
 blocked-by: []

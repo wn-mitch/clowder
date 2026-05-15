@@ -3,6 +3,7 @@ id: 136
 title: WoundedAlly marker + positional dependent-proximity for escape_viability
 status: ready
 cluster: combat-threat
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-02
 parked: null

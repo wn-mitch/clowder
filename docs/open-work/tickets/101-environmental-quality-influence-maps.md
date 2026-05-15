@@ -3,6 +3,7 @@ id: 101
 title: Environmental quality — five influence maps for ambient spatial pressure
 status: ready
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [environmental-simulation]
 added: 2026-05-01
 parked: null

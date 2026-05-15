@@ -3,6 +3,7 @@ id: 341
 title: Retarget 057 blocked-by from 126 to 128
 status: ready
 cluster: process-discipline
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null

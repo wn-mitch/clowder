@@ -3,6 +3,7 @@ id: 144
 title: IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink)
 status: blocked
 cluster: combat-threat
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-02
 parked: null

@@ -3,6 +3,7 @@ id: 339
 title: CatSnapshot gains goal_stack + active_aspirations fields
 status: ready
 cluster: tooling-diagnostics-ui
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null

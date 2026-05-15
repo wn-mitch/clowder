@@ -3,6 +3,7 @@ id: 348
 title: Hawk + snake balance iteration — first tuning pass post-GOAP cutover
 status: ready
 cluster: wildlife
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-15
 parked: null

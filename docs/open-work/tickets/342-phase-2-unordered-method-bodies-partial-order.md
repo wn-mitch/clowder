@@ -3,6 +3,7 @@ id: 342
 title: Phase-2 :unordered method bodies + partial-order
 status: parked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: 2026-05-14

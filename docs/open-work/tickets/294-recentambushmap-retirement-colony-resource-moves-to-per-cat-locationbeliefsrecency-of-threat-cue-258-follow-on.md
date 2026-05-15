@@ -3,6 +3,7 @@ id: 294
 title: RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on)
 status: ready
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-05-11
 parked: null

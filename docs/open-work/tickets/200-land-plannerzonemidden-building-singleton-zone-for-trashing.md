@@ -3,6 +3,7 @@ id: 200
 title: Land PlannerZone::Midden — building-singleton zone for Trashing
 status: ready
 cluster: buildings-zones
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-06
 parked: null

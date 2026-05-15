@@ -3,6 +3,7 @@ id: 015
 title: Alloparenting Reframe B — mama drops kitten at hearth near resting elder
 status: parked
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [generational-continuity]
 added: 2026-04-22
 parked: 2026-04-22

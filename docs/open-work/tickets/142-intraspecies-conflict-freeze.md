@@ -3,6 +3,7 @@ id: 142
 title: IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence
 status: ready
 cluster: combat-threat
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-02
 parked: null

@@ -3,6 +3,7 @@ id: 304
 title: WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate
 status: ready
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-05-12
 parked: null

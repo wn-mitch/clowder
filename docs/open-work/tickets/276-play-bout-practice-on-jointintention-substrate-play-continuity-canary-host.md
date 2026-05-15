@@ -3,6 +3,7 @@ id: 276
 title: Play-bout practice on JointIntention substrate (play continuity canary host)
 status: ready
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: [mythic-texture]
 added: 2026-05-11
 parked: null

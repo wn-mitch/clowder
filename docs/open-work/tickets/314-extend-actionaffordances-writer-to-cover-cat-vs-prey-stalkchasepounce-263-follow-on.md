@@ -3,6 +3,7 @@ id: 314
 title: extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-13
 parked: null

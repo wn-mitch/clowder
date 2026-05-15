@@ -3,6 +3,7 @@ id: 095
 title: Body zones — anatomical injury model for all animal species
 status: ready
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
 added: 2026-05-01
 parked: null

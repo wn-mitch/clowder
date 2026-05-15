@@ -3,6 +3,7 @@ id: 325
 title: Hunting aspiration_milestone_wrapper + emits tables
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: null

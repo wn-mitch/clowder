@@ -3,6 +3,7 @@ id: 243
 title: Behavior-observation L1 channel (target-side body-cue + physical marker reads)
 status: blocked
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-05-08
 parked: null

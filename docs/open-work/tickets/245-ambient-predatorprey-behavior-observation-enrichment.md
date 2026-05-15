@@ -3,6 +3,7 @@ id: 245
 title: Ambient predator/prey behavior-observation enrichment
 status: blocked
 cluster: wildlife
+orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics, environmental-simulation]
 added: 2026-05-08
 parked: null

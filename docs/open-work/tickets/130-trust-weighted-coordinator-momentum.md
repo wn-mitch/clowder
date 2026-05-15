@@ -3,6 +3,7 @@ id: 130
 title: Trust-weighted coordinator directive momentum
 status: blocked
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-02
 parked: null

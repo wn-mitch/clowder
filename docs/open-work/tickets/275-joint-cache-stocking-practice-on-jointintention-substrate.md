@@ -3,6 +3,7 @@ id: 275
 title: Joint cache-stocking practice on JointIntention substrate
 status: ready
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-11
 parked: null

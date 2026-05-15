@@ -3,6 +3,7 @@ id: 100
 title: Tremor map, Action::Stalk, and personality-driven hunt approach
 status: ready
 cluster: wildlife
+orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics, environmental-simulation]
 added: 2026-05-01
 parked: null

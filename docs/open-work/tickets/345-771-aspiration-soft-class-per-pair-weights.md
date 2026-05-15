@@ -3,6 +3,7 @@ id: 345
 title: §7.7.1 aspiration soft-class per-pair weights
 status: parked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-14
 parked: 2026-05-14

@@ -3,6 +3,7 @@ id: 060
 title: AI substrate refactor — program epic
 status: in-progress
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-04-27
 parked: null

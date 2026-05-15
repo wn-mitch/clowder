@@ -3,6 +3,7 @@ id: 310
 title: ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball
 status: ready
 cluster: wildlife
+orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
 added: 2026-05-13
 parked: null

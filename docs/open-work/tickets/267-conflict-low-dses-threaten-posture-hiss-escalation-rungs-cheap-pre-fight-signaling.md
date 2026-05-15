@@ -3,6 +3,7 @@ id: 267
 title: Conflict-low DSEs — Threaten / Posture / Hiss escalation rungs (cheap pre-Fight signaling)
 status: ready
 cluster: combat-threat
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-10
 parked: null

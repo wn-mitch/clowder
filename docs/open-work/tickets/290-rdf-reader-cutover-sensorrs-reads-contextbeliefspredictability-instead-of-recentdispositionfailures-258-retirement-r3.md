@@ -3,6 +3,7 @@ id: 290
 title: RDF reader cutover — sensor.rs reads ContextBeliefs.predictability instead of RecentDispositionFailures (258 retirement R3)
 status: ready
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-05-11
 parked: null

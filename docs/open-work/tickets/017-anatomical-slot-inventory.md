@@ -3,6 +3,7 @@ id: 017
 title: Anatomical slot inventory
 status: blocked
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-04-22
 parked: null

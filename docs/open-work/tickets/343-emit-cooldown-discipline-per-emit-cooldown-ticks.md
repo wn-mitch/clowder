@@ -3,6 +3,7 @@ id: 343
 title: Emit-cooldown discipline — per-emit cooldown_ticks
 status: parked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-14
 parked: 2026-05-14

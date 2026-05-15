@@ -3,6 +3,7 @@ id: 147
 title: Per-axis distress-modifier value tuning (multi-seed hypothesize)
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 added: 2026-05-02
 parked: null
 blocked-by: []

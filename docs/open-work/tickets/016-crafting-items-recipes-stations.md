@@ -3,6 +3,7 @@ id: 016
 title: Crafting — items, recipes, stations
 status: ready
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-04-22
 parked: null

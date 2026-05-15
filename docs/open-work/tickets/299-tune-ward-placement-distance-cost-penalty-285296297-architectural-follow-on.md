@@ -3,6 +3,7 @@ id: 299
 title: tune ward placement distance_cost penalty (285+296+297 architectural follow-on)
 status: ready
 cluster: buildings-zones
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-12
 parked: null

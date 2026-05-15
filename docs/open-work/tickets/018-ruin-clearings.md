@@ -3,6 +3,7 @@ id: 018
 title: Ruin clearings (corruption nodes, PMD-flavored)
 status: blocked
 cluster: magic-mythic
+orchestration: substrate-sensitive
 initiative: [mythic-texture, world-richness]
 added: 2026-04-22
 parked: null

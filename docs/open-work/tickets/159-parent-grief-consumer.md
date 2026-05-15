@@ -3,6 +3,7 @@ id: 159
 title: Parent grief consumer for kitten / dependent death
 status: ready
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
 added: 2026-05-04
 parked: null

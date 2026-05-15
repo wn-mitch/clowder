@@ -3,6 +3,7 @@ id: 180
 title: Death-stamp / scent-anchor at kill sites (176 follow-on)
 status: ready
 cluster: belief-perception
+orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics, environmental-simulation]
 added: 2026-05-05
 parked: null

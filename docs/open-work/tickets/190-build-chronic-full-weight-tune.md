@@ -3,6 +3,7 @@ id: 190
 title: Tune build_chronic_full_weight (179 follow-on)
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 added: 2026-05-06
 parked: null
 blocked-by: []

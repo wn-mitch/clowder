@@ -3,6 +3,7 @@ id: 344
 title: §7.7.1 aspiration arc per-chain expected_valence_target field
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-14
 parked: null

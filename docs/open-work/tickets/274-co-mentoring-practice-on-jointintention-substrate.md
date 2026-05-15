@@ -3,6 +3,7 @@ id: 274
 title: Co-mentoring practice on JointIntention substrate
 status: ready
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-11
 parked: null

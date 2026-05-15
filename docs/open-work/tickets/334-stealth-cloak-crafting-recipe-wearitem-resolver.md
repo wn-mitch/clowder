@@ -3,6 +3,7 @@ id: 334
 title: Stealth-cloak crafting recipe + WearItem resolver
 status: ready
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: [smarter-cats, world-richness]
 added: 2026-05-14
 parked: null

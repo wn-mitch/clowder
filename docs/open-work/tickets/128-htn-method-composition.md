@@ -3,6 +3,7 @@ id: 128
 title: HTN method composition — epic
 status: in-progress
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-02
 parked: null

@@ -3,6 +3,7 @@ id: 115
 title: Bond-weighted social recovery — fondness scales Needs.social inflow
 status: ready
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
 added: 2026-05-01
 parked: null

@@ -3,6 +3,7 @@ id: 241
 title: Burial canary structurally hard to fire post-230 — death-rate audit + canary policy
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 added: 2026-05-08
 parked: null
 blocked-by: []

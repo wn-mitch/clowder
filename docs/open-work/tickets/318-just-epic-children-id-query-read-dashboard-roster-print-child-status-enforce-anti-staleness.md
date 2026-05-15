@@ -3,6 +3,7 @@ id: 318
 title: just epic-children <id> query — read dashboard roster, print child status, enforce anti-staleness
 status: ready
 cluster: tooling-diagnostics-ui
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-14
 parked: null

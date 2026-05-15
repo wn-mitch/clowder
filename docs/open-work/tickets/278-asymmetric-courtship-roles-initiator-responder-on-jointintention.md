@@ -3,6 +3,7 @@ id: 278
 title: Asymmetric Courtship roles (Initiator / Responder) on JointIntention
 status: ready
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: [generational-continuity]
 added: 2026-05-11
 parked: null

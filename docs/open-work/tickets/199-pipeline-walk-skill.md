@@ -3,6 +3,7 @@ id: 199
 title: Hunt / production / consumption pipeline-walk skill (194 P4)
 status: parked
 cluster: tooling-diagnostics-ui
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-06
 parked: 2026-05-06

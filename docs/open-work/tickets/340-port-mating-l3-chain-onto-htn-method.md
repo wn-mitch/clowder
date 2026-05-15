@@ -3,6 +3,7 @@ id: 340
 title: Port Mating L3 chain onto HTN method
 status: blocked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats, generational-continuity]
 added: 2026-05-14
 parked: null

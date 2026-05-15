@@ -3,6 +3,7 @@ id: 303
 title: split cat_value into movement-intensity and residence axes (298 structural follow-on)
 status: ready
 cluster: buildings-zones
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-12
 parked: null

@@ -3,6 +3,7 @@ id: 134
 title: Phobia modifier family — Crusader-Kings-style trait modifiers on urge response
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-02
 parked: null

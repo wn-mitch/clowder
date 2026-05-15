@@ -3,6 +3,7 @@ id: 324
 title: gestation_method — mirror Pregnant stages
 status: ready
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [smarter-cats, generational-continuity]
 added: 2026-05-14
 parked: null

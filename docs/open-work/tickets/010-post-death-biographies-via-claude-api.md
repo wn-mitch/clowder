@@ -3,6 +3,7 @@ id: 010
 title: Post-death biographies via Claude API (presenter)
 status: ready
 cluster: magic-mythic
+orchestration: substrate-sensitive
 initiative: [mythic-texture]
 added: 2026-04-21
 parked: null
