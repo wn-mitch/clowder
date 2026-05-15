@@ -422,6 +422,18 @@ check:
 retag-init:
     bash scripts/retag_init.sh
 
+# [retag] Single-ticket orchestration retag. Sets/updates the orchestration / block / verdict-anchor / initiative fields on one ticket. Idempotent. Usage: just retag <id> --track <name> [--block <name>] [--anchor] [--initiative <a,b>]. Validated by `just check`.
+retag ID *ARGS:
+    bash scripts/retag.sh {{ID}} {{ARGS}}
+
+# [retag] Heuristic auto-classifier — proposes orchestration tags for every untagged-or-default ticket. Read-only by default; --apply commits suggestions per-batch. --only <track> filters output; --json emits machine-readable for the /retag skill.
+retag-suggest *ARGS:
+    python3 scripts/retag_suggest.py {{ARGS}}
+
+# [retag] Corpus rollup — counts per track / per status / per cluster, plus per-block anchor status. --json emits machine-readable. Complementary to `just check` (which gates) — audit reports state.
+retag-audit *ARGS:
+    python3 scripts/retag_audit.py {{ARGS}}
+
 # Generate a random template authoring prompt
 template-prompt:
     cargo run --example template_prompt
