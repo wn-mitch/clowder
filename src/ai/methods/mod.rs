@@ -94,6 +94,11 @@ pub enum TargetHint {
     /// planned-but-unfinished structure or open building slot). Used
     /// by `build_method` as the Building chains' primary emit target.
     ConstructionSite,
+    /// 331 — primitive sub-goal binds to the cat's audience picker
+    /// (Coordinate-DSE's existing target resolution: nearest cluster
+    /// of cats receptive to direction). Used by `coordinate_method`
+    /// as the Leadership chains' primary emit target.
+    Audience,
 }
 
 // ---------------------------------------------------------------------------
@@ -420,6 +425,11 @@ pub mod explore;
 // and THE_ARCHITECT). Tier-1 Live primitive mirroring `fight_method`'s
 // 327 shape.
 pub mod build;
+// 331: Live HTN method module — Leadership chain wrapper.
+// `coordinate_method` catches `direct_colony` (Primary emit on both
+// VOICE_OF_THE_COLONY and THE_UNIFIER). Tier-1 Live primitive
+// mirroring `fight_method`'s 327 shape.
+pub mod coordinate;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
 

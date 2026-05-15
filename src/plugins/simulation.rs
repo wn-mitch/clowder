@@ -310,6 +310,16 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // is #335 territory; production gating (site-claimed predicate,
     // materials-on-hand) lands as a follow-on balance pass.
     registry.push(crate::ai::methods::build::build_method());
+
+    // 331: Tier-1 Live method — Leadership chain wrapper.
+    // `coordinate_method` catches `direct_colony` (Primary emit on
+    // every milestone of VOICE_OF_THE_COLONY and THE_UNIFIER). Carries
+    // `applicable_when: Live(always_true)` with one primitive sub-goal
+    // (Action::Coordinate + TargetHint::Audience). Coordinator-
+    // directive integration is #335 territory; production gating
+    // (mentor-relationships / role-acceptance predicates) lands as
+    // a follow-on balance pass.
+    registry.push(crate::ai::methods::coordinate::coordinate_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of
