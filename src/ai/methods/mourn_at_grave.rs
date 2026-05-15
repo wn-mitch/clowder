@@ -38,10 +38,11 @@ pub fn mourn_at_grave() -> Method {
         id: MethodId("mourn_at_grave"),
         goal_label: "process_grief",
         applicable_when: ApplicableWhen::PendingSubstrate {
-            blocker: "332",
+            blocker: "357",
             // Placeholder. `MethodRegistry::lookup` filters out
             // PendingSubstrate methods unconditionally, so this is
-            // never invoked while the variant is dormant. #332
+            // never invoked while the variant is dormant. #357
+            // dispatches the action vocabulary substrate landed by #332.
             // replaces it with the real (mourning-active &&
             // grave-in-range) check.
             eventual: |_world, _entity| false,

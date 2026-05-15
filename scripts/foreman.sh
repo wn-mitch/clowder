@@ -178,10 +178,20 @@ Constraints (load-bearing):
 Verifiability triage (do this FIRST, before reading any source code or
 running \`cargo\`):
 Read the ticket body below. Decide *how* you would prove correctness:
-- If verification needs visually inspecting a rendered window, screenshot,
-  or log-viewer chart (windowed UI overlay, render-pipeline change,
-  visualization widget) → abandon NOW:
-    print "polecat-abandoned: $slug requires-gui"
+- UI-rendering work (windowed overlay, render-pipeline change, log-viewer
+  chart) is NOT a reason to abandon. Pixels are programmatically assertable.
+  Use the existing toolchain:
+    - Bevy windowed surface → \`Screenshot::primary_window()\` + \`save_to_disk\`
+      are wired in \`src/rendering/camera.rs\` (F5 + \`AutoScreenshot\` resource).
+      Spawn headed binary, scrub to a known tick, capture, exit, assert
+      against the saved PNG (pixel diff or OCR on stable text regions).
+    - \`tools/narrative-editor\` (vite/npm web app) → \`npm run dev\` on a
+      fixed port, drive with Playwright (\`npm install --save-dev
+      @playwright/test\` if missing), assert against DOM and canvas pixels.
+  Most UI tickets also split: do the headless plumbing (event payload, query,
+  hit-test math, anchor constants, color tokens) verified by
+  \`just check && just test\`, then add the screenshot/Playwright assertion
+  for the rendered surface.
 - If verification needs running a full \`just soak\` > 5 min and comparing
   footers / continuity canaries → abandon NOW:
     print "polecat-abandoned: $slug requires-long-soak"
@@ -189,6 +199,9 @@ Read the ticket body below. Decide *how* you would prove correctness:
   [suspect] layer-walk row, ECS-schedule reasoning, balance call) →
   abandon NOW:
     print "polecat-abandoned: $slug requires-substrate-judgment"
+- Reserve \`requires-gui\` abandons for rare cases of genuinely subjective
+  aesthetic judgment ("does this color feel right", "is the easing curve
+  pleasant") — NOT for any ticket that renders pixels.
 - If verification is \`just check && just test\` + reading a deterministic
   \`just\` recipe output (\`just inspect\`, \`just q\`, \`just explain\`,
   \`just similar\`) → proceed to the exit ceremony.

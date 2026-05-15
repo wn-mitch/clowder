@@ -12,6 +12,7 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
+wires-method: [mourn_at_grave, rear_kitten]
 landed-at: null
 landed-on: null
 ---

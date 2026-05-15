@@ -36,9 +36,10 @@ pub fn rear_kitten() -> Method {
         id: MethodId("rear_kitten"),
         goal_label: "kitten_reared",
         applicable_when: ApplicableWhen::PendingSubstrate {
-            blocker: "333",
-            // Placeholder. #333 replaces it with the real
-            // "mother && has-dependent-kitten" check.
+            blocker: "357",
+            // Placeholder. #357 dispatches the rear_kitten action
+            // vocabulary substrate landed by #333; the real
+            // "mother && has-dependent-kitten" check lands there.
             eventual: |_world, _entity| false,
         },
         sub_goals: &[
