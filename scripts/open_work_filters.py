@@ -108,8 +108,8 @@ def cmd_active() -> int:
     return 0
 
 
-def cmd_ready(cluster: str | None, initiative: str | None) -> int:
-    """List ready tickets, optionally filtered by cluster or initiative."""
+def cmd_ready(cluster: str | None, initiative: str | None, track: str | None = None) -> int:
+    """List ready tickets, optionally filtered by cluster / initiative / track."""
     tickets = load_tickets(TICKETS_DIR)
     ready = sorted([t for t in tickets if t.status == "ready"], key=lambda t: t.id)
 
@@ -117,12 +117,16 @@ def cmd_ready(cluster: str | None, initiative: str | None) -> int:
         ready = [t for t in ready if t.cluster == cluster]
     if initiative:
         ready = [t for t in ready if initiative in t.initiative]
+    if track:
+        ready = [t for t in ready if t.orchestration == track]
 
     filter_bits = []
     if cluster:
         filter_bits.append(f"cluster={cluster}")
     if initiative:
         filter_bits.append(f"initiative={initiative}")
+    if track:
+        filter_bits.append(f"track={track}")
     suffix = f" ({', '.join(filter_bits)})" if filter_bits else ""
     print(f"Ready ({len(ready)}){suffix}:")
     for t in ready:
@@ -226,6 +230,12 @@ def main(argv: list[str]) -> int:
     p_ready = sub.add_parser("ready")
     p_ready.add_argument("--cluster", default=None)
     p_ready.add_argument("--initiative", default=None)
+    p_ready.add_argument(
+        "--track",
+        choices=("substrate-sensitive", "coherent-block", "swarm-safe"),
+        default=None,
+        help="filter by orchestration track (ticket 354)",
+    )
     p_stale = sub.add_parser("stale")
     p_stale.add_argument("--days", type=int, default=30)
     p_blocking = sub.add_parser("blocking")
@@ -236,7 +246,7 @@ def main(argv: list[str]) -> int:
     if args.cmd == "active":
         return cmd_active()
     if args.cmd == "ready":
-        return cmd_ready(args.cluster, args.initiative)
+        return cmd_ready(args.cluster, args.initiative, args.track)
     if args.cmd == "stale":
         return cmd_stale(args.days)
     if args.cmd == "blocking":

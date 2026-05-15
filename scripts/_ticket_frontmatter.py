@@ -157,6 +157,26 @@ class Ticket:
     def added(self):
         return self.frontmatter.get("added")
 
+    @property
+    def orchestration(self) -> str:
+        """The three-track orchestration axis (ticket 354).
+
+        Returns one of substrate-sensitive / coherent-block / swarm-safe,
+        or empty string if untagged (which `just check` rejects).
+        """
+        return str(self.frontmatter.get("orchestration") or "")
+
+    @property
+    def block(self) -> str:
+        """Coherent-block name; only meaningful when orchestration is
+        coherent-block (enforced by check_orchestration_frontmatter.py)."""
+        return str(self.frontmatter.get("block") or "")
+
+    @property
+    def verdict_anchor(self) -> bool:
+        """True iff this ticket is the verdict-anchor for its block."""
+        return self.frontmatter.get("verdict-anchor") in (True, "true")
+
 
 def load_tickets(tickets_dir: Path) -> list[Ticket]:
     tickets = []

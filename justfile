@@ -454,6 +454,18 @@ session-done SLUG *ARGS:
 refinery *ARGS:
     bash scripts/refinery.sh {{ARGS}}
 
+# [block] List all coherent-block initiatives in the corpus — ticket count, verdict-anchor, status rollup. --json for skill consumption.
+block-list *ARGS:
+    python3 scripts/block_info.py list {{ARGS}}
+
+# [block] Detail view of one coherent-block (initiative name) — all member tickets, anchor, status rollup, dependency graph hints. --json for skill consumption.
+block-info BLOCK *ARGS:
+    python3 scripts/block_info.py {{BLOCK}} {{ARGS}}
+
+# [ticket-query] Single-ticket frontmatter + status + which session (if any) currently holds it. --json for /work skill.
+ticket-info ID *ARGS:
+    python3 scripts/ticket_info.py {{ID}} {{ARGS}}
+
 # Generate a random template authoring prompt
 template-prompt:
     cargo run --example template_prompt
