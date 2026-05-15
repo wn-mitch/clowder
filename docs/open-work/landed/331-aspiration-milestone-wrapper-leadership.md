@@ -13,7 +13,7 @@ wires-method: [aspiration_milestone_wrapper.leadership]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: pending
+landed-at: b6a7ae88cbce
 landed-on: 2026-05-15
 ---
 
