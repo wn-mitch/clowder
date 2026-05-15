@@ -154,6 +154,37 @@ pub enum Feature {
     /// pre-023 combat-approach path).
     ShadowFoxHauntingEscalated,
     DirectiveDelivered,
+    // --- Hawk ecology (ticket 025 Phase 2) ---
+    /// A hawk spotted prey within detection range. Witness: yes/no per
+    /// `resolve_spot_prey` call. Positive — substrate-driven hunting is
+    /// finding targets.
+    HawkSpottedPrey,
+    /// A hawk completed a dive (the dive *attempt* — kill-attribution is
+    /// `predator_hunt_prey`'s job). Positive — the predation pipeline
+    /// is firing.
+    HawkDiveLanded,
+    /// A hawk finished perching on a Perch zone. Positive but bursty —
+    /// depends on Resting disposition winning the softmax.
+    HawkPerched,
+    /// A hawk reached the map edge while Fleeing. Positive but state-
+    /// dependent (only fires when health drops or cats threaten).
+    HawkFled,
+    /// A hawk died of starvation / old age / combat. Bursty.
+    HawkDied,
+    // --- Snake ecology ---
+    /// A snake completed a strike attempt against prey (kill-attribution
+    /// stays in `predator_hunt_prey`). Positive.
+    SnakeStruckPrey,
+    /// A snake completed a Bask cycle on warm terrain. Positive but
+    /// thermoregulation-dependent.
+    SnakeBasked,
+    /// A snake settled into ambush posture after `SetAmbush`. Positive
+    /// — the default predation mode is firing.
+    SnakeAmbushed,
+    /// A snake reached cover / map edge while Retreating. State-dependent.
+    SnakeRetreated,
+    /// A snake died of starvation / old age / combat. Bursty.
+    SnakeDied,
     // --- Corruption & carcass systems ---
     CarcassSpawned,
     WardSiegeStarted,
@@ -545,6 +576,21 @@ impl Feature {
         Feature::ShadowFoxHaunting,
         Feature::ShadowFoxHauntingEscalated,
         Feature::DirectiveDelivered,
+        // Hawk ecology (ticket 025 Phase 2). All four "trunk" positives
+        // ship dormant via `expected_to_fire_per_soak() => false` in
+        // this commit and are promoted to `true` in commit 6 once the
+        // seed-42 cutover soak confirms they fire.
+        Feature::HawkSpottedPrey,
+        Feature::HawkDiveLanded,
+        Feature::HawkPerched,
+        Feature::HawkFled,
+        Feature::HawkDied,
+        // Snake ecology
+        Feature::SnakeStruckPrey,
+        Feature::SnakeBasked,
+        Feature::SnakeAmbushed,
+        Feature::SnakeRetreated,
+        Feature::SnakeDied,
         // Corruption & carcass systems
         Feature::CarcassSpawned,
         Feature::WardSiegeStarted,
@@ -698,6 +744,21 @@ impl Feature {
             Feature::JointStageAdvanced { .. } => Positive,
             // Ticket 104 — Hide/Freeze valence
             Feature::HideFreezeFired => Positive,
+            // Ticket 025 Phase 2 — hawk/snake GOAP positives. All ten
+            // ship as Positive so the never-fired canary can promote
+            // the four trunks (`HawkSpottedPrey`, `HawkDiveLanded`,
+            // `SnakeStruckPrey`, `SnakeAmbushed`) once the cutover soak
+            // observes them firing (see `expected_to_fire_per_soak`).
+            Feature::HawkSpottedPrey => Positive,
+            Feature::HawkDiveLanded => Positive,
+            Feature::HawkPerched => Positive,
+            Feature::HawkFled => Positive,
+            Feature::HawkDied => Positive,
+            Feature::SnakeStruckPrey => Positive,
+            Feature::SnakeBasked => Positive,
+            Feature::SnakeAmbushed => Positive,
+            Feature::SnakeRetreated => Positive,
+            Feature::SnakeDied => Positive,
             // Ticket 149 — discrete hunt attempts (kill or lost) are
             // healthy-colony activity; the never-fired canary catches a
             // dead hunting pipeline.
@@ -1093,6 +1154,27 @@ impl Feature {
             // HP below `fight_bail_health_threshold`). Promote to
             // `true` after the post-288 baseline shows reliable firing.
             Feature::CommitmentDropMoraleBreak => false,
+            // Ticket 025 Phase 2 — hawk/snake GOAP positives ship
+            // dormant. Commit 3 (this commit) registers the variants
+            // but the resolvers don't fire yet because no entity carries
+            // `HawkState` / `SnakeState`. Commit 6's cutover lands the
+            // spawn-side attach + runs a soak; the four trunks
+            // (`HawkSpottedPrey`, `HawkDiveLanded`, `SnakeStruckPrey`,
+            // `SnakeAmbushed`) promote to `true` after the seed-42 soak
+            // confirms each fires at least once. The other six stay
+            // `false` permanently — they're state-dependent (perch /
+            // flee / die / bask / retreat) and a healthy soak may not
+            // observe them.
+            Feature::HawkSpottedPrey => false,
+            Feature::HawkDiveLanded => false,
+            Feature::HawkPerched => false,
+            Feature::HawkFled => false,
+            Feature::HawkDied => false,
+            Feature::SnakeStruckPrey => false,
+            Feature::SnakeBasked => false,
+            Feature::SnakeAmbushed => false,
+            Feature::SnakeRetreated => false,
+            Feature::SnakeDied => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -1180,6 +1262,17 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ShadowFoxHaunting => "ShadowFoxHaunting",
         Feature::ShadowFoxHauntingEscalated => "ShadowFoxHauntingEscalated",
         Feature::DirectiveDelivered => "DirectiveDelivered",
+        // Ticket 025 Phase 2 — hawk/snake GOAP.
+        Feature::HawkSpottedPrey => "HawkSpottedPrey",
+        Feature::HawkDiveLanded => "HawkDiveLanded",
+        Feature::HawkPerched => "HawkPerched",
+        Feature::HawkFled => "HawkFled",
+        Feature::HawkDied => "HawkDied",
+        Feature::SnakeStruckPrey => "SnakeStruckPrey",
+        Feature::SnakeBasked => "SnakeBasked",
+        Feature::SnakeAmbushed => "SnakeAmbushed",
+        Feature::SnakeRetreated => "SnakeRetreated",
+        Feature::SnakeDied => "SnakeDied",
         Feature::CarcassSpawned => "CarcassSpawned",
         Feature::WardSiegeStarted => "WardSiegeStarted",
         Feature::CarcassCleansed => "CarcassCleansed",
@@ -1519,7 +1612,10 @@ mod tests {
         // Ticket 320 added 2 Positive (MethodAdopted, SubGoalAdvanced)
         // and 2 Neutral (MethodBacktracked, MethodDepthExceeded) for
         // the HTN method-stack lifecycle.
-        assert_eq!(positive, 58);
+        // Ticket 025 Phase 2 added 10 Positive (5 hawk + 5 snake GOAP
+        // features). All ship dormant; the four trunks are promoted
+        // in commit 6 after the cutover soak.
+        assert_eq!(positive, 68);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -1603,9 +1699,11 @@ mod tests {
         // Ticket 320: +2 Positive (MethodAdopted, SubGoalAdvanced) /
         // +2 Neutral (MethodBacktracked, MethodDepthExceeded) for the
         // HTN method-stack lifecycle.
+        // Ticket 025 Phase 2: +10 Positive (5 hawk + 5 snake GOAP
+        // features; ship dormant, four trunks promoted in commit 6).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            58
+            68
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -1743,6 +1841,24 @@ mod tests {
         // genuinely rare. Demoted to neutral + exempted from the
         // never-fired canary.
         assert!(!Feature::BurialPerformed.expected_to_fire_per_soak());
+        // Ticket 025 Phase 2 — hawk/snake GOAP positives ship dormant.
+        // Commit 3 (this commit) registers them; commit 6 promotes the
+        // four trunks (`HawkSpottedPrey`, `HawkDiveLanded`,
+        // `SnakeStruckPrey`, `SnakeAmbushed`) to `true` after the
+        // cutover soak observes them firing. The other six stay false.
+        assert!(!Feature::HawkSpottedPrey.expected_to_fire_per_soak());
+        assert!(!Feature::HawkDiveLanded.expected_to_fire_per_soak());
+        assert!(!Feature::HawkPerched.expected_to_fire_per_soak());
+        assert!(!Feature::HawkFled.expected_to_fire_per_soak());
+        assert!(!Feature::HawkDied.expected_to_fire_per_soak());
+        assert!(!Feature::SnakeStruckPrey.expected_to_fire_per_soak());
+        assert!(!Feature::SnakeBasked.expected_to_fire_per_soak());
+        assert!(!Feature::SnakeAmbushed.expected_to_fire_per_soak());
+        assert!(!Feature::SnakeRetreated.expected_to_fire_per_soak());
+        assert!(!Feature::SnakeDied.expected_to_fire_per_soak());
+        // Category assertions — all ten are Positive.
+        assert_eq!(Feature::HawkSpottedPrey.category(), FeatureCategory::Positive);
+        assert_eq!(Feature::SnakeStruckPrey.category(), FeatureCategory::Positive);
         assert_eq!(
             Feature::BurialPerformed.category(),
             FeatureCategory::Neutral

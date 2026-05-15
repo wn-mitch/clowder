@@ -1,8 +1,10 @@
 pub mod building;
 pub mod disposition;
 pub mod fox;
+pub mod hawk;
 pub mod magic;
 pub mod outcome;
+pub mod snake;
 
 pub use outcome::StepOutcome;
 
