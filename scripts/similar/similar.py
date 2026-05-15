@@ -55,13 +55,18 @@ ALL_CORPUSES = ["tickets", "landed", "balance", "pre-existing", "systems",
                 "dses", "planner", "markers"]
 
 
-def main() -> int:
+def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Semantic retrieval over Clowder prose.",
     )
     parser.add_argument(
         "input",
-        help="Ticket id (bare number), repo-relative file path, or free-text query.",
+        nargs="+",
+        help=("Ticket id (bare number), repo-relative file path, or free-text "
+              "query. Free-text queries may be passed as multiple tokens — "
+              "they are joined with a space before classification — so the "
+              "justfile `{{ARGS}}` passthrough preserves multi-word intent "
+              "without requiring shell-quoting that just doesn't preserve."),
     )
     parser.add_argument(
         "--top-k", "-k",
@@ -82,7 +87,12 @@ def main() -> int:
         "--rebuild", action="store_true",
         help="Force a full index rebuild before running the query.",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> int:
+    args = _build_arg_parser().parse_args()
+    input_str = " ".join(args.input)
 
     if args.rebuild:
         _rebuild_index()
@@ -106,7 +116,7 @@ def main() -> int:
     # Resolve input to (query_vec, input_kind, exclude_chunk_ids).
     try:
         query_vec, input_kind, exclude_ids, resolution_note = _resolve_query(
-            args.input, idx,
+            input_str, idx,
         )
     except ValueError as e:
         print(f"ERROR: {e}", file=sys.stderr)
@@ -130,13 +140,13 @@ def main() -> int:
 
     results = [_chunk_to_result(idx.chunks[i], score) for i, score in hits]
 
-    narrative = _make_narrative(args.input, input_kind, results, resolution_note)
+    narrative = _make_narrative(input_str, input_kind, results, resolution_note)
 
-    suggestions = _suggest_next(args.input, input_kind, args.top_k, corpus_filter, len(hits))
+    suggestions = _suggest_next(input_str, input_kind, args.top_k, corpus_filter, len(hits))
 
     env = Envelope(
         query={
-            "input": args.input,
+            "input": input_str,
             "input_kind": input_kind,
             "top_k": args.top_k,
             "corpus": sorted(corpus_filter) if corpus_filter else ALL_CORPUSES,

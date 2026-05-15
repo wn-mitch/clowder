@@ -33,6 +33,7 @@ from retrieve import (                                                   # noqa:
     Index, INDEX_NPZ, INDEX_META, load_index, save_index, stale_files,
     top_k, chunks_by_ticket_id,
 )
+from similar import _build_arg_parser                                    # noqa: E402
 
 
 # ── deterministic fake embedder ─────────────────────────────────────────────
@@ -184,6 +185,47 @@ class TestStaleFiles(unittest.TestCase):
                 )
             finally:
                 os.utime(target, (original_mtime, original_mtime))
+
+
+class TestArgParser(unittest.TestCase):
+    """Regression test for the `just similar "multi word"` quoting fix.
+
+    `just`'s `{{ARGS}}` passthrough does not preserve shell-level
+    quoting — `just similar "starvation cluster"` reaches the script
+    as two argv tokens (`starvation`, `cluster`). The fix makes
+    `input` argparse-positional with `nargs='+'` so multiple tokens
+    are accepted; main() then joins with a single space before
+    classification.
+    """
+
+    def setUp(self) -> None:
+        self.parser = _build_arg_parser()
+
+    def test_single_token_preserved(self) -> None:
+        args = self.parser.parse_args(["189"])
+        self.assertEqual(args.input, ["189"])
+        self.assertEqual(" ".join(args.input), "189")
+
+    def test_multi_token_joined(self) -> None:
+        args = self.parser.parse_args(["starvation", "cluster"])
+        self.assertEqual(" ".join(args.input), "starvation cluster")
+
+    def test_flags_separate_from_positional(self) -> None:
+        # `just similar 189 --top-k 5` and the multi-word variant
+        # `just similar starvation cluster --top-k 3` must both keep
+        # flags out of the positional accumulator.
+        args = self.parser.parse_args(["189", "--top-k", "5"])
+        self.assertEqual(args.input, ["189"])
+        self.assertEqual(args.top_k, 5)
+
+        args = self.parser.parse_args(
+            ["starvation", "cluster", "after", "schedule", "edge",
+             "--top-k", "3"],
+        )
+        self.assertEqual(
+            " ".join(args.input), "starvation cluster after schedule edge",
+        )
+        self.assertEqual(args.top_k, 3)
 
 
 class TestChunksByTicketId(unittest.TestCase):

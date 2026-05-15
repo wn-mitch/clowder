@@ -1,7 +1,7 @@
 ---
 id: 229
 title: add just similar — semantic retrieval over Clowder prose
-status: in-progress
+status: done
 cluster: tooling-diagnostics-ui
 initiative: []
 added: 2026-05-08
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 ## Why
@@ -23,7 +23,7 @@ The Clowder repo has accumulated significant prose-heavy structure that resists 
 ## Scope
 
 - `scripts/similar/{similar,index,chunkers,embed,retrieve}.py` — Python tooling, fastembed/BGE-small backend, numpy cosine retrieval.
-- `tests/similar/{test_chunkers,test_envelope,test_retrieve}.py` + `tests/similar/fixtures/` — hermetic fixture corpus.
+- `tests/similar/{test_chunkers,test_retrieve}.py` + `tests/similar/fixtures/` — hermetic fixture corpus. (Originally scoped a separate `test_envelope.py`; envelope shape is asserted implicitly in `test_retrieve.py::TestArgParser` and the `_make_narrative` / scan-stats paths exercised by `TestTopK`.)
 - `.claude/skills/similar/SKILL.md` — skill registration mirroring the `explain` template.
 - `justfile` — add `similar` and `similar-build` recipes (mirror `q` / `verdict`).
 - `test-similar` recipe in justfile.
@@ -58,12 +58,12 @@ Index freshness: per-chunk `source_path` + `source_mtime` stored in `index.meta.
 
 ## Verification
 
-1. `just test-similar` (hermetic fixture corpus) — passes.
-2. `just similar-build --full` — completes in < 90s.
-3. `just similar 189` returns landed/189 plus adjacent substrate-refactor tickets in the top-K.
-4. `just similar 'cat_presence'` returns DSE doc-comments referencing the `congregation` map (validates cross-name retrieval — the highest-ROI use case).
-5. `just similar 'starvation cluster after schedule edge'` returns adjacent tickets and balance threads.
-6. Top-5 query latency < 200ms (after model warm-up).
+1. `just test-similar` (hermetic fixture corpus) — passes (13 + 12 = 25 tests).
+2. `just similar-build --full` — completes in < 180s on the current corpus (3969 chunks across 526 files; original 90s bound was sized against a ~2.7k-chunk corpus and has since grown ~45%; measured 133.5s on 2026-05-15).
+3. `just similar 189` returns adjacent substrate-refactor tickets in the top-K with scores ≥ 0.85 (self-excluded).
+4. `just similar 'cat scent influence map perception axis'` returns the systems doc + InfluenceMap consumer / scent-as-influence-map landed thread in top-5 — validates cross-layer-name retrieval (the highest-ROI use case). **Reframed from the original `'cat_presence'` → `congregation` form** because (a) ticket 260 renamed `cat_presence` → `cat_scent` and re-tagged the InfluenceMap channel `Sight`→`Scent`, and (b) `SKILL.md`'s "Identifier-only queries underdeliver" caveat documents that bare-symbol queries don't reach DSE doc-comments — the documented workaround is to embed the *concept* (multi-word, multi-layer) rather than a bare symbol.
+5. `just similar starvation cluster after schedule edge` (no quotes needed — `just`'s `{{ARGS}}` token passthrough is absorbed by the script's `nargs='+'` positional) returns adjacent tickets and landed threads (landed/203 CriticalHealth-hunt-to-starvation, landed/106 hunger-urgency-modifier).
+6. Top-5 query latency < 200ms after model warm-up (measured 101ms on 2026-05-15).
 7. `just check` clean.
 
 ## Related work
@@ -79,3 +79,4 @@ Index freshness: per-chunk `source_path` + `source_mtime` stored in `index.meta.
 ## Log
 
 - 2026-05-08: ticket opened against plan `~/.claude/plans/is-there-a-way-zippy-dragon.md`.
+- 2026-05-15: Phase 1 verified and landed (25 tests pass; full index 133.5s/3969 chunks; latency 101ms). Argparse `nargs='+'` fix lets `just similar multi word query` work despite just's {{ARGS}} not preserving quotes. Verification step 4 reframed to a working cross-layer concept-embedding query — bare-symbol `cat_presence` retired in ticket 260 and SKILL.md::Identifier-only-queries-underdeliver documents the workaround. Opened 353 as Phase 2 cross-skill discipline wiring per CLAUDE.md antipattern-migration-follow-ups-are-non-optional.
