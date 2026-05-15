@@ -1,7 +1,7 @@
 ---
 id: 328
 title: Herbcraft aspiration_milestone_wrapper + emits tables
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: coherent-block
 block: htn-method-composition
@@ -13,8 +13,8 @@ wires-method: [aspiration_milestone_wrapper.herbcraft]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 ## Why

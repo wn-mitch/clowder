@@ -74,6 +74,16 @@ pub enum TargetHint {
     /// the safety axis). Used by `flee_method` as WARRIORS_PATH's
     /// survival-fallback emit target.
     SafeGround,
+    /// 328 — primitive sub-goal binds to the cat's herb-target picker
+    /// (Herbcraft-Gather DSE's existing target resolution: nearest
+    /// gatherable herb tile / plant). Used by `gather_herbs_method`
+    /// as WHISKERWEAVERS_APPRENTICE's primary emit target.
+    Herb,
+    /// 328 — primitive sub-goal binds to the cat's patient-target
+    /// picker (Herbcraft-Remedy DSE's existing target resolution:
+    /// nearest cat in need of a remedy). Used by
+    /// `prepare_remedy_method` as HEALERS_CALLING's primary emit target.
+    Patient,
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +392,14 @@ pub mod hunt;
 // SHADOW_FIGHTER (Patrol-based) lands in a follow-on ticket.
 pub mod fight;
 pub mod flee;
+// 328: Live HTN method modules — Herbcraft chain wrappers.
+// `gather_herbs_method` catches `gather_herbs` (Apprentice Primary);
+// `prepare_remedy_method` catches `prepare_remedy` (Healer Primary).
+// Both Tier-1 Live primitives, mirroring `fight_method`'s 327 shape;
+// chain-level routing distinguishes apprentice from healer rather than
+// per-action gating, which lands in a follow-on balance pass.
+pub mod gather_herbs;
+pub mod prepare_remedy;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
 

@@ -280,6 +280,18 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // ticket alongside its Patrol primitive method.
     registry.push(crate::ai::methods::fight::fight_method());
     registry.push(crate::ai::methods::flee::flee_method());
+
+    // 328: Tier-1 Live methods — combine-and-test slice for the
+    // Herbcraft chain. `gather_herbs_method` catches `gather_herbs`
+    // (WHISKERWEAVERS_APPRENTICE Primary emit); `prepare_remedy_method`
+    // catches `prepare_remedy` (HEALERS_CALLING Primary emit). Both
+    // carry `applicable_when: Live(always_true)` and one primitive
+    // sub-goal each (HerbcraftGather + TargetHint::Herb;
+    // HerbcraftRemedy + TargetHint::Patient). Production gating
+    // (herb-in-range / patient-in-need predicates) lands as a follow-on
+    // balance pass alongside 327's similar pass.
+    registry.push(crate::ai::methods::gather_herbs::gather_herbs_method());
+    registry.push(crate::ai::methods::prepare_remedy::prepare_remedy_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of

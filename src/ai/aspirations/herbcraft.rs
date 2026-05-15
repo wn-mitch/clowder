@@ -1,6 +1,6 @@
 //! Herbcraft domain — two chains (Whiskerweaver's Apprentice, Healer's
 //! Calling). Ported 1:1 from `assets/narrative/aspirations/herbcraft.ron`
-//! (retired at 321). Empty `emits` on every milestone — #328 fills them.
+//! (retired at 321). #328 fills `emits` on every milestone.
 //!
 //! Pre-321 the RON `ActionCount(action: "Herbcraft")` reference never
 //! matched any `Action` variant (ticket 155 fanned `Action::Herbcraft`
@@ -11,7 +11,10 @@
 //! 321; the affected milestones now make forward progress where they
 //! previously sat at zero.
 
-use super::{always_true, AspirationChain, Milestone, ProgressTracker, SkillKind};
+use super::{
+    always_true, AspirationChain, Emit, Milestone, Priority, ProgressTracker, SkillKind,
+};
+use crate::ai::dse::CommitmentStrategy;
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
 
@@ -25,6 +28,30 @@ const HERBCRAFT_ACTIONS: &[Action] = &[
     Action::HerbcraftSetWard,
 ];
 
+/// 328 — Apprentice Primary emit. Routes to `gather_herbs_method`
+/// (Tier-1 Live), which binds `Action::HerbcraftGather`. The chain's
+/// narrative metaphor — gathering as the apprentice's first discipline
+/// — drives the label choice; chains share `AspirationDomain::Herbcraft`
+/// so the picker's §H step-3 fallback can still find Live methods
+/// across the chain split. Per-row `applicable_when` is `always_true`
+/// at 328 land; a follow-on balance pass adds herb-in-range gating.
+const WHISKERWEAVERS_EMITS: &[Emit] = &[Emit {
+    label: "gather_herbs",
+    applicable_when: always_true,
+    strategy: CommitmentStrategy::SingleMinded,
+    priority: Priority::Primary,
+}];
+
+/// 328 — Healer Primary emit. Routes to `prepare_remedy_method`
+/// (Tier-1 Live), which binds `Action::HerbcraftRemedy`. Mirror of
+/// `WHISKERWEAVERS_EMITS` with the chain's remedy-focused metaphor.
+const HEALERS_EMITS: &[Emit] = &[Emit {
+    label: "prepare_remedy",
+    applicable_when: always_true,
+    strategy: CommitmentStrategy::SingleMinded,
+    priority: Priority::Primary,
+}];
+
 pub const WHISKERWEAVERS_APPRENTICE: AspirationChain = AspirationChain {
     name: "Whiskerweaver's Apprentice",
     domain: AspirationDomain::Herbcraft,
@@ -36,7 +63,7 @@ pub const WHISKERWEAVERS_APPRENTICE: AspirationChain = AspirationChain {
                 actions: HERBCRAFT_ACTIONS,
                 count: 3,
             },
-            emits: &[],
+            emits: WHISKERWEAVERS_EMITS,
             narrative_on_complete: "{name} learns which leaves heal and which sting.",
         },
         Milestone {
@@ -46,7 +73,7 @@ pub const WHISKERWEAVERS_APPRENTICE: AspirationChain = AspirationChain {
                 actions: HERBCRAFT_ACTIONS,
                 count: 15,
             },
-            emits: &[],
+            emits: WHISKERWEAVERS_EMITS,
             narrative_on_complete: "{name}'s paws no longer tremble over the mortar.",
         },
         Milestone {
@@ -56,7 +83,7 @@ pub const WHISKERWEAVERS_APPRENTICE: AspirationChain = AspirationChain {
                 skill: SkillKind::Herbcraft,
                 level: 1.0,
             },
-            emits: &[],
+            emits: WHISKERWEAVERS_EMITS,
             narrative_on_complete:
                 "{name} weaves remedies from root and petal like breathing.",
         },
@@ -77,7 +104,7 @@ pub const HEALERS_CALLING: AspirationChain = AspirationChain {
                 actions: HERBCRAFT_ACTIONS,
                 count: 5,
             },
-            emits: &[],
+            emits: HEALERS_EMITS,
             narrative_on_complete:
                 "{name} presses moss to a wound and feels purpose settle in.",
         },
@@ -88,7 +115,7 @@ pub const HEALERS_CALLING: AspirationChain = AspirationChain {
                 actions: HERBCRAFT_ACTIONS,
                 count: 25,
             },
-            emits: &[],
+            emits: HEALERS_EMITS,
             narrative_on_complete: "{name} stays through the fever-watches when others sleep.",
         },
         Milestone {
@@ -98,7 +125,7 @@ pub const HEALERS_CALLING: AspirationChain = AspirationChain {
                 skill: SkillKind::Herbcraft,
                 level: 1.5,
             },
-            emits: &[],
+            emits: HEALERS_EMITS,
             narrative_on_complete:
                 "They bring the sick to {name} now, and {subject} sends them back whole.",
         },
