@@ -11,7 +11,7 @@ wires-method: [aspiration_milestone_wrapper.combat]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: pending
+landed-at: be6785fd38a5
 landed-on: 2026-05-14
 ---
 
