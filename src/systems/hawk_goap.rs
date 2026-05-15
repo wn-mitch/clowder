@@ -35,17 +35,10 @@ use crate::components::wildlife::{
 };
 use crate::resources::map::TileMap;
 use crate::resources::rng::SimRng;
+use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::TimeState;
+use crate::resources::time::{TimeScale, TimeState};
 use crate::steps::{hawk as hawk_steps, StepResult};
-
-// Tuning placeholders — replaced in commit 5 by `HawkEcologyConstants`.
-const HAWK_SOFTMAX_TEMPERATURE: f32 = 0.15;
-const HAWK_HUNGER_DECAY_PER_TICK: f32 = 0.000_15;
-const HAWK_STARVATION_DEATH_TICKS: u64 = 60 * 60 * 24 * 2; // 2 in-game days at 60 tps
-const HAWK_DIVE_RANGE: i32 = 6;
-const HAWK_DETECTION_RANGE: i32 = 12;
-const HAWK_REST_TICKS: u64 = 200;
 
 // ---------------------------------------------------------------------------
 // hawk_needs_tick — per-tick hunger decay + age + cooldown
@@ -53,13 +46,19 @@ const HAWK_REST_TICKS: u64 = 200;
 
 /// Per-tick hawk-state maintenance: hunger decay, satiation countdown,
 /// post-action cooldown, age. Mirrors `fox_needs_tick` (`wildlife.rs`).
-pub fn hawk_needs_tick(mut hawks: Query<&mut HawkState>) {
+pub fn hawk_needs_tick(
+    mut hawks: Query<&mut HawkState>,
+    constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
+) {
+    let hc = &constants.hawk_ecology;
+    let hunger_per_tick = hc.hunger_decay_rate.per_tick(&time_scale);
     for mut hawk in &mut hawks {
         hawk.age_ticks += 1;
         if hawk.satiation_ticks > 0 {
             hawk.satiation_ticks -= 1;
         } else {
-            hawk.hunger = (hawk.hunger + HAWK_HUNGER_DECAY_PER_TICK).min(1.0);
+            hawk.hunger = (hawk.hunger + hunger_per_tick).min(1.0);
         }
         hawk.post_action_cooldown = hawk.post_action_cooldown.saturating_sub(1);
     }
@@ -108,20 +107,22 @@ pub fn hawk_evaluate_and_plan(
     time: Res<TimeState>,
     dse_registry: Res<DseRegistry>,
     modifier_pipeline: Res<ModifierPipeline>,
+    constants: Res<SimConstants>,
 ) {
+    let hc = &constants.hawk_ecology;
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
     let prey_positions: Vec<Position> = prey.iter().copied().collect();
     let markers = MarkerSnapshot::new();
 
     for (hawk_entity, hawk_state, hawk_pos, needs, personality) in &hawks {
-        let _ = hawk_state; // unused here; reserved for §L2.10.7 anchors when wired
+        let _ = hawk_state; // reserved for §L2.10.7 anchors when wired
         let cats_nearby = cat_positions
             .iter()
-            .filter(|p| p.manhattan_distance(hawk_pos) <= 6)
+            .filter(|p| p.manhattan_distance(hawk_pos) <= hc.cat_avoidance_range)
             .count();
         let prey_nearby = prey_positions
             .iter()
-            .any(|p| p.manhattan_distance(hawk_pos) <= HAWK_DETECTION_RANGE);
+            .any(|p| p.manhattan_distance(hawk_pos) <= hc.detection_range);
 
         let ctx = HawkScoringContext {
             needs,
@@ -147,13 +148,16 @@ pub fn hawk_evaluate_and_plan(
         };
 
         let scoring_result = score_hawk_dispositions(&ctx, &inputs, &mut rng.rng);
-        let Some(chosen) =
-            select_hawk_disposition_softmax(&scoring_result, &mut rng.rng, HAWK_SOFTMAX_TEMPERATURE)
-        else {
+        let Some(chosen) = select_hawk_disposition_softmax(
+            &scoring_result,
+            &mut rng.rng,
+            hc.softmax_temperature,
+        ) else {
             continue;
         };
 
-        let planner_state = build_planner_state(hawk_state, hawk_pos, &prey_positions);
+        let planner_state =
+            build_planner_state(hawk_state, hawk_pos, &prey_positions, hc.detection_range);
         let actions = actions_for_disposition(chosen);
         let goal = goal_for_disposition(chosen);
 
@@ -161,7 +165,7 @@ pub fn hawk_evaluate_and_plan(
             continue;
         };
 
-        let _ = map; // currently unused; reserved for zone-resolution at plan-build time
+        let _ = map; // reserved for zone-resolution at plan-build time
         let plan = HawkGoapPlan::new(chosen, time.tick, steps);
         commands.entity(hawk_entity).insert(plan);
     }
@@ -171,10 +175,11 @@ fn build_planner_state(
     hawk_state: &HawkState,
     hawk_pos: &Position,
     prey_positions: &[Position],
+    detection_range: i32,
 ) -> HawkPlannerState {
     let prey_visible = prey_positions
         .iter()
-        .any(|p| p.manhattan_distance(hawk_pos) <= HAWK_DETECTION_RANGE);
+        .any(|p| p.manhattan_distance(hawk_pos) <= detection_range);
     HawkPlannerState {
         zone: HawkZone::Sky,
         prey_spotted: prey_visible,
@@ -236,8 +241,10 @@ pub fn hawk_resolve_goap_plans(
     prey: Query<(Entity, &Position), (With<PreyAnimal>, Without<HawkState>)>,
     map: Res<TileMap>,
     time: Res<TimeState>,
+    constants: Res<SimConstants>,
     mut activation: Option<ResMut<SystemActivation>>,
 ) {
+    let hc = &constants.hawk_ecology;
     let prey_positions: Vec<Position> = prey.iter().map(|(_, p)| *p).collect();
     let prey_entities: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
 
@@ -289,7 +296,7 @@ pub fn hawk_resolve_goap_plans(
                     &pos,
                     &prey_positions,
                     step_state,
-                    HAWK_DETECTION_RANGE,
+                    hc.detection_range,
                 );
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::HawkSpottedPrey);
                 outcome.result
@@ -299,7 +306,7 @@ pub fn hawk_resolve_goap_plans(
                     &mut pos,
                     step_state,
                     &prey_entities,
-                    HAWK_DIVE_RANGE,
+                    hc.dive_range,
                 );
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::HawkDiveLanded);
                 if outcome.witness.is_some() {
@@ -309,7 +316,7 @@ pub fn hawk_resolve_goap_plans(
                 outcome.result
             }
             HawkGoapActionKind::Rest => {
-                let outcome = hawk_steps::resolve_rest(step_state, HAWK_REST_TICKS);
+                let outcome = hawk_steps::resolve_rest(step_state, hc.rest_duration_ticks);
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::HawkPerched);
                 if outcome.witness {
                     hawk_state.last_perch_tick = time.tick;
@@ -357,13 +364,19 @@ pub fn hawk_lifecycle_tick(
     mut commands: Commands,
     mut hawks: Query<(Entity, &mut HawkState), Without<Dead>>,
     mut died_w: MessageWriter<HawkDied>,
+    constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: Option<ResMut<SystemActivation>>,
     time: Res<TimeState>,
 ) {
+    let starvation_death_ticks = constants
+        .hawk_ecology
+        .starvation_death_duration
+        .ticks(&time_scale);
     for (entity, mut hawk_state) in &mut hawks {
         if hawk_state.hunger >= 1.0 {
             hawk_state.starvation_ticks += 1;
-            if hawk_state.starvation_ticks >= HAWK_STARVATION_DEATH_TICKS {
+            if hawk_state.starvation_ticks >= starvation_death_ticks {
                 if let Some(act) = activation.as_deref_mut() {
                     act.record(Feature::HawkDied);
                 }
@@ -385,11 +398,20 @@ pub fn hawk_lifecycle_tick(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::resources::time::SimConfig;
+
+    fn new_test_app() -> bevy::prelude::App {
+        let mut app = bevy::prelude::App::new();
+        app.insert_resource(SimConstants::default());
+        app.insert_resource(SimConfig::default());
+        app.insert_resource(TimeScale::from_config(&SimConfig::default(), 16.6667));
+        app.add_systems(bevy::prelude::Update, hawk_needs_tick);
+        app
+    }
 
     #[test]
     fn hawk_needs_tick_decays_hunger() {
-        let mut app = bevy::prelude::App::new();
-        app.add_systems(bevy::prelude::Update, hawk_needs_tick);
+        let mut app = new_test_app();
         let id = app.world_mut().spawn(HawkState::new_adult()).id();
         let baseline = app.world().get::<HawkState>(id).unwrap().hunger;
         app.update();
@@ -399,8 +421,7 @@ mod tests {
 
     #[test]
     fn hawk_needs_tick_advances_age() {
-        let mut app = bevy::prelude::App::new();
-        app.add_systems(bevy::prelude::Update, hawk_needs_tick);
+        let mut app = new_test_app();
         let id = app.world_mut().spawn(HawkState::new_adult()).id();
         app.update();
         let age = app.world().get::<HawkState>(id).unwrap().age_ticks;
@@ -409,7 +430,6 @@ mod tests {
 
     #[test]
     fn phase_for_action_maps_each_variant() {
-        // Smoke check: every action kind produces a valid HawkAiPhase.
         let _ = phase_for_action(HawkGoapActionKind::SoarTo(HawkZone::Sky));
         let _ = phase_for_action(HawkGoapActionKind::SpotPrey);
         let _ = phase_for_action(HawkGoapActionKind::DiveAttack);

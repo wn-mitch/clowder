@@ -28,6 +28,14 @@ pub struct SimConstants {
     pub wildlife: WildlifeConstants,
     #[serde(default)]
     pub fox_ecology: FoxEcologyConstants,
+    /// Ticket 025 Phase 2 — hawk GOAP tuning. `#[serde(default)]` so
+    /// pre-025 `events.jsonl` headers still deserialize cleanly; new
+    /// fields populate from [`HawkEcologyConstants::default`].
+    #[serde(default)]
+    pub hawk_ecology: HawkEcologyConstants,
+    /// Ticket 025 Phase 2 — snake GOAP tuning with thermoregulation.
+    #[serde(default)]
+    pub snake_ecology: SnakeEcologyConstants,
     pub fate: FateConstants,
     pub coordination: CoordinationConstants,
     pub aspirations: AspirationConstants,
@@ -5275,6 +5283,119 @@ impl Default for FoxEcologyConstants {
     }
 }
 
+// ---------- HawkEcologyConstants (ticket 025 Phase 2) ----------
+
+/// Tuning knobs for the hawk GOAP loop. Hawks are aerial survival-tier
+/// predators with no territory/breeding tier — the struct is simpler
+/// than [`FoxEcologyConstants`]. Default values in
+/// [`HawkEcologyConstants::default`] mirror ticket 025 §9.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HawkEcologyConstants {
+    /// Hunger increase per in-game day when not satiated.
+    pub hunger_decay_rate: RatePerDay,
+    /// Satiation duration after a successful dive.
+    pub satiation_after_dive_kill: DurationDays,
+    /// Health fraction below which hawk switches to Fleeing.
+    pub flee_health_threshold: f32,
+    /// Tile range at which a hawk avoids healthy adult cats.
+    pub cat_avoidance_range: i32,
+    /// Tile range from which hawk initiates a dive.
+    pub dive_range: i32,
+    /// Detection range for spotting prey from altitude.
+    pub detection_range: i32,
+    /// Tiles searched for a Perch zone.
+    pub perch_search_radius: i32,
+    /// Ticks the hawk perches before advancing the Resting plan.
+    pub rest_duration_ticks: u64,
+    /// Sustained starvation before death.
+    pub starvation_death_duration: DurationDays,
+    /// Cooldown after dive / flee.
+    pub post_action_cooldown: DurationDays,
+    /// Softmax temperature for disposition selection (mirror
+    /// `fox_softmax_temperature`).
+    pub softmax_temperature: f32,
+    /// Cats nearby that trigger flee response.
+    pub outnumbered_flee_count: usize,
+}
+
+impl Default for HawkEcologyConstants {
+    fn default() -> Self {
+        Self {
+            hunger_decay_rate: RatePerDay::new(0.15),
+            satiation_after_dive_kill: DurationDays::new(0.7),
+            flee_health_threshold: 0.4,
+            cat_avoidance_range: 4,
+            dive_range: 6,
+            detection_range: 12,
+            perch_search_radius: 15,
+            rest_duration_ticks: 200,
+            starvation_death_duration: DurationDays::new(2.0),
+            post_action_cooldown: DurationDays::new(0.4),
+            softmax_temperature: 0.15,
+            outnumbered_flee_count: 2,
+        }
+    }
+}
+
+// ---------- SnakeEcologyConstants (ticket 025 Phase 2) ----------
+
+/// Tuning knobs for the snake GOAP loop. Adds thermoregulation (Maslow
+/// tier 2: `warmth`) on top of the survival tier. Default values mirror
+/// ticket 025 §9.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SnakeEcologyConstants {
+    /// Hunger decay; snakes are slow-metabolism, slower than foxes.
+    pub hunger_decay_rate: RatePerDay,
+    /// Warmth decay rate when off warm terrain.
+    pub warmth_decay_rate: RatePerDay,
+    /// Warmth set after a complete Bask.
+    pub bask_warmth_restore: f32,
+    /// Bask duration before the warmth top-up applies.
+    pub bask_duration_ticks: u64,
+    /// Ticks the snake spends settling into ambush before the
+    /// `SnakeAmbushed` witness fires.
+    pub ambush_settle_ticks: u64,
+    /// Satiation duration after a successful strike.
+    pub satiation_after_strike_kill: DurationDays,
+    /// Health fraction below which snake switches to Fleeing.
+    pub flee_health_threshold: f32,
+    /// Tile range for strike (adjacency by default).
+    pub strike_range: i32,
+    /// Detection range for sensing prey from cover.
+    pub detection_range: i32,
+    /// Search radius for Cover zone.
+    pub cover_search_radius: i32,
+    /// Long; snakes survive lean periods.
+    pub starvation_death_duration: DurationDays,
+    /// Post-strike / post-bask cooldown.
+    pub post_action_cooldown: DurationDays,
+    /// Softmax temperature for disposition selection.
+    pub softmax_temperature: f32,
+    /// Warmth below which snake forces Basking disposition.
+    pub cold_threshold: f32,
+}
+
+impl Default for SnakeEcologyConstants {
+    fn default() -> Self {
+        Self {
+            hunger_decay_rate: RatePerDay::new(0.05),
+            warmth_decay_rate: RatePerDay::new(0.4),
+            bask_warmth_restore: 1.0,
+            bask_duration_ticks: 180,
+            ambush_settle_ticks: 40,
+            satiation_after_strike_kill: DurationDays::new(2.0),
+            flee_health_threshold: 0.5,
+            strike_range: 1,
+            detection_range: 4,
+            cover_search_radius: 8,
+            starvation_death_duration: DurationDays::new(5.0),
+            post_action_cooldown: DurationDays::new(0.5),
+            softmax_temperature: 0.15,
+            cold_threshold: 0.3,
+        }
+    }
+}
+
 // ---------- FateConstants ----------
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -6822,6 +6943,57 @@ mod tests {
         // Re-serialize and compare strings to confirm full fidelity
         let json2 = serde_json::to_string_pretty(&deserialized).expect("re-serialize");
         assert_eq!(json, json2);
+    }
+
+    #[test]
+    fn hawk_snake_ecology_defaults_match_ticket_025_table() {
+        let d = SimConstants::default();
+        // Hawk — ticket 025 §9 table.
+        assert_eq!(d.hawk_ecology.flee_health_threshold, 0.4);
+        assert_eq!(d.hawk_ecology.cat_avoidance_range, 4);
+        assert_eq!(d.hawk_ecology.dive_range, 6);
+        assert_eq!(d.hawk_ecology.outnumbered_flee_count, 2);
+        assert_eq!(d.hawk_ecology.softmax_temperature, 0.15);
+        // Snake — ticket 025 §9 table.
+        assert_eq!(d.snake_ecology.strike_range, 1);
+        assert_eq!(d.snake_ecology.flee_health_threshold, 0.5);
+        assert_eq!(d.snake_ecology.cold_threshold, 0.3);
+        assert_eq!(d.snake_ecology.bask_warmth_restore, 1.0);
+        assert_eq!(d.snake_ecology.softmax_temperature, 0.15);
+    }
+
+    #[test]
+    fn hawk_snake_ecology_serde_default_loads_legacy_header() {
+        // Simulate a pre-Phase-2 events.jsonl header that omits the
+        // new sections. `#[serde(default)]` on both fields means the
+        // legacy JSON should still load; the missing sections populate
+        // from `*EcologyConstants::default()`.
+        let legacy_json = serde_json::json!({
+            "needs": serde_json::to_value(NeedsConstants::default()).unwrap(),
+            "buildings": serde_json::to_value(BuildingConstants::default()).unwrap(),
+            "combat": serde_json::to_value(CombatConstants::default()).unwrap(),
+            "magic": serde_json::to_value(MagicConstants::default()).unwrap(),
+            "social": serde_json::to_value(SocialConstants::default()).unwrap(),
+            "mood": serde_json::to_value(MoodConstants::default()).unwrap(),
+            "death": serde_json::to_value(DeathConstants::default()).unwrap(),
+            "prey": serde_json::to_value(PreyConstants::default()).unwrap(),
+            "species": serde_json::to_value(SpeciesConstants::default()).unwrap(),
+            "scoring": serde_json::to_value(ScoringConstants::default()).unwrap(),
+            "disposition": serde_json::to_value(DispositionConstants::default()).unwrap(),
+            "colony_score": serde_json::to_value(ColonyScoreConstants::default()).unwrap(),
+            "wildlife": serde_json::to_value(WildlifeConstants::default()).unwrap(),
+            "fate": serde_json::to_value(FateConstants::default()).unwrap(),
+            "coordination": serde_json::to_value(CoordinationConstants::default()).unwrap(),
+            "aspirations": serde_json::to_value(AspirationConstants::default()).unwrap(),
+            "knowledge": serde_json::to_value(KnowledgeConstants::default()).unwrap(),
+            "personality_friction": serde_json::to_value(PersonalityFrictionConstants::default()).unwrap(),
+            // Deliberately omit hawk_ecology + snake_ecology to model a
+            // pre-Phase-2 header.
+        });
+        let parsed: SimConstants =
+            serde_json::from_value(legacy_json).expect("legacy header should still load");
+        assert_eq!(parsed.hawk_ecology.dive_range, 6);
+        assert_eq!(parsed.snake_ecology.strike_range, 1);
     }
 
     /// 284 (first-light) + 296 (curve-shape extraction): ward-placement

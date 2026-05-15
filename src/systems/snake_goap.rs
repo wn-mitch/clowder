@@ -26,19 +26,10 @@ use crate::components::wildlife::{
 };
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::rng::SimRng;
+use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::TimeState;
+use crate::resources::time::{TimeScale, TimeState};
 use crate::steps::{snake as snake_steps, StepResult};
-
-// Tuning placeholders — replaced in commit 5 by `SnakeEcologyConstants`.
-const SNAKE_SOFTMAX_TEMPERATURE: f32 = 0.15;
-const SNAKE_HUNGER_DECAY_PER_TICK: f32 = 0.000_05;
-const SNAKE_WARMTH_DECAY_PER_TICK: f32 = 0.000_40;
-const SNAKE_STARVATION_DEATH_TICKS: u64 = 60 * 60 * 24 * 5; // 5 days at 60 tps
-const SNAKE_STRIKE_RANGE: i32 = 1;
-const SNAKE_DETECTION_RANGE: i32 = 4;
-const SNAKE_AMBUSH_SETTLE_TICKS: u64 = 40;
-const SNAKE_BASK_TICKS: u64 = 180;
 
 /// Terrains that warm a basking snake. Mirrors `WARM_TERRAINS` from
 /// ticket 025 §4.
@@ -52,21 +43,28 @@ fn is_warm(terrain: Terrain) -> bool {
 // snake_needs_tick — hunger + warmth decay, cooldown, age
 // ---------------------------------------------------------------------------
 
-pub fn snake_needs_tick(mut snakes: Query<(&mut SnakeState, &Position)>, map: Res<TileMap>) {
+pub fn snake_needs_tick(
+    mut snakes: Query<(&mut SnakeState, &Position)>,
+    map: Res<TileMap>,
+    constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
+) {
+    let sc = &constants.snake_ecology;
+    let hunger_per_tick = sc.hunger_decay_rate.per_tick(&time_scale);
+    let warmth_per_tick = sc.warmth_decay_rate.per_tick(&time_scale);
     for (mut snake, pos) in &mut snakes {
         snake.age_ticks += 1;
         if snake.satiation_ticks > 0 {
             snake.satiation_ticks -= 1;
         } else {
-            snake.hunger = (snake.hunger + SNAKE_HUNGER_DECAY_PER_TICK).min(1.0);
+            snake.hunger = (snake.hunger + hunger_per_tick).min(1.0);
         }
         snake.post_action_cooldown = snake.post_action_cooldown.saturating_sub(1);
 
-        // Warmth: decays unless the snake is on warm terrain.
         if map.in_bounds(pos.x, pos.y) {
             let terrain = map.get(pos.x, pos.y).terrain;
             if !is_warm(terrain) {
-                snake.warmth = (snake.warmth - SNAKE_WARMTH_DECAY_PER_TICK).max(0.0);
+                snake.warmth = (snake.warmth - warmth_per_tick).max(0.0);
             }
         }
     }
@@ -118,7 +116,9 @@ pub fn snake_evaluate_and_plan(
     time: Res<TimeState>,
     dse_registry: Res<DseRegistry>,
     modifier_pipeline: Res<ModifierPipeline>,
+    constants: Res<SimConstants>,
 ) {
+    let sc = &constants.snake_ecology;
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
     let prey_positions: Vec<Position> = prey.iter().copied().collect();
     let markers = MarkerSnapshot::new();
@@ -126,11 +126,11 @@ pub fn snake_evaluate_and_plan(
     for (snake_entity, snake_state, snake_pos, needs, personality) in &snakes {
         let cats_nearby = cat_positions
             .iter()
-            .filter(|p| p.manhattan_distance(snake_pos) <= 4)
+            .filter(|p| p.manhattan_distance(snake_pos) <= sc.detection_range)
             .count();
         let prey_nearby = prey_positions
             .iter()
-            .any(|p| p.manhattan_distance(snake_pos) <= SNAKE_DETECTION_RANGE);
+            .any(|p| p.manhattan_distance(snake_pos) <= sc.detection_range);
         let on_warm_terrain = if map.in_bounds(snake_pos.x, snake_pos.y) {
             is_warm(map.get(snake_pos.x, snake_pos.y).terrain)
         } else {
@@ -165,12 +165,18 @@ pub fn snake_evaluate_and_plan(
         let Some(chosen) = select_snake_disposition_softmax(
             &scoring_result,
             &mut rng.rng,
-            SNAKE_SOFTMAX_TEMPERATURE,
+            sc.softmax_temperature,
         ) else {
             continue;
         };
 
-        let planner_state = build_planner_state(snake_state, snake_pos, &prey_positions, on_warm_terrain);
+        let planner_state = build_planner_state(
+            snake_state,
+            snake_pos,
+            &prey_positions,
+            on_warm_terrain,
+            sc.strike_range,
+        );
         let actions = actions_for_disposition(chosen);
         let goal = goal_for_disposition(chosen);
 
@@ -188,10 +194,11 @@ fn build_planner_state(
     snake_pos: &Position,
     prey_positions: &[Position],
     on_warm_terrain: bool,
+    strike_range: i32,
 ) -> SnakePlannerState {
     let prey_in_range = prey_positions
         .iter()
-        .any(|p| p.manhattan_distance(snake_pos) <= SNAKE_STRIKE_RANGE);
+        .any(|p| p.manhattan_distance(snake_pos) <= strike_range);
     SnakePlannerState {
         zone: SnakeZone::Cover,
         prey_in_range,
@@ -273,8 +280,10 @@ pub fn snake_resolve_goap_plans(
     prey: Query<(Entity, &Position), (With<PreyAnimal>, Without<SnakeState>)>,
     map: Res<TileMap>,
     time: Res<TimeState>,
+    constants: Res<SimConstants>,
     mut activation: Option<ResMut<SystemActivation>>,
 ) {
+    let sc = &constants.snake_ecology;
     let prey_positions: Vec<Position> = prey.iter().map(|(_, p)| *p).collect();
     let prey_entities: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
 
@@ -311,8 +320,7 @@ pub fn snake_resolve_goap_plans(
                 outcome.result
             }
             SnakeGoapActionKind::SetAmbush => {
-                let outcome =
-                    snake_steps::resolve_set_ambush(step_state, SNAKE_AMBUSH_SETTLE_TICKS);
+                let outcome = snake_steps::resolve_set_ambush(step_state, sc.ambush_settle_ticks);
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::SnakeAmbushed);
                 outcome.result
             }
@@ -321,7 +329,7 @@ pub fn snake_resolve_goap_plans(
                     &mut pos,
                     step_state,
                     &prey_entities,
-                    SNAKE_STRIKE_RANGE,
+                    sc.strike_range,
                 );
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::SnakeStruckPrey);
                 if outcome.witness.is_some() {
@@ -330,10 +338,10 @@ pub fn snake_resolve_goap_plans(
                 outcome.result
             }
             SnakeGoapActionKind::Bask => {
-                let outcome = snake_steps::resolve_bask(step_state, SNAKE_BASK_TICKS);
+                let outcome = snake_steps::resolve_bask(step_state, sc.bask_duration_ticks);
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::SnakeBasked);
                 if outcome.witness {
-                    snake_state.warmth = 1.0;
+                    snake_state.warmth = sc.bask_warmth_restore;
                     snake_state.last_bask_tick = time.tick;
                 }
                 outcome.result
@@ -376,13 +384,19 @@ pub fn snake_lifecycle_tick(
     mut commands: Commands,
     mut snakes: Query<(Entity, &mut SnakeState), Without<Dead>>,
     mut died_w: MessageWriter<SnakeDied>,
+    constants: Res<SimConstants>,
+    time_scale: Res<TimeScale>,
     mut activation: Option<ResMut<SystemActivation>>,
     time: Res<TimeState>,
 ) {
+    let starvation_death_ticks = constants
+        .snake_ecology
+        .starvation_death_duration
+        .ticks(&time_scale);
     for (entity, mut snake_state) in &mut snakes {
         if snake_state.hunger >= 1.0 {
             snake_state.starvation_ticks += 1;
-            if snake_state.starvation_ticks >= SNAKE_STARVATION_DEATH_TICKS {
+            if snake_state.starvation_ticks >= starvation_death_ticks {
                 if let Some(act) = activation.as_deref_mut() {
                     act.record(Feature::SnakeDied);
                 }
@@ -404,12 +418,21 @@ pub fn snake_lifecycle_tick(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::resources::time::SimConfig;
+
+    fn new_test_app(terrain: Terrain) -> bevy::prelude::App {
+        let mut app = bevy::prelude::App::new();
+        app.insert_resource(TileMap::new(20, 20, terrain));
+        app.insert_resource(SimConstants::default());
+        app.insert_resource(SimConfig::default());
+        app.insert_resource(TimeScale::from_config(&SimConfig::default(), 16.6667));
+        app.add_systems(bevy::prelude::Update, snake_needs_tick);
+        app
+    }
 
     #[test]
     fn snake_needs_tick_decays_hunger() {
-        let mut app = bevy::prelude::App::new();
-        app.insert_resource(TileMap::new(20, 20, Terrain::Grass));
-        app.add_systems(bevy::prelude::Update, snake_needs_tick);
+        let mut app = new_test_app(Terrain::Grass);
         let id = app
             .world_mut()
             .spawn((SnakeState::new_adult(), Position::new(5, 5)))
@@ -422,10 +445,7 @@ mod tests {
 
     #[test]
     fn snake_needs_tick_decays_warmth_off_warm_terrain() {
-        let mut app = bevy::prelude::App::new();
-        // Grass is not warm; warmth should decay.
-        app.insert_resource(TileMap::new(20, 20, Terrain::Grass));
-        app.add_systems(bevy::prelude::Update, snake_needs_tick);
+        let mut app = new_test_app(Terrain::Grass);
         let id = app
             .world_mut()
             .spawn((SnakeState::new_adult(), Position::new(5, 5)))
@@ -438,10 +458,7 @@ mod tests {
 
     #[test]
     fn snake_needs_tick_holds_warmth_on_warm_terrain() {
-        let mut app = bevy::prelude::App::new();
-        // Rock is warm; warmth should not decay.
-        app.insert_resource(TileMap::new(20, 20, Terrain::Rock));
-        app.add_systems(bevy::prelude::Update, snake_needs_tick);
+        let mut app = new_test_app(Terrain::Rock);
         let id = app
             .world_mut()
             .spawn((SnakeState::new_adult(), Position::new(5, 5)))
