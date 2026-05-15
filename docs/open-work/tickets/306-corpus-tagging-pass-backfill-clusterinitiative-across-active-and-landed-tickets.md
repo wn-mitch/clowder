@@ -1,13 +1,13 @@
 ---
 id: 306
 title: Corpus tagging pass — backfill cluster+initiative across active and landed tickets
-status: blocked
+status: ready
 cluster: process-discipline
 orchestration: swarm-safe
 initiative: []
 added: 2026-05-13
 parked: null
-blocked-by: [305]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

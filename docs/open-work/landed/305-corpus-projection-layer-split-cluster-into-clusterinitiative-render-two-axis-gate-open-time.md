@@ -1,7 +1,7 @@
 ---
 id: 305
 title: Corpus projection layer — split cluster into cluster+initiative, render two-axis, gate open-time
-status: ready
+status: done
 cluster: process-discipline
 orchestration: swarm-safe
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 ## Why
