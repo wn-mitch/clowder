@@ -41,39 +41,28 @@ use crate::ai::methods::{
     ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint,
 };
 use crate::ai::Action;
+use crate::components::markers::Parent;
 use crate::components::physical::Dead;
 use bevy_ecs::prelude::*;
 
-/// `applicable_when` predicate — the cat is alive (placeholder).
+/// `applicable_when` predicate — alive cat carrying the `Parent`
+/// marker (ticket 357 refinement of the prior `cat_is_alive`
+/// placeholder).
 ///
-/// Read by `MethodRegistry::lookup`. The intended precise predicate
-/// is "any Entity in the world carries
-/// `KittenDependency.mother == Some(self)`", but that requires
-/// enumerating archetypes, and the HTN `applicable_when` signature
-/// (`fn(&World, Entity) -> bool`) only exposes per-entity component
-/// access via `world.entity(entity)` — Bevy 0.18 reserves world-wide
-/// query iteration for `&mut World` paths.
-///
-/// Two options were considered:
-/// (a) maintain a reverse-lookup `Resource` (e.g.
-///     `KittenMotherIndex: HashMap<Entity, Vec<Entity>>`) updated by
-///     an exclusive system,
-/// (b) attach a `MotherOfDependent` marker Component to mothers and
-///     remove it when their last kitten matures.
-///
-/// Both are real substrate that earns its keep at dispatch time
-/// (the dispatch resolver also needs to look up the kitten target).
-/// Authoring either at #333's scope is premature — the dispatch
-/// follow-on (named in #333's landing Log) authors the same
-/// reverse-lookup once for both `applicable_when` and the
-/// kitten-target picker. Until then, the method is Live in the
-/// registry but never selected (no aspiration emits `kitten_reared`
-/// either, so the picker's emit-walk doesn't reach the registry
-/// lookup), so the permissive `is alive` placeholder is honest:
-/// the method *will* apply to any alive cat once dispatch lands;
-/// the precise gate moves to the resolver until then.
-fn cat_is_alive(world: &World, entity: Entity) -> bool {
-    !world.entity(entity).contains::<Dead>()
+/// The `Parent` marker is authored by
+/// [`crate::systems::growth::update_parent_markers`] in Chain 2a; its
+/// predicate is "this cat has ≥1 living dependent kitten with
+/// `KittenDependency.mother == self` OR `…father == self`." 357
+/// reuses the existing reverse-lookup substrate rather than
+/// introducing a sibling `MotherOfDependent` marker — the existing
+/// single marker covers both parental roles, and the dependent-
+/// kitten target picker filters mother-only (per #333 §Out of scope)
+/// at target resolution time. If father involvement in rearing is
+/// later authored as a separate aspiration (#333 §Out of scope), it
+/// shares the same gate; only the picker's filter changes.
+fn has_dependent_kitten(world: &World, entity: Entity) -> bool {
+    let ent = world.entity(entity);
+    !ent.contains::<Dead>() && ent.contains::<Parent>()
 }
 
 /// Construct the `rear_kitten` method literal. Called by
@@ -82,7 +71,7 @@ pub fn rear_kitten() -> Method {
     Method {
         id: MethodId("rear_kitten"),
         goal_label: "kitten_reared",
-        applicable_when: ApplicableWhen::Live(cat_is_alive),
+        applicable_when: ApplicableWhen::Live(has_dependent_kitten),
         sub_goals: &[
             SubGoal::Primitive {
                 label: "wean_kitten",

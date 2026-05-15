@@ -146,3 +146,35 @@ implementation surfaces the trade-offs.
   #332 + #333. Both parents named this ticket's gap in their
   landing Logs; this ticket inherits their named structural
   candidates.
+- 2026-05-15 (planning session, plan at
+  `~/.claude/plans/work-357-purrfect-flask.md`):
+  Planning surfaced that §Current state was inaccurate — #332 / #333
+  shipped only paperwork; the substrate work (`Mourning` Component,
+  `Action::ReleaseGrief`, `TargetHint::{Grave, DependentKitten}`,
+  witness-typed Vigil / GriefSit / Wean / Teach / Release resolvers,
+  Live-method flips) was orphaned twice by `scripts/session_done.sh`
+  forgetting unpushed bookmarks. Forensic root cause: see #362.
+  Substrate recovered via `jj restore --from 00aa3636` and landed at
+  `4c211d5b` ("fix: 332/333 substrate recovery (orphaned during
+  initial polecat landing — see 362)"). Tickets #362 (workflow bug
+  fix) and #363 (track-enforcement gap follow-on) opened + #362
+  landed alongside. Substrate state now matches the §Current state
+  claim in this ticket.
+- 2026-05-15: layered `rear_kitten` gate refinement on top — gate
+  flipped from `cat_is_alive` placeholder to `has_dependent_kitten`,
+  using the existing `Parent` marker (`src/components/markers.rs:620`,
+  authored by `update_parent_markers` in `growth.rs:294`). Plan's
+  D3 (`MotherOfDependent` marker) RETIRED in favor of reusing
+  `Parent` — same predicate, single marker, mother-only filtering
+  moves to the dependent-kitten target picker per #333 §Out of scope.
+- **NEXT** (continuation session): D1 dispatch closure (adoption +
+  advance hooks in `evaluate_and_plan` + `resolve_goap_plans`), D2
+  reactive emission (`ReactiveEmit` registry in
+  `aspiration_picker.rs`), D5 two consolidated target pickers
+  (`grave_target.rs` + `dependent_kitten_target.rs`), three new
+  `GoapActionKind` variants + plan templates + dispatch arms for
+  Wean / Teach / Release (mourn arc deferred — its writer is the
+  out-of-scope §7.7.b emission), D6 Feature promotion (flip
+  `KittenWeaned`/`Taught`/`Released` to `true`). Plan file
+  `~/.claude/plans/work-357-purrfect-flask.md` carries the full
+  file-by-file list.
