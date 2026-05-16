@@ -152,10 +152,10 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // and §4.7 of `docs/systems/ai-substrate-refactor.md` for the
     // substrate-vs-search-state boundary.
     use crate::resources::{
-        CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, ConstructionSiteMap,
-        ExplorationMap, FoodLocationMap, FoxApproachCorridorMap, FoxScentMap,
-        GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, PreyScentMaps,
-        RecentAmbushMap, TileMap, WardCoverageMap, WardIntentMap,
+        CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, ColonyDistrictMap,
+        ConstructionSiteMap, ExplorationMap, FoodLocationMap, FoxApproachCorridorMap,
+        FoxScentMap, GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap,
+        PreyScentMaps, RecentAmbushMap, TileMap, WardCoverageMap, WardIntentMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -205,6 +205,11 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     registry.register::<HerbLocationMap>();
     // 035: anti-corruption aura around buried graves.
     registry.register::<GraveAuraMap>();
+    // 382: colony-district composite — frontier minus crowding minus
+    // threat. Read by `compute_building_placement` to retire the
+    // radius-16 spiral search; per-kind weighting happens at the
+    // placement call-site via direct per-axis getters.
+    registry.register::<ColonyDistrictMap>();
 
     // CorruptionLens is a borrow adapter over TileMap.corruption — not
     // a Resource itself, so it can't go through the generic
@@ -443,6 +448,25 @@ impl Plugin for SimulationPlugin {
                     (
                         systems::magic::ward_decay,
                         systems::magic::update_ward_coverage_map,
+                        // 382: sliding ColonyCenter. Runs before
+                        // `update_colony_district_map` so the district
+                        // populator sees the current anchor (the
+                        // district populator doesn't read ColonyCenter
+                        // directly, but consumer ordering downstream
+                        // expects center to be up-to-date by the time
+                        // any L1/L2/L3 system reads it this tick).
+                        systems::coordination::update_colony_center,
+                        // 382: ColonyDistrictMap populator. Threaded
+                        // into the existing ward-coverage chain rather
+                        // than added as a new top-level sibling — the
+                        // chain extension keeps the relative order of
+                        // every other system unchanged. Reads
+                        // CatScentMap / FoxScentMap /
+                        // FoxApproachCorridorMap / TileMap corruption
+                        // and emits the three-axis colony-district
+                        // composite consumed by
+                        // `compute_building_placement`.
+                        systems::coordination::update_colony_district_map,
                     )
                         .chain(),
                     // Herb/flavor growth sub-chain: seasonal check resets stage,

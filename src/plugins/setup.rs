@@ -488,6 +488,11 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert ward coverage map resource (ticket 045 — substrate-refactor §5.6.3).
     world.insert_resource(crate::resources::WardCoverageMap::default());
 
+    // 382: colony-district composite map. Populated each tick by
+    // `update_colony_district_map`; consumed by
+    // `compute_building_placement` to retire the radius-16 spiral search.
+    world.insert_resource(crate::resources::ColonyDistrictMap::default());
+
     // 261: per-action success-affordance substrate. Allocated empty;
     // populated each tick by `affordance_writer` (ticket 261 C3). Lands
     // substrate-only — no DSE consumers wired at land, so the resource is

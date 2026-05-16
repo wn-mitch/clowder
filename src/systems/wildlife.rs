@@ -3415,6 +3415,7 @@ mod tests {
         // through the InfluenceMap registry; insert defaults so the
         // unit tests can exercise the no-ward / no-scent baseline.
         world.insert_resource(crate::resources::WardCoverageMap::default());
+        world.insert_resource(crate::resources::ColonyDistrictMap::default());
         world.insert_resource(CatScentMap::default());
 
         let mut schedule = Schedule::default();

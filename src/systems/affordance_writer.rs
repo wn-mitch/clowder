@@ -644,6 +644,7 @@ mod tests {
         world.insert_resource(ActionAffordances::default());
         world.insert_resource(FoxScentMap::default());
         world.insert_resource(WardCoverageMap::default_map());
+        world.insert_resource(crate::resources::ColonyDistrictMap::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(affordance_writer);
         (world, schedule)

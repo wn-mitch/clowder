@@ -15,10 +15,10 @@ _Last generated: 2026-05-16._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 107 |
+| Ready | 108 |
 | Parked | 15 |
 | Blocked | 33 |
-| **Open total** | **161** |
+| **Open total** | **162** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -41,10 +41,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · score 0.93_
-- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.91_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.90_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.92_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
+- **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · score 0.91_
 
 ## Epic progress (3)
 
@@ -65,11 +65,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (107)
+## Ready by cluster (108)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (27 ready, 5 blocked)
+### ai-substrate (28 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -97,7 +97,8 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[366](docs/open-work/tickets/366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md)** — Aspirations mastery arcs — Weaving, BoneShaping, Hidework, Pigment, Cairn (016 Phase 5 precursor) — _[ai-substrate] · added 2026-05-16_
 - **[373](docs/open-work/tickets/373-denworkshop-food-retrieval-broaden-eat-substrate-beyond-stores-only.md)** — Den/Workshop food retrieval — broaden eat substrate beyond Stores-only — _[ai-substrate] · added 2026-05-16_
 - **[374](docs/open-work/tickets/374-shelter-as-housing-security-belief-per-cat-home-den-facet-replace-per-tick-spatial-shelter-rollup.md)** — Shelter as housing-security belief — per-cat home-den facet, replace per-tick spatial shelter rollup — _[ai-substrate] · added 2026-05-16_
-- **[382](docs/open-work/tickets/382-influence-map-based-colony-district-placement-retire-find-building-placement-spiral-plan-expansion-zones.md)** — Influence-map based colony-district placement — retire find_building_placement spiral, plan expansion zones — _[ai-substrate] · added 2026-05-16_
+- **[383](docs/open-work/tickets/383-build-cadence-under-population-growth-shelter-pressure-under-fires-once-colony-establishes.md)** — Build-cadence under population growth — shelter pressure under-fires once colony establishes — _[ai-substrate] · added 2026-05-16_
+- **[384](docs/open-work/tickets/384-sliding-colonycenter-ward-activity-audit-verify-wards-placed-despawned-doubling-is-healthy.md)** — Sliding ColonyCenter ward-activity audit — verify wards-placed/-despawned doubling is healthy — _[ai-substrate] · added 2026-05-16_
 
 ### belief-perception (13 ready, 2 blocked)
 
@@ -296,7 +297,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 
-## Ready (107)
+## Ready (108)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -404,7 +405,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[374](docs/open-work/tickets/374-shelter-as-housing-security-belief-per-cat-home-den-facet-replace-per-tick-spatial-shelter-rollup.md)** — Shelter as housing-security belief — per-cat home-den facet, replace per-tick spatial shelter rollup — _[ai-substrate] · added 2026-05-16_
 - **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · added 2026-05-16_
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
-- **[382](docs/open-work/tickets/382-influence-map-based-colony-district-placement-retire-find-building-placement-spiral-plan-expansion-zones.md)** — Influence-map based colony-district placement — retire find_building_placement spiral, plan expansion zones — _[ai-substrate] · added 2026-05-16_
+- **[383](docs/open-work/tickets/383-build-cadence-under-population-growth-shelter-pressure-under-fires-once-colony-establishes.md)** — Build-cadence under population growth — shelter pressure under-fires once colony establishes — _[ai-substrate] · added 2026-05-16_
+- **[384](docs/open-work/tickets/384-sliding-colonycenter-ward-activity-audit-verify-wards-placed-despawned-doubling-is-healthy.md)** — Sliding ColonyCenter ward-activity audit — verify wards-placed/-despawned doubling is healthy — _[ai-substrate] · added 2026-05-16_
 
 ## Parked (15)
 
@@ -465,12 +467,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (240)
+## Landed archive (241)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (175)
+### 2026-05 (176)
 
+- **[382](docs/open-work/landed/382-influence-map-based-colony-district-placement-retire-find-building-placement-spiral-plan-expansion-zones.md)** — Influence-map based colony-district placement — retire find_building_placement spiral, plan expansion zones _(2026-05-16)_
 - **[190](docs/open-work/landed/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) _(2026-05-16)_
 - **[095](docs/open-work/landed/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species _(2026-05-16)_
 - **[362](docs/open-work/landed/362-session-donesh-orphans-unpushed-bookmarks-invert-keep-bookmark-default-add-landed-on-main-precondition.md)** — session_done.sh orphans unpushed bookmarks — invert --keep-bookmark default + add landed-on-main precondition _(2026-05-15)_

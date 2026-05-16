@@ -1,7 +1,7 @@
 ---
 id: 382
 title: Influence-map based colony-district placement — retire find_building_placement spiral, plan expansion zones
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-16
 ---
 
 ## Why
@@ -179,3 +179,4 @@ Implementation phases:
   precedent for placement-via-influence-maps in ward work) provides the
   substrate-correct pattern. User framing: "influence-map based to plan
   out 'colony districts' or do some semblance of expansion planning."
+- 2026-05-16: 2026-05-16: landed — ColonyDistrictMap + compute_building_placement + sliding ColonyCenter + DirectiveStuckOnPlacement / ConstructionSiteSpawned features. Soak verdict 'concern' (survival gates pass, mythic-texture pre-existing failure). Follow-ons 383 (build-cadence) + 384 (ward-activity audit) opened blocked-by.

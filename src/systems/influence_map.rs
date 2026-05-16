@@ -457,6 +457,26 @@ impl InfluenceMap for crate::resources::GraveAuraMap {
     }
 }
 
+impl InfluenceMap for crate::resources::ColonyDistrictMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // 382: "where the colony wants to grow" composite —
+            // frontier minus crowding minus threat. Sight × Colony
+            // following the WardCoverageMap convention; trace
+            // emitters surface the composite scalar, the placement
+            // scorer reads per-axis getters directly for per-kind
+            // weighting.
+            name: "colony_district",
+            channel: ChannelKind::Sight,
+            faction: Faction::Colony,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.composite(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::FoodLocationMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

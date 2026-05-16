@@ -1503,6 +1503,31 @@ pub enum WardPlacementSemantics {
     DescendingResidual,
 }
 
+/// 382: selection rule used by `compute_building_placement()` for the
+/// coordinator's autonomous Build directive site-spawning. The
+/// pre-382 `Spiral` arm preserves the radius-16 spiral search from
+/// `find_building_placement` as an emergency revert / regression-bisect
+/// fixture; the `InfluenceMap` default replaces it with an argmax over
+/// `ColonyDistrictMap` + per-kind weight tables. Variant names are
+/// stable identifiers; add new variants rather than renaming in place.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
+)]
+pub enum BuildingPlacementSemantics {
+    /// Pre-382 behavior. Spiral search outward from `colony_center` to
+    /// Manhattan radius 16; returns the first `footprint_valid` tile.
+    /// Saturates after ~3-5 buildings near center and silently returns
+    /// `None`. Retained as a regression-bisect fixture only.
+    Spiral,
+    /// 382 default. Argmax over `ColonyDistrictMap` (the composite
+    /// `frontier − crowding − threat`) plus per-kind affinity lifts and
+    /// `same_kind_proximity` clustering / dispersion. Whole-map
+    /// candidate generation (`building_placement_candidate_step`),
+    /// `footprint_valid` gate, jitter tiebreak.
+    #[default]
+    InfluenceMap,
+}
+
 /// 313: composition rule for the `CatScentMap` lift to ward-placement
 /// scoring. `Additive` (default) preserves the pre-313 formula
 /// `+ w_cat_value * cat_value` — proximity to cat-density peaks
@@ -2612,6 +2637,95 @@ pub struct ScoringConstants {
     /// Tile radius within which a cat "smells" corruption on nearby tiles.
     /// Corruption beyond this range is out of sensing reach.
     pub corruption_smell_range: i32,
+    // --- 382 — Building placement (autonomous coordinator path) ---
+    /// 382: selection rule for `compute_building_placement()`. Default
+    /// `InfluenceMap` replaces the radius-16 spiral search from
+    /// `find_building_placement` with an argmax over `ColonyDistrictMap`.
+    /// `Spiral` is retained as an emergency revert / regression-bisect
+    /// fixture.
+    #[serde(default = "default_building_placement_semantics")]
+    pub building_placement_semantics: BuildingPlacementSemantics,
+    /// 382: minimum composite score required to place. Below this, the
+    /// directive defers and the stuck-counter increments. Default `0.0`
+    /// — any positive score wins.
+    #[serde(default = "default_building_placement_score_floor")]
+    pub building_placement_score_floor: f32,
+    /// 382: deterministic per-candidate jitter range. Matches ward
+    /// placement's `[0, 0.05)` convention.
+    #[serde(default = "default_building_placement_jitter_range")]
+    pub building_placement_jitter_range: f32,
+    /// 382: per-Manhattan-tile soft penalty pulling placement toward
+    /// the colony anchor. Matches ward placement's `0.005` coefficient
+    /// (`compute_ward_placement` `DIST_PENALTY_PER_TILE`).
+    #[serde(default = "default_building_placement_distance_cost_per_tile")]
+    pub building_placement_distance_cost_per_tile: f32,
+    /// 382: candidate-tile grid step in world tiles. Default `5` to
+    /// align with the 5-tile influence-map bucket size.
+    #[serde(default = "default_building_placement_candidate_step")]
+    pub building_placement_candidate_step: i32,
+    /// 382: weight of `ColonyDistrictMap::frontier_at` in the placement
+    /// composite.
+    #[serde(default = "default_building_placement_frontier_weight")]
+    pub building_placement_frontier_weight: f32,
+    /// 382: weight of `ColonyDistrictMap::crowding_at` (subtracted).
+    #[serde(default = "default_building_placement_crowding_weight")]
+    pub building_placement_crowding_weight: f32,
+    /// 382: weight of `ColonyDistrictMap::threat_at` (subtracted for
+    /// non-defensive kinds).
+    #[serde(default = "default_building_placement_threat_weight")]
+    pub building_placement_threat_weight: f32,
+    /// 382: per-kind affinity lift for `Stores` / `Kitchen` / `Workshop`
+    /// against `FoodLocationMap` (cooked-food infrastructure adjacency).
+    #[serde(default = "default_building_placement_food_proximity_weight")]
+    pub building_placement_food_proximity_weight: f32,
+    /// 382: per-kind affinity lift for `Garden` against
+    /// `GardenLocationMap` plus fertile-terrain class.
+    #[serde(default = "default_building_placement_garden_terrain_weight")]
+    pub building_placement_garden_terrain_weight: f32,
+    /// 382: per-kind affinity lift for `Watchtower` / `WardPost` against
+    /// `FoxApproachCorridorMap`. Combined with a sign flip on
+    /// `building_placement_threat_weight` so defensive structures want
+    /// the predator corridor.
+    #[serde(default = "default_building_placement_defensive_corridor_weight")]
+    pub building_placement_defensive_corridor_weight: f32,
+    /// 382: per-kind affinity for `Midden`. Inverts frontier (refuse
+    /// pile wants the periphery).
+    #[serde(default = "default_building_placement_midden_periphery_weight")]
+    pub building_placement_midden_periphery_weight: f32,
+    /// 382: weight on the nearest-same-kind Manhattan-proximity term.
+    /// Sign per kind: positive for `Stores` / `Kitchen` / `Workshop`
+    /// (warehouse-district clustering); negative for `Den` (dispersion);
+    /// zero for everything else.
+    #[serde(default = "default_building_placement_same_kind_proximity_weight")]
+    pub building_placement_same_kind_proximity_weight: f32,
+    /// 382: Manhattan range over which `same_kind_proximity` lifts.
+    /// Beyond this distance the term is exactly zero.
+    #[serde(default = "default_building_placement_same_kind_proximity_range")]
+    pub building_placement_same_kind_proximity_range: i32,
+    /// 382: structure-halo radius used by `update_colony_district_map`
+    /// when stamping the frontier axis around existing buildings.
+    #[serde(default = "default_colony_district_structure_halo_radius")]
+    pub colony_district_structure_halo_radius: f32,
+    /// 382: building-crowding radius. Each existing structure stamps a
+    /// disc of this radius into the crowding axis.
+    #[serde(default = "default_colony_district_crowding_radius")]
+    pub colony_district_crowding_radius: f32,
+    /// 382: per-tick deposit ceiling on `frontier` per CatScent bucket
+    /// — scales the cat-scent contribution so dense colonies don't peg
+    /// the frontier axis to 1.0 everywhere.
+    #[serde(default = "default_colony_district_cat_scent_scale")]
+    pub colony_district_cat_scent_scale: f32,
+    /// 382: ticks between threshold-triggered emissions of
+    /// `Feature::DirectiveStuckOnPlacement` and the "looks for a spot
+    /// for the new …" narration. Default `60` ≈ one in-game minute.
+    #[serde(default = "default_placement_stuck_narrate_threshold_ticks")]
+    pub placement_stuck_narrate_threshold_ticks: u32,
+    /// 382: cadence in ticks between `update_colony_center`
+    /// recomputations. Snap-to-centroid; cat populations move slowly
+    /// enough that jitter at this cadence is negligible. Default
+    /// `1000` ≈ one in-game season segment.
+    #[serde(default = "default_colony_center_update_cadence_ticks")]
+    pub colony_center_update_cadence_ticks: u64,
 }
 
 #[allow(deprecated)] // 228: patrol_fox_scent_weight retained for one-cycle header compat.
@@ -2827,6 +2941,35 @@ impl Default for ScoringConstants {
             mating_fertility_summer: default_mating_fertility_summer(),
             mating_fertility_autumn: default_mating_fertility_autumn(),
             mating_fertility_winter: default_mating_fertility_winter(),
+            building_placement_semantics: default_building_placement_semantics(),
+            building_placement_score_floor: default_building_placement_score_floor(),
+            building_placement_jitter_range: default_building_placement_jitter_range(),
+            building_placement_distance_cost_per_tile:
+                default_building_placement_distance_cost_per_tile(),
+            building_placement_candidate_step: default_building_placement_candidate_step(),
+            building_placement_frontier_weight: default_building_placement_frontier_weight(),
+            building_placement_crowding_weight: default_building_placement_crowding_weight(),
+            building_placement_threat_weight: default_building_placement_threat_weight(),
+            building_placement_food_proximity_weight:
+                default_building_placement_food_proximity_weight(),
+            building_placement_garden_terrain_weight:
+                default_building_placement_garden_terrain_weight(),
+            building_placement_defensive_corridor_weight:
+                default_building_placement_defensive_corridor_weight(),
+            building_placement_midden_periphery_weight:
+                default_building_placement_midden_periphery_weight(),
+            building_placement_same_kind_proximity_weight:
+                default_building_placement_same_kind_proximity_weight(),
+            building_placement_same_kind_proximity_range:
+                default_building_placement_same_kind_proximity_range(),
+            colony_district_structure_halo_radius:
+                default_colony_district_structure_halo_radius(),
+            colony_district_crowding_radius: default_colony_district_crowding_radius(),
+            colony_district_cat_scent_scale: default_colony_district_cat_scent_scale(),
+            placement_stuck_narrate_threshold_ticks:
+                default_placement_stuck_narrate_threshold_ticks(),
+            colony_center_update_cadence_ticks:
+                default_colony_center_update_cadence_ticks(),
             magic_harvest_carcass_scale: 0.6,
             magic_cleanse_colony_scale: 0.4,
             herbcraft_ward_siege_bonus: 0.4,
@@ -4382,6 +4525,65 @@ fn default_mating_fertility_winter() -> f32 {
 
 fn default_caretake_bond_compassion_boost_max() -> f32 {
     1.0
+}
+
+// 382: building-placement default helpers
+fn default_building_placement_semantics() -> BuildingPlacementSemantics {
+    BuildingPlacementSemantics::InfluenceMap
+}
+fn default_building_placement_score_floor() -> f32 {
+    0.0
+}
+fn default_building_placement_jitter_range() -> f32 {
+    0.05
+}
+fn default_building_placement_distance_cost_per_tile() -> f32 {
+    0.005
+}
+fn default_building_placement_candidate_step() -> i32 {
+    5
+}
+fn default_building_placement_frontier_weight() -> f32 {
+    1.0
+}
+fn default_building_placement_crowding_weight() -> f32 {
+    1.0
+}
+fn default_building_placement_threat_weight() -> f32 {
+    1.0
+}
+fn default_building_placement_food_proximity_weight() -> f32 {
+    0.4
+}
+fn default_building_placement_garden_terrain_weight() -> f32 {
+    0.3
+}
+fn default_building_placement_defensive_corridor_weight() -> f32 {
+    0.5
+}
+fn default_building_placement_midden_periphery_weight() -> f32 {
+    0.4
+}
+fn default_building_placement_same_kind_proximity_weight() -> f32 {
+    0.2
+}
+fn default_building_placement_same_kind_proximity_range() -> i32 {
+    12
+}
+fn default_colony_district_structure_halo_radius() -> f32 {
+    8.0
+}
+fn default_colony_district_crowding_radius() -> f32 {
+    5.0
+}
+fn default_colony_district_cat_scent_scale() -> f32 {
+    1.0
+}
+fn default_placement_stuck_narrate_threshold_ticks() -> u32 {
+    60
+}
+fn default_colony_center_update_cadence_ticks() -> u64 {
+    1000
 }
 
 impl ScoringConstants {

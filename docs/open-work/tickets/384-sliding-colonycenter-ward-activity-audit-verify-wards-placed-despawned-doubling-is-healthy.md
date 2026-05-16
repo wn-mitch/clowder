@@ -1,0 +1,75 @@
+---
+id: 384
+title: Sliding ColonyCenter ward-activity audit — verify wards-placed/-despawned doubling is healthy
+status: ready
+cluster: ai-substrate
+orchestration: substrate-sensitive
+initiative: []
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: [382-district-placement.md]
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+382's soak surfaced an unpredicted +100% / +125% rise in
+`wards_placed_total` / `wards_despawned_total` (4/4 → 8/9 vs the
+pre-382 archive). The most plausible mechanism: 382's sliding
+`ColonyCenter` (re-anchored every 1000 ticks from the cat centroid)
+shifted the anchor read by `compute_ward_placement`, so the
+priestess sees more candidate tiles within the distance-cost
+envelope. This may be healthy ecology — wards now serve the
+inhabited core rather than the founding site — OR may indicate the
+priestess is wasting thornbriar on transient placements that
+despawn quickly (`ward_count_final = 0` in both pre/post archives).
+
+## Scope
+
+- Audit ward placement decisions in the 382 post-fix soak:
+  - Cross-correlate ward `placed-at` ticks with `ColonyCenter`
+    update ticks.
+  - Frame-diff per-DSE drift on `SetWard` and `Herbcraft` between
+    pre-382 and post-382 traces.
+  - Distinguish "more wards placed AND held" from "more wards placed
+    AND quickly decayed."
+- If wasteful: tighten `ward_placement_distance_cost_per_tile` or
+  introduce a `ward_intent_stability_window` to prevent the
+  coordinator from re-stamping in transient locations.
+
+## Out of scope
+
+- Modifying 382's `ColonyCenter` slide cadence (1000 ticks).
+- New ward kinds.
+
+## Current state
+
+382 landed the slide. Wards-placed doubling is the most salient
+behavioral shift in the 382 verdict that isn't trivially explained
+by the placement substrate.
+
+## Approach
+
+Frame-diff first; if the per-DSE shift on SetWard is within ±30% of
+baseline despite the doubled count, the lift is mechanical
+(more candidate tiles scoring above threshold) rather than a DSE
+calibration shift. If the per-DSE final score has drifted, the
+mechanism is upstream and needs structural review.
+
+## Verification
+
+- Per-ward audit log shows placements correlated with reasonable
+  cat-density and threat geometry, not random transient locations.
+- `ward_count_final` ≥ 2 in seed-42 soaks (currently 0 both pre- and
+  post-382 — separate issue worth confirming isn't 384-introduced).
+- Frame-diff per-DSE SetWard final-score drift within concordance
+  band.
+
+## Log
+
+- 2026-05-16: opened blocked-by 382 from 382's soak observation —
+  ward activity doubled, mechanism unverified.

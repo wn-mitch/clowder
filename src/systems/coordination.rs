@@ -375,6 +375,7 @@ pub fn assess_colony_needs(
                 target_entity: None,
                 target_position: None,
                 blueprint: None,
+                placement_failure_count: 0,
             });
             // Also queue forage if food is critically low.
             if food_fraction < food_threshold * 0.5 {
@@ -384,6 +385,7 @@ pub fn assess_colony_needs(
                     target_entity: None,
                     target_position: None,
                     blueprint: None,
+                    placement_failure_count: 0,
                 });
             }
         }
@@ -397,6 +399,7 @@ pub fn assess_colony_needs(
                 target_entity: breach_threats.first().map(|(e, _)| *e),
                 target_position: breach_threats.first().map(|(_, p)| *p),
                 blueprint: None,
+                placement_failure_count: 0,
             });
         }
         if !nearby_threats.is_empty() {
@@ -414,6 +417,7 @@ pub fn assess_colony_needs(
                 target_entity: None,
                 target_position: closest_threat.map(|(_, p)| *p),
                 blueprint: None,
+                placement_failure_count: 0,
             });
         }
 
@@ -432,6 +436,7 @@ pub fn assess_colony_needs(
                         target_entity: None,
                         target_position: Some(Position::new(sx, sy)),
                         blueprint: None,
+                        placement_failure_count: 0,
                     });
                 }
             }
@@ -456,6 +461,7 @@ pub fn assess_colony_needs(
                 target_entity: Some(build_entity),
                 target_position: Some(*build_pos),
                 blueprint: None,
+                placement_failure_count: 0,
             });
             let _ = structure; // used indirectly via condition filter
         }
@@ -469,6 +475,7 @@ pub fn assess_colony_needs(
                 target_entity: None,
                 target_position: None,
                 blueprint: None,
+                placement_failure_count: 0,
             });
         }
 
@@ -495,6 +502,7 @@ pub fn assess_colony_needs(
                     target_entity: Some(wildlife_entity),
                     target_position: Some(*wpos),
                     blueprint: None,
+                    placement_failure_count: 0,
                 });
             }
         }
@@ -532,6 +540,7 @@ pub fn assess_colony_needs(
                 target_entity: None,
                 target_position: Some(ward_pos),
                 blueprint: None,
+                placement_failure_count: 0,
             });
         }
 
@@ -549,6 +558,7 @@ pub fn assess_colony_needs(
                 target_entity: None,
                 target_position: Some(hotspot_pos),
                 blueprint: None,
+                placement_failure_count: 0,
             });
         }
         if let Some((carcass_entity, carcass_pos)) = uncleansed_carcasses.first() {
@@ -561,6 +571,7 @@ pub fn assess_colony_needs(
                 target_entity: Some(*carcass_entity),
                 target_position: Some(*carcass_pos),
                 blueprint: None,
+                placement_failure_count: 0,
             });
         }
 
@@ -1025,6 +1036,7 @@ pub fn accumulate_build_pressure(
                 target_entity: None,
                 target_position: None,
                 blueprint: None,
+                placement_failure_count: 0,
             });
         }
 
@@ -1050,6 +1062,7 @@ pub fn accumulate_build_pressure(
                     target_entity: None,
                     target_position: None,
                     blueprint: None,
+                    placement_failure_count: 0,
                 });
             }
         }
@@ -1098,6 +1111,7 @@ pub fn accumulate_build_pressure(
                     target_entity: None,
                     target_position: None,
                     blueprint: Some(blueprint),
+                    placement_failure_count: 0,
                 });
 
                 log.push(
@@ -1161,27 +1175,65 @@ fn structure_display_name(kind: StructureType) -> &'static str {
 
 /// Convert Build directives into physical ConstructionSite entities on the map.
 ///
-/// When a coordinator issues a Build directive with a blueprint, this system
-/// finds a valid placement near the colony center and spawns the site. For the
-/// founding store, materials are pre-delivered (the colony pooled resources they
-/// arrived with).
+/// **Real-world effect** — when a coordinator issues a Build directive
+/// with a blueprint, this system finds a valid placement via
+/// `compute_building_placement` (382) and spawns a `ConstructionSite`
+/// entity. For founding buildings, materials are pre-delivered.
+///
+/// **Placement failure** — if `compute_building_placement` returns
+/// `None`, the directive's `placement_failure_count` increments. At
+/// `placement_stuck_narrate_threshold_ticks` the system emits a
+/// "looks for a spot for the new …" narration and
+/// `Feature::DirectiveStuckOnPlacement`, then resets the counter so a
+/// chronic-stuck directive re-emits each window.
+///
+/// **Witness** — emits `Feature::BuildingConstructed`-adjacent
+/// `Feature::DirectiveDelivered` (already wired upstream by
+/// `process_directives`) on successful spawn; the construction site is
+/// the persistent witness.
+///
+/// **Feature emission** — `Feature::DirectiveStuckOnPlacement`
+/// (regression canary, `expected_to_fire_per_soak() => false`).
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn spawn_construction_sites(
     mut commands: Commands,
-    mut coordinators: Query<(&mut DirectiveQueue, &Name), With<Coordinator>>,
+    mut coordinators: Query<(Entity, &mut DirectiveQueue, &Name), With<Coordinator>>,
     buildings: Query<(&crate::components::building::Structure, &Position)>,
     construction_sites: Query<&crate::components::building::ConstructionSite>,
     colony_center: Res<crate::resources::ColonyCenter>,
     mut map: ResMut<crate::resources::map::TileMap>,
+    district: Res<crate::resources::ColonyDistrictMap>,
+    fox_corridor: Res<crate::resources::FoxApproachCorridorMap>,
+    food_location: Res<crate::resources::FoodLocationMap>,
+    garden_location: Res<crate::resources::GardenLocationMap>,
+    constants: Res<SimConstants>,
+    mut activation: ResMut<SystemActivation>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
 ) {
+    use crate::resources::sim_constants::BuildingPlacementSemantics;
+
     // Track blueprints spawned this tick to prevent duplicates from multiple
     // coordinators issuing the same directive (commands are deferred, so
     // construction_sites won't see entities spawned earlier in this loop).
     let mut spawned_this_tick = std::collections::HashSet::new();
 
-    for (mut queue, coordinator_name) in &mut coordinators {
+    // Snapshot building positions once per system call — every coordinator
+    // sees the same colony state and per-kind nearest-neighbor query.
+    let building_positions: Vec<(Position, (i32, i32), StructureType)> = buildings
+        .iter()
+        .map(|(s, p)| (*p, s.size, s.kind))
+        .collect();
+    let occupied: Vec<(Position, (i32, i32))> = building_positions
+        .iter()
+        .map(|(p, sz, _)| (*p, *sz))
+        .collect();
+    let stuck_threshold = constants
+        .scoring
+        .placement_stuck_narrate_threshold_ticks
+        .max(1);
+
+    for (coord_entity, mut queue, coordinator_name) in &mut coordinators {
         // Find the first Build directive with a blueprint.
         let directive_idx = queue
             .directives
@@ -1199,7 +1251,7 @@ pub fn spawn_construction_sites(
             .any(|site| site.blueprint == blueprint)
             || spawned_this_tick.contains(&blueprint);
         // Also skip if the building type already exists as a completed structure.
-        let already_built = buildings.iter().any(|(s, _)| s.kind == blueprint);
+        let already_built = building_positions.iter().any(|(_, _, k)| *k == blueprint);
         if already_exists || already_built {
             queue.directives.remove(idx);
             continue;
@@ -1208,10 +1260,65 @@ pub fn spawn_construction_sites(
         let size = blueprint.default_size();
         let center = colony_center.0;
 
-        // Find a valid placement position via spiral search from colony center.
-        let placement = find_building_placement(&map, center, size, &buildings);
+        // 382: collect same-kind building positions for the
+        // proximity-clustering term in `compute_building_placement`.
+        let buildings_of_kind: Vec<Position> = building_positions
+            .iter()
+            .filter(|(_, _, k)| *k == blueprint)
+            .map(|(p, _, _)| *p)
+            .collect();
+
+        let placement = match constants.scoring.building_placement_semantics {
+            BuildingPlacementSemantics::Spiral => {
+                find_building_placement_spiral(&map, center, size, &occupied)
+            }
+            BuildingPlacementSemantics::InfluenceMap => {
+                // 382: deterministic per-call RNG seeded by tick +
+                // coordinator entity. Same pattern as
+                // `assess_colony_needs` (`coordination.rs:509`) — avoids
+                // threading a shared SimRng through Bevy's 16-param tuple.
+                let seed = time
+                    .tick
+                    .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                    ^ coord_entity.to_bits();
+                let mut local_rng =
+                    rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+                compute_building_placement(
+                    blueprint,
+                    size,
+                    center,
+                    &occupied,
+                    &buildings_of_kind,
+                    &district,
+                    &fox_corridor,
+                    &food_location,
+                    &garden_location,
+                    &map,
+                    &constants,
+                    &mut local_rng,
+                )
+            }
+        };
         let Some(anchor) = placement else {
-            // No valid placement found — leave the directive for next tick.
+            // 382 Phase C: stuck-directive observability. Increment
+            // failure counter; at threshold, narrate + emit feature
+            // once, then reset so a still-stuck directive re-fires next
+            // window rather than spamming every tick.
+            let count = &mut queue.directives[idx].placement_failure_count;
+            *count = count.saturating_add(1);
+            if *count >= stuck_threshold {
+                log.push(
+                    time.tick,
+                    format!(
+                        "{} looks for a spot for the new {} but the colony has grown too crowded — the plan sits in the back of her mind.",
+                        coordinator_name.0,
+                        structure_display_name(blueprint),
+                    ),
+                    NarrativeTier::Action,
+                );
+                activation.record(Feature::DirectiveStuckOnPlacement);
+                *count = 0;
+            }
             continue;
         };
 
@@ -1246,6 +1353,10 @@ pub fn spawn_construction_sites(
         ));
 
         spawned_this_tick.insert(blueprint);
+        // 382: positive observability — pairs with
+        // `DirectiveStuckOnPlacement`. Healthy seed-42 soaks issue ~6
+        // Build directives over 15 min, so this fires at least once.
+        activation.record(Feature::ConstructionSiteSpawned);
 
         log.push(
             time.tick,
@@ -1261,34 +1372,268 @@ pub fn spawn_construction_sites(
     }
 }
 
-/// Spiral search outward from `center` to find a position where a building of
-/// `size` fits with all tiles passable and at least 1 tile gap from existing
-/// buildings.
-fn find_building_placement(
+/// Pre-382 spiral search outward from `center` to find a position
+/// where a building of `size` fits with all tiles passable and at
+/// least 1 tile gap from existing buildings. Retained behind
+/// `BuildingPlacementSemantics::Spiral` as an emergency-revert
+/// fixture; the default semantics (`InfluenceMap`) routes through
+/// `compute_building_placement` instead.
+fn find_building_placement_spiral(
     map: &crate::resources::map::TileMap,
     center: Position,
     size: (i32, i32),
-    buildings: &Query<(&crate::components::building::Structure, &Position)>,
+    occupied: &[(Position, (i32, i32))],
 ) -> Option<Position> {
-    // Collect existing building footprints for gap checking.
-    let occupied: Vec<(Position, (i32, i32))> =
-        buildings.iter().map(|(s, p)| (*p, s.size)).collect();
-
-    // Spiral search: try positions at increasing Manhattan distance.
     for radius in 1..=16_i32 {
         for dy in -radius..=radius {
             for dx in -radius..=radius {
                 if dx.abs() + dy.abs() != radius {
-                    continue; // Only check the ring at this radius.
+                    continue;
                 }
                 let anchor = Position::new(center.x + dx, center.y + dy);
-                if footprint_valid(map, anchor, size, &occupied) {
+                if footprint_valid(map, anchor, size, occupied) {
                     return Some(anchor);
                 }
             }
         }
     }
     None
+}
+
+/// 382: per-kind affinity weights derived from the universal
+/// `ScoringConstants` knobs. Computed once per placement call to keep
+/// the inner candidate loop tight.
+#[derive(Debug, Clone, Copy)]
+struct KindAffinity {
+    /// Multiplier on the `threat` term. Negative for non-defensive
+    /// kinds (threat suppresses); positive for `Watchtower` / `WardPost`
+    /// (threat attracts).
+    threat_sign: f32,
+    /// Multiplier on the `frontier` term. Negative for `Midden` (refuse
+    /// pile wants the periphery).
+    frontier_sign: f32,
+    food_proximity_weight: f32,
+    garden_terrain_weight: f32,
+    defensive_corridor_weight: f32,
+    same_kind_proximity_weight: f32,
+}
+
+fn kind_affinity(kind: StructureType, c: &SimConstants) -> KindAffinity {
+    use StructureType::*;
+    let s = &c.scoring;
+    let (threat_sign, frontier_sign, food, garden, defensive, same_kind) = match kind {
+        Stores | Kitchen | Workshop => (
+            -1.0,
+            1.0,
+            s.building_placement_food_proximity_weight,
+            0.0,
+            0.0,
+            s.building_placement_same_kind_proximity_weight,
+        ),
+        Garden => (
+            -1.0,
+            1.0,
+            0.0,
+            s.building_placement_garden_terrain_weight,
+            0.0,
+            0.0,
+        ),
+        Watchtower | WardPost => (
+            1.0,
+            1.0,
+            0.0,
+            0.0,
+            s.building_placement_defensive_corridor_weight,
+            0.0,
+        ),
+        Midden => (
+            -1.0,
+            -s.building_placement_midden_periphery_weight,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ),
+        Den => (
+            -1.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            -s.building_placement_same_kind_proximity_weight,
+        ),
+        Hearth | Wall | Gate => (-1.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+    };
+    KindAffinity {
+        threat_sign,
+        frontier_sign,
+        food_proximity_weight: food,
+        garden_terrain_weight: garden,
+        defensive_corridor_weight: defensive,
+        same_kind_proximity_weight: same_kind,
+    }
+}
+
+/// Score the same-kind-proximity term for one candidate. Returns the
+/// lift in `[0, 1]` derived from the nearest building of matching
+/// kind — `1.0` when a same-kind building sits right next to the
+/// candidate, falling linearly to `0.0` at
+/// `same_kind_proximity_range`.
+fn same_kind_proximity_lift(
+    candidate: Position,
+    kind: StructureType,
+    buildings_of_kind: &[Position],
+    range: i32,
+) -> f32 {
+    if buildings_of_kind.is_empty() || range <= 0 {
+        return 0.0;
+    }
+    let mut best_dist = i32::MAX;
+    for p in buildings_of_kind {
+        let d = candidate.manhattan_distance(p);
+        if d < best_dist {
+            best_dist = d;
+        }
+    }
+    let _ = kind; // kind is captured by the caller's affinity table
+    if best_dist >= range {
+        0.0
+    } else {
+        1.0 - (best_dist as f32 / range as f32)
+    }
+}
+
+/// 382: pick an anchor position for a new building of `kind` via an
+/// argmax over `ColonyDistrictMap` plus per-kind affinity lifts.
+/// Replaces the radius-16 spiral search in
+/// `find_building_placement_spiral`. Returns `None` when no candidate
+/// scores above `building_placement_score_floor` — the caller defers
+/// the directive and increments its stuck-counter.
+///
+/// Candidate generation: coarse grid across the whole map at step
+/// `building_placement_candidate_step` (default 5, matching the
+/// 5-tile influence-map bucket size). Every candidate is gated by
+/// `footprint_valid` (preserving the 1-tile-gap rule and passability
+/// check).
+///
+/// Determinism: per-call RNG seeded by tick + coordinator entity,
+/// jitter `[0, building_placement_jitter_range)` per candidate for
+/// deterministic tiebreak.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn compute_building_placement(
+    kind: StructureType,
+    size: (i32, i32),
+    anchor: Position,
+    occupied: &[(Position, (i32, i32))],
+    buildings_of_kind: &[Position],
+    district: &crate::resources::ColonyDistrictMap,
+    fox_corridor: &crate::resources::FoxApproachCorridorMap,
+    food_location: &crate::resources::FoodLocationMap,
+    garden_location: &crate::resources::GardenLocationMap,
+    tile_map: &crate::resources::map::TileMap,
+    constants: &SimConstants,
+    rng: &mut impl rand::Rng,
+) -> Option<Position> {
+    let s = &constants.scoring;
+    let aff = kind_affinity(kind, constants);
+    let step = s.building_placement_candidate_step.max(1) as usize;
+    let map_w = tile_map.width;
+    let map_h = tile_map.height;
+    let dist_cost = s.building_placement_distance_cost_per_tile;
+    let jitter_range = s.building_placement_jitter_range.max(0.0);
+
+    let mut best: Option<(Position, f32)> = None;
+
+    for cy in (0..map_h).step_by(step) {
+        for cx in (0..map_w).step_by(step) {
+            let candidate = Position::new(cx, cy);
+            if !footprint_valid(tile_map, candidate, size, occupied) {
+                continue;
+            }
+            let frontier = district.frontier_at(cx, cy);
+            let crowding = district.crowding_at(cx, cy);
+            let threat = district.threat_at(cx, cy);
+
+            let district_score = s.building_placement_frontier_weight * aff.frontier_sign * frontier
+                - s.building_placement_crowding_weight * crowding
+                + s.building_placement_threat_weight * aff.threat_sign * threat;
+
+            let food_lift = if aff.food_proximity_weight > 0.0 {
+                aff.food_proximity_weight * food_location.get(cx, cy)
+            } else {
+                0.0
+            };
+
+            let garden_lift = if aff.garden_terrain_weight > 0.0 {
+                let terrain_bonus = if tile_map.in_bounds(cx, cy) {
+                    use crate::resources::map::Terrain;
+                    let t = tile_map.get(cx, cy).terrain;
+                    // Fertile classes: Grass and Garden footprints
+                    // (re-stamped over Grass during construction); other
+                    // classes get no lift. LightForest/DenseForest are
+                    // edible-leaf rich but cats want open ground for
+                    // tilling, so they're explicitly excluded.
+                    match t {
+                        Terrain::Grass | Terrain::Garden => 1.0,
+                        _ => 0.0,
+                    }
+                } else {
+                    0.0
+                };
+                aff.garden_terrain_weight
+                    * (garden_location.get(cx, cy) * 0.5 + terrain_bonus * 0.5)
+            } else {
+                0.0
+            };
+
+            let defensive_lift = if aff.defensive_corridor_weight > 0.0 {
+                aff.defensive_corridor_weight * fox_corridor.get(cx, cy)
+            } else {
+                0.0
+            };
+
+            let same_kind_lift = if aff.same_kind_proximity_weight != 0.0 {
+                aff.same_kind_proximity_weight
+                    * same_kind_proximity_lift(
+                        candidate,
+                        kind,
+                        buildings_of_kind,
+                        s.building_placement_same_kind_proximity_range,
+                    )
+            } else {
+                0.0
+            };
+
+            let dist = anchor.manhattan_distance(&candidate) as f32;
+            let distance_cost = dist_cost * dist;
+
+            let jitter = if jitter_range > 0.0 {
+                rng.random_range(0.0..jitter_range)
+            } else {
+                0.0
+            };
+
+            let score = district_score
+                + food_lift
+                + garden_lift
+                + defensive_lift
+                + same_kind_lift
+                - distance_cost
+                + jitter;
+
+            match best {
+                Some((_, b)) if score <= b => {}
+                _ => {
+                    best = Some((candidate, score));
+                }
+            }
+        }
+    }
+
+    match best {
+        Some((pos, score)) if score >= s.building_placement_score_floor => Some(pos),
+        _ => None,
+    }
 }
 
 /// Check that every tile in the footprint is passable, in-bounds, and has at
@@ -2016,6 +2361,159 @@ pub fn update_directive_markers(
             commands
                 .entity(entity)
                 .remove::<IsCoordinatorWithDirectives>();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 382 — sliding ColonyCenter
+// ---------------------------------------------------------------------------
+
+/// Periodic re-anchor of `ColonyCenter` from the centroid of live cat
+/// positions. Pre-382 the resource was set once at world-gen and never
+/// changed; 382's user-chosen approach promotes it to a sliding
+/// anchor so as the colony grows, every consumer that uses
+/// `colony_center` (patrol perimeter, coordinator perch, corruption
+/// search, build placement) orients on the inhabited core rather than
+/// the founding tile.
+///
+/// Cadence: recomputed every
+/// `colony_center_update_cadence_ticks` ticks (default 1000 ≈ one
+/// in-game season segment). Snap-to-centroid with no clamp; cat
+/// populations move slowly enough that jitter isn't an issue at this
+/// cadence. Falls back to the existing center when the colony has
+/// no live cats (founding edge / total extinction).
+#[allow(clippy::type_complexity)]
+pub fn update_colony_center(
+    cats: Query<
+        &Position,
+        (
+            With<crate::components::physical::Needs>,
+            Without<crate::components::physical::Dead>,
+            Without<crate::components::wildlife::WildAnimal>,
+        ),
+    >,
+    mut center: ResMut<crate::resources::ColonyCenter>,
+    time: Res<TimeState>,
+    constants: Res<SimConstants>,
+) {
+    let cadence = constants
+        .scoring
+        .colony_center_update_cadence_ticks
+        .max(1);
+    if !time.tick.is_multiple_of(cadence) {
+        return;
+    }
+    let mut count: i64 = 0;
+    let mut sx: i64 = 0;
+    let mut sy: i64 = 0;
+    for p in &cats {
+        sx += p.x as i64;
+        sy += p.y as i64;
+        count += 1;
+    }
+    if count == 0 {
+        return;
+    }
+    let cx = (sx / count) as i32;
+    let cy = (sy / count) as i32;
+    center.0 = Position::new(cx, cy);
+}
+
+// ---------------------------------------------------------------------------
+// 382 — ColonyDistrictMap populator
+// ---------------------------------------------------------------------------
+
+/// Rebuild `ColonyDistrictMap` each tick from live colony state.
+///
+/// Three axes, each in `[0.0, 1.0]`:
+/// - **frontier**: structure halos (radius
+///   `colony_district_structure_halo_radius`) + `CatScentMap` per-bucket
+///   contributions scaled by `colony_district_cat_scent_scale`.
+/// - **crowding**: per-structure short-radius disc
+///   (`colony_district_crowding_radius`) so candidate tiles inside a
+///   building footprint or its immediate apron score crowded.
+/// - **threat**: per-bucket max of `FoxScentMap`, `FoxApproachCorridorMap`,
+///   and `TileMap` corruption sampled at each bucket center.
+///
+/// Scheduled as a sibling of `update_ward_coverage_map` to share the
+/// `magic` chain slot rather than introduce a new top-level edge in
+/// `SimulationPlugin::build()` (`learning_bevy_schedule_edge_perturbation`).
+///
+/// Read by `compute_building_placement` (382) to retire the radius-16
+/// spiral search in `find_building_placement`.
+pub fn update_colony_district_map(
+    structures: Query<
+        (&crate::components::building::Structure, &Position),
+        Without<crate::components::building::ConstructionSite>,
+    >,
+    cat_scent: Res<crate::resources::CatScentMap>,
+    fox_scent: Res<crate::resources::FoxScentMap>,
+    fox_corridor: Res<crate::resources::FoxApproachCorridorMap>,
+    tile_map: Res<crate::resources::map::TileMap>,
+    mut district: ResMut<crate::resources::ColonyDistrictMap>,
+    constants: Res<SimConstants>,
+) {
+    use crate::resources::DistrictAxis;
+
+    district.clear();
+
+    let halo_radius = constants.scoring.colony_district_structure_halo_radius;
+    let crowding_radius = constants.scoring.colony_district_crowding_radius;
+    let cat_scent_scale = constants.scoring.colony_district_cat_scent_scale;
+
+    // Frontier: cat-scent contribution per bucket. Iterates the
+    // CatScent grid directly rather than per-entity, mirroring the
+    // bucket-aligned shape both maps share.
+    let bs = district.bucket_size;
+    for by in 0..district.grid_h {
+        for bx in 0..district.grid_w {
+            let cx = bx as i32 * bs + bs / 2;
+            let cy = by as i32 * bs + bs / 2;
+            let scent = cat_scent.get(cx, cy);
+            if scent > 0.0 {
+                district.stamp(
+                    DistrictAxis::Frontier,
+                    cx,
+                    cy,
+                    (scent * cat_scent_scale).min(1.0),
+                    (bs as f32).max(1.0),
+                );
+            }
+        }
+    }
+
+    // Frontier halo + crowding disc per existing structure. Iterates
+    // once.
+    for (structure, anchor) in &structures {
+        let center = structure.center(anchor);
+        district.stamp(DistrictAxis::Frontier, center.x, center.y, 0.6, halo_radius);
+        district.stamp(
+            DistrictAxis::Crowding,
+            center.x,
+            center.y,
+            1.0,
+            crowding_radius,
+        );
+    }
+
+    // Threat: per-bucket max over three signal sources.
+    for by in 0..district.grid_h {
+        for bx in 0..district.grid_w {
+            let cx = bx as i32 * bs + bs / 2;
+            let cy = by as i32 * bs + bs / 2;
+            let fs = fox_scent.get(cx, cy);
+            let fc = fox_corridor.get(cx, cy);
+            let cr = if tile_map.in_bounds(cx, cy) {
+                tile_map.get(cx, cy).corruption
+            } else {
+                0.0
+            };
+            let threat = fs.max(fc).max(cr).clamp(0.0, 1.0);
+            if threat > 0.0 {
+                let idx = by * district.grid_w + bx;
+                district.threat[idx] = threat;
+            }
         }
     }
 }
@@ -3252,6 +3750,7 @@ mod tests {
         world.insert_resource(crate::resources::FoxScentMap::default());
         world.insert_resource(crate::resources::CatScentMap::default());
         world.insert_resource(crate::resources::WardCoverageMap::default());
+        world.insert_resource(crate::resources::ColonyDistrictMap::default());
         world.insert_resource(crate::resources::WardIntentMap::default());
         world.insert_resource(crate::resources::RecentAmbushMap::default());
         world.insert_resource(crate::resources::CarcassScentMap::default());
@@ -3305,6 +3804,7 @@ mod tests {
         world.insert_resource(crate::resources::FoxScentMap::default());
         world.insert_resource(crate::resources::CatScentMap::default());
         world.insert_resource(crate::resources::WardCoverageMap::default());
+        world.insert_resource(crate::resources::ColonyDistrictMap::default());
         world.insert_resource(crate::resources::WardIntentMap::default());
         world.insert_resource(crate::resources::RecentAmbushMap::default());
         world.insert_resource(crate::resources::CarcassScentMap::default());
@@ -3530,6 +4030,7 @@ mod tests {
                         target_entity: None,
                         target_position: None,
                         blueprint: Some(crate::components::building::StructureType::Den),
+                        placement_failure_count: 0,
                     }],
                 },
             ))
@@ -3559,6 +4060,7 @@ mod tests {
                     target_entity: None,
                     target_position: None,
                     blueprint: Some(crate::components::building::StructureType::Den),
+                    placement_failure_count: 0,
                 }],
             })
             .id();
@@ -3579,6 +4081,7 @@ mod tests {
                         target_entity: None,
                         target_position: None,
                         blueprint: Some(crate::components::building::StructureType::Den),
+                        placement_failure_count: 0,
                     }],
                 },
             ))
@@ -3608,6 +4111,7 @@ mod tests {
                         target_entity: None,
                         target_position: None,
                         blueprint: Some(crate::components::building::StructureType::Den),
+                        placement_failure_count: 0,
                     }],
                 },
             ))
@@ -3625,6 +4129,144 @@ mod tests {
         assert!(
             !has_coord_dir(&world, cat),
             "empty directive queue should remove marker"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // 382 — compute_building_placement tests
+    // -----------------------------------------------------------------
+
+    fn empty_building_placement_maps() -> (
+        crate::resources::ColonyDistrictMap,
+        crate::resources::FoxApproachCorridorMap,
+        crate::resources::FoodLocationMap,
+        crate::resources::GardenLocationMap,
+        crate::resources::map::TileMap,
+    ) {
+        (
+            crate::resources::ColonyDistrictMap::default(),
+            crate::resources::FoxApproachCorridorMap::default(),
+            crate::resources::FoodLocationMap::default(),
+            crate::resources::GardenLocationMap::default(),
+            crate::resources::map::TileMap::new(120, 90, crate::resources::Terrain::Grass),
+        )
+    }
+
+    #[test]
+    fn compute_building_placement_returns_some_in_open_colony() {
+        // No existing buildings, fully passable grass map → any
+        // candidate is valid. With non-zero frontier (provided by a
+        // small CatScentMap deposit, here mocked via a direct stamp on
+        // the district map's frontier axis), the argmax should
+        // strictly prefer the warm tile.
+        let (mut district, fox_corridor, food, garden, tile_map) =
+            empty_building_placement_maps();
+        district.stamp(
+            crate::resources::DistrictAxis::Frontier,
+            60,
+            45,
+            1.0,
+            10.0,
+        );
+        let constants = SimConstants::default();
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let placement = compute_building_placement(
+            StructureType::Stores,
+            (3, 3),
+            Position::new(60, 45),
+            &[],
+            &[],
+            &district,
+            &fox_corridor,
+            &food,
+            &garden,
+            &tile_map,
+            &constants,
+            &mut rng,
+        );
+        let pos = placement.expect("placement must succeed on an open map");
+        // Argmax should land within the frontier-lifted disc, allowing
+        // for the coarse 5-tile candidate step.
+        assert!(
+            (pos.x - 60).abs() <= 10 && (pos.y - 45).abs() <= 10,
+            "placement {pos:?} should sit near the lifted frontier center"
+        );
+    }
+
+    #[test]
+    fn compute_building_placement_prefers_food_proximity_for_stores() {
+        // Two frontier lifts of equal strength on opposite sides of
+        // colony_center. One side also has a saturated FoodLocationMap
+        // bucket. Stores carries `food_proximity_weight > 0` per
+        // `kind_affinity`, so the argmax should land on the food side.
+        let (mut district, fox_corridor, mut food, garden, tile_map) =
+            empty_building_placement_maps();
+        district.stamp(
+            crate::resources::DistrictAxis::Frontier,
+            40,
+            45,
+            1.0,
+            15.0,
+        );
+        district.stamp(
+            crate::resources::DistrictAxis::Frontier,
+            80,
+            45,
+            1.0,
+            15.0,
+        );
+        food.stamp(80, 45, 1.0, 15.0);
+        let constants = SimConstants::default();
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
+        let pos = compute_building_placement(
+            StructureType::Stores,
+            (3, 3),
+            Position::new(60, 45),
+            &[],
+            &[],
+            &district,
+            &fox_corridor,
+            &food,
+            &garden,
+            &tile_map,
+            &constants,
+            &mut rng,
+        )
+        .expect("placement must succeed");
+        assert!(
+            pos.x > 60,
+            "Stores should pick the food-rich side; got {pos:?}"
+        );
+    }
+
+    #[test]
+    fn compute_building_placement_returns_none_below_score_floor() {
+        // Lift the score floor above any composite the empty maps can
+        // produce. With zero frontier, zero same-kind proximity, and a
+        // distance cost that strictly penalizes every candidate, the
+        // argmax never clears the floor.
+        let (district, fox_corridor, food, garden, tile_map) =
+            empty_building_placement_maps();
+        let mut constants = SimConstants::default();
+        constants.scoring.building_placement_score_floor = 5.0;
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(11);
+        let placement = compute_building_placement(
+            StructureType::Stores,
+            (3, 3),
+            Position::new(60, 45),
+            &[],
+            &[],
+            &district,
+            &fox_corridor,
+            &food,
+            &garden,
+            &tile_map,
+            &constants,
+            &mut rng,
+        );
+        assert!(
+            placement.is_none(),
+            "score floor 5.0 should suppress every candidate on empty maps"
         );
     }
 }

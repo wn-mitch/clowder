@@ -31,6 +31,7 @@ pub mod chokepoint_defense_isthmus;
 pub mod colony_reserves_belief;
 pub mod disposal_dispatch;
 pub mod disposal_election;
+pub mod district_placement_under_pressure;
 pub mod dying_arc_softmax;
 pub mod env;
 pub mod exploration_ranging;
@@ -243,6 +244,12 @@ pub const ALL: &[&Scenario] = &[
     &belief_affordance_dse_consumers::SCENARIO_PATROL_AVOIDS_HIGH_THREAT_SECTOR,
     &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_STALK_FOR_OBLIVIOUS_PREY,
     &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_CHASE_FOR_ALERTED_PREY,
+    // 382 — district placement under colony-crowd pressure. Six
+    // founder buildings packed inside the radius-16 spiral disc;
+    // pre-loaded `Build` directive for `Stores`. Asserts the
+    // influence-map placement finds a spot on the expansion frontier
+    // and `Feature::ConstructionSiteSpawned` fires.
+    &district_placement_under_pressure::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

@@ -78,6 +78,14 @@ pub struct Directive {
     pub target_position: Option<Position>,
     /// Blueprint for new construction (None = repair existing building).
     pub blueprint: Option<StructureType>,
+    /// 382: consecutive ticks `compute_building_placement` has returned
+    /// `None` for this directive. Reset on successful placement or on
+    /// each emission of `Feature::DirectiveStuckOnPlacement`. Only
+    /// meaningful for `Build` directives with a blueprint; ignored for
+    /// every other kind. `#[serde(default)]` so pre-382 saves
+    /// deserialize cleanly.
+    #[serde(default)]
+    pub placement_failure_count: u32,
 }
 
 /// Queue of pending directives on a coordinator entity.

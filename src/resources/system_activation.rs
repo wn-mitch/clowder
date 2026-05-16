@@ -57,6 +57,22 @@ pub enum Feature {
     BondFormed,
     CoordinatorElected,
     DirectiveIssued,
+    /// Ticket 382 — a Build directive's `compute_building_placement`
+    /// returned `None` for `placement_stuck_narrate_threshold_ticks`
+    /// consecutive ticks; the coordinator narrated the situation and
+    /// the system reset the counter. Regression canary —
+    /// `expected_to_fire_per_soak() => false`. Firing in a healthy
+    /// seed-42 soak means the influence-map composition or
+    /// `ColonyDistrictMap` weights are mis-calibrated; treat as a
+    /// failed verification.
+    DirectiveStuckOnPlacement,
+    /// Ticket 382 — a Build directive's `compute_building_placement`
+    /// returned `Some` and `spawn_construction_sites` spawned a new
+    /// ConstructionSite entity. Positive observability signal paired
+    /// with `DirectiveStuckOnPlacement`. The seed-42 deep-soak issues
+    /// ~6 Build directives over 15 min, so this is expected to fire
+    /// at least once in any healthy canonical soak.
+    ConstructionSiteSpawned,
     BuildingConstructed,
     BuildingTidied,
     GateProcessed,
@@ -750,6 +766,10 @@ impl Feature {
             Feature::BondFormed => Positive,
             Feature::CoordinatorElected => Positive,
             Feature::DirectiveIssued => Positive,
+            // 382: regression canary — firing means placement is broken.
+            Feature::DirectiveStuckOnPlacement => Negative,
+            // 382: positive observability — a new ConstructionSite spawned.
+            Feature::ConstructionSiteSpawned => Positive,
             Feature::DirectiveDelivered => Positive,
             Feature::BuildingConstructed => Positive,
             Feature::BuildingTidied => Positive,
@@ -1050,6 +1070,10 @@ impl Feature {
             // (`just q events ... BodyPartInjury`) when combat happens —
             // the never-fired canary doesn't add diagnostic value here.
             Feature::BodyPartInjury => false,
+            // Ticket 382: regression canary. Healthy colonies should
+            // never see `compute_building_placement` fail repeatedly;
+            // firing means the influence-map composition is wrong.
+            Feature::DirectiveStuckOnPlacement => false,
             // Misc rare events.
             Feature::PosseCandidateExcludedStarving => false,
             Feature::DepositFailedNoStore => false,
@@ -1301,6 +1325,8 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::BondFormed => "BondFormed",
         Feature::CoordinatorElected => "CoordinatorElected",
         Feature::DirectiveIssued => "DirectiveIssued",
+        Feature::DirectiveStuckOnPlacement => "DirectiveStuckOnPlacement",
+        Feature::ConstructionSiteSpawned => "ConstructionSiteSpawned",
         Feature::BuildingConstructed => "BuildingConstructed",
         Feature::BuildingTidied => "BuildingTidied",
         Feature::GateProcessed => "GateProcessed",

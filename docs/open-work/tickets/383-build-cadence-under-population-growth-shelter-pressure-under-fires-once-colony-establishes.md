@@ -1,0 +1,74 @@
+---
+id: 383
+title: Build-cadence under population growth — shelter pressure under-fires once colony establishes
+status: ready
+cluster: ai-substrate
+orchestration: substrate-sensitive
+initiative: []
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: [382-district-placement.md]
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Surfaced by 382's post-fix soak (`docs/balance/382-district-placement.md`).
+With the influence-map placement landing, the placement layer no
+longer silently fails — but `structures_built` only rose 3 → 4
+across a 15-min seed-42 soak because the colony grew dramatically
+(`peak_population` 9 → 12, `kittens_born` 1 → 4) while only one
+additional building got built. `welfare.shelter` regressed
+0.20 → 0.17. The substrate-correct fix exposed the next bottleneck:
+`accumulate_build_pressure` under-issues Den / Stores blueprints
+once the colony establishes, and the duplicate-blueprint gate in
+`spawn_construction_sites` drops the second of any matching-kind
+directive that does fire.
+
+## Scope
+
+- Layer-walk audit (per CLAUDE.md `Bugfix discipline`) on
+  `accumulate_build_pressure` → `assess_colony_needs`'s build slot
+  → `BuildDse` eligibility → `spawn_construction_sites`. Promote
+  `[suspect]` rows via concrete queries (`just q`).
+- Identify whether shelter pressure should rise faster on
+  `peak_population` growth, or whether the coordinator should batch
+  unique-blueprint issuance across a window.
+- Structural-option menu (split / extend / rebind / retire) for the
+  shelter-pressure axis.
+
+## Out of scope
+
+- Modifying 382's placement substrate.
+- New building kinds.
+- Player-driven build commands.
+
+## Current state
+
+382 landed `compute_building_placement` + `Feature::ConstructionSiteSpawned`
++ `Feature::DirectiveStuckOnPlacement`. The latter is the regression
+canary; it stays cold (= 0) in healthy soaks. This ticket investigates
+the upstream cadence question that 382's soak surfaced.
+
+## Approach
+
+TBD — layer-walk first, then candidate menu, per `_template_bugfix.md`
+discipline. Read `docs/balance/382-district-placement.md` §Observation
+for the empirical anchor.
+
+## Verification
+
+- Layer-walk audit table populated with `[verified-*]` rows.
+- Soak-trace seed-42 + frame-diff: `structures_built` lift > 50% on
+  the same population-growth trajectory.
+- `welfare.shelter` ≥ baseline (no further regression).
+- All hard gates + continuity canaries hold.
+
+## Log
+
+- 2026-05-16: opened blocked-by 382 from 382's soak observation —
+  placement fixed, build cadence is the next bottleneck.
