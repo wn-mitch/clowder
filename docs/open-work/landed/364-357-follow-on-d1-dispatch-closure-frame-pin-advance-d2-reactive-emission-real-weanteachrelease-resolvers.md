@@ -13,7 +13,7 @@ supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
 wires-method: []
-landed-at: pending
+landed-at: 6f69f0c5
 landed-on: 2026-05-16
 ---
 

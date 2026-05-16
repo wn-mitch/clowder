@@ -464,6 +464,22 @@ pub struct TargetMarkerQueries<'w, 's> {
     /// own-kitten-anywhere fallback when the per-tick range gate
     /// would otherwise filter every candidate out.
     pub parent_hungry_kitten_q: Query<'w, 's, Has<markers::IsParentOfHungryKitten>>,
+    /// Ticket 397 (Layer 1) — broader parent-state substrate plumbed
+    /// into `MarkerSnapshot` so `score_actions` can gate Caretake's
+    /// pool entry on "this cat structurally has a dependent kitten,"
+    /// not just "an acutely hungry kitten is in range." `Parent` stays
+    /// true through full natural maturity (set by
+    /// `growth::update_parent_markers`); `HasJuvenileDependent` is
+    /// the rear_kitten arc emit window subset. The mirror of `Parent`
+    /// here also corrects the pre-existing silent stale read at
+    /// `escape_viability(...)` (this file ~line 1955) which queried
+    /// `markers.has(Parent::KEY, entity)` against a snapshot that
+    /// never populated the key.
+    pub parent_markers_q: Query<
+        'w,
+        's,
+        (Has<markers::Parent>, Has<markers::HasJuvenileDependent>),
+    >,
     /// Ticket 321 — per-cat L1→L2 picker output. When the cat carries
     /// a non-empty `AspirationEmissions`, the L2 author site replaces
     /// the default `Intention::Activity { Idle }` wrap with
@@ -557,6 +573,11 @@ pub struct ExecutorContext<'w, 's> {
             Entity,
             &'static crate::components::KittenDependency,
             &'static Position,
+            // 395: rear_kitten arc's one-shot Release marker. The
+            // `dependent_kitten_target` picker excludes already-released
+            // kittens so the second parent's concurrent frame doesn't
+            // re-witness `Feature::KittenReleased`.
+            Has<crate::components::markers::RearKittenReleased>,
         ),
         // Disjoint from the cats query (which holds `&mut Position`):
         // kittens never carry `GoapPlan` (evaluate_and_plan filters
@@ -1698,6 +1719,17 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::Banished::KEY, entity, banished);
             markers.set_entity(markers::BefriendedAlly::KEY, entity, befriended_ally);
         }
+        // Ticket 397 Layer 1 — Parent + HasJuvenileDependent mirror
+        // into `MarkerSnapshot`. `score_actions` reads `Parent` to gate
+        // Caretake's pool entry every tick the cat structurally has a
+        // dependent kitten (per §L2.10.4 — every DSE whose emit
+        // precondition holds belongs in the candidate pool). Authored
+        // each tick by `growth::update_parent_markers` (Chain 2a,
+        // before this loop).
+        if let Ok((is_parent, has_juv_dep)) = marker_qs.parent_markers_q.get(entity) {
+            markers.set_entity(markers::Parent::KEY, entity, is_parent);
+            markers.set_entity(markers::HasJuvenileDependent::KEY, entity, has_juv_dep);
+        }
 
         // Ticket 014 §4 sensing batch — `has_herbs_nearby` /
         // `prey_nearby` now read from `MarkerSnapshot`. The inline
@@ -2423,19 +2455,51 @@ pub fn evaluate_and_plan(
         // load-bearing: the cat must walk through sub-goals across
         // ticks, and the softmax can't independently re-derive Wean →
         // Teach → Release sequencing.
-        let frame_pinned_primitive: Option<Action> = world_state
-            .held_goal_stacks
-            .get(entity)
-            .ok()
-            .and_then(|stack| stack.top())
-            .filter(|frame| frame.sub_goal_count > 1)
-            .and_then(|frame| {
-                let method = res.method_registry.lookup_by_id(frame.method)?;
-                match method.sub_goals.get(frame.sub_goal_index)? {
-                    crate::ai::methods::SubGoal::Primitive { action, .. } => Some(*action),
-                    crate::ai::methods::SubGoal::Goal(_) => None,
-                }
-            });
+        // Ticket 397 Layer 3 — narrow §L2.10.6 precedent: when the L2/L3
+        // softmax just picked Caretake, do not let the frame-pin discard
+        // that selection. Caretake's score is high precisely when a
+        // dependent kitten is in acute need (kitten_urgency axis, weight
+        // 0.45); preempting it with a maturity-bump primitive
+        // (Wean/Teach/Release — none of which feed) strands the kitten.
+        // The held rear_kitten frame stays on the stack as durable
+        // commitment per §8.4 ("never exclude the incumbent"); next tick
+        // softmax samples again, and if Caretake's score drops (kitten
+        // sated after feeding), the pin resumes walking sub-goals. This
+        // is the narrow precedent for the full §L2.10.6 softmax-over-
+        // Intentions wrap-site rework (deferred to the 060 epic) — the
+        // architectural answer is "Caretake-as-Intention and rear_kitten-
+        // as-Intention compete in one pool with persistence-bonus"; the
+        // narrow guard here approximates that outcome for the load-
+        // bearing acute-Caretake case without rewriting the full pool
+        // machinery. With this guard, 395's reactive-emit yield rule
+        // (`has_dependent_kitten`'s `!IsParentOfHungryKitten` clause)
+        // becomes structurally unnecessary and retires in the same land.
+        //
+        // The guard zeros `frame_pinned_primitive` itself (not just the
+        // chosen_action override) so the downstream plan-template branch
+        // at line ~2549 routes Caretake through `actions_for_disposition`
+        // (its real plan template, [TravelTo(SocialTarget), Caretake])
+        // instead of `htn_primitive_actions` (which panics on Caretake —
+        // that function only handles Wean/Teach/Release/Vigil/GriefSit
+        // /ReleaseGrief).
+        let softmax_winner_preempts_pin = chosen_action == Action::Caretake;
+        let frame_pinned_primitive: Option<Action> = if softmax_winner_preempts_pin {
+            None
+        } else {
+            world_state
+                .held_goal_stacks
+                .get(entity)
+                .ok()
+                .and_then(|stack| stack.top())
+                .filter(|frame| frame.sub_goal_count > 1)
+                .and_then(|frame| {
+                    let method = res.method_registry.lookup_by_id(frame.method)?;
+                    match method.sub_goals.get(frame.sub_goal_index)? {
+                        crate::ai::methods::SubGoal::Primitive { action, .. } => Some(*action),
+                        crate::ai::methods::SubGoal::Goal(_) => None,
+                    }
+                })
+        };
         if let Some(leaf_action) = frame_pinned_primitive {
             chosen_action = leaf_action;
             if let Some(disp) = DispositionKind::from_action(leaf_action) {
@@ -3517,7 +3581,7 @@ pub fn resolve_goap_plans(
         kitten_parents: ec
             .kitten_parentage
             .iter()
-            .map(|(e, dep, _pos)| (e, (dep.mother, dep.father)))
+            .map(|(e, dep, _pos, _released)| (e, (dep.mother, dep.father)))
             .collect(),
         // 035: dead-cat snapshot for burial target picking + post-loop
         // drain. The `cats` query is `Without<Dead>` so this is disjoint.
@@ -4672,7 +4736,7 @@ pub fn resolve_goap_plans(
             KittenRearingAdvance::Teach(e) => (e, "Teach"),
             KittenRearingAdvance::Release(e) => (e, "Release"),
         };
-        let Ok((_, dep, _pos)) = ec.kitten_parentage.get(target) else {
+        let Ok((_, dep, _pos, _released)) = ec.kitten_parentage.get(target) else {
             // Kitten despawned between the per-cat loop and now (e.g.,
             // death cascade). Skip silently — the HTN frame will abandon
             // via backtrack hook (commit b) on the next plan boundary.
@@ -4697,9 +4761,29 @@ pub fn resolve_goap_plans(
                 });
             }
             KittenRearingAdvance::Release(_) => {
+                // 395 / R13: Release is symbolic — Feature::KittenReleased
+                // was already witnessed in the per-cat dispatch. Author
+                // the kitten-side RearKittenReleased ZST so:
+                //   (a) the second parent's concurrent frame sees
+                //       released_by_arc=true and the picker returns
+                //       None → R11 Advance → no double-witness.
+                //   (b) update_parent_markers stops re-authoring
+                //       HasJuvenileDependent for the near-mature window
+                //       — the arc emit shuts off for this kitten.
+                // KittenDependency removal stays gated on natural
+                // maturity (>= 1.0); the canonical site is
+                // `tick_kitten_growth`. This drain branch only fires
+                // when picker timing happens to coincide with that
+                // boundary; Commands::remove is idempotent with growth's
+                // queued remove.
                 commands
                     .entity(target)
-                    .remove::<crate::components::KittenDependency>();
+                    .insert(crate::components::markers::RearKittenReleased);
+                if dep.maturity >= 1.0 {
+                    commands
+                        .entity(target)
+                        .remove::<crate::components::KittenDependency>();
+                }
             }
         }
     }
@@ -7137,10 +7221,15 @@ fn dispatch_htn_kitten_primitive(
     use crate::resources::system_activation::Feature;
     let weaned_threshold = ec.constants.kitten_rearing.weaned_threshold;
     let teach_done_threshold = ec.constants.kitten_rearing.teach_done_threshold;
+    let release_threshold = ec.constants.kitten_rearing.release_threshold;
     let curriculum_size = ec.constants.kitten_rearing.teach_curriculum_size;
 
-    // Resolve target via picker if not cached. Picker filters candidates
-    // by mother + per-action maturity band; returns the nearest match.
+    // 395: picker filters candidates by (mother OR father) +
+    // per-action maturity band + !released_by_arc; returns the nearest
+    // match. Wean is `[0, weaned_threshold)`, Teach is
+    // `[weaned_threshold, teach_done_threshold)`, Release is
+    // `[release_threshold, 1.0)` (the near-mature window — Release
+    // fires "at max age").
     if plan.step_state[step_idx].target_entity.is_none() {
         let kittens = build_dependent_kitten_snapshot(
             &ec.kitten_parentage,
@@ -7155,14 +7244,34 @@ fn dispatch_htn_kitten_primitive(
                 &kittens,
                 weaned_threshold,
                 teach_done_threshold,
+                release_threshold,
                 ec.time.tick,
                 None,
             );
     }
 
     let Some(target) = plan.step_state[step_idx].target_entity else {
-        // No eligible kitten in range. The HTN backtrack hook (commit b)
-        // consults the frame's `MethodFailure` strategy on this Fail.
+        // 395 / R11: differentiate two failure modes:
+        //   - This cat is a parent (mother or father) of a dependent
+        //     kitten but the kitten is past or before this sub-goal's
+        //     maturity band → substrate-clean `Advance` so the HTN
+        //     frame's sub_goal_index moves on; next tick's dispatch
+        //     resolves the band-correct primitive. Without this,
+        //     `GoalFrame::new`'s hard-coded `sub_goal_index = 0`
+        //     causes per-tick Wean failures (2439 per soak pre-395).
+        //   - This cat has no dependent kitten at all → real `Fail`
+        //     via the HTN backtrack hook (consults the frame's
+        //     `MethodFailure`).
+        // 395 extends 333/364's mother-only check to symmetric
+        // mother-OR-father per the "both parents pitch in" decision.
+        let is_parent_of_any_dependent = ec.kitten_parentage.iter().any(
+            |(_, dep, _pos, _released)| {
+                dep.mother == Some(cat_entity) || dep.father == Some(cat_entity)
+            },
+        );
+        if is_parent_of_any_dependent {
+            return crate::steps::StepResult::Advance;
+        }
         return crate::steps::StepResult::Fail(format!(
             "{action:?}: no dependent kitten in range/band"
         ));
@@ -7170,7 +7279,11 @@ fn dispatch_htn_kitten_primitive(
 
     // Read current KittenDependency state via the disjoint
     // `kitten_parentage` query.
-    let dep_state = ec.kitten_parentage.get(target).ok().map(|(_, d, _)| d);
+    let dep_state = ec
+        .kitten_parentage
+        .get(target)
+        .ok()
+        .map(|(_, d, _, _)| d);
 
     match action {
         crate::ai::Action::Wean => {
@@ -7226,28 +7339,36 @@ fn dispatch_htn_kitten_primitive(
     }
 }
 
-/// 364: build the kitten snapshot consumed by
+/// 364 / 395: build the kitten snapshot consumed by
 /// `resolve_dependent_kitten_target`. Reads
 /// `ExecutorContext::kitten_parentage` directly (which carries Position
-/// alongside `KittenDependency`); the `cat_positions` snapshot in
-/// `StepSnapshots` excludes kittens because they don't carry `GoapPlan`,
-/// so it can't be used here.
+/// alongside `KittenDependency` and the 395 `RearKittenReleased`
+/// marker); the `cat_positions` snapshot in `StepSnapshots` excludes
+/// kittens because they don't carry `GoapPlan`, so it can't be used
+/// here.
 #[allow(clippy::type_complexity)]
 fn build_dependent_kitten_snapshot(
     kitten_parentage: &Query<
-        (Entity, &crate::components::KittenDependency, &Position),
+        (
+            Entity,
+            &crate::components::KittenDependency,
+            &Position,
+            Has<crate::components::markers::RearKittenReleased>,
+        ),
         (Without<Dead>, Without<GoapPlan>),
     >,
     _cat_positions: &[(Entity, Position)],
 ) -> Vec<crate::ai::dses::dependent_kitten_target::DependentKittenState> {
     kitten_parentage
         .iter()
-        .map(|(entity, dep, pos)| {
+        .map(|(entity, dep, pos, released)| {
             crate::ai::dses::dependent_kitten_target::DependentKittenState {
                 entity,
                 pos: *pos,
                 maturity: dep.maturity,
                 mother: dep.mother,
+                father: dep.father,
+                released_by_arc: released,
             }
         })
         .collect()

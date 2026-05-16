@@ -623,6 +623,54 @@ impl Parent {
     pub const KEY: &str = "Parent";
 }
 
+/// **Active milestone-arc availability** (ticket 395). Cat has ≥1
+/// living dependent kitten where this cat is `mother` or `father` AND
+/// the kitten is in either:
+/// - **Early arc window** `[0, teach_done_threshold)` — Wean / Teach
+///   milestones still have eligibility, OR
+/// - **Near-mature window** `[release_threshold, 1.0)` — Release is
+///   pickable AND the kitten has not yet been symbolically released
+///   (no `RearKittenReleased` marker).
+///
+/// Gates the `kitten_reared` reactive emit so the arc doesn't churn
+/// during the long `[teach_done_threshold, release_threshold)` idle
+/// gap (queen does Caretake-only there) or after symbolic Release
+/// has fired for the kitten. Both parents pitch in — 395 retired the
+/// 333/364 mother-only deferral on the picker too.
+///
+/// **§4.3 ordering hazard.** Same as [`Parent`]: a kitten's death
+/// removes its parents' markers within the same tick. Don't infer
+/// grief-parent status from `With<HasJuvenileDependent>` post-death.
+///
+/// Authoring: `growth.rs::update_parent_markers` (merged pass with
+/// `Parent`).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasJuvenileDependent;
+impl HasJuvenileDependent {
+    pub const KEY: &str = "HasJuvenileDependent";
+}
+
+/// **Symbolic Release fired** (ticket 395). Inserted by the
+/// `rear_kitten` arc's Release drain when a parent (mother or father)
+/// witnesses `Feature::KittenReleased` for this kitten. One-shot
+/// semantics: the second parent's concurrent frame, on its next
+/// dispatch, sees `released_by_arc=true` in the picker snapshot and
+/// returns None → R11 Advance → frame pops without re-witnessing.
+/// The marker also flips `HasJuvenileDependent` false on the parents'
+/// side so the near-mature emit window stops firing for this kitten
+/// even before natural maturation.
+///
+/// Persists on the kitten until despawn — survives natural
+/// maturation alongside `BornInSim`.
+///
+/// Authoring: drain arm `KittenRearingAdvance::Release` in
+/// `goap.rs`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct RearKittenReleased;
+impl RearKittenReleased {
+    pub const KEY: &str = "RearKittenReleased";
+}
+
 /// Cat was born during this simulation run (not a founding member).
 /// Inserted once at the kitten-spawn site in `pregnancy.rs` alongside
 /// `KittenDependency::new(...)`; never removed. Survives maturation
@@ -870,6 +918,8 @@ mod tests {
     #[test]
     fn reproduction_markers_queryable() {
         assert_marker_queryable(Parent);
+        assert_marker_queryable(HasJuvenileDependent);
+        assert_marker_queryable(RearKittenReleased);
         assert_marker_queryable(BornInSim);
     }
 

@@ -1957,8 +1957,55 @@ pub fn score_actions(
     }
 
     // --- Caretake (§2.3: WS of kitten_urgency + compassion + is_parent) ---
-    if ctx.hungry_kitten_urgency > 0.0 {
-        let score = score_dse_by_id("caretake", ctx, inputs);
+    // Ticket 397 Layer 1 — Caretake enters the L2 pool every tick the cat
+    // structurally has a dependent kitten (`Parent` marker), not only when
+    // an acutely hungry kitten clears the upstream
+    // `caretake_resolution.urgency > 0` gate. Per §L2.10.4, the candidate
+    // pool for the L3 softmax is *all* DSEs whose emit preconditions hold —
+    // and Caretake's emit precondition is "this cat is in a position to
+    // caretake," i.e., has a dependent. Pool-entry vs score magnitude are
+    // distinct concerns: when no kitten is in acute hunger, the existing
+    // `kitten_urgency` axis (Quadratic-amplified hunger deficit at weight
+    // 0.45) keeps the score modest (~compassion-only); Caretake competes
+    // gracefully in softmax without forcing a firing.
+    //
+    // The `hungry_kitten_urgency > 0.0` branch is retained so non-parent
+    // adults responding to colony-kittens (Phase 4c.4 alloparenting
+    // pattern, kinship Cliff non-parent floor 0.6) still enter the pool
+    // under the original signal.
+    //
+    // Ticket 397 Layer 2 — durable-commitment L2 lift. When the cat is
+    // structurally inside a rear_kitten arc window
+    // (`HasJuvenileDependent` marker — set by
+    // `growth::update_parent_markers` during the early window
+    // [0, teach_done) and near-mature window [release_threshold, 1.0)),
+    // bias Caretake's L2 score so it competes with the rest of the cat's
+    // per-tick DSEs. This is the "L2 lift" the user described in
+    // planning ("the cat sees the L1 stimuli but she also knows she
+    // wants to take care of her kitten"). Approximates the spec's full
+    // §L2.10.6 softmax-over-Intentions composition for the narrow
+    // rear_kitten case — the durable commitment manifests as additive
+    // score bias on the corresponding DSE, not as a hard frame-pin that
+    // discards softmax winners. The pin still fires for the
+    // Wean/Teach/Release primitives during the idle space (Layer 3's
+    // pin-Caretake-preempts guard kicks in only when Caretake wins
+    // softmax). Magnitude derived from the observed Cook−Caretake L2
+    // score gap in Pebblekit-67's window (Cook avg 0.355, Caretake avg
+    // 0.101 post-Layer-1 baseline): +0.25 brings Caretake to ~0.35 at
+    // the floor (no acute hunger) and climbs naturally above competitor
+    // DSEs as kitten hunger axis amplifies. Tunable via
+    // `ScoringConstants::rear_kitten_caretake_lift`; balance-doc
+    // iteration after first soak surfaces a tuned value if needed.
+    let has_dependent_kitten =
+        inputs.markers.has(crate::components::markers::Parent::KEY, inputs.cat);
+    if has_dependent_kitten || ctx.hungry_kitten_urgency > 0.0 {
+        let mut score = score_dse_by_id("caretake", ctx, inputs);
+        if inputs
+            .markers
+            .has(crate::components::markers::HasJuvenileDependent::KEY, inputs.cat)
+        {
+            score = (score + s.rear_kitten_caretake_lift).clamp(0.0, 1.0);
+        }
         scores.push((Action::Caretake, score + jitter(rng, s.jitter_range)));
     }
 

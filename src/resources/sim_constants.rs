@@ -2125,6 +2125,22 @@ pub struct ScoringConstants {
     /// `mentor_food_security_weight`. Ships dormant at 0.0.
     #[serde(default = "default_caretake_food_security_weight")]
     pub caretake_food_security_weight: f32,
+    /// 397 Layer 2 — durable-commitment L2 lift on Caretake when the
+    /// cat carries `HasJuvenileDependent` (i.e., is structurally
+    /// inside a rear_kitten arc window). Approximates §L2.10.6
+    /// softmax-over-Intentions for the rear_kitten ↔ Caretake pair:
+    /// the durable commitment manifests as an additive score bias on
+    /// the corresponding DSE rather than a hard frame-pin override.
+    /// Magnitude derived from the observed Cook−Caretake L2 score gap
+    /// in `logs/tuned-42-395-with-yield` (Cook avg 0.355, Caretake
+    /// post-Layer-1 avg 0.101) — +0.25 brings Caretake's floor up to
+    /// ~0.35 (parity) and acute-hunger ticks climb naturally above.
+    /// Read at `score_actions` (`src/ai/scoring.rs:~1990`); applied
+    /// post-DSE-eval and clamped to [0, 1]. Balance-doc iteration
+    /// after first soak surfaces a tuned value if survival cadence is
+    /// marginal.
+    #[serde(default = "default_rear_kitten_caretake_lift")]
+    pub rear_kitten_caretake_lift: f32,
     /// 209: weight on the `FoodSecurityGroomLift` modifier targeting
     /// GroomOther. Multiplicative shape `(1 + w · colony_food_security)`
     /// preserves CompensatedProduct gates in the underlying DSE. Ships
@@ -2885,6 +2901,7 @@ impl Default for ScoringConstants {
             mentor_food_security_weight: default_mentor_food_security_weight(),
             coordinate_food_security_weight: default_coordinate_food_security_weight(),
             caretake_food_security_weight: default_caretake_food_security_weight(),
+            rear_kitten_caretake_lift: default_rear_kitten_caretake_lift(),
             groom_food_security_weight: default_groom_food_security_weight(),
             patrol_fox_scent_weight: default_patrol_fox_scent_weight(),
             patrol_route_cost_weight: default_patrol_route_cost_weight(),
@@ -4140,6 +4157,13 @@ fn default_coordinate_food_security_weight() -> f32 {
 /// `colony_food_security` axis. Ships dormant at 0.0.
 fn default_caretake_food_security_weight() -> f32 {
     0.0
+}
+
+/// 397 Layer 2 — additive L2 score lift on Caretake when the cat
+/// carries `HasJuvenileDependent`. Derived from the Cook−Caretake
+/// score gap in Pebblekit-67's window (~0.25). See struct field doc.
+fn default_rear_kitten_caretake_lift() -> f32 {
+    0.25
 }
 
 /// 209: GroomOther `FoodSecurityGroomLift` modifier weight. Ships
@@ -6328,10 +6352,19 @@ pub struct KittenRearingConstants {
     /// `weaned_threshold <= maturity < teach_done_threshold`. resolve_teach
     /// bumps maturity to this value on success.
     pub teach_done_threshold: f32,
-    /// Release is eligible while `maturity >= teach_done_threshold`.
-    /// resolve_release removes `KittenDependency` (the natural maturation
-    /// removal at `maturity >= release_threshold = 1.0` still applies if the
-    /// arc never completes).
+    /// Lower bound of the **near-mature emission window** for the
+    /// `rear_kitten` HTN arc (ticket 395). The arc emits in two narrow
+    /// windows gated by the `HasJuvenileDependent` marker:
+    /// (a) early `[0, teach_done_threshold)` for Wean / Teach milestones,
+    /// (b) near-mature `[release_threshold, 1.0)` for symbolic Release.
+    /// The Release picker uses this value as its eligibility lower bound,
+    /// so Release fires "at max age" — near the natural maturation moment.
+    /// Natural maturation itself (the moment `KittenDependency` is removed
+    /// physiologically) is hardcoded at maturity ≥ 1.0 in
+    /// `tick_kitten_growth` and is independent of this constant. The
+    /// kitten-side `RearKittenReleased` marker is one-shot so the second
+    /// parent's frame can't re-witness within the window.
+    /// **Invariant:** `teach_done_threshold < release_threshold < 1.0`.
     pub release_threshold: f32,
     /// Number of skill demonstrations recorded on the kitten's
     /// `KittenDependency.skills_learned` over the Teach phase. Substrate-only
@@ -6346,7 +6379,7 @@ impl Default for KittenRearingConstants {
         Self {
             weaned_threshold: 0.33,
             teach_done_threshold: 0.66,
-            release_threshold: 1.0,
+            release_threshold: 0.95,
             teach_curriculum_size: 5,
         }
     }

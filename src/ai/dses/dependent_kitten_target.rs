@@ -6,18 +6,20 @@
 //!
 //! One factory parameterized by [`Action`] produces three sibling
 //! `TargetTakingDse`s — same scoring shape, different DseId + eligibility
-//! band:
+//! band (ticket 395 moved Release from `teach_done_threshold` to a
+//! distinct `release_threshold`, leaving a deliberate gap where the arc
+//! is idle and Caretake covers feeding):
 //!
-//! | Action     | Eligibility band                                      |
-//! |------------|-------------------------------------------------------|
-//! | `Wean`     | `maturity < weaned_threshold`                         |
-//! | `Teach`    | `weaned_threshold <= maturity < teach_done_threshold` |
-//! | `Release`  | `maturity >= teach_done_threshold`                    |
+//! | Action     | Eligibility band                                       |
+//! |------------|--------------------------------------------------------|
+//! | `Wean`     | `maturity < weaned_threshold`                          |
+//! | `Teach`    | `weaned_threshold <= maturity < teach_done_threshold`  |
+//! | `Release`  | `maturity >= release_threshold` AND not yet released   |
 //!
-//! All three filter candidates to `KittenDependency.mother == Some(self)`
-//! per #333 §Out-of-scope (father-side rearing deferred). The leaves are
-//! mutually exclusive on maturity, so at most one DSE fires per kitten per
-//! tick.
+//! 395 widened the parent filter from `KittenDependency.mother == Some(self)`
+//! to `mother == Some(self) OR father == Some(self)` — both parents pitch
+//! in. The leaves are mutually exclusive on maturity, so at most one DSE
+//! fires per kitten per tick.
 //!
 //! **Scoring axes (single).** Spatial nearness only — `Quadratic(exp=1.5,
 //! divisor=-1, shift=1)` over normalized cost, matching the §L2.10.7
@@ -64,6 +66,13 @@ pub struct DependentKittenState {
     pub pos: Position,
     pub maturity: f32,
     pub mother: Option<Entity>,
+    /// 395: father parental link, so the picker can resolve either
+    /// parent (symmetric — both pitch in).
+    pub father: Option<Entity>,
+    /// 395: `RearKittenReleased` marker present on the kitten. The
+    /// picker excludes already-released kittens so the second parent's
+    /// concurrent frame can't re-witness `Feature::KittenReleased`.
+    pub released_by_arc: bool,
 }
 
 /// `rear_kitten` target-taking DSE factory parameterized by the primitive
@@ -117,7 +126,7 @@ pub fn dependent_kitten_target_dse_id_for(action: Action) -> DseId {
 }
 
 fn dependent_kitten_candidate_query_doc(_cat: Entity) -> &'static str {
-    "kittens with KittenDependency.mother == Some(self) within DEPENDENT_KITTEN_TARGET_RANGE and matching the action's maturity band"
+    "kittens with KittenDependency.(mother | father) == Some(self) within DEPENDENT_KITTEN_TARGET_RANGE, matching the action's maturity band, and not yet released by the arc"
 }
 
 fn dependent_kitten_intention_for(action: Action) -> fn(Entity) -> Intention {
@@ -163,23 +172,31 @@ fn release_intention(_target: Entity) -> Intention {
 // Caller-side resolver
 // ---------------------------------------------------------------------------
 
-/// Pick the best dependent-kitten target for `queen` given the leaf
+/// Pick the best dependent-kitten target for `parent` given the leaf
 /// primitive's `action`. Returns `None` iff no kitten satisfies the
-/// action's maturity band AND the mother-side filter AND the range gate.
+/// action's maturity band AND the mother-OR-father filter AND the
+/// range gate AND the not-yet-released filter.
 ///
 /// `kittens` is built upstream by the dispatch arm from
 /// `ExecutorContext::kitten_parentage` joined against the cat-position
 /// snapshot. Kittens without a recorded position are excluded by the
 /// caller (cannot score nearness).
+///
+/// **395:** parameter renamed `queen` → `parent` (both parents
+/// eligible), and a new `release_threshold` parameter gates the
+/// Release band's lower bound. Picker also filters
+/// `!released_by_arc` so the second parent's concurrent frame can't
+/// re-witness Release.
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_dependent_kitten_target(
     action: Action,
     registry: &DseRegistry,
-    queen: Entity,
-    queen_pos: Position,
+    parent: Entity,
+    parent_pos: Position,
     kittens: &[DependentKittenState],
     weaned_threshold: f32,
     teach_done_threshold: f32,
+    release_threshold: f32,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
 ) -> Option<Entity> {
@@ -192,13 +209,26 @@ pub fn resolve_dependent_kitten_target(
     let mut candidates: Vec<Entity> = Vec::new();
     let mut positions: Vec<Position> = Vec::new();
     for kitten in kittens {
-        if kitten.mother != Some(queen) {
+        // 395: symmetric — either parent is eligible.
+        if kitten.mother != Some(parent) && kitten.father != Some(parent) {
             continue;
         }
-        if !maturity_in_band(action, kitten.maturity, weaned_threshold, teach_done_threshold) {
+        // 395: arc fires Release exactly once per kitten via the
+        // one-shot RearKittenReleased marker; second parent's frame
+        // sees this and falls through to None → R11 Advance.
+        if kitten.released_by_arc {
             continue;
         }
-        let dist = queen_pos.manhattan_distance(&kitten.pos) as f32;
+        if !maturity_in_band(
+            action,
+            kitten.maturity,
+            weaned_threshold,
+            teach_done_threshold,
+            release_threshold,
+        ) {
+            continue;
+        }
+        let dist = parent_pos.manhattan_distance(&kitten.pos) as f32;
         if dist > DEPENDENT_KITTEN_TARGET_RANGE {
             continue;
         }
@@ -218,12 +248,12 @@ pub fn resolve_dependent_kitten_target(
     let has_marker = |_: &str, _: Entity| -> bool { false };
 
     let ctx = EvalCtx {
-        cat: queen,
+        cat: parent,
         tick,
         entity_position: &entity_position,
         anchor_position: &anchor_position,
         has_marker: &has_marker,
-        self_position: queen_pos,
+        self_position: parent_pos,
         target: None,
         target_position: None,
         target_alive: None,
@@ -232,7 +262,7 @@ pub fn resolve_dependent_kitten_target(
 
     let scored = evaluate_target_taking(
         dse,
-        queen,
+        parent,
         &candidates,
         &positions,
         &ctx,
@@ -254,17 +284,22 @@ pub fn resolve_dependent_kitten_target(
     scored.winning_target
 }
 
-/// Per-action maturity-band predicate.
+/// Per-action maturity-band predicate. 395: Release lower bound
+/// switched from `teach_done_threshold` to `release_threshold` (the
+/// near-mature window). The gap `[teach_done_threshold,
+/// release_threshold)` is deliberate idle space where the arc emits
+/// nothing and Caretake covers feeding.
 pub fn maturity_in_band(
     action: Action,
     maturity: f32,
     weaned_threshold: f32,
     teach_done_threshold: f32,
+    release_threshold: f32,
 ) -> bool {
     match action {
         Action::Wean => maturity < weaned_threshold,
         Action::Teach => maturity >= weaned_threshold && maturity < teach_done_threshold,
-        Action::Release => maturity >= teach_done_threshold,
+        Action::Release => maturity >= release_threshold,
         _ => false,
     }
 }
@@ -279,6 +314,43 @@ mod tests {
             pos: Position::new(x, y),
             maturity,
             mother,
+            father: None,
+            released_by_arc: false,
+        }
+    }
+
+    fn kitten_with_father(
+        id: u32,
+        x: i32,
+        y: i32,
+        maturity: f32,
+        mother: Option<Entity>,
+        father: Option<Entity>,
+    ) -> DependentKittenState {
+        DependentKittenState {
+            entity: Entity::from_raw_u32(id).unwrap(),
+            pos: Position::new(x, y),
+            maturity,
+            mother,
+            father,
+            released_by_arc: false,
+        }
+    }
+
+    fn kitten_released(
+        id: u32,
+        x: i32,
+        y: i32,
+        maturity: f32,
+        mother: Option<Entity>,
+    ) -> DependentKittenState {
+        DependentKittenState {
+            entity: Entity::from_raw_u32(id).unwrap(),
+            pos: Position::new(x, y),
+            maturity,
+            mother,
+            father: None,
+            released_by_arc: true,
         }
     }
 
@@ -332,25 +404,30 @@ mod tests {
 
     #[test]
     fn wean_band_is_below_weaned_threshold() {
-        assert!(maturity_in_band(Action::Wean, 0.0, 0.33, 0.66));
-        assert!(maturity_in_band(Action::Wean, 0.32, 0.33, 0.66));
-        assert!(!maturity_in_band(Action::Wean, 0.33, 0.33, 0.66));
-        assert!(!maturity_in_band(Action::Wean, 0.5, 0.33, 0.66));
+        assert!(maturity_in_band(Action::Wean, 0.0, 0.33, 0.66, 0.95));
+        assert!(maturity_in_band(Action::Wean, 0.32, 0.33, 0.66, 0.95));
+        assert!(!maturity_in_band(Action::Wean, 0.33, 0.33, 0.66, 0.95));
+        assert!(!maturity_in_band(Action::Wean, 0.5, 0.33, 0.66, 0.95));
     }
 
     #[test]
     fn teach_band_is_between_thresholds() {
-        assert!(!maturity_in_band(Action::Teach, 0.32, 0.33, 0.66));
-        assert!(maturity_in_band(Action::Teach, 0.33, 0.33, 0.66));
-        assert!(maturity_in_band(Action::Teach, 0.5, 0.33, 0.66));
-        assert!(!maturity_in_band(Action::Teach, 0.66, 0.33, 0.66));
+        assert!(!maturity_in_band(Action::Teach, 0.32, 0.33, 0.66, 0.95));
+        assert!(maturity_in_band(Action::Teach, 0.33, 0.33, 0.66, 0.95));
+        assert!(maturity_in_band(Action::Teach, 0.5, 0.33, 0.66, 0.95));
+        assert!(!maturity_in_band(Action::Teach, 0.66, 0.33, 0.66, 0.95));
     }
 
     #[test]
-    fn release_band_is_at_or_above_teach_done() {
-        assert!(!maturity_in_band(Action::Release, 0.5, 0.33, 0.66));
-        assert!(maturity_in_band(Action::Release, 0.66, 0.33, 0.66));
-        assert!(maturity_in_band(Action::Release, 1.0, 0.33, 0.66));
+    fn release_band_is_at_or_above_release_threshold() {
+        // 395: Release band lower bound is release_threshold (0.95),
+        // not teach_done_threshold (0.66). The gap [0.66, 0.95) is
+        // deliberate idle space (Caretake covers feeding there).
+        assert!(!maturity_in_band(Action::Release, 0.5, 0.33, 0.66, 0.95));
+        assert!(!maturity_in_band(Action::Release, 0.66, 0.33, 0.66, 0.95));
+        assert!(!maturity_in_band(Action::Release, 0.9, 0.33, 0.66, 0.95));
+        assert!(maturity_in_band(Action::Release, 0.95, 0.33, 0.66, 0.95));
+        assert!(maturity_in_band(Action::Release, 1.0, 0.33, 0.66, 0.95));
     }
 
     // -- Resolver boundary ----------------------------------------------------
@@ -367,6 +444,7 @@ mod tests {
             &[],
             0.33,
             0.66,
+            0.95,
             0,
             None,
         );
@@ -374,26 +452,101 @@ mod tests {
     }
 
     #[test]
-    fn resolver_skips_kittens_with_other_mother() {
+    fn resolver_skips_kittens_unrelated_to_parent() {
+        // 395: with symmetric matching, kittens whose neither parent
+        // matches `parent` are rejected.
         let mut registry = DseRegistry::new();
         registry
             .target_taking_dses
             .push(dependent_kitten_target_dse(Action::Wean));
-        let queen = Entity::from_raw_u32(1).unwrap();
+        let parent = Entity::from_raw_u32(1).unwrap();
         let other_mother = Entity::from_raw_u32(99).unwrap();
-        let kittens = vec![kitten(10, 1, 0, 0.1, Some(other_mother))];
+        let other_father = Entity::from_raw_u32(98).unwrap();
+        let kittens = vec![kitten_with_father(
+            10,
+            1,
+            0,
+            0.1,
+            Some(other_mother),
+            Some(other_father),
+        )];
         let out = resolve_dependent_kitten_target(
             Action::Wean,
             &registry,
-            queen,
+            parent,
             Position::new(0, 0),
             &kittens,
             0.33,
             0.66,
+            0.95,
             0,
             None,
         );
-        assert!(out.is_none(), "non-mother kittens should be rejected");
+        assert!(out.is_none(), "unrelated kittens should be rejected");
+    }
+
+    #[test]
+    fn resolver_matches_via_father_too() {
+        // 395 symmetric: father can fire the arc when picker filter
+        // sees `father == Some(parent)`.
+        let mut registry = DseRegistry::new();
+        registry
+            .target_taking_dses
+            .push(dependent_kitten_target_dse(Action::Wean));
+        let father = Entity::from_raw_u32(1).unwrap();
+        let mother = Entity::from_raw_u32(99).unwrap();
+        let target_kitten = Entity::from_raw_u32(10).unwrap();
+        let kittens = vec![kitten_with_father(
+            10,
+            1,
+            0,
+            0.1,
+            Some(mother),
+            Some(father),
+        )];
+        let out = resolve_dependent_kitten_target(
+            Action::Wean,
+            &registry,
+            father,
+            Position::new(0, 0),
+            &kittens,
+            0.33,
+            0.66,
+            0.95,
+            0,
+            None,
+        );
+        assert_eq!(
+            out,
+            Some(target_kitten),
+            "father should match via symmetric picker"
+        );
+    }
+
+    #[test]
+    fn resolver_skips_released_kittens() {
+        // 395 one-shot: a kitten with RearKittenReleased marker (set
+        // by the first parent's Release drain) is excluded so the
+        // second parent's frame can't re-witness.
+        let mut registry = DseRegistry::new();
+        registry
+            .target_taking_dses
+            .push(dependent_kitten_target_dse(Action::Release));
+        let mother = Entity::from_raw_u32(1).unwrap();
+        let kittens = vec![kitten_released(10, 1, 0, 0.97, Some(mother))];
+        let out = resolve_dependent_kitten_target(
+            Action::Release,
+            &registry,
+            mother,
+            Position::new(0, 0),
+            &kittens,
+            0.33,
+            0.66,
+            0.95,
+            0,
+            None,
+        );
+        assert!(out.is_none(), "released kittens should be rejected");
     }
 
     #[test]
@@ -413,10 +566,36 @@ mod tests {
             &kittens,
             0.33,
             0.66,
+            0.95,
             0,
             None,
         );
         assert!(out.is_none(), "out-of-band maturity should be rejected");
+    }
+
+    #[test]
+    fn resolver_skips_kittens_in_idle_gap() {
+        // 395: maturity 0.8 sits in [teach_done=0.66, release_thresh=0.95)
+        // — deliberate idle gap. Release picker rejects.
+        let mut registry = DseRegistry::new();
+        registry
+            .target_taking_dses
+            .push(dependent_kitten_target_dse(Action::Release));
+        let mother = Entity::from_raw_u32(1).unwrap();
+        let kittens = vec![kitten(10, 1, 0, 0.8, Some(mother))];
+        let out = resolve_dependent_kitten_target(
+            Action::Release,
+            &registry,
+            mother,
+            Position::new(0, 0),
+            &kittens,
+            0.33,
+            0.66,
+            0.95,
+            0,
+            None,
+        );
+        assert!(out.is_none(), "idle-gap maturity should be rejected");
     }
 
     #[test]
@@ -430,7 +609,7 @@ mod tests {
         let kittens = vec![
             kitten(10, 1, 0, 0.5, Some(queen)), // Teach band
             kitten(11, 2, 0, 0.1, Some(queen)), // Wean band — excluded
-            kitten(12, 3, 0, 0.8, Some(queen)), // Release band — excluded
+            kitten(12, 3, 0, 0.97, Some(queen)), // Release band — excluded
         ];
         let out = resolve_dependent_kitten_target(
             Action::Teach,
@@ -440,6 +619,7 @@ mod tests {
             &kittens,
             0.33,
             0.66,
+            0.95,
             0,
             None,
         );
@@ -465,6 +645,7 @@ mod tests {
             &kittens,
             0.33,
             0.66,
+            0.95,
             0,
             None,
         );
@@ -478,7 +659,8 @@ mod tests {
             .target_taking_dses
             .push(dependent_kitten_target_dse(Action::Release));
         let queen = Entity::from_raw_u32(1).unwrap();
-        let kittens = vec![kitten(10, 50, 0, 0.8, Some(queen))]; // dist >> 12
+        // 395: kitten at maturity 0.97 (Release band) but far away.
+        let kittens = vec![kitten(10, 50, 0, 0.97, Some(queen))]; // dist >> 12
         let out = resolve_dependent_kitten_target(
             Action::Release,
             &registry,
@@ -487,6 +669,7 @@ mod tests {
             &kittens,
             0.33,
             0.66,
+            0.95,
             0,
             None,
         );

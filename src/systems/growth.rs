@@ -267,53 +267,95 @@ pub fn update_life_stage_markers(
 // update_parent_markers (Ticket 014 §4 Reproduction marker)
 // ---------------------------------------------------------------------------
 
-/// Author the `Parent` ZST on every living cat that has at least one
-/// living dependent kitten with `mother == self` or `father == self`.
+/// Author the `Parent` and `HasJuvenileDependent` ZSTs on every
+/// living cat that has at least one living dependent kitten with
+/// `mother == self` or `father == self`. Both parents pitch in
+/// (ticket 395 retired the 333/364 mother-only deferral).
 ///
-/// **Predicate** — `Parent` iff `∃ living KittenDependency d : d.mother == self ∨ d.father == self`.
-/// First authoring of this marker; no inline predicate is being
-/// retired. The marker is staged for future grief / aspiration
-/// consumers — there is no DSE `.require()` cutover today.
+/// **`Parent` predicate** — `∃ living KittenDependency d : d.mother == self ∨ d.father == self`.
+/// Stays true through natural maturity 1.0; drops when the last
+/// dependent kitten matures or dies.
+///
+/// **`HasJuvenileDependent` predicate** (ticket 395) — same parent
+/// gate AND at least one of the dependent kittens has either
+/// `maturity < teach_done_threshold` (early Wean/Teach arc window)
+/// OR `maturity >= release_threshold` with no `RearKittenReleased`
+/// marker (near-mature window for symbolic Release). Gates the
+/// `kitten_reared` reactive emit so the arc fires only in those
+/// two narrow windows — Caretake (kitten-side `With<KittenDependency>`)
+/// covers the long gap between them and continues until natural
+/// maturity.
 ///
 /// **§4.3 ordering hazard.** Grief consumers MUST NOT infer
-/// parent-at-time-of-death status from `With<Parent>` on a survivor
-/// post-death. When a kitten dies, the surviving parent's `Parent`
-/// marker is removed within the same tick (the kitten's
-/// `KittenDependency` stops counting once `With<Dead>` filters it
-/// out, then `cleanup_dead` despawns it). A bereaved-parent grief
-/// emitter that queries `With<Parent>` after the death cleanup
-/// would see a false negative for parents whose only kitten just
-/// died. The canonical parent-at-time-of-death channel is the
-/// future `CatDied.survivors_by_relationship` event payload — see
-/// `docs/systems/ai-substrate-refactor.md` §4.3 prose.
+/// parent-at-time-of-death status from `With<Parent>` (or
+/// `With<HasJuvenileDependent>`) on a survivor post-death. When a
+/// kitten dies, the surviving parent's markers are removed within
+/// the same tick. The canonical parent-at-time-of-death channel is
+/// the future `CatDied.survivors_by_relationship` event payload.
 ///
 /// **Ordering** — Chain 2a, before the GOAP / disposition scoring
-/// loops so the snapshot population sees the freshly-authored marker.
-/// Sibling of `update_life_stage_markers` in growth.rs.
+/// loops so the snapshot population sees the freshly-authored
+/// markers. Sibling of `update_life_stage_markers`.
 #[allow(clippy::type_complexity)]
 pub fn update_parent_markers(
     mut commands: Commands,
-    kittens: Query<&KittenDependency, Without<Dead>>,
-    cats: Query<(Entity, Has<markers::Parent>), (With<Species>, Without<Dead>)>,
+    kittens: Query<
+        (&KittenDependency, Has<markers::RearKittenReleased>),
+        Without<Dead>,
+    >,
+    cats: Query<
+        (
+            Entity,
+            Has<markers::Parent>,
+            Has<markers::HasJuvenileDependent>,
+        ),
+        (With<Species>, Without<Dead>),
+    >,
+    constants: Res<SimConstants>,
 ) {
     use std::collections::HashSet;
+    let teach_done = constants.kitten_rearing.teach_done_threshold;
+    let release_thresh = constants.kitten_rearing.release_threshold;
+
     let mut parents: HashSet<Entity> = HashSet::new();
-    for dep in kittens.iter() {
+    let mut juvenile_parents: HashSet<Entity> = HashSet::new();
+
+    for (dep, arc_released) in kittens.iter() {
+        let early = dep.maturity < teach_done;
+        let near_mature = !arc_released && dep.maturity >= release_thresh;
+        let has_arc_work = early || near_mature;
         if let Some(m) = dep.mother {
             parents.insert(m);
+            if has_arc_work {
+                juvenile_parents.insert(m);
+            }
         }
         if let Some(f) = dep.father {
             parents.insert(f);
+            if has_arc_work {
+                juvenile_parents.insert(f);
+            }
         }
     }
-    for (entity, has_marker) in cats.iter() {
-        let want = parents.contains(&entity);
-        match (want, has_marker) {
+
+    for (entity, has_parent, has_juvenile) in cats.iter() {
+        match (parents.contains(&entity), has_parent) {
             (true, false) => {
                 commands.entity(entity).insert(markers::Parent);
             }
             (false, true) => {
                 commands.entity(entity).remove::<markers::Parent>();
+            }
+            _ => {}
+        }
+        match (juvenile_parents.contains(&entity), has_juvenile) {
+            (true, false) => {
+                commands.entity(entity).insert(markers::HasJuvenileDependent);
+            }
+            (false, true) => {
+                commands
+                    .entity(entity)
+                    .remove::<markers::HasJuvenileDependent>();
             }
             _ => {}
         }
@@ -477,7 +519,11 @@ mod tests {
     use crate::components::physical::DeathCause;
 
     fn setup_parent() -> (World, Schedule) {
-        let world = World::new();
+        let mut world = World::new();
+        // 395: update_parent_markers now reads SimConstants
+        // (kitten_rearing.teach_done_threshold + release_threshold) to
+        // gate HasJuvenileDependent authoring.
+        world.insert_resource(SimConstants::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(update_parent_markers);
         (world, schedule)
@@ -618,6 +664,142 @@ mod tests {
             .id();
         schedule.run(&mut world);
         assert!(world.entity(mother).contains::<markers::Parent>());
+    }
+
+    // -----------------------------------------------------------------------
+    // Ticket 395 — HasJuvenileDependent marker tests
+    // -----------------------------------------------------------------------
+
+    fn spawn_kitten_with_maturity(
+        world: &mut World,
+        mother: Entity,
+        father: Entity,
+        maturity: f32,
+    ) -> Entity {
+        world
+            .spawn((
+                Species,
+                KittenDependency {
+                    mother: Some(mother),
+                    father: Some(father),
+                    maturity,
+                    skills_learned: 0,
+                },
+            ))
+            .id()
+    }
+
+    #[test]
+    fn juvenile_kitten_marks_both_parents_with_juvenile_marker() {
+        // Maturity 0.0 — well inside the early arc window (< 0.66).
+        // Both parents get Parent AND HasJuvenileDependent.
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let _kitten = spawn_kitten_with_maturity(&mut world, mother, father, 0.0);
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+        assert!(world.entity(father).contains::<markers::Parent>());
+        assert!(
+            world.entity(mother).contains::<markers::HasJuvenileDependent>(),
+            "mother of early-arc kitten gets HasJuvenileDependent"
+        );
+        assert!(
+            world.entity(father).contains::<markers::HasJuvenileDependent>(),
+            "father of early-arc kitten gets HasJuvenileDependent"
+        );
+    }
+
+    #[test]
+    fn mid_gap_kitten_keeps_parent_but_drops_juvenile_marker() {
+        // Maturity 0.7 — past teach_done_threshold (0.66) but below
+        // release_threshold (0.95). Arc has no work; Parent stays
+        // (Caretake still applies via kitten-side KittenDependency),
+        // but HasJuvenileDependent drops.
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let _kitten = spawn_kitten_with_maturity(&mut world, mother, father, 0.7);
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+        assert!(world.entity(father).contains::<markers::Parent>());
+        assert!(
+            !world.entity(mother).contains::<markers::HasJuvenileDependent>(),
+            "mid-gap kitten does NOT mark HasJuvenileDependent"
+        );
+        assert!(
+            !world.entity(father).contains::<markers::HasJuvenileDependent>(),
+            "mid-gap kitten does NOT mark HasJuvenileDependent on father"
+        );
+    }
+
+    #[test]
+    fn near_mature_unreleased_kitten_reauthors_juvenile_marker() {
+        // Maturity 0.97 — inside the near-mature window
+        // [release_threshold=0.95, 1.0), kitten not yet released.
+        // HasJuvenileDependent flips back true so the arc can emit
+        // and fire Release.
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let _kitten = spawn_kitten_with_maturity(&mut world, mother, father, 0.97);
+        schedule.run(&mut world);
+        assert!(
+            world.entity(mother).contains::<markers::HasJuvenileDependent>(),
+            "near-mature unreleased kitten re-authors juvenile marker"
+        );
+        assert!(world.entity(father).contains::<markers::HasJuvenileDependent>());
+    }
+
+    #[test]
+    fn near_mature_released_kitten_clears_juvenile_marker() {
+        // Maturity 0.97 AND RearKittenReleased present — arc already
+        // fired Release. HasJuvenileDependent stays false; the queen
+        // does Caretake until natural maturation.
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let _kitten = world
+            .spawn((
+                Species,
+                KittenDependency {
+                    mother: Some(mother),
+                    father: Some(father),
+                    maturity: 0.97,
+                    skills_learned: 0,
+                },
+                markers::RearKittenReleased,
+            ))
+            .id();
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::Parent>());
+        assert!(
+            !world.entity(mother).contains::<markers::HasJuvenileDependent>(),
+            "released kitten doesn't re-arm the arc emit"
+        );
+        assert!(
+            !world.entity(father).contains::<markers::HasJuvenileDependent>(),
+            "released kitten doesn't re-arm father's arc emit either"
+        );
+    }
+
+    #[test]
+    fn juvenile_marker_drops_when_dependent_kitten_dies() {
+        let (mut world, mut schedule) = setup_parent();
+        let mother = spawn_adult(&mut world);
+        let father = spawn_adult(&mut world);
+        let kitten = spawn_kitten_with_maturity(&mut world, mother, father, 0.1);
+        schedule.run(&mut world);
+        assert!(world.entity(mother).contains::<markers::HasJuvenileDependent>());
+        // Kill the kitten — same §4.3 ordering hazard: marker drops
+        // within the same tick.
+        world.entity_mut(kitten).insert(Dead {
+            tick: 0,
+            cause: DeathCause::Starvation,
+        });
+        schedule.run(&mut world);
+        assert!(!world.entity(mother).contains::<markers::HasJuvenileDependent>());
+        assert!(!world.entity(father).contains::<markers::HasJuvenileDependent>());
     }
 
     // -----------------------------------------------------------------------

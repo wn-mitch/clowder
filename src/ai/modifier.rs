@@ -2679,6 +2679,30 @@ impl ScoreModifier for DispositionFailureCooldown {
         let Some(signal_key) = Self::signal_key(dse_id) else {
             return score;
         };
+        // Ticket 397 Layer 2 — bypass the cooldown for Caretake when the
+        // cat carries `HasJuvenileDependent`. The cooldown was designed
+        // for "don't keep trying failed dispositions" — a productive
+        // signal when the failure is structural (no prey to hunt, no
+        // building site reachable). For Caretake under an active
+        // rear_kitten arc, the kitten's continued hunger overrides:
+        // failure to feed the kitten on tick T does not make the kitten
+        // less in need of feeding on tick T+1. Without this bypass,
+        // 397's L2 lift (a +0.25 additive on Caretake when
+        // HasJuvenileDependent is set) is overwhelmed by the cooldown's
+        // multiplicative damp (score × 0.1 on signal=0). The bypass
+        // composes the spec's §L2.10.6 durable-commitment behavior
+        // ("cat sees the L1 stimuli but also knows she wants to take
+        // care of her kitten") with the cooldown's still-valid role of
+        // suppressing repeated genuine-blocker dispositions (Hunt with
+        // no prey, etc.) for non-Caretake DSEs.
+        if dse_id.0 == CARETAKE
+            && (ctx.has_marker)(
+                crate::components::markers::HasJuvenileDependent::KEY,
+                ctx.cat,
+            )
+        {
+            return score;
+        }
         let signal = fetch(signal_key, ctx.cat);
         if signal >= 1.0 {
             return score;

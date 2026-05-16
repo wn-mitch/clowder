@@ -471,6 +471,105 @@ Intention (with `source: CoordinatorDirective(coord)`). Both
 compete in the same softmax pool. 057 doesn't go through the
 picker; it has its own author path.
 
+### Reactive-emit yield rule (composition rule, ticket 395)
+
+§L2.10.6's softmax-over-Intentions across `{DSE-Activity-default}
+∪ {emitted-Goals}` is the eventual contract — emitted Goals
+compete in the same pool as DSE Activity-default wraps, and the
+L2 winner reflects their relative scores. Phase-1 implementation
+(at 320 land) deferred the formal softmax and uses a **priority
+override** at the L2 wrap site (`goap.rs:2733-2790`): when any
+emission exists, the highest-`Priority` row replaces the
+softmax-winning Activity wrap with `Intention::Goal { label,
+strategy }` unconditionally. The 364 frame-pin
+(`goap.rs:2410-2449`) then overrides `chosen_action` to the
+frame's leaf primitive. Together these two overrides discard the
+L2 softmax winner whenever a Live method's reactive emit fires —
+even when softmax would have picked a high-urgency rescue DSE
+like Caretake for a starving kitten.
+
+Until §L2.10.6's formal softmax lands, **reactive emits must
+declare their yield conditions explicitly in `applicable_when`**:
+a substrate marker whose presence suppresses the emit for the
+tick. The rule:
+
+> A reactive emit's `applicable_when` predicate MUST consult an
+> already-authored marker that signals "an acute urgency within
+> this method's own substrate domain is in flight." When the
+> marker is set, the predicate returns false → no emission → no
+> Goal-wrap → no frame push → the L2 softmax winner (Caretake,
+> Flee, whatever the per-tick DSEs scored) executes as authored.
+> The frame from prior ticks survives via `resolve_goap_plans`'s
+> `PreserveStackOnly` path; once the marker clears, the arc
+> resumes mid-stride on the next tick.
+
+**Why this is substrate, not a hack.** The yield marker
+(`IsParentOfHungryKitten` for `rear_kitten`) was already
+authored for an unrelated consumer (Caretake's own-kitten-anywhere
+targeting fallback, ticket 161). Consuming it here adds no new
+substrate — the reactive emit reads the same `0/1` signal that
+Caretake's DSE consumes. The rule composes naturally with §4.7.2's
+substrate-vs-search-state classifier: yield markers are L1
+substrate authored from observable world state; they're not new
+search-state introduced by the rule.
+
+**Why per-emit and not at the pin.** The pin operates on already-
+pushed frames. Yielding at the pin layer requires either (a)
+authoring an interrupt list per method (substrate proliferation,
+slippery slope) or (b) re-deriving softmax winner vs. pin's leaf
+each tick to decide whether to honor the pin (replaying scoring
+state). Yielding at the emit layer is one substrate touchpoint
+per method, consumes existing markers, and short-circuits both
+overrides simultaneously.
+
+**Why per-method and not global.** Each method's "acute urgency"
+is domain-specific. `rear_kitten` yields to hungry-kitten
+substrate (`IsParentOfHungryKitten`); `mourn_at_grave` (when its
+`Mourning` insertion path lands) will yield to e.g.
+`HasAcuteSafetyNeed` (immediate predator threat) or
+`HasAcuteHungerNeed` (starvation imminent), authored at whichever
+system already computes those urgency thresholds. A global yield
+predicate would either be too permissive (yields when no
+domain-acute condition exists) or too coarse (suppresses Live
+arcs that shouldn't yield). Each emit row owns its yield contract
+and points to the marker's existing author.
+
+**Anti-patterns this rule prevents:**
+
+- *Authoring a new marker just for the yield.* If no existing
+  substrate signals the acute urgency, the missing substrate is
+  the actual ticket — author it for the domain consumer first
+  (the DSE that would benefit from the signal), then consume it
+  from the reactive-emit predicate as a downstream effect.
+- *Yielding in the pin (`goap.rs:2410`) instead of the emit.*
+  This is one layer too low. By the time the pin runs, the L2
+  wrap site has already replaced the held intention with the
+  emitted Goal and the frame has been pushed; un-pinning produces
+  inconsistent state (held intention says "kitten_reared", but
+  chosen_action says Caretake — what does `IntentionFulfilled`
+  hook do?).
+- *Using `applicable_when` as a generic per-tick veto.* The
+  yield is for *acute domain urgency* — events that the method's
+  own substrate flags as "this arc shouldn't be in flight right
+  now." Non-urgent competing priorities (the cat is also tired,
+  the cat is also hungry-on-self) are L2 softmax's job; they
+  should be expressed as DSE scores, not yield markers.
+
+**Precedent table.** Maintained as Live methods adopt the
+contract:
+
+| Method | Yield marker | Author | Reason |
+|---|---|---|---|
+| `rear_kitten` | `IsParentOfHungryKitten` | `update_kitten_cry_map` (ticket 161) | A dependent kitten's hunger is below the cry threshold — Caretake's softmax score is high; arc must yield so the rescue runs. |
+| `mourn_at_grave` (pending) | TBD (likely `HasAcuteSafetyNeed`) | TBD | Predator-near-self / starvation-imminent — survival overrides grief arc. |
+
+§L2.10.6's formal softmax retires this rule by making it
+implicit: a high-scoring Caretake DSE would simply outscore the
+emitted Goal in the unified pool, and the L2 wrap would adopt
+Caretake without needing an `applicable_when` gate at all.
+Until then, the per-emit yield is the substrate-clean way to
+express "this Live arc shouldn't be pushed right now."
+
 ## Dormant-method discipline (§G) — `ApplicableWhen::PendingSubstrate`
 
 Many methods the universal-aspiration framing requires (stealth-
