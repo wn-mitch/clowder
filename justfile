@@ -454,6 +454,14 @@ session-done SLUG *ARGS:
 orphan-scan *ARGS:
     bash scripts/orphan_scan.sh {{ARGS}}
 
+# [session] Batch GC: finds sessions whose bookmark tip is on main@origin (landed) and runs session-done against each. --dry-run reports without acting; --yes skips per-session confirm; --json for skill consumption; --force passes through to session-done.
+session-gc *ARGS:
+    bash scripts/session_gc.sh {{ARGS}}
+
+# [session] Suggest one or more next-session candidates {slug, tickets, track, rationale}. Composes open-work-by-track and groups by cluster (substrate-sensitive: pair adjacent; swarm-safe: atomic; coherent-block: prefer densest block). --track filters; --n caps count; --json for /work skill.
+session-suggest *ARGS:
+    python3 scripts/session_suggest.py {{ARGS}}
+
 # [refinery] Gated lander. Walks all session/* bookmarks; reports rebase / conflict status. `just refinery` reports the table; `just refinery --json` for /work + /foreman skills; `just refinery --land <slug>` lands one session into main (any track, manual gate); `just refinery --auto [--dry-run]` drains swarm-safe queue gated on working-copy clean + `just check && just test` in each workspace. `--auto` is whitelisted in code to track=swarm-safe; coherent-block + substrate-sensitive always land via `--land <slug>`.
 refinery *ARGS:
     bash scripts/refinery.sh {{ARGS}}
@@ -489,6 +497,10 @@ block-info BLOCK *ARGS:
 # [ticket-query] Single-ticket frontmatter + status + which session (if any) currently holds it. --json for /work skill.
 ticket-info ID *ARGS:
     python3 scripts/ticket_info.py {{ID}} {{ARGS}}
+
+# [ticket-query] Ready-queue rollup grouped by orchestration track (substrate-sensitive / coherent-block / swarm-safe). Within coherent-block, sub-grouped by block. --json emits {"swarm-safe": [...], "substrate-sensitive": [...], "coherent-block": {"<block>": [...]}} for /work skill consumption.
+open-work-by-track *ARGS:
+    python3 scripts/open_work_by_track.py {{ARGS}}
 
 # Generate a random template authoring prompt
 template-prompt:
@@ -593,11 +605,12 @@ open-work-index:
 open-work-active:
     uv run scripts/open_work_filters.py active
 
-# Filter ready tickets by cluster or initiative. With no flags, lists all ready.
+# [ticket-query] Filter ready tickets by track / cluster / initiative. With no flags, lists all ready. Drop-in companion to `open-work-ready` (same output shape).
 #
 #   just open-work-ready                          # all ready
 #   just open-work-ready --cluster ai-substrate   # one cluster
 #   just open-work-ready --initiative world-richness  # one initiative
+#   just open-work-ready --track swarm-safe       # filter by orchestration track
 open-work-ready-filtered *ARGS:
     uv run scripts/open_work_filters.py ready {{ARGS}}
 
