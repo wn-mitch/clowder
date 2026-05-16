@@ -71,6 +71,10 @@ class Verdict:
     # required Feature at 0 is "unprovable" — the run cannot evaluate the
     # hypothesis the caller is asking about.
     features_fired: dict[str, int] | None = None
+    # Ticket 396: rows from `plan_failure_canary()` — keys whose per-tick
+    # failure rate jumped sharply vs baseline. Empty when no baseline,
+    # durations unreadable, or no key crosses the thresholds.
+    plan_failure_canary: list[dict[str, Any]] = field(default_factory=list)
     baseline: str | None = None
     commit: str | None = None
     seed: int | None = None
@@ -316,6 +320,22 @@ def _is_rate_normalizable(field_name: str) -> bool:
 
 DURATION_DRIFT_PCT_THRESHOLD = 10.0
 
+# Ticket 396: plan-failure rate canary. Iterates `plan_failures_by_reason`,
+# `planning_failures_by_reason`, and `interrupts_by_reason` (footer dicts
+# the existing top-level field scan can't see) and flags keys whose
+# per-tick rate is either >=10x the baseline rate (with a floor to avoid
+# noise on rare keys) or new vs baseline above a higher absolute floor.
+# Defaults chosen so the 394 Wean regression (0 -> 2439 over ~125000 ticks
+# -> 0.019/tick) flags clearly while small per-run variance doesn't.
+PLAN_FAILURE_DICTS = (
+    "plan_failures_by_reason",
+    "planning_failures_by_reason",
+    "interrupts_by_reason",
+)
+PLAN_FAILURE_RATIO_THRESHOLD = 10.0
+PLAN_FAILURE_RATIO_FLOOR = 0.001
+PLAN_FAILURE_NEW_KEY_FLOOR = 0.005
+
 
 def band(delta_pct: float) -> str:
     a = abs(delta_pct)
@@ -392,10 +412,79 @@ def footer_drift(baseline: dict[str, Any], observed: dict[str, Any],
     return rows[:20]
 
 
+def plan_failure_canary(baseline: dict[str, Any], observed: dict[str, Any],
+                        baseline_dur: int | None,
+                        observed_dur: int | None) -> list[dict[str, Any]]:
+    """Flag plan-failure-reason keys whose per-tick rate jumped sharply.
+
+    Iterates `PLAN_FAILURE_DICTS` in both footers. For each reason:
+    - New vs baseline (`baseline = 0`) above `PLAN_FAILURE_NEW_KEY_FLOOR`
+      ticks per emission -> `band: new-high-rate`.
+    - Ratio `rate_observed / rate_baseline >= PLAN_FAILURE_RATIO_THRESHOLD`
+      AND `rate_observed >= PLAN_FAILURE_RATIO_FLOOR` -> `band: high-rate-ratio`.
+
+    Skips when durations are unavailable (rate normalization required).
+    Skips when observed count is 0 (a regression elsewhere drove the
+    reason to zero - not a plan-failure regression).
+    """
+    rows: list[dict[str, Any]] = []
+    if not baseline_dur or not observed_dur:
+        return rows
+    for dict_name in PLAN_FAILURE_DICTS:
+        b_dict = baseline.get(dict_name) or {}
+        o_dict = observed.get(dict_name) or {}
+        if not isinstance(b_dict, dict) or not isinstance(o_dict, dict):
+            continue
+        for reason in set(b_dict.keys()) | set(o_dict.keys()):
+            b = b_dict.get(reason, 0)
+            o = o_dict.get(reason, 0)
+            if not isinstance(b, (int, float)) or not isinstance(o, (int, float)):
+                continue
+            if o == 0:
+                continue
+            rate_b = b / baseline_dur
+            rate_o = o / observed_dur
+            if b == 0:
+                if rate_o >= PLAN_FAILURE_NEW_KEY_FLOOR:
+                    rows.append({
+                        "dict": dict_name,
+                        "reason": reason,
+                        "baseline": b,
+                        "observed": o,
+                        "rate_baseline": 0.0,
+                        "rate_observed": round(rate_o, 5),
+                        "ratio": None,
+                        "band": "new-high-rate",
+                    })
+            else:
+                ratio = rate_o / rate_b
+                if ratio >= PLAN_FAILURE_RATIO_THRESHOLD and rate_o >= PLAN_FAILURE_RATIO_FLOOR:
+                    rows.append({
+                        "dict": dict_name,
+                        "reason": reason,
+                        "baseline": b,
+                        "observed": o,
+                        "rate_baseline": round(rate_b, 5),
+                        "rate_observed": round(rate_o, 5),
+                        "ratio": round(ratio, 1),
+                        "band": "high-rate-ratio",
+                    })
+    # Sort by severity: ratio rows by descending ratio, new-high-rate by
+    # descending observed rate. Ratio rows first since they have a direct
+    # comparison anchor; new keys are listed after.
+    rows.sort(key=lambda r: (
+        0 if r["band"] == "high-rate-ratio" else 1,
+        -(r["ratio"] or 0.0),
+        -r["rate_observed"],
+    ))
+    return rows
+
+
 def derive_overall(canary_survival: str, canary_continuity: str,
                    constants: str, drift: list[dict[str, Any]],
                    colony_score: dict[str, dict[str, Any]] | None,
-                   duration_drift_pct: float | None = None) -> str:
+                   duration_drift_pct: float | None = None,
+                   plan_failure_canary: list[dict[str, Any]] | None = None) -> str:
     if canary_survival == "fail":
         return "fail"
     if canary_continuity == "fail" or constants == "drift":
@@ -417,6 +506,12 @@ def derive_overall(canary_survival: str, canary_continuity: str,
             row = colony_score.get(axis)
             if row and row.get("band") in ("concern", "fail"):
                 return "concern"
+    # Ticket 396: any flagged plan-failure-rate row escalates to concern.
+    # The gap this closes is "substrate ships a regression that absorbs
+    # silently via plan_failures_by_reason churn" — the 364→394 Wean
+    # 0→2439 jump (no deaths, welfare improved) would have caught here.
+    if plan_failure_canary:
+        return "concern"
     return "pass"
 
 
@@ -524,6 +619,24 @@ def derive_next_steps(v: Verdict, run_dir: Path, footer: dict[str, Any]) -> list
                 f"rate: {top['field']} {top.get('delta_pct_rate', 0):+.1f}% "
                 "per 10kt (raw delta is duration-confounded)"
             )
+    # Ticket 396: name plan-failure reasons whose rate jumped sharply.
+    # Surfaces the substrate-regression class that survival + continuity
+    # gates absorb silently (the 394 Wean 0->2439 case).
+    if v.plan_failure_canary:
+        top = v.plan_failure_canary[0]
+        if top["band"] == "high-rate-ratio":
+            shape = (f"{top['reason']}: rate {top['rate_observed']}/tick "
+                     f"({top['ratio']}x baseline)")
+        else:
+            shape = (f"{top['reason']}: new at "
+                     f"{top['rate_observed']}/tick (baseline 0)")
+        rest = ""
+        if len(v.plan_failure_canary) > 1:
+            rest = f" + {len(v.plan_failure_canary) - 1} more"
+        steps.append(
+            f"plan-failure rate regression: {shape}{rest} - "
+            f"`just q events {run_dir} _footer` to inspect the dict"
+        )
     # Ticket 125: name colony_score axes that moved out of band so the
     # caller can decide whether the drift is intentional (file a hypothesis)
     # or a regression (bisect-canary on the moved axis).
@@ -604,6 +717,7 @@ def main(argv: list[str]) -> int:
     baseline_seed: int | None = None
     drift_rows: list[dict[str, Any]] = []
     cs_drift: dict[str, dict[str, Any]] | None = None
+    plan_failure_rows: list[dict[str, Any]] = []
     baseline_dur: int | None = None
     observed_dur = run_duration_ticks(events_path)
     duration_drift_pct: float | None = None
@@ -616,12 +730,15 @@ def main(argv: list[str]) -> int:
             drift_rows = footer_drift(baseline_footer, footer,
                                       baseline_dur, observed_dur)
             cs_drift = colony_score_drift(baseline_footer, footer)
+            plan_failure_rows = plan_failure_canary(
+                baseline_footer, footer, baseline_dur, observed_dur)
         if baseline_dur and observed_dur:
             duration_drift_pct = round(
                 abs(observed_dur - baseline_dur) / baseline_dur * 100.0, 1)
 
     overall = derive_overall(surv_status, cont_status, constants_status,
-                             drift_rows, cs_drift, duration_drift_pct)
+                             drift_rows, cs_drift, duration_drift_pct,
+                             plan_failure_rows)
     # Seed mismatch is a comparability failure: the drift table is bogus
     # because we're comparing different control worlds. Downgrade the
     # verdict (but never below the survival/continuity verdict) and let
@@ -656,6 +773,7 @@ def main(argv: list[str]) -> int:
         seed_match_vs_baseline=seed_status,
         footer_drift=drift_rows,
         colony_score_drift=cs_drift,
+        plan_failure_canary=plan_failure_rows,
         baseline_duration_ticks=baseline_dur,
         observed_duration_ticks=observed_dur,
         duration_drift_pct=duration_drift_pct,
@@ -739,6 +857,18 @@ def _text(v: Verdict) -> str:
                 d = row["delta_pct"]
                 d_s = "  new" if d is None else f"{d:+5.1f}%"
                 lines.append(f"    {row['band']:8s} {d_s}  {axis} ({row['baseline']} → {row['observed']})")
+    if v.plan_failure_canary:
+        lines.append("  plan-failure regressions:")
+        for r in v.plan_failure_canary[:5]:
+            if r["band"] == "high-rate-ratio":
+                tag = f"{r['ratio']:>5.1f}x"
+            else:
+                tag = "  new "
+            lines.append(
+                f"    {tag}  {r['reason']}  "
+                f"({r['baseline']} -> {r['observed']}, "
+                f"{r['rate_observed']}/tick)"
+            )
     if v.features_fired:
         lines.append("  features required:")
         for name, count in v.features_fired.items():

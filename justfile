@@ -79,9 +79,10 @@ test-logq:
 
 # Ticket 125: verdict's colony_score_drift channel — bucket boundaries
 # + escalation logic + per-field shape. Same stdlib-unittest pattern as
-# test-logq.
+# test-logq. Ticket 396 adds the plan-failure canary test set.
 test-verdict:
     python3 tests/verdict/test_colony_score_drift.py -v
+    python3 tests/verdict/test_plan_failure_canary.py -v
 
 # Ticket 229: similar.py chunkers + retrieval — pure-Python tests with
 # a deterministic fake embedder so the suite runs without downloading
