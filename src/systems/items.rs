@@ -151,36 +151,82 @@ pub fn prune_stored_items(
     }
 }
 
-/// Recalculate FoodStores from actual food items in Stores buildings.
+/// Recalculate `FoodStores` from actual food items across the colony (190).
+///
+/// **What this sets.**
+/// - `current` / `capacity` describe `Stores` buildings only — the canonical
+///   stockpile number the chronic-full latch, `HasStoredFood`, and the
+///   coordinator's food-pressure assessment all reason about.
+/// - `in_stores` / `in_dens` / `in_workshops` / `held` carry the per-source
+///   breakdown the UI surfaces ("12 in stores · 3 in dens · 0 workshops ·
+///   4 held"). These exist so the player can see where the colony's food
+///   actually is without changing what `current` means for backend consumers.
 pub fn sync_food_stores(
     mut food: ResMut<FoodStores>,
     stores_query: Query<(&Structure, &StoredItems)>,
+    cats: Query<&crate::components::magic::Inventory, Without<crate::components::physical::Dead>>,
     items_query: Query<
         &Item,
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
     >,
 ) {
-    let mut total_food_count = 0u32;
+    let mut in_stores = 0u32;
+    let mut in_dens = 0u32;
+    let mut in_workshops = 0u32;
     let mut total_capacity = 0.0f32;
 
     for (structure, stored) in stores_query.iter() {
-        if structure.kind == StructureType::Stores {
-            total_capacity += StoredItems::effective_capacity_with_items(
-                StructureType::Stores,
-                &stored.items,
-                &items_query,
-            ) as f32;
-            for &item_entity in &stored.items {
-                if let Ok(item) = items_query.get(item_entity) {
-                    if item.kind.is_food() {
-                        total_food_count += 1;
+        match structure.kind {
+            StructureType::Stores => {
+                total_capacity += StoredItems::effective_capacity_with_items(
+                    StructureType::Stores,
+                    &stored.items,
+                    &items_query,
+                ) as f32;
+                for &item_entity in &stored.items {
+                    if let Ok(item) = items_query.get(item_entity) {
+                        if item.kind.is_food() {
+                            in_stores += 1;
+                        }
                     }
                 }
+            }
+            StructureType::Den => {
+                for &item_entity in &stored.items {
+                    if let Ok(item) = items_query.get(item_entity) {
+                        if item.kind.is_food() {
+                            in_dens += 1;
+                        }
+                    }
+                }
+            }
+            StructureType::Workshop => {
+                for &item_entity in &stored.items {
+                    if let Ok(item) = items_query.get(item_entity) {
+                        if item.kind.is_food() {
+                            in_workshops += 1;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut held = 0u32;
+    for inventory in cats.iter() {
+        for slot in &inventory.slots {
+            if slot.kind.is_food() {
+                held += 1;
             }
         }
     }
 
-    food.current = total_food_count as f32;
+    food.in_stores = in_stores;
+    food.in_dens = in_dens;
+    food.in_workshops = in_workshops;
+    food.held = held;
+    food.current = in_stores as f32;
     food.capacity = total_capacity;
 }
 
@@ -415,14 +461,13 @@ mod tests {
     }
 
     #[test]
-    fn sync_food_stores_ignores_non_stores_buildings() {
+    fn sync_food_stores_segregates_den_and_workshop_into_breakdown_fields() {
         let (mut world, mut schedule) = setup_sync();
 
-        // A Den with a food item should not count.
         let den = world
             .spawn((Structure::new(StructureType::Den), StoredItems::default()))
             .id();
-        let mouse = world
+        let den_mouse = world
             .spawn(Item::new(
                 ItemKind::RawMouse,
                 1.0,
@@ -433,16 +478,146 @@ mod tests {
             .entity_mut(den)
             .get_mut::<StoredItems>()
             .unwrap()
-            .items = vec![mouse];
+            .items = vec![den_mouse];
+
+        let workshop = world
+            .spawn((
+                Structure::new(StructureType::Workshop),
+                StoredItems::default(),
+            ))
+            .id();
+        let workshop_fish = world
+            .spawn(Item::new(
+                ItemKind::RawFish,
+                1.0,
+                ItemLocation::StoredIn(workshop),
+            ))
+            .id();
+        world
+            .entity_mut(workshop)
+            .get_mut::<StoredItems>()
+            .unwrap()
+            .items = vec![workshop_fish];
 
         schedule.run(&mut world);
 
         let food = world.resource::<FoodStores>();
-        assert!(
-            food.current.abs() < f32::EPSILON,
-            "food in non-Stores buildings should not count; got {}",
-            food.current
+        assert_eq!(
+            food.current.round() as u32,
+            0,
+            "Stores-only `current` should ignore food in Dens/Workshops"
         );
+        assert_eq!(food.in_stores, 0);
+        assert_eq!(food.in_dens, 1, "Den food should populate in_dens");
+        assert_eq!(
+            food.in_workshops, 1,
+            "Workshop food should populate in_workshops"
+        );
+        assert_eq!(food.total_accessible(), 2);
+    }
+
+    #[test]
+    fn sync_food_stores_counts_cat_held_food() {
+        let (mut world, mut schedule) = setup_sync();
+
+        // A cat carrying one food item should populate `held`, not `current`.
+        use crate::components::items::{ItemKind, ItemModifiers};
+        use crate::components::magic::{Inventory, ItemSlot};
+
+        world.spawn(Inventory {
+            slots: vec![ItemSlot::new(ItemKind::RawRabbit, ItemModifiers::default())],
+        });
+
+        schedule.run(&mut world);
+
+        let food = world.resource::<FoodStores>();
+        assert_eq!(food.held, 1, "cat-held food should populate `held`");
+        assert_eq!(food.in_stores, 0);
+        assert_eq!(food.current.round() as u32, 0);
+        assert_eq!(food.total_accessible(), 1);
+    }
+
+    #[test]
+    fn sync_food_stores_skips_dead_cats_for_held_food() {
+        let (mut world, mut schedule) = setup_sync();
+
+        use crate::components::items::{ItemKind, ItemModifiers};
+        use crate::components::magic::{Inventory, ItemSlot};
+        use crate::components::physical::{Dead, DeathCause};
+
+        world.spawn((
+            Inventory {
+                slots: vec![ItemSlot::new(ItemKind::RawBird, ItemModifiers::default())],
+            },
+            Dead {
+                tick: 0,
+                cause: DeathCause::Injury,
+            },
+        ));
+
+        schedule.run(&mut world);
+
+        let food = world.resource::<FoodStores>();
+        assert_eq!(
+            food.held, 0,
+            "food on a corpse is not colony-accessible (the corpse decays as an item)"
+        );
+    }
+
+    #[test]
+    fn sync_food_stores_total_accessible_sums_all_sources() {
+        let (mut world, mut schedule) = setup_sync();
+
+        use crate::components::items::{ItemKind, ItemModifiers};
+        use crate::components::magic::{Inventory, ItemSlot};
+
+        let store = world
+            .spawn((
+                Structure::new(StructureType::Stores),
+                StoredItems::default(),
+            ))
+            .id();
+        let store_mouse = world
+            .spawn(Item::new(
+                ItemKind::RawMouse,
+                1.0,
+                ItemLocation::StoredIn(store),
+            ))
+            .id();
+        world
+            .entity_mut(store)
+            .get_mut::<StoredItems>()
+            .unwrap()
+            .items = vec![store_mouse];
+
+        let den = world
+            .spawn((Structure::new(StructureType::Den), StoredItems::default()))
+            .id();
+        let den_fish = world
+            .spawn(Item::new(
+                ItemKind::RawFish,
+                1.0,
+                ItemLocation::StoredIn(den),
+            ))
+            .id();
+        world
+            .entity_mut(den)
+            .get_mut::<StoredItems>()
+            .unwrap()
+            .items = vec![den_fish];
+
+        world.spawn(Inventory {
+            slots: vec![ItemSlot::new(ItemKind::RawRabbit, ItemModifiers::default())],
+        });
+
+        schedule.run(&mut world);
+
+        let food = world.resource::<FoodStores>();
+        assert_eq!(food.in_stores, 1);
+        assert_eq!(food.in_dens, 1);
+        assert_eq!(food.in_workshops, 0);
+        assert_eq!(food.held, 1);
+        assert_eq!(food.total_accessible(), 3);
     }
 
     #[test]

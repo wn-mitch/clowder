@@ -1,0 +1,78 @@
+# Ticket 190 — Balance-tune build_chronic_full_weight (179 follow-on).
+#
+# Background: 179 wired ColonyStoresChronicallyFull as a fourth
+# MarkerConsideration axis in BuildDse (composition weights
+# [0.4 diligence, 0.25 site_distance, 0.20 repair_presence, 0.15 chronic_full]).
+# The chronic-full input value (`build_chronic_full_weight`) was lifted
+# from 0.0 (dormant) to 0.5 (plausibility default). 190's job is to
+# empirically validate or revise that value via just hypothesize.
+#
+# Pre-run gate (2026-05-16):
+# - DepositRejected fires 5,529 times across seed-42 baseline → upstream
+#   signal abundant.
+# - ColonyStoresChronicallyFull marker passes L2 eligibility on
+#   10,490 / 19,044 trace-Simba L2 build-DSE checks (~55%) → latch fires
+#   reliably.
+# - But structures_built = 3 and welfare.shelter = 0.20 — Build is
+#   under-winning despite latch firing, because composition weight on
+#   the chronic-full axis is only 0.15 and weight 0.5 contributes max
+#   (0.5 × 0.15 = 0.075) to a 0-1 weighted sum.
+# - Diagnosis: substrate works, weight under-tuned. Directional lift
+#   indicated.
+#
+# Iteration policy:
+# - concordant lift on seed-42 (structures_built ≥ +30% from 095-phase-1a-shadow
+#   baseline = ≥ 4 structures) AND survival hard-gates pass AND continuity
+#   canaries ≥ 1 → first-light succeeds. Decide on global default in
+#   second iteration after seed-99 / seed-7.
+# - no-lift or wrong-direction on seed-42 → second iteration with
+#   build_chronic_full_weight = 1.0 (max value the input can present).
+# - 1.0 also fails → land 190 findings-only and open a follow-up to
+#   investigate the composition slot weight (0.15) as a structural lever
+#   (rebind: lift slot 0.15 → 0.25, demote another axis). See parent
+#   ticket §Structural fallback.
+# - any survival-gate violation (Starvation > 0, ShadowFoxAmbush > 10,
+#   never-fired-expected-positives > 0) → stop; the lift broke colony
+#   viability.
+# - any continuity-canary regression > 10% on any seed → stop; the lift
+#   bought building at the cost of behavioral health.
+
+hypothesis: |
+  Across 16 historical seed-42 archives the chronic-full feedback loop
+  fires reliably — DepositRejected accumulates to 5K+ per soak and the
+  ColonyStoresChronicallyFull marker passes L2 eligibility on the
+  majority of Build-DSE checks. But only 3 structures are built per
+  15-min soak and the welfare shelter axis sits at 0.20, indicating
+  the colony cannot keep up with deposit pressure under the
+  plausibility-default weight (0.5). BuildDse's composition slot for
+  chronic-full is 0.15; at weight 0.5 the axis contributes a maximum
+  of 0.075 to the 0-1 weighted sum — modest relative to DILIGENCE
+  (0.4 × ≤1.0) and competing DSEs scoring on hunger / fatigue / fear
+  pressure. Lifting build_chronic_full_weight from 0.5 to 0.7 raises
+  the maximum chronic-full contribution from 0.075 to 0.105 (+40%
+  on the axis input value, ~4% additive lift on BuildDse's total
+  score when the latch fires). On seed-42 with chronic-full firing
+  on >50% of L2 checks, this should increase Build's win-rate in the
+  L3 softmax sufficiently to add at least one additional Stores
+  construction over the soak, lifting structures_built from 3 toward
+  4-6 and raising welfare.shelter from 0.20 toward 0.25-0.35. Hunger
+  / nourishment should hold (more Stores doesn't reduce food
+  production); survival hard-gates remain unmoved.
+constants_patch:
+  scoring:
+    # Iterations 0.5 (baseline) → 0.7 (iter-1) → 1.0 (iter-2) all yielded
+    # structures_built = 5. Wrong-direction verdict both iterations.
+    # Root cause is the placement bug (ticket 382), not the weight value.
+    # Leaving at plausibility default — 190 ships findings-only.
+    build_chronic_full_weight: 0.5
+prediction:
+  metric: colony_score.structures_built
+  direction: increase
+  # Wide band because the base rate is small (3 in baseline). A single
+  # additional construction is +33%; doubling is +100%. Capping at +200%
+  # to flag concordance from a real lift while leaving room for noise
+  # variance on a low-N count.
+  rough_magnitude_pct: [20, 200]
+seeds: [42]
+reps: 1
+duration: 900

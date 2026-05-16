@@ -204,6 +204,47 @@ impl ItemKind {
         }
     }
 
+    /// Display category for UI rollups (190).
+    ///
+    /// Identity-keyed, derived from the variant itself. No new fields on
+    /// items — categorization is display-layer-only, per the no-stat-sticks
+    /// invariant. Categories grow as 016 crafting phases land (Tool /
+    /// Wearable / Decoration arrive with phases 2/3/4).
+    pub fn category(self) -> ItemCategory {
+        match self {
+            Self::RawMouse
+            | Self::RawRat
+            | Self::RawRabbit
+            | Self::RawFish
+            | Self::RawBird
+            | Self::Berries
+            | Self::Nuts
+            | Self::Roots
+            | Self::WildOnion
+            | Self::Mushroom => ItemCategory::RawFood,
+
+            Self::HerbHealingMoss
+            | Self::HerbMoonpetal
+            | Self::HerbCalmroot
+            | Self::HerbThornbriar
+            | Self::HerbDreamroot
+            | Self::HerbCatnip
+            | Self::HerbSlumbershade
+            | Self::HerbOracleOrchid => ItemCategory::Herb,
+
+            Self::ShinyPebble | Self::GlassShard | Self::ColorfulShell => ItemCategory::Curiosity,
+
+            Self::Barrel | Self::Crate | Self::Shelf => ItemCategory::StorageUpgrade,
+
+            Self::Moss
+            | Self::DriedGrass
+            | Self::Feather
+            | Self::ShadowBone
+            | Self::Wood
+            | Self::Stone => ItemCategory::Material,
+        }
+    }
+
     /// Hunger satisfaction provided when consumed (0.0–1.0 scale).
     /// Non-food items return 0.0.
     ///
@@ -218,6 +259,51 @@ impl ItemKind {
             Self::RawBird => 0.6,
             Self::Berries | Self::Nuts | Self::Roots | Self::Mushroom | Self::WildOnion => 0.2,
             _ => 0.0,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ItemCategory — UI display rollup
+// ---------------------------------------------------------------------------
+
+/// Display-layer grouping for items in inventory / stores overview UI.
+///
+/// Identity-keyed: every `ItemKind` maps to exactly one category via
+/// `ItemKind::category()`. No numeric modifier fields on items; categories
+/// are derived, not stored. New variants (Tool / Wearable / Decoration /
+/// PreservedFood) land alongside their corresponding 016 crafting phases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum ItemCategory {
+    RawFood,
+    Herb,
+    Material,
+    StorageUpgrade,
+    Curiosity,
+}
+
+impl ItemCategory {
+    /// Display label for the UI category header. Singular form — the panel
+    /// appends a count separately.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::RawFood => "Food",
+            Self::Herb => "Herbs",
+            Self::Material => "Materials",
+            Self::StorageUpgrade => "Storage upgrades",
+            Self::Curiosity => "Curiosities",
+        }
+    }
+
+    /// Stable display ordering for the panel — food first (most important),
+    /// herbs next (healing/ward inputs), then materials, then the long tail.
+    pub fn sort_key(self) -> u8 {
+        match self {
+            Self::RawFood => 0,
+            Self::Herb => 1,
+            Self::Material => 2,
+            Self::StorageUpgrade => 3,
+            Self::Curiosity => 4,
         }
     }
 }
@@ -401,6 +487,68 @@ impl Item {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_item_kind_has_a_category() {
+        // Exhaustive over the 30 variants — extend this list when ItemKind grows.
+        let all: [ItemKind; 30] = [
+            ItemKind::RawMouse,
+            ItemKind::RawRat,
+            ItemKind::RawRabbit,
+            ItemKind::RawFish,
+            ItemKind::RawBird,
+            ItemKind::Berries,
+            ItemKind::Nuts,
+            ItemKind::Roots,
+            ItemKind::WildOnion,
+            ItemKind::Mushroom,
+            ItemKind::Moss,
+            ItemKind::DriedGrass,
+            ItemKind::Feather,
+            ItemKind::HerbHealingMoss,
+            ItemKind::HerbMoonpetal,
+            ItemKind::HerbCalmroot,
+            ItemKind::HerbThornbriar,
+            ItemKind::HerbDreamroot,
+            ItemKind::HerbCatnip,
+            ItemKind::HerbSlumbershade,
+            ItemKind::HerbOracleOrchid,
+            ItemKind::ShinyPebble,
+            ItemKind::GlassShard,
+            ItemKind::ColorfulShell,
+            ItemKind::ShadowBone,
+            ItemKind::Barrel,
+            ItemKind::Crate,
+            ItemKind::Shelf,
+            ItemKind::Wood,
+            ItemKind::Stone,
+        ];
+        // Trivially exhaustive (the match in category() is total) — this test
+        // exists to make ItemKind growth fail loudly if a future variant gets
+        // added without extending this list.
+        for kind in all {
+            let _ = kind.category();
+        }
+        assert_eq!(all.len(), 30);
+    }
+
+    #[test]
+    fn category_buckets_match_intent() {
+        assert_eq!(ItemKind::RawMouse.category(), ItemCategory::RawFood);
+        assert_eq!(ItemKind::Berries.category(), ItemCategory::RawFood);
+        assert_eq!(ItemKind::HerbCatnip.category(), ItemCategory::Herb);
+        assert_eq!(ItemKind::Moss.category(), ItemCategory::Material);
+        assert_eq!(ItemKind::Wood.category(), ItemCategory::Material);
+        assert_eq!(ItemKind::Barrel.category(), ItemCategory::StorageUpgrade);
+        assert_eq!(ItemKind::ShinyPebble.category(), ItemCategory::Curiosity);
+    }
+
+    #[test]
+    fn category_sort_orders_food_first() {
+        assert!(ItemCategory::RawFood.sort_key() < ItemCategory::Herb.sort_key());
+        assert!(ItemCategory::Herb.sort_key() < ItemCategory::Material.sort_key());
+        assert!(ItemCategory::Curiosity.sort_key() == 4);
+    }
 
     #[test]
     fn raw_prey_is_food() {

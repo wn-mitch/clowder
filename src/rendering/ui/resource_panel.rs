@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
+
 use bevy::prelude::*;
 
-use crate::components::items::{Item, ItemKind};
+use crate::components::items::{Item, ItemCategory};
 use crate::components::prey::{PreyAnimal, PreyConfig, PreyKind};
 use crate::rendering::ui::{UiRoot, PANEL_BG, PANEL_BORDER, TEXT_COLOR, TEXT_DIM, TEXT_HIGHLIGHT};
 use crate::resources::food::FoodStores;
@@ -99,11 +101,24 @@ pub fn update_resource_panel(
         TEXT_HIGHLIGHT,
     ));
 
-    // --- Food stores bar ---
+    // --- Food stores bar (Stores fill — the canonical chronic-full signal) ---
     children.push(spawn_food_bar(&mut commands, food.current, food.capacity));
 
-    // --- Item counts by category ---
-    let (food_count, herb_count, material_count) = count_items_by_category(&items);
+    // --- Food breakdown by source (190) ---
+    // Honest labels: in_stores/held are GOAP-accessible today; in_dens/in_workshops
+    // are tracked-but-dark until the Den/Workshop retrieval substrate lands.
+    let breakdown = format!(
+        "  Total {} food  ({} stores · {} dens · {} workshops · {} held)",
+        food.total_accessible(),
+        food.in_stores,
+        food.in_dens,
+        food.in_workshops,
+        food.held,
+    );
+    children.push(spawn_text(&mut commands, &breakdown, FONT_SIZE, TEXT_DIM));
+
+    // --- Item counts by category (enum-driven; hides zero-count categories) ---
+    let counts = count_items_by_category(&items);
     children.push(spawn_spacer(&mut commands));
     children.push(spawn_text(
         &mut commands,
@@ -111,24 +126,23 @@ pub fn update_resource_panel(
         FONT_SIZE + 1.0,
         TEXT_COLOR,
     ));
-    children.push(spawn_text(
-        &mut commands,
-        &format!("  Food items: {food_count}"),
-        FONT_SIZE,
-        TEXT_DIM,
-    ));
-    children.push(spawn_text(
-        &mut commands,
-        &format!("  Herbs: {herb_count}"),
-        FONT_SIZE,
-        TEXT_DIM,
-    ));
-    children.push(spawn_text(
-        &mut commands,
-        &format!("  Materials: {material_count}"),
-        FONT_SIZE,
-        TEXT_DIM,
-    ));
+    if counts.is_empty() {
+        children.push(spawn_text(
+            &mut commands,
+            "  (empty)",
+            FONT_SIZE,
+            TEXT_DIM,
+        ));
+    } else {
+        for (category, count) in counts {
+            children.push(spawn_text(
+                &mut commands,
+                &format!("  {}: {}", category.label(), count),
+                FONT_SIZE,
+                TEXT_DIM,
+            ));
+        }
+    }
 
     // --- Prey populations ---
     let (mice, rats, rabbits, fish, birds) = count_prey(&prey);
@@ -190,18 +204,17 @@ pub fn update_resource_panel(
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn count_items_by_category(items: &Query<&Item>) -> (usize, usize, usize) {
-    let mut food = 0;
-    let mut herbs = 0;
-    let mut materials = 0;
+/// Bucket every world `Item` by `ItemCategory`, returning categories in
+/// stable display order. Empty categories are omitted so the panel only
+/// renders rows for items the colony actually has.
+fn count_items_by_category(items: &Query<&Item>) -> Vec<(ItemCategory, u32)> {
+    let mut by_category: BTreeMap<u8, (ItemCategory, u32)> = BTreeMap::new();
     for item in items.iter() {
-        match item_category(item.kind) {
-            ItemCategory::Food => food += 1,
-            ItemCategory::Herb => herbs += 1,
-            ItemCategory::Material => materials += 1,
-        }
+        let cat = item.kind.category();
+        let entry = by_category.entry(cat.sort_key()).or_insert((cat, 0));
+        entry.1 += 1;
     }
-    (food, herbs, materials)
+    by_category.into_values().collect()
 }
 
 fn count_prey(prey: &Query<&PreyConfig, With<PreyAnimal>>) -> (usize, usize, usize, usize, usize) {
@@ -216,27 +229,6 @@ fn count_prey(prey: &Query<&PreyConfig, With<PreyAnimal>>) -> (usize, usize, usi
         }
     }
     (mice, rats, rabbits, fish, birds)
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ItemCategory {
-    Food,
-    Herb,
-    Material,
-}
-
-fn item_category(kind: ItemKind) -> ItemCategory {
-    if kind.is_food() {
-        return ItemCategory::Food;
-    }
-    match kind {
-        ItemKind::HerbHealingMoss
-        | ItemKind::HerbMoonpetal
-        | ItemKind::HerbCalmroot
-        | ItemKind::HerbThornbriar
-        | ItemKind::HerbDreamroot => ItemCategory::Herb,
-        _ => ItemCategory::Material,
-    }
 }
 
 fn spawn_text(commands: &mut Commands, content: &str, size: f32, color: Color) -> Entity {
@@ -369,50 +361,70 @@ fn spawn_food_bar(commands: &mut Commands, current: f32, capacity: f32) -> Entit
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::items::{ItemKind, ItemLocation};
+    use bevy_ecs::system::SystemState;
+
+    fn count_in_world(world: &mut World) -> Vec<(ItemCategory, u32)> {
+        let mut state: SystemState<Query<&Item>> = SystemState::new(world);
+        let items = state.get(world);
+        count_items_by_category(&items)
+    }
 
     #[test]
-    fn all_item_kinds_have_category() {
-        let all_kinds = [
-            ItemKind::RawMouse,
-            ItemKind::RawRat,
-            ItemKind::RawFish,
-            ItemKind::RawBird,
-            ItemKind::Berries,
-            ItemKind::Nuts,
-            ItemKind::Roots,
-            ItemKind::WildOnion,
-            ItemKind::Mushroom,
-            ItemKind::Moss,
-            ItemKind::DriedGrass,
-            ItemKind::Feather,
-            ItemKind::HerbHealingMoss,
-            ItemKind::HerbMoonpetal,
-            ItemKind::HerbCalmroot,
-            ItemKind::HerbThornbriar,
-            ItemKind::HerbDreamroot,
+    fn count_items_by_category_groups_and_orders() {
+        let mut world = World::new();
+        world.spawn(Item::new(ItemKind::RawMouse, 1.0, ItemLocation::OnGround));
+        world.spawn(Item::new(ItemKind::RawFish, 1.0, ItemLocation::OnGround));
+        world.spawn(Item::new(
+            ItemKind::HerbCatnip,
+            1.0,
+            ItemLocation::OnGround,
+        ));
+        world.spawn(Item::new(ItemKind::Wood, 1.0, ItemLocation::OnGround));
+        world.spawn(Item::new(ItemKind::Barrel, 1.0, ItemLocation::OnGround));
+        world.spawn(Item::new(
             ItemKind::ShinyPebble,
-            ItemKind::GlassShard,
-            ItemKind::ColorfulShell,
-        ];
+            1.0,
+            ItemLocation::OnGround,
+        ));
 
-        let mut food = 0;
-        let mut herbs = 0;
-        let mut materials = 0;
-        for kind in all_kinds {
-            match item_category(kind) {
-                ItemCategory::Food => food += 1,
-                ItemCategory::Herb => herbs += 1,
-                ItemCategory::Material => materials += 1,
-            }
-        }
+        let counts = count_in_world(&mut world);
 
+        // Expect display order: RawFood, Herb, Material, StorageUpgrade, Curiosity.
+        let cats: Vec<ItemCategory> = counts.iter().map(|(c, _)| *c).collect();
         assert_eq!(
-            food + herbs + materials,
-            20,
-            "all 20 item kinds should be classified"
+            cats,
+            vec![
+                ItemCategory::RawFood,
+                ItemCategory::Herb,
+                ItemCategory::Material,
+                ItemCategory::StorageUpgrade,
+                ItemCategory::Curiosity,
+            ]
         );
-        assert_eq!(food, 9, "9 food items");
-        assert_eq!(herbs, 5, "5 herb items");
-        assert_eq!(materials, 6, "6 material items");
+
+        assert_eq!(counts[0], (ItemCategory::RawFood, 2));
+        assert_eq!(counts[1], (ItemCategory::Herb, 1));
+        assert_eq!(counts[2], (ItemCategory::Material, 1));
+        assert_eq!(counts[3], (ItemCategory::StorageUpgrade, 1));
+        assert_eq!(counts[4], (ItemCategory::Curiosity, 1));
+    }
+
+    #[test]
+    fn count_items_by_category_omits_empty_categories() {
+        let mut world = World::new();
+        world.spawn(Item::new(ItemKind::HerbCalmroot, 1.0, ItemLocation::OnGround));
+
+        let counts = count_in_world(&mut world);
+
+        assert_eq!(counts.len(), 1, "only one non-empty category");
+        assert_eq!(counts[0], (ItemCategory::Herb, 1));
+    }
+
+    #[test]
+    fn count_items_by_category_empty_world() {
+        let mut world = World::new();
+        let counts = count_in_world(&mut world);
+        assert!(counts.is_empty());
     }
 }
