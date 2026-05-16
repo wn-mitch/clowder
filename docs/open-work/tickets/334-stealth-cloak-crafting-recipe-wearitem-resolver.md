@@ -1,14 +1,14 @@
 ---
 id: 334
 title: Stealth-cloak crafting recipe + WearItem resolver
-status: ready
+status: blocked
 cluster: items-crafting
 orchestration: coherent-block
 block: htn-method-composition
 initiative: [smarter-cats, world-richness, htn-method-composition]
 added: 2026-05-14
 parked: null
-blocked-by: []
+blocked-by: [365, 17]
 wires-method: [acquire_stealth_via_self_craft, acquire_stealth_via_commission]
 supersedes: []
 related-systems: [htn-methods.md, slot-inventory.md, crafting.md]
@@ -113,3 +113,10 @@ lists both for enforcement.
 
 - 2026-05-14: opened as 128 epic child #16 (Batch D Tier 2 glue;
   longest external-dependency chain).
+- 2026-05-16: 016 promoted to epic dashboard; `blocked-by` updated
+  to `[365, 17]` — the crafting substrate work this ticket assumed
+  ("if not, spin off a crafting-substrate ticket as predecessor")
+  is now ticket 365 (016 Phase 1a). Scope may shrink further once
+  369 (Phase 2b warrior's kit) lands the WearItem resolver — at
+  that point 334 may close to a pure HTN-method-flip ticket, or
+  fold into 369's scope. Decide during 369 session.

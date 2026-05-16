@@ -1,0 +1,41 @@
+---
+id: 366
+title: Aspirations mastery arcs — Weaving, BoneShaping, Hidework, Pigment, Cairn (016 Phase 5 precursor)
+status: ready
+cluster: ai-substrate
+orchestration: substrate-sensitive
+initiative: [world-richness]
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [crafting.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Add five new mastery arcs to `src/components/aspirations.rs` — `WeavingMastery`, `BoneShapingMastery`, `HideworkMastery`, `PigmentMastery`, `CairnMastery` — that gate Phase 5 crafting recipes (372). Lands independently of any crafting work; arcs are read by the future `CraftDse` / `RecipeRegistry` eligibility check. No 372 recipe ships until at least one cat in the colony has advanced on a relevant arc. Parent epic: [016](016-crafting-items-recipes-stations.md). Phase 5 hard-depends on this.
+
+## Scope
+- Five new mastery arcs in `src/components/aspirations.rs` (variant under `AspirationDomain`, or sub-domain alongside `Herbcraft`).
+- Milestone templates for each arc (number of milestones + progression curve TBD during 366 design — refer to existing Hunting / Combat arcs for shape).
+- Aspirational-adoption hooks so cats can actually pursue mastery (read-side: aspiration-scoring + adoption substrate).
+- Read-side stub: `RecipeRegistry::is_phase5_unlocked(colony) -> bool` returns true iff any colony cat has advanced on a relevant arc. Default false until 372 wires it.
+
+## Out of scope
+- Phase 5 recipes themselves (→ 372).
+- Per-cast bonus from mastery — `docs/systems/crafting.md` §Phase 5 safeguards: mastery is a latent colony enabler, never personal-strike. No artisan hierarchy in-sim.
+
+## Approach
+See `docs/systems/crafting.md` §Phase 5 — skill-via-aspirations gating. The five arcs are *named* there but *defined* in `aspirations.rs`; this ticket does the definition + adoption-side wiring. Hypothesis: pre-372, mastery-arc adoption appears in the L1 aspiration trace ≥1× per seed-42 soak once at least one cat has the domain affinity. The recipe-eligibility consumer wires in 372.
+
+## Verification
+- `just check` passes.
+- `just inspect <cat>` shows a mastery arc in adopted aspirations on a soak where a cat had the prerequisite affinity.
+- L1 trace (`trace-<focal>.jsonl`) records the new arc-adoption events.
+
+## Log
+- 2026-05-16: opened as 016 epic decomposition (Phase 5 precursor; parent 016).

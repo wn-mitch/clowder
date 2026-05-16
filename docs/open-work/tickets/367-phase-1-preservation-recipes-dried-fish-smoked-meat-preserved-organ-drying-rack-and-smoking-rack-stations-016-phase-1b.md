@@ -1,0 +1,42 @@
+---
+id: 367
+title: Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b)
+status: blocked
+cluster: items-crafting
+orchestration: substrate-sensitive
+initiative: [world-richness]
+added: 2026-05-16
+parked: null
+blocked-by: [365]
+supersedes: []
+related-systems: [crafting.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Land the three Phase 1 preservation recipes (Dried Fish, Smoked Meat, Preserved Organ) and the two new station types (Drying Rack, Smoking Rack) on top of the unified Recipe / Station / CraftAction substrate from 365. Directly targets the starvation continuity gate via winter buffer calories. Parent epic: [016](016-crafting-items-recipes-stations.md).
+
+## Scope
+- `StructureType::DryingRack`, `StructureType::SmokingRack` in `src/components/building.rs` + placement / building chains.
+- Three new `Recipe` registry entries with timing / fuel / weather requirements from `docs/systems/crafting.md` Phase 1.
+- Drying Rack: sun-powered, weather-sensitive (Clear weather only, ~3 days per fish).
+- Smoking Rack: requires Fuel input + attending-cat tend cycles (~1 day per cut).
+- Preserved food `CraftedItem` variants: don't spoil; reduced hunger-restore ratios per design doc (0.7× for dried fish, 0.8× for smoked meat, mood-bonus retained for preserved organ).
+- Eating chain reads new preserved variants via the existing `eat_from_inventory` path.
+
+## Out of scope
+- §5 behavioral tools (→ 368).
+- Warrior's kit + Tanning Frame (→ 369; Tanning Frame extends Drying Rack but ships under 2b).
+
+## Approach
+See `docs/systems/crafting.md` Phase 1 table. Hypothesis: `deaths_by_cause.Starvation` on seed-42 `--duration 900` remains 0 while season-3 food-stockpile median rises ~2×; mortality distribution shifts from late-winter to non-seasonal causes.
+
+## Verification
+- `just hypothesize <spec.yaml>` runs the four-artifact methodology (baseline vs. treatment).
+- `just verdict <run-dir>` passes — starvation canary holds, preservation-recipe Feature events emitted.
+
+## Log
+- 2026-05-16: opened as 016 epic decomposition (Phase 1b; parent 016, blocked-by 365).

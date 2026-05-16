@@ -1,0 +1,48 @@
+---
+id: 365
+title: Crafting substrate — Recipe + Station + CraftAction; generalize remedy_prep and ward_setting (016 Phase 1a)
+status: ready
+cluster: items-crafting
+orchestration: substrate-sensitive
+initiative: [world-richness]
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [crafting.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Generalize the existing `remedy_prep` (`StepKind::PrepareRemedy`, `src/systems/magic.rs`, `src/steps/magic/prepare_remedy.rs`) and `ward_setting` (`StepKind::SetWard`, `src/steps/magic/set_ward.rs`) into a unified `Recipe` / `Station` / `CraftAction` substrate. The two existing one-off code paths get retired; every later phase child (367 / 368 / 369 / 370 / 371 / 372) reads this. No new recipes ship in 1a — substrate-only refactor with behavioral parity. Parent epic: [016](016-crafting-items-recipes-stations.md).
+
+## Scope
+- New types: `Recipe`, `RecipeRegistry`, `Station` marker family, `CraftedItem` (per `docs/systems/crafting.md` §Design constraints — the doc owns the shape; this ticket doesn't restate it).
+- New `StepKind::CraftRecipe { recipe: RecipeId }` (or per-recipe step modules under `src/steps/crafting/`) — collapses `PrepareRemedy` + `SetWard` into the unified path.
+- Unified `CraftDse` (or per-station DSE family) — retires `HerbcraftPrepareDse` (`src/ai/dses/herbcraft_prepare.rs`) and `HerbcraftWardDse` (`src/ai/dses/herbcraft_ward.rs`).
+- Migrate the two existing recipes (remedy prep at Workshop, ward set with thornbriar) to the unified path.
+- Five-heading rustdoc contract on every new `pub fn resolve_*` per CLAUDE.md "GOAP Step Resolver Contract" + `Feature::expected_to_fire_per_soak()` entries.
+- First-commit decision: 173 (`crafting-split-capability-markers`, parked) — un-park or close based on whether capability markers fall out of the unified substrate naturally.
+
+## Out of scope
+- New preservation recipes (→ 367 Phase 1b).
+- Drying Rack / Smoking Rack station structures (→ 367 Phase 1b).
+- Any §5 behavioral tools (368), warrior's kit (369), wearables (370), decorations (371), Phase 5 (372).
+
+## Current state
+- Existing `HerbcraftPrepareDse` / `HerbcraftWardDse` working; 155 (landed) and 172 (landed) reduced Cooking/Herbalism plan failures 58% by splitting `DispositionKind::Crafting` into Herbalism / Witchcraft / Cooking. 309 (blocked) is a Phase 1.5 anticipatory-crafting extension.
+- `resolve_craft()` stub at `src/steps/disposition/craft.rs:37-41` returns `Fail` with blocker message "ticket #334 not yet landed" — this ticket replaces that stub.
+
+## Approach
+Layer-walk audit (L1 markers → L2 DSE → L3 softmax → Action→Disposition → plan template → completion proxy → resolver) on the existing remedy_prep + ward_setting paths; mark each row `[verified-correct]` (the substrate is currently working; the refactor preserves behavior). Structural-option menu in the audit table: chosen **extend** (unified substrate replaces both per-discipline DSEs with one polymorphic DSE) over **split** (keep separate + add cook-DSE). Rationale: `docs/systems/crafting.md` forbids parallel code paths after Phase 1 lands.
+
+## Verification
+- `just check` passes (substrate-stub allowlist, step-resolver contracts, never-fired canary, orchestration frontmatter).
+- `just scenario` (or `just soak-trace 42 <focal>`) shows remedy / ward firing via the unified `CraftDse` in the L2 trace; pre/post-refactor selection identical on a controlled focal cat.
+- `just verdict` baseline holds (no canary regression).
+
+## Log
+- 2026-05-16: opened as 016 epic decomposition (Phase 1a; parent 016).

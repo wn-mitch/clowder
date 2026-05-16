@@ -1,0 +1,40 @@
+---
+id: 370
+title: Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer)
+status: blocked
+cluster: items-crafting
+orchestration: substrate-sensitive
+initiative: [world-richness]
+added: 2026-05-16
+parked: null
+blocked-by: [368, 17]
+supersedes: []
+related-systems: [crafting.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Land Phase 3 wearable recipes — Mentorship Token, Heirloom Piece, Calling Wearable, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin — that produce identity objects with narrative weight. First producer of wearables for 017 slot-inventory. Integration point with `the-calling.md` Named Objects. Adornment & Setting discipline enters here. Parent epic: [016](016-crafting-items-recipes-stations.md).
+
+## Scope
+- Six new `Recipe` entries on the Workshop (Calling Wearable also craftable at Fairy-Ring).
+- Wearable routing via the slot-inventory Collar slot (017 dependency).
+- Naming-substrate consumer: Mentorship Tokens named via event-proximity matcher (e.g., "Cedar's First Catch") — not a per-stub generator. Implements against the shared `naming.md` matcher, not a one-off.
+- `ScavengedMetal` input wiring on Tiara and Stone-Set Pin. Input availability gated by `ruin-clearings.md` landing; stub as zero-probability drop until then.
+
+## Out of scope
+- Place-anchored decorations (→ 371).
+- Phase 5 cumulative / multi-cat artefacts (→ 372).
+
+## Approach
+See `docs/systems/crafting.md` Phase 3 + `the-calling.md` Named Objects. Hypothesis: post-370, named-event count per sim year rises by ≥1 independent of Calling trigger rate; mythic-texture continuity canary holds.
+
+## Verification
+- `just hypothesize <spec.yaml>` for mythic-texture continuity.
+- `just verdict <run-dir>` — ≥1 named-object event per sim year from non-Calling sources; generational-continuity canary holds.
+
+## Log
+- 2026-05-16: opened as 016 epic decomposition (Phase 3; parent 016, blocked-by 368 + 017).

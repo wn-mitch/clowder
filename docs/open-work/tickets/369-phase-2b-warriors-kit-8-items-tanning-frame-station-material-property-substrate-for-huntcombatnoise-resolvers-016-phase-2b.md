@@ -1,0 +1,41 @@
+---
+id: 369
+title: Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b)
+status: blocked
+cluster: items-crafting
+orchestration: substrate-sensitive
+initiative: [world-richness]
+added: 2026-05-16
+parked: null
+blocked-by: [365]
+supersedes: []
+related-systems: [crafting.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Land the eight Phase 2b warrior's-kit recipes — Bone-Tip Spear, Bone Stiletto, Flint Blade, Hide Bracers, Hide-Plated Wrap, Sling, Woven Reed Cloak, Tooth-Notched Club — plus the Tanning Frame station (extends Drying Rack). Items carry ecological properties (material, weapon class, noise profile, durability tier) that hunt / combat / movement / noise resolvers read, per `docs/systems/crafting.md` §Design constraints. Subsumes ticket 334 stealth-cloak as the simplest concrete consumer — 334's `blocked-by` adds 365 + 017 in the same commit that opens this ticket. Parent epic: [016](016-crafting-items-recipes-stations.md).
+
+## Scope
+- New `StructureType::TanningFrame`.
+- Eight new `Recipe` entries spanning Bone & Shell Craft, Hide & Pelt Work, Stonecraft, Fiber & Weaving (per `docs/systems/crafting.md` Phase 2b table).
+- Material-property substrate readable by `take_damage`, hunt-strike, ranged-attack, movement-detection, and noise resolvers (extend existing resolvers; no new resolver kinds).
+- Snap-event emission for bone weapons (e.g., `BoneWeaponSnapped`) — a snapped bone-tip spear mid-hunt is a story.
+- Subsume 334: stealth-cloak recipe lands here alongside the Woven Reed Cloak (or as a sibling Phase 2b sub-recipe; decide during 2b design).
+
+## Out of scope
+- Metal-bearing items (Adornment & Setting — → 370).
+- Wearable slot wiring on slot-inventory (017 + → 370).
+
+## Approach
+See `docs/systems/crafting.md` Phase 2b + the material-property table (Bone / Flint / Cured hide / Fiber / Scavenged-Metal). Hypothesis: on seed-42 `--duration 900`, hunt-success rate rises ≥1.1× for equipped cats vs. unequipped; `deaths_by_cause.Starvation` remains 0; bone-weapon snap events appear in the log ≥1× per soak confirming durability mechanics fire.
+
+## Verification
+- `just hypothesize <spec.yaml>` runs treatment-vs-control on hunt-success with equipped/unequipped cohorts.
+- `just verdict <run-dir>` — starvation canary holds, hunt rate up, snap events emitted.
+
+## Log
+- 2026-05-16: opened as 016 epic decomposition (Phase 2b; parent 016, blocked-by 365).
