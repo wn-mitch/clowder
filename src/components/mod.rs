@@ -1,6 +1,7 @@
 pub mod aspiration_emission;
 pub mod aspirations;
 pub mod beliefs;
+pub mod body_zones;
 pub mod building;
 pub mod coordination;
 pub mod disposition;
@@ -48,6 +49,9 @@ pub use aspirations::{
     ActiveAspiration, AspirationChain, AspirationDomain, Aspirations, AspirationsInitialized, Emit,
     Milestone, Preference, Preferences, Priority, ProgressTracker, SkillKind,
 };
+pub use body_zones::{
+    BodyPart, BodyPartState, CatBodyModel, PartCategory, PartCondition, CAT_BODY_PART_COUNT,
+};
 pub use beliefs::{
     bucket_position as bucket_location_position, CandidateFacet, CatBeliefs, ContextBeliefs,
     EnvironmentalContextKey, EvidenceKind, Facet, FacetSlot, LocationBeliefs, LocationKey,
@@ -88,7 +92,7 @@ pub use mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 pub use mourning::Mourning;
 pub use personality::Personality;
 pub use physical::{
-    Dead, Health, Injury, InjuryKind, InjurySource, Needs, Position, PreviousPosition,
+    Dead, Health, InjurySource, Needs, Position, PreviousPosition,
     RenderPosition,
 };
 pub use pregnancy::{GestationStage, Pregnant};

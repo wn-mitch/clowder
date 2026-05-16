@@ -27,7 +27,7 @@ use crate::components::magic::{Harvestable, Herb, HerbKind, Inventory, Ward};
 use crate::components::markers;
 use crate::components::mental::Memory;
 use crate::components::personality::Personality;
-use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
+use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::prey::{
     DenRaided, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled, PreyKind, PreyState,
 };
@@ -1175,6 +1175,8 @@ pub fn evaluate_and_plan(
                 &Memory,
                 &Skills,
                 &Health,
+                // Ticket 095 Phase 1 Stage B — anatomical pain substrate.
+                &crate::components::CatBodyModel,
             ),
             (
                 &MagicAffinity,
@@ -1413,7 +1415,7 @@ pub fn evaluate_and_plan(
 
     let colony_injury_count = query
         .iter()
-        .filter(|((_, _, _, _, _, _, _, health), _)| health.current < 1.0)
+        .filter(|((_, _, _, _, _, _, _, health, _), _)| health.current < 1.0)
         .count();
 
     let directive_snapshot: HashMap<Entity, (usize, Option<Directive>)> = world_state
@@ -1425,7 +1427,7 @@ pub fn evaluate_and_plan(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _, _, _, _))| {
+            |((entity, _, _, _, pos, _, _, _, _), (_, _, current, _, _, _, _, _, _, _, _))| {
                 (entity, *pos, current.action)
             },
         )
@@ -1467,7 +1469,7 @@ pub fn evaluate_and_plan(
     let current_day_phase = mating_fitness_params.current_day_phase();
 
     for (
-        (entity, name, needs, personality, pos, memory, skills, health),
+        (entity, name, needs, personality, pos, memory, skills, health, body_model),
         (
             magic_aff,
             inventory,
@@ -1557,10 +1559,11 @@ pub fn evaluate_and_plan(
 
         let combat_effective =
             skills.combat + skills.hunting * d.combat_effective_hunting_cross_train;
-        let is_incapacitated = health
-            .injuries
-            .iter()
-            .any(|inj| inj.kind == InjuryKind::Severe && !inj.healed);
+        // 095 Phase 1 Stage B — anatomical pain replaces severe-injury count.
+        let max_pain: f32 = res.constants.combat.body_zone_pain_weights.iter().sum();
+        let is_incapacitated = max_pain > 0.0
+            && (body_model.total_pain(&res.constants.combat.body_zone_pain_weights) / max_pain)
+                > res.constants.combat.pain_incapacitation_threshold;
         // §4.3 per-cat marker population. Bit-for-bit mirrors the
         // inline `is_incapacitated` above — kept side-by-side so
         // `MarkerSnapshot::has("Incapacitated", entity)` resolves
@@ -1887,7 +1890,8 @@ pub fn evaluate_and_plan(
             // perception module's helpers so the scalar derivation lives
             // in one place across all consumers.
             pain_level: crate::systems::interoception::pain_level(
-                &health.injuries,
+                body_model,
+                &res.constants.combat.body_zone_pain_weights,
                 d.pain_normalization_max,
             ),
             body_distress_composite: crate::systems::interoception::body_distress_composite(
@@ -2125,7 +2129,7 @@ pub fn evaluate_and_plan(
                     memory,
                     d.safe_rest_threat_suppression_radius,
                 ),
-                own_injury_site: crate::systems::interoception::own_injury_site(health),
+                own_injury_site: crate::systems::interoception::own_injury_site(body_model, *pos),
                 // Ticket 228 — populated by the replan-time anchor
                 // resolution above. Hunt's route-cost axis samples
                 // through `nearest_prey`; Wander's through
@@ -3013,6 +3017,8 @@ pub fn resolve_goap_plans(
                 // recently removed) won't have it; `dispatch_step_action`
                 // falls back to A* via `CatPathPlan::AStarFallback`.
                 Option<&crate::components::RouteCostField>,
+                // Ticket 095 Phase 1 Stage B — body-zone substrate.
+                &crate::components::CatBodyModel,
             ),
         ),
         (
@@ -3237,7 +3243,7 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _, _))| {
+                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _, _, _))| {
                     (e, g.as_ref().map_or(0.8, |g| g.0))
                 },
             )
@@ -3247,7 +3253,7 @@ pub fn resolve_goap_plans(
         // double-borrowing the mutable `cats` query.
         gender: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _))| (e, *g))
+            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _))| (e, *g))
             .collect(),
         cat_tile_counts: {
             let mut counts = HashMap::new();
@@ -3284,7 +3290,7 @@ pub fn resolve_goap_plans(
             .collect(),
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _))| health.current < health.max)
+            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _, _))| health.current < health.max)
             .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
             .collect(),
         // §6.5.3 mentor-target DSE snapshot: candidate-side Skills lookup
@@ -3368,6 +3374,7 @@ pub fn resolve_goap_plans(
             mut fulfillment_opt,
             mut recent_failures,
             route_cost_field,
+            body_model,
         ),
     ) in &mut cats
     {
@@ -3731,6 +3738,7 @@ pub fn resolve_goap_plans(
             &mut accum,
             recent_failures.as_deref(),
             route_cost_field,
+            body_model,
         );
 
         // Re-derive `d` after the dispatch call so the immutable borrow
@@ -4287,7 +4295,7 @@ pub fn resolve_goap_plans(
     // Deferred grooming restorations — apply grooming condition delta and
     // §7.W social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _, _))) =
+        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _))) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -4505,6 +4513,9 @@ fn dispatch_step_action(
     // back to A* via `CatPathPlan::AStarFallback` (and emitting
     // `Feature::RouteCostFieldFallback`) when stale or out-of-budget.
     route_cost_field: Option<&crate::components::RouteCostField>,
+    // Ticket 095 Phase 1 Stage B — body-zone substrate. Provides
+    // `health_derived` for the 046-Layer-1 carry in EngageThreat.
+    body_model: &crate::components::CatBodyModel,
 ) -> crate::steps::StepResult {
     let d = &ec.constants.disposition;
 
@@ -5386,11 +5397,14 @@ fn dispatch_step_action(
                     .iter()
                     .filter_map(|(e, p)| if *e == cat_entity { None } else { Some(*p) })
                     .collect();
-                let self_health_fraction = if health.max > 0.0 {
-                    (health.current / health.max).clamp(0.0, 1.0)
-                } else {
-                    0.0
-                };
+                // 095 Phase 1 Stage B — 046-Layer-1 carry: feed
+                // `combat_advantage_normalized` the body-zone-derived
+                // health rather than raw Health.current/max. Spec
+                // §IAUS Integration §2.
+                let weights = &ec.constants.combat.body_zone_pain_weights;
+                let max_pain: f32 = weights.iter().sum();
+                let self_health_fraction = body_model.health_derived(weights, max_pain);
+                let _ = health;
                 // §11 focal-cat hook: mirror socialize/goap.rs:~2557.
                 let focal_hook = if ec_is_focal(ec, cat_entity) {
                     ec.focal_capture

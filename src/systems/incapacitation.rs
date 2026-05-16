@@ -32,7 +32,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::markers::Incapacitated;
-use crate::components::physical::{Dead, Health, InjuryKind};
+use crate::components::physical::Dead;
 
 /// Author the `Incapacitated` ZST on living cats with at least one
 /// unhealed `InjuryKind::Severe` injury; remove it otherwise.
@@ -56,13 +56,26 @@ use crate::components::physical::{Dead, Health, InjuryKind};
 /// grace-period window before `cleanup_dead`.
 pub fn update_incapacitation(
     mut commands: Commands,
-    cats: Query<(Entity, &Health, Has<Incapacitated>), Without<Dead>>,
+    cats: Query<
+        (
+            Entity,
+            &crate::components::CatBodyModel,
+            Has<Incapacitated>,
+        ),
+        Without<Dead>,
+    >,
+    constants: Res<crate::resources::sim_constants::SimConstants>,
 ) {
-    for (entity, health, has_marker) in cats.iter() {
-        let is_incapacitated = health
-            .injuries
-            .iter()
-            .any(|inj| inj.kind == InjuryKind::Severe && !inj.healed);
+    // 095 Phase 1 Stage B — Incapacitated derives from anatomical pain
+    // fraction (normalized total_pain / max_possible_pain) crossing the
+    // configured threshold. Replaces the legacy "any Severe unhealed
+    // injury" predicate.
+    let weights = &constants.combat.body_zone_pain_weights;
+    let max_pain: f32 = weights.iter().sum();
+    let threshold = constants.combat.pain_incapacitation_threshold;
+    for (entity, body_model, has_marker) in cats.iter() {
+        let is_incapacitated =
+            max_pain > 0.0 && (body_model.total_pain(weights) / max_pain) > threshold;
         match (is_incapacitated, has_marker) {
             (true, false) => {
                 commands.entity(entity).insert(Incapacitated);
@@ -82,28 +95,52 @@ pub fn update_incapacitation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::physical::{DeathCause, Injury, InjurySource, Position};
+    use crate::components::body_zones::{BodyPart, CatBodyModel};
+    use crate::components::physical::{DeathCause, Health};
+    use crate::resources::sim_constants::SimConstants;
     use bevy_ecs::schedule::Schedule;
 
     fn setup_world() -> (World, Schedule) {
-        let world = World::new();
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(update_incapacitation);
         (world, schedule)
     }
 
-    fn spawn_cat_with_health(world: &mut World, health: Health) -> Entity {
-        world.spawn(health).id()
+    /// 095 Phase 1 Stage B — construct a body model whose total_pain is
+    /// at or above the configured incapacitation fraction. Saturates
+    /// every part to ensure the predicate trips even with conservative
+    /// weights.
+    fn saturated_body_model() -> CatBodyModel {
+        let c = SimConstants::default();
+        let weights = &c.combat.body_zone_pain_weights;
+        let thresholds = &c.combat.body_zone_condition_thresholds;
+        let permanent = &c.combat.body_zone_permanent_at_destroyed;
+        let mut model = CatBodyModel::default();
+        for part in BodyPart::ALL {
+            model.apply_damage(part, 1.0, thresholds, permanent);
+            let _ = weights; // pain weights drive total_pain; saturating tissue is enough.
+        }
+        model
     }
 
-    fn injury(kind: InjuryKind, healed: bool) -> Injury {
-        Injury {
-            kind,
-            tick_received: 0,
-            healed,
-            source: InjurySource::Unknown,
-            at: Position::new(0, 0),
-        }
+    /// Body model with one part lightly damaged (Bruised tier) — below
+    /// the incapacitation threshold even with the heaviest-weight part.
+    fn lightly_damaged_body_model() -> CatBodyModel {
+        let c = SimConstants::default();
+        let mut model = CatBodyModel::default();
+        model.apply_damage(
+            BodyPart::Tail,
+            0.1,
+            &c.combat.body_zone_condition_thresholds,
+            &c.combat.body_zone_permanent_at_destroyed,
+        );
+        model
+    }
+
+    fn spawn_cat_with_body_model(world: &mut World, model: CatBodyModel) -> Entity {
+        world.spawn((Health::default(), model)).id()
     }
 
     fn has_incapacitated(world: &World, entity: Entity) -> bool {
@@ -111,187 +148,66 @@ mod tests {
     }
 
     #[test]
-    fn empty_injuries_no_marker() {
+    fn empty_body_no_marker() {
         let (mut world, mut schedule) = setup_world();
-        let cat = spawn_cat_with_health(&mut world, Health::default());
+        let cat = spawn_cat_with_body_model(&mut world, CatBodyModel::default());
         schedule.run(&mut world);
         assert!(
             !has_incapacitated(&world, cat),
-            "no injuries should leave no marker"
+            "uninjured cat should leave no marker"
         );
     }
 
     #[test]
-    fn single_unhealed_severe_inserts_marker() {
+    fn saturated_body_inserts_marker() {
         let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Severe, false)],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
+        let cat = spawn_cat_with_body_model(&mut world, saturated_body_model());
         schedule.run(&mut world);
         assert!(
             has_incapacitated(&world, cat),
-            "unhealed severe should insert marker"
+            "total_pain at max should insert marker"
         );
     }
 
     #[test]
-    fn healed_severe_no_marker() {
+    fn light_damage_no_marker() {
         let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Severe, true)],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
+        let cat = spawn_cat_with_body_model(&mut world, lightly_damaged_body_model());
         schedule.run(&mut world);
         assert!(
             !has_incapacitated(&world, cat),
-            "healed severe should not insert marker"
-        );
-    }
-
-    #[test]
-    fn unhealed_minor_no_marker() {
-        let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Minor, false)],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
-        schedule.run(&mut world);
-        assert!(
-            !has_incapacitated(&world, cat),
-            "minor injury alone should not insert marker"
-        );
-    }
-
-    #[test]
-    fn unhealed_moderate_no_marker() {
-        let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Moderate, false)],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
-        schedule.run(&mut world);
-        assert!(
-            !has_incapacitated(&world, cat),
-            "moderate injury alone should not insert marker"
-        );
-    }
-
-    #[test]
-    fn unhealed_severe_plus_moderate_inserts_marker() {
-        let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![
-                injury(InjuryKind::Moderate, false),
-                injury(InjuryKind::Severe, false),
-            ],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
-        schedule.run(&mut world);
-        assert!(
-            has_incapacitated(&world, cat),
-            "any unhealed severe wins even when mixed with moderate"
-        );
-    }
-
-    #[test]
-    fn healed_severe_plus_unhealed_moderate_no_marker() {
-        let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![
-                injury(InjuryKind::Severe, true),
-                injury(InjuryKind::Moderate, false),
-            ],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
-        schedule.run(&mut world);
-        assert!(
-            !has_incapacitated(&world, cat),
-            "healed severe + unhealed moderate should not insert marker"
-        );
-    }
-
-    #[test]
-    fn multiple_unhealed_severe_inserts_once() {
-        let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![
-                injury(InjuryKind::Severe, false),
-                injury(InjuryKind::Severe, false),
-                injury(InjuryKind::Severe, false),
-            ],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
-        schedule.run(&mut world);
-        // Component presence is a set — multiple severes still collapse
-        // to a single marker ZST.
-        assert!(
-            has_incapacitated(&world, cat),
-            "multiple unhealed severes should still insert marker"
+            "small tissue damage should not exceed incapacitation threshold"
         );
     }
 
     #[test]
     fn heal_transition_removes_marker() {
         let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Severe, false)],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
+        let cat = spawn_cat_with_body_model(&mut world, saturated_body_model());
         schedule.run(&mut world);
         assert!(
             has_incapacitated(&world, cat),
             "tick 1 should insert marker"
         );
 
-        // Simulate combat::heal_injuries flipping the severe to healed.
-        world.get_mut::<Health>(cat).unwrap().injuries[0].healed = true;
+        // Manually reset every part's tissue damage to 0 — simulates a
+        // full per-part healing pass returning the cat to Healthy.
+        let mut model = world.get_mut::<CatBodyModel>(cat).unwrap();
+        for state in model.parts.iter_mut() {
+            state.tissue_damage = 0.0;
+            state.condition = crate::components::body_zones::PartCondition::Healthy;
+        }
         schedule.run(&mut world);
         assert!(
             !has_incapacitated(&world, cat),
-            "tick 2 should remove marker once injury is healed"
-        );
-    }
-
-    #[test]
-    fn new_injury_inserts_marker_next_tick() {
-        let (mut world, mut schedule) = setup_world();
-        let cat = spawn_cat_with_health(&mut world, Health::default());
-        schedule.run(&mut world);
-        assert!(
-            !has_incapacitated(&world, cat),
-            "tick 1 should not insert marker on uninjured cat"
-        );
-
-        world
-            .get_mut::<Health>(cat)
-            .unwrap()
-            .injuries
-            .push(injury(InjuryKind::Severe, false));
-        schedule.run(&mut world);
-        assert!(
-            has_incapacitated(&world, cat),
-            "tick 2 should insert marker after severe injury added"
+            "tick 2 should remove marker once body has healed"
         );
     }
 
     #[test]
     fn idempotent_no_flap_across_ticks() {
         let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Severe, false)],
-            ..Health::default()
-        };
-        let cat = spawn_cat_with_health(&mut world, health);
-
+        let cat = spawn_cat_with_body_model(&mut world, saturated_body_model());
         schedule.run(&mut world);
         assert!(has_incapacitated(&world, cat));
         schedule.run(&mut world);
@@ -300,8 +216,7 @@ mod tests {
             "steady-state tick should not flap marker"
         );
 
-        // And the steady-state uninjured case: no flap either.
-        let healthy = spawn_cat_with_health(&mut world, Health::default());
+        let healthy = spawn_cat_with_body_model(&mut world, CatBodyModel::default());
         schedule.run(&mut world);
         assert!(!has_incapacitated(&world, healthy));
         schedule.run(&mut world);
@@ -314,13 +229,10 @@ mod tests {
     #[test]
     fn dead_cats_are_skipped() {
         let (mut world, mut schedule) = setup_world();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Severe, false)],
-            ..Health::default()
-        };
         let cat = world
             .spawn((
-                health,
+                Health::default(),
+                saturated_body_model(),
                 Dead {
                     tick: 0,
                     cause: DeathCause::Injury,
@@ -330,42 +242,21 @@ mod tests {
         schedule.run(&mut world);
         assert!(
             !has_incapacitated(&world, cat),
-            "dead cats should not receive marker even with severe injury"
+            "dead cats should not receive marker even when saturated"
         );
     }
 
     #[test]
     fn mixed_population_independent_authoring() {
         let (mut world, mut schedule) = setup_world();
-        let downed = spawn_cat_with_health(
-            &mut world,
-            Health {
-                injuries: vec![injury(InjuryKind::Severe, false)],
-                ..Health::default()
-            },
-        );
-        let wounded = spawn_cat_with_health(
-            &mut world,
-            Health {
-                injuries: vec![injury(InjuryKind::Moderate, false)],
-                ..Health::default()
-            },
-        );
-        let healthy = spawn_cat_with_health(&mut world, Health::default());
+        let downed = spawn_cat_with_body_model(&mut world, saturated_body_model());
+        let wounded = spawn_cat_with_body_model(&mut world, lightly_damaged_body_model());
+        let healthy = spawn_cat_with_body_model(&mut world, CatBodyModel::default());
 
         schedule.run(&mut world);
 
-        assert!(
-            has_incapacitated(&world, downed),
-            "severe-injury cat should have marker"
-        );
-        assert!(
-            !has_incapacitated(&world, wounded),
-            "moderate-injury cat should not have marker"
-        );
-        assert!(
-            !has_incapacitated(&world, healthy),
-            "healthy cat should not have marker"
-        );
+        assert!(has_incapacitated(&world, downed));
+        assert!(!has_incapacitated(&world, wounded));
+        assert!(!has_incapacitated(&world, healthy));
     }
 }

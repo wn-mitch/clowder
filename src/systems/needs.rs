@@ -420,10 +420,16 @@ pub fn update_exploration_centroid(mut exploration_map: ResMut<crate::resources:
 /// state. Dead cats filtered via `Without<Dead>`.
 pub fn update_injury_marker(
     mut commands: Commands,
-    cats: Query<(Entity, &Health, Has<Injured>), Without<Dead>>,
+    cats: Query<
+        (Entity, &crate::components::CatBodyModel, Has<Injured>),
+        Without<Dead>,
+    >,
 ) {
-    for (entity, health, has_marker) in cats.iter() {
-        let is_injured = health.injuries.iter().any(|inj| !inj.healed);
+    // 095 Phase 1 Stage B — `Injured` marker derives from anatomical
+    // condition: any part at Wounded or worse. Replaces the legacy
+    // "any unhealed injury record" predicate.
+    for (entity, body_model, has_marker) in cats.iter() {
+        let is_injured = body_model.any_wounded_or_worse();
         match (is_injured, has_marker) {
             (true, false) => {
                 commands.entity(entity).insert(Injured);
@@ -1001,25 +1007,43 @@ mod tests {
         assert_eq!(after, 1.0, "kittens should not decay mating; got {after}");
     }
 
-    // --- update_injury_marker ---
+    // --- update_injury_marker (095 Phase 1 Stage B — body-zone substrate) ---
 
-    use crate::components::physical::{DeathCause, Injury, InjuryKind, InjurySource, Position};
+    use crate::components::body_zones::{BodyPart, CatBodyModel};
+    use crate::components::physical::DeathCause;
 
     fn setup_injury_marker() -> (World, Schedule) {
-        let world = World::new();
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(update_injury_marker);
         (world, schedule)
     }
 
-    fn injury(kind: InjuryKind, healed: bool) -> Injury {
-        Injury {
-            kind,
-            tick_received: 0,
-            healed,
-            source: InjurySource::Unknown,
-            at: Position::new(0, 0),
-        }
+    fn wounded_body_model() -> CatBodyModel {
+        let c = SimConstants::default();
+        let mut model = CatBodyModel::default();
+        // 0.3 tissue damage to the ear → Wounded tier per default thresholds.
+        model.apply_damage(
+            BodyPart::Ears,
+            0.3,
+            &c.combat.body_zone_condition_thresholds,
+            &c.combat.body_zone_permanent_at_destroyed,
+        );
+        model
+    }
+
+    fn bruised_only_body_model() -> CatBodyModel {
+        let c = SimConstants::default();
+        let mut model = CatBodyModel::default();
+        // 0.1 tissue damage → Bruised (below the Wounded threshold).
+        model.apply_damage(
+            BodyPart::Tail,
+            0.1,
+            &c.combat.body_zone_condition_thresholds,
+            &c.combat.body_zone_permanent_at_destroyed,
+        );
+        model
     }
 
     fn has_injured(world: &World, entity: Entity) -> bool {
@@ -1027,64 +1051,46 @@ mod tests {
     }
 
     #[test]
-    fn no_injuries_no_injured_marker() {
+    fn healthy_body_no_injured_marker() {
         let (mut world, mut schedule) = setup_injury_marker();
-        let cat = world.spawn(Health::default()).id();
+        let cat = world.spawn((Health::default(), CatBodyModel::default())).id();
         schedule.run(&mut world);
         assert!(!has_injured(&world, cat));
     }
 
     #[test]
-    fn unhealed_minor_sets_injured() {
+    fn wounded_part_sets_injured() {
         let (mut world, mut schedule) = setup_injury_marker();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Minor, false)],
-            ..Health::default()
-        };
-        let cat = world.spawn(health).id();
+        let cat = world.spawn((Health::default(), wounded_body_model())).id();
         schedule.run(&mut world);
-        assert!(has_injured(&world, cat), "any unhealed injury sets Injured");
+        assert!(has_injured(&world, cat), "Wounded part sets Injured");
     }
 
     #[test]
-    fn unhealed_severe_sets_injured() {
+    fn bruised_only_no_marker() {
         let (mut world, mut schedule) = setup_injury_marker();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Severe, false)],
-            ..Health::default()
-        };
-        let cat = world.spawn(health).id();
-        schedule.run(&mut world);
-        assert!(has_injured(&world, cat));
-    }
-
-    #[test]
-    fn healed_injury_no_marker() {
-        let (mut world, mut schedule) = setup_injury_marker();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Minor, true)],
-            ..Health::default()
-        };
-        let cat = world.spawn(health).id();
+        let cat = world
+            .spawn((Health::default(), bruised_only_body_model()))
+            .id();
         schedule.run(&mut world);
         assert!(
             !has_injured(&world, cat),
-            "healed injury should not set marker"
+            "Bruised tier is below Wounded gate"
         );
     }
 
     #[test]
     fn heal_transition_removes_injured() {
         let (mut world, mut schedule) = setup_injury_marker();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Moderate, false)],
-            ..Health::default()
-        };
-        let cat = world.spawn(health).id();
+        let cat = world.spawn((Health::default(), wounded_body_model())).id();
         schedule.run(&mut world);
         assert!(has_injured(&world, cat));
 
-        world.get_mut::<Health>(cat).unwrap().injuries[0].healed = true;
+        let mut model = world.get_mut::<CatBodyModel>(cat).unwrap();
+        for state in model.parts.iter_mut() {
+            state.tissue_damage = 0.0;
+            state.condition = crate::components::body_zones::PartCondition::Healthy;
+        }
         schedule.run(&mut world);
         assert!(
             !has_injured(&world, cat),
@@ -1095,13 +1101,10 @@ mod tests {
     #[test]
     fn dead_cats_skip_injured_marker() {
         let (mut world, mut schedule) = setup_injury_marker();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Severe, false)],
-            ..Health::default()
-        };
         let cat = world
             .spawn((
-                health,
+                Health::default(),
+                wounded_body_model(),
                 Dead {
                     tick: 0,
                     cause: DeathCause::Injury,
@@ -1109,20 +1112,13 @@ mod tests {
             ))
             .id();
         schedule.run(&mut world);
-        assert!(
-            !has_injured(&world, cat),
-            "dead cats should not get Injured marker"
-        );
+        assert!(!has_injured(&world, cat));
     }
 
     #[test]
     fn injured_marker_idempotent() {
         let (mut world, mut schedule) = setup_injury_marker();
-        let health = Health {
-            injuries: vec![injury(InjuryKind::Minor, false)],
-            ..Health::default()
-        };
-        let cat = world.spawn(health).id();
+        let cat = world.spawn((Health::default(), wounded_body_model())).id();
         schedule.run(&mut world);
         assert!(has_injured(&world, cat));
         schedule.run(&mut world);

@@ -7,5 +7,6 @@
 //! `JointInteractionObserved`) remain next to their domain types; later
 //! tickets may migrate them here.
 
+pub mod body_part_injury;
 pub mod fox_lifecycle;
 pub mod witnessable_event;

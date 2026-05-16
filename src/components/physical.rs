@@ -55,16 +55,10 @@ impl Position {
 // Health
 // ---------------------------------------------------------------------------
 
-/// Severity of a wound.
+/// What inflicted an injury. Used by `BodyPartInjury` messages and the
+/// `damage_to_body_part` targeting selector. Survives the 095 Phase 1
+/// Stage B retirement of legacy `Injury` records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum InjuryKind {
-    Minor,
-    Moderate,
-    Severe,
-}
-
-/// What inflicted an injury.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum InjurySource {
     /// Regular wildlife combat (hawk, snake, etc.).
     WildlifeCombat,
@@ -78,34 +72,16 @@ pub enum InjurySource {
     Unknown,
 }
 
-/// A single wound record.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Injury {
-    pub kind: InjuryKind,
-    pub tick_received: u64,
-    pub healed: bool,
-    /// What system inflicted this injury.
-    pub source: InjurySource,
-    /// Where the cat was when the injury was inflicted. Read by
-    /// `interoception::own_injury_site` to author the
-    /// `LandmarkAnchor::OwnInjurySite` anchor for future TendInjury
-    /// DSE consumers. Defaults to map origin via
-    /// `default_injury_position` for legacy serde fixtures encoded
-    /// before the field existed. Ticket 089.
-    #[serde(default = "default_injury_position")]
-    pub at: Position,
-}
-
-fn default_injury_position() -> Position {
-    Position::new(0, 0)
-}
-
 /// Health component. `current` and `max` are normalised to `[0.0, 1.0]`.
+///
+/// 095 Phase 1 Stage B retired the `injuries: Vec<Injury>` field — the
+/// 13-part `CatBodyModel` is now the canonical anatomical injury
+/// substrate. `Health.current` remains the canonical HP scalar; starvation
+/// and magic still write it directly.
 #[derive(Component, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Health {
     pub current: f32,
     pub max: f32,
-    pub injuries: Vec<Injury>,
     /// Ticket 032 — monotonic accumulator of all health drained by the
     /// starvation cascade in `decay_needs`. Used by the death-cause
     /// discriminator under graded-cliff mode (`starvation_cliff_use_legacy
@@ -122,7 +98,6 @@ impl Default for Health {
         Self {
             current: 1.0,
             max: 1.0,
-            injuries: Vec::new(),
             total_starvation_damage: 0.0,
         }
     }

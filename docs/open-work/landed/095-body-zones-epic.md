@@ -1,7 +1,7 @@
 ---
 id: 095
 title: Body zones — anatomical injury model for all animal species
-status: ready
+status: done
 cluster: life-cycle
 orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [body-zones.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: ae0865f8
+landed-on: 2026-05-16
 ---
 
 ## Why
@@ -148,3 +148,8 @@ Suggested landing order: Phase 1 → Fox zones (Phase 2 partial) → Phase 3
   substrate-over-override form) lands as ticket **133**'s
   `combat_winnability` scalar's consumer wiring (separate follow-on
   tickets per 133's §Out of scope).
+- 2026-05-15: Started Phase 1 (cat zones). Identity-coherence sequencing
+  ahead of 016 Phase 3 (wearables). Sub-staged inside the ticket as
+  Stage A (shadow / behavior-preserving) and Stage B (cutover / readers
+  retired, `Health.injuries` retired, `combat_advantage_normalized`
+  reads `health_derived`). Plan at `~/.claude/plans/it-s-time-to-start-lively-wilkinson.md`.

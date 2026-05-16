@@ -22,7 +22,7 @@ use crate::components::markers;
 use crate::components::mental::Memory;
 use crate::components::joint_intention::{joint_bias_for, PracticeKind};
 use crate::components::personality::Personality;
-use crate::components::physical::{Dead, Health, InjuryKind, Needs, Position};
+use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::prey::{
     DenRaided, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled, PreyState,
 };
@@ -365,6 +365,9 @@ pub fn evaluate_dispositions(
                 &Memory,
                 &Skills,
                 &Health,
+                // Ticket 095 Phase 1 Stage B — anatomical pain substrate
+                // replaces the retired `Health.injuries` list.
+                &crate::components::CatBodyModel,
             ),
             (
                 &MagicAffinity,
@@ -524,7 +527,7 @@ pub fn evaluate_dispositions(
 
     let colony_injury_count = query
         .iter()
-        .filter(|((_, _, _, _, _, _, _, health), _)| health.current < 1.0)
+        .filter(|((_, _, _, _, _, _, _, health, _), _)| health.current < 1.0)
         .count();
 
     let directive_snapshot: HashMap<Entity, (usize, Option<Directive>)> = directive_queue_query
@@ -539,7 +542,7 @@ pub fn evaluate_dispositions(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |((entity, _, _, _, pos, _, _, _), (_, _, current, _, _, _, _, _, _, _))| {
+            |((entity, _, _, _, pos, _, _, _, _), (_, _, current, _, _, _, _, _, _, _))| {
                 (entity, *pos, current.action)
             },
         )
@@ -552,7 +555,7 @@ pub fn evaluate_dispositions(
     // `MentorDse.eligibility()` requires `HasMentoringTarget::KEY`.
 
     for (
-        (entity, _name, needs, personality, pos, memory, skills, health),
+        (entity, _name, needs, personality, pos, memory, skills, health, body_model),
         (
             magic_aff,
             inventory,
@@ -641,10 +644,13 @@ pub fn evaluate_dispositions(
 
         let combat_effective =
             skills.combat + skills.hunting * d.combat_effective_hunting_cross_train;
-        let is_incapacitated = health
-            .injuries
-            .iter()
-            .any(|inj| inj.kind == InjuryKind::Severe && !inj.healed);
+        // 095 Phase 1 Stage B — incapacitation derived from anatomical
+        // pain instead of severe-injury count. Normalized by
+        // `max_possible_pain` so the threshold is a [0, 1] fraction.
+        let max_pain: f32 = constants.combat.body_zone_pain_weights.iter().sum();
+        let is_incapacitated = max_pain > 0.0
+            && (body_model.total_pain(&constants.combat.body_zone_pain_weights) / max_pain)
+                > constants.combat.pain_incapacitation_threshold;
         // §4.3 per-cat marker population — mirror of goap.rs.
         markers.set_entity(markers::Incapacitated::KEY, entity, is_incapacitated);
         if let Ok((k, y, a, e)) = side_effects.marker_queries.life_stage.get(entity) {
@@ -861,7 +867,8 @@ pub fn evaluate_dispositions(
             // perception module's helpers so the scalar derivation lives
             // in one place across all consumers.
             pain_level: crate::systems::interoception::pain_level(
-                &health.injuries,
+                body_model,
+                &constants.combat.body_zone_pain_weights,
                 d.pain_normalization_max,
             ),
             body_distress_composite: crate::systems::interoception::body_distress_composite(
@@ -1065,7 +1072,7 @@ pub fn evaluate_dispositions(
                     memory,
                     d.safe_rest_threat_suppression_radius,
                 ),
-                own_injury_site: crate::systems::interoception::own_injury_site(health),
+                own_injury_site: crate::systems::interoception::own_injury_site(body_model, *pos),
                 // Ticket 228 — populated at replan-time alongside the
                 // RouteCostField build (commit 4). Resolves to None
                 // here in the modifier-pipeline path; Hunt/Wander

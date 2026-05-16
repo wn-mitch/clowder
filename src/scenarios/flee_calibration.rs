@@ -253,7 +253,6 @@ fn setup_cornered(world: &mut World, seed: u64) {
     world.entity_mut(cat).insert(Health {
         current: 0.5,
         max: 1.0,
-        injuries: Vec::new(),
         total_starvation_damage: 0.0,
     });
 
@@ -312,7 +311,6 @@ fn setup_sleep_partner(world: &mut World, seed: u64) {
     world.entity_mut(cat).insert(Health {
         current: 0.5,
         max: 1.0,
-        injuries: Vec::new(),
         total_starvation_damage: 0.0,
     });
 
@@ -387,7 +385,6 @@ fn setup_critical_cornered(world: &mut World, seed: u64) {
     world.entity_mut(cat).insert(Health {
         current: 0.26,
         max: 1.0,
-        injuries: Vec::new(),
         total_starvation_damage: 0.0,
     });
 

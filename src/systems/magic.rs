@@ -736,12 +736,7 @@ pub fn spawn_shadow_fox_from_corruption(
                     crate::components::wildlife::ShadowFoxDrives::newly_manifested(
                         corruption_at_spawn,
                     ),
-                    Health {
-                        current: 1.0,
-                        max: 1.0,
-                        injuries: Vec::new(),
-                        total_starvation_damage: 0.0,
-                    },
+                    Health::default(),
                     crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
                     crate::components::SensorySignature::WILDLIFE,
                 ));
@@ -1162,18 +1157,16 @@ pub fn apply_misfire(
             );
         }
         MisfireEffect::WoundTransfer => {
-            // Minor wound: apply_injury handles HP penalty + injury record.
-            // Use the negligible threshold + epsilon so a Minor injury is
-            // always created regardless of the combat damage thresholds.
+            // 095 Phase 1 Stage B — `apply_injury` retired. Misfire still
+            // applies a synthetic minor wound to `Health.current`. The
+            // `CatBodyModel` write is deferred (would require threading
+            // `&mut CatBodyModel` + `&mut MessageWriter<BodyPartInjury>`
+            // through 4 step resolvers × 2 Bevy systems — separate ticket
+            // since misfire is rare and synthetic damage barely exceeds
+            // the negligible threshold).
             let synthetic_damage = combat.injury_negligible_threshold + 0.001;
-            crate::systems::combat::apply_injury(
-                health,
-                synthetic_damage,
-                tick,
-                crate::components::physical::InjurySource::MagicMisfire,
-                *pos,
-                combat,
-            );
+            health.current = (health.current - synthetic_damage).max(0.0);
+            let _ = pos; // injury_pos no longer recorded (no Injury record)
             log.push(
                 tick,
                 format!("{cat_name} gasps as a wound appears on their own flank."),
@@ -1462,7 +1455,6 @@ mod tests {
                 Health {
                     current: 0.5,
                     max: 1.0,
-                    injuries: Vec::new(),
                     total_starvation_damage: 0.0,
                 },
                 Needs::default(),

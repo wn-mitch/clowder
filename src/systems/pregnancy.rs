@@ -123,7 +123,6 @@ pub fn tick_pregnancy(
                         Health {
                             current: kitten_health,
                             max: 1.0,
-                            injuries: Vec::new(),
                             total_starvation_damage: 0.0,
                         },
                         Needs {
@@ -159,6 +158,9 @@ pub fn tick_pregnancy(
                         // in `growth.rs::tick_kitten_growth` and `death.rs::check_death`.
                         markers::BornInSim,
                     ),
+                    // 095 Phase 1 — anatomical injury substrate. Kittens
+                    // spawn with a default (all-Healthy) `CatBodyModel`.
+                    crate::components::CatBodyModel::default(),
                 ))
                 .id();
 

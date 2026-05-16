@@ -409,6 +409,122 @@ pub struct CombatConstants {
     pub heal_moderate_duration: DurationDays,
     #[serde(alias = "heal_duration_severe")]
     pub heal_severe_duration: DurationDays,
+
+    // --- Body-zone substrate (ticket 095 Phase 1) ---
+    /// Cat is incapacitated (Idle/Sleep/treatment only) when
+    /// `total_pain / max_possible_pain >= pain_incapacitation_threshold`.
+    /// Spec §Cat Pain System default 0.9 (normalized). Replaces the legacy
+    /// "any `InjuryKind::Severe && !healed`" predicate in Stage B.
+    #[serde(default = "default_pain_incapacitation_threshold")]
+    pub pain_incapacitation_threshold: f32,
+    /// Per-part pain weight indexed by `BodyPart::index()`. Sum is the
+    /// effective `max_possible_pain` used by `health_derived`. Spec §Cat
+    /// Pain System.
+    #[serde(default = "default_body_zone_pain_weights")]
+    pub body_zone_pain_weights: [f32; 13],
+    /// Lower bounds for `PartCondition` promotion, in order:
+    /// [Bruised, Wounded, Mangled, Destroyed]. Spec §Cat Condition Thresholds.
+    #[serde(default = "default_body_zone_condition_thresholds")]
+    pub body_zone_condition_thresholds: [f32; 4],
+    /// Whether a part stays Destroyed forever once it first reaches that
+    /// tier. Indexed by `BodyPart::index()`. Spec §Cat Healing Rates
+    /// (Permanent column).
+    #[serde(default = "default_body_zone_permanent_at_destroyed")]
+    pub body_zone_permanent_at_destroyed: [bool; 13],
+    /// Per-(category × condition-transition) healing durations. Tick
+    /// conversion happens once at system construction; per-tick
+    /// `1.0 / duration_ticks` is the per-part decrement. Spec §Cat
+    /// Healing Rates.
+    #[serde(default)]
+    pub body_zone_healing: BodyZoneHealing,
+}
+
+fn default_pain_incapacitation_threshold() -> f32 {
+    0.9
+}
+
+fn default_body_zone_pain_weights() -> [f32; 13] {
+    [
+        0.5, // Whiskers
+        0.5, // Ears
+        1.5, // Mouth/Jaw
+        0.8, // Scruff
+        3.0, // Throat
+        1.5, // Flanks
+        0.8, // Belly
+        1.0, // Front-left paw
+        1.0, // Front-right paw
+        1.0, // Rear-left paw
+        1.0, // Rear-right paw
+        2.0, // Haunches
+        0.5, // Tail
+    ]
+}
+
+fn default_body_zone_condition_thresholds() -> [f32; 4] {
+    [0.01, 0.26, 0.61, 0.91]
+}
+
+fn default_body_zone_permanent_at_destroyed() -> [bool; 13] {
+    [
+        false, // Whiskers — regrow
+        true,  // Ears — torn tips persist as identity scar
+        true,  // Mouth/Jaw — permanent if Destroyed
+        false, // Scruff
+        false, // Throat — fatal before Destroyed
+        false, // Flanks
+        false, // Belly
+        false, // Front-left paw
+        false, // Front-right paw
+        false, // Rear-left paw
+        false, // Rear-right paw
+        true,  // Haunches — permanent limp
+        true,  // Tail — permanent crook
+    ]
+}
+
+/// Healing durations per (category × condition-transition). At default
+/// 1000-ticks/day scale, the day fractions below recover the spec's raw-tick
+/// numerics (30 ticks = 0.03 days, etc).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BodyZoneHealing {
+    pub soft_bruised_to_healthy: DurationDays,
+    pub soft_wounded_to_bruised: DurationDays,
+    pub soft_mangled_to_wounded: DurationDays,
+    pub structural_bruised_to_healthy: DurationDays,
+    pub structural_wounded_to_bruised: DurationDays,
+    pub structural_mangled_to_wounded: DurationDays,
+    pub sensory_bruised_to_healthy: DurationDays,
+    pub sensory_wounded_to_bruised: DurationDays,
+    pub sensory_mangled_to_wounded: DurationDays,
+    pub throat_bruised_to_healthy: DurationDays,
+    pub throat_wounded_to_bruised: DurationDays,
+    pub tail_bruised_to_healthy: DurationDays,
+    pub tail_wounded_to_bruised: DurationDays,
+    pub tail_mangled_to_wounded: DurationDays,
+}
+
+impl Default for BodyZoneHealing {
+    fn default() -> Self {
+        Self {
+            soft_bruised_to_healthy: DurationDays::new(0.03),
+            soft_wounded_to_bruised: DurationDays::new(0.08),
+            soft_mangled_to_wounded: DurationDays::new(0.20),
+            structural_bruised_to_healthy: DurationDays::new(0.05),
+            structural_wounded_to_bruised: DurationDays::new(0.15),
+            structural_mangled_to_wounded: DurationDays::new(0.40),
+            sensory_bruised_to_healthy: DurationDays::new(0.04),
+            sensory_wounded_to_bruised: DurationDays::new(0.12),
+            sensory_mangled_to_wounded: DurationDays::new(0.30),
+            // Throat: Mangled→Wounded is "N/A — fatal before Mangled without
+            // treatment" per spec. Phase 1 leaves the field absent.
+            throat_bruised_to_healthy: DurationDays::new(0.04),
+            throat_wounded_to_bruised: DurationDays::new(0.10),
+            tail_bruised_to_healthy: DurationDays::new(0.03),
+            tail_wounded_to_bruised: DurationDays::new(0.08),
+            tail_mangled_to_wounded: DurationDays::new(0.20),
+        }
+    }
 }
 
 impl Default for CombatConstants {
@@ -466,6 +582,11 @@ impl Default for CombatConstants {
             heal_minor_duration: DurationDays::new(0.05),
             heal_moderate_duration: DurationDays::new(0.2),
             heal_severe_duration: DurationDays::new(0.5),
+            pain_incapacitation_threshold: default_pain_incapacitation_threshold(),
+            body_zone_pain_weights: default_body_zone_pain_weights(),
+            body_zone_condition_thresholds: default_body_zone_condition_thresholds(),
+            body_zone_permanent_at_destroyed: default_body_zone_permanent_at_destroyed(),
+            body_zone_healing: BodyZoneHealing::default(),
         }
     }
 }

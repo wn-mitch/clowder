@@ -5,9 +5,11 @@ use crate::ai::{Action, CurrentAction};
 use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
+use crate::components::body_zones::{BodyPart, CatBodyModel};
 use crate::components::physical::{
-    Dead, Health, Injury, InjuryKind, InjurySource, Needs, Position,
+    Dead, Health, InjurySource, Needs, Position,
 };
+use crate::messages::body_part_injury::BodyPartInjury;
 use crate::components::skills::Skills;
 use crate::components::wildlife::{WildAnimal, WildlifeAiState};
 use crate::resources::map::Terrain;
@@ -54,6 +56,7 @@ pub fn resolve_combat(
             &Name,
             &mut Memory,
             &mut Mood,
+            &mut CatBodyModel,
         ),
         Without<Dead>,
     >,
@@ -76,6 +79,7 @@ pub fn resolve_combat(
     mut activation: ResMut<SystemActivation>,
     mut relationships: ResMut<crate::resources::relationships::Relationships>,
     mut pushback_writer: MessageWriter<crate::systems::magic::CorruptionPushback>,
+    mut body_part_writer: MessageWriter<BodyPartInjury>,
     mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
     mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     registry: Option<Res<TemplateRegistry>>,
@@ -90,10 +94,10 @@ pub fn resolve_combat(
 
     let fights: Vec<FightInfo> = cats
         .iter()
-        .filter(|(_, current, _, _, _, _, _, _, _, _)| {
+        .filter(|(_, current, _, _, _, _, _, _, _, _, _)| {
             current.action == Action::Fight && current.target_entity.is_some()
         })
-        .map(|(entity, current, _, _, _, _, _, _, _, _)| FightInfo {
+        .map(|(entity, current, _, _, _, _, _, _, _, _, _)| FightInfo {
             cat_entity: entity,
             target_entity: current.target_entity.unwrap(),
         })
@@ -160,7 +164,7 @@ pub fn resolve_combat(
             combat_effective,
             cat_name,
         ) = {
-            if let Ok((_, _, health, _, skills, personality, pos, name, _, _)) =
+            if let Ok((_, _, health, _, skills, personality, pos, name, _, _, _)) =
                 cats.get(fight.cat_entity)
             {
                 let ce = skills.combat + skills.hunting * c.combat_effective_hunting_weight;
@@ -291,22 +295,30 @@ pub fn resolve_combat(
             name,
             mut memory,
             mut mood,
+            mut cat_body_model,
         )) = cats.get_mut(fight.cat_entity)
         {
             let injury_pos = *cat_pos;
             cat_health.current = (cat_health.current - wildlife_damage).max(0.0);
 
-            // Apply injury based on damage.
-            if let Some(kind) = apply_injury(
-                &mut cat_health,
+            // 095 Phase 1 — anatomical substrate is canonical. Legacy
+            // `Injury` record + injury_*_health_penalty retired.
+            damage_to_body_part(
+                fight.cat_entity,
+                &mut cat_body_model,
                 wildlife_damage,
                 time.tick,
                 InjurySource::WildlifeCombat,
-                injury_pos,
                 c,
-            ) {
-                // Narrative for injuries.
-                if matches!(kind, InjuryKind::Moderate | InjuryKind::Severe) {
+                &mut rng,
+                &mut body_part_writer,
+                &mut activation,
+            );
+
+            // Narrative + memory side-effects derived from raw damage
+            // magnitude (no stored Injury record).
+            if let Some(tier) = classify_damage_for_narrative(wildlife_damage, c) {
+                if matches!(tier, DamageTier::Moderate | DamageTier::Severe) {
                     let text = format!("{} is knocked aside but scrambles back.", name.0);
                     log.push(time.tick, text, NarrativeTier::Danger);
                 }
@@ -316,10 +328,10 @@ pub fn resolve_combat(
                     location: Some(injury_pos),
                     involved: vec![fight.target_entity],
                     tick: time.tick,
-                    strength: match kind {
-                        InjuryKind::Minor => c.memory_strength_minor,
-                        InjuryKind::Moderate => c.memory_strength_moderate,
-                        InjuryKind::Severe => c.memory_strength_severe,
+                    strength: match tier {
+                        DamageTier::Minor => c.memory_strength_minor,
+                        DamageTier::Moderate => c.memory_strength_moderate,
+                        DamageTier::Severe => c.memory_strength_severe,
                     },
                     firsthand: true,
                 });
@@ -398,7 +410,7 @@ pub fn resolve_combat(
         let leader_read: Option<(String, Personality, Needs)> = posse
             .first()
             .and_then(|e| cats.get(*e).ok())
-            .map(|(_, _, _, needs, _, personality, _, name, _, _)| {
+            .map(|(_, _, _, needs, _, personality, _, name, _, _, _)| {
                 (name.0.clone(), personality.clone(), needs.clone())
             });
         let leader_name = leader_read
@@ -410,10 +422,10 @@ pub fn resolve_combat(
         // not in the posse) so we can iter_mut without aliasing.
         let witnesses: Vec<Entity> = cats
             .iter()
-            .filter(|(e, _, _, _, _, _, pos, _, _, _)| {
+            .filter(|(e, _, _, _, _, _, pos, _, _, _, _)| {
                 !posse.contains(e) && pos.manhattan_distance(target_pos) <= c.legend_witness_range
             })
-            .map(|(e, _, _, _, _, _, _, _, _, _)| e)
+            .map(|(e, _, _, _, _, _, _, _, _, _, _)| e)
             .collect();
 
         // Apply posse boons. Skill gain diminishes per prior banishment a
@@ -424,7 +436,7 @@ pub fn resolve_combat(
         let valor_ticks = config.ticks_per_season * 2;
         let seasonal_ticks = config.ticks_per_season;
         for cat_entity in posse {
-            if let Ok((_, _, _, _, mut skills, _, _, _, mut memory, mut mood)) =
+            if let Ok((_, _, _, _, mut skills, _, _, _, mut memory, mut mood, _)) =
                 cats.get_mut(*cat_entity)
             {
                 let prior_triumphs = memory
@@ -456,7 +468,7 @@ pub fn resolve_combat(
 
         // Apply witness boons.
         for witness in &witnesses {
-            if let Ok((_, _, _, mut w_needs, _, _, _, _, mut w_memory, mut w_mood)) =
+            if let Ok((_, _, _, mut w_needs, _, _, _, _, mut w_memory, mut w_mood, _)) =
                 cats.get_mut(*witness)
             {
                 w_needs.safety = w_needs.safety.max(c.banishment_witness_safety_floor);
@@ -533,7 +545,7 @@ pub fn resolve_combat(
             let posse_names: Vec<String> = posse
                 .iter()
                 .filter_map(|e| cats.get(*e).ok())
-                .map(|(_, _, _, _, _, _, _, name, _, _)| name.0.clone())
+                .map(|(_, _, _, _, _, _, _, name, _, _, _)| name.0.clone())
                 .collect();
             elog.push(
                 time.tick,
@@ -546,7 +558,7 @@ pub fn resolve_combat(
 
         // Release posse cats from Fight action so they can re-evaluate.
         for cat_entity in posse {
-            if let Ok((_, mut current, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
+            if let Ok((_, mut current, _, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
                 current.ticks_remaining = 0;
             }
         }
@@ -555,7 +567,7 @@ pub fn resolve_combat(
 
     // Apply victory rewards.
     for (cat_entity, _defeated) in &victorious_cats {
-        if let Ok((_, mut current, _, mut needs, _, personality, _, _, _memory, mut mood)) =
+        if let Ok((_, mut current, _, mut needs, _, personality, _, _, _memory, mut mood, _)) =
             cats.get_mut(*cat_entity)
         {
             needs.respect = (needs.respect + c.victory_respect_gain).min(1.0);
@@ -611,7 +623,7 @@ pub fn resolve_combat(
     // until they starved (ticket 043, mirrors ticket 042's pattern for
     // a different urgency path).
     for cat_entity in &cats_to_flee {
-        if let Ok((_, mut current, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
+        if let Ok((_, mut current, _, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
             current.action = Action::Flee;
             current.ticks_remaining = 0;
             // Keep target_position — will be recalculated next evaluate_actions.
@@ -622,7 +634,7 @@ pub fn resolve_combat(
     // Despawn dead/fleeing wildlife and reset any cats targeting them.
     for wl_entity in &wildlife_to_despawn {
         // Reset cats targeting this wildlife.
-        for (_, mut current, _, _, _, _, _, _, _, _) in &mut cats {
+        for (_, mut current, _, _, _, _, _, _, _, _, _) in &mut cats {
             if current.target_entity == Some(*wl_entity) {
                 current.ticks_remaining = 0;
                 current.target_entity = None;
@@ -632,86 +644,206 @@ pub fn resolve_combat(
 }
 
 // ---------------------------------------------------------------------------
-// Injury helpers
+// Injury narrative classifier (ticket 095 Phase 1 Stage B)
+//
+// Replaces the retired `damage_to_injury` / `apply_injury` pair. The
+// anatomical substrate (`CatBodyModel`) is now canonical for injury state
+// — what's left at each combat site is the narrative + memory side-effect
+// keyed off damage magnitude. `classify_damage_for_narrative` returns the
+// tier label for those side-effects without creating any stored record.
 // ---------------------------------------------------------------------------
 
-/// Convert raw damage to an Injury, or None for negligible damage.
-fn damage_to_injury(
+/// Damage-magnitude bucket used by narrative + memory writers. Mirrors the
+/// retired `InjuryKind` enum so existing narrative templates keep working
+/// without storing a per-cat injury list. `None` ⇒ negligible scratch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DamageTier {
+    Minor,
+    Moderate,
+    Severe,
+}
+
+pub fn classify_damage_for_narrative(
     damage: f32,
-    tick: u64,
-    source: InjurySource,
-    at: Position,
     c: &crate::resources::sim_constants::CombatConstants,
-) -> Option<Injury> {
+) -> Option<DamageTier> {
     if damage < c.injury_negligible_threshold {
-        return None; // Negligible scratch.
+        return None;
     }
-    let kind = if damage < c.injury_moderate_threshold {
-        InjuryKind::Minor
+    Some(if damage < c.injury_moderate_threshold {
+        DamageTier::Minor
     } else if damage < c.injury_severe_threshold {
-        InjuryKind::Moderate
+        DamageTier::Moderate
     } else {
-        InjuryKind::Severe
-    };
-    Some(Injury {
-        kind,
-        tick_received: tick,
-        healed: false,
-        source,
-        at,
+        DamageTier::Severe
     })
 }
 
-/// Apply the injury layer on top of raw damage already dealt. If `damage`
-/// exceeds the negligible threshold, creates an `Injury` record, subtracts
-/// the severity-specific HP penalty, and pushes the injury onto the `Health`
-/// component. Returns the injury kind if one was created.
+// ---------------------------------------------------------------------------
+// Body-zone substrate (ticket 095 Phase 1)
+// ---------------------------------------------------------------------------
+
+/// Select a target body part for a non-negligible hit, weighted by attacker
+/// type. Spec §Combat Targeting Weights (Predators → Cats). Phase 1 collapses
+/// `InjurySource` to the rough attacker class — `WildlifeCombat` /
+/// `FoxConfrontation` / `ShadowFoxAmbush` all use the Fox table (wildlife
+/// damage is fox-dominated today; hawk/snake combat lands with Phase 2).
+/// `MagicMisfire` / `Unknown` distribute uniformly.
+fn select_body_part_for_attacker(source: InjurySource, rng: &mut SimRng) -> BodyPart {
+    use BodyPart::*;
+    let table: &[(BodyPart, f32)] = match source {
+        InjurySource::WildlifeCombat
+        | InjurySource::FoxConfrontation
+        | InjurySource::ShadowFoxAmbush => &[
+            (Throat, 0.35),
+            (Flanks, 0.25),
+            (Haunches, 0.15),
+            (FrontLeftPaw, 0.0375),
+            (FrontRightPaw, 0.0375),
+            (RearLeftPaw, 0.0375),
+            (RearRightPaw, 0.0375),
+            (Ears, 0.10),
+        ],
+        InjurySource::MagicMisfire | InjurySource::Unknown => &[
+            (Whiskers, 1.0 / 13.0),
+            (Ears, 1.0 / 13.0),
+            (MouthJaw, 1.0 / 13.0),
+            (Scruff, 1.0 / 13.0),
+            (Throat, 1.0 / 13.0),
+            (Flanks, 1.0 / 13.0),
+            (Belly, 1.0 / 13.0),
+            (FrontLeftPaw, 1.0 / 13.0),
+            (FrontRightPaw, 1.0 / 13.0),
+            (RearLeftPaw, 1.0 / 13.0),
+            (RearRightPaw, 1.0 / 13.0),
+            (Haunches, 1.0 / 13.0),
+            (Tail, 1.0 / 13.0),
+        ],
+    };
+    let total: f32 = table.iter().map(|(_, w)| *w).sum();
+    let mut roll = rng.rng.random::<f32>() * total;
+    for (part, w) in table {
+        if roll < *w {
+            return *part;
+        }
+        roll -= *w;
+    }
+    table.last().expect("targeting table is non-empty").0
+}
+
+/// Shadow-write the anatomical injury substrate. Called alongside the legacy
+/// `damage_to_injury` / `apply_injury` push during Stage A. Selects a target
+/// part via `select_body_part_for_attacker`, applies the tissue damage on
+/// the `CatBodyModel`, and emits a `BodyPartInjury` message for the L1 trace
+/// + Feature canary.
 ///
-/// `at` is the cat's position at the time of injury — recorded on the
-/// `Injury.at` field so future `TendInjury` DSEs can route via
-/// `LandmarkAnchor::OwnInjurySite` (ticket 089).
-pub(crate) fn apply_injury(
-    health: &mut Health,
+/// Returns `Some((part, condition))` when damage was non-negligible, else
+/// `None`. The caller passes the cat's entity for the message.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn damage_to_body_part(
+    entity: Entity,
+    body_model: &mut CatBodyModel,
     damage: f32,
     tick: u64,
     source: InjurySource,
-    at: Position,
     c: &crate::resources::sim_constants::CombatConstants,
-) -> Option<InjuryKind> {
-    let inj = damage_to_injury(damage, tick, source, at, c)?;
-    let kind = inj.kind;
-    let penalty = match kind {
-        InjuryKind::Minor => c.injury_minor_health_penalty,
-        InjuryKind::Moderate => c.injury_moderate_health_penalty,
-        InjuryKind::Severe => c.injury_severe_health_penalty,
-    };
-    health.current = (health.current - penalty).max(0.0);
-    health.injuries.push(inj);
-    Some(kind)
+    rng: &mut SimRng,
+    writer: &mut MessageWriter<BodyPartInjury>,
+    activation: &mut SystemActivation,
+) -> Option<(BodyPart, crate::components::body_zones::PartCondition)> {
+    if damage < c.injury_negligible_threshold {
+        return None;
+    }
+    let part = select_body_part_for_attacker(source, rng);
+    let condition = body_model.apply_damage(
+        part,
+        damage,
+        &c.body_zone_condition_thresholds,
+        &c.body_zone_permanent_at_destroyed,
+    );
+    activation.record(Feature::BodyPartInjury);
+    writer.write(BodyPartInjury {
+        entity,
+        part,
+        tissue_damage_delta: damage,
+        condition,
+        source,
+        tick,
+    });
+    Some((part, condition))
 }
 
-/// Duration in ticks for an injury to heal naturally.
-pub fn heal_duration(
-    kind: InjuryKind,
-    c: &crate::resources::sim_constants::CombatConstants,
-    time_scale: &crate::resources::time::TimeScale,
-) -> u64 {
-    match kind {
-        InjuryKind::Minor => c.heal_minor_duration.ticks(time_scale),
-        InjuryKind::Moderate => c.heal_moderate_duration.ticks(time_scale),
-        InjuryKind::Severe => c.heal_severe_duration.ticks(time_scale),
-    }
-}
+// `heal_duration(InjuryKind, ...)` retired with the `InjuryKind` enum
+// (Ticket 095 Phase 1 Stage B). Body-zone per-part healing uses
+// `BodyZoneHealing` durations indexed by (category, condition).
 
 // ---------------------------------------------------------------------------
 // Healing system
 // ---------------------------------------------------------------------------
+
+/// Compute per-tick `tissue_damage` decrement for each body part based on
+/// its category × current condition. Returns an array indexed by
+/// `BodyPart::index()`. Spec §Cat Healing Rates.
+fn per_part_heal_decrements(
+    body_model: &CatBodyModel,
+    healing: &crate::resources::sim_constants::BodyZoneHealing,
+    time_scale: &crate::resources::time::TimeScale,
+) -> [f32; crate::components::body_zones::CAT_BODY_PART_COUNT] {
+    use crate::components::body_zones::{
+        BodyPart, PartCategory, PartCondition, CAT_BODY_PART_COUNT,
+    };
+    let mut out = [0.0_f32; CAT_BODY_PART_COUNT];
+    for (i, part) in BodyPart::ALL.iter().enumerate() {
+        let condition = body_model.parts[i].condition;
+        if condition == PartCondition::Healthy {
+            continue;
+        }
+        let duration = match (part.category(), condition) {
+            (PartCategory::SoftTissue, PartCondition::Bruised) => healing.soft_bruised_to_healthy,
+            (PartCategory::SoftTissue, PartCondition::Wounded) => healing.soft_wounded_to_bruised,
+            (PartCategory::SoftTissue, PartCondition::Mangled)
+            | (PartCategory::SoftTissue, PartCondition::Destroyed) => {
+                healing.soft_mangled_to_wounded
+            }
+            (PartCategory::Structural, PartCondition::Bruised) => {
+                healing.structural_bruised_to_healthy
+            }
+            (PartCategory::Structural, PartCondition::Wounded) => {
+                healing.structural_wounded_to_bruised
+            }
+            (PartCategory::Structural, PartCondition::Mangled)
+            | (PartCategory::Structural, PartCondition::Destroyed) => {
+                healing.structural_mangled_to_wounded
+            }
+            (PartCategory::Sensory, PartCondition::Bruised) => healing.sensory_bruised_to_healthy,
+            (PartCategory::Sensory, PartCondition::Wounded) => healing.sensory_wounded_to_bruised,
+            (PartCategory::Sensory, PartCondition::Mangled)
+            | (PartCategory::Sensory, PartCondition::Destroyed) => {
+                healing.sensory_mangled_to_wounded
+            }
+            (PartCategory::Throat, PartCondition::Bruised) => healing.throat_bruised_to_healthy,
+            (PartCategory::Throat, PartCondition::Wounded) => healing.throat_wounded_to_bruised,
+            // Throat Mangled+ is fatal before natural healing per spec — no
+            // recovery rate. Leave decrement at 0 so this branch is a no-op.
+            (PartCategory::Throat, _) => continue,
+            (PartCategory::Tail, PartCondition::Bruised) => healing.tail_bruised_to_healthy,
+            (PartCategory::Tail, PartCondition::Wounded) => healing.tail_wounded_to_bruised,
+            (PartCategory::Tail, PartCondition::Mangled)
+            | (PartCategory::Tail, PartCondition::Destroyed) => healing.tail_mangled_to_wounded,
+            (_, PartCondition::Healthy) => continue,
+        };
+        let ticks = duration.ticks(time_scale).max(1);
+        out[i] = 1.0 / ticks as f32;
+    }
+    out
+}
 
 /// Per-tick healing: check each cat's injuries and heal those past their duration.
 pub fn heal_injuries(
     mut query: Query<(
         &mut Health,
         Option<&mut crate::components::identity::Appearance>,
+        &mut CatBodyModel,
     )>,
     time: Res<TimeState>,
     time_scale: Res<crate::resources::time::TimeScale>,
@@ -719,42 +851,45 @@ pub fn heal_injuries(
     mut activation: ResMut<SystemActivation>,
 ) {
     let c = &constants.combat;
-    for (mut health, appearance) in &mut query {
-        let mut healed_severe = false;
-        let mut hp_restored = 0.0_f32;
-        for injury in health.injuries.iter_mut() {
-            if injury.healed {
-                continue;
-            }
-            let duration = heal_duration(injury.kind, c, &time_scale);
-            if time.tick.saturating_sub(injury.tick_received) >= duration {
-                injury.healed = true;
-                activation.record(Feature::InjuryHealed);
-
-                // Accumulate the injury kind's health penalty for natural recovery.
-                hp_restored += match injury.kind {
-                    InjuryKind::Minor => c.injury_minor_health_penalty,
-                    InjuryKind::Moderate => c.injury_moderate_health_penalty,
-                    InjuryKind::Severe => c.injury_severe_health_penalty,
-                };
-
-                if injury.kind == InjuryKind::Severe {
-                    healed_severe = true;
-                }
-            }
-        }
-
-        // Restore accumulated HP from healed injuries (natural recovery).
-        if hp_restored > 0.0 {
+    let _ = time;
+    let weights = &c.body_zone_pain_weights;
+    let max_pain: f32 = weights.iter().sum();
+    for (mut health, appearance, mut body_model) in &mut query {
+        // Snapshot pre-heal pain so we can credit the freed pain delta
+        // back to Health.current. Replaces the legacy
+        // `Health.injuries` heal loop's HP-restore-on-heal path.
+        let pre_tick_pain = body_model.total_pain(weights);
+        // 095 Phase 1 — anatomical per-part healing on the canonical
+        // substrate. Permanent destroyed parts (ears, mouth/jaw,
+        // haunches, tail) stay locked; the scar appearance below is
+        // authored when a part first crosses to permanently Destroyed.
+        let decrements = per_part_heal_decrements(&body_model, &c.body_zone_healing, &time_scale);
+        body_model.heal_tick(&decrements, &c.body_zone_condition_thresholds);
+        let post_tick_pain = body_model.total_pain(weights);
+        let pain_recovered = (pre_tick_pain - post_tick_pain).max(0.0);
+        if pain_recovered > 0.0 && max_pain > 0.0 {
+            // Tissue healing returns the freed pain-fraction to
+            // Health.current. A part healing from Wounded → Bruised
+            // restores its pain-weighted share of the HP budget.
+            // `InjuryHealed` Feature emits per cat per healing tick that
+            // produces any recovery — mirrors the legacy "injury crossed
+            // its duration" emission cadence.
+            let hp_restored = pain_recovered / max_pain;
             health.current = (health.current + hp_restored).min(health.max);
+            activation.record(Feature::InjuryHealed);
         }
 
-        // Remove healed injuries.
-        health.injuries.retain(|inj| !inj.healed);
-
-        // Add scar for healed severe injuries.
-        if healed_severe {
-            if let Some(mut app) = appearance {
+        // Permanent-Destroyed parts (ears, mouth/jaw, haunches, tail)
+        // are identity-bearing scars. Author the appearance line iff
+        // any newly-permanent part exists for this cat without an
+        // existing scar marker. Spec §Cat Functional Consequences.
+        if let Some(mut app) = appearance {
+            let has_permanent = body_model.parts.iter().any(|p| p.permanent);
+            let has_scar_text = app
+                .distinguishing_marks
+                .iter()
+                .any(|m| m == "a ragged scar from an old wound");
+            if has_permanent && !has_scar_text {
                 app.distinguishing_marks
                     .push("a ragged scar from an old wound".to_string());
             }
@@ -827,231 +962,248 @@ mod tests {
     use super::*;
 
     #[test]
-    fn damage_to_injury_thresholds() {
+    fn classify_damage_tier_thresholds() {
         let c = &SimConstants::default().combat;
-        let at = Position::new(0, 0);
-        assert!(
-            damage_to_injury(0.02, 0, InjurySource::Unknown, at, c).is_none(),
-            "negligible damage should not create injury"
+        assert!(classify_damage_for_narrative(0.02, c).is_none());
+        assert_eq!(
+            classify_damage_for_narrative(0.05, c),
+            Some(DamageTier::Minor)
         );
+        assert_eq!(
+            classify_damage_for_narrative(0.15, c),
+            Some(DamageTier::Moderate)
+        );
+        assert_eq!(
+            classify_damage_for_narrative(0.30, c),
+            Some(DamageTier::Severe)
+        );
+    }
 
-        let minor = damage_to_injury(0.05, 100, InjurySource::Unknown, at, c).unwrap();
-        assert_eq!(minor.kind, InjuryKind::Minor);
-        assert_eq!(minor.tick_received, 100);
-        assert!(!minor.healed);
+    // ----- 095 Phase 1 — damage_to_body_part substrate tests -----
 
-        let moderate = damage_to_injury(0.15, 200, InjurySource::Unknown, at, c).unwrap();
-        assert_eq!(moderate.kind, InjuryKind::Moderate);
-
-        let severe = damage_to_injury(0.30, 300, InjurySource::Unknown, at, c).unwrap();
-        assert_eq!(severe.kind, InjuryKind::Severe);
+    /// Helper: a fresh SimRng with a fixed seed for deterministic
+    /// part-selection rolls.
+    fn test_rng() -> SimRng {
+        use rand::SeedableRng;
+        SimRng {
+            rng: rand_chacha::ChaCha8Rng::seed_from_u64(7),
+        }
     }
 
     #[test]
-    fn apply_injury_records_inflicted_position() {
+    fn damage_to_body_part_below_threshold_skips() {
+        use bevy_ecs::system::SystemState;
         let c = &SimConstants::default().combat;
-        let mut h = Health {
-            current: 1.0,
-            max: 1.0,
-            injuries: Vec::new(),
-            total_starvation_damage: 0.0,
+        let mut world = bevy_ecs::world::World::new();
+        world.insert_resource(bevy_ecs::message::Messages::<BodyPartInjury>::default());
+        let mut writer_state = SystemState::<MessageWriter<BodyPartInjury>>::new(&mut world);
+
+        let mut model = CatBodyModel::default();
+        let mut rng = test_rng();
+        let mut activation = SystemActivation::default();
+        let result = {
+            let mut writer = writer_state.get_mut(&mut world);
+            damage_to_body_part(
+                Entity::PLACEHOLDER,
+                &mut model,
+                0.01,
+                10,
+                InjurySource::WildlifeCombat,
+                c,
+                &mut rng,
+                &mut writer,
+                &mut activation,
+            )
         };
-        let at = Position::new(7, 3);
-        let kind = apply_injury(&mut h, 0.05, 10, InjurySource::Unknown, at, c);
-        assert!(matches!(kind, Some(InjuryKind::Minor)));
-        assert_eq!(h.injuries.len(), 1);
-        assert_eq!(h.injuries[0].at, at);
+        writer_state.apply(&mut world);
+        assert!(result.is_none(), "below-threshold damage returns None");
+        assert_eq!(model.parts.iter().filter(|p| p.tissue_damage > 0.0).count(), 0);
+        let messages = world.resource::<bevy_ecs::message::Messages<BodyPartInjury>>();
+        let mut cursor = messages.get_cursor();
+        assert_eq!(cursor.read(messages).count(), 0);
     }
 
     #[test]
-    fn heal_duration_ordering() {
+    fn damage_to_body_part_populates_substrate_and_emits_message() {
+        use bevy_ecs::system::SystemState;
         let c = &SimConstants::default().combat;
-        let ts = crate::resources::time::TimeScale::from_config(
-            &crate::resources::time::SimConfig::default(),
-            16.6667,
-        );
+        let mut world = bevy_ecs::world::World::new();
+        world.insert_resource(bevy_ecs::message::Messages::<BodyPartInjury>::default());
+
+        let mut model = CatBodyModel::default();
+        let mut rng = test_rng();
+        let mut activation = SystemActivation::default();
+
+        let mut writer_state =
+            SystemState::<MessageWriter<BodyPartInjury>>::new(&mut world);
+        let result = {
+            let mut writer = writer_state.get_mut(&mut world);
+            damage_to_body_part(
+                Entity::PLACEHOLDER,
+                &mut model,
+                0.30, // above injury_severe_threshold (0.25)
+                42,
+                InjurySource::ShadowFoxAmbush,
+                c,
+                &mut rng,
+                &mut writer,
+                &mut activation,
+            )
+        };
+        writer_state.apply(&mut world);
+
+        let (part, condition) = result.expect("severe damage should produce a body part injury");
+
+        // Tissue damage went somewhere in the Fox targeting table — Phase 1
+        // collapses ShadowFoxAmbush to the Fox table.
         assert!(
-            heal_duration(InjuryKind::Minor, c, &ts) < heal_duration(InjuryKind::Moderate, c, &ts)
+            model.parts[part.index()].tissue_damage >= 0.30,
+            "selected part should carry the damage delta"
         );
+
+        // Damage of 0.30 is in the Wounded tier per default thresholds
+        // (0.26 lower bound), unless drift carries it higher.
+        use crate::components::body_zones::PartCondition;
         assert!(
-            heal_duration(InjuryKind::Moderate, c, &ts) < heal_duration(InjuryKind::Severe, c, &ts)
+            condition >= PartCondition::Wounded,
+            "0.30 damage exceeds Wounded threshold"
+        );
+
+        // Reading messages out of the world confirms the L1 emit.
+        let messages = world.resource::<bevy_ecs::message::Messages<BodyPartInjury>>();
+        let mut cursor = messages.get_cursor();
+        let collected: Vec<_> = cursor.read(messages).collect();
+        assert_eq!(collected.len(), 1, "exactly one BodyPartInjury message");
+        let msg = collected[0];
+        assert_eq!(msg.part, part);
+        assert!((msg.tissue_damage_delta - 0.30).abs() < 1e-6);
+        assert_eq!(msg.condition, condition);
+        assert_eq!(msg.tick, 42);
+
+        // Feature canary recorded.
+        assert!(
+            activation.counts.get(&Feature::BodyPartInjury).copied().unwrap_or(0) >= 1,
+            "BodyPartInjury feature should be activated"
         );
     }
 
     #[test]
-    fn heal_injuries_removes_healed() {
+    fn damage_to_body_part_permanent_destroyed_persists() {
+        use bevy_ecs::system::SystemState;
+        let c = &SimConstants::default().combat;
+        let mut world = bevy_ecs::world::World::new();
+        world.insert_resource(bevy_ecs::message::Messages::<BodyPartInjury>::default());
+
+        let mut model = CatBodyModel::default();
+        let mut rng = test_rng();
+        let mut activation = SystemActivation::default();
+
+        // Force the haunches to be Destroyed by applying directly (the
+        // weighted target picker is fox-table-biased, but we don't want
+        // to depend on RNG selection here).
+        model.apply_damage(
+            BodyPart::Haunches,
+            0.95,
+            &c.body_zone_condition_thresholds,
+            &c.body_zone_permanent_at_destroyed,
+        );
+        assert_eq!(
+            model.part(BodyPart::Haunches).condition,
+            crate::components::body_zones::PartCondition::Destroyed
+        );
+        assert!(model.part(BodyPart::Haunches).permanent);
+
+        // Subsequent healing must not undo the permanent destroyed flag.
+        let decrements = [1.0_f32; crate::components::body_zones::CAT_BODY_PART_COUNT];
+        model.heal_tick(&decrements, &c.body_zone_condition_thresholds);
+        assert!(
+            model.part(BodyPart::Haunches).permanent,
+            "haunches must stay permanently destroyed"
+        );
+
+        // No spurious message generation.
+        let mut writer_state =
+            SystemState::<MessageWriter<BodyPartInjury>>::new(&mut world);
+        {
+            let mut writer = writer_state.get_mut(&mut world);
+            // Apply a tiny ear hit to verify the message path still works.
+            damage_to_body_part(
+                Entity::PLACEHOLDER,
+                &mut model,
+                0.10,
+                100,
+                InjurySource::FoxConfrontation,
+                c,
+                &mut rng,
+                &mut writer,
+                &mut activation,
+            );
+        }
+        writer_state.apply(&mut world);
+        let messages = world.resource::<bevy_ecs::message::Messages<BodyPartInjury>>();
+        let mut cursor = messages.get_cursor();
+        let collected: Vec<_> = cursor.read(messages).collect();
+        assert_eq!(collected.len(), 1);
+    }
+
+    #[test]
+    fn heal_injuries_advances_tissue_healing_and_restores_hp() {
+        // 095 Phase 1 Stage B — `Health.injuries`-based healing retired.
+        // Verify the per-part tissue healing tick restores Health.current
+        // proportionally to the pain delta freed by healing.
         use bevy_ecs::schedule::Schedule;
 
+        let c = SimConstants::default();
         let mut world = World::new();
         world.insert_resource(TimeState {
             tick: 200,
             paused: false,
             speed: crate::resources::time::SimSpeed::Normal,
         });
-        world.insert_resource(SimConstants::default());
+        world.insert_resource(c.clone());
         world.insert_resource(SystemActivation::default());
         world.insert_resource(crate::resources::time::TimeScale::from_config(
             &crate::resources::time::SimConfig::default(),
             16.6667,
         ));
 
+        // Construct a cat with a Wounded ear (tissue 0.3) so heal_tick
+        // decrements meaningfully on the soft-tissue rate.
+        let mut model = CatBodyModel::default();
+        model.apply_damage(
+            BodyPart::Ears,
+            0.3,
+            &c.combat.body_zone_condition_thresholds,
+            &c.combat.body_zone_permanent_at_destroyed,
+        );
+        let initial_hp = 0.5;
         let entity = world
-            .spawn(Health {
-                current: 0.5,
-                max: 1.0,
-                injuries: vec![
-                    Injury {
-                        kind: InjuryKind::Minor,
-                        tick_received: 100,
-                        healed: false,
-                        source: InjurySource::Unknown,
-                        at: Position::new(0, 0),
-                    },
-                    Injury {
-                        kind: InjuryKind::Severe,
-                        tick_received: 100,
-                        healed: false,
-                        source: InjurySource::Unknown,
-                        at: Position::new(0, 0),
-                    },
-                ],
-                total_starvation_damage: 0.0,
-            })
+            .spawn((
+                Health {
+                    current: initial_hp,
+                    max: 1.0,
+                    total_starvation_damage: 0.0,
+                },
+                model,
+            ))
             .id();
 
         let mut schedule = Schedule::default();
         schedule.add_systems(heal_injuries);
         schedule.run(&mut world);
 
-        let health = world.get::<Health>(entity).unwrap();
-        // Minor injury (50 ticks) at tick 100, now tick 200 = 100 ticks elapsed. Should be healed.
-        // Severe injury (500 ticks) at tick 100, now tick 200 = 100 ticks elapsed. Should NOT be healed.
-        assert_eq!(
-            health.injuries.len(),
-            1,
-            "minor injury should be healed and removed"
-        );
-        assert_eq!(
-            health.injuries[0].kind,
-            InjuryKind::Severe,
-            "severe injury should remain"
-        );
-
-        // HP must increase by the minor injury penalty (natural recovery).
-        let expected_hp = 0.5 + SimConstants::default().combat.injury_minor_health_penalty;
+        let after = world.get::<CatBodyModel>(entity).unwrap();
+        let healed_tissue = after.part(BodyPart::Ears).tissue_damage;
         assert!(
-            (health.current - expected_hp).abs() < 1e-5,
-            "HP should be restored by minor penalty; expected {expected_hp}, got {}",
-            health.current,
+            healed_tissue < 0.3,
+            "ear tissue should decrement after a heal tick (was 0.3, now {healed_tissue})"
         );
-    }
 
-    #[test]
-    fn apply_injury_creates_record_and_penalty() {
-        let c = &SimConstants::default().combat;
-        let mut health = Health {
-            current: 1.0,
-            max: 1.0,
-            injuries: Vec::new(),
-            total_starvation_damage: 0.0,
-        };
-
-        let at = Position::new(0, 0);
-        // Damage above negligible threshold should create a minor injury.
-        let kind = apply_injury(&mut health, 0.05, 10, InjurySource::Unknown, at, c);
-        assert_eq!(kind, Some(InjuryKind::Minor));
-        assert_eq!(health.injuries.len(), 1);
-        assert_eq!(health.injuries[0].tick_received, 10);
-        let expected = 1.0 - c.injury_minor_health_penalty;
+        let post_health = world.get::<Health>(entity).unwrap();
         assert!(
-            (health.current - expected).abs() < 1e-5,
-            "expected HP {expected}, got {}",
-            health.current,
-        );
-
-        // Negligible damage should not create an injury.
-        let kind = apply_injury(&mut health, 0.01, 11, InjurySource::Unknown, at, c);
-        assert_eq!(kind, None);
-        assert_eq!(health.injuries.len(), 1, "no new injury for negligible hit");
-    }
-
-    #[test]
-    fn ambush_damage_heals_via_injury_system() {
-        // Simulate the predator_stalk_cats damage pattern followed by
-        // heal_injuries, verifying partial HP recovery.
-        use bevy_ecs::schedule::Schedule;
-
-        let c = SimConstants::default();
-        let raw_damage: f32 = 0.15; // above moderate threshold
-        let tick_of_injury: u64 = 50;
-
-        let mut health = Health {
-            current: 1.0,
-            max: 1.0,
-            injuries: Vec::new(),
-            total_starvation_damage: 0.0,
-        };
-
-        // Apply raw damage (same as predator_stalk_cats).
-        health.current = (health.current - raw_damage).max(0.0);
-        let kind = apply_injury(
-            &mut health,
-            raw_damage,
-            tick_of_injury,
-            InjurySource::Unknown,
-            Position::new(0, 0),
-            &c.combat,
-        );
-        assert_eq!(kind, Some(InjuryKind::Moderate));
-
-        let hp_after_hit = health.current;
-        let expected_after_hit = 1.0 - raw_damage - c.combat.injury_moderate_health_penalty;
-        assert!(
-            (hp_after_hit - expected_after_hit).abs() < 1e-5,
-            "HP after hit: expected {expected_after_hit}, got {hp_after_hit}",
-        );
-
-        // Advance time past heal_moderate_duration and run heal_injuries.
-        let ts = crate::resources::time::TimeScale::from_config(
-            &crate::resources::time::SimConfig::default(),
-            16.6667,
-        );
-        let heal_tick = tick_of_injury + c.combat.heal_moderate_duration.ticks(&ts);
-
-        let mut world = World::new();
-        world.insert_resource(TimeState {
-            tick: heal_tick,
-            paused: false,
-            speed: crate::resources::time::SimSpeed::Normal,
-        });
-        world.insert_resource(c);
-        world.insert_resource(SystemActivation::default());
-        world.insert_resource(ts);
-
-        let entity = world.spawn(health).id();
-
-        let mut schedule = Schedule::default();
-        schedule.add_systems(heal_injuries);
-        schedule.run(&mut world);
-
-        let healed = world.get::<Health>(entity).unwrap();
-        assert!(
-            healed.injuries.is_empty(),
-            "moderate injury should be healed and removed"
-        );
-        let expected_hp = hp_after_hit
-            + SimConstants::default()
-                .combat
-                .injury_moderate_health_penalty;
-        assert!(
-            (healed.current - expected_hp).abs() < 1e-5,
-            "HP should be partially restored; expected {expected_hp}, got {}",
-            healed.current,
-        );
-        // Raw damage portion remains unrecovered.
-        assert!(
-            healed.current < 1.0,
-            "full HP should not be restored — raw damage is permanent",
+            post_health.current > initial_hp,
+            "Health.current should rise as pain-fraction recovers (was {initial_hp}, now {})",
+            post_health.current
         );
     }
 

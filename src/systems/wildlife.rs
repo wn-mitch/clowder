@@ -1619,7 +1619,15 @@ pub fn predator_stalk_cats(
         ),
     >,
     mut cats: Query<
-        (Entity, &Position, &mut Health, &mut Needs, &mut Mood, &Name),
+        (
+            Entity,
+            &Position,
+            &mut Health,
+            &mut Needs,
+            &mut Mood,
+            &Name,
+            &mut crate::components::CatBodyModel,
+        ),
         (Without<WildAnimal>, Without<Dead>),
     >,
     wards: Query<(&Ward, &Position), Without<WildAnimal>>,
@@ -1631,6 +1639,7 @@ pub fn predator_stalk_cats(
     time: Res<TimeState>,
     mut activation: ResMut<SystemActivation>,
     mut recent_ambush_map: ResMut<crate::resources::RecentAmbushMap>,
+    mut body_part_writer: MessageWriter<crate::messages::body_part_injury::BodyPartInjury>,
 ) {
     let c = &constants.wildlife;
     let ward_multiplier = constants.magic.shadow_fox_ward_repel_multiplier;
@@ -1644,7 +1653,7 @@ pub fn predator_stalk_cats(
 
     // Snapshot cat positions for stalking target selection.
     let cat_positions: Vec<(Entity, Position)> =
-        cats.iter().map(|(e, p, _, _, _, _)| (e, *p)).collect();
+        cats.iter().map(|(e, p, _, _, _, _, _)| (e, *p)).collect();
 
     for (mut animal, wl_pos, mut ai_state, _health) in &mut wildlife {
         // Query filter `With<ShadowFoxDrives>` gates this loop to shadow
@@ -1738,7 +1747,7 @@ pub fn predator_stalk_cats(
                         .min_by_key(|(_, cp)| wl_pos.manhattan_distance(cp))
                     {
                         let cat_pos = *cat_pos;
-                        if let Ok((_, _, mut cat_health, mut needs, mut mood, name)) =
+                        if let Ok((_, _, mut cat_health, mut needs, mut mood, name, mut cat_body_model)) =
                             cats.get_mut(*cat_entity)
                         {
                             let tile_corruption = if map.in_bounds(wl_pos.x, wl_pos.y) {
@@ -1749,13 +1758,19 @@ pub fn predator_stalk_cats(
                             let damage = animal.threat_power
                                 * (1.0 + tile_corruption * c.corruption_threat_multiplier);
                             cat_health.current = (cat_health.current - damage).max(0.0);
-                            crate::systems::combat::apply_injury(
-                                &mut cat_health,
+                            // 095 Phase 1 — anatomical substrate is canonical.
+                            // Legacy `Injury` record retired.
+                            let _ = cat_pos; // injury_pos no longer needed
+                            crate::systems::combat::damage_to_body_part(
+                                *cat_entity,
+                                &mut cat_body_model,
                                 damage,
                                 time.tick,
                                 crate::components::physical::InjurySource::ShadowFoxAmbush,
-                                cat_pos,
                                 &constants.combat,
+                                &mut rng,
+                                &mut body_part_writer,
+                                &mut activation,
                             );
                             needs.safety = (needs.safety - c.threat_safety_drain).max(0.0);
 
@@ -1808,7 +1823,7 @@ pub fn predator_stalk_cats(
                                 continue;
                             }
                             if wl_pos.manhattan_distance(witness_pos) <= c.ambush_witness_range {
-                                if let Ok((_, _, _, mut w_needs, mut w_mood, _)) =
+                                if let Ok((_, _, _, mut w_needs, mut w_mood, _, _)) =
                                     cats.get_mut(*witness_entity)
                                 {
                                     w_needs.safety =
@@ -3064,7 +3079,13 @@ pub fn fox_confrontation_tick(
         ),
     >,
     mut cats: Query<
-        (&Position, &mut Health, &mut Mood, &Name),
+        (
+            &Position,
+            &mut Health,
+            &mut Mood,
+            &Name,
+            &mut crate::components::CatBodyModel,
+        ),
         (Without<WildAnimal>, Without<Dead>),
     >,
     mut rng: ResMut<SimRng>,
@@ -3074,6 +3095,7 @@ pub fn fox_confrontation_tick(
     time_scale: Res<TimeScale>,
     mut activation: ResMut<SystemActivation>,
     map: Res<TileMap>,
+    mut body_part_writer: MessageWriter<crate::messages::body_part_injury::BodyPartInjury>,
 ) {
     let fc = &constants.fox_ecology;
     let post_action_cooldown_ticks = fc.post_action_cooldown.ticks(&time_scale);
@@ -3145,17 +3167,20 @@ pub fn fox_confrontation_tick(
 
             // Try to find the target cat and damage it.
             let target_entity = Entity::from_bits(target_id);
-            if let Ok((cat_pos, mut cat_health, mut mood, name)) = cats.get_mut(target_entity) {
-                let injury_pos = *cat_pos;
+            if let Ok((_cat_pos, mut cat_health, mut mood, name, mut cat_body_model)) = cats.get_mut(target_entity) {
                 cat_health.current =
                     (cat_health.current - fc.standoff_damage_on_escalation).max(0.0);
-                crate::systems::combat::apply_injury(
-                    &mut cat_health,
+                // 095 Phase 1 — anatomical substrate is canonical.
+                crate::systems::combat::damage_to_body_part(
+                    target_entity,
+                    &mut cat_body_model,
                     fc.standoff_damage_on_escalation,
                     time.tick,
                     crate::components::physical::InjurySource::FoxConfrontation,
-                    injury_pos,
                     &constants.combat,
+                    &mut rng,
+                    &mut body_part_writer,
+                    &mut activation,
                 );
                 mood.modifiers.push_back(
                     MoodModifier::new(

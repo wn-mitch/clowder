@@ -115,6 +115,7 @@ pub fn update_cat_inspect_panel(
     >,
     names: Query<&Name>,
     health_query: Query<&Health>,
+    body_zones_query: Query<&crate::components::CatBodyModel>,
     relationships: Res<Relationships>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
@@ -307,18 +308,38 @@ pub fn update_cat_inspect_panel(
             "Health",
             health.current / health.max,
         ));
-        if !health.injuries.is_empty() {
-            let injury_count = health.injuries.iter().filter(|i| !i.healed).count();
-            if injury_count > 0 {
-                children.push(spawn_text(
-                    &mut commands,
-                    &format!(
-                        "  {injury_count} active injur{}",
-                        if injury_count == 1 { "y" } else { "ies" }
-                    ),
-                    FONT_SIZE,
-                    BAR_RED,
+        // 095 Phase 1 Stage B — legacy injury count retired; the body-
+        // zone panel below renders per-part state directly.
+        let _ = health;
+    }
+
+    // --- 095 Phase 1 — Body zones (cat) ---
+    if let Ok(body) = body_zones_query.get(entity) {
+        use crate::components::body_zones::PartCondition;
+        let mut wounded_lines: Vec<(String, Color)> = Vec::new();
+        let mut permanent_lines: Vec<String> = Vec::new();
+        for (part, state) in body.iter() {
+            if state.permanent && state.condition >= PartCondition::Wounded {
+                permanent_lines.push(format!("  {}: {} (permanent)", part.display_name(), part_condition_label(state.condition)));
+            } else if state.condition >= PartCondition::Wounded {
+                let color = match state.condition {
+                    PartCondition::Wounded => BAR_RED,
+                    PartCondition::Mangled | PartCondition::Destroyed => Color::srgb(0.9, 0.2, 0.2),
+                    _ => TEXT_COLOR,
+                };
+                wounded_lines.push((
+                    format!("  {}: {}", part.display_name(), part_condition_label(state.condition)),
+                    color,
                 ));
+            }
+        }
+        if !wounded_lines.is_empty() || !permanent_lines.is_empty() {
+            children.push(spawn_text(&mut commands, "Body zones", FONT_SIZE, TEXT_COLOR));
+            for (text, color) in &wounded_lines {
+                children.push(spawn_text(&mut commands, text, FONT_SIZE, *color));
+            }
+            for text in &permanent_lines {
+                children.push(spawn_text(&mut commands, text, FONT_SIZE, Color::srgb(0.7, 0.5, 0.3)));
             }
         }
     }
@@ -528,6 +549,17 @@ pub fn update_cat_inspect_panel(
 // ---------------------------------------------------------------------------
 // Helper spawners
 // ---------------------------------------------------------------------------
+
+fn part_condition_label(condition: crate::components::body_zones::PartCondition) -> &'static str {
+    use crate::components::body_zones::PartCondition;
+    match condition {
+        PartCondition::Healthy => "healthy",
+        PartCondition::Bruised => "bruised",
+        PartCondition::Wounded => "wounded",
+        PartCondition::Mangled => "mangled",
+        PartCondition::Destroyed => "destroyed",
+    }
+}
 
 fn milestone_target(tracker: &ProgressTracker) -> u32 {
     match tracker {

@@ -77,6 +77,12 @@ pub struct CatSnapshot {
     pub is_coordinator: bool,
     #[serde(default)]
     pub directive_queue: Option<Vec<crate::components::coordination::Directive>>,
+    /// Ticket 095 Phase 1 — anatomical injury substrate. Pre-095 saves use
+    /// `Default` (all parts Healthy); existing `Health.injuries` records ride
+    /// along on the legacy field during Stage A and are not back-translated
+    /// into body-part damage (see plan §Save migration).
+    #[serde(default)]
+    pub body_model: crate::components::CatBodyModel,
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +248,7 @@ fn snapshot_cat(world: &World, entity: Entity, entity_map: &HashMap<Entity, usiz
     let current_action = world.get::<CurrentAction>(entity).unwrap();
     let dead = world.get::<Dead>(entity);
     let inventory = world.get::<Inventory>(entity);
+    let body_model = world.get::<crate::components::CatBodyModel>(entity);
 
     let is_coordinator = world
         .get::<crate::components::coordination::Coordinator>(entity)
@@ -271,6 +278,7 @@ fn snapshot_cat(world: &World, entity: Entity, entity_map: &HashMap<Entity, usiz
         inventory: inventory.map(|i| i.slots.clone()).unwrap_or_default(),
         is_coordinator,
         directive_queue,
+        body_model: body_model.cloned().unwrap_or_default(),
     }
 }
 
@@ -362,6 +370,7 @@ pub fn load_world(world: &mut World, save: SaveFile) {
                     Inventory {
                         slots: cat.inventory.clone(),
                     },
+                    cat.body_model.clone(),
                 ),
             ))
             .id();

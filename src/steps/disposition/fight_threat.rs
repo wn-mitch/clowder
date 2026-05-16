@@ -72,7 +72,6 @@ mod tests {
         let health = Health {
             current: 0.2,
             max: 1.0,
-            injuries: Vec::new(),
             total_starvation_damage: 0.0,
         };
         let outcome = resolve_fight_threat(0, &mut skills, &mut needs, &health, &d);
@@ -121,7 +120,6 @@ mod tests {
         let health = Health {
             current: 0.1,
             max: 1.0,
-            injuries: Vec::new(),
             total_starvation_damage: 0.0,
         };
         let outcome = resolve_fight_threat(d.fight_duration, &mut skills, &mut needs, &health, &d);

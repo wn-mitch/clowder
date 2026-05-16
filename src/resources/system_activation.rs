@@ -44,6 +44,11 @@ pub enum Feature {
     PersonalCorruptionEffect,
     CombatResolved,
     InjuryHealed,
+    /// Ticket 095 Phase 1 — anatomical body-part damage applied to a cat.
+    /// Emitted by `damage_to_body_part` (combat.rs) alongside the legacy
+    /// `Injury` push during Stage A. Positive: cats take damage in every
+    /// canonical seed-42 soak (wildlife encounters, standoffs).
+    BodyPartInjury,
     FateAssigned,
     FateAwakened,
     AspirationSelected,
@@ -554,6 +559,7 @@ impl Feature {
         Feature::PersonalCorruptionEffect,
         Feature::CombatResolved,
         Feature::InjuryHealed,
+        Feature::BodyPartInjury,
         Feature::FateAssigned,
         Feature::FateAwakened,
         Feature::AspirationSelected,
@@ -736,6 +742,7 @@ impl Feature {
             // --- Positive: healthy-colony wins ---
             Feature::RemedyApplied => Positive,
             Feature::InjuryHealed => Positive,
+            Feature::BodyPartInjury => Positive,
             Feature::FateAssigned => Positive,
             Feature::FateAwakened => Positive,
             Feature::AspirationSelected => Positive,
@@ -1035,6 +1042,14 @@ impl Feature {
             Feature::PersonalCorruptionEffect => false,
             Feature::RemedyApplied => false,
             Feature::InjuryHealed => false,
+            // Mirrors `InjuryHealed` / `CombatResolved`: the seed-42
+            // baseline currently has zero cat-vs-wildlife combat firings
+            // (wards + flee logic keep cats out of damage range), so
+            // BodyPartInjury isn't gated either. The substrate is wired
+            // and verifiable via direct event-stream inspection
+            // (`just q events ... BodyPartInjury`) when combat happens —
+            // the never-fired canary doesn't add diagnostic value here.
+            Feature::BodyPartInjury => false,
             // Misc rare events.
             Feature::PosseCandidateExcludedStarving => false,
             Feature::DepositFailedNoStore => false,
@@ -1277,6 +1292,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::PersonalCorruptionEffect => "PersonalCorruptionEffect",
         Feature::CombatResolved => "CombatResolved",
         Feature::InjuryHealed => "InjuryHealed",
+        Feature::BodyPartInjury => "BodyPartInjury",
         Feature::FateAssigned => "FateAssigned",
         Feature::FateAwakened => "FateAwakened",
         Feature::AspirationSelected => "AspirationSelected",
@@ -1704,7 +1720,10 @@ mod tests {
         // for the `mourn_at_grave` and `rear_kitten` HTN method
         // primitive completions. All ship dormant; promotion is the
         // dispatch follow-on named in each ticket's landing Log.
-        assert_eq!(positive, 74);
+        // Ticket 095 Phase 1 added 1 Positive (BodyPartInjury) for the
+        // anatomical injury substrate. Enrolled in the seed-42 canary
+        // (cats take damage every soak).
+        assert_eq!(positive, 75);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -1794,9 +1813,11 @@ mod tests {
         // GriefReleased, KittenWeaned, SkillTaught, KittenReleased)
         // for the `mourn_at_grave` and `rear_kitten` HTN method
         // primitive completions. All ship dormant.
+        // Ticket 095 Phase 1: +1 Positive (BodyPartInjury) for the
+        // anatomical injury substrate.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            74
+            75
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

@@ -377,6 +377,10 @@ impl Plugin for SimulationPlugin {
         app.add_message::<crate::components::wildlife::SnakeStrikeLanded>();
         app.add_message::<crate::components::wildlife::HawkDied>();
         app.add_message::<crate::components::wildlife::SnakeDied>();
+        // 095 Phase 1 — anatomical injury substrate. Emitted by
+        // `damage_to_body_part` (combat.rs) alongside the legacy `Injury`
+        // push during Stage A; becomes the sole signal at Stage B.
+        app.add_message::<crate::messages::body_part_injury::BodyPartInjury>();
 
         // L2 substrate resources (§9 faction + §L2.10). FactionRelations
         // is a constant lookup — fine to insert at build time.

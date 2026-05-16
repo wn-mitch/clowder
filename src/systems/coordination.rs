@@ -224,7 +224,10 @@ pub fn assess_colony_needs(
     time: Res<TimeState>,
     food: Res<crate::resources::food::FoodStores>,
     mut coordinators: Query<(Entity, &Name, &Skills, &mut DirectiveQueue), With<Coordinator>>,
-    injured_cats: Query<(Entity, &crate::components::physical::Health, &Position), Without<Dead>>,
+    injured_cats: Query<
+        (Entity, &crate::components::CatBodyModel, &Position),
+        Without<Dead>,
+    >,
     building_query: Query<(
         Entity,
         &crate::components::building::Structure,
@@ -254,9 +257,11 @@ pub fn assess_colony_needs(
 
     // Pre-compute colony state once.
     let food_fraction = food.fraction();
+    // 095 Phase 1 Stage B — count cats with any body part at Wounded
+    // or worse. Replaces the legacy `Health.injuries`-based count.
     let colony_injury_count = injured_cats
         .iter()
-        .filter(|(_, h, _)| h.injuries.iter().any(|i| !i.healed))
+        .filter(|(_, body, _)| body.any_wounded_or_worse())
         .count();
 
     // Collect building positions for proximity checks.

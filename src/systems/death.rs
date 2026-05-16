@@ -99,16 +99,11 @@ pub fn check_death(
 
         if let Some(cause) = cause {
             commands.entity(entity).insert(Dead { tick, cause });
-            let injury_source = if cause == DeathCause::Injury {
-                health
-                    .injuries
-                    .iter()
-                    .filter(|inj| !inj.healed)
-                    .max_by_key(|inj| inj.tick_received)
-                    .map(|inj| format!("{:?}", inj.source))
-            } else {
-                None
-            };
+            // 095 Phase 1 Stage B — `Health.injuries` retired; the per-
+            // tick `Injury.source` history isn't preserved on the body
+            // model. Future TendInjury / detailed-cause narratives can
+            // hook the `BodyPartInjury` event stream if needed.
+            let injury_source: Option<String> = None;
             newly_dead.push((entity, *pos, name.0.clone(), cause, injury_source));
 
             match cause {
@@ -378,7 +373,6 @@ mod tests {
                     Health {
                         current: health,
                         max: 1.0,
-                        injuries: vec![],
                         total_starvation_damage: 0.0,
                     },
                     needs,
@@ -511,7 +505,6 @@ mod tests {
                     Health {
                         current: health,
                         max: 1.0,
-                        injuries: vec![],
                         total_starvation_damage: 0.0,
                     },
                     needs,

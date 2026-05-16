@@ -129,6 +129,10 @@ pub fn spawn_cat_from_blueprint(
                 // WitnessableEvent variants; dormant at land (consumer
                 // is ticket 309).
                 crate::components::beliefs::ColonyReservesBelief::default(),
+                // 095 Phase 1 — anatomical injury substrate. Shadow
+                // co-resident with Health during Stage A; sole source of
+                // truth after Stage B cutover.
+                crate::components::CatBodyModel::default(),
             ),
         ))
         .id()

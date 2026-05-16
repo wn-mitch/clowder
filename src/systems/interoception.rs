@@ -58,42 +58,33 @@ use crate::components::markers::{
     BodyDistressed, EsteemDistressed, LackingPurpose, LowHealth, LowMastery, SevereInjury,
 };
 use crate::components::mental::{Memory, MemoryType};
-use crate::components::physical::{Dead, Health, Injury, InjuryKind, Needs, Position};
+use crate::components::body_zones::{CatBodyModel, PartCondition};
+use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::Skills;
 use crate::resources::map::TileMap;
 use crate::resources::sim_constants::{EscapeViabilityConstants, SimConstants};
 
-/// Per-`InjuryKind` severity score used to derive `pain_level`. Minor
-/// wounds register a small ache; Moderate is meaningfully painful; Severe
-/// dominates. The numbers are calibrated against `pain_normalization_max`
-/// (default 2.0) so three Severe wounds saturate the scalar at 1.0.
-pub const INJURY_KIND_MINOR_SEVERITY: f32 = 0.1;
-pub const INJURY_KIND_MODERATE_SEVERITY: f32 = 0.3;
-pub const INJURY_KIND_SEVERE_SEVERITY: f32 = 0.7;
-
-/// Map an `InjuryKind` to its scalar severity. Unhealed injuries
-/// contribute their severity to `pain_level`; healed injuries contribute
-/// nothing.
-pub fn severity_score(kind: InjuryKind) -> f32 {
-    match kind {
-        InjuryKind::Minor => INJURY_KIND_MINOR_SEVERITY,
-        InjuryKind::Moderate => INJURY_KIND_MODERATE_SEVERITY,
-        InjuryKind::Severe => INJURY_KIND_SEVERE_SEVERITY,
-    }
-}
-
-/// Sum unhealed-injury severity scores, normalized into `[0, 1]` by
-/// `pain_normalization_max`. Healed injuries do not contribute.
-pub fn pain_level(injuries: &[Injury], normalization_max: f32) -> f32 {
+/// Pain-level scalar in `[0, 1]`, derived from `CatBodyModel` total pain
+/// normalized by `max_possible_pain` (sum of `body_zone_pain_weights`).
+/// Ticket 095 Phase 1 Stage B — replaces the legacy severity-based
+/// `pain_level(&[Injury], f32)`. The `normalization_max` parameter is
+/// retained for callsite-compatibility but now scales the body-zone pain
+/// fraction (default callers pass `pain_normalization_max`; values
+/// outside `(0, 1]` saturate to the equivalent value).
+pub fn pain_level(
+    body_model: &CatBodyModel,
+    weights: &[f32; crate::components::body_zones::CAT_BODY_PART_COUNT],
+    normalization_max: f32,
+) -> f32 {
     if normalization_max <= 0.0 {
         return 0.0;
     }
-    let total: f32 = injuries
-        .iter()
-        .filter(|i| !i.healed)
-        .map(|i| severity_score(i.kind))
-        .sum();
-    (total / normalization_max).clamp(0.0, 1.0)
+    let max_pain: f32 = weights.iter().sum();
+    if max_pain <= 0.0 {
+        return 0.0;
+    }
+    let fraction = (body_model.total_pain(weights) / max_pain).clamp(0.0, 1.0);
+    (fraction / normalization_max).clamp(0.0, 1.0)
 }
 
 /// HP-ratio-derived health deficit in `[0, 1]`. `health.max == 0` is
@@ -277,18 +268,24 @@ pub fn own_safe_rest_spot(memory: &Memory, suppression_radius: i32) -> Option<Po
         .map(|(loc, _)| loc)
 }
 
-/// Most-recent unhealed-injury site. Scans `health.injuries` for
-/// `!healed` entries and returns the one with the highest
-/// `tick_received`'s `at`. `None` when no unhealed injuries.
-/// Future TendInjury DSE consumes this via
-/// `LandmarkAnchor::OwnInjurySite`. Ticket 089.
-pub fn own_injury_site(health: &Health) -> Option<Position> {
-    health
-        .injuries
+/// Returns `Some(cat_pos)` when the cat has at least one body part at
+/// `Wounded` or worse, else `None`. Pre-095, this scanned a list of
+/// timestamped `Injury` records for the most-recent unhealed site; the
+/// body-zone substrate doesn't track per-tick injury locations, so the
+/// best approximation is "the cat's current position iff any wound is
+/// active." Future TendInjury DSE consumers via
+/// `LandmarkAnchor::OwnInjurySite` can rebuild the precise locator from
+/// `BodyPartInjury` events if needed. Ticket 089 / Ticket 095.
+pub fn own_injury_site(body_model: &CatBodyModel, cat_pos: Position) -> Option<Position> {
+    if body_model
+        .parts
         .iter()
-        .filter(|i| !i.healed)
-        .max_by_key(|i| i.tick_received)
-        .map(|i| i.at)
+        .any(|p| p.condition >= PartCondition::Wounded)
+    {
+        Some(cat_pos)
+    } else {
+        None
+    }
 }
 
 /// Ticket 109 (Phase A) — composite social-status pressure scalar
@@ -449,6 +446,12 @@ pub fn author_self_markers(
             Has<LowMastery>,
             Has<LackingPurpose>,
             Has<EsteemDistressed>,
+            // Ticket 095 Phase 1 Stage B — Optional so legacy test
+            // fixtures and pre-095 save-loaded cats keep working
+            // through the lazy-insert window. Production spawn paths
+            // always insert one (`setup.rs::spawn_cat_from_blueprint`,
+            // `pregnancy.rs::spawn_kitten`).
+            Option<&CatBodyModel>,
         ),
         Without<Dead>,
     >,
@@ -471,6 +474,7 @@ pub fn author_self_markers(
         has_low_mastery,
         has_lacking_purpose,
         has_esteem_distressed,
+        body_model,
     ) in cats.iter()
     {
         let health_ratio = if health.max > 0.0 {
@@ -479,10 +483,13 @@ pub fn author_self_markers(
             0.0
         };
         let want_low_health = health_ratio <= critical_health_threshold;
-        let want_severe_injury = health
-            .injuries
-            .iter()
-            .any(|i| !i.healed && i.kind == InjuryKind::Severe);
+        // 095 Phase 1 Stage B — `SevereInjury` marker derived from
+        // anatomical condition (any part at Mangled or worse).
+        // Cats without a `CatBodyModel` (legacy / test fixtures) are
+        // treated as uninjured.
+        let want_severe_injury = body_model
+            .map(|m| m.parts.iter().any(|p| p.condition >= PartCondition::Mangled))
+            .unwrap_or(false);
         let want_body_distressed =
             body_distress_composite(needs, health) >= body_distress_threshold;
         let want_low_mastery = mastery_confidence(skills) < low_mastery_threshold;
@@ -550,7 +557,7 @@ pub fn author_self_markers(
 mod tests {
     use super::*;
     use crate::components::aspirations::{ActiveAspiration, AspirationDomain, Aspirations};
-    use crate::components::physical::{Health, Injury, InjuryKind, InjurySource, Needs};
+    use crate::components::physical::{Health, Needs};
     use crate::components::skills::Skills;
     use bevy::ecs::schedule::Schedule;
 
@@ -558,19 +565,26 @@ mod tests {
         Health {
             current: 1.0,
             max: 1.0,
-            injuries: Vec::new(),
             total_starvation_damage: 0.0,
         }
     }
 
-    fn injury(kind: InjuryKind, healed: bool) -> Injury {
-        Injury {
-            kind,
-            tick_received: 0,
-            healed,
-            source: InjurySource::Unknown,
-            at: crate::components::physical::Position::new(0, 0),
-        }
+    /// 095 Phase 1 Stage B helpers — `pain_level` now takes a body
+    /// model + weight array.
+    fn weights() -> [f32; crate::components::body_zones::CAT_BODY_PART_COUNT] {
+        SimConstants::default().combat.body_zone_pain_weights
+    }
+
+    fn body_with_damage(part: crate::components::body_zones::BodyPart, tissue: f32) -> CatBodyModel {
+        let c = SimConstants::default();
+        let mut model = CatBodyModel::default();
+        model.apply_damage(
+            part,
+            tissue,
+            &c.combat.body_zone_condition_thresholds,
+            &c.combat.body_zone_permanent_at_destroyed,
+        );
+        model
     }
 
     fn comfortable_needs() -> Needs {
@@ -589,51 +603,41 @@ mod tests {
     }
 
     #[test]
-    fn severity_score_orders_kinds() {
-        assert!(severity_score(InjuryKind::Minor) < severity_score(InjuryKind::Moderate));
-        assert!(severity_score(InjuryKind::Moderate) < severity_score(InjuryKind::Severe));
-    }
-
-    #[test]
     fn pain_level_zero_with_no_injuries() {
-        let health = full_health();
-        assert_eq!(pain_level(&health.injuries, 2.0), 0.0);
+        let model = CatBodyModel::default();
+        assert_eq!(pain_level(&model, &weights(), 2.0), 0.0);
     }
 
     #[test]
-    fn pain_level_ignores_healed_injuries() {
-        let mut health = full_health();
-        health.injuries.push(injury(InjuryKind::Severe, true));
-        health.injuries.push(injury(InjuryKind::Severe, true));
-        assert_eq!(pain_level(&health.injuries, 2.0), 0.0);
+    fn pain_level_rises_with_tissue_damage() {
+        // Throat tissue 0.5 → pain = 0.5 × 3.0 = 1.5;
+        // max_pain ≈ 15.1 → fraction ≈ 0.099 → /2.0 ≈ 0.0497.
+        let model = body_with_damage(crate::components::body_zones::BodyPart::Throat, 0.5);
+        let level = pain_level(&model, &weights(), 2.0);
+        assert!(level > 0.0 && level < 0.1, "got {level}");
     }
 
     #[test]
-    fn pain_level_normalizes_to_unit_range() {
-        let mut health = full_health();
-        // Three severe wounds at 0.7 each = 2.1 raw, > 2.0 normalization
-        // max → saturates at 1.0.
-        for _ in 0..3 {
-            health.injuries.push(injury(InjuryKind::Severe, false));
+    fn pain_level_saturates_at_full_body() {
+        let mut model = CatBodyModel::default();
+        let c = SimConstants::default();
+        for part in crate::components::body_zones::BodyPart::ALL {
+            model.apply_damage(
+                part,
+                1.0,
+                &c.combat.body_zone_condition_thresholds,
+                &c.combat.body_zone_permanent_at_destroyed,
+            );
         }
-        assert_eq!(pain_level(&health.injuries, 2.0), 1.0);
-    }
-
-    #[test]
-    fn pain_level_scales_intermediate_load() {
-        let mut health = full_health();
-        // One Severe (0.7) + one Moderate (0.3) = 1.0 raw, /2.0 = 0.5.
-        health.injuries.push(injury(InjuryKind::Severe, false));
-        health.injuries.push(injury(InjuryKind::Moderate, false));
-        assert!((pain_level(&health.injuries, 2.0) - 0.5).abs() < 1e-4);
+        let level = pain_level(&model, &weights(), 1.0);
+        assert!((level - 1.0).abs() < 1e-4, "expected 1.0, got {level}");
     }
 
     #[test]
     fn pain_level_zero_normalizer_is_safe() {
-        let mut health = full_health();
-        health.injuries.push(injury(InjuryKind::Severe, false));
-        assert_eq!(pain_level(&health.injuries, 0.0), 0.0);
-        assert_eq!(pain_level(&health.injuries, -1.0), 0.0);
+        let model = body_with_damage(crate::components::body_zones::BodyPart::Throat, 0.5);
+        assert_eq!(pain_level(&model, &weights(), 0.0), 0.0);
+        assert_eq!(pain_level(&model, &weights(), -1.0), 0.0);
     }
 
     #[test]
@@ -646,7 +650,6 @@ mod tests {
         let h = Health {
             current: 0.5,
             max: 1.0,
-            injuries: Vec::new(),
             total_starvation_damage: 0.0,
         };
         assert!((health_deficit(&h) - 0.5).abs() < 1e-4);
@@ -657,7 +660,6 @@ mod tests {
         let h = Health {
             current: 0.0,
             max: 0.0,
-            injuries: Vec::new(),
             total_starvation_damage: 0.0,
         };
         assert_eq!(health_deficit(&h), 1.0);
@@ -689,7 +691,6 @@ mod tests {
         let health = Health {
             current: 0.2,
             max: 1.0,
-            injuries: Vec::new(),
             total_starvation_damage: 0.0,
         };
         let composite = body_distress_composite(&needs, &health);
@@ -712,7 +713,6 @@ mod tests {
                 Health {
                     current: 0.3,
                     max: 1.0,
-                    injuries: Vec::new(),
                     total_starvation_damage: 0.0,
                 },
                 comfortable_needs(),
@@ -731,7 +731,6 @@ mod tests {
                 Health {
                     current: 0.3,
                     max: 1.0,
-                    injuries: Vec::new(),
                     total_starvation_damage: 0.0,
                 },
                 comfortable_needs(),
@@ -744,7 +743,6 @@ mod tests {
         world.entity_mut(cat).insert(Health {
             current: 1.0,
             max: 1.0,
-            injuries: Vec::new(),
             total_starvation_damage: 0.0,
         });
         schedule.run(&mut world);
@@ -752,27 +750,28 @@ mod tests {
     }
 
     #[test]
-    fn severe_injury_marker_only_for_unhealed_severe() {
+    fn severe_injury_marker_responds_to_mangled_part() {
         let (mut world, mut schedule) = setup_world();
-        let mut h = Health {
-            current: 0.6,
-            max: 1.0,
-            injuries: Vec::new(),
-            total_starvation_damage: 0.0,
-        };
-        h.injuries.push(injury(InjuryKind::Moderate, false));
-        h.injuries.push(injury(InjuryKind::Severe, true));
+        // No Mangled+ part → no SevereInjury marker.
         let cat = world
-            .spawn((h, comfortable_needs(), Skills::default()))
+            .spawn((
+                full_health(),
+                comfortable_needs(),
+                Skills::default(),
+                body_with_damage(crate::components::body_zones::BodyPart::Tail, 0.3),
+            ))
             .id();
         schedule.run(&mut world);
-        // Moderate unhealed + Severe healed → no SevereInjury marker.
-        assert!(world.get::<SevereInjury>(cat).is_none());
+        assert!(
+            world.get::<SevereInjury>(cat).is_none(),
+            "Wounded-only body should not set SevereInjury"
+        );
 
-        // Add an unhealed Severe.
-        let mut updated = world.get::<Health>(cat).unwrap().clone();
-        updated.injuries.push(injury(InjuryKind::Severe, false));
-        world.entity_mut(cat).insert(updated);
+        // Promote the tail to Mangled (tissue 0.7 ≥ Mangled threshold 0.61).
+        world.entity_mut(cat).insert(body_with_damage(
+            crate::components::body_zones::BodyPart::Tail,
+            0.7,
+        ));
         schedule.run(&mut world);
         assert!(world.get::<SevereInjury>(cat).is_some());
     }
@@ -795,7 +794,6 @@ mod tests {
                 Health {
                     current: 0.0,
                     max: 1.0,
-                    injuries: Vec::new(),
                     total_starvation_damage: 0.0,
                 },
                 comfortable_needs(),
@@ -1138,57 +1136,22 @@ mod tests {
 
     #[test]
     fn own_injury_site_none_with_no_injuries() {
-        let h = full_health();
-        assert_eq!(own_injury_site(&h), None);
+        let model = CatBodyModel::default();
+        assert_eq!(own_injury_site(&model, Position::new(5, 5)), None);
     }
 
     #[test]
-    fn own_injury_site_picks_most_recent_unhealed() {
-        let mut h = full_health();
-        h.injuries.push(Injury {
-            kind: InjuryKind::Minor,
-            tick_received: 100,
-            healed: false,
-            source: InjurySource::Unknown,
-            at: Position::new(1, 1),
-        });
-        h.injuries.push(Injury {
-            kind: InjuryKind::Moderate,
-            tick_received: 200,
-            healed: false,
-            source: InjurySource::Unknown,
-            at: Position::new(2, 2),
-        });
-        h.injuries.push(Injury {
-            kind: InjuryKind::Severe,
-            tick_received: 150,
-            healed: false,
-            source: InjurySource::Unknown,
-            at: Position::new(3, 3),
-        });
-        assert_eq!(own_injury_site(&h), Some(Position::new(2, 2)));
+    fn own_injury_site_returns_cat_pos_when_wounded() {
+        let model = body_with_damage(crate::components::body_zones::BodyPart::Tail, 0.3);
+        let pos = Position::new(7, 9);
+        assert_eq!(own_injury_site(&model, pos), Some(pos));
     }
 
     #[test]
-    fn own_injury_site_ignores_healed() {
-        let mut h = full_health();
-        h.injuries.push(Injury {
-            kind: InjuryKind::Minor,
-            tick_received: 100,
-            healed: false,
-            source: InjurySource::Unknown,
-            at: Position::new(1, 1),
-        });
-        h.injuries.push(Injury {
-            kind: InjuryKind::Moderate,
-            tick_received: 200,
-            healed: true,
-            source: InjurySource::Unknown,
-            at: Position::new(2, 2),
-        });
-        // Healed injury is most recent but ignored; falls back to
-        // the older unhealed one.
-        assert_eq!(own_injury_site(&h), Some(Position::new(1, 1)));
+    fn own_injury_site_ignores_bruised_only() {
+        // Bruised tier (tissue 0.1) is below the Wounded gate (0.26).
+        let model = body_with_damage(crate::components::body_zones::BodyPart::Tail, 0.1);
+        assert_eq!(own_injury_site(&model, Position::new(5, 5)), None);
     }
 
     // ---- Ticket 103 — `escape_viability` ----

@@ -247,6 +247,17 @@ pub fn threat_level_normalized(threat_power: f32) -> f32 {
 /// matching the Logistic's midpoint. Values outside [-0.5, 0.5]
 /// saturate, which is fine because the Logistic already saturates
 /// those regions.
+/// 095 Phase 1 Stage B — `self_health_fraction` now denotes the
+/// body-zone-derived `health_derived` scalar (1 - total_pain /
+/// max_possible_pain) rather than the raw `Health.current / Health.max`
+/// fraction. Carries the 046-Layer-1 partial fix per ticket 095's
+/// §IAUS Integration §2: an anatomically-injured cat sees its own
+/// combat advantage drop mid-fight even when whole-body HP is
+/// unaffected by a single hit. The pain-fraction lift is more conservative
+/// than the legacy raw-HP drop (multiple parts must be damaged before
+/// the curve saturates), so engagement persistence is expected to
+/// shift modestly. Parameter name preserved for ABI continuity at call
+/// sites — meaning has changed.
 pub fn combat_advantage_normalized(
     self_combat: f32,
     self_health_fraction: f32,

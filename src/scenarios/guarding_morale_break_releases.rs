@@ -94,7 +94,6 @@ fn setup(world: &mut World, seed: u64) {
     world.entity_mut(cat).insert(Health {
         current: 0.10,
         max: 1.0,
-        injuries: Vec::new(),
         total_starvation_damage: 0.0,
     });
 
