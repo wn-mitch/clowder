@@ -434,6 +434,10 @@ retag-suggest *ARGS:
 retag-audit *ARGS:
     python3 scripts/retag_audit.py {{ARGS}}
 
+# [retag] Interactive per-ticket retag walk. Companion to `retag-suggest --apply` (batched): walks one suggestion at a time with [y]es/[n]o/[a]ll-remaining/[q]uit prompts. Composes retag-suggest --json for the heuristic + retag.sh for the edit, so the heuristic stays in one place. --track filters; --include-noop walks current==suggested rows; --dry-run prints without applying.
+retag-walk *ARGS:
+    python3 scripts/retag_walk.py {{ARGS}}
+
 # [session] Create an isolated parallel-session workspace + bookmark + atomic ticket claim. Creates ~/clowder-sessions/<slug>/, sets bookmark session/<slug>, writes .session-info.json. Usage: just session-new <slug> [--tickets <ids>] [--track <name>] [--pick] [--print-prompt]. Ticket claim uses flock on docs/open-work/.claim-lock to prevent races.
 session-new SLUG *ARGS:
     bash scripts/session_new.sh {{SLUG}} {{ARGS}}
