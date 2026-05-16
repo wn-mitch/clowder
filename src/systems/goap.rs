@@ -264,6 +264,13 @@ pub struct WorldStateQueries<'w, 's> {
     /// both are read-only on the same archetype, permitted by Bevy's
     /// borrow checker.
     pub held_intentions: Query<'w, 's, &'static crate::components::HeldIntention>,
+    /// Ticket 364 — read-only `HeldGoalStack` lookup at the L2 adopt
+    /// hook. When the cat carries a non-empty stack whose top frame's
+    /// current sub-goal is a `Primitive`, the adopt hook overrides
+    /// `(chosen, chosen_action)` to the leaf's action and routes the
+    /// plan-template through `htn_primitive_actions`. Disjoint from the
+    /// per-cat mutable iteration query — `&HeldGoalStack` is read-only.
+    pub held_goal_stacks: Query<'w, 's, &'static crate::components::HeldGoalStack>,
     /// 263 — read-only `LocationBeliefs` lookup for the
     /// `patrol_threat_recency` precomputed scalar at `ScoringContext`
     /// construction. Reads the cat's per-location facet at the patrol
@@ -585,6 +592,17 @@ pub struct ExecutorContext<'w, 's> {
         'w,
         's,
         &'static crate::components::HeldIntention,
+    >,
+    /// Ticket 364 — read-only `HeldGoalStack` lookup at the
+    /// advance / backtrack hook in `resolve_goap_plans`'s
+    /// `plans_to_remove` drain. Consults the stack on Fulfilled
+    /// (advance) and Abandoned (backtrack) plan endings; rewrites the
+    /// stack via Commands when the method has remaining sub-goals.
+    /// Read-only and disjoint from the mutable cats query.
+    pub held_goal_stacks: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        &'static crate::components::HeldGoalStack,
     >,
     /// Ticket 127 — L2 JointIntention lookup (successor to
     /// `PairingActivity`). The `SocializeWith` step resolver reads
@@ -2362,13 +2380,42 @@ pub fn evaluate_and_plan(
         // single-constituent Dispositions this trivially picks the only
         // constituent. For Herbalism / Witchcraft / Cooking it picks
         // the L3-winning sub-action.
-        let chosen_action = scores
+        let mut chosen = chosen;
+        let mut chosen_action = scores
             .iter()
             .filter(|(a, _)| DispositionKind::from_action(*a) == Some(chosen))
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(a, _)| *a)
             .or_else(|| chosen.constituent_actions().first().copied())
             .unwrap_or(Action::Idle);
+
+        // 364 D1 — HTN frame-pin adopt hook. If the cat carries a
+        // non-empty `HeldGoalStack` whose top frame's current sub-goal is
+        // a `Primitive { action, .. }`, override (chosen, chosen_action)
+        // to the leaf primitive. The stack was authored either by 320's
+        // initial author (Intention::Goal at the L2 author site) or by
+        // commit (b)'s advance hook on a prior tick. The plan-template
+        // branch below (`actions_for_disposition` vs
+        // `htn_primitive_actions`) routes through the HTN builder when
+        // this fires.
+        let frame_pinned_primitive: Option<Action> = world_state
+            .held_goal_stacks
+            .get(entity)
+            .ok()
+            .and_then(|stack| stack.top())
+            .and_then(|frame| {
+                let method = res.method_registry.lookup_by_id(frame.method)?;
+                match method.sub_goals.get(frame.sub_goal_index)? {
+                    crate::ai::methods::SubGoal::Primitive { action, .. } => Some(*action),
+                    crate::ai::methods::SubGoal::Goal(_) => None,
+                }
+            });
+        if let Some(leaf_action) = frame_pinned_primitive {
+            chosen_action = leaf_action;
+            if let Some(disp) = DispositionKind::from_action(leaf_action) {
+                chosen = disp;
+            }
+        }
 
         // Build planner state and zone distances.
         let construction_pos: Vec<(Entity, Position)> = world_state
@@ -2462,7 +2509,16 @@ pub fn evaluate_and_plan(
             entity,
             d,
         );
-        let mut actions = actions_for_disposition(chosen, chosen_action, &zone_distances);
+        // 364 D1 — when frame-pinned, route plan-template through
+        // htn_primitive_actions (single Pattern-B step keyed to the
+        // primitive's GoapActionKind) instead of the disposition's full
+        // action catalog. The dispatch arm at `evaluate_step_for_action`
+        // then resolves the target + runs the resolver.
+        let mut actions = if frame_pinned_primitive.is_some() {
+            crate::ai::planner::actions::htn_primitive_actions(chosen_action)
+        } else {
+            actions_for_disposition(chosen, chosen_action, &zone_distances)
+        };
         // Posse override: when a Fight directive is active on the cat and
         // they've landed in Guarding disposition, replace the generic
         // action list (which A* solves with cheapest = Survey) with a
@@ -2986,6 +3042,65 @@ enum KittenRearingAdvance {
     Release(Entity),
 }
 
+/// 364: outcome of the HTN advance / backtrack hook against a non-empty
+/// `HeldGoalStack` on a plan-ending tick. The `plans_to_remove` drain
+/// branches on this: `AdvanceTo` / `BacktrackTo` keep the cat's HTN
+/// frame alive (next tick's L2 author rebuilds `HeldIntention` from the
+/// pinned sub-goal); `Done` clears both `HeldIntention` and
+/// `HeldGoalStack` and emits the underlying `IntentionFulfilled` /
+/// `IntentionAbandoned` Feature.
+enum StackOutcome {
+    AdvanceTo(crate::components::HeldGoalStack),
+    #[allow(dead_code)] // wired by sibling-method backtrack — deferred.
+    BacktrackTo(crate::components::HeldGoalStack),
+    Done,
+}
+
+/// 364: Fulfilled-path advance. Clone the stack, increment top frame's
+/// `sub_goal_index`, recursively pop frames whose sub_goals are
+/// exhausted. Returns `AdvanceTo(updated)` when a sub-goal remains
+/// (anywhere up the stack), `Done` when the stack ran out.
+fn htn_advance_or_pop(
+    stack: crate::components::HeldGoalStack,
+) -> StackOutcome {
+    let mut updated = stack;
+    loop {
+        let Some(top) = updated.top_mut() else {
+            return StackOutcome::Done;
+        };
+        top.sub_goal_index += 1;
+        if top.sub_goal_index < top.sub_goal_count {
+            return StackOutcome::AdvanceTo(updated);
+        }
+        // This frame is exhausted. Pop and let the parent frame advance
+        // on the next iteration (caller treats child completion as
+        // "parent's current sub-goal is satisfied" → bump parent's
+        // index too). If no parent, fall through to Done.
+        let _ = updated.pop();
+    }
+}
+
+/// 364: Abandoned-path backtrack/abandon. For 364 scope (rear_kitten
+/// is the only Live method for `"kitten_reared"`), Backtrack ≡ Abandon
+/// because no sibling Live method exists to walk to. Pops the top
+/// frame and falls through to the parent (which is then treated as
+/// also-abandoned, recursively). When sibling methods land, this
+/// function consults `top.method.failure_strategy` and walks
+/// `MethodRegistry::iter_applicable_for(...)` to pick a successor
+/// method, emitting `BacktrackTo(..)` instead.
+fn htn_abandon_or_pop(
+    stack: crate::components::HeldGoalStack,
+) -> StackOutcome {
+    let mut updated = stack;
+    while updated.pop().is_some() {
+        // Abandoning a child propagates to the parent today. When
+        // sibling-method backtrack lands (multi-method goal_label
+        // coverage), this loop consults the parent's failure_strategy
+        // and branches before pop.
+    }
+    StackOutcome::Done
+}
+
 /// Ticket 177: the per-pair payload queued by a successful Handoff
 /// dispatch-arm pre-flight. The post-loop drain re-fetches both
 /// inventories via `cats.get_many_mut([actor, recipient])` and runs
@@ -3072,6 +3187,13 @@ pub fn resolve_goap_plans(
     #[derive(Debug, Clone, Copy)]
     enum IntentionEnding {
         Fulfilled,
+        // The `IntentionAbandonReason` payload is unused at the
+        // activation-emit site today (the per-cause classification lives
+        // in the §7.2 trace pipeline). Kept to preserve future
+        // `failure_strategy: Retry` branching that consults the reason —
+        // 364's backtrack hook will read it once sibling Live methods
+        // give Backtrack a non-trivial walk to perform.
+        #[allow(dead_code)]
         Abandoned(crate::components::IntentionAbandonReason),
     }
     let mut plans_to_remove: Vec<(Entity, IntentionEnding)> = Vec::new();
@@ -4265,43 +4387,64 @@ pub fn resolve_goap_plans(
     // the activation counter only.
     for (entity, ending) in plans_to_remove {
         commands.entity(entity).remove::<GoapPlan>();
+
+        // 364 D1 — advance / backtrack hook. Consult the cat's
+        // HeldGoalStack: on Fulfilled, increment top frame's
+        // sub_goal_index (recursively pop on overflow). On Abandoned,
+        // consult top.method.failure_strategy (Backtrack ≡ Abandon
+        // today because rear_kitten is the only Live method for
+        // "kitten_reared"; sibling-method backtrack lands when a
+        // second Live method exists). On `AdvanceTo(updated_stack)`,
+        // keep the stack + remove HeldIntention (L2 author rebuilds
+        // next tick from the pinned leaf). On `Done`, remove both.
+        let stack_now = ec
+            .held_goal_stacks
+            .get(entity)
+            .ok()
+            .cloned();
+        let stack_outcome = match stack_now {
+            Some(stack) if !stack.is_empty() => {
+                match ending {
+                    IntentionEnding::Fulfilled => htn_advance_or_pop(stack),
+                    IntentionEnding::Abandoned(_) => htn_abandon_or_pop(stack),
+                }
+            }
+            _ => StackOutcome::Done,
+        };
+
         commands
             .entity(entity)
             .remove::<crate::components::HeldIntention>();
-        // Ticket 320 — clear `HeldGoalStack` in lock-step with the
-        // 126 `HeldIntention` removal. At 320's land the registry
-        // holds zero Live methods and the L2 author never inserts
-        // a `HeldGoalStack`, so this removal is a no-op in
-        // production; the wiring exists so the substrate doesn't
-        // leak orphaned stacks once 321's picker lands (authors
-        // `Intention::Goal`) and 323's `courtship_method` lands
-        // (first Live method).
-        //
-        // **Phase-1 lifecycle scope.** This handler clears the
-        // entire stack on every ending — Fulfilled and Abandoned
-        // alike. The §Lifecycle design doc names richer behavior
-        // (Fulfilled → increment cursor, recurse, pop on overflow;
-        // Abandoned → consult `failure_strategy` for Backtrack /
-        // Abandon / Retry). 320 explicitly defers per-frame
-        // advance + backtrack to a follow-on ticket because the
-        // right architectural shape of "re-author `HeldIntention`
-        // from the next sub-goal in the same tick" is easier to
-        // pin against the first concrete multi-step Live method
-        // (323's `courtship_method`) than against an empty
-        // registry. The four new Features (`MethodAdopted`,
-        // `SubGoalAdvanced`, `MethodBacktracked`,
-        // `MethodDepthExceeded`) are registered and emit-ready;
-        // 323 wires the per-frame Feature emissions when it
-        // exercises the multi-step path.
-        commands
-            .entity(entity)
-            .remove::<crate::components::HeldGoalStack>();
+        match &stack_outcome {
+            StackOutcome::AdvanceTo(updated_stack) => {
+                commands
+                    .entity(entity)
+                    .insert(updated_stack.clone());
+            }
+            StackOutcome::BacktrackTo(updated_stack) => {
+                commands
+                    .entity(entity)
+                    .insert(updated_stack.clone());
+            }
+            StackOutcome::Done => {
+                commands
+                    .entity(entity)
+                    .remove::<crate::components::HeldGoalStack>();
+            }
+        }
+
         if let Some(activation) = narr.activation.as_deref_mut() {
-            match ending {
-                IntentionEnding::Fulfilled => {
+            match (&stack_outcome, &ending) {
+                (StackOutcome::AdvanceTo(_), _) => {
+                    activation.record(Feature::SubGoalAdvanced);
+                }
+                (StackOutcome::BacktrackTo(_), _) => {
+                    activation.record(Feature::MethodBacktracked);
+                }
+                (StackOutcome::Done, IntentionEnding::Fulfilled) => {
                     activation.record(Feature::IntentionFulfilled);
                 }
-                IntentionEnding::Abandoned(_reason) => {
+                (StackOutcome::Done, IntentionEnding::Abandoned(_)) => {
                     activation.record(Feature::IntentionAbandoned);
                 }
             }
@@ -9233,5 +9376,88 @@ mod tests {
             None,
             "no frontier + no reachable passable neighbor → fail visibly"
         );
+    }
+
+    // ----- 364: htn_advance_or_pop / htn_abandon_or_pop -------------------
+
+    use crate::ai::methods::MethodId;
+    use crate::components::{GoalFrame, HeldGoalStack};
+
+    fn make_frame(id: &'static str, sub_goal_count: usize, sub_goal_index: usize) -> GoalFrame {
+        let mut frame = GoalFrame::new(
+            MethodId(id),
+            "test_goal",
+            sub_goal_count,
+            0,
+            None,
+            crate::components::IntentionSource::SelfMotivated,
+        );
+        frame.sub_goal_index = sub_goal_index;
+        frame
+    }
+
+    #[test]
+    fn advance_increments_cursor_when_subgoal_remains() {
+        let mut stack = HeldGoalStack::empty();
+        stack.push(make_frame("rear_kitten", 3, 0)).unwrap();
+        let outcome = htn_advance_or_pop(stack);
+        match outcome {
+            StackOutcome::AdvanceTo(s) => {
+                let top = s.top().expect("stack non-empty after advance");
+                assert_eq!(top.sub_goal_index, 1);
+                assert_eq!(top.method.0, "rear_kitten");
+            }
+            other => panic!("expected AdvanceTo, got {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn advance_pops_when_cursor_at_end() {
+        // sub_goal_index=2 of count=3 — increment to 3, equal to count → pop.
+        let mut stack = HeldGoalStack::empty();
+        stack.push(make_frame("rear_kitten", 3, 2)).unwrap();
+        let outcome = htn_advance_or_pop(stack);
+        assert!(matches!(outcome, StackOutcome::Done));
+    }
+
+    #[test]
+    fn advance_propagates_through_parent_frame() {
+        // Parent at index 0 of 2, child at index 1 of 2. Child advance pops
+        // (cursor would hit 2 == count), then parent's index advances from
+        // 0 to 1 — sub_goals remain on parent → AdvanceTo with parent on top.
+        let mut stack = HeldGoalStack::empty();
+        stack.push(make_frame("parent_method", 2, 0)).unwrap();
+        stack.push(make_frame("child_method", 2, 1)).unwrap();
+        let outcome = htn_advance_or_pop(stack);
+        match outcome {
+            StackOutcome::AdvanceTo(s) => {
+                assert_eq!(s.depth(), 1, "child frame popped");
+                let top = s.top().expect("parent frame remains");
+                assert_eq!(top.method.0, "parent_method");
+                assert_eq!(top.sub_goal_index, 1, "parent's index advanced");
+            }
+            other => panic!("expected AdvanceTo, got {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn advance_done_when_both_frames_exhausted() {
+        // Parent at index 1 of 2, child at index 1 of 2. Child pops, parent
+        // index advances to 2 == count, parent pops. Stack empty → Done.
+        let mut stack = HeldGoalStack::empty();
+        stack.push(make_frame("parent_method", 2, 1)).unwrap();
+        stack.push(make_frame("child_method", 2, 1)).unwrap();
+        let outcome = htn_advance_or_pop(stack);
+        assert!(matches!(outcome, StackOutcome::Done));
+    }
+
+    #[test]
+    fn abandon_clears_stack() {
+        // Today (364 scope) Backtrack ≡ Abandon — pops all frames.
+        let mut stack = HeldGoalStack::empty();
+        stack.push(make_frame("parent_method", 2, 0)).unwrap();
+        stack.push(make_frame("child_method", 3, 1)).unwrap();
+        let outcome = htn_abandon_or_pop(stack);
+        assert!(matches!(outcome, StackOutcome::Done));
     }
 }

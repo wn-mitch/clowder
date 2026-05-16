@@ -347,6 +347,38 @@ impl MethodRegistry {
             })
             .map(MethodPushSpec::from_method)
     }
+
+    /// Ticket 364 caller: look up a method by its [`MethodId`]. Used by
+    /// the L2 frame-pin (adopt hook) to consult the held frame's method
+    /// and read its `sub_goals[sub_goal_index]` payload. Linear scan;
+    /// the registry is small (≤20 methods today) so this is O(n) but
+    /// the constant is tiny.
+    pub fn lookup_by_id(&self, id: MethodId) -> Option<&Method> {
+        self.methods.iter().find(|m| m.id == id)
+    }
+
+    /// Ticket 364 caller: iterate every method matching `goal_label`
+    /// whose `applicable_when` evaluates true for `entity`. Used by the
+    /// HTN backtrack hook (resolve_goap_plans) to walk sibling Live
+    /// methods after one fails per its `MethodFailure::Backtrack`
+    /// strategy. `PendingSubstrate` rows are filtered out (their
+    /// `eventual` predicate is never invoked while dormant). Walks the
+    /// registry in insertion order; callers may filter further (e.g.
+    /// skip the current method id).
+    pub fn iter_applicable_for<'a>(
+        &'a self,
+        goal_label: &'a str,
+        world: &'a World,
+        entity: Entity,
+    ) -> impl Iterator<Item = &'a Method> + 'a {
+        self.methods.iter().filter(move |m| {
+            m.goal_label == goal_label
+                && match &m.applicable_when {
+                    ApplicableWhen::Live(check) => check(world, entity),
+                    ApplicableWhen::PendingSubstrate { .. } => false,
+                }
+        })
+    }
 }
 
 /// Plain-old-data slice of a [`Method`] sufficient for the 320 L2
