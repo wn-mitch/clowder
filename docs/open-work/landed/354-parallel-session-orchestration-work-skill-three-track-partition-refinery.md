@@ -1,7 +1,7 @@
 ---
 id: 354
 title: Parallel-session orchestration: /work skill + three-track partition + refinery
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-15
 ---
 
 ## Why
@@ -85,3 +85,4 @@ Post-Stage-1: `/retag` ceremony tags all 156 tickets across the three tracks; HT
 ## Log
 
 - 2026-05-15: opened. Stage 0 pre-conditions completed in this session (disk recovery + sibling cull + sccache); Stage 1 build-out starts next commit.
+- 2026-05-15: 2026-05-15: all Scope recipes shipped (open-work-by-track, session-gc, session-suggest, block-anchor, block-verdict, retag-walk); /work skill's open-work-by-track reference now resolves; three-track surface complete

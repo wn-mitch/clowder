@@ -1,13 +1,13 @@
 ---
 id: 355
 title: Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto
-status: blocked
+status: ready
 cluster: tooling-diagnostics-ui
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-15
 parked: null
-blocked-by: [354]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

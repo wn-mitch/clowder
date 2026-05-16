@@ -17,15 +17,15 @@ _Last generated: 2026-05-15._
 | In progress | 5 |
 | Ready | 104 |
 | Parked | 14 |
-| Blocked | 23 |
-| **Open total** | **146** |
+| Blocked | 22 |
+| **Open total** | **145** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (5 in-progress · 0 ready blockers · 5 next-recommended)
+## Active focus (5 in-progress · 0 ready blockers · 0 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
@@ -36,14 +36,6 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
-
-### Next-recommended (from `just next`)
-
-- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · score 0.93_
-- **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · score 0.91_
-- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.91_
-- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
-- **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · score 0.90_
 
 ## Epic progress (3)
 
@@ -180,14 +172,14 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · added 2026-05-15_
 
-### tooling-diagnostics-ui (6 ready, 1 blocked)
+### tooling-diagnostics-ui (6 ready)
 
 - **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 
 ### buildings-zones (5 ready, 2 blocked)
 
@@ -395,7 +387,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 - **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[354](docs/open-work/tickets/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · added 2026-05-15_
 - **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 
@@ -416,7 +408,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[345](docs/open-work/tickets/345-771-aspiration-soft-class-per-pair-weights.md)** — §7.7.1 aspiration soft-class per-pair weights — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 
-## Blocked (23)
+## Blocked (22)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -440,18 +432,17 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · blocked-by 314 · added 2026-05-13_
 - **[317](docs/open-work/tickets/317-retire-flee-threat-distance-power-invert-if-frame-diff-shows-redundancy-with-affordanceflee.md)** — retire flee_threat_distance Power-Invert if frame-diff shows redundancy with Affordance(Flee) — _[ai-substrate] · blocked-by 315 · added 2026-05-13_
 - **[340](docs/open-work/tickets/340-port-mating-l3-chain-onto-htn-method.md)** — Port Mating L3 chain onto HTN method — _[ai-substrate] · blocked-by 323 · added 2026-05-14_
-- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · blocked-by 354 · added 2026-05-15_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (237)
+## Landed archive (238)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (172)
+### 2026-05 (173)
 
 - **[362](docs/open-work/landed/362-session-donesh-orphans-unpushed-bookmarks-invert-keep-bookmark-default-add-landed-on-main-precondition.md)** — session_done.sh orphans unpushed bookmarks — invert --keep-bookmark default + add landed-on-main precondition _(2026-05-15)_
 - **[361](docs/open-work/landed/361-gitignore-polecat-workspace-artifacts-and-clean-up-repo-root-pollution.md)** — Gitignore polecat workspace artifacts and clean up repo-root pollution _(2026-05-15)_
@@ -460,6 +451,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[358](docs/open-work/landed/358-refinery-dry-run-silently-ignored-in-land-mode-executes-destructively.md)** — refinery --dry-run silently ignored in --land mode, executes destructively _(2026-05-15)_
 - **[357](docs/open-work/landed/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md)** — HTN-driven action dispatch — DSE / GoapActionKind / plan template for mourn_at_grave and rear_kitten primitives _(2026-05-15)_
 - **[356](docs/open-work/landed/356-foreman-polecat-abandon-archive-early-abandon-triage-close-the-silent-waste-loop.md)** — foreman polecat-abandon archive + early-abandon triage (close the silent-waste loop) _(2026-05-15)_
+- **[354](docs/open-work/landed/354-parallel-session-orchestration-work-skill-three-track-partition-refinery.md)** — Parallel-session orchestration: /work skill + three-track partition + refinery _(2026-05-15)_
 - **[347](docs/open-work/landed/347-shadow-fighter-aspiration-milestone-wrapper-emits-patrol-method.md)** — Shadow Fighter aspiration_milestone_wrapper + emits + patrol_method _(2026-05-15)_
 - **[336](docs/open-work/landed/336-just-inspect-renders-goal-stack-aspiration-set.md)** — just inspect renders the goal stack + aspiration set _(2026-05-15)_
 - **[333](docs/open-work/landed/333-kitten-rearing-action-vocabulary.md)** — Kitten-rearing action vocabulary — flip rear_kitten to Live _(2026-05-15)_
