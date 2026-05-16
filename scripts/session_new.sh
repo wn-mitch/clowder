@@ -181,7 +181,26 @@ just open-work-index >/dev/null 2>&1 || true
 
 echo "session-new: $workspace ← bookmark=session/$slug track=$track tickets=${tickets:-_}"
 
+convention_reminders() {
+    case "$1" in
+        substrate-sensitive)
+            echo "  - Layer-walk required before listing fixes (CLAUDE.md \"Bugfix discipline\")"
+            echo "  - Structural-option menu required (split / extend / rebind / retire)"
+            echo "  - Promote [suspect] rows to [verified-*] via fresh queries"
+            ;;
+        coherent-block)
+            echo "  - Block-level verdict — intermediates land verdict-skipped"
+            echo "  - Orthogonality precondition holds (verify before declaring done)"
+            ;;
+        swarm-safe)
+            echo "  - Atomic / mechanical work; sweep-land may auto"
+            echo "  - Stick to scope; don't drift into substrate-sensitive territory"
+            ;;
+    esac
+}
+
 if [[ "$print_prompt" == "true" ]]; then
+    reminders=$(convention_reminders "$track")
     cat <<PROMPT
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -193,15 +212,7 @@ Workspace: $workspace
 Bookmark: session/$slug (push here, never main)
 
 Convention reminders:
-  $(case "$track" in
-    substrate-sensitive) echo "- Layer-walk required before listing fixes (CLAUDE.md \"Bugfix discipline\")"
-                          echo "- Structural-option menu required (split / extend / rebind / retire)"
-                          echo "- Promote [suspect] rows to [verified-*] via fresh queries" ;;
-    coherent-block)       echo "- Block-level verdict — intermediates land verdict-skipped"
-                          echo "- Orthogonality precondition holds (verify before declaring done)" ;;
-    swarm-safe)           echo "- Atomic / mechanical work; sweep-land may auto"
-                          echo "- Stick to scope; don't drift into substrate-sensitive territory" ;;
-  esac)
+$reminders
 
 Exit ceremony:
   /handoff
