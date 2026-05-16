@@ -1,0 +1,59 @@
+---
+id: 375
+title: prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker
+status: ready
+cluster: items-crafting
+orchestration: substrate-sensitive
+initiative: [world-richness]
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [crafting.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+The 016 crafting epic (`docs/systems/crafting.md`) names **bone, hide, sinew, organ, tooth, feather, fish-scale, oil/tallow** as recipe inputs for Phases 1, 2, 2b, 3, 4, and 5. Today every prey kill yields exactly one item (raw meat); none of the named byproducts have producers. `Feather` exists as an `ItemKind` but is never spawned. The crafting epic is structurally upstream-starved: phase-children 367–372 can ship recipe definitions, but the recipes will be uncraftable. This ticket plugs the producer side for guaranteed byproducts (rare-tier drops live in 377).
+
+## Scope
+- Add 7 new `ItemKind` variants in `src/components/items.rs`: `Bone`, `Sinew`, `Whisker`, `Hide`, `FishScale`, `Tallow`, `Organ` (with `decay_rate()` + `is_food() == false`).
+- Extend `resolve_engage_prey` in `src/systems/goap.rs` to spawn meat + 2–3 byproducts per species:
+  - Mouse → `RawMouse` + `Bone` + `Sinew`
+  - Rat → `RawRat` + `Bone` + `Sinew` + `Whisker`
+  - Rabbit → `RawRabbit` + `Hide` + `Bone` + `Sinew`
+  - Fish → `RawFish` + `FishScale` + `Tallow` + `Organ`
+  - Bird → `RawBird` + `Feather` (existing — wire producer) + `Bone`
+- Verify inventory-overflow drop-to-ground path composes with multi-item spawn (already exists in `src/systems/items.rs`).
+- Append a §Inputs subsection to `docs/systems/crafting.md` naming each byproduct's downstream sinks (Bone → 369/372; Sinew → 369/368; Whisker → 370/368; Hide → 369/370; FishScale → 372/371; Tallow → 371; Organ → 367; Feather → 368/370).
+
+## Out of scope
+- ShadowFox banishment byproducts → 379.
+- Cat-death byproducts (heirloom-eligible bones, fur-tuft) → 380.
+- Situational-trigger rare drops (LuckyRabbitsFoot etc.) → 377.
+- Colony-level material demand axis that makes these byproducts felt-needed → 378.
+- Metal-scrap (trader-only) → 381.
+
+## Current state
+Today: every prey kill in `resolve_engage_prey` spawns exactly one raw-meat item via `ItemSlot::new(item_kind, modifiers)`; if hunter inventory is full it drops to ground. Multi-item spawn is a clean extension of that path.
+
+## Approach
+1. Extend `ItemKind` enum + match arms for `decay_rate()`, `is_food()`, display name. Organic byproducts (Bone, Hide, Sinew, Feather, Whisker, Organ, FishScale, Tallow) decay slowly; verify against existing slow-decay items.
+2. Refactor `resolve_engage_prey` to look up byproducts via a species → byproduct-list table (new `prey_byproducts` table in `src/resources/sim_constants.rs` or `src/species/`).
+3. Emit one `ItemKind::*` per byproduct + the meat; reuse existing drop-to-ground overflow logic.
+4. Confirm `sync_food_stores` in `src/systems/items.rs` is unaffected (new byproducts return `false` from `is_food()`).
+5. Verify `Eat` DSE and resolver paths don't accidentally pull non-food byproducts (the existing `is_food()` filter is the gate).
+
+**Design pillar:** "items are real" — these are spatial entities with real physical presence (inventory pressure, drop-to-ground, decay). No numeric modifier fields; downstream uses live on resolvers that read item identity (369 Hide-Bracers reads `Hide` presence, not a `defense_rating` float).
+
+**Inventory pressure note:** a rabbit kill now produces 4 items instead of 1. This creates emergent pressure toward Stores deposits + cat-cooperation hauling. Surface in verdict comparison.
+
+## Verification
+- `just scenario prey-byproduct-spawn` (new scenario): preset one cat + one of each prey species at adjacent tiles; assert each kill spawns expected meat + byproducts.
+- `just soak-trace 42 Simba` + `just verdict logs/tuned-42`: confirm inventory-overflow → drop-to-ground hasn't broken haul-to-Stores continuity; survival gates hold (`Starvation == 0`, `ShadowFoxAmbush ≤ 10`).
+- `just frame-diff` baseline-vs-treatment: per-DSE drift should be small; this is a producer-only change with no L2 modifier wiring.
+
+## Log
+- 2026-05-16: opened. Plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`. First of the four tickets in the input-substrate cluster (375 / 376 / 377 / 378) plus three follow-ons (379 / 380 / 381).

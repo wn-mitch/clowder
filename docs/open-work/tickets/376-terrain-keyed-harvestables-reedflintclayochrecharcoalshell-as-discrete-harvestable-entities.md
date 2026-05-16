@@ -1,0 +1,56 @@
+---
+id: 376
+title: terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities
+status: ready
+cluster: items-crafting
+orchestration: substrate-sensitive
+initiative: [world-richness]
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: [crafting.md]
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+The 016 crafting epic names **reed, flint, clay, pigment (ochre / charcoal), shell** as recipe inputs for Phases 2b, 3, 4, and 5. Today none of these have producers — they don't exist in `ItemKind`. `ColorfulShell` exists but is never spawned. Phase children 369 (warrior's kit), 371 (domestic refinement), and 372 (elevated cat-craft) depend on this producer side. This ticket extends the existing `Thornbriar` harvestable pattern to non-herb terrain materials — discrete entities the cat walks to and gathers, not a generic-tile-keyed resolver. Spatial texture matters for 378 (`"scout the cliff for ochre"` is a perceivable thing, not an abstract roll).
+
+## Scope
+- Add 5 new `ItemKind` variants in `src/components/items.rs`: `Reed`, `Flint`, `Clay`, `Ochre`, `Charcoal` (with `decay_rate() == 0.0` — minerals/fibres don't spoil) + wire `ColorfulShell` producer (already exists as ItemKind).
+- Extend `Harvestable` / `HerbKind` pattern (or sibling enum) in `src/components/magic.rs` or `src/systems/foraging.rs` for non-herb terrain materials. Decision deferred to implementation — both viable; herbs and reeds differ in seasonal logic but share spawn-at-terrain mechanism.
+- World-gen: seed `Harvestable` entities at world-gen on terrain-eligible tiles:
+  - `Reed` on Water-edge, Mud tiles (seasonal Spring–Autumn)
+  - `Flint` on Rock, Cliff tiles (year-round)
+  - `Clay` on Mud, Water-edge (year-round)
+  - `Ochre` on Cliff (year-round, rarer than Flint)
+  - `Charcoal` on Dense Forest (year-round; alternate pigment)
+  - `Shell` (`ColorfulShell` reuse) on Sand, Water-edge (year-round)
+- Generalize `resolve_gather_herb` → `resolve_harvest` (or sibling resolver) to dispatch on the harvestable kind.
+- Append §Inputs entries to `docs/systems/crafting.md`: Reed → 369/371; Flint → 369; Clay → 371/372; Ochre + Charcoal → 366/372; ColorfulShell → 370.
+
+## Out of scope
+- Metal-scrap is **trader-only** — see 381 (`trader-substrate foundation`). Metal-consuming Phase 3 recipes (Bone-and-Wire Tiara, Stone-Set Pin in 370) stay blocked on 381.
+- Colony-level demand pressure that pulls cats toward depleted reed-beds → 378.
+- Rare-tier terrain drops → 377 (rare drops are prey-side; terrain rare drops are not in this ticket's scope).
+
+## Current state
+`Thornbriar` is the exemplar — a `Harvestable` entity spawned at world-gen on dense-forest tiles, harvested by `resolve_gather_herb`. This ticket widens that channel to non-herb materials.
+
+## Approach
+1. Decide: extend `HerbKind` enum (smaller diff, but conflates herbs with minerals) OR introduce sibling `MaterialKind` enum + `MaterialHarvestable` component (cleaner separation, more boilerplate). Default: sibling enum — semantically clean, follows the "richer perception" pillar (orthogonal categories, not amplified single channel).
+2. World-gen pass in `src/plugins/setup.rs` (or wherever terrain spawn lives) — N harvestables per chunk based on terrain eligibility + seasonal window.
+3. Resolver: if pattern duplication is small, sibling `resolve_harvest_material`; if substantial overlap, generalize `resolve_gather_herb` and dispatch internally.
+4. Confirm L2 trace surfaces `harvest_target` DSE scoring against material harvestables (this DSE may not exist yet — could be a new sibling to `harvest_herb_target` DSE, or extension).
+
+**Design pillar:** "items are real" — flint occupies a tile, reeds grow in seasonal beds. Spatial routing of cat behavior toward known harvestable locations is the substrate; 378's demand pressure composes on top.
+
+## Verification
+- `just scenario terrain-harvest`: preset cats near each terrain type; assert harvest step picks the right Harvestable and spawns the right material.
+- World-gen sanity: `just headless --seed 42 --ticks 1000`; then `just q events events.jsonl HarvestableSpawned` to confirm reeds / flint / clay / ochre / charcoal / shells exist in expected counts on the right terrain.
+- `just verdict logs/...` to confirm no continuity regression.
+
+## Log
+- 2026-05-16: opened. Plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`. Sibling to 375.
