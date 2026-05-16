@@ -1,7 +1,7 @@
 ---
 id: 190
 title: Tune build_chronic_full_weight (179 follow-on)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 added: 2026-05-06
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [190-build-chronic-full-weight.md]
-landed-at: null
-landed-on: null
+landed-at: b56d97a8b58c8c265d27bb2e174a6314819e9c07
+landed-on: 2026-05-16
 ---
 
 ## Why
@@ -145,3 +145,4 @@ substrate (179 + this investigation's findings) is doing.
   saturate). Opened sibling tickets 382 (placement substrate),
   373 (Den retrieval), 374 (shelter belief). Decision: ship 190
   as findings-only with unchanged weight + opened follow-ups.
+- 2026-05-16: Landed findings-only: weight unchanged at 0.5; root cause is upstream placement bug (382). UI work (FoodStores breakdown + enum-driven ResourcePanel) shipped in commit b56d97a8.

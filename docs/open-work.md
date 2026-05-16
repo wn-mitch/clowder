@@ -15,10 +15,10 @@ _Last generated: 2026-05-16._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 108 |
+| Ready | 107 |
 | Parked | 15 |
 | Blocked | 33 |
-| **Open total** | **162** |
+| **Open total** | **161** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -41,10 +41,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · score 0.93_
-- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.91_
-- **[190](docs/open-work/tickets/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) — _[ai-substrate] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.90_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.91_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (3)
 
@@ -65,11 +65,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (108)
+## Ready by cluster (107)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (28 ready, 5 blocked)
+### ai-substrate (27 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -78,7 +78,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · blocked-by 135 · added 2026-05-02_
 - **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[ai-substrate] · blocked-by 135 · added 2026-05-02_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
-- **[190](docs/open-work/tickets/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) — _[ai-substrate] · added 2026-05-06_
 - **[205](docs/open-work/tickets/205-social-status-distress-perception-cost.md)** — social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan — _[ai-substrate] · added 2026-05-07_
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
 - **[226](docs/open-work/tickets/226-audit-groomother-share-vs-score-inversion-under-demographic-shift.md)** — audit GroomOther share-vs-score inversion under demographic shift — _[ai-substrate] · added 2026-05-07_
@@ -297,7 +296,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 
-## Ready (108)
+## Ready (107)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -327,7 +326,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 - **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _[items-crafting] · added 2026-05-06_
 - **[187](docs/open-work/tickets/187-kitten-starvation-under-active-mating-pipeline.md)** — Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate — _[life-cycle] · added 2026-05-06_
-- **[190](docs/open-work/tickets/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) — _[ai-substrate] · added 2026-05-06_
 - **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[items-crafting] · added 2026-05-06_
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
 - **[200](docs/open-work/tickets/200-land-plannerzonemidden-building-singleton-zone-for-trashing.md)** — Land PlannerZone::Midden — building-singleton zone for Trashing — _[buildings-zones] · added 2026-05-06_
@@ -467,12 +465,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (239)
+## Landed archive (240)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (174)
+### 2026-05 (175)
 
+- **[190](docs/open-work/landed/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) _(2026-05-16)_
 - **[095](docs/open-work/landed/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species _(2026-05-16)_
 - **[362](docs/open-work/landed/362-session-donesh-orphans-unpushed-bookmarks-invert-keep-bookmark-default-add-landed-on-main-precondition.md)** — session_done.sh orphans unpushed bookmarks — invert --keep-bookmark default + add landed-on-main precondition _(2026-05-15)_
 - **[361](docs/open-work/landed/361-gitignore-polecat-workspace-artifacts-and-clean-up-repo-root-pollution.md)** — Gitignore polecat workspace artifacts and clean up repo-root pollution _(2026-05-15)_
