@@ -2967,6 +2967,23 @@ struct StepAccumulators {
     /// `BuryOutcome` triggers (1) `commands.entity(deceased).insert(Buried)`,
     /// (2) `commands.entity(deceased).despawn()`, (3) `commands.spawn((Grave { ... }, Position { ... }))`.
     bury_completions: Vec<crate::steps::disposition::BuryOutcome>,
+    /// 364: kitten-arc HTN advances queued by Wean/Teach/Release dispatch
+    /// arms. Each entry mutates the kitten's `KittenDependency` in the
+    /// post-loop drain (read via `ec.kitten_parentage`, write via
+    /// `commands.entity(kitten).insert(updated_dep)` or `.remove::<…>()`).
+    /// Mirrors `kitten_feedings` shape — disjoint from the outer `cats`
+    /// query so no query-conflict.
+    kitten_rearing_advances: Vec<KittenRearingAdvance>,
+}
+
+/// 364: one entry per witnessed HTN leaf primitive in the kitten arc.
+/// The post-loop drain reads `ec.kitten_parentage.get(target)` to learn
+/// the current `KittenDependency` state, then writes the updated value.
+#[derive(Debug, Clone, Copy)]
+enum KittenRearingAdvance {
+    Wean(Entity),
+    Teach(Entity),
+    Release(Entity),
 }
 
 /// Ticket 177: the per-pair payload queued by a successful Handoff
@@ -3346,6 +3363,7 @@ pub fn resolve_goap_plans(
         kitten_feedings: Vec::new(),
         handoff_pending: Vec::new(),
         bury_completions: Vec::new(),
+        kitten_rearing_advances: Vec::new(),
     };
 
     for (
@@ -4375,6 +4393,53 @@ pub fn resolve_goap_plans(
             },
             outcome.position,
         ));
+    }
+
+    // 364: kitten-arc HTN advances. Reads the kitten's current
+    // KittenDependency via the disjoint `kitten_parentage` query, then
+    // writes the updated component via Commands. The mutation lands at
+    // the next command-buffer flush — semantically indistinguishable from
+    // immediate mutation since the resolver gates on its own state read
+    // and won't re-witness once the new state is observable.
+    let weaned_threshold = ec.constants.kitten_rearing.weaned_threshold;
+    let teach_done_threshold = ec.constants.kitten_rearing.teach_done_threshold;
+    let curriculum_size = ec.constants.kitten_rearing.teach_curriculum_size;
+    for advance in std::mem::take(&mut accum.kitten_rearing_advances) {
+        let (target, action_tag) = match advance {
+            KittenRearingAdvance::Wean(e) => (e, "Wean"),
+            KittenRearingAdvance::Teach(e) => (e, "Teach"),
+            KittenRearingAdvance::Release(e) => (e, "Release"),
+        };
+        let Ok((_, dep)) = ec.kitten_parentage.get(target) else {
+            // Kitten despawned between the per-cat loop and now (e.g.,
+            // death cascade). Skip silently — the HTN frame will abandon
+            // via backtrack hook (commit b) on the next plan boundary.
+            let _ = action_tag;
+            continue;
+        };
+        match advance {
+            KittenRearingAdvance::Wean(_) => {
+                commands.entity(target).insert(crate::components::KittenDependency {
+                    mother: dep.mother,
+                    father: dep.father,
+                    maturity: dep.maturity.max(weaned_threshold),
+                    skills_learned: dep.skills_learned,
+                });
+            }
+            KittenRearingAdvance::Teach(_) => {
+                commands.entity(target).insert(crate::components::KittenDependency {
+                    mother: dep.mother,
+                    father: dep.father,
+                    maturity: dep.maturity.max(teach_done_threshold),
+                    skills_learned: dep.skills_learned.saturating_add(1).min(curriculum_size),
+                });
+            }
+            KittenRearingAdvance::Release(_) => {
+                commands
+                    .entity(target)
+                    .remove::<crate::components::KittenDependency>();
+            }
+        }
     }
 
     // Deferred mentor effects.
@@ -6730,23 +6795,202 @@ fn dispatch_step_action(
             );
             outcome.result
         }
-        // 357: HTN-driven primitives. The dispatch closure (D1) pins
-        // chosen_action from `HeldGoalStack.frames[top].sub_goals[idx]`
-        // at the evaluate_and_plan author site; the plan-template
-        // emits a single-action plan that lands here. The resolver
-        // functions currently return `StepResult::Fail` (recovered as
-        // dormant stubs from the 332/333 substrate restore — see
-        // 4c211d5b); landing real maturity / mourning side-effects is
-        // a follow-on per the substrate-vs-balance separation.
-        // Failure is informative — the held method backtracks per its
-        // `MethodFailure` strategy.
-        GoapActionKind::Wean => crate::steps::disposition::resolve_wean().result,
-        GoapActionKind::Teach => crate::steps::disposition::resolve_teach().result,
-        GoapActionKind::Release => crate::steps::disposition::resolve_release().result,
+        // 364: HTN-driven primitives — kitten arc. The dispatch closure
+        // (D1, commit b) pins chosen_action from
+        // `HeldGoalStack.frames[top].sub_goals[idx]` at the
+        // evaluate_and_plan author site; the plan-template emits a
+        // single-action plan that lands here. Each arm resolves the
+        // target kitten via `dependent_kitten_target` picker (filtered by
+        // mother + per-action maturity band), reads the current
+        // KittenDependency state via `ec.kitten_parentage`, runs the pure
+        // resolver, records the Feature if witnessed, and queues a
+        // post-loop drain entry (`accum.kitten_rearing_advances`) that
+        // performs the actual component mutation.
+        GoapActionKind::Wean => {
+            dispatch_htn_kitten_primitive(
+                crate::ai::Action::Wean,
+                step_idx,
+                cat_entity,
+                *pos,
+                plan,
+                ec,
+                snaps,
+                accum,
+                narr,
+            )
+        }
+        GoapActionKind::Teach => {
+            dispatch_htn_kitten_primitive(
+                crate::ai::Action::Teach,
+                step_idx,
+                cat_entity,
+                *pos,
+                plan,
+                ec,
+                snaps,
+                accum,
+                narr,
+            )
+        }
+        GoapActionKind::Release => {
+            dispatch_htn_kitten_primitive(
+                crate::ai::Action::Release,
+                step_idx,
+                cat_entity,
+                *pos,
+                plan,
+                ec,
+                snaps,
+                accum,
+                narr,
+            )
+        }
+        // 357: HTN-driven primitives — mourn arc. Real wiring deferred:
+        // the §7.7.b grief-event-emission debt authors the `Mourning`
+        // marker on colony-mate death. Until that lands, `mourn_at_grave`
+        // is never adopted and these arms are unreachable in production.
         GoapActionKind::Vigil => crate::steps::disposition::resolve_vigil().result,
         GoapActionKind::GriefSit => crate::steps::disposition::resolve_grief_sit().result,
         GoapActionKind::ReleaseGrief => crate::steps::disposition::resolve_release_grief().result,
     }
+}
+
+/// 364: kitten-arc dispatch helper. Resolves the target via the
+/// per-action `dependent_kitten_target` picker, reads
+/// `KittenDependency` state, runs the resolver, records the Feature,
+/// queues the post-loop drain entry. Returns the underlying
+/// [`StepResult`](crate::steps::StepResult).
+#[allow(clippy::too_many_arguments)]
+fn dispatch_htn_kitten_primitive(
+    action: crate::ai::Action,
+    step_idx: usize,
+    cat_entity: Entity,
+    pos: Position,
+    plan: &mut GoapPlan,
+    ec: &mut ExecutorContext,
+    snaps: &StepSnapshots,
+    accum: &mut StepAccumulators,
+    narr: &mut NarrativeEmitter,
+) -> crate::steps::StepResult {
+    use crate::resources::system_activation::Feature;
+    let weaned_threshold = ec.constants.kitten_rearing.weaned_threshold;
+    let teach_done_threshold = ec.constants.kitten_rearing.teach_done_threshold;
+    let curriculum_size = ec.constants.kitten_rearing.teach_curriculum_size;
+
+    // Resolve target via picker if not cached. Picker filters candidates
+    // by mother + per-action maturity band; returns the nearest match.
+    if plan.step_state[step_idx].target_entity.is_none() {
+        let kittens = build_dependent_kitten_snapshot(
+            &ec.kitten_parentage,
+            &snaps.cat_positions,
+        );
+        plan.step_state[step_idx].target_entity =
+            crate::ai::dses::dependent_kitten_target::resolve_dependent_kitten_target(
+                action,
+                &ec.dse_registry,
+                cat_entity,
+                pos,
+                &kittens,
+                weaned_threshold,
+                teach_done_threshold,
+                ec.time.tick,
+                None,
+            );
+    }
+
+    let Some(target) = plan.step_state[step_idx].target_entity else {
+        // No eligible kitten in range. The HTN backtrack hook (commit b)
+        // consults the frame's `MethodFailure` strategy on this Fail.
+        return crate::steps::StepResult::Fail(format!(
+            "{action:?}: no dependent kitten in range/band"
+        ));
+    };
+
+    // Read current KittenDependency state via the disjoint
+    // `kitten_parentage` query.
+    let dep_state = ec.kitten_parentage.get(target).ok().map(|(_, d)| d);
+
+    match action {
+        crate::ai::Action::Wean => {
+            let current_maturity = dep_state.map(|d| d.maturity).unwrap_or(1.0);
+            let outcome = crate::steps::disposition::resolve_wean(
+                target,
+                current_maturity,
+                weaned_threshold,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::KittenWeaned);
+            if let Some(advanced) = outcome.witness {
+                accum
+                    .kitten_rearing_advances
+                    .push(KittenRearingAdvance::Wean(advanced));
+            }
+            outcome.result
+        }
+        crate::ai::Action::Teach => {
+            let current_maturity = dep_state.map(|d| d.maturity).unwrap_or(1.0);
+            let current_skills = dep_state.map(|d| d.skills_learned).unwrap_or(curriculum_size);
+            let outcome = crate::steps::disposition::resolve_teach(
+                target,
+                current_maturity,
+                current_skills,
+                teach_done_threshold,
+                curriculum_size,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::SkillTaught);
+            if let Some(advanced) = outcome.witness {
+                accum
+                    .kitten_rearing_advances
+                    .push(KittenRearingAdvance::Teach(advanced));
+            }
+            outcome.result
+        }
+        crate::ai::Action::Release => {
+            let kitten_has_dependency = dep_state.is_some();
+            let outcome = crate::steps::disposition::resolve_release(
+                target,
+                kitten_has_dependency,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::KittenReleased);
+            if let Some(advanced) = outcome.witness {
+                accum
+                    .kitten_rearing_advances
+                    .push(KittenRearingAdvance::Release(advanced));
+            }
+            outcome.result
+        }
+        other => crate::steps::StepResult::Fail(format!(
+            "dispatch_htn_kitten_primitive: unsupported action {other:?}"
+        )),
+    }
+}
+
+/// 364: build the kitten snapshot consumed by
+/// `resolve_dependent_kitten_target`. Joins
+/// `ExecutorContext::kitten_parentage` against the cat-position
+/// snapshot; kittens without a recorded position are excluded.
+fn build_dependent_kitten_snapshot(
+    kitten_parentage: &Query<
+        (Entity, &crate::components::KittenDependency),
+        Without<Dead>,
+    >,
+    cat_positions: &[(Entity, Position)],
+) -> Vec<crate::ai::dses::dependent_kitten_target::DependentKittenState> {
+    let pos_lookup: std::collections::HashMap<Entity, Position> =
+        cat_positions.iter().copied().collect();
+    kitten_parentage
+        .iter()
+        .filter_map(|(entity, dep)| {
+            let pos = pos_lookup.get(&entity).copied()?;
+            Some(
+                crate::ai::dses::dependent_kitten_target::DependentKittenState {
+                    entity,
+                    pos,
+                    maturity: dep.maturity,
+                    mother: dep.mother,
+                },
+            )
+        })
+        .collect()
 }
 
 // ===========================================================================

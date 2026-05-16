@@ -55,6 +55,25 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry
         .target_taking_dses
         .push(dses::caretake_target_dse());
+    // 364: three sibling registrations for the rear_kitten HTN method's
+    // primitive leaves. Maturity bands are mutually exclusive (Wean <
+    // weaned ≤ Teach < teach_done ≤ Release), so at most one fires per
+    // kitten per tick. Filter + scoring lives in dependent_kitten_target.rs.
+    registry
+        .target_taking_dses
+        .push(dses::dependent_kitten_target::dependent_kitten_target_dse(
+            crate::ai::Action::Wean,
+        ));
+    registry
+        .target_taking_dses
+        .push(dses::dependent_kitten_target::dependent_kitten_target_dse(
+            crate::ai::Action::Teach,
+        ));
+    registry
+        .target_taking_dses
+        .push(dses::dependent_kitten_target::dependent_kitten_target_dse(
+            crate::ai::Action::Release,
+        ));
     registry.cat_dses.push(dses::mate_dse());
     registry.target_taking_dses.push(dses::mate_target_dse());
     registry.cat_dses.push(dses::patrol_dse(scoring));

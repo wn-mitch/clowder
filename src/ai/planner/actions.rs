@@ -274,6 +274,38 @@ pub fn burying_actions() -> Vec<GoapActionDef> {
     }]
 }
 
+/// 364: single-action plan template for an HTN leaf primitive. The L2
+/// frame-pin (#364 commit b) selects this builder when the cat's
+/// `HeldGoalStack` pins a `SubGoal::Primitive { action, .. }` — chosen
+/// in place of `actions_for_disposition`. The plan is a single-step
+/// Pattern-B template keyed to the primitive's `GoapActionKind`.
+///
+/// Routes through `PlannerZone::SocialTarget` for the kitten-arc leaves
+/// (Wean / Teach / Release — kittens are alive cats in `cat_positions`)
+/// and `PlannerZone::GraveTarget` for the mourn-arc leaves (Vigil /
+/// GriefSit / ReleaseGrief — graves are dead-and-buried positions).
+///
+/// # Panics
+/// Panics on actions that are not HTN primitive leaves; the L2 frame-pin
+/// is the only authoritative caller and pre-filters to supported variants.
+pub fn htn_primitive_actions(action: Action) -> Vec<GoapActionDef> {
+    let (kind, zone) = match action {
+        Action::Wean => (GoapActionKind::Wean, PlannerZone::SocialTarget),
+        Action::Teach => (GoapActionKind::Teach, PlannerZone::SocialTarget),
+        Action::Release => (GoapActionKind::Release, PlannerZone::SocialTarget),
+        Action::Vigil => (GoapActionKind::Vigil, PlannerZone::CorpseTarget),
+        Action::GriefSit => (GoapActionKind::GriefSit, PlannerZone::CorpseTarget),
+        Action::ReleaseGrief => (GoapActionKind::ReleaseGrief, PlannerZone::CorpseTarget),
+        other => panic!("htn_primitive_actions: unsupported action {other:?}"),
+    };
+    vec![GoapActionDef {
+        kind,
+        cost: 2,
+        preconditions: vec![StatePredicate::ZoneIs(zone)],
+        effects: vec![StateEffect::SetInteractionDone(true)],
+    }]
+}
+
 /// 176: single-action template for `Discarding`. No travel — the cat
 /// drops one item where they stand. The plan is `[DropItem]`; the
 /// resolver removes one slot and spawns an `Item` entity with

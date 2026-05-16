@@ -15,6 +15,7 @@ pub mod caretake;
 pub mod caretake_target;
 pub mod cook;
 pub mod coordinate;
+pub mod dependent_kitten_target;
 pub mod discarding;
 pub mod eat;
 pub mod explore;

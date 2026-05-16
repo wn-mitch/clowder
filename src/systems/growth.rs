@@ -612,6 +612,7 @@ mod tests {
                     mother: Some(mother),
                     father: None,
                     maturity: 0.0,
+                    skills_learned: 0,
                 },
             ))
             .id();
@@ -797,6 +798,7 @@ mod tests {
                 mother: None,
                 father: None,
                 maturity: 1.0 - rate * 0.5,
+                skills_learned: 0,
             })
             .id();
 
@@ -822,6 +824,7 @@ mod tests {
                 mother: None,
                 father: None,
                 maturity: 0.0,
+                skills_learned: 0,
             })
             .id();
 
@@ -845,6 +848,7 @@ mod tests {
                 mother: None,
                 father: None,
                 maturity: 1.0 - rate * 0.5,
+                skills_learned: 0,
             })
             .id();
 

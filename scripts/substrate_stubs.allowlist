@@ -16,7 +16,7 @@
 # Catalogue: docs/open-work/pre-existing/substrate-stub-catalogue.md
 
 HideEligible 170           # Hide-authoring system (extends ticket 104's Phase 1 dormancy)
-STUB:src/ai/planner/actions.rs:298:trashing 200    # Trashing routes through Wilds until PlannerZone::Midden lands (ticket 200) — line shifted by 035's burying_actions() insertion
+STUB:src/ai/planner/actions.rs:330:trashing 200    # Trashing routes through Wilds until PlannerZone::Midden lands (ticket 200) — line shifted by 035's burying_actions() insertion + 364's htn_primitive_actions() insertion
 
 # 322: Action-enum dormant stubs for the 128 HTN-methods epic Tier-2
 # methods. Each placeholder step resolver in `src/steps/disposition/`
@@ -33,6 +33,6 @@ resolve_craft                 334   # acquire_stealth_via_self_craft crafting su
 resolve_petition_coordinator  334   # acquire_stealth_via_commission petition sub-goal
 resolve_vigil                 332   # mourn_at_grave vigil-at-grave sub-goal
 resolve_grief_sit             332   # mourn_at_grave grieve-in-den sub-goal
-resolve_wean                  333   # rear_kitten weaning sub-goal
-resolve_teach                 333   # rear_kitten teaching sub-goal
-resolve_release               333   # rear_kitten release sub-goal
+# resolve_wean / resolve_teach / resolve_release retired by 364 — real
+# bodies + dispatch arm expansion + post-loop drain landed; allowlist
+# entries removed in the same commit.

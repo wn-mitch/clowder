@@ -1,44 +1,59 @@
 use crate::steps::{StepOutcome, StepResult};
+use bevy_ecs::entity::Entity;
 
 /// # GOAP step resolver: `Release`
 ///
-/// 333 — vocabulary and method-flip landed with #333 (`rear_kitten`
-/// is now `ApplicableWhen::Live`). **Dispatch is pending** — no
-/// GoapActionKind / plan-template / dispatch arm wires the cat to
-/// this resolver yet (HTN substrate doesn't override `chosen_action`
-/// in the L2 evaluator). The follow-on dispatch ticket (named in
-/// #333's landing Log) wires DSE / GoapActionKind / resolver call
-/// site so this resolver actually fires.
+/// Ticket 364 — final sub-goal of the `rear_kitten` HTN method. Pairs with
+/// the `dependent_kitten_release_target` DSE that picks the kitten.
 ///
-/// **Real-world effect** — when dispatch lands, retires the mother's
-/// `rear_kitten` method frame (the parent
-/// [`HeldGoalStack`](crate::components::HeldGoalStack) walks the
-/// abandon path) and removes the kitten target's
-/// [`KittenDependency`](crate::components::KittenDependency)
-/// Component, leaving the kitten as a fully independent colony
-/// member. Distinct from `ReleaseGrief` (which retires a
-/// `mourn_at_grave` arc — different real-world effect).
+/// **Real-world effect** — removes the target kitten's
+/// [`KittenDependency`](crate::components::KittenDependency) Component,
+/// retiring the kitten to fully-independent colony-member status. The
+/// existing [`update_parent_markers`](crate::systems::growth::update_parent_markers)
+/// cascades the `Parent` marker removal on the mother next tick. Distinct
+/// from `ReleaseGrief` (which retires a `mourn_at_grave` arc — different
+/// real-world effect on a different Component).
 ///
-/// **Plan-level preconditions** — emitted under a maturity-threshold
-/// check on the kitten target's `KittenDependency.maturity`
-/// (post-Wean and post-Teach milestones cleared).
+/// **Plan-level preconditions** — emitted under a `ZoneIs(SocialTarget)`
+/// precondition.
 ///
-/// **Runtime preconditions** — re-checks the kitten target still
-/// carries `KittenDependency` and that the cat is the recorded
-/// mother; returns `unwitnessed(Fail)` while dispatch is unwired so
-/// accidental invocation is observable.
+/// **Runtime preconditions** — accepts `kitten_has_dependency` from the
+/// caller. Returns witnessed-`None` if the Component was already removed
+/// (e.g., natural maturation at `maturity >= 1.0` retired it first).
 ///
-/// **Witness** — `StepOutcome<Option<bevy_ecs::entity::Entity>>`.
-/// The witness payload is the kitten Entity that was released this
-/// call. The witness gates `Feature::KittenReleased` emission via
-/// `record_if_witnessed`.
+/// **Witness** — `StepOutcome<Option<Entity>>`. The witness payload is the
+/// kitten Entity that was released. The witness gates
+/// `Feature::KittenReleased` emission via `record_if_witnessed`.
 ///
 /// **Feature emission** — caller passes `Feature::KittenReleased`
-/// (Positive) to `record_if_witnessed`. Ships
-/// `expected_to_fire_per_soak() => false` until the dispatch
-/// follow-on lands.
-pub fn resolve_release() -> StepOutcome<Option<bevy_ecs::entity::Entity>> {
-    StepOutcome::unwitnessed(StepResult::Fail(
-        "Release dispatch wiring (DSE / GoapActionKind / plan template) pending — see follow-on ticket named in #333's landing Log".into(),
-    ))
+/// (Positive) to `record_if_witnessed`.
+pub fn resolve_release(
+    target_kitten: Entity,
+    kitten_has_dependency: bool,
+) -> StepOutcome<Option<Entity>> {
+    if !kitten_has_dependency {
+        return StepOutcome::unwitnessed(StepResult::Advance);
+    }
+    StepOutcome::witnessed_with(StepResult::Advance, target_kitten)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ent(id: u32) -> Entity {
+        Entity::from_raw_u32(id).unwrap()
+    }
+
+    #[test]
+    fn witnessed_when_dependency_present() {
+        let outcome = resolve_release(ent(10), true);
+        assert_eq!(outcome.witness, Some(ent(10)));
+    }
+
+    #[test]
+    fn unwitnessed_when_dependency_absent() {
+        let outcome = resolve_release(ent(10), false);
+        assert_eq!(outcome.witness, None);
+    }
 }

@@ -78,6 +78,11 @@ pub struct SimConstants {
     /// the consumer tickets (263+) per the four-artifact methodology.
     #[serde(default)]
     pub affordances: AffordancesConstants,
+    /// Ticket 364 — `rear_kitten` HTN method thresholds. Maturity bands
+    /// for Wean / Teach / Release sub-goals + teach-phase curriculum size
+    /// (substrate-only at 364 land; richer skill attribution lives downstream).
+    #[serde(default)]
+    pub kitten_rearing: KittenRearingConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -6305,6 +6310,45 @@ impl FertilityConstants {
     /// fractions exceed 1.0 by clamping at zero.
     pub fn diestrus_fraction(&self) -> f32 {
         (1.0 - self.proestrus_fraction - self.estrus_fraction).max(0.0)
+    }
+}
+
+// ---------- KittenRearingConstants (ticket 364) ----------
+
+/// Maturity-band thresholds + curriculum size for the `rear_kitten` HTN
+/// method's Wean / Teach / Release sub-goals. The `dependent_kitten_target`
+/// picker's per-action eligibility filter uses these to gate which kittens
+/// each action sees.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KittenRearingConstants {
+    /// Wean is eligible while `maturity < weaned_threshold`. resolve_wean
+    /// bumps maturity to this value on success.
+    pub weaned_threshold: f32,
+    /// Teach is eligible while
+    /// `weaned_threshold <= maturity < teach_done_threshold`. resolve_teach
+    /// bumps maturity to this value on success.
+    pub teach_done_threshold: f32,
+    /// Release is eligible while `maturity >= teach_done_threshold`.
+    /// resolve_release removes `KittenDependency` (the natural maturation
+    /// removal at `maturity >= release_threshold = 1.0` still applies if the
+    /// arc never completes).
+    pub release_threshold: f32,
+    /// Number of skill demonstrations recorded on the kitten's
+    /// `KittenDependency.skills_learned` over the Teach phase. Substrate-only
+    /// at 364 land — no consumer reads the count yet; the field exists so
+    /// downstream memory/personality attribution can read which skills the
+    /// kitten was taught without re-authoring substrate.
+    pub teach_curriculum_size: u8,
+}
+
+impl Default for KittenRearingConstants {
+    fn default() -> Self {
+        Self {
+            weaned_threshold: 0.33,
+            teach_done_threshold: 0.66,
+            release_threshold: 1.0,
+            teach_curriculum_size: 5,
+        }
     }
 }
 
