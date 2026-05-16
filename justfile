@@ -494,6 +494,14 @@ block-list *ARGS:
 block-info BLOCK *ARGS:
     python3 scripts/block_info.py {{BLOCK}} {{ARGS}}
 
+# [block] Set or clear the verdict-anchor on a coherent-block ticket. Refuses up-front if another ticket in the same block already carries the anchor (≤1 per block invariant; also enforced by `just check`). Composes scripts/retag.sh and regenerates the open-work index. Usage: just block-anchor <block> <ticket-id> [--clear].
+block-anchor BLOCK TICKET *ARGS:
+    python3 scripts/block_anchor.py {{BLOCK}} {{TICKET}} {{ARGS}}
+
+# [block] Run `just verdict` against the soak log of a coherent-block's anchor session. Composes block-info + ticket-info to find the anchor's holding session, then runs verdict in that workspace. Refuses if the block has no anchor / the anchor is not in any session / the session has no soak log. Usage: just block-verdict <block> [seed=42].
+block-verdict BLOCK *ARGS:
+    bash scripts/block_verdict.sh {{BLOCK}} {{ARGS}}
+
 # [ticket-query] Single-ticket frontmatter + status + which session (if any) currently holds it. --json for /work skill.
 ticket-info ID *ARGS:
     python3 scripts/ticket_info.py {{ID}} {{ARGS}}
