@@ -1,0 +1,56 @@
+---
+id: 385
+title: Phase-1 history-gen sim-loop mode (worldgen-prehistory leg)
+status: ready
+cluster: ai-substrate
+orchestration: coherent-block
+block: worldgen-prehistory
+initiative: [generational-continuity, smarter-cats, worldgen-prehistory]
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Today `src/main.rs` spawns cats at t=0 with fresh stats — no lineage, no shared past, empty `ColonyKnowledge`, no relationships forged in lived experience. Talk of the Town and Dwarf Fortress both fix this by running the sim loop itself for generations before the player arrives (Ryan et al. *Game AI Pro 3* § 37.2.2 — "world-gen is the sim loop, run longer"). This leg builds the architectural surface: a history-gen mode for `build_schedule()` + `SimulationPlugin::build()` that runs the same sim loop minus rendering, minus per-axis diagnostic capture, minus high-tier narrative emission, suitable for ~15–30 sim-years of fast-forward. No new procedural-history algorithm — the sim's existing dynamics ARE the generator.
+
+## Scope
+
+- `SimulationPlugin::build()` carries a `SimMode { Runtime | HistoryGen }` axis (or analogous typestate) wired through to all systems that should gate behavior on it
+- `build_schedule()` in `src/main.rs` + the headless path accept the mode and return a slimmed-down schedule under `HistoryGen`
+- Per-axis diagnostic systems (the 12 trace map writers, focal-cat trace sidecar emitters, sensitivity-map probe writers) respect the mode and no-op under `HistoryGen`
+- Narrative emission filters to Significant tier only under `HistoryGen`
+- Rendering systems are not added to the schedule under `HistoryGen`
+- Phase-1 termination point (sim-year count + N) is a `SimConstants` field so it's reproducibility-tracked
+
+## Out of scope
+
+- Performance work to make `HistoryGen` mode tolerable wall-time (#389)
+- The bulk-insert procedure that populates per-cat mental models at the Phase-1 → Phase-3 boundary (#386)
+- ColonyKnowledge pre-seeding from the Phase-1 event log (#388)
+- C2 Versu practices that need to RUN during Phase-1 (#392)
+- Lineage substrate that needs to PERSIST across the Phase-1 → Phase-3 boundary (#387)
+
+## Current state
+
+Aspirational — gated on `worldgen-prehistory` block activation (see [9]). A1 IAUS substrate is landed; no other prerequisites within this block. Independent of #389 in shape (this is the *architecture*; #389 is the *speed*); the two will pair when the leg actually runs.
+
+## Approach
+
+Mirror the existing windowed-vs-headless factoring of `SimulationPlugin`, adding a third axis `mode: SimMode`. The schedule the plugin produces is a function of (windowing-policy, mode). Diagnostic and narrative-emission systems read `Res<SimMode>` (or a typestate carrier) and short-circuit under `HistoryGen`. Don't make `HistoryGen` a separate `App` — same plugin tree with the same `SimConstants`, different schedule.
+
+## Verification
+
+- Headless test: `App` built with `SimMode::HistoryGen` runs N ticks without panicking, without emitting any trace-* sidecar, without writing per-axis diagnostic to `events.jsonl`, without rendering systems being added
+- The `events.jsonl` header still records `start_tick` correctly (now the Phase-3 start tick = end-of-Phase-1)
+- The same `App` with `SimMode::Runtime` produces baseline-comparable output (verdict-pass on seed-42 unchanged)
+
+## Log
+
+- 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])

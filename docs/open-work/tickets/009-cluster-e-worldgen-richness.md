@@ -3,7 +3,10 @@ id: 009
 title: World-generation richness (Cluster E)
 status: ready
 cluster: ai-substrate
-orchestration: substrate-sensitive
+orchestration: coherent-block
+initiative: [generational-continuity, mythic-texture, smarter-cats, worldgen-prehistory]
+verdict-anchor: true
+block: worldgen-prehistory
 added: 2026-04-20
 parked: null
 blocked-by: []
@@ -148,6 +151,38 @@ canary passes from t=0 forward without relying on live-sim events.
   during fast-forward produce the current coordinator *and* the
   dynastic backstory explaining why they lead.
 
+## Decomposition
+
+The block exploded into 9 children on 2026-05-16. Each leg captures one orthogonal design surface (the orthogonality assertion is what `verdict-anchor: true` codifies — if two legs end up doing the same work, the safety property breaks and we fall back to per-ticket cadence).
+
+| # | Leg | Cluster | blocked-by | One-line |
+|---|---|---|---|---|
+| 385 | Phase-1 history-gen sim-loop mode | `ai-substrate` | — | `build_schedule()` + `SimulationPlugin::build()` history-gen mode (no rendering / no per-axis diagnostic / narrative-tier filter). The architectural surface, not the speed. |
+| 386 | Phase-2 knowledge implantation procedure | `belief-perception` | [385] | Ryan § 37.3.10 / Listing 37.1 ported into Rust. Bulk-populates per-cat `MentalModel`s from the Phase-1 event log using 258's `Implant` evidence type. |
+| 387 | Multi-generation lineage substrate (≥3 generations) | `life-cycle` | — | Kin tracking depth: parents / grandparents / great-grandparents reachable by name even when only living cats are entities. Colony-scope substrate; survives entity despawn. |
+| 388 | ColonyKnowledge pre-seeding from generated history | `belief-perception` | [385, 291] | The named-events ledger ("the Long Winter of year 12"). Colony-shared substrate; distinct from #386's per-cat subjective implants. |
+| 389 | History-gen throughput uplift (10–100× perf) | `tooling-diagnostics-ui` | — | The performance sub-concern. Profile + lever-identification + prototype to make Phase-1 tolerable wall-time. Independent of architectural legs. |
+| 390 | Fate-seeded prophecy from generated history | `magic-mythic` | [388] | `fate.rs` reads pre-sim `ColonyKnowledge` at t=0 and seeds the prophecy queue. Distinct from runtime fate emission. |
+| 391 | Narrative-template historical reference | `magic-mythic` | [387, 388] | `narrative.rs` templates cite pre-sim figures + events in the first sim-week. Continuity canary holds from t=0 without relying on live-sim event emission. |
+| 392 | C2 Versu social practices (proper ticket) | `social-coordination` | — | The "currently unspun-out from 007" debt 258 documents. Multi-stage courtship + mentoring + alloparenting that run during fast-forward to produce the t=0 relationship graph. Substrate proper. |
+| 393 | C4 coordinator dynastic seeding | `social-coordination` | [57] | Phase-1 leadership patterns → t=0 coordinator + dynastic backstory. Composes with 057 (Intention strategy row) and 335 (HTN method seeds). Asymmetric authority — distinct from #392's peer-symmetric practices. |
+
+**Orthogonality argument.** The legs touch six different clusters (`ai-substrate`, `belief-perception`, `life-cycle`, `magic-mythic`, `social-coordination`, `tooling-diagnostics-ui`), making accidental coupling hard to write by mistake. The Phase-1 → Phase-2 → Phase-3 architecture maps cleanly onto the leg structure: #385 + #389 produce Phase-1 (the architecture and its speed); #386 + #388 are the Phase-2 boundary operators (per-cat subjective vs colony-shared); #387 is the substrate that persists across the boundary; #392 supplies the dynamics that run inside Phase-1; #393 composes the Phase-1 output into asymmetric authority; #390 + #391 are the Phase-3 consumers of pre-sim state.
+
+## Block-verdict pattern
+
+Per CLAUDE.md "Per-block verdict pattern" doctrine, the anchor authors its own composition of `just verdict` + block-specific Feature-fired checks + welfare deltas. For `worldgen-prehistory` the signal shape is:
+
+1. **Phase-1 terminates without panic / OOM** — fast-forward runs to completion at target sim-year count
+2. **Phase-2 populates every surviving cat** — post-implantation, ∀ surviving cat: `MentalModel` non-empty for self + kin + closest bonds + territory
+3. **ColonyKnowledge non-empty at t=0** — ≥1 seeded entry, ≥1 referenceable by name in narrative output
+4. **Lineage depth ≥2 for ≥80% of starting cats** — parents/grandparents reachable by name lookup
+5. **≥1 named historical event surfaces in narrative output in first sim-week** — mythic-texture canary fires from t=0 forward without relying on live-sim event generation
+6. **Continuity canaries hold from t=0** — grooming / play / mentoring / courtship / mythic-texture pass on the first soak after Phase-3 activation
+7. **Welfare deltas within ±10% vs fresh-spawn baseline** — implanted relationships + ColonyKnowledge don't perturb the canonical seed-42 welfare envelope (or, if they do, the perturbation is named in a 4-artifact balance hypothesis)
+
+`just block-verdict worldgen-prehistory` is the recipe surface; the script composition lands with the first leg to ship.
+
 ## Related work
 
 <!-- linkages:start -->
@@ -161,3 +196,4 @@ canary passes from t=0 forward without relying on live-sim events.
 ## Log
 
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.
+- 2026-05-16: promoted to coherent-block epic. Opened children 385–393; block=`worldgen-prehistory`, anchor=true. Initiatives unioned: `[generational-continuity, mythic-texture, smarter-cats, worldgen-prehistory]`. Long-term aspirational content — the explosion is for legibility (cross-linking with 258 / 280 / 291 / 264 / 265 / 057 / 335 neighbors), not scheduling. See `## Decomposition` + `## Block-verdict pattern`.

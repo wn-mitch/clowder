@@ -1,0 +1,53 @@
+---
+id: 393
+title: C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory)
+status: blocked
+cluster: social-coordination
+orchestration: coherent-block
+block: worldgen-prehistory
+initiative: [generational-continuity, mythic-texture, smarter-cats, worldgen-prehistory]
+added: 2026-05-16
+parked: null
+blocked-by: [57]
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+009 lines 147–149: "leadership patterns during fast-forward produce the current coordinator *and* the dynastic backstory explaining why they lead." A founder colony emerging from Phase-1 should have a coordinator whose authority is grounded in the *generated* past — they're the granddaughter of the matriarch who taught the colony to ward against shadowfoxes, or the survivor of the Long Winter who organized the food cache. Without this leg, a t=0 coordinator's authority is unmotivated. Composes 057 (coordinator-directive Intention strategy row) with #387 (lineage) + #388 (ColonyKnowledge).
+
+## Scope
+
+- During Phase-1, a coordinator emerges via existing leadership dynamics (or, if those are absent, this leg specifies them)
+- At the Phase-1 → Phase-3 boundary, the current coordinator's `Lineage` + the `ColonyKnowledge` entries they're connected to compose into a "dynastic backstory" — a per-coordinator narrative substrate
+- Narrative templates (#391) can cite the coordinator's dynastic justification
+- Composes with 057 and 335 (HTN method seeds — coordinator directives as method seeds; 335 is blocked on 320)
+
+## Out of scope
+
+- Peer-symmetric social practices (#392 — coordinator is asymmetric authority)
+- Lineage substrate itself (#387)
+- ColonyKnowledge substrate itself (#388)
+- 057's strategy row substrate (separate ticket)
+
+## Current state
+
+Aspirational — gated on `worldgen-prehistory` block activation (see [9]). Blocked-by [57]. Pairs with 335 + 128 epic.
+
+## Approach
+
+Phase-1 leadership dynamics either exist (use them) or need to be specified (use existing coordinator-election machinery; this leg adds the dynastic-backstory composition). Output substrate: per-coordinator `DynasticBackstory` component referencing Lineage + ColonyKnowledge entries.
+
+## Verification
+
+- ≥1 t=0 coordinator has a non-empty `DynasticBackstory`
+- ≥1 narrative line in first sim-week cites the coordinator's dynastic justification
+- The coordinator's authority composes with 057's Intention strategy row (no conflict)
+
+## Log
+
+- 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])

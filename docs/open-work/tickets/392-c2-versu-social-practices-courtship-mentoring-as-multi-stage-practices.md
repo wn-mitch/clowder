@@ -1,0 +1,53 @@
+---
+id: 392
+title: C2 Versu social practices (courtship + mentoring as multi-stage practices)
+status: ready
+cluster: social-coordination
+orchestration: coherent-block
+block: worldgen-prehistory
+initiative: [generational-continuity, smarter-cats, worldgen-prehistory]
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+Ticket 258's "Out of scope" notes: "Versu social practices (C2) — gossip transmission as a multi-stage practice ... the practice itself is C2 territory (currently unspun-out from 007)." This leg is the proper spin-out. Versu-style multi-stage practices (courtship as a multi-day pursuit, mentoring as an apprenticeship arc, alloparenting as a sustained relationship) need to *run during Phase-1* to produce the relationship graph that exists at t=0 — and need substrate at runtime to continue running thereafter. This is core social-coordination substrate, not a worldgen detail.
+
+## Scope
+
+- `Practice` substrate: multi-stage social interactions with their own state machine (courtship: approach → display → mutual-grooming → mating; mentoring: pair → observe → teach → release)
+- Composition with existing DSEs (Socialize, GroomOther, Mate, Mentor, Care) — each becomes a step within a Practice
+- Practices run during Phase-1 to produce the relationship graph
+- Practices continue to run during Phase-3, producing live-sim relationship dynamics
+- Composes with 264 (Social DSE consumers, in-flight) and 127 (JointIntention, landed)
+
+## Out of scope
+
+- Lineage substrate (#387 — practices PRODUCE births, but the kin graph is a separate substrate)
+- Coordinator-directive substrate (#393 / 057 — practices are peer-symmetric, coordinator-directive is asymmetric)
+- The HTN method registry (128 epic — practices may or may not be HTN methods; that's a design decision within this leg)
+
+## Current state
+
+Aspirational — gated on `worldgen-prehistory` block activation (see [9]). 007 is the umbrella that should reference this spin-out; this ticket is the proper home. Pairs with 264 + 265 (DSE consumers) + 127 (landed JointIntention) + 128 (HTN methods — practices may compose).
+
+## Approach
+
+Either as HTN methods (composes with 128) or as a dedicated `Practice` substrate (separate registry). Worked example: courtship as a multi-stage practice with sub-DSEs scoring within each stage. Decision between HTN-composition vs dedicated-substrate is part of this leg's design work.
+
+## Verification
+
+- ≥1 practice (e.g. courtship) runs end-to-end in Phase-1 producing ≥1 mating event
+- The same practice runs in Phase-3 producing live-sim relationship dynamics
+- Composition with 127 JointIntention is well-formed (no marker-axis collision)
+
+## Log
+
+- 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])

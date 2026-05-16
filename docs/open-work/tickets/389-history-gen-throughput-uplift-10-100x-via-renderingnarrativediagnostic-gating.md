@@ -1,0 +1,52 @@
+---
+id: 389
+title: History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating)
+status: ready
+cluster: tooling-diagnostics-ui
+orchestration: coherent-block
+block: worldgen-prehistory
+initiative: [generational-continuity, worldgen-prehistory]
+added: 2026-05-16
+parked: null
+blocked-by: []
+supersedes: []
+related-systems: []
+related-balance: []
+landed-at: null
+landed-on: null
+---
+
+## Why
+
+009 notes current headless throughput is ~15 minutes wall per ~10 sim-days. At that rate, a 15-sim-year fast-forward is ~8 hours wall — untenable for build-time generation. The block's economic viability depends on getting Phase-1 to 10–100× faster than runtime soak. This leg names the perf surface — profile, identify dominant levers, prototype the uplift, measure.
+
+## Scope
+
+- Profile `SimMode::HistoryGen` headless: where does wall time actually go? Sensing? Narrative emission? Trace writers? Influence-map updates? Modifier-pipeline pass? Per-tick allocations?
+- Prototype 1–3 levers — candidates: coarser tick resolution under `HistoryGen`; skip-list of always-no-op systems; pre-allocation; sense-tier filter; influence-map sparsity heuristic
+- Measure: target 10× minimum, 100× aspirational, for `HistoryGen` mode vs `Runtime` mode at same sim-day count
+- Document the levers + their tradeoffs (e.g. "coarser ticks under `HistoryGen` drops per-tick fidelity — acceptable because Phase-1 outputs population/lineage/event-log, not per-tick scoring")
+
+## Out of scope
+
+- The sim-loop mode itself (#385) — that's the architectural surface; this leg is the perf characterization
+- General headless-runtime perf improvements (benefit `Runtime` mode but aren't motivated by this block)
+- Multi-threading the simulation (much larger architectural change)
+
+## Current state
+
+Aspirational — gated on `worldgen-prehistory` block activation (see [9]). Independent of other legs; could be prototyped against current `Runtime`-only mode and ported once #385 lands.
+
+## Approach
+
+Use `cargo` tracing-flamegraph or criterion benchmarks to characterize per-tick cost breakdown. Prototype the most promising lever; measure; iterate. Don't ship the lever until #385 lands a `HistoryGen` mode that can guard it.
+
+## Verification
+
+- Profile report: per-system wall-time breakdown for a 100-sim-day `HistoryGen` run
+- Measured speedup: ≥10× faster than `Runtime` at the same sim-day count
+- Welfare canary on `Runtime` mode unchanged (no perf-lever leaks into runtime behavior)
+
+## Log
+
+- 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])
