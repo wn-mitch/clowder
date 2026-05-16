@@ -491,6 +491,11 @@ pub struct ExecutorContext<'w, 's> {
     pub time_scale: Res<'w, crate::resources::time::TimeScale>,
     pub constants: Res<'w, SimConstants>,
     pub event_log: Option<ResMut<'w, EventLog>>,
+    /// Ticket 364 — read-only `MethodRegistry` for the HTN advance hook's
+    /// gate (matches the held frame's leaf primitive action against the
+    /// completed plan's chosen action, so only HTN-leaf plan completions
+    /// advance the frame).
+    pub method_registry: Res<'w, crate::ai::methods::MethodRegistry>,
     /// Wildlife entities with positions, for `EngageThreat` target resolution.
     /// Excludes prey animals so cats don't try to "fight" rabbits as threats.
     pub wildlife: bevy_ecs::prelude::Query<
@@ -548,8 +553,16 @@ pub struct ExecutorContext<'w, 's> {
     pub kitten_parentage: bevy_ecs::prelude::Query<
         'w,
         's,
-        (Entity, &'static crate::components::KittenDependency),
-        Without<Dead>,
+        (
+            Entity,
+            &'static crate::components::KittenDependency,
+            &'static Position,
+        ),
+        // Disjoint from the cats query (which holds `&mut Position`):
+        // kittens never carry `GoapPlan` (evaluate_and_plan filters
+        // `Without<KittenDependency>`), so this `Without<GoapPlan>`
+        // gives Bevy the static disjointness proof.
+        (Without<Dead>, Without<GoapPlan>),
     >,
     /// §11 focal-cat target. Present only when `--focal-cat` wired the
     /// resource in the headless runner; absent in every interactive
@@ -2398,11 +2411,24 @@ pub fn evaluate_and_plan(
         // branch below (`actions_for_disposition` vs
         // `htn_primitive_actions`) routes through the HTN builder when
         // this fires.
+        // Gate the adopt hook to MULTI-STEP methods only
+        // (`sub_goal_count > 1`). Single-step methods (hunt_method,
+        // forage_method, etc.) don't need frame-pinning — their leaf
+        // action is what the L3 softmax already picks via the parent
+        // disposition. Pinning Hunt here would route the plan template
+        // through `htn_primitive_actions`, which only supports the 6
+        // HTN-leaf actions (kitten + mourn arcs) and panics on Hunt /
+        // Forage / Patrol / etc. Multi-step methods (rear_kitten,
+        // mourn_at_grave) are the structural case where frame-pin is
+        // load-bearing: the cat must walk through sub-goals across
+        // ticks, and the softmax can't independently re-derive Wean →
+        // Teach → Release sequencing.
         let frame_pinned_primitive: Option<Action> = world_state
             .held_goal_stacks
             .get(entity)
             .ok()
             .and_then(|stack| stack.top())
+            .filter(|frame| frame.sub_goal_count > 1)
             .and_then(|frame| {
                 let method = res.method_registry.lookup_by_id(frame.method)?;
                 match method.sub_goals.get(frame.sub_goal_index)? {
@@ -2510,12 +2536,13 @@ pub fn evaluate_and_plan(
             d,
         );
         // 364 D1 — when frame-pinned, route plan-template through
-        // htn_primitive_actions (single Pattern-B step keyed to the
-        // primitive's GoapActionKind) instead of the disposition's full
-        // action catalog. The dispatch arm at `evaluate_step_for_action`
-        // then resolves the target + runs the resolver.
+        // htn_primitive_actions (travel + single Pattern-B step keyed to
+        // the primitive's GoapActionKind) instead of the disposition's
+        // full action catalog. The dispatch arm at
+        // `evaluate_step_for_action` then resolves the target + runs the
+        // resolver.
         let mut actions = if frame_pinned_primitive.is_some() {
-            crate::ai::planner::actions::htn_primitive_actions(chosen_action)
+            crate::ai::planner::actions::htn_primitive_actions(chosen_action, &zone_distances)
         } else {
             actions_for_disposition(chosen, chosen_action, &zone_distances)
         };
@@ -2557,7 +2584,18 @@ pub fn evaluate_and_plan(
         // Read for the PlanningFailed event below — markers are the
         // authoritative source of `HasStoredFood` (093 substrate doctrine).
         let planner_has_stored_food = markers.has(markers::HasStoredFood::KEY, entity);
-        let goal = goal_for_disposition(chosen, 0, &plan_ctx);
+        // 364 D1 — when frame-pinned, override the goal to
+        // `InteractionDone(true)` (matches the HTN leaf's
+        // `SetInteractionDone(true)` effect). The chosen disposition's
+        // own goal (e.g., `Caretaking::TripsAtLeast`) wouldn't be
+        // satisfied by the leaf's effects, so the plan would fail.
+        let goal = if frame_pinned_primitive.is_some() {
+            crate::ai::planner::GoalState {
+                predicates: vec![crate::ai::planner::StatePredicate::InteractionDone(true)],
+            }
+        } else {
+            goal_for_disposition(chosen, 0, &plan_ctx)
+        };
 
         let plan_outcome = make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx);
         if let Ok(steps) = plan_outcome {
@@ -2764,6 +2802,24 @@ pub fn evaluate_and_plan(
             // tickets that exercise this path.
             if let crate::ai::dse::Intention::Goal { state, .. } = &held.intention
             {
+                // 364 — preserve an existing HeldGoalStack when the held
+                // intention's label matches the current top frame's
+                // goal_label. The advance hook (resolve_goap_plans) owns
+                // sub_goal_index updates across ticks; rebuilding the
+                // stack from scratch every tick would reset the cursor
+                // to 0 and trap the arc on its first sub-goal. The
+                // rebuild path still fires when the cat starts a NEW
+                // Goal (different label or no existing stack).
+                let preserve_existing = world_state
+                    .held_goal_stacks
+                    .get(entity)
+                    .ok()
+                    .and_then(|s| s.top())
+                    .map(|frame| frame.goal_label == state.label)
+                    .unwrap_or(false);
+                if preserve_existing {
+                    // Keep the advance hook's stack as-is.
+                } else {
                 let mut stack = crate::components::HeldGoalStack::empty();
                 let mut next_label: Option<&'static str> = Some(state.label);
                 let mut depth_exceeded = false;
@@ -2814,6 +2870,7 @@ pub fn evaluate_and_plan(
                 }
                 if !stack.is_empty() {
                     commands.entity(entity).insert(stack);
+                }
                 }
             }
 
@@ -3053,6 +3110,10 @@ enum StackOutcome {
     AdvanceTo(crate::components::HeldGoalStack),
     #[allow(dead_code)] // wired by sibling-method backtrack — deferred.
     BacktrackTo(crate::components::HeldGoalStack),
+    /// The completed plan was unrelated to the held HTN leaf (e.g.,
+    /// the cat ran a Hunt plan while carrying a rear_kitten frame).
+    /// Preserve the stack as-is; only HeldIntention is cleared.
+    PreserveStackOnly(crate::components::HeldGoalStack),
     Done,
 }
 
@@ -3456,7 +3517,7 @@ pub fn resolve_goap_plans(
         kitten_parents: ec
             .kitten_parentage
             .iter()
-            .map(|(e, dep)| (e, (dep.mother, dep.father)))
+            .map(|(e, dep, _pos)| (e, (dep.mother, dep.father)))
             .collect(),
         // 035: dead-cat snapshot for burial target picking + post-loop
         // drain. The `cats` query is `Without<Dead>` so this is disjoint.
@@ -4389,25 +4450,71 @@ pub fn resolve_goap_plans(
         commands.entity(entity).remove::<GoapPlan>();
 
         // 364 D1 — advance / backtrack hook. Consult the cat's
-        // HeldGoalStack: on Fulfilled, increment top frame's
-        // sub_goal_index (recursively pop on overflow). On Abandoned,
-        // consult top.method.failure_strategy (Backtrack ≡ Abandon
-        // today because rear_kitten is the only Live method for
+        // HeldGoalStack ONLY when the plan that just ended had an
+        // HTN-leaf primitive as its last step (Wean / Teach / Release
+        // for the kitten arc; Vigil / GriefSit / ReleaseGrief for
+        // mourn). The `plan.steps.last()` field reflects the actual
+        // current plan structure — including any replan that
+        // swapped a Wean plan for a Caretake plan. Replanned plans
+        // wouldn't end with the HTN leaf, so this gate keeps them
+        // from advancing the frame.
+        //
+        // On Fulfilled + htn-leaf-last-step: advance the frame
+        // (`htn_advance_or_pop`).
+        // On Abandoned + htn-leaf-last-step: consult
+        // `top.method.failure_strategy` (currently Backtrack ≡
+        // Abandon because rear_kitten is the only Live method for
         // "kitten_reared"; sibling-method backtrack lands when a
-        // second Live method exists). On `AdvanceTo(updated_stack)`,
-        // keep the stack + remove HeldIntention (L2 author rebuilds
-        // next tick from the pinned leaf). On `Done`, remove both.
+        // second Live method exists).
+        // Otherwise: leave the frame alone via `PreserveStackOnly`
+        // (multi-step) or clear it (single-step).
         let stack_now = ec
             .held_goal_stacks
             .get(entity)
             .ok()
             .cloned();
+        // Read the plan's actual last-step GoapActionKind. The plan is
+        // still in the world (the remove command above is deferred); a
+        // read-only get on the cats query returns the current
+        // (possibly replanned) step sequence.
+        let plan_last_action_kind: Option<GoapActionKind> = cats
+            .get(entity)
+            .ok()
+            .and_then(|((_, plan, _, _, _, _, _, _, _), _)| {
+                plan.steps.last().map(|s| s.action)
+            });
+        let plan_was_htn_leaf = matches!(
+            plan_last_action_kind,
+            Some(
+                GoapActionKind::Wean
+                    | GoapActionKind::Teach
+                    | GoapActionKind::Release
+                    | GoapActionKind::Vigil
+                    | GoapActionKind::GriefSit
+                    | GoapActionKind::ReleaseGrief
+            )
+        );
+        let _ = accum; // accumulator unused at this site
+        let top_is_multi_step = stack_now
+            .as_ref()
+            .and_then(|s| s.top())
+            .map(|f| f.sub_goal_count > 1)
+            .unwrap_or(false);
         let stack_outcome = match stack_now {
-            Some(stack) if !stack.is_empty() => {
+            Some(stack) if !stack.is_empty() && plan_was_htn_leaf => {
                 match ending {
                     IntentionEnding::Fulfilled => htn_advance_or_pop(stack),
                     IntentionEnding::Abandoned(_) => htn_abandon_or_pop(stack),
                 }
+            }
+            Some(stack) if !stack.is_empty() && top_is_multi_step => {
+                // Multi-step method, plan wasn't an HTN-leaf dispatch
+                // (the cat was running a non-leaf plan — e.g., a
+                // replan from a failed HTN leaf). Preserve the stack
+                // as-is. HeldIntention is still cleared below (the
+                // next tick's L2 author rebuilds it from the pinned
+                // leaf via the adopt hook).
+                StackOutcome::PreserveStackOnly(stack)
             }
             _ => StackOutcome::Done,
         };
@@ -4426,6 +4533,12 @@ pub fn resolve_goap_plans(
                     .entity(entity)
                     .insert(updated_stack.clone());
             }
+            StackOutcome::PreserveStackOnly(stack) => {
+                // Re-insert to ensure the stack survives any hypothetical
+                // future Commands flush race; this is the existing
+                // committed state, not a mutation.
+                commands.entity(entity).insert(stack.clone());
+            }
             StackOutcome::Done => {
                 commands
                     .entity(entity)
@@ -4440,6 +4553,12 @@ pub fn resolve_goap_plans(
                 }
                 (StackOutcome::BacktrackTo(_), _) => {
                     activation.record(Feature::MethodBacktracked);
+                }
+                (StackOutcome::PreserveStackOnly(_), IntentionEnding::Fulfilled) => {
+                    activation.record(Feature::IntentionFulfilled);
+                }
+                (StackOutcome::PreserveStackOnly(_), IntentionEnding::Abandoned(_)) => {
+                    activation.record(Feature::IntentionAbandoned);
                 }
                 (StackOutcome::Done, IntentionEnding::Fulfilled) => {
                     activation.record(Feature::IntentionFulfilled);
@@ -4553,7 +4672,7 @@ pub fn resolve_goap_plans(
             KittenRearingAdvance::Teach(e) => (e, "Teach"),
             KittenRearingAdvance::Release(e) => (e, "Release"),
         };
-        let Ok((_, dep)) = ec.kitten_parentage.get(target) else {
+        let Ok((_, dep, _pos)) = ec.kitten_parentage.get(target) else {
             // Kitten despawned between the per-cat loop and now (e.g.,
             // death cascade). Skip silently — the HTN frame will abandon
             // via backtrack hook (commit b) on the next plan boundary.
@@ -7051,7 +7170,7 @@ fn dispatch_htn_kitten_primitive(
 
     // Read current KittenDependency state via the disjoint
     // `kitten_parentage` query.
-    let dep_state = ec.kitten_parentage.get(target).ok().map(|(_, d)| d);
+    let dep_state = ec.kitten_parentage.get(target).ok().map(|(_, d, _)| d);
 
     match action {
         crate::ai::Action::Wean => {
@@ -7108,30 +7227,28 @@ fn dispatch_htn_kitten_primitive(
 }
 
 /// 364: build the kitten snapshot consumed by
-/// `resolve_dependent_kitten_target`. Joins
-/// `ExecutorContext::kitten_parentage` against the cat-position
-/// snapshot; kittens without a recorded position are excluded.
+/// `resolve_dependent_kitten_target`. Reads
+/// `ExecutorContext::kitten_parentage` directly (which carries Position
+/// alongside `KittenDependency`); the `cat_positions` snapshot in
+/// `StepSnapshots` excludes kittens because they don't carry `GoapPlan`,
+/// so it can't be used here.
+#[allow(clippy::type_complexity)]
 fn build_dependent_kitten_snapshot(
     kitten_parentage: &Query<
-        (Entity, &crate::components::KittenDependency),
-        Without<Dead>,
+        (Entity, &crate::components::KittenDependency, &Position),
+        (Without<Dead>, Without<GoapPlan>),
     >,
-    cat_positions: &[(Entity, Position)],
+    _cat_positions: &[(Entity, Position)],
 ) -> Vec<crate::ai::dses::dependent_kitten_target::DependentKittenState> {
-    let pos_lookup: std::collections::HashMap<Entity, Position> =
-        cat_positions.iter().copied().collect();
     kitten_parentage
         .iter()
-        .filter_map(|(entity, dep)| {
-            let pos = pos_lookup.get(&entity).copied()?;
-            Some(
-                crate::ai::dses::dependent_kitten_target::DependentKittenState {
-                    entity,
-                    pos,
-                    maturity: dep.maturity,
-                    mother: dep.mother,
-                },
-            )
+        .map(|(entity, dep, pos)| {
+            crate::ai::dses::dependent_kitten_target::DependentKittenState {
+                entity,
+                pos: *pos,
+                maturity: dep.maturity,
+                mother: dep.mother,
+            }
         })
         .collect()
 }

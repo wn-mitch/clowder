@@ -15,10 +15,10 @@ _Last generated: 2026-05-16._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 112 |
+| Ready | 111 |
 | Parked | 15 |
 | Blocked | 38 |
-| **Open total** | **171** |
+| **Open total** | **170** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,11 +40,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · score 0.93_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.92_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · score 0.91_
+- **[383](docs/open-work/tickets/383-build-cadence-under-population-growth-shelter-pressure-under-fires-once-colony-establishes.md)** — Build-cadence under population growth — shelter pressure under-fires once colony establishes — _[ai-substrate] · score 0.90_
 
 ## Epic progress (3)
 
@@ -65,11 +65,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (112)
+## Ready by cluster (111)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (29 ready, 5 blocked)
+### ai-substrate (28 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -93,7 +93,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
-- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 - **[366](docs/open-work/tickets/366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md)** — Aspirations mastery arcs — Weaving, BoneShaping, Hidework, Pigment, Cairn (016 Phase 5 precursor) — _[ai-substrate] · added 2026-05-16_
 - **[373](docs/open-work/tickets/373-denworkshop-food-retrieval-broaden-eat-substrate-beyond-stores-only.md)** — Den/Workshop food retrieval — broaden eat substrate beyond Stores-only — _[ai-substrate] · added 2026-05-16_
 - **[374](docs/open-work/tickets/374-shelter-as-housing-security-belief-per-cat-home-den-facet-replace-per-tick-spatial-shelter-rollup.md)** — Shelter as housing-security belief — per-cat home-den facet, replace per-tick spatial shelter rollup — _[ai-substrate] · added 2026-05-16_
@@ -214,26 +213,9 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
 
-## Ready by initiative (70 tag-memberships across 10 initiatives)
+## Ready by initiative (68 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
-
-### smarter-cats (14 open, 18 landed)
-
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
-- **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
-- **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
-- **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
-- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
-- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
-- **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
-- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
-- **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
-- **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
 ### full-sensory-perception (13 open, 3 landed)
 
@@ -250,6 +232,22 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[292](docs/open-work/tickets/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
+
+### smarter-cats (13 open, 19 landed)
+
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
+- **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
+- **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
+- **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
+- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
+- **[337](docs/open-work/tickets/337-l3commitment-trace-method-stack-field.md)** — L3Commitment trace gains method_stack field — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[338](docs/open-work/tickets/338-l1aspiration-trace-record-emit-walk.md)** — L1Aspiration trace record — emit-walk per aspiration — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
+- **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
+- **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
 ### generational-continuity (10 open, 2 landed)
 
@@ -314,11 +312,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-### htn-method-composition (1 open, 8 landed)
-
-- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
-
-## Ready (112)
+## Ready (111)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -419,7 +413,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[353](docs/open-work/tickets/353-splice-just-similar-into-peer-skill-cross-references-claudemd-bugfix-discipline.md)** — splice just similar into peer skill cross-references + CLAUDE.md bugfix discipline — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[363](docs/open-work/tickets/363-polecat-track-enforcement-gap-coherent-block-tickets-reach-polecat-queue.md)** — polecat track-enforcement gap — coherent-block tickets reach polecat queue — _[process-discipline] · added 2026-05-15_
-- **[364](docs/open-work/tickets/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers — _[ai-substrate] · added 2026-05-15_
 - **[365](docs/open-work/tickets/365-crafting-substrate-recipe-station-craftaction-generalize-remedy-prep-and-ward-setting-016-phase-1a.md)** — Crafting substrate — Recipe + Station + CraftAction; generalize remedy_prep and ward_setting (016 Phase 1a) — _[items-crafting] · added 2026-05-16_
 - **[366](docs/open-work/tickets/366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md)** — Aspirations mastery arcs — Weaving, BoneShaping, Hidework, Pigment, Cairn (016 Phase 5 precursor) — _[ai-substrate] · added 2026-05-16_
 - **[373](docs/open-work/tickets/373-denworkshop-food-retrieval-broaden-eat-substrate-beyond-stores-only.md)** — Den/Workshop food retrieval — broaden eat substrate beyond Stores-only — _[ai-substrate] · added 2026-05-16_
@@ -497,13 +490,14 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (241)
+## Landed archive (242)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (176)
+### 2026-05 (177)
 
 - **[382](docs/open-work/landed/382-influence-map-based-colony-district-placement-retire-find-building-placement-spiral-plan-expansion-zones.md)** — Influence-map based colony-district placement — retire find_building_placement spiral, plan expansion zones _(2026-05-16)_
+- **[364](docs/open-work/landed/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers _(2026-05-16)_
 - **[190](docs/open-work/landed/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) _(2026-05-16)_
 - **[095](docs/open-work/landed/095-body-zones-epic.md)** — Body zones — anatomical injury model for all animal species _(2026-05-16)_
 - **[362](docs/open-work/landed/362-session-donesh-orphans-unpushed-bookmarks-invert-keep-bookmark-default-add-landed-on-main-precondition.md)** — session_done.sh orphans unpushed bookmarks — invert --keep-bookmark default + add landed-on-main precondition _(2026-05-15)_

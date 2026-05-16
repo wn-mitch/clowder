@@ -16,7 +16,7 @@
 # Catalogue: docs/open-work/pre-existing/substrate-stub-catalogue.md
 
 HideEligible 170           # Hide-authoring system (extends ticket 104's Phase 1 dormancy)
-STUB:src/ai/planner/actions.rs:330:trashing 200    # Trashing routes through Wilds until PlannerZone::Midden lands (ticket 200) — line shifted by 035's burying_actions() insertion + 364's htn_primitive_actions() insertion
+STUB:src/ai/planner/actions.rs:342:trashing 200    # Trashing routes through Wilds until PlannerZone::Midden lands (ticket 200) — line shifted by 035's burying_actions() insertion + 364's htn_primitive_actions() insertion + late-364 travel_actions splice
 
 # 322: Action-enum dormant stubs for the 128 HTN-methods epic Tier-2
 # methods. Each placeholder step resolver in `src/steps/disposition/`

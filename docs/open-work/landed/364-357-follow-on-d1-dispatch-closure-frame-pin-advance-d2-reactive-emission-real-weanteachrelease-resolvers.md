@@ -1,7 +1,7 @@
 ---
 id: 364
 title: 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: coherent-block
 block: htn-method-composition
@@ -13,8 +13,8 @@ supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
 wires-method: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-16
 ---
 
 ## Why
@@ -203,3 +203,4 @@ already exposes `L3Commitment.method_stack` — verifying via
   plan file at `~/.claude/plans/work-357-purrfect-flask.md`
   carries the multi-decision rationale; this ticket carries the
   executable steps.
+- 2026-05-16: Landed after 12 soak iterations; KittenWeaned=2, SkillTaught=1, KittenReleased=1, SubGoalAdvanced=3 confirmed firing on seed-42. Known regression: 1 kitten starvation (Pebblekit-67), peak_pop 9 vs baseline 12. Feature promotion deferred to a balance-tuning follow-on ticket.

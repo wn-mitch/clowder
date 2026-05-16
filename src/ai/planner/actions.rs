@@ -274,21 +274,31 @@ pub fn burying_actions() -> Vec<GoapActionDef> {
     }]
 }
 
-/// 364: single-action plan template for an HTN leaf primitive. The L2
-/// frame-pin (#364 commit b) selects this builder when the cat's
-/// `HeldGoalStack` pins a `SubGoal::Primitive { action, .. }` — chosen
-/// in place of `actions_for_disposition`. The plan is a single-step
-/// Pattern-B template keyed to the primitive's `GoapActionKind`.
+/// 364: plan template for an HTN leaf primitive. The L2 frame-pin
+/// (#364 commit b) selects this builder when the cat's `HeldGoalStack`
+/// pins a `SubGoal::Primitive { action, .. }` — chosen in place of
+/// `actions_for_disposition`. Returns `travel_actions(distances)` ∪
+/// the single Pattern-B leaf step keyed to the primitive's
+/// `GoapActionKind` (mirrors `actions_for_disposition`'s travel + domain
+/// union pattern, so A* can satisfy `ZoneIs(...)` preconditions via the
+/// per-zone TravelTo legs).
 ///
 /// Routes through `PlannerZone::SocialTarget` for the kitten-arc leaves
 /// (Wean / Teach / Release — kittens are alive cats in `cat_positions`)
-/// and `PlannerZone::GraveTarget` for the mourn-arc leaves (Vigil /
-/// GriefSit / ReleaseGrief — graves are dead-and-buried positions).
+/// and `PlannerZone::CorpseTarget` for the mourn-arc leaves (Vigil /
+/// GriefSit / ReleaseGrief — grave zone routing reuses CorpseTarget
+/// until a dedicated GraveTarget zone lands).
+///
+/// The leaf's effect is `SetInteractionDone(true)`, so the L2 author
+/// must pair this with the matching goal predicate
+/// `StatePredicate::InteractionDone(true)` (overridden at the
+/// `evaluate_and_plan` call site when frame-pinned — `Caretaking`'s
+/// `TripsAtLeast` goal won't satisfy via `SetInteractionDone`).
 ///
 /// # Panics
 /// Panics on actions that are not HTN primitive leaves; the L2 frame-pin
 /// is the only authoritative caller and pre-filters to supported variants.
-pub fn htn_primitive_actions(action: Action) -> Vec<GoapActionDef> {
+pub fn htn_primitive_actions(action: Action, distances: &ZoneDistances) -> Vec<GoapActionDef> {
     let (kind, zone) = match action {
         Action::Wean => (GoapActionKind::Wean, PlannerZone::SocialTarget),
         Action::Teach => (GoapActionKind::Teach, PlannerZone::SocialTarget),
@@ -298,12 +308,14 @@ pub fn htn_primitive_actions(action: Action) -> Vec<GoapActionDef> {
         Action::ReleaseGrief => (GoapActionKind::ReleaseGrief, PlannerZone::CorpseTarget),
         other => panic!("htn_primitive_actions: unsupported action {other:?}"),
     };
-    vec![GoapActionDef {
+    let mut actions = travel_actions(distances);
+    actions.push(GoapActionDef {
         kind,
         cost: 2,
         preconditions: vec![StatePredicate::ZoneIs(zone)],
         effects: vec![StateEffect::SetInteractionDone(true)],
-    }]
+    });
+    actions
 }
 
 /// 176: single-action template for `Discarding`. No travel — the cat
