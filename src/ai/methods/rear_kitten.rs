@@ -60,7 +60,7 @@ use bevy_ecs::prelude::*;
 /// at target resolution time. If father involvement in rearing is
 /// later authored as a separate aspiration (#333 §Out of scope), it
 /// shares the same gate; only the picker's filter changes.
-fn has_dependent_kitten(world: &World, entity: Entity) -> bool {
+pub fn has_dependent_kitten(world: &World, entity: Entity) -> bool {
     let ent = world.entity(entity);
     !ent.contains::<Dead>() && ent.contains::<Parent>()
 }

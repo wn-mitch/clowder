@@ -70,6 +70,37 @@ use crate::resources::trace_log::{
     EmitWalkRow, FocalTraceTarget, TraceEntry, TraceLog, TraceRecord,
 };
 
+/// Ticket 364 — reactive emit sentinel chain name. Folded into
+/// `IntentionSource::AspirationEmitted { chain: REACTIVE_CHAIN }`
+/// when a marker-gated demand authors an emission row. The picker's
+/// in-flight check distinguishes reactive vs aspirational frames by
+/// matching the sentinel here.
+pub const REACTIVE_CHAIN: &str = "<reactive>";
+
+/// 364 — marker-gated reactive emit. Unlike aspiration milestones, a
+/// reactive emit fires whenever the cat's substrate state satisfies the
+/// `applicable_when` predicate; there's no chain / milestone bookkeeping
+/// behind it. The Live method matching `label` provides the structure
+/// the leaf-primitive arc walks.
+struct ReactiveEmit {
+    label: &'static str,
+    applicable_when: fn(&World, Entity) -> bool,
+    strategy: CommitmentStrategy,
+    priority: Priority,
+}
+
+/// 364 — registry of reactive emits walked after the per-aspiration
+/// loop. Order is registration order; `Priority` decides winner via
+/// `AspirationEmissions::winner()`. `kitten_reared` is the only entry
+/// at 364 land; `process_grief` follows when §7.7.b ships the
+/// `Mourning` writer.
+const REACTIVE_EMITS: &[ReactiveEmit] = &[ReactiveEmit {
+    label: "kitten_reared",
+    applicable_when: crate::ai::methods::rear_kitten::has_dependent_kitten,
+    strategy: CommitmentStrategy::SingleMinded,
+    priority: Priority::Primary,
+}];
+
 /// One cat's picker snapshot — captured under the `Aspirations`
 /// query borrow so subsequent `&World`-taking predicates can run
 /// without holding it.
@@ -210,6 +241,35 @@ fn compute_outcome(
         }
     }
 
+    // 364 step 1.5 — reactive emits. Marker-gated demands (active
+    // dependent kitten, future mourning) that don't ride on an
+    // aspiration milestone. Skip when ANY frame is in flight (today's
+    // policy is non-preemptive — the cat finishes their current arc
+    // before adopting a new one; revisit if welfare canaries degrade).
+    if snap.in_flight_chain.is_none() {
+        for reactive in REACTIVE_EMITS {
+            if !(reactive.applicable_when)(world, snap.entity) {
+                continue;
+            }
+            // Live method existence check — mirrors step 2's discipline.
+            let method_registry = world.resource::<MethodRegistry>();
+            if method_registry.lookup(reactive.label, world, snap.entity).is_none() {
+                continue;
+            }
+            emissions.rows.push(EmissionRow {
+                chain: REACTIVE_CHAIN,
+                milestone_index: 0, // reactive emits have no milestone
+                label: reactive.label,
+                strategy: reactive.strategy,
+                priority: reactive.priority,
+                fallback_used: false,
+            });
+            // First match wins per ordering — Primary reactive emits
+            // dominate any later Secondary/Tertiary reactive entry.
+            break;
+        }
+    }
+
     CatOutcome {
         entity: snap.entity,
         emissions,
@@ -321,5 +381,29 @@ fn apply_outcome(world: &mut World, outcome: CatOutcome) {
         for entry in outcome.traces {
             log.push(entry);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reactive_emits_table_contains_kitten_reared() {
+        // 364 — the kitten_reared reactive emit is the only registered
+        // entry at 364 land. process_grief follows when §7.7.b ships.
+        assert_eq!(REACTIVE_EMITS.len(), 1);
+        assert_eq!(REACTIVE_EMITS[0].label, "kitten_reared");
+        assert_eq!(REACTIVE_EMITS[0].priority, Priority::Primary);
+        assert_eq!(REACTIVE_EMITS[0].strategy, CommitmentStrategy::SingleMinded);
+    }
+
+    #[test]
+    fn reactive_chain_sentinel_is_stable() {
+        // The sentinel string round-trips through
+        // `IntentionSource::AspirationEmitted { chain }`. Stable constant
+        // so the in-flight check (snap.in_flight_chain == REACTIVE_CHAIN)
+        // matches frames authored from a reactive emit.
+        assert_eq!(REACTIVE_CHAIN, "<reactive>");
     }
 }
