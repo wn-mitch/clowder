@@ -16,9 +16,9 @@ _Last generated: 2026-05-17._
 |---|---|
 | In progress | 6 |
 | Ready | 112 |
-| Parked | 18 |
+| Parked | 15 |
 | Blocked | 38 |
-| **Open total** | **174** |
+| **Open total** | **171** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,11 +40,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
-- **[383](docs/open-work/tickets/383-build-cadence-under-population-growth-shelter-pressure-under-fires-once-colony-establishes.md)** — Build-cadence under population growth — shelter pressure under-fires once colony establishes — _[ai-substrate] · score 0.91_
-- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[187](docs/open-work/tickets/187-kitten-starvation-under-active-mating-pipeline.md)** — Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate — _[life-cycle] · score 0.91_
+- **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · score 0.91_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (3)
 
@@ -218,7 +218,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
-### smarter-cats (14 open, 20 landed)
+### smarter-cats (14 open, 23 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
@@ -314,7 +314,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-### htn-method-composition (1 open, 10 landed)
+### htn-method-composition (1 open, 13 landed)
 
 - **[399](docs/open-work/tickets/399-l2-parentingactivity-express-non-primary-caretaker-parent-roles-per-7m2-design.md)** — L2 ParentingActivity — express non-primary-caretaker parent roles per §7.M.2 (design) — _[social-coordination] · added 2026-05-17_
 
@@ -433,7 +433,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 - **[399](docs/open-work/tickets/399-l2-parentingactivity-express-non-primary-caretaker-parent-roles-per-7m2-design.md)** — L2 ParentingActivity — express non-primary-caretaker parent roles per §7.M.2 (design) — _[social-coordination] · added 2026-05-17_
 
-## Parked (18)
+## Parked (15)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _[life-cycle] · parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _[ai-substrate] · parked 2026-04-30 · added 2026-04-27_
@@ -450,9 +450,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[345](docs/open-work/tickets/345-771-aspiration-soft-class-per-pair-weights.md)** — §7.7.1 aspiration soft-class per-pair weights — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
-- **[394](docs/open-work/tickets/394-rear-kitten-arc-starvation-regression-queen-attention-diverted-from-caretakefeedkitten.md)** — rear_kitten arc Wean-failure churn — frame always created at sub_goal 0 — _[ai-substrate] · parked 2026-05-17 · added 2026-05-16_
-- **[395](docs/open-work/tickets/395-rear-kitten-arc-decouple-release-from-kittendependency-removal.md)** — rear_kitten arc — decouple Release from KittenDependency removal — _[ai-substrate] · parked 2026-05-17 · added 2026-05-16_
-- **[397](docs/open-work/tickets/397-rear-kitten-arc-clean-completion-exposes-kitten-survival-regression.md)** — rear_kitten arc clean completion exposes kitten survival regression — _[ai-substrate] · parked 2026-05-17 · added 2026-05-16_
 
 ## Blocked (38)
 
@@ -500,14 +497,17 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (244)
+## Landed archive (247)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (179)
+### 2026-05 (182)
 
 - **[398](docs/open-work/landed/398-7m2-raiseoffspringaspiration-kitten-rearing-as-nested-intention-aspiration.md)** — §7.M.2 RaiseOffspringAspiration — kitten-rearing as nested-Intention aspiration _(2026-05-17)_
+- **[397](docs/open-work/landed/397-rear-kitten-arc-clean-completion-exposes-kitten-survival-regression.md)** — rear_kitten arc clean completion exposes kitten survival regression _(2026-05-17)_
 - **[396](docs/open-work/landed/396-verdict-canary-for-new-high-rate-plan-failures-by-reason-keys.md)** — verdict canary for new high-rate plan_failures_by_reason keys _(2026-05-17)_
+- **[395](docs/open-work/landed/395-rear-kitten-arc-decouple-release-from-kittendependency-removal.md)** — rear_kitten arc — decouple Release from KittenDependency removal _(2026-05-17)_
+- **[394](docs/open-work/landed/394-rear-kitten-arc-starvation-regression-queen-attention-diverted-from-caretakefeedkitten.md)** — rear_kitten arc Wean-failure churn — frame always created at sub_goal 0 _(2026-05-17)_
 - **[382](docs/open-work/landed/382-influence-map-based-colony-district-placement-retire-find-building-placement-spiral-plan-expansion-zones.md)** — Influence-map based colony-district placement — retire find_building_placement spiral, plan expansion zones _(2026-05-16)_
 - **[364](docs/open-work/landed/364-357-follow-on-d1-dispatch-closure-frame-pin-advance-d2-reactive-emission-real-weanteachrelease-resolvers.md)** — 357 follow-on — D1 dispatch closure (frame-pin + advance) + D2 reactive emission + real Wean/Teach/Release resolvers _(2026-05-16)_
 - **[190](docs/open-work/landed/190-build-chronic-full-weight-tune.md)** — Tune build_chronic_full_weight (179 follow-on) _(2026-05-16)_

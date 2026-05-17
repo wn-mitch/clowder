@@ -1,7 +1,7 @@
 ---
 id: 395
 title: rear_kitten arc — decouple Release from KittenDependency removal
-status: parked
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats, htn-method-composition]
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-17
 ---
 
 ## Why
@@ -327,3 +327,4 @@ follow-ups" discipline in CLAUDE.md)
   override). Plan at
   `/Users/will.mitchell/.claude/plans/let-s-start-tickets-394-397-snazzy-kahan.md`
   (local).
+- 2026-05-17: Superseded by 398 — kept-substrate (R13 Release-at-maturity-1.0, father-pitches-in symmetric picker, release_threshold gap) ships inside 398. The Release-from-KittenDependency-removal decoupling per se is no longer a separate ticket: §7.M.2's L1 architecture treats parenthood as a sustained aspiration tied to Parent marker presence; removal-of-dependency is the natural drop signal.

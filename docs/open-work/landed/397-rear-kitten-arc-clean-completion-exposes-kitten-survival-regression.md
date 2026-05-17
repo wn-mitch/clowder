@@ -1,7 +1,7 @@
 ---
 id: 397
 title: rear_kitten arc clean completion exposes kitten survival regression
-status: parked
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats, htn-method-composition]
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-17
 ---
 
 ## Why
@@ -347,3 +347,4 @@ The full plan document with file-path-level detail is at
   cadence. Plan at
   `/Users/will.mitchell/.claude/plans/let-s-start-tickets-394-397-snazzy-kahan.md`
   (local).
+- 2026-05-17: Superseded by 398 — L1 broadening at scoring.rs:1973-2000 (Parent || hungry_kitten_urgency entry-gate) ships as kept-substrate. The +0.25 lift, DispositionFailureCooldown bypass, and pin-Caretake-preempts guard remain in code (load-bearing for the current frame-pin-based dispatch); their architectural retirement is part of the deferred L2/L3 follow-on tracked via #399 and the §L2.10.6 unified-softmax phase. Pebblekit-67-class kittens survive via 398's AspirationLift mechanism rather than via the per-tick +0.25 compensation.

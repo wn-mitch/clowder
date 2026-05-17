@@ -1,7 +1,7 @@
 ---
 id: 394
 title: rear_kitten arc Wean-failure churn — frame always created at sub_goal 0
-status: parked
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats, htn-method-composition]
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-17
 ---
 
 ## Why
@@ -234,3 +234,4 @@ out-of-range-at-dispatch-time) that R10 would also need to address.
   Wean-churn mechanism. Plan at
   `/Users/will.mitchell/.claude/plans/let-s-start-tickets-394-397-snazzy-kahan.md`
   (local).
+- 2026-05-17: Superseded by 398 — RaiseOffspringAspiration's L1 AspirationLift (Mother + Parent marker → Caretake +0.2) provides reliable Caretake score elevation across the full kitten-dependency window, addressing the queen-attention-diverted failure mode at the substrate layer rather than via per-tick lift compensations.
