@@ -32,6 +32,13 @@ pub enum AspirationDomain {
     Exploration,
     Building,
     Leadership,
+    /// Ticket 398 — §7.M.2 RaiseOffspringAspiration domain. Lifetime
+    /// kitten-rearing arc; matching action is `Action::Caretake`.
+    /// Distinct from Social (relational-but-not-kin) because §7.M.2's
+    /// spec-named aspiration tracks a separate commitment axis
+    /// (provisioning + protection of dependents) that the personality
+    /// alignment picks up via `compassion`, not `warmth`.
+    Kinship,
 }
 
 impl AspirationDomain {
@@ -51,6 +58,7 @@ impl AspirationDomain {
             Self::Exploration => &[Action::Explore, Action::Wander],
             Self::Building => &[Action::Build],
             Self::Leadership => &[Action::Coordinate],
+            Self::Kinship => &[Action::Caretake],
         }
     }
 }

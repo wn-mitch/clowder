@@ -428,6 +428,13 @@ pub mod fight;
 pub mod flee;
 pub mod mourn_at_grave;
 pub mod rear_kitten;
+// 398: Live HTN method module — single-primitive `caretake_kitten`
+// catches the `caretake_kitten` label that `RAISE_OFFSPRING_ASPIRATION`'s
+// dormant emit row will fire once Phase 1c/1d's unified softmax +
+// persistence-bonus land. Registers Live at 398 Phase 1a so the
+// picker's `MethodRegistry::lookup` check resolves cleanly when the
+// row activates.
+pub mod caretake_kitten;
 
 // Tests live in `tests.rs` so the bash lint can exclude that path
 // while scanning `src/ai/methods/` for production `Method` literals.

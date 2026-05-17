@@ -251,6 +251,16 @@ pub fn find_path(
     if from == to {
         return Some(Vec::new());
     }
+    // Ticket 398 — bounds-check BOTH endpoints. Pre-398, only `to`
+    // was checked; callers that passed an out-of-bounds `from`
+    // (e.g. a stale cached source position) panicked on the
+    // `g_score[start_idx] = 0` write below. Returning `None` is the
+    // safe semantic: an unrouteable request is indistinguishable
+    // from "from-position invalid," and downstream callers already
+    // handle the `None` return.
+    if !map.in_bounds(from.x, from.y) {
+        return None;
+    }
     if !map.in_bounds(to.x, to.y) || !map.get(to.x, to.y).terrain.is_passable() {
         return None;
     }

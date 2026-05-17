@@ -40,6 +40,7 @@ pub mod combat;
 pub mod exploration;
 pub mod herbcraft;
 pub mod hunting;
+pub mod kinship;
 pub mod leadership;
 pub mod social;
 
@@ -52,6 +53,17 @@ pub mod social;
 /// follow-on work when authoring needs surface.
 pub fn always_true(_world: &World, _entity: Entity) -> bool {
     true
+}
+
+/// Inert-predicate sentinel. Used on emit rows that are structurally
+/// authored but not yet meant to fire — the substrate ships dormant
+/// until the rest of the supporting infrastructure lands. Ticket 398's
+/// `RaiseOffspringAspiration` emit row uses this until §L2.10.6's
+/// unified softmax + §7.4 per-tier persistence-bonus arrive (phases
+/// 1c/1d in the 398 plan); the row flips to `has_juvenile_dependent`
+/// at that point.
+pub fn always_false(_world: &World, _entity: Entity) -> bool {
+    false
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +240,7 @@ pub const ALL_CHAINS: &[&AspirationChain] = &[
     &building::THE_ARCHITECT,
     &leadership::VOICE_OF_THE_COLONY,
     &leadership::THE_UNIFIER,
+    &kinship::RAISE_OFFSPRING_ASPIRATION,
 ];
 
 // ---------------------------------------------------------------------------

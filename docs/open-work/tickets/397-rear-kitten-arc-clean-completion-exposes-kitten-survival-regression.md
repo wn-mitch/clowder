@@ -7,7 +7,7 @@ initiative: [smarter-cats, htn-method-composition]
 orchestration: substrate-sensitive
 added: 2026-05-16
 parked: 2026-05-17
-blocked-by: [398]
+blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []

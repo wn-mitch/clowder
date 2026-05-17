@@ -72,6 +72,8 @@ mod tests {
             AspirationDomain::Exploration,
             AspirationDomain::Building,
             AspirationDomain::Leadership,
+            // 398: Kinship — single chain `RAISE_OFFSPRING_ASPIRATION`.
+            AspirationDomain::Kinship,
         ];
         for domain in domains {
             assert!(

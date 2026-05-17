@@ -36,6 +36,10 @@ fn domain_personality_axis(domain: AspirationDomain, p: &Personality) -> f32 {
         AspirationDomain::Exploration => p.curiosity,
         AspirationDomain::Building => p.diligence,
         AspirationDomain::Leadership => p.ambition,
+        // Ticket 398 — Kinship aligns with compassion (the values-axis
+        // most tightly coupled to the spec's "compassionate → Caretake-
+        // biased" cleavage in §7.M.2).
+        AspirationDomain::Kinship => p.compassion,
     }
 }
 
@@ -89,6 +93,12 @@ fn score_chain(
         AspirationDomain::Leadership => {
             memory_count(memory, MemoryType::SocialEvent) as f32 * c.experience_secondary_scale
         }
+        // Ticket 398 — Kinship has no specific memory-type proxy yet.
+        // Adoption is personality-driven (compassion axis) at this
+        // phase; the §L2.10.6 land + post-partum trigger (398 follow-on)
+        // will add a `BecomesParent`/`KittenBorn` event-driven adoption
+        // path separate from this passive-scoring loop.
+        AspirationDomain::Kinship => 0.0,
     };
     score += experience.min(c.experience_cap); // cap experience contribution
 
@@ -229,6 +239,18 @@ pub fn select_aspirations(
         // Score all available chains.
         let mut best: Option<(&str, AspirationDomain, f32)> = None;
         for chain in registry.all_chains() {
+            // Ticket 398 — Kinship aspirations are spec-event-driven
+            // (post-partum / first-litter triggers per §7.M.2), not
+            // passive-scored. Skip them in the passive adoption picker.
+            // Skipping BEFORE the `rng.random_range` call inside
+            // `score_chain` preserves seed-42 determinism: adding the
+            // chain to `ALL_CHAINS` must not consume RNG state in this
+            // path (per `learning_bevy_schedule_edge_perturbation`).
+            // Event-driven adoption wiring lands as 398 Phase 1c+
+            // follow-on once `BecomesParent` plumbing is in place.
+            if chain.domain == AspirationDomain::Kinship {
+                continue;
+            }
             let s = score_chain(
                 chain.domain,
                 personality,
@@ -346,6 +368,12 @@ pub fn check_second_aspiration_slot(
             if can_adopt(&aspirations.active, chain, &registry).is_some() {
                 continue;
             }
+            // Ticket 398 — Kinship is event-driven (see select_aspirations
+            // sibling site). Skip before rng-consumption to preserve
+            // seed-42 determinism.
+            if chain.domain == AspirationDomain::Kinship {
+                continue;
+            }
             let s = score_chain(
                 chain.domain,
                 personality,
@@ -399,6 +427,16 @@ pub fn check_aspiration_abandonment(
     for (name, personality, mut aspirations) in &mut query {
         let mut to_remove = Vec::new();
         for (i, asp) in aspirations.active.iter().enumerate() {
+            // Ticket 398 — Kinship aspirations are event-driven (adopt
+            // on first kitten, drop when no more dependents per
+            // `adopt_kinship_aspiration`). The progress-stagnation
+            // abandonment path doesn't apply: ActionCount(9999) is
+            // unreachable by design, and low-compassion mothers would
+            // otherwise cycle adopt → abandon every 2000 ticks for the
+            // duration of their kittens' dependency.
+            if asp.domain == AspirationDomain::Kinship {
+                continue;
+            }
             let stagnant = time.tick.saturating_sub(asp.last_progress_tick) >= STAGNATION_TICKS;
             let low_alignment = domain_personality_axis(asp.domain, personality) < MIN_ALIGNMENT;
             if stagnant && low_alignment {
@@ -772,6 +810,108 @@ pub fn update_mentoring_target_markers(
             has_marker,
             markers::HasMentoringTarget,
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// adopt_kinship_aspiration (Ticket 398)
+// ---------------------------------------------------------------------------
+
+/// Ticket 398 — event-driven adoption + drop of `RAISE_OFFSPRING_ASPIRATION`.
+///
+/// §7.M.2 frames RaiseOffspringAspiration as a post-partum aspiration
+/// (a mother adopts on first kitten; persists across the dependency
+/// window; drops when no more dependent kittens). Unlike the other
+/// 14 chains which adopt via the passive personality-scored picker,
+/// Kinship is **event-driven**: presence-in-`KittenDependency.mother`
+/// is the trigger.
+///
+/// **Mother-only adoption (not father).** §7.M.2's spec model has the
+/// father shifting to a provisioner role via the L2 `ParentingActivity`
+/// substrate (Hunt-bias for diligent personality, etc.). Without L2
+/// landed, lifting Caretake's score for fathers via the L1
+/// `AspirationLift` (`compute_aspiration_action_counts`) causes them
+/// to over-attempt Caretake while the mother is already handling it,
+/// inflating `HandoffItem` plan-failure rates. The narrow L1-only
+/// landing scopes Kinship to mothers; father provisioning is L2
+/// follow-on.
+///
+/// **Drops when no more dependent kittens.** When a cat is no longer
+/// the mother of any living kitten (kittens matured or died), the
+/// aspiration is removed from `Aspirations.active` — it doesn't move
+/// to `completed` (no narrative-worthy completion event; the cat may
+/// have another litter later). This makes the chain effectively
+/// re-adoptable per-litter.
+///
+/// **Bypasses progress-stagnation abandonment.** The chain's
+/// ActionCount(9999) progress tracker is deliberately unreachable
+/// (the spec's natural completion is §7.7.a Elder transition).
+/// `check_aspiration_abandonment` would otherwise drop the aspiration
+/// on low-compassion mothers after 2000 ticks of stagnation; the
+/// abandonment system has a sibling guard to skip Kinship.
+///
+/// Sibling of `update_parent_markers` in Chain 2a — runs after the
+/// markers are authored so adoption sees the freshly-set state.
+#[allow(clippy::type_complexity)]
+pub fn adopt_kinship_aspiration(
+    mut query: Query<
+        (Entity, &Name, &mut Aspirations),
+        (With<AspirationsInitialized>, Without<Dead>),
+    >,
+    kittens: Query<&crate::components::KittenDependency, Without<Dead>>,
+    time: Res<TimeState>,
+    mut log: ResMut<NarrativeLog>,
+) {
+    const KINSHIP_CHAIN_NAME: &str = "Raise Offspring";
+
+    use std::collections::HashSet;
+    // Build the set of mother Entities with at least one living dependent kitten.
+    let mothers: HashSet<Entity> = kittens
+        .iter()
+        .filter_map(|dep| dep.mother)
+        .collect();
+
+    for (entity, name, mut aspirations) in &mut query {
+        let is_mother = mothers.contains(&entity);
+        let kinship_active_idx = aspirations
+            .active
+            .iter()
+            .position(|a| a.chain_name == KINSHIP_CHAIN_NAME);
+
+        match (is_mother, kinship_active_idx) {
+            (true, None) => {
+                // Newly mother — adopt.
+                aspirations.active.push(ActiveAspiration {
+                    chain_name: KINSHIP_CHAIN_NAME.to_string(),
+                    domain: AspirationDomain::Kinship,
+                    current_milestone: 0,
+                    progress: 0,
+                    adopted_tick: time.tick,
+                    last_progress_tick: time.tick,
+                });
+                log.push(
+                    time.tick,
+                    format!(
+                        "{} commits to raising their young. The litter becomes the work.",
+                        name.0,
+                    ),
+                    NarrativeTier::Action,
+                );
+            }
+            (false, Some(idx)) => {
+                // No more living dependents — drop the aspiration.
+                aspirations.active.remove(idx);
+                log.push(
+                    time.tick,
+                    format!(
+                        "{}'s litter has grown beyond their reach. The work is done.",
+                        name.0,
+                    ),
+                    NarrativeTier::Action,
+                );
+            }
+            _ => {}
+        }
     }
 }
 

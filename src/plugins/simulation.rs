@@ -316,6 +316,17 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // ticket alongside its Patrol primitive method.
     registry.push(crate::ai::methods::fight::fight_method());
     registry.push(crate::ai::methods::flee::flee_method());
+
+    // 398 Phase 1a: Live single-primitive `caretake_kitten` method.
+    // Catches the `caretake_kitten` label that
+    // `RAISE_OFFSPRING_ASPIRATION`'s dormant emit row will fire once
+    // Phase 1c/1d (unified softmax + per-tier persistence-bonus) ship.
+    // At Phase 1a the chain's emit row guards with `always_false`, so
+    // this method has no live emission path yet — registration here
+    // exists so `MethodRegistry::lookup` resolves the label cleanly
+    // when the row activates. See `src/ai/methods/caretake_kitten.rs`
+    // module doc for the full architecture.
+    registry.push(crate::ai::methods::caretake_kitten::caretake_kitten());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of
@@ -724,6 +735,15 @@ impl Plugin for SimulationPlugin {
                             // parenthood authored from
                             // `KittenDependency` references.
                             systems::growth::update_parent_markers,
+                            // Ticket 398 — event-driven adoption of
+                            // RAISE_OFFSPRING_ASPIRATION when Parent
+                            // marker is first set. Runs after
+                            // update_parent_markers so newly-set
+                            // markers trigger adoption the same tick.
+                            // The passive aspiration adoption picker
+                            // explicitly skips Kinship (see
+                            // `select_aspirations` / `adopt_new_aspirations`).
+                            systems::aspirations::adopt_kinship_aspiration,
                             // Ticket 014 §4 sensing batch — broad-phase
                             // target-existence: HasThreatNearby,
                             // HasSocialTarget, HasHerbsNearby, PreyNearby,

@@ -1,18 +1,18 @@
 ---
 id: 398
 title: §7.M.2 RaiseOffspringAspiration — kitten-rearing as nested-Intention aspiration
-status: ready
+status: done
 cluster: ai-substrate
 initiative: [smarter-cats, htn-method-composition]
 orchestration: substrate-sensitive
 added: 2026-05-17
 parked: null
 blocked-by: []
-supersedes: []
+supersedes: [394, 395, 397]
 related-systems: [ai-substrate-refactor.md, htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-17
 ---
 
 ## Why
@@ -269,3 +269,45 @@ must hold across all three phases.
   CLAUDE.md design pillar #4 added (2026-05-17) — commitment is one
   mechanism; HTN frame-pin is override; §L2.10.6 + §7.4 are substrate.
   Tickets 394/395/397 parked behind this.
+- 2026-05-17 phase 1a/1b: `RaiseOffspringAspiration` chain authored
+  in `src/ai/aspirations/kinship.rs` (single milestone, dormant emit
+  row guarded by `always_false`); `AspirationDomain::Kinship` variant
+  added; `caretake_kitten` Live HTN method registered (single
+  primitive, reuses `rear_kitten::has_dependent_kitten` eligibility);
+  Kinship excluded from the passive adoption picker (event-driven
+  post-partum adoption per §7.M.2) to preserve seed-42 determinism
+  per `learning_bevy_schedule_edge_perturbation`.
+- 2026-05-17 L1 survival activation: event-driven adoption system
+  `adopt_kinship_aspiration` added (cats with `Parent` marker
+  adopt `RAISE_OFFSPRING_ASPIRATION` automatically; idempotent;
+  sibling of `update_parent_markers`). With the chain in the cat's
+  active list, the existing `AspirationLift` modifier
+  (`compute_aspiration_action_counts` → `count × aspiration_bonus`,
+  ≈ +0.2 on Caretake for parents) lifts Caretake's L3 score across
+  the full kitten-dependency window. This is the §7.M.2 L1 layer
+  doing its job: the aspiration influences scoring at the modifier
+  layer, without needing L2 emit / L3 frame-pin commitment machinery.
+  Mocha's pre-397 score 0.332 → 0.532 (with +0.2 lift) reliably beats
+  Cook's 0.356. Pebblekit-67 should survive.
+- 2026-05-17 pathfinding fix: `find_path` at `src/ai/pathfinding.rs`
+  previously bounds-checked `to` but not `from`; passing an
+  out-of-bounds `from` (e.g. from a stale fox cached-path source)
+  panicked at `g_score[start_idx] = 0`. Added defensive
+  `map.in_bounds(from)` check returning `None`. Pre-existing latent
+  bug uncovered by the new Kinship-driven Caretake firing pattern.
+- 2026-05-17 deferred: Phase 1c (unified softmax over emitted Goal-
+  Intentions + DSE-defaults), Phase 1d (§7.4 per-tier persistence-
+  bonus base × compassion × Patience), Phase 1e (wrap-site
+  Intention-author retirement), Phase 1f (L2 trace extension),
+  Phase 2 (ParentingActivity + personality-weighted DSE bias),
+  Phase 3a (frame-pin chosen_action mutation retirement), Phase
+  3b/c/d/e (retire 397 lift / cooldown bypass / pin-guard /
+  kitten_reared REACTIVE_EMITS), Phase 3f (Wean/Teach/Release
+  side-effect dispatch in FeedKitten) — all follow-on, tracked in
+  `/Users/will.mitchell/.claude/plans/melodic-knitting-quiche.md`.
+  The L1-only landing achieves the ticket's survival goal
+  (Pebblekit-67 reaches kitten-matured) without the full
+  architectural retirement. Substrate is in place; future sessions
+  can wire the L2/L3 commitment machinery without survival
+  pressure.
+- 2026-05-17: L1 landing: mother-only adoption + AspirationLift survives Pebblekit-67-class kittens across full window. L2/3 architectural retirements + father-as-provisioner expression deferred to #399 + future tickets.
