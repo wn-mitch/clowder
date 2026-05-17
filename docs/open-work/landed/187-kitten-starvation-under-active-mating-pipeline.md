@@ -1,7 +1,7 @@
 ---
 id: 187
 title: Kittens starve in the post-184 soak — RetrieveFoodForKitten plan-fails dominate
-status: ready
+status: done
 cluster: life-cycle
 orchestration: substrate-sensitive
 initiative: [generational-continuity, welfare-fidelity]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-17
 ---
 
 ## Why
@@ -158,3 +158,4 @@ parameter tuning:
   post-184 reproduction may or may not still be the dominant
   failure mode in the post-272 trajectory — re-confirm with
   `/logq` on the parent of Dawnkit-28 near the death tick.
+- 2026-05-17: Superseded by 398's L1 RaiseOffspringAspiration landing. Hard gates verified on post-398 soak (logs/tuned-42, commit 0bf7bdd1): deaths_by_cause.Starvation == 0 (vs 2 in post-184 baseline); 3 kittens born, 3 weaned, 0 died; KittenFed == 39 (vs 5 in post-184, ~8× scaling-up at constant kitten count); RetrieveFoodForKitten:inventory-full plan-failures absent from dict entirely (pattern shifted — Caretake is winning softmax often enough that inventory-full corner cases don't accumulate). 398's mechanism (L1 AspirationLift, +0.2 on Caretake for mothers via compute_aspiration_action_counts) differs from 187's hypothesized structural-revision menu (split/extend/rebind RetrieveFoodForKitten with deposit-first chain) — but the hard gate is what 187 exists to enforce, and the gate passes. The current post-398 load-bearing plan-failure is HandoffItem-no-recipient (9316×) — a different shape addressed in #399 + #192 (handing_target_dse L2 picker + ticket-231-style marker gating).
