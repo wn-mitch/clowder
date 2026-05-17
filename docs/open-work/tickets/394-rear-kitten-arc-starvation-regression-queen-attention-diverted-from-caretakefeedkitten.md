@@ -6,8 +6,8 @@ cluster: ai-substrate
 initiative: [smarter-cats, htn-method-composition]
 orchestration: substrate-sensitive
 added: 2026-05-16
-parked: 2026-05-16
-blocked-by: [395]
+parked: 2026-05-17
+blocked-by: [398]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
@@ -223,3 +223,14 @@ out-of-range-at-dispatch-time) that R10 would also need to address.
   as the comprehensive fix (R11 + R13: dispatch case-split +
   Release's KittenDependency removal gated on natural maturity 1.0).
   394 carries the Phase A diagnostic record; 395 carries the fix.
+- 2026-05-17: **Re-parked, blocked on 398** (`§7.M.2
+  RaiseOffspringAspiration — kitten-rearing as nested-Intention
+  aspiration`). Session dissection identified the 364 HTN
+  frame-pin + wrap-site override as the wrong commitment layer
+  per CLAUDE.md design pillar #4 (added 2026-05-17 — *"commitment
+  is one mechanism, not two"*). 394's R11 dispatch-case-split is
+  a patch on the override and retires with the override; 394's
+  Phase A diagnostic record remains the source-of-truth for the
+  Wean-churn mechanism. Plan at
+  `/Users/will.mitchell/.claude/plans/let-s-start-tickets-394-397-snazzy-kahan.md`
+  (local).

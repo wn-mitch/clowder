@@ -1,13 +1,13 @@
 ---
 id: 397
 title: rear_kitten arc clean completion exposes kitten survival regression
-status: ready
+status: parked
 cluster: ai-substrate
 initiative: [smarter-cats, htn-method-composition]
 orchestration: substrate-sensitive
 added: 2026-05-16
-parked: null
-blocked-by: []
+parked: 2026-05-17
+blocked-by: [398]
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
@@ -322,3 +322,28 @@ The full plan document with file-path-level detail is at
   precedent. Open follow-on ticket recommended: "Caretake target
   picker: per-tick round-robin or hunger-floor-prioritization
   across multiple dependents."
+- 2026-05-17: **Parked, blocked on 398** (`§7.M.2
+  RaiseOffspringAspiration — kitten-rearing as nested-Intention
+  aspiration`). Session reframe identified that 397's narrow
+  §L2.10.6 land (pool-gate + lift + cooldown bypass + pin-guard)
+  was itself another patch on the deferred-spec boundary rather
+  than the spec-mandated convergence per `docs/systems/ai-substrate-refactor.md`
+  §7.M.2 (post-mating cascade names a `RaiseOffspringAspiration`
+  that emits Caretake-Intentions into the unified softmax pool
+  with §7.4 persistence). CLAUDE.md design pillar #4
+  (2026-05-17) — *"commitment is one mechanism, not two."*
+  Substrate pieces from 397 that survive the convergence: L1
+  pool-entry gate broadening (Caretake enters L2 pool every tick
+  the `Parent` marker is set — keep), `Parent` +
+  `HasJuvenileDependent` plumbed into `MarkerSnapshot` (keep).
+  Pieces that retire with the override: +0.25 lift
+  (`rear_kitten_caretake_lift`), `DispositionFailureCooldown`
+  bypass for Caretake, pin-Caretake-preempts guard — all
+  workarounds for the frame-pin and wrap-site override. The
+  multi-kitten picker recommendation from the prior log entry is
+  also superseded: with sustained Caretake-Intention emission +
+  §7.4 persistence under 398, even `Best` aggregation across
+  multiple dependents produces adequate cross-kitten feeding
+  cadence. Plan at
+  `/Users/will.mitchell/.claude/plans/let-s-start-tickets-394-397-snazzy-kahan.md`
+  (local).

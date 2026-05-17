@@ -1,13 +1,13 @@
 ---
 id: 395
 title: rear_kitten arc — decouple Release from KittenDependency removal
-status: blocked
+status: parked
 cluster: ai-substrate
 initiative: [smarter-cats, htn-method-composition]
 orchestration: substrate-sensitive
 added: 2026-05-16
-parked: 2026-05-16
-blocked-by: [397]
+parked: 2026-05-17
+blocked-by: [398]
 supersedes: []
 related-systems: [htn-methods.md]
 related-balance: []
@@ -312,3 +312,18 @@ follow-ups" discipline in CLAUDE.md)
   `project_pair_baseline_drift_attribution` discipline. The
   yield-rule code stays in the working tree as foundation for
   397's stack.
+- 2026-05-17: **Re-parked, blocked on 398** (`§7.M.2
+  RaiseOffspringAspiration — kitten-rearing as nested-Intention
+  aspiration`). Session dissection identified that 397 itself was
+  another patch on the same deferred-spec boundary (HTN frame-pin
+  + wrap-site override as stopgap for §L2.10.6) rather than the
+  spec-mandated convergence. CLAUDE.md design pillar #4
+  (2026-05-17) — *"commitment is one mechanism, not two."*
+  Substrate pieces from 395 that survive the convergence:
+  R13 Release-at-maturity-1.0 (keep), father-pitches-in symmetric
+  picker (keep), release_threshold gap (keep). Pieces that retire
+  with the override: R11 dispatch-Advance-on-band-mismatch (patch
+  on the HTN-pin), yield rule (workaround for the wrap-site
+  override). Plan at
+  `/Users/will.mitchell/.claude/plans/let-s-start-tickets-394-397-snazzy-kahan.md`
+  (local).
