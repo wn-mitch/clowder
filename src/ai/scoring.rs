@@ -2049,8 +2049,9 @@ pub fn score_actions(
     //   `ColonyStoresChronicallyFull` so cats don't dispose of food
     //   the colony's Stores could still accept. Trashing additionally
     //   gates on `HasMidden`.
-    // - **Handing** (deferred to 188) — gates on
-    //   `HasHandoffRecipient` (authored by the future target picker).
+    // - **Handing** (deferred to 188; renamed in 410) — gates on
+    //   `HasDependentCat` (authored by the target picker; co-gates
+    //   Caretake as of 410).
     // - **PickingUp** (deferred to 185) — gates on `HasGroundCarcass`
     //   (authored by 185's sensing extension).
     //

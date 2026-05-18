@@ -104,6 +104,34 @@ def _top_n_dict(d: dict[str, Any] | None, n: int = 3) -> list[dict[str, Any]]:
     return [{"key": k, "value": v} for k, v in items[:n]]
 
 
+def _top_n_with_rates(
+    d: dict[str, Any] | None, elapsed_ticks: int | None, n: int = 3,
+) -> list[dict[str, Any]]:
+    """Like `_top_n_dict` but adds a per-tick rate when `elapsed_ticks` is
+    available.
+
+    Ticket 410: surfacing rate alongside the absolute count prevents the
+    "freakout" pattern where a consumer reads the count, divides by
+    `final_tick` (treating ticks as zero-based), and reports a ~13.6×
+    under-count as a regression. The correct denominator —
+    `elapsed_ticks = final_tick - start_tick` — is now stamped on the
+    footer; consumers should read this field rather than derive it
+    themselves. Returns `rate_per_tick: null` when `elapsed_ticks` is
+    unknown (pre-410 archive) so the caller can still surface the count.
+    """
+    if not d:
+        return []
+    items = [(k, v) for k, v in d.items() if isinstance(v, (int, float))]
+    items.sort(key=lambda kv: -kv[1])
+    out: list[dict[str, Any]] = []
+    for k, v in items[:n]:
+        rate: float | None = None
+        if isinstance(elapsed_ticks, int) and elapsed_ticks > 0:
+            rate = v / elapsed_ticks
+        out.append({"key": k, "value": v, "rate_per_tick": rate})
+    return out
+
+
 def _derive_final_tick(footer_field: Any, ev_path: Path) -> int | None:
     """Footer in current schema doesn't always carry `final_tick`. Derive
     it from `max(.tick)` over events when missing — that is the highest
@@ -154,16 +182,31 @@ def cmd_run_summary(args: argparse.Namespace) -> Envelope:
         })
     if footer:
         f = footer[0]
-        # `final_tick` isn't in the current footer schema; derive from
-        # the highest event tick when it's absent so the field stops
-        # reporting `null` / `?` to consumers.
+        # Ticket 410: `start_tick` / `final_tick` / `elapsed_ticks` now
+        # ship in the footer. Older archives (pre-410) lack the fields;
+        # derive `final_tick` from `max(.tick)` and read `start_tick`
+        # from the header so the per-tick rate column still works.
         final_tick = _derive_final_tick(f.get("final_tick"), ev_path)
+        start_tick = f.get("start_tick")
+        if not isinstance(start_tick, int):
+            header_st = (
+                header[0].get("start_tick") if header else None
+            )
+            start_tick = header_st if isinstance(header_st, int) else None
+        elapsed_ticks = f.get("elapsed_ticks")
+        if not isinstance(elapsed_ticks, int):
+            if isinstance(start_tick, int) and isinstance(final_tick, int):
+                elapsed_ticks = final_tick - start_tick
+            else:
+                elapsed_ticks = None
         deaths = f.get("deaths_by_cause") or {}
         nf = f.get("never_fired_expected_positives") or []
         results.append({
             "id": "run:footer",
             "kind": "footer",
+            "start_tick": start_tick,
             "final_tick": final_tick,
+            "elapsed_ticks": elapsed_ticks,
             "final_tick_source": "footer" if isinstance(f.get("final_tick"), int)
                                  else "derived_max_event_tick",
             "deaths_by_cause": deaths,
@@ -171,11 +214,11 @@ def cmd_run_summary(args: argparse.Namespace) -> Envelope:
             "never_fired_expected_positives": nf,
             "continuity_tallies": f.get("continuity_tallies", {}),
             "wards_placed_total": f.get("wards_placed_total"),
-            "interrupts_by_reason_top": _top_n_dict(
-                f.get("interrupts_by_reason"), 3
+            "interrupts_by_reason_top": _top_n_with_rates(
+                f.get("interrupts_by_reason"), elapsed_ticks, 3
             ),
-            "plan_failures_by_reason_top": _top_n_dict(
-                f.get("plan_failures_by_reason"), 3
+            "plan_failures_by_reason_top": _top_n_with_rates(
+                f.get("plan_failures_by_reason"), elapsed_ticks, 3
             ),
             "anxiety_interrupt_total": f.get("anxiety_interrupt_total"),
             "negative_events_total": f.get("negative_events_total"),
@@ -183,6 +226,7 @@ def cmd_run_summary(args: argparse.Namespace) -> Envelope:
             "positive_features_total": f.get("positive_features_total"),
             "summary": (
                 f"final_tick={final_tick if final_tick is not None else '?'} "
+                f"elapsed_ticks={elapsed_ticks if elapsed_ticks is not None else '?'} "
                 f"deaths={sum(deaths.values()) if deaths else 0} "
                 f"never_fired={len(nf)}"
             ),

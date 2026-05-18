@@ -23,6 +23,34 @@ pub struct RelationshipEntry {
     pub bond: Option<String>,
 }
 
+/// Ticket 400 — L2 ParentingActivity summary for the `CatSnapshot` event.
+/// Carries the five-scale composition asymptote (Presence / Provision /
+/// Protection / Cultural / Autonomy), the per-DSE bias sums emitted by
+/// the modifier this tick, the JointIntention-aware Caretake
+/// suppression factor, and a relationship count by kind. `just inspect`
+/// renders the parental 5-vector from these fields without needing the
+/// original `ParentingActivity` Component.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ParentingSummary {
+    pub asymptote: f32,
+    pub scale_presence: f32,
+    pub scale_provision: f32,
+    pub scale_protection: f32,
+    pub scale_cultural: f32,
+    pub scale_autonomy: f32,
+    pub caretake_bias_sum: f32,
+    pub provision_bias_sum: f32,
+    pub protect_bias_sum: f32,
+    pub cultural_teach_bias_sum: f32,
+    pub autonomy_teach_bias_sum: f32,
+    pub caretake_suppression_factor: f32,
+    pub parental_engagement_max: f32,
+    pub biological_count: usize,
+    pub in_law_count: usize,
+    pub bond_formed_count: usize,
+    pub adopted_count: usize,
+}
+
 /// One wild-predator position in a spatial snapshot.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WildlifePosRow {
@@ -147,6 +175,15 @@ pub enum EventKind {
         season: String,
         /// §7.W social_warmth fulfillment axis (0.0–1.0).
         social_warmth: f32,
+        /// Ticket 400 — L2 ParentingActivity summary. `None` for cats
+        /// without a `ParentingActivity` Component (non-parents). Carries
+        /// the five-scale composition asymptote + relationship rollup so
+        /// `just inspect` can render the parental 5-vector without
+        /// needing the original Component (events.jsonl is the source
+        /// of truth for post-hoc analysis). Boxed to keep EventKind's
+        /// variant size within the `large_enum_variant` clippy budget.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parenting: Option<Box<ParentingSummary>>,
     },
     FoodLevel {
         current: f32,

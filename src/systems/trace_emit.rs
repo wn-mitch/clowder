@@ -419,6 +419,11 @@ fn l2_record_for(
             // `multiplier` stays None.
             delta: Some(d.post - d.pre),
             multiplier: None,
+            // Ticket 400 — `details` populated by the trace builder
+            // for modifiers whose internal state is informative beyond
+            // delta (e.g., `parenting_activity` carries 5 scale sums
+            // + suppression factor). None for additive-only modifiers.
+            details: None,
         })
         .collect();
     let intention = intention_summary(&dse.intention);

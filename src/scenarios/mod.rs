@@ -51,6 +51,11 @@ pub mod inventory_full_no_pickup;
 pub mod kitten_cry;
 pub mod lone_burial;
 pub mod mate_chain;
+pub mod parenting_caretake_kitten_absent;
+pub mod parenting_caretake_kitten_present;
+pub mod parenting_father_provisions;
+pub mod parenting_grief_kitten_death;
+pub mod parenting_joint_suppression;
 pub mod patrol_recalibration;
 pub mod picking_up_scavenging;
 pub mod preset;
@@ -250,6 +255,18 @@ pub const ALL: &[&Scenario] = &[
     // influence-map placement finds a spot on the expansion frontier
     // and `Feature::ConstructionSiteSpawned` fires.
     &district_placement_under_pressure::SCENARIO,
+    // Ticket 400 — L2 ParentingActivity archetype scenarios. Each
+    // pre-populates `ParentingActivity` at the personality-derived
+    // engagement asymptote to skip the ~1000-tick EMA build phase.
+    &parenting_father_provisions::SCENARIO,
+    &parenting_joint_suppression::SCENARIO,
+    &parenting_grief_kitten_death::SCENARIO,
+    // Ticket 410 — Caretake DSE eligibility-gate scenarios. `absent`
+    // proves the gate suppresses Caretake when no dependent cat
+    // exists; `present` proves the gate passes when a Kitten exists.
+    // Closes the canary regression on the 400 verdict.
+    &parenting_caretake_kitten_absent::SCENARIO,
+    &parenting_caretake_kitten_present::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

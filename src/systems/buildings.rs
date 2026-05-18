@@ -468,10 +468,12 @@ pub fn update_construction_site_map(
 ///   replans (ticket 193 root-cause). Carcass component entities
 ///   continue to drive `HarvestCarcass` / `MagicColonyCleanse` /
 ///   carcass-corruption — separate surfaces, unchanged.
-/// - `HasHandoffRecipient` — ticket 188; ≥1 `Kitten` exists in the
-///   colony (kittens are perpetual handoff recipients — they can't
-///   fetch their own food). Reader: the Handing DSE's eligibility
-///   filter, gating adult-to-kitten food handoffs.
+/// - `HasDependentCat` — ticket 188 (originally `HasHandoffRecipient`,
+///   renamed in 410); ≥1 cat in the colony is a *care dependent* who
+///   cannot self-provision. Currently populated as "≥1 `Kitten` exists"
+///   (kittens can't hunt); trivially extends to incapacitated adults
+///   when their recipient pathway is wired. Readers: Handing DSE and
+///   (ticket 410) Caretake DSE eligibility filters.
 #[allow(clippy::too_many_arguments)]
 pub fn update_colony_building_markers(
     mut commands: Commands,
@@ -591,17 +593,19 @@ pub fn update_colony_building_markers(
     } else {
         em.remove::<crate::components::markers::HasGroundCarcass>();
     }
-    // 188: HasHandoffRecipient — any living kitten in the colony.
-    // Reader: Handing DSE eligibility. Adults give food to kittens;
-    // a colony with no kittens has no Handing recipients, so the DSE
-    // stays dormant. The actual recipient (which kitten) is resolved
-    // at dispatch time in goap.rs::HandoffItem; per-cat picker is a
-    // balance follow-on (ticket 192).
-    let has_handoff_recipient = !kittens.is_empty();
-    if has_handoff_recipient {
-        em.insert(crate::components::markers::HasHandoffRecipient);
+    // 188 / 410: HasDependentCat — any living cat who needs care
+    // (cannot self-provision). Currently this is just "any living
+    // kitten" — kittens can't hunt and depend on adults for food.
+    // Trivially extends to incapacitated adults if/when their
+    // recipient pathway is wired: `!kittens.is_empty() ||
+    // !incapacitated_adults_needing_food.is_empty()`. Readers:
+    // Handing DSE and (ticket 410) Caretake DSE eligibility filters.
+    // Per-cat recipient picker is a balance follow-on (ticket 192).
+    let has_dependent_cat = !kittens.is_empty();
+    if has_dependent_cat {
+        em.insert(crate::components::markers::HasDependentCat);
     } else {
-        em.remove::<crate::components::markers::HasHandoffRecipient>();
+        em.remove::<crate::components::markers::HasDependentCat>();
     }
 }
 

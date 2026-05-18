@@ -1,13 +1,13 @@
 ---
 id: 403
 title: BondFormed parental adoption (399 follow-on; mythic-texture)
-status: blocked
+status: ready
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [smarter-cats, mythic-texture]
 added: 2026-05-17
 parked: null
-blocked-by: [400]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, htn-methods.md]
 related-balance: []

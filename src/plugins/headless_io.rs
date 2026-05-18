@@ -97,6 +97,20 @@ pub struct HeadlessRunStart(pub Instant);
 #[derive(Resource, Default)]
 pub struct HeadlessTickCount(pub u64);
 
+/// Absolute `TimeState.tick` captured at header-emit time (≈ 1,200,000;
+/// see `start_tick` doc-comment in `write_jsonl_headers`). Read by
+/// [`emit_headless_footer`] to surface `start_tick` / `final_tick` /
+/// `elapsed_ticks` in the run footer so downstream consumers can
+/// compute per-tick rates without needing to also parse the header.
+///
+/// **Why a dedicated resource.** Stashing the start tick at header emit
+/// avoids re-deriving it from the formula at footer emit (which would
+/// fragment the source of truth) and avoids round-tripping through
+/// header parsing at every consumer site. The footer is now self-
+/// contained for rate arithmetic. Ticket 410.
+#[derive(Resource, Default)]
+pub struct HeadlessRunTickStart(pub u64);
+
 /// Marker resource that the tick-budget exit system writes once,
 /// the same tick the footer is emitted, so the post-loop helpers
 /// in `run_headless` can detect "exit triggered".
@@ -174,6 +188,7 @@ impl Plugin for HeadlessIoPlugin {
         app.insert_resource(HeadlessRunStart(Instant::now()));
         app.init_resource::<HeadlessTickCount>();
         app.init_resource::<HeadlessExitSignaled>();
+        app.init_resource::<HeadlessRunTickStart>();
 
         // Post-world-setup Startup systems. Both run after
         // `setup_world_exclusive` so SimConstants / SimConfig /
@@ -254,6 +269,7 @@ pub fn write_jsonl_headers(
     mut narrative_writer: ResMut<NarrativeJsonlWriter>,
     mut event_writer: ResMut<EventJsonlWriter>,
     trace_writer: Option<ResMut<TraceJsonlWriter>>,
+    mut run_tick_start: ResMut<HeadlessRunTickStart>,
 ) {
     let commit_hash = env!("GIT_HASH");
     let commit_hash_short = env!("GIT_HASH_SHORT");
@@ -300,6 +316,10 @@ pub fn write_jsonl_headers(
     // header makes the run self-describing for downstream tooling and
     // for fresh agents inspecting an old archive.
     let start_tick = time_state.tick;
+    // Ticket 410 — stash for emit_headless_footer so the footer carries
+    // start_tick / final_tick / elapsed_ticks alongside the header. Lets
+    // consumers compute correct per-tick rates from the footer alone.
+    run_tick_start.0 = start_tick;
 
     // Events: full header with constants + map size.
     let event_header = serde_json::json!({
@@ -597,9 +617,26 @@ pub fn emit_headless_footer(world: &mut World) -> String {
         }
     };
 
+    // Ticket 410 — tick bounds. The header carries `start_tick`; the
+    // footer historically did not, forcing consumers (verdict.py,
+    // logq.py, ad-hoc agents) to pair footer with header to compute a
+    // correct per-tick rate. Surfacing `start_tick` / `final_tick` /
+    // `elapsed_ticks` directly in the footer prevents the class of
+    // arithmetic error where rates get computed as `count / final_tick`
+    // (treating ticks as zero-based) instead of `count / elapsed_ticks`
+    // — for typical runs that produces a ~13.6× under-count and looks
+    // like a real regression. **Invariant:** rate = count /
+    // `elapsed_ticks`. Never divide by `final_tick`.
+    let start_tick = world.resource::<HeadlessRunTickStart>().0;
+    let final_tick = world.resource::<TimeState>().tick;
+    let elapsed_ticks = final_tick.saturating_sub(start_tick);
+
     let event_log = world.resource::<EventLog>();
     let footer = serde_json::json!({
         "_footer": true,
+        "start_tick": start_tick,
+        "final_tick": final_tick,
+        "elapsed_ticks": elapsed_ticks,
         "wards_placed_total": feature_count(Feature::WardPlaced),
         "wards_despawned_total": feature_count(Feature::WardDespawned),
         "ward_count_final": ward_count_final,

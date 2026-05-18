@@ -1,13 +1,13 @@
 ---
 id: 405
 title: Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster)
-status: blocked
+status: ready
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [smarter-cats, mythic-texture]
 added: 2026-05-17
 parked: null
-blocked-by: [400]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

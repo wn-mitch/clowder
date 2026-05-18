@@ -74,6 +74,7 @@ fn main() -> io::Result<()> {
     }
 
     print_personality(&cat_name, &snapshots);
+    print_parental_vector(&cat_name, &snapshots);
     print_action_distribution(&cat_name, &actions, &snapshots);
     print_score_breakdown(&snapshots);
     print_needs_timeline(&snapshots);
@@ -180,6 +181,84 @@ fn make_bar(val: f32, width: usize) -> String {
     let filled = (val * width as f32).round() as usize;
     let empty = width.saturating_sub(filled);
     format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty))
+}
+
+// ---------------------------------------------------------------------------
+// Parental 5-vector (ticket 400)
+// ---------------------------------------------------------------------------
+
+fn print_parental_vector(name: &str, snapshots: &[Value]) {
+    // Find the latest snapshot that carries a `parenting` block. Earlier
+    // snapshots (before the cat became a parent) are skipped.
+    let latest = snapshots
+        .iter()
+        .rev()
+        .find_map(|s| s.get("parenting").and_then(|p| (!p.is_null()).then_some((s, p))));
+    let Some((snap, p)) = latest else {
+        return;
+    };
+    println!("=== {name} — Parental 5-vector (ticket 400) ===");
+    println!();
+    let tick = snap.get("tick").and_then(|t| t.as_u64()).unwrap_or(0);
+    println!("As of tick {tick}:");
+    let asymptote = field_f32(p, "asymptote");
+    let engagement = field_f32(p, "parental_engagement_max");
+    let suppression = field_f32(p, "caretake_suppression_factor");
+    println!(
+        "  engagement {engagement:.3} / asymptote {asymptote:.3} ({:.0}% converged)",
+        if asymptote > 0.0 {
+            (engagement / asymptote * 100.0).clamp(0.0, 100.0)
+        } else {
+            0.0
+        }
+    );
+    println!();
+    println!("Five-scale composition (personality-derived):");
+    for (label, key) in [
+        ("Presence    ", "scale_presence"),
+        ("Provision   ", "scale_provision"),
+        ("Protection  ", "scale_protection"),
+        ("Cultural    ", "scale_cultural"),
+        ("Autonomy    ", "scale_autonomy"),
+    ] {
+        let v = field_f32(p, key);
+        println!("  {label} {v:.2}  {}", make_bar(v, 20));
+    }
+    println!();
+    println!("Per-DSE bias sums (lifts emitted by ParentingActivityModifier):");
+    for (label, key) in [
+        ("Caretake    ", "caretake_bias_sum"),
+        ("Provision (Hunt) ", "provision_bias_sum"),
+        ("Protect (Patrol)  ", "protect_bias_sum"),
+        ("Cultural teach (Mentor)  ", "cultural_teach_bias_sum"),
+        ("Autonomy teach (Mentor)  ", "autonomy_teach_bias_sum"),
+    ] {
+        let v = field_f32(p, key);
+        println!("  {label} {v:.3}");
+    }
+    if suppression < 1.0 {
+        println!();
+        println!(
+            "  JointIntention-aware suppression: ×{suppression:.2} on Caretake (partner is on it)"
+        );
+    }
+    println!();
+    let bio = field_u64(p, "biological_count");
+    let inl = field_u64(p, "in_law_count");
+    let bnd = field_u64(p, "bond_formed_count");
+    let adp = field_u64(p, "adopted_count");
+    println!(
+        "Relationships: {bio} biological · {inl} in-law · {bnd} bond-formed · {adp} adopted"
+    );
+    println!();
+}
+
+fn field_f32(v: &Value, key: &str) -> f32 {
+    v.get(key).and_then(|x| x.as_f64()).unwrap_or(0.0) as f32
+}
+
+fn field_u64(v: &Value, key: &str) -> u64 {
+    v.get(key).and_then(|x| x.as_u64()).unwrap_or(0)
 }
 
 // ---------------------------------------------------------------------------

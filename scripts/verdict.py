@@ -137,7 +137,26 @@ def read_final_tick(events_path: Path) -> int | None:
 
 
 def run_duration_ticks(events_path: Path) -> int | None:
-    """`final_tick - start_tick`, or None if either is unreadable."""
+    """Elapsed ticks for rate-per-tick arithmetic.
+
+    Prefers the footer's `elapsed_ticks` field (ticket 410 — self-
+    contained, no header round-trip required). Falls back to
+    `(final_tick - start_tick)` via header lookup + event scan so older
+    archives written before the footer enrichment landed continue to
+    work.
+
+    **Invariant for callers:** rate = count / this value. Never divide
+    by `final_tick` alone — runs start at absolute tick ≈ 1,200,000
+    (`60 * ticks_per_season`, see `project_clowder_tick_origin` /
+    CLAUDE.md "ticks on disk are absolute"). For a typical 15-min soak
+    `final_tick ≈ 1,295,000` and `elapsed_ticks ≈ 95,000` — dividing by
+    `final_tick` under-counts the rate by ~13.6× and looks like a real
+    regression. Ticket 410 surfaced this footer-rate "freakout" pattern.
+    """
+    footer = read_footer(events_path)
+    elapsed = footer.get("elapsed_ticks")
+    if isinstance(elapsed, int) and elapsed > 0:
+        return elapsed
     start = read_header_field(events_path, ".start_tick")
     final = read_final_tick(events_path)
     if not isinstance(start, int) or not isinstance(final, int):

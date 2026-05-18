@@ -27,6 +27,20 @@
 //! consumer is purely additive — when cry is heard, Caretake gets a
 //! lift on top of the legacy three-axis score; when no cry is heard,
 //! the score is bit-identical to the pre-156 baseline.
+//!
+//! Ticket 410 — `require(HasDependentCat)` eligibility gate. Closes
+//! the 400-verdict `HandoffItem: no recipient on disposition` canary
+//! regression: the three-axis WeightedSum produces a positive raw
+//! score even when no kitten exists (compassion is gated only on
+//! personality; parental_engagement decays to a residual per §7.7.b
+//! grief substrate), so Caretake was being elected in zero-kitten
+//! windows and the planner immediately failed to find a recipient.
+//! `HasDependentCat` (renamed from `HasHandoffRecipient` in 410) is
+//! true iff a care dependent exists in the colony — currently any
+//! living kitten; trivially extends to incapacitated adults. The
+//! grief substrate is preserved: the ParentingActivity gradient still
+//! decays toward residual on the cat; it just doesn't elect Caretake
+//! when no recipient exists.
 
 use bevy::prelude::*;
 
@@ -105,7 +119,12 @@ impl CaretakeDse {
                 lift_weight,
             ]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
+            // Ticket 410: require HasDependentCat so the DSE stays
+            // dormant when no care dependent exists (else the planner
+            // emits HandoffItem with no recipient).
+            eligibility: EligibilityFilter::new()
+                .forbid(markers::Incapacitated::KEY)
+                .require(markers::HasDependentCat::KEY),
         }
     }
 }
@@ -178,5 +197,26 @@ mod tests {
         assert!((weights[1] - 0.30).abs() < 1e-4);
         assert!((weights[2] - 0.25).abs() < 1e-4);
         assert!((weights[3] - 0.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn caretake_eligibility_requires_dependent_cat() {
+        // Ticket 410 — without this gate, Caretake's three-axis
+        // WeightedSum produces a positive raw score in zero-kitten
+        // windows (compassion is non-zero from personality;
+        // parental_engagement decays to a residual per §7.7.b grief
+        // substrate), and the planner emits HandoffItem with no
+        // recipient. Mirrors `handing.rs::handing_eligibility_
+        // requires_dependent_cat`.
+        let dse = CaretakeDse::new(&default_scoring());
+        let elig = dse.eligibility();
+        assert!(
+            elig.required.contains(&markers::HasDependentCat::KEY),
+            "Caretake must require HasDependentCat (ticket 410)",
+        );
+        assert!(
+            elig.forbidden.contains(&markers::Incapacitated::KEY),
+            "Caretake must forbid Incapacitated (§13.1)",
+        );
     }
 }

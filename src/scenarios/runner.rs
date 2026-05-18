@@ -401,6 +401,7 @@ fn drain_tick_report(app: &mut App) -> TickReport {
                                  name,
                                  delta,
                                  multiplier,
+                                 details: _,
                              }| {
                                 // Additive modifiers carry `delta`; the few
                                 // multiplicative ones surface their multiplier

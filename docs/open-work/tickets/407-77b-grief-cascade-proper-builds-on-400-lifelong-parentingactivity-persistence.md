@@ -1,13 +1,13 @@
 ---
 id: 407
 title: §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence)
-status: blocked
+status: ready
 cluster: life-cycle
 orchestration: substrate-sensitive
 initiative: [welfare-fidelity, mythic-texture]
 added: 2026-05-17
 parked: null
-blocked-by: [400]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

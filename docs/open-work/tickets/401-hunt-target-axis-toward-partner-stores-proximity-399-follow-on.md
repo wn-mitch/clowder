@@ -1,13 +1,13 @@
 ---
 id: 401
 title: Hunt target-axis toward partner_Stores_proximity (399 follow-on)
-status: blocked
+status: ready
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-17
 parked: null
-blocked-by: [400]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

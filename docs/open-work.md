@@ -15,9 +15,9 @@ _Last generated: 2026-05-18._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 107 |
+| Ready | 115 |
 | Parked | 15 |
-| Blocked | 46 |
+| Blocked | 38 |
 | **Open total** | **174** |
 | Pre-existing | 2 |
 
@@ -40,11 +40,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
+- **[410](docs/open-work/tickets/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) — _[social-coordination] · score 0.94_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[400](docs/open-work/tickets/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design — _[social-coordination] · score 0.92_
+- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.91_
+- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.91_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
-- **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · score 0.91_
-- **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · score 0.90_
 
 ## Epic progress (3)
 
@@ -65,11 +65,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (107)
+## Ready by cluster (115)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (28 ready, 8 blocked)
+### ai-substrate (31 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -99,6 +99,28 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[383](docs/open-work/tickets/383-build-cadence-under-population-growth-shelter-pressure-under-fires-once-colony-establishes.md)** — Build-cadence under population growth — shelter pressure under-fires once colony establishes — _[ai-substrate] · added 2026-05-16_
 - **[384](docs/open-work/tickets/384-sliding-colonycenter-ward-activity-audit-verify-wards-placed-despawned-doubling-is-healthy.md)** — Sliding ColonyCenter ward-activity audit — verify wards-placed/-despawned doubling is healthy — _[ai-substrate] · added 2026-05-16_
 - **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · added 2026-05-17_
+- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · added 2026-05-17_
+- **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
+
+### social-coordination (16 ready, 7 blocked)
+
+- **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
+- **[274](docs/open-work/tickets/274-co-mentoring-practice-on-jointintention-substrate.md)** — Co-mentoring practice on JointIntention substrate — _[social-coordination] · added 2026-05-11_
+- **[275](docs/open-work/tickets/275-joint-cache-stocking-practice-on-jointintention-substrate.md)** — Joint cache-stocking practice on JointIntention substrate — _[social-coordination] · added 2026-05-11_
+- **[276](docs/open-work/tickets/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) — _[social-coordination] · added 2026-05-11_
+- **[277](docs/open-work/tickets/277-n2-joint-practices-group-hunting-kitten-circles-participants-hashsetentity-shape.md)** — N>2 joint practices (group hunting / kitten circles) — participants: HashSet<Entity> shape — _[social-coordination] · added 2026-05-11_
+- **[278](docs/open-work/tickets/278-asymmetric-courtship-roles-initiator-responder-on-jointintention.md)** — Asymmetric Courtship roles (Initiator / Responder) on JointIntention — _[social-coordination] · added 2026-05-11_
+- **[279](docs/open-work/tickets/279-body-cue-driven-joint-adoption-compose-127-with-242-243.md)** — Body-cue-driven joint adoption (compose 127 with 242 + 243) — _[social-coordination] · added 2026-05-11_
+- **[280](docs/open-work/tickets/280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md)** — Mental model of partner JointIntention (compose 127 with 258 C3 mental models) — _[social-coordination] · added 2026-05-11_
+- **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
+- **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
+- **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
+- **[403](docs/open-work/tickets/403-bondformed-parental-adoption-399-follow-on-mythic-texture.md)** — BondFormed parental adoption (399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
+- **[404](docs/open-work/tickets/404-adopted-parental-adoption-orphan-integration-399-follow-on-mythic-texture.md)** — Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
+- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
+- **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
+- **[410](docs/open-work/tickets/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) — _[social-coordination] · added 2026-05-18_
 
 ### belief-perception (13 ready, 4 blocked)
 
@@ -115,21 +137,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[292](docs/open-work/tickets/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
-
-### social-coordination (12 ready, 11 blocked)
-
-- **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
-- **[274](docs/open-work/tickets/274-co-mentoring-practice-on-jointintention-substrate.md)** — Co-mentoring practice on JointIntention substrate — _[social-coordination] · added 2026-05-11_
-- **[275](docs/open-work/tickets/275-joint-cache-stocking-practice-on-jointintention-substrate.md)** — Joint cache-stocking practice on JointIntention substrate — _[social-coordination] · added 2026-05-11_
-- **[276](docs/open-work/tickets/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) — _[social-coordination] · added 2026-05-11_
-- **[277](docs/open-work/tickets/277-n2-joint-practices-group-hunting-kitten-circles-participants-hashsetentity-shape.md)** — N>2 joint practices (group hunting / kitten circles) — participants: HashSet<Entity> shape — _[social-coordination] · added 2026-05-11_
-- **[278](docs/open-work/tickets/278-asymmetric-courtship-roles-initiator-responder-on-jointintention.md)** — Asymmetric Courtship roles (Initiator / Responder) on JointIntention — _[social-coordination] · added 2026-05-11_
-- **[279](docs/open-work/tickets/279-body-cue-driven-joint-adoption-compose-127-with-242-243.md)** — Body-cue-driven joint adoption (compose 127 with 242 + 243) — _[social-coordination] · added 2026-05-11_
-- **[280](docs/open-work/tickets/280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md)** — Mental model of partner JointIntention (compose 127 with 258 C3 mental models) — _[social-coordination] · added 2026-05-11_
-- **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
-- **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
-- **[400](docs/open-work/tickets/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design — _[social-coordination] · added 2026-05-17_
 
 ### combat-threat (10 ready, 2 blocked)
 
@@ -156,7 +163,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · added 2026-05-16_
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
 
-### life-cycle (8 ready, 2 blocked)
+### life-cycle (9 ready, 1 blocked)
 
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
@@ -166,6 +173,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
 - **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
 - **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
+- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 
 ### wildlife (8 ready, 1 blocked)
 
@@ -209,9 +217,30 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 
-## Ready by initiative (66 tag-memberships across 10 initiatives)
+## Ready by initiative (77 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
+
+### smarter-cats (18 open, 27 landed)
+
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
+- **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
+- **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
+- **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
+- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
+- **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
+- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
+- **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
+- **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
+- **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · added 2026-05-17_
+- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · added 2026-05-17_
+- **[403](docs/open-work/tickets/403-bondformed-parental-adoption-399-follow-on-mythic-texture.md)** — BondFormed parental adoption (399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
+- **[404](docs/open-work/tickets/404-adopted-parental-adoption-orphan-integration-399-follow-on-mythic-texture.md)** — Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
+- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
+- **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
+- **[410](docs/open-work/tickets/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) — _[social-coordination] · added 2026-05-18_
 
 ### full-sensory-perception (13 open, 3 landed)
 
@@ -229,20 +258,20 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 
-### smarter-cats (12 open, 26 landed)
+### mythic-texture (12 open, 1 landed)
 
+- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
-- **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
-- **[323](docs/open-work/tickets/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages — _[social-coordination] · added 2026-05-14_
-- **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
-- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
-- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
-- **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
-- **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
-- **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
-- **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
-- **[400](docs/open-work/tickets/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design — _[social-coordination] · added 2026-05-17_
+- **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
+- **[236](docs/open-work/tickets/236-body-preparation-tiers-dragshroudmummify-gated-by-tech-markers.md)** — Body preparation tiers — drag/shroud/mummify gated by tech markers — _[life-cycle] · added 2026-05-08_
+- **[237](docs/open-work/tickets/237-gravesite-selection-corpse-transport-plan-multi-axis-site-scoring-proximate-to-other-graves-safe-low-corruption-beautiful.md)** — Gravesite selection — corpse transport plan + multi-axis site scoring (proximate to other graves, safe, low-corruption, beautiful) — _[buildings-zones] · added 2026-05-08_
+- **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
+- **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
+- **[276](docs/open-work/tickets/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) — _[social-coordination] · added 2026-05-11_
+- **[403](docs/open-work/tickets/403-bondformed-parental-adoption-399-follow-on-mythic-texture.md)** — BondFormed parental adoption (399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
+- **[404](docs/open-work/tickets/404-adopted-parental-adoption-orphan-integration-399-follow-on-mythic-texture.md)** — Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
+- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
+- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 
 ### generational-continuity (9 open, 3 landed)
 
@@ -256,16 +285,15 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
-### mythic-texture (8 open, 1 landed)
+### welfare-fidelity (7 open, 3 landed)
 
-- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
-- **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
-- **[236](docs/open-work/tickets/236-body-preparation-tiers-dragshroudmummify-gated-by-tech-markers.md)** — Body preparation tiers — drag/shroud/mummify gated by tech markers — _[life-cycle] · added 2026-05-08_
-- **[237](docs/open-work/tickets/237-gravesite-selection-corpse-transport-plan-multi-axis-site-scoring-proximate-to-other-graves-safe-low-corruption-beautiful.md)** — Gravesite selection — corpse transport plan + multi-axis site scoring (proximate to other graves, safe, low-corruption, beautiful) — _[buildings-zones] · added 2026-05-08_
-- **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
+- **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
+- **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
+- **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[life-cycle] · added 2026-05-04_
+- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
 - **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
-- **[276](docs/open-work/tickets/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) — _[social-coordination] · added 2026-05-11_
+- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
+- **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 
 ### predator-prey-dynamics (6 open, 5 landed)
 
@@ -275,14 +303,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
 - **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
-
-### welfare-fidelity (5 open, 3 landed)
-
-- **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
-- **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
-- **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[life-cycle] · added 2026-05-04_
-- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
-- **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
 
 ### worldgen-prehistory (5 open, 0 landed)
 
@@ -305,11 +325,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-### htn-method-composition (1 open, 14 landed)
-
-- **[400](docs/open-work/tickets/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design — _[social-coordination] · added 2026-05-17_
-
-## Ready (107)
+## Ready (115)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -416,8 +432,16 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
-- **[400](docs/open-work/tickets/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design — _[social-coordination] · added 2026-05-17_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · added 2026-05-17_
+- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · added 2026-05-17_
+- **[403](docs/open-work/tickets/403-bondformed-parental-adoption-399-follow-on-mythic-texture.md)** — BondFormed parental adoption (399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
+- **[404](docs/open-work/tickets/404-adopted-parental-adoption-orphan-integration-399-follow-on-mythic-texture.md)** — Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
+- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
+- **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
+- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
+- **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[409](docs/open-work/tickets/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings — _[process-discipline] · added 2026-05-18_
+- **[410](docs/open-work/tickets/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) — _[social-coordination] · added 2026-05-18_
 
 ## Parked (15)
 
@@ -437,7 +461,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
 
-## Blocked (46)
+## Blocked (38)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -477,26 +501,19 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[390](docs/open-work/tickets/390-fate-seeded-prophecy-from-generated-history.md)** — Fate-seeded prophecy from generated history — _[magic-mythic] · blocked-by 388 · added 2026-05-16_
 - **[391](docs/open-work/tickets/391-narrative-template-historical-reference-pre-sim-figures-cited-in-first-sim-week.md)** — Narrative-template historical reference (pre-sim figures cited in first sim-week) — _[magic-mythic] · blocked-by 387, 388 · added 2026-05-16_
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · blocked-by 400 · added 2026-05-17_
-- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · blocked-by 400 · added 2026-05-17_
-- **[403](docs/open-work/tickets/403-bondformed-parental-adoption-399-follow-on-mythic-texture.md)** — BondFormed parental adoption (399 follow-on; mythic-texture) — _[social-coordination] · blocked-by 400 · added 2026-05-17_
-- **[404](docs/open-work/tickets/404-adopted-parental-adoption-orphan-integration-399-follow-on-mythic-texture.md)** — Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture) — _[social-coordination] · blocked-by 400 · added 2026-05-17_
-- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · blocked-by 400 · added 2026-05-17_
-- **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · blocked-by 400 · added 2026-05-17_
-- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · blocked-by 400 · added 2026-05-17_
-- **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · blocked-by 400 · added 2026-05-17_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (254)
+## Landed archive (255)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (189)
+### 2026-05 (190)
 
+- **[400](docs/open-work/landed/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design _(2026-05-18)_
 - **[399](docs/open-work/landed/399-l2-parentingactivity-express-non-primary-caretaker-parent-roles-per-7m2-design.md)** — L2 ParentingActivity — express non-primary-caretaker parent roles per §7.M.2 (design) _(2026-05-17)_
 - **[398](docs/open-work/landed/398-7m2-raiseoffspringaspiration-kitten-rearing-as-nested-intention-aspiration.md)** — §7.M.2 RaiseOffspringAspiration — kitten-rearing as nested-Intention aspiration _(2026-05-17)_
 - **[397](docs/open-work/landed/397-rear-kitten-arc-clean-completion-exposes-kitten-survival-regression.md)** — rear_kitten arc clean completion exposes kitten survival regression _(2026-05-17)_

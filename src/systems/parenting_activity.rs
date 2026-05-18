@@ -426,8 +426,18 @@ pub fn populate_parenting_scalars(
     }
 }
 
-/// True iff `held` is a Caretake commitment whose target is one of
-/// `dependents`. Used by the JointIntention-aware suppression check.
+/// True iff `held` is a Caretake commitment whose target is one of the
+/// owner's `dependents`. Target specificity is load-bearing: in
+/// multi-litter colonies, parent X must not over-suppress when parent Y
+/// is caretaking a kitten that X has no relationship with — otherwise
+/// one litter's kitten could starve because every adult in the colony
+/// yields whenever any other adult takes Caretake.
+///
+/// `HeldIntention.target` for Caretake is plumbed from
+/// `caretake_resolution.target` at the L2 author site (see ticket 400 edit
+/// in `src/systems/goap.rs`). Caretake's `emit` itself produces an
+/// `Intention::Goal { state: "kitten_fed" }` with no embedded target —
+/// the resolved kitten rides on `HeldIntention.target`.
 fn is_held_caretake_against(held: &HeldIntention, dependents: &[Entity]) -> bool {
     if held.held_action != Action::Caretake {
         return false;
@@ -505,6 +515,320 @@ mod tests {
         assert!(
             parental_engagement_asymptote(&high, 0.0, &constants)
                 > parental_engagement_asymptote(&low, 0.0, &constants)
+        );
+    }
+
+    /// Drive `populate_parenting_scalars` end-to-end against a minimal
+    /// World containing a cat with a pre-populated ParentingActivity.
+    /// Confirms the bundle reaches ParentingScalars correctly — the
+    /// integration glue the scenario tests depend on.
+    #[test]
+    fn populate_scalars_builds_bundle_for_parenting_cat() {
+        use bevy_ecs::world::World;
+        use crate::resources::sim_constants::SimConstants;
+        use crate::resources::time::TimeState;
+        use crate::components::parenting_activity::{
+            ParentalKind, ParentingActivity, RelationshipTo,
+        };
+
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(TimeState {
+            tick: 1_000,
+            ..Default::default()
+        });
+        world.insert_resource(ParentingScalars::default());
+
+        // Spawn parent cat. Brick's archetype: high provision, low presence.
+        let mut p = flat_personality(0.5);
+        p.compassion = 0.2;
+        p.warmth = 0.2;
+        p.diligence = 0.9;
+        p.loyalty = 0.9;
+        let kitten = world.spawn(()).id();
+        let owner = world
+            .spawn((
+                p.clone(),
+                ParentingActivity {
+                    relationships: vec![RelationshipTo {
+                        target: kitten,
+                        kind: ParentalKind::Biological,
+                        bond_strength: 1.0,
+                        parental_engagement: 0.5,
+                        partner: None,
+                        entered_tick: 1_000,
+                        last_interaction_tick: 1_000,
+                    }],
+                },
+            ))
+            .id();
+
+        // Run populate_parenting_scalars manually.
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(populate_parenting_scalars);
+        schedule.run(&mut world);
+
+        let scalars = world.resource::<ParentingScalars>();
+        let bundle = scalars.get(owner);
+        // weight = 1.0 × 0.5 = 0.5; scale_provision = 0.9; expect 0.45.
+        assert!(
+            (bundle.provision_bias_sum - 0.45).abs() < 1e-4,
+            "provision_bias_sum {} ≠ 0.45",
+            bundle.provision_bias_sum
+        );
+        // scale_presence = 0.2; expect 0.10.
+        assert!(
+            (bundle.caretake_bias_sum - 0.10).abs() < 1e-4,
+            "caretake_bias_sum {} ≠ 0.10",
+            bundle.caretake_bias_sum
+        );
+        assert!((bundle.parental_engagement_max - 0.5).abs() < 1e-4);
+        assert!((bundle.caretake_suppression_factor - 1.0).abs() < 1e-4);
+    }
+
+    /// Ticket 400 — the load-bearing test for the suppression mechanic.
+    /// Two parents (A, B) co-parenting kitten K. Parent B has
+    /// `HeldIntention { held_action: Caretake, target: Some(K) }` —
+    /// the target field is plumbed by the L2 author site from
+    /// `caretake_resolution.target` so the suppression check can verify
+    /// target specificity. Parent A's populate must detect B's
+    /// commitment to one of A's dependents (K) and set
+    /// `caretake_suppression_factor = joint_suppression_factor` (≈ 0.3).
+    #[test]
+    fn suppression_fires_when_partner_holds_caretake() {
+        use bevy_ecs::world::World;
+        use crate::components::held_intention::IntentionSource;
+        use crate::components::parenting_activity::{
+            ParentalKind, ParentingActivity, RelationshipTo,
+        };
+        use crate::resources::sim_constants::SimConstants;
+        use crate::resources::time::TimeState;
+
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(TimeState {
+            tick: 1_000,
+            ..Default::default()
+        });
+        world.insert_resource(ParentingScalars::default());
+
+        let kitten = world.spawn(()).id();
+        // Reserve parent B's entity id first; we need to know it to set
+        // A's RelationshipTo.partner before B exists.
+        let parent_b = world.spawn(()).id();
+
+        // Parent A — co-parent, no held intention yet.
+        let parent_a = world
+            .spawn((
+                flat_personality(0.7),
+                ParentingActivity {
+                    relationships: vec![RelationshipTo {
+                        target: kitten,
+                        kind: ParentalKind::Biological,
+                        bond_strength: 1.0,
+                        parental_engagement: 0.5,
+                        partner: Some(parent_b),
+                        entered_tick: 1_000,
+                        last_interaction_tick: 1_000,
+                    }],
+                },
+            ))
+            .id();
+
+        // Parent B — holds Caretake targeting kitten K (plumbed from
+        // caretake_resolution.target at the L2 author site).
+        let held = HeldIntention {
+            intention: crate::ai::dse::Intention::Goal {
+                state: crate::ai::dse::GoalState {
+                    label: "kitten_fed",
+                    achieved: |_, _| false,
+                },
+                strategy: crate::ai::dse::CommitmentStrategy::SingleMinded,
+            },
+            held_action: Action::Caretake,
+            target: Some(kitten),
+            adopted_tick: 999,
+            commitment_strength: 0.5,
+            expiry_tick: None,
+            source: IntentionSource::SelfMotivated,
+        };
+        world
+            .entity_mut(parent_b)
+            .insert((
+                flat_personality(0.7),
+                ParentingActivity {
+                    relationships: vec![RelationshipTo {
+                        target: kitten,
+                        kind: ParentalKind::Biological,
+                        bond_strength: 1.0,
+                        parental_engagement: 0.5,
+                        partner: Some(parent_a),
+                        entered_tick: 1_000,
+                        last_interaction_tick: 1_000,
+                    }],
+                },
+                held,
+            ));
+
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(populate_parenting_scalars);
+        schedule.run(&mut world);
+
+        let scalars = world.resource::<ParentingScalars>();
+        let bundle_a = scalars.get(parent_a);
+        // Parent A's suppression should fire because B (her partner)
+        // has HeldIntention::Caretake.
+        let constants = world.resource::<SimConstants>();
+        let expected = constants.parenting.joint_suppression_factor;
+        assert!(
+            (bundle_a.caretake_suppression_factor - expected).abs() < 1e-4,
+            "Parent A's suppression {} should equal joint_suppression_factor {}",
+            bundle_a.caretake_suppression_factor,
+            expected
+        );
+
+        // Parent B's suppression should NOT fire (A holds nothing).
+        let bundle_b = scalars.get(parent_b);
+        assert!(
+            (bundle_b.caretake_suppression_factor - 1.0).abs() < 1e-4,
+            "Parent B's suppression should remain 1.0 (A holds no Caretake intention)"
+        );
+    }
+
+    /// Ticket 400 — target specificity is load-bearing. Two unrelated
+    /// litters in the colony: parent A1 caretaking kitten K1 must NOT
+    /// suppress parent B1's Caretake on kitten K2 (K2 is B1's
+    /// dependent, not A1's). Without target-matching, the second
+    /// litter's kitten would starve because every adult in the colony
+    /// yields whenever any other adult takes Caretake.
+    #[test]
+    fn suppression_target_specific_no_cross_litter_yield() {
+        use bevy_ecs::world::World;
+        use crate::components::held_intention::IntentionSource;
+        use crate::components::parenting_activity::{
+            ParentalKind, ParentingActivity, RelationshipTo,
+        };
+        use crate::resources::sim_constants::SimConstants;
+        use crate::resources::time::TimeState;
+
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        world.insert_resource(TimeState {
+            tick: 1_000,
+            ..Default::default()
+        });
+        world.insert_resource(ParentingScalars::default());
+
+        let k1 = world.spawn(()).id();
+        let k2 = world.spawn(()).id();
+        let a1 = world.spawn(()).id();
+        let a2 = world.spawn(()).id();
+        let b1 = world.spawn(()).id();
+        let b2 = world.spawn(()).id();
+
+        // Litter 1: A1 + A2 → K1. A1 holds Caretake on K1.
+        let held_a1 = HeldIntention {
+            intention: crate::ai::dse::Intention::Goal {
+                state: crate::ai::dse::GoalState {
+                    label: "kitten_fed",
+                    achieved: |_, _| false,
+                },
+                strategy: crate::ai::dse::CommitmentStrategy::SingleMinded,
+            },
+            held_action: Action::Caretake,
+            target: Some(k1),
+            adopted_tick: 999,
+            commitment_strength: 0.5,
+            expiry_tick: None,
+            source: IntentionSource::SelfMotivated,
+        };
+        world.entity_mut(a1).insert((
+            flat_personality(0.7),
+            ParentingActivity {
+                relationships: vec![RelationshipTo {
+                    target: k1,
+                    kind: ParentalKind::Biological,
+                    bond_strength: 1.0,
+                    parental_engagement: 0.5,
+                    partner: Some(a2),
+                    entered_tick: 1_000,
+                    last_interaction_tick: 1_000,
+                }],
+            },
+            held_a1,
+        ));
+        // A2 — co-parent with A1. Holds nothing.
+        world.entity_mut(a2).insert((
+            flat_personality(0.7),
+            ParentingActivity {
+                relationships: vec![RelationshipTo {
+                    target: k1,
+                    kind: ParentalKind::Biological,
+                    bond_strength: 1.0,
+                    parental_engagement: 0.5,
+                    partner: Some(a1),
+                    entered_tick: 1_000,
+                    last_interaction_tick: 1_000,
+                }],
+            },
+        ));
+        // Litter 2: B1 + B2 → K2. Neither holds anything.
+        world.entity_mut(b1).insert((
+            flat_personality(0.7),
+            ParentingActivity {
+                relationships: vec![RelationshipTo {
+                    target: k2,
+                    kind: ParentalKind::Biological,
+                    bond_strength: 1.0,
+                    parental_engagement: 0.5,
+                    partner: Some(b2),
+                    entered_tick: 1_000,
+                    last_interaction_tick: 1_000,
+                }],
+            },
+        ));
+        world.entity_mut(b2).insert((
+            flat_personality(0.7),
+            ParentingActivity {
+                relationships: vec![RelationshipTo {
+                    target: k2,
+                    kind: ParentalKind::Biological,
+                    bond_strength: 1.0,
+                    parental_engagement: 0.5,
+                    partner: Some(b1),
+                    entered_tick: 1_000,
+                    last_interaction_tick: 1_000,
+                }],
+            },
+        ));
+
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(populate_parenting_scalars);
+        schedule.run(&mut world);
+
+        let scalars = world.resource::<ParentingScalars>();
+        // A2 — co-parent of A1 — should suppress (A1 is caretaking
+        // their shared kitten K1).
+        let constants = world.resource::<SimConstants>();
+        let expected = constants.parenting.joint_suppression_factor;
+        let bundle_a2 = scalars.get(a2);
+        assert!(
+            (bundle_a2.caretake_suppression_factor - expected).abs() < 1e-4,
+            "A2 should suppress (partner A1 caretaking shared K1); got {}",
+            bundle_a2.caretake_suppression_factor
+        );
+        // B1 and B2 — unrelated litter — should NOT suppress.
+        let bundle_b1 = scalars.get(b1);
+        let bundle_b2 = scalars.get(b2);
+        assert!(
+            (bundle_b1.caretake_suppression_factor - 1.0).abs() < 1e-4,
+            "B1 must not suppress when A1 caretakes a different litter's kitten; got {}",
+            bundle_b1.caretake_suppression_factor
+        );
+        assert!(
+            (bundle_b2.caretake_suppression_factor - 1.0).abs() < 1e-4,
+            "B2 must not suppress when A1 caretakes a different litter's kitten; got {}",
+            bundle_b2.caretake_suppression_factor
         );
     }
 }

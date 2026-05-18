@@ -1022,7 +1022,27 @@ impl Plugin for SimulationPlugin {
             systems::goap::evaluate_and_plan
                 .after(systems::goap::check_modifier_preemption)
                 .after(systems::items::sync_food_stores)
-                .after(systems::aspiration_picker::pick_aspiration_emissions),
+                .after(systems::aspiration_picker::pick_aspiration_emissions)
+                // Ticket 400 — ensure ParentingScalars is populated for
+                // this tick before scoring reads it via ColonyContext.
+                // Without this, Bevy's scheduler can run the modifier
+                // pipeline before `populate_parenting_scalars` writes
+                // the per-cat bundle — the nested SystemParam access
+                // path through `ColonyContext` doesn't surface the
+                // ResMut<ParentingScalars> dependency to the scheduler
+                // strongly enough.
+                //
+                // Schedule-edge note (per memory:
+                // `learning_bevy_schedule_edge_perturbation`): adding
+                // this constraint perturbs seed-42 RNG via the
+                // re-ordered FixedUpdate sequence. Affected scenario
+                // tests (`disposal_election`, `picking_up_scavenging`)
+                // see different tick-1 softmax outcomes despite
+                // structurally-identical scoring — they assert on
+                // probabilistic L3 wins under specific seed behavior.
+                // Updated to use sufficiently long tick budgets that
+                // re-elections smooth out the RNG variance.
+                .after(systems::parenting_activity::populate_parenting_scalars),
         );
         // Flush commands so GoapPlan inserted by evaluate_and_plan is
         // visible to resolve_goap_plans in the same tick.

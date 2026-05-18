@@ -227,7 +227,7 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::ColonyStoresChronicallyFull>,
             Has<markers::HasMidden>,
             Has<markers::HasGroundCarcass>,
-            Has<markers::HasHandoffRecipient>,
+            Has<markers::HasDependentCat>,
         ),
         With<markers::ColonyState>,
     >,
@@ -1353,7 +1353,7 @@ pub fn evaluate_and_plan(
         colony_stores_chronically_full,
         has_midden,
         has_ground_carcass,
-        has_handoff_recipient,
+        has_dependent_cat,
     ) = world_state.colony_state_query.single().expect(
         "ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)",
     );
@@ -1419,10 +1419,11 @@ pub fn evaluate_and_plan(
     // emergent scavenging. Authored by `update_colony_building_markers`
     // from any uncleansed/unharvested carcass in the colony.
     markers.set_colony(markers::HasGroundCarcass::KEY, has_ground_carcass);
-    // 188: HasHandoffRecipient — Handing DSE eligibility filter.
-    // Authored by `update_colony_building_markers` from any living
-    // kitten in the colony. Adults hand to kittens.
-    markers.set_colony(markers::HasHandoffRecipient::KEY, has_handoff_recipient);
+    // 188 / 410: HasDependentCat — Handing AND Caretake DSE eligibility
+    // filter. Authored by `update_colony_building_markers` from any
+    // care-dependent cat (currently any living kitten). Adults give
+    // care to dependents.
+    markers.set_colony(markers::HasDependentCat::KEY, has_dependent_cat);
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query
@@ -2838,10 +2839,25 @@ pub fn evaluate_and_plan(
                     softmax_outcome.margin(),
                     softmax_temperature,
                 );
+            // Ticket 400 — Caretake target plumbing. Caretake's `emit`
+            // returns an `Intention::Goal { state: "kitten_fed", .. }`
+            // with no embedded target; the resolved kitten lives on
+            // `caretake_resolution.target`. The L2 ParentingActivity
+            // suppression mechanic (`populate_parenting_scalars`) needs
+            // `HeldIntention.target` to know which kitten the partner
+            // is caretaking — otherwise a partner caretaking kitten A
+            // would over-suppress my Caretake bias for kitten B (e.g.
+            // multi-litter colonies). Threading the resolved target in
+            // here keeps the suppression target-specific.
+            let held_target = if chosen_action == crate::ai::Action::Caretake {
+                caretake_resolution.target
+            } else {
+                None
+            };
             let held = crate::components::HeldIntention::new(
                 held_intention,
                 chosen_action,
-                None,
+                held_target,
                 res.time.tick,
                 commitment_strength,
                 None,
@@ -6997,14 +7013,17 @@ fn dispatch_step_action(
             outcome.result
         }
         GoapActionKind::HandoffItem => {
-            // 188: resolve nearest hungry kitten as recipient if not
-            // already set. Mirrors `TrashItemAtMidden`'s nearest-Midden
-            // fallback above. The `HasHandoffRecipient` colony marker
-            // guarantees ≥1 kitten exists when we reach this arm; pick
-            // the closest one with the lowest hunger satisfaction so
-            // adults preferentially feed the most-in-need nearby kitten.
-            // Per-cat target picker DSE (multi-axis: proximity +
-            // hunger + fondness) is a balance follow-on (ticket 192).
+            // 188 / 410: resolve nearest hungry kitten as recipient if
+            // not already set. Mirrors `TrashItemAtMidden`'s nearest-
+            // Midden fallback above. The `HasDependentCat` colony marker
+            // gates both Handing and Caretake DSEs upstream, so the
+            // kitten roster is non-empty when we reach this arm under
+            // normal conditions. We still guard for the empty case
+            // because eligibility is sampled at L2 and the snapshot can
+            // race with a kitten despawn between filter and resolve.
+            // Pick the closest kitten with the lowest hunger
+            // satisfaction so adults feed the most-in-need nearby
+            // dependent. Per-cat picker (multi-axis) is ticket 192.
             if plan.step_state[step_idx].target_entity.is_none() {
                 plan.step_state[step_idx].target_entity = snaps
                     .kitten_snapshot
@@ -7025,7 +7044,8 @@ fn dispatch_step_action(
             }
             let Some(recipient) = plan.step_state[step_idx].target_entity else {
                 return crate::steps::StepResult::Fail(
-                    "handoff: no recipient on disposition (no kittens in colony)".to_string(),
+                    "handoff: no recipient on disposition (no dependent cat in colony)"
+                        .to_string(),
                 );
             };
             let has_transferable = !inventory.slots.is_empty();

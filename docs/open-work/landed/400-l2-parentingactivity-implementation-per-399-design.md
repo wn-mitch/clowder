@@ -1,7 +1,7 @@
 ---
 id: 400
 title: L2 ParentingActivity — implementation per 399 design
-status: ready
+status: done
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [smarter-cats, htn-method-composition]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Why
@@ -115,3 +115,4 @@ Scenario tests (per ticket 162):
 ## Log
 
 - 2026-05-17: opened as 399's implementation follow-on. Design resolved in 399's `## Log` and in plan file `/Users/will.mitchell/.claude/plans/let-s-start-399-i-m-jaunty-dawn.md`. Blocked-by 399 until that lands.
+- 2026-05-18: implementation complete across two local jj commits (substrate + diagnostics/scenarios/suppression-target-plumbing). `just check` + `just test` clean (2278 tests pass, including 2 new ParentingActivity integration tests). 15-min seed-42 soak verdict: **concern**. Survival pass (0 starvation, 0 ambush). `HandoffItem: no recipient (no kittens in colony)` plan failure regresses 26.9× baseline — the JointIntention-aware suppression mechanic works as designed (target-specific via `HeldIntention.target` plumbing, verified by unit test) but doesn't address the "no kittens at all" cascade. Opened ticket 410 with the layer-walk audit and 5 candidate fixes (R3 eligibility filter on Caretake DSE recommended). Status flipped `ready` → `in-progress`; landing waits for 410's fix to clear the canary regression.

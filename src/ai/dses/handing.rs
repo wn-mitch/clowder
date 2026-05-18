@@ -13,10 +13,11 @@
 //! (`goap.rs::HandoffItem` falls back to the nearest hungry kitten).
 //!
 //! **Eligibility.** `forbid(Incapacitated)` AND
-//! `require(HasHandoffRecipient)`. The colony-scoped marker is
-//! authored by `update_colony_building_markers` (ticket 188 wave-
-//! closeout) from the existence of any living kitten — adults hand to
-//! kittens, so the DSE is dormant when the colony has no kittens.
+//! `require(HasDependentCat)`. The colony-scoped marker (renamed from
+//! `HasHandoffRecipient` in ticket 410) is authored by
+//! `update_colony_building_markers` from the existence of any care
+//! dependent — currently any living kitten. Adults hand to dependents,
+//! so the DSE is dormant when the colony has no one needing care.
 
 use bevy::prelude::*;
 
@@ -50,7 +51,7 @@ impl HandingDse {
             composition: Composition::weighted_sum(vec![1.0]),
             eligibility: EligibilityFilter::new()
                 .forbid(markers::Incapacitated::KEY)
-                .require(markers::HasHandoffRecipient::KEY),
+                .require(markers::HasDependentCat::KEY),
         }
     }
 }
@@ -107,8 +108,9 @@ mod tests {
         // 188: replaced 178's default-zero curve with the same Logistic
         // shape Discarding/Trashing use on `inventory_excess`. Empty
         // inventory → near-zero score; full → near-one. Eligibility
-        // gates the DSE dormant when no kitten exists in the colony,
-        // so this curve only fires when the substrate has a recipient.
+        // gates the DSE dormant when no care dependent exists in the
+        // colony, so this curve only fires when the substrate has a
+        // recipient (via HasDependentCat).
         let dse = HandingDse::new(&defaults());
         let c = match &dse.considerations()[0] {
             Consideration::Scalar(sc) => &sc.curve,
@@ -120,12 +122,12 @@ mod tests {
     }
 
     #[test]
-    fn handing_eligibility_requires_handoff_recipient() {
+    fn handing_eligibility_requires_dependent_cat() {
         let dse = HandingDse::new(&defaults());
         let elig = dse.eligibility();
         assert!(
-            elig.required.contains(&markers::HasHandoffRecipient::KEY),
-            "Handing must require HasHandoffRecipient",
+            elig.required.contains(&markers::HasDependentCat::KEY),
+            "Handing must require HasDependentCat",
         );
         assert!(
             elig.forbidden.contains(&markers::Incapacitated::KEY),

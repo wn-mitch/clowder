@@ -154,6 +154,14 @@ pub struct ModifierApplication {
     /// Set on multiplicative modifiers (Fox-territory suppression).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub multiplier: Option<f32>,
+    /// Ticket 400 — structured per-modifier breakdown for multi-axis
+    /// modifiers whose `delta` doesn't carry enough information to
+    /// debug. `ParentingActivityModifier` populates this with its five
+    /// per-scale bias sums + Caretake suppression factor when it emits
+    /// a non-zero lift; other modifiers leave it `None` (zero-cost
+    /// when not tracing). Read by `frame-diff` and `just inspect`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
 }
 
 /// Phase 3a lands a typed `Intention` enum (§L2.10.4); Phase 1 shim

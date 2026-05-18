@@ -474,23 +474,40 @@ impl HasMidden {
     pub const KEY: &str = "HasMidden";
 }
 
-/// 188: colony-scoped marker indicating ≥1 cat in the colony is a
-/// plausible handoff recipient — i.e., at least one `Kitten` exists.
-/// Read by the Handing DSE's
-/// `EligibilityFilter::require(HasHandoffRecipient::KEY)`. Authored by
-/// `update_colony_building_markers` (ticket 188 wave-closeout).
+/// Colony-scoped marker: ≥1 cat in the colony is a *care dependent* —
+/// a creature who cannot self-provision and needs another cat to bring
+/// it food. Read by both the Handing DSE's
+/// `EligibilityFilter::require(HasDependentCat::KEY)` and (ticket 410)
+/// the Caretake DSE's same requirement. Authored by
+/// `update_colony_building_markers`.
 ///
-/// Colony-scope rather than per-cat: adults give to kittens; the
-/// existence of *any* kitten in the colony enables Handing for *any*
-/// adult holding food. The actual recipient resolution happens at
-/// dispatch time (`goap.rs::HandoffItem` fallback resolves the nearest
-/// hungry kitten via `caretake_resolution`-style proximity search) —
-/// the per-cat target picker is a balance follow-on, not load-bearing
-/// for the structural plumbing.
+/// **Narrative, not mechanic.** This marker says "a creature here needs
+/// care," not "a slot exists to receive an item" — the latter
+/// (`HasHandoffRecipient` pre-410) would equally apply to a
+/// construction-kitty waiting on reeds, conflating distinct narratives.
+/// Per the "mechanics are the narrative" design pillar.
+///
+/// **Current population:** any living `Kitten` (kittens cannot hunt and
+/// depend on adults for food). The populator
+/// (`src/systems/buildings.rs::update_colony_building_markers`) trivially
+/// extends to other categories — incapacitated adults who cannot reach
+/// food, other future dependents — as `kittens.is_empty() &&
+/// other_dependents.is_empty()`. No consumer changes required when the
+/// union grows.
+///
+/// **Colony-scope rather than per-cat:** any caregiver responds to any
+/// dependent; the existence of *any* dependent in the colony enables
+/// Caretake/Handing for *any* eligible cat. Actual recipient resolution
+/// happens at dispatch time (`goap.rs::HandoffItem` picks the
+/// hungriest-then-nearest from the kitten roster); per-cat picker is a
+/// balance follow-on (ticket 192).
+///
+/// Ticket 188 authored the marker (then `HasHandoffRecipient`); ticket
+/// 410 renamed and extended its consumer set.
 #[derive(Component, Debug, Clone, Copy)]
-pub struct HasHandoffRecipient;
-impl HasHandoffRecipient {
-    pub const KEY: &str = "HasHandoffRecipient";
+pub struct HasDependentCat;
+impl HasDependentCat {
+    pub const KEY: &str = "HasDependentCat";
 }
 
 /// Colony-scoped marker indicating ≥1 ground carcass (an `Item` with
