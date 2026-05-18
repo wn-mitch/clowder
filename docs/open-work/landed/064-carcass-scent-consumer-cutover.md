@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: pending
+landed-at: 63cd68887c0d
 landed-on: 2026-05-18
 ---
 
