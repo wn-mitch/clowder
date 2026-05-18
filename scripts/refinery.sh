@@ -68,6 +68,15 @@ fi
 
 cd "$REPO_ROOT"
 
+# R3 (ticket 409): refresh origin state before reading local bookmarks.
+# Without this, a polecat that pushed to origin but advanced its own
+# session bookmark locally can be invisible to refinery if the master
+# workspace's local jj op-log is stale. The 2026-05-17 failure had two
+# polecats (337/353/363) in this exact state — work on origin, refinery
+# reported "no commits ahead of main". Adds 1-3s per invocation; non-fatal
+# on failure so refinery still runs offline.
+jj git fetch 2>/dev/null || echo "refinery: jj git fetch failed (continuing with local bookmark state)" >&2
+
 list_session_bookmarks() {
     jj bookmark list 2>/dev/null \
         | awk '/^session\//{print $1}' \

@@ -63,6 +63,7 @@ just refinery --land <slug>
 ```
 
 The refinery:
+- Runs `jj git fetch` to refresh origin bookmarks (ticket 409: prevents stale-local-view masking a polecat's push)
 - Rebases `session/<slug>` onto current `main` (if behind)
 - Advances `main` to the session's head
 - Forgets `session/<slug>`
