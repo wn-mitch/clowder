@@ -1,7 +1,10 @@
 use bevy_ecs::prelude::*;
 
 use crate::ai::CurrentAction;
+use crate::components::aspirations::Aspirations;
 use crate::components::fulfillment::Fulfillment;
+use crate::components::held_goal_stack::HeldGoalStack;
+use crate::components::held_intention::IntentionSource;
 use crate::components::identity::{Age, Gender, Name, Orientation};
 use crate::components::mental::Mood;
 use crate::components::parenting_activity::{ParentalKind, ParentingActivity};
@@ -9,7 +12,10 @@ use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::pregnancy::Pregnant;
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
-use crate::resources::event_log::{EventKind, EventLog, ParentingSummary, RelationshipEntry};
+use crate::resources::event_log::{
+    AspirationSnapshot, CatGoalState, EventKind, EventLog, GoalFrameSnapshot, ParentingSummary,
+    RelationshipEntry,
+};
 use crate::resources::relationships::Relationships;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::snapshot_config::SnapshotConfig;
@@ -51,6 +57,8 @@ pub fn emit_cat_snapshots(
                 Option<&Pregnant>,
                 Option<&Fulfillment>,
                 Option<&ParentingActivity>,
+                Option<&HeldGoalStack>,
+                Option<&Aspirations>,
             ),
         ),
         Without<Dead>,
@@ -80,6 +88,8 @@ pub fn emit_cat_snapshots(
             pregnant,
             fulfillment,
             parenting_activity,
+            goal_stack,
+            aspirations,
         ),
     ) in &query
     {
@@ -149,6 +159,52 @@ pub fn emit_cat_snapshots(
             }
         }));
 
+        // Ticket 339 — serialize HTN goal-stack as stable string slugs.
+        let goal_stack_snap: Vec<GoalFrameSnapshot> = goal_stack
+            .map(|stack| {
+                stack
+                    .frames
+                    .iter()
+                    .map(|f| GoalFrameSnapshot {
+                        method: f.method.0.to_string(),
+                        goal_label: f.goal_label.to_string(),
+                        sub_goal_index: f.sub_goal_index,
+                        sub_goal_count: f.sub_goal_count,
+                        target: f
+                            .target
+                            .and_then(|e| names.get(e).ok())
+                            .map(|n| n.0.clone()),
+                        source: match &f.source {
+                            IntentionSource::SelfMotivated => "self_motivated".to_string(),
+                            IntentionSource::CoordinatorDirective { .. } => {
+                                "coordinator_directive".to_string()
+                            }
+                            IntentionSource::AspirationEmitted { chain } => {
+                                format!("aspiration:{chain}")
+                            }
+                        },
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Ticket 339 — serialize active aspirations.
+        let active_aspirations_snap: Vec<AspirationSnapshot> = aspirations
+            .map(|asps| {
+                asps.active
+                    .iter()
+                    .map(|a| AspirationSnapshot {
+                        chain_name: a.chain_name.clone(),
+                        domain: a.domain,
+                        current_milestone: a.current_milestone,
+                        progress: a.progress,
+                        adopted_tick: a.adopted_tick,
+                        last_progress_tick: a.last_progress_tick,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
         log.push(
             time.tick,
             EventKind::CatSnapshot {
@@ -172,6 +228,10 @@ pub fn emit_cat_snapshots(
                 season: format!("{season:?}"),
                 social_warmth: fulfillment.map_or(0.6, |f| f.social_warmth),
                 parenting,
+                goal_state: Box::new(CatGoalState {
+                    goal_stack: goal_stack_snap,
+                    active_aspirations: active_aspirations_snap,
+                }),
             },
         );
     }

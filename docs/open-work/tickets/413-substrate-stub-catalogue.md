@@ -3,6 +3,7 @@ id: 413
 title: Substrate stub catalogue — orphan markers + invalid consideration string-name references
 status: in-progress
 cluster: ai-substrate
+orchestration: substrate-sensitive
 added: 2026-05-05
 parked: null
 priority: medium

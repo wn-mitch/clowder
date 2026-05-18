@@ -5,6 +5,7 @@ use bevy_ecs::prelude::Resource;
 
 use crate::ai::planner::PlanningFailureReason;
 use crate::ai::Action;
+use crate::components::aspirations::AspirationDomain;
 use crate::components::personality::Personality;
 use crate::components::physical::Needs;
 use crate::components::skills::Skills;
@@ -49,6 +50,55 @@ pub struct ParentingSummary {
     pub in_law_count: usize,
     pub bond_formed_count: usize,
     pub adopted_count: usize,
+}
+
+/// Ticket 339 — per-frame snapshot of one entry in a cat's HTN goal-stack.
+/// Stable string slugs (no Entity refs) preserve cross-run comparability.
+/// Backward-compatible: `CatSnapshot` carries this in a `#[serde(default)]`
+/// vec, so older readers tolerate its absence.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GoalFrameSnapshot {
+    /// Stable slug matching `MethodId.0`.
+    pub method: String,
+    /// Goal-label this method was selected for.
+    pub goal_label: String,
+    /// Current cursor within the method's sub-goal list.
+    pub sub_goal_index: usize,
+    /// Total sub-goal count (captured at push-time).
+    pub sub_goal_count: usize,
+    /// Stable name slug for the bound target entity, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    /// Source slug: `"self_motivated"` / `"coordinator_directive"` /
+    /// `"aspiration:<chain-name>"`.
+    pub source: String,
+}
+
+/// Ticket 339 — snapshot of one active aspiration for the `CatSnapshot` event.
+/// Mirrors `ActiveAspiration` fields so cross-run tools can query aspiration
+/// state from `events.jsonl` without a per-focal trace sidecar.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AspirationSnapshot {
+    pub chain_name: String,
+    pub domain: AspirationDomain,
+    pub current_milestone: usize,
+    pub progress: u32,
+    pub adopted_tick: u64,
+    pub last_progress_tick: u64,
+}
+
+/// Ticket 339 — boxed container for goal-stack and aspiration state within
+/// `CatSnapshot`. Boxed to keep `EventKind::CatSnapshot` within the
+/// `large_enum_variant` clippy budget (Box = 8 bytes inline vs 48 bytes for
+/// two bare Vecs). Flattened into the parent via `#[serde(flatten)]` so
+/// `goal_stack` and `active_aspirations` appear as top-level JSON fields
+/// rather than nested under a container key.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct CatGoalState {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub goal_stack: Vec<GoalFrameSnapshot>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub active_aspirations: Vec<AspirationSnapshot>,
 }
 
 /// One wild-predator position in a spatial snapshot.
@@ -184,6 +234,13 @@ pub enum EventKind {
         /// variant size within the `large_enum_variant` clippy budget.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         parenting: Option<Box<ParentingSummary>>,
+        /// Ticket 339 — HTN goal-stack + active aspirations. Boxed to stay
+        /// within the `large_enum_variant` budget; flattened so `goal_stack`
+        /// and `active_aspirations` appear as top-level JSON fields.
+        /// Older readers get the `Default` (empty vecs) via `#[serde(default)]`
+        /// on each field inside `CatGoalState`.
+        #[serde(flatten)]
+        goal_state: Box<CatGoalState>,
     },
     FoodLevel {
         current: f32,

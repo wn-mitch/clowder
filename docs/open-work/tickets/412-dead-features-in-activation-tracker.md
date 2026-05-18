@@ -3,6 +3,7 @@ id: 412
 title: Three permanently dead features in activation tracker
 status: blocked
 cluster: null
+orchestration: substrate-sensitive
 added: 2026-04-14
 parked: null
 priority: low
