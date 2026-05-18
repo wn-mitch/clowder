@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [refactor-plan.md, ai-substrate-refactor.md, strategist-coordinator.md]
 related-balance: [social-target-range.report.md]
-landed-at: pending
+landed-at: be920de9e2f9
 landed-on: 2026-05-18
 ---
 
