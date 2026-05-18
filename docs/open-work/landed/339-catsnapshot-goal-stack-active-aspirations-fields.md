@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: pending
+landed-at: 9a93e6f3e989
 landed-on: 2026-05-18
 ---
 
