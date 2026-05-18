@@ -1,7 +1,7 @@
 ---
 id: 066
 title: Explore dominance over targeted leisure
-status: in-progress
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [refactor-plan.md, ai-substrate-refactor.md, strategist-coordinator.md]
 related-balance: [social-target-range.report.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Current state
@@ -145,3 +145,4 @@ before it's scoped.
   something orthogonal to Explore scoring. Sub-2 verdict still pending.
   Folded in via 034 closure (which was opened against the stale
   Phase-0 vs Phase-1 framing).
+- 2026-05-18: Landing summary: sub-2 (Explore saturation curve) four-fix shipped 2026-04-24 — passive-exploration stamping in src/systems/needs.rs, exploration_decay_rate 4× slower (0.00005 → 0.0000125), decoupled perception radius (6 vs 20), still_goal wired to unexplored_nearby >= explore_satiation_threshold. Sub-1 (social_target_range iter 3) — proved compromised by bond-attenuation; real fix in AI substrate refactor Phase 4 (target-quality scoring), not parked-as-bug. Sub-3 (strategist-coordinator / C4 deliberation-layer task board) — tracked under ticket 128 HTN method composition epic, which is the C4 deliverable (per landed ticket 007 cluster-C roadmap). Play residual — post-127-joint-intention baseline shows play: 14 unchanged from Phase-1 109; PlayFired emit at personality_events.rs:320 is gated by something orthogonal to Explore scoring; opened as ticket 415 (with 276 cross-reference for JointIntention-based play canary path).

@@ -14,8 +14,8 @@ _Last generated: 2026-05-18._
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
-| Ready | 112 |
+| In progress | 5 |
+| Ready | 113 |
 | Parked | 15 |
 | Blocked | 39 |
 | **Open total** | **172** |
@@ -25,7 +25,7 @@ Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (6 in-progress · 0 ready blockers · 5 next-recommended)
+## Active focus (5 in-progress · 0 ready blockers · 5 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
@@ -34,7 +34,6 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _[life-cycle] · added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
-- **[066](docs/open-work/tickets/066-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _[ai-substrate] · parked 2026-04-21 · added 2026-04-20_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
@@ -56,20 +55,19 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 
-## In progress (6)
+## In progress (5)
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _[life-cycle] · added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
-- **[066](docs/open-work/tickets/066-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _[ai-substrate] · parked 2026-04-21 · added 2026-04-20_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (112)
+## Ready by cluster (113)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (31 ready, 6 blocked)
+### ai-substrate (32 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -102,6 +100,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · added 2026-05-17_
 - **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · added 2026-05-17_
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
+- **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 
 ### social-coordination (15 ready, 7 blocked)
 
@@ -324,7 +323,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (112)
+## Ready (113)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -438,6 +437,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
+- **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 
 ## Parked (15)
 
@@ -499,11 +499,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
 - **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 
-## Landed archive (270)
+## Landed archive (271)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (204)
+### 2026-05 (205)
 
 - **[410](docs/open-work/landed/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) _(2026-05-18)_
 - **[409](docs/open-work/landed/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings _(2026-05-18)_
@@ -518,6 +518,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[069](docs/open-work/landed/069-folded-into-024.md)** — Folded into ticket 024 _(2026-05-18)_
 - **[068](docs/open-work/landed/068-folded-into-014.md)** — Folded into ticket 014 _(2026-05-18)_
 - **[067](docs/open-work/landed/067-folded-into-014.md)** — Folded into ticket 014 _(2026-05-18)_
+- **[066](docs/open-work/landed/066-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure _(2026-05-18)_
 - **[399](docs/open-work/landed/399-l2-parentingactivity-express-non-primary-caretaker-parent-roles-per-7m2-design.md)** — L2 ParentingActivity — express non-primary-caretaker parent roles per §7.M.2 (design) _(2026-05-17)_
 - **[398](docs/open-work/landed/398-7m2-raiseoffspringaspiration-kitten-rearing-as-nested-intention-aspiration.md)** — §7.M.2 RaiseOffspringAspiration — kitten-rearing as nested-Intention aspiration _(2026-05-17)_
 - **[397](docs/open-work/landed/397-rear-kitten-arc-clean-completion-exposes-kitten-survival-regression.md)** — rear_kitten arc clean completion exposes kitten survival regression _(2026-05-17)_
