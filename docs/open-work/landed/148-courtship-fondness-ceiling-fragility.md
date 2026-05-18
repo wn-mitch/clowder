@@ -1,7 +1,7 @@
 ---
 id: 148
 title: Courtship-chain fondness ceiling vs gate fragility
-status: in-progress
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: [smarter-cats]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [146-distress-substrate-inert.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Why
@@ -115,3 +115,4 @@ small. Other seeds may not have this fragility.
   measure the post-balancing fondness ceiling for the Mocha+Birch
   dyad and the Adult-Adult pool, then compare against the pre-150
   ceiling values to see whether (a)'s threshold dropped.
+- 2026-05-18: Diagnostic run via scripts/diag_courtship_ceiling.py against logs/sweep-courtship-fondness-diag (5 seeds × 3 reps = 15 runs, 2026-05-02 sweep). Findings: seed 42 max_eligible_pair_fondness = 0.3035 (gate is 0.30; six-thousandths above), courtship_tally 1695-1791 across reps — the canonical canary seed holds; the 2026-05-03 alarm (032-soak-treatment showing 0 events) was a transient that downstream landings resolved. Structural fragility documented: 3/5 seeds (314 max 0.2347, 2025 / 7 with 4 founders but 0 orientation-compatible eligible pairs) produce ZERO courtship events. Hypothesis (a) fondness ceiling ~0.30 fits seeds 42 / 99 / 314; hypothesis (b) co-location-failure fits 2025 / 7 via orientation incompatibility. Closes the investigation; not opening a follow-on per 'close the clade' — if the canary regresses on canonical seed, that's a fresh ticket.
