@@ -98,6 +98,10 @@ test-similar:
 #   just similar 189                          # ticket id (centroid query)
 #   just similar tickets/175.md               # repo-relative file path
 #   just similar "starvation cluster"         # free text
+# Initiative-scoped modes (no positional input):
+#   just similar --centroid world-richness    # centroid of tagged members → all neighbors
+#   just similar --not-tagged world-richness  # same centroid → exclude tagged (discovery)
+#   just similar 189 --initiative world-richness  # normal query, results filtered
 similar *ARGS:
     @uv run scripts/similar/similar.py {{ARGS}}
 
@@ -143,6 +147,7 @@ similar-link-report *ARGS:
 #   just next --mode seed --seed "starvation"  # free-text seed
 #   just next --top 10 --text                  # widen + render text envelope
 #   just next --no-auto-rebuild                # skip stale-index auto-rebuild
+#   just next --initiative world-richness      # scope to one initiative
 next *ARGS:
     @uv run scripts/similar/next.py {{ARGS}}
 
@@ -651,6 +656,7 @@ initiatives:
 #   just open-work-epics --epic 093      # one epic
 #   just open-work-epics --detailed      # every child listed under each epic
 #   just open-work-epics --json          # machine-readable
+#   just open-work-epics --check         # lint: orphan tickets + stale rosters
 open-work-epics *ARGS:
     uv run scripts/epic_progress.py {{ARGS}}
 

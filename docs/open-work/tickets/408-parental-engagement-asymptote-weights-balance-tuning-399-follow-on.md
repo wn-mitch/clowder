@@ -3,6 +3,7 @@ id: 408
 title: Parental engagement asymptote weights — balance tuning (399 follow-on)
 status: blocked
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
 added: 2026-05-17
 parked: null

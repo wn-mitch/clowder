@@ -1,7 +1,7 @@
 ---
 id: 307
 title: Cluster/initiative filter recipes + epic-rollup lint for open-work index
-status: ready
+status: done
 cluster: process-discipline
 orchestration: swarm-safe
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 3bebdbb7
+landed-on: 2026-05-17
 ---
 
 ## Why

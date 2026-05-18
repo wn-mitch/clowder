@@ -3,6 +3,7 @@ id: 400
 title: L2 ParentingActivity — implementation per 399 design
 status: ready
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: [smarter-cats, htn-method-composition]
 added: 2026-05-17
 parked: null

@@ -3,6 +3,7 @@ id: 194
 title: saturation suppression elevates Patrol over Hunt under predator pressure
 status: ready
 cluster: ai-substrate
+initiative: [colony-safety]
 added: 2026-04-25
 ---
 

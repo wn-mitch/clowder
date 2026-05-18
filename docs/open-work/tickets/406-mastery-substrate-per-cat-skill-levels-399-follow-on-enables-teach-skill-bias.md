@@ -3,6 +3,7 @@ id: 406
 title: Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias)
 status: blocked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-17
 parked: null

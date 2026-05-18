@@ -71,6 +71,7 @@ class TicketView:
     source_path: str
     status: str
     cluster: str | None
+    initiative: list[str]
     title: str
     landed_on: str | None
     row_indices: list[int]      # rows in idx.vectors / idx.chunks
@@ -139,9 +140,14 @@ def main() -> int:
         and t.status in statuses
         and (t.source_kind, t.ticket_id) not in excluded
     ]
+    if args.initiative:
+        candidates = [t for t in candidates if args.initiative in t.initiative]
     if not candidates:
+        detail = (
+            f" (initiative={args.initiative})" if args.initiative else ""
+        )
         print(
-            f"ERROR: no candidate tickets with status in {sorted(statuses)}",
+            f"ERROR: no candidate tickets with status in {sorted(statuses)}{detail}",
             file=sys.stderr,
         )
         return 1
@@ -189,7 +195,7 @@ def main() -> int:
         narrative=_make_narrative(
             args.mode, breakdown, len(candidates), len(top),
         ),
-        next=_suggest_next(args.mode, args.seed, args.top),
+        next=_suggest_next(args.mode, args.seed, args.top, args.initiative),
     )
     emit(env, fmt="text" if args.text else "json")
     return 0 if results else 1
@@ -238,6 +244,13 @@ def _parse_args() -> argparse.Namespace:
         "--no-auto-rebuild", action="store_true",
         help=("Skip the auto-rebuild that fires when the index is stale; "
               "emit the stale WARN and proceed with current index."),
+    )
+    parser.add_argument(
+        "--initiative",
+        default=None,
+        metavar="NAME",
+        help=("Filter candidates to ready tickets tagged with this initiative. "
+              "Useful for 'what should I work on next in this initiative?'"),
     )
     return parser.parse_args()
 
@@ -317,12 +330,16 @@ def _build_ticket_views(idx: Index) -> list[TicketView]:
             if cluster_raw not in ("—", None, "", "null")
             else None
         )
+        raw_initiative = md.get("initiative") or []
+        if isinstance(raw_initiative, str):
+            raw_initiative = [raw_initiative]
         out.append(TicketView(
             ticket_id=ticket_id,
             source_kind=source_kind,
             source_path=path_by_key[key],
             status=str(md.get("status") or "?"),
             cluster=cluster,
+            initiative=list(raw_initiative),
             title=str(md.get("title") or ""),
             landed_on=md.get("landed_on") or None,
             row_indices=rows,
@@ -611,7 +628,7 @@ def _make_narrative(
     )
 
 
-def _suggest_next(mode: str, seed: str | None, k: int) -> list[str]:
+def _suggest_next(mode: str, seed: str | None, k: int, initiative: str | None = None) -> list[str]:
     out: list[str] = []
     if mode == "blend":
         out.append("just next --mode momentum")
@@ -626,6 +643,8 @@ def _suggest_next(mode: str, seed: str | None, k: int) -> list[str]:
     elif mode == "seed" and seed:
         out.append(f"just similar {seed!r}  # raw retrieval over all corpora")
         out.append("just next  # default blended mode")
+    if not initiative:
+        out.append("just next --initiative <name>  # scope to one initiative")
     return out
 
 

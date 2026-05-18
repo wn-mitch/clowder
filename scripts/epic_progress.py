@@ -22,6 +22,7 @@ Usage:
 """
 
 import argparse
+import datetime as dt
 import json
 import sys
 from pathlib import Path
@@ -37,6 +38,7 @@ from generate_open_work import (  # noqa: E402
     compute_epic_progress,
     discover_epics,
 )
+from _ticket_frontmatter import load_tickets  # noqa: E402
 
 
 # Status badges for terminal output.
@@ -131,6 +133,70 @@ def _epic_to_dict(ep: EpicProgress) -> dict:
     }
 
 
+def _run_lint(epics: list[EpicProgress], repo_root: Path, stale_days: int) -> int:
+    """Lint check: flag orphan tickets + stale epic rosters.
+
+    Orphan: a ready/in-progress ticket whose cluster matches an active
+    epic's cluster but is not listed in that epic's roster.
+
+    Stale: an in-progress epic whose file mtime is older than `stale_days`
+    days (roster hasn't been updated; may be missing recently-opened tickets).
+
+    Returns 0 if no issues, 1 if violations found.
+    """
+    today = dt.date.today()
+    threshold_ts = (today - dt.timedelta(days=stale_days)).timetuple()
+    import time
+    threshold_epoch = time.mktime(threshold_ts)
+
+    violations: list[str] = []
+
+    tickets_dir = repo_root / "docs" / "open-work" / "tickets"
+    open_tickets = load_tickets(tickets_dir)
+
+    for ep in epics:
+        if ep.epic.status not in ("in-progress", "ready"):
+            continue
+
+        epic_cluster = ep.epic.cluster
+
+        # Rule 1: Orphan tickets — open tickets in this epic's cluster
+        # that are not listed in the roster.
+        if epic_cluster:
+            roster_ids = {c.id for c in ep.children}
+            for t in open_tickets:
+                if t.status not in ("in-progress", "ready"):
+                    continue
+                if t.cluster != epic_cluster:
+                    continue
+                if t.id in roster_ids:
+                    continue
+                violations.append(
+                    f"ORPHAN  [{t.id}] {t.title!r} has cluster={epic_cluster} "
+                    f"but is not in epic [{ep.epic.id}] roster"
+                )
+
+        # Rule 2: Stale roster — epic file mtime older than threshold.
+        epic_mtime = ep.epic.path.stat().st_mtime
+        if epic_mtime < threshold_epoch and ep.open_count > 0:
+            age_days = int((today.toordinal() -
+                            dt.date.fromtimestamp(epic_mtime).toordinal()))
+            violations.append(
+                f"STALE   epic [{ep.epic.id}] {ep.epic.title!r} "
+                f"roster last touched {age_days}d ago "
+                f"({ep.open_count} open children)"
+            )
+
+    if violations:
+        print(f"epic-rollup lint: {len(violations)} violation(s)")
+        for v in violations:
+            print(f"  {v}")
+        return 1
+
+    print(f"epic-rollup lint: OK (checked {len(epics)} epic(s))")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -156,11 +222,27 @@ def main() -> int:
         action="store_true",
         help="Emit JSON to stdout instead of human-readable output.",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help=("Epic-rollup lint: flag open tickets not in any matching epic roster "
+              "(orphans) and active epics with stale rosters (>30d untouched)."),
+    )
+    parser.add_argument(
+        "--stale-days",
+        type=int,
+        default=30,
+        metavar="N",
+        help="Stale threshold in days for --check (default: 30).",
+    )
     args = parser.parse_args()
 
     repo_root = args.repo.resolve()
     ticket_index = build_ticket_index(repo_root)
     epics = [compute_epic_progress(e, ticket_index) for e in discover_epics(repo_root)]
+
+    if args.check:
+        return _run_lint(epics, repo_root, args.stale_days)
 
     if args.epic:
         wanted = args.epic

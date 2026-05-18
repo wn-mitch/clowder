@@ -3,6 +3,7 @@ id: 402
 title: Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on)
 status: blocked
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [smarter-cats]
 added: 2026-05-17
 parked: null

@@ -3,6 +3,7 @@ id: 404
 title: Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture)
 status: blocked
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: [smarter-cats, mythic-texture]
 added: 2026-05-17
 parked: null

@@ -33,7 +33,7 @@ from retrieve import (                                                   # noqa:
     Index, INDEX_NPZ, INDEX_META, load_index, save_index, stale_files,
     top_k, chunks_by_ticket_id,
 )
-from similar import _build_arg_parser                                    # noqa: E402
+from similar import _build_arg_parser, _chunks_for_initiative            # noqa: E402
 
 
 # ── deterministic fake embedder ─────────────────────────────────────────────
@@ -239,6 +239,71 @@ class TestChunksByTicketId(unittest.TestCase):
             self.assertGreater(len(rows_int), 0)
             for r in rows_int:
                 self.assertEqual(idx.chunks[r]["metadata"]["ticket_id"], 189)
+
+
+class TestChunksForInitiative(unittest.TestCase):
+    """Tests for the _chunks_for_initiative helper introduced in ticket 307."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tmpdir = Path(self.tmp.name)
+        self.idx = build_synthetic_index(self.tmpdir)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_tagged_ticket_found(self) -> None:
+        # fixture 194 carries initiative: [colony-safety]
+        rows = _chunks_for_initiative(self.idx, "colony-safety")
+        self.assertGreater(len(rows), 0)
+        for r in rows:
+            md = self.idx.chunks[r].get("metadata", {}) or {}
+            self.assertIn("colony-safety", (md.get("initiative") or []))
+
+    def test_unknown_initiative_returns_empty(self) -> None:
+        rows = _chunks_for_initiative(self.idx, "nonexistent-initiative")
+        self.assertEqual(rows, [])
+
+    def test_untagged_tickets_excluded(self) -> None:
+        # Tickets 175 and 189 in fixtures have no initiative tag.
+        rows = _chunks_for_initiative(self.idx, "colony-safety")
+        tagged_ticket_ids = {
+            str(self.idx.chunks[r].get("metadata", {}).get("ticket_id") or "")
+            for r in rows
+        }
+        self.assertNotIn("189", tagged_ticket_ids)
+        self.assertNotIn("175", tagged_ticket_ids)
+
+
+class TestArgParserInitiativeFlags(unittest.TestCase):
+    """Regression tests for --centroid, --not-tagged, --initiative flags (ticket 307)."""
+
+    def setUp(self) -> None:
+        self.parser = _build_arg_parser()
+
+    def test_centroid_flag_accepted(self) -> None:
+        args = self.parser.parse_args(["--centroid", "world-richness"])
+        self.assertEqual(args.centroid, "world-richness")
+        self.assertIsNone(args.not_tagged)
+        self.assertEqual(args.input, [])
+
+    def test_not_tagged_flag_accepted(self) -> None:
+        args = self.parser.parse_args(["--not-tagged", "world-richness"])
+        self.assertEqual(args.not_tagged, "world-richness")
+        self.assertIsNone(args.centroid)
+
+    def test_initiative_filter_combinable_with_ticket_id(self) -> None:
+        args = self.parser.parse_args(["189", "--initiative", "colony-safety"])
+        self.assertEqual(args.input, ["189"])
+        self.assertEqual(args.initiative, "colony-safety")
+
+    def test_input_still_required_without_centroid_modes(self) -> None:
+        # With no positional input and no --centroid/--not-tagged, main() returns 2.
+        # The parser itself accepts [] because nargs="*"; main() validates.
+        args = self.parser.parse_args([])
+        self.assertEqual(args.input, [])
+        self.assertIsNone(args.centroid)
+        self.assertIsNone(args.not_tagged)
 
 
 if __name__ == "__main__":

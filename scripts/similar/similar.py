@@ -19,6 +19,13 @@ of that source's existing chunks. The source's own chunks are excluded
 from results (no self-matches). For free-text queries the text is
 embedded directly.
 
+Initiative-scoped modes (--centroid and --not-tagged don't take a
+positional input; the initiative name is the query seed):
+
+  just similar --centroid world-richness    # centroid of tagged members → all neighbors
+  just similar --not-tagged world-richness  # same centroid → exclude tagged (discovery)
+  just similar 189 --initiative world-richness  # normal query, results filtered to initiative
+
 Emits the standard envelope (see scripts/logq/envelope.py): query echo,
 scan stats, top-K results with stable ids, narrative gloss, and
 suggested next commands.
@@ -61,12 +68,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "input",
-        nargs="+",
+        nargs="*",
         help=("Ticket id (bare number), repo-relative file path, or free-text "
               "query. Free-text queries may be passed as multiple tokens — "
               "they are joined with a space before classification — so the "
               "justfile `{{ARGS}}` passthrough preserves multi-word intent "
-              "without requiring shell-quoting that just doesn't preserve."),
+              "without requiring shell-quoting that just doesn't preserve. "
+              "Optional when --centroid or --not-tagged is given."),
     )
     parser.add_argument(
         "--top-k", "-k",
@@ -78,6 +86,30 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help=("Comma-separated corpus filter. Default: all. Options: "
               + ", ".join(ALL_CORPUSES)),
+    )
+    parser.add_argument(
+        "--initiative",
+        default=None,
+        metavar="NAME",
+        help=("Filter results to chunks tagged with this initiative. "
+              "Combinable with any input mode."),
+    )
+    parser.add_argument(
+        "--centroid",
+        default=None,
+        metavar="INITIATIVE",
+        help=("Use the section-weighted centroid of all chunks tagged with "
+              "this initiative as the query vector. No positional input needed. "
+              "Returns all neighbors — use --not-tagged to find untagged tickets "
+              "that semantically belong in the initiative."),
+    )
+    parser.add_argument(
+        "--not-tagged",
+        default=None,
+        metavar="INITIATIVE",
+        help=("Centroid query (same as --centroid) but exclude chunks already "
+              "tagged with this initiative from results. Discovery surface for "
+              "tickets that belong in the initiative but haven't been tagged yet."),
     )
     parser.add_argument(
         "--text", action="store_true",
@@ -92,7 +124,19 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = _build_arg_parser().parse_args()
-    input_str = " ".join(args.input)
+
+    # --centroid and --not-tagged are mutually exclusive initiative-centroid modes.
+    if args.centroid and args.not_tagged:
+        print("ERROR: --centroid and --not-tagged are mutually exclusive.", file=sys.stderr)
+        return 2
+
+    initiative_query = args.centroid or args.not_tagged
+    if not args.input and not initiative_query:
+        print("ERROR: positional input is required unless --centroid or --not-tagged is given.",
+              file=sys.stderr)
+        return 2
+
+    input_str = " ".join(args.input) if args.input else (initiative_query or "")
 
     if args.rebuild:
         _rebuild_index()
@@ -113,15 +157,6 @@ def main() -> int:
 
     corpus_filter = _parse_corpus_filter(args.corpus)
 
-    # Resolve input to (query_vec, input_kind, exclude_chunk_ids).
-    try:
-        query_vec, input_kind, exclude_ids, resolution_note = _resolve_query(
-            input_str, idx,
-        )
-    except ValueError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        return 2
-
     # Stale-files warning to stderr — non-blocking.
     paths_now = discover_corpus_files(REPO_ROOT)
     stale = stale_files(REPO_ROOT, idx, paths_now)
@@ -132,11 +167,49 @@ def main() -> int:
             file=sys.stderr,
         )
 
+    # Resolve query vector and exclude set.
+    initiative_query = args.centroid or args.not_tagged
+    if initiative_query:
+        # Initiative-centroid mode: derive query from tagged corpus.
+        init_rows = _chunks_for_initiative(idx, initiative_query)
+        if not init_rows:
+            print(
+                f"ERROR: no chunks tagged with initiative '{initiative_query}' — "
+                f"run `just similar-build` to refresh the index.",
+                file=sys.stderr,
+            )
+            return 2
+        query_vec = weighted_centroid_from_rows(idx, init_rows)
+        input_kind = "initiative_centroid"
+        resolution_note = (
+            f"centroid of {len(init_rows)} chunks tagged initiative='{initiative_query}'"
+        )
+        # --not-tagged: exclude the initiative-tagged chunks from results.
+        exclude_ids: set[str] = set()
+        if args.not_tagged:
+            exclude_ids = {idx.chunks[r]["chunk_id"] for r in init_rows}
+    else:
+        try:
+            query_vec, input_kind, exclude_ids, resolution_note = _resolve_query(
+                input_str, idx,
+            )
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 2
+
     hits = top_k(
         idx, query_vec, args.top_k,
         corpus_filter=corpus_filter,
         exclude_chunk_ids=exclude_ids,
     )
+
+    # --initiative result filter: keep only chunks tagged with the initiative.
+    if args.initiative:
+        init_chunk_ids = {
+            idx.chunks[r]["chunk_id"]
+            for r in _chunks_for_initiative(idx, args.initiative)
+        }
+        hits = [(i, s) for i, s in hits if idx.chunks[i]["chunk_id"] in init_chunk_ids]
 
     results = [_chunk_to_result(idx.chunks[i], score) for i, score in hits]
 
@@ -165,6 +238,22 @@ def main() -> int:
     )
     emit(env, fmt="text" if args.text else "json")
     return 0 if results else 1
+
+
+# ── initiative helpers ───────────────────────────────────────────────────────
+
+def _chunks_for_initiative(idx: Index, initiative: str) -> list[int]:
+    """Return row indices of all chunks whose metadata.initiative list
+    contains the given initiative name."""
+    out = []
+    for i, c in enumerate(idx.chunks):
+        md = c.get("metadata", {}) or {}
+        tags = md.get("initiative") or []
+        if isinstance(tags, str):
+            tags = [tags]
+        if initiative in tags:
+            out.append(i)
+    return out
 
 
 # ── input resolution ────────────────────────────────────────────────────────
@@ -316,6 +405,9 @@ def _make_narrative(
     resolution_note: str | None,
 ) -> str:
     if not results:
+        if input_kind == "initiative_centroid":
+            return (f"no results for initiative centroid `{raw_input}`. "
+                    f"Try widening --top-k or removing --corpus.")
         return (f"no results for {input_kind} `{raw_input}`. Try widening "
                 f"--top-k or removing --corpus.")
     by_kind: dict[str, int] = {}
@@ -340,7 +432,10 @@ def _suggest_next(
     n_results: int,
 ) -> list[str]:
     out: list[str] = []
-    if input_kind == "ticket_id":
+    if input_kind == "initiative_centroid":
+        out.append(f"just similar --not-tagged {raw!r}  # exclude already-tagged, show gaps")
+        out.append(f"just next --initiative {raw!r}  # ranked ready tickets for this initiative")
+    elif input_kind == "ticket_id":
         if not corpus_filter or "landed" not in corpus_filter:
             out.append(f"just similar {raw} --corpus landed")
         out.append(f"just similar {raw} --corpus dses,planner,markers")
