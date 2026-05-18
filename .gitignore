@@ -70,3 +70,8 @@ __pycache__/
 .polecat-*
 .polecat.pid
 .session-info.json
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
