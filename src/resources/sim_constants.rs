@@ -7533,7 +7533,36 @@ impl Default for BeliefsConstants {
             recency_of_threat_cue: BeliefAxisTunables::fast(),
             perceived_violence_capability: BeliefAxisTunables::slow(),
             affiliation_history: BeliefAxisTunables::slow(),
-            predictability: BeliefAxisTunables::slow(),
+            // 290: inline predictability tunables to preserve the legacy
+            // RDF-style snap-to-0 on failure (`learning_rate = 1.0`)
+            // and ~3000-tick recovery toward `prior = 1.0`
+            // (`decay_rate_to_prior = 0.00075`, applied per Pass-B stagger
+            // = 20 ticks → ~0.015 fractional gap closure per pass).
+            //
+            // Iteration history (single-seed-42, see `docs/balance/290-rdf-reader-cutover.md`):
+            //   - iter-1 `decay = 0.00075` (kept): aggregate +12.9%, pop
+            //     +18%, bonds +52%, kittens +67% (activity-permissive
+            //     drift; survival gates clean).
+            //   - iter-2 `decay = 0.00035` (rejected): tighter midpoint
+            //     match but shelter score -100% / health -37% / welfare
+            //     -11% — slower recovery starves shelter-seeking
+            //     dispositions of retry opportunity.
+            //
+            // The exponential EMA can't simultaneously match the legacy
+            // linear midpoint AND endpoint; iter-1 prefers the permissive
+            // mid-curve (~0.55 at t=1000 vs legacy 0.25), which the
+            // verdict surfaces as more colony activity rather than
+            // suppressed welfare. The drift is documented as substrate-
+            // revealing balance change per the four-artifact write-up.
+            //
+            // `strength_*` retain `slow()` values (govern eviction, not
+            // the cooldown signal's shape; validated null-drift in 258).
+            predictability: BeliefAxisTunables {
+                learning_rate: 1.0,
+                decay_rate_to_prior: 0.00075,
+                strength_per_observation: 0.1,
+                strength_decay_per_tick: 0.00005,
+            },
             perceived_hostility: BeliefAxisTunables::fast(),
             perceived_receptivity: BeliefAxisTunables::slow(),
             species_violence_priors: SpeciesViolencePriors::default(),

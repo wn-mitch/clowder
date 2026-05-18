@@ -48,7 +48,7 @@ pub mod target;
 pub use disposition::record_disposition_switch;
 pub use lifecycle::{abandon_plan, record_step_failure, try_preempt, PreemptKind, PreemptOutcome};
 pub use sensors::{
-    cooldown_curve, disposition_recent_failure_age_normalized, prune_recent_disposition_failures,
+    cooldown_curve, disposition_cooldown_signal, prune_recent_disposition_failures,
     prune_recent_target_failures, target_recent_failure_age_normalized, update_prev_safety_deficit,
 };
 pub use target::{

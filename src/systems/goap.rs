@@ -1359,8 +1359,19 @@ pub fn evaluate_and_plan(
                 // `make_plan → None` veto. Lazy-inserted on first
                 // failure; `None` here means the cat has never failed
                 // a disposition and the consideration scores 1.0
-                // (no penalty).
+                // (no penalty). (290 Commit A: superseded as the read
+                // source by the adjacent `ContextBeliefs`; still held
+                // here for the dual-write block below until Commit B
+                // retires the proxy.)
                 Option<&mut crate::components::RecentDispositionFailures>,
+                // Ticket 290 (Commit A) — `ContextBeliefs` from the C3
+                // subjective belief substrate (258). The
+                // `DispositionExecution(kind)` entry's `predictability`
+                // facet is the new read source for
+                // `disposition_cooldown_signal`. `None` means
+                // ContextBeliefs hasn't spawned yet (test paths) — the
+                // sensor fail-opens to 1.0.
+                Option<&crate::components::beliefs::ContextBeliefs>,
                 // Ticket 108 — last tick's `safety_deficit` snapshot
                 // for the `ThreatProximityAdrenaline` rising-only
                 // derivative. Optional because save-loaded cats
@@ -1672,9 +1683,10 @@ pub fn evaluate_and_plan(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |((entity, _, _, _, pos, _, _, _, _), (_, _, current, _, _, _, _, _, _, _, _))| {
-                (entity, *pos, current.action)
-            },
+            |(
+                (entity, _, _, _, pos, _, _, _, _),
+                (_, _, current, _, _, _, _, _, _, _, _, _),
+            )| { (entity, *pos, current.action) },
         )
         .collect();
 
@@ -1743,6 +1755,7 @@ pub fn evaluate_and_plan(
             fated_rival,
             fulfillment,
             mut recent_disposition_failures,
+            context_beliefs,
             prev_safety_deficit,
             focal_age,
         ),
@@ -2546,22 +2559,14 @@ pub fn evaluate_and_plan(
             },
             route_cost_field: Some(&cat_route_cost_field),
             disposition_failure_signal_hunting:
-                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
-                    recent_disposition_failures.as_deref(),
+                crate::systems::plan_substrate::disposition_cooldown_signal(
+                    context_beliefs,
                     crate::components::disposition::DispositionKind::Hunting,
-                    res.time.tick,
-                    res.constants
-                        .planning_substrate
-                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_foraging:
-                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
-                    recent_disposition_failures.as_deref(),
+                crate::systems::plan_substrate::disposition_cooldown_signal(
+                    context_beliefs,
                     crate::components::disposition::DispositionKind::Foraging,
-                    res.time.tick,
-                    res.constants
-                        .planning_substrate
-                        .disposition_failure_cooldown_ticks,
                 ),
             // 155: `Crafting` retired into Herbalism / Witchcraft /
             // Cooking. The per-disposition recent-failure signal field
@@ -2572,49 +2577,29 @@ pub fn evaluate_and_plan(
             // 152's audit). Witchcraft / Cooking failure tracking is
             // follow-on work — see ticket 155 § "Out of scope".
             disposition_failure_signal_crafting:
-                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
-                    recent_disposition_failures.as_deref(),
+                crate::systems::plan_substrate::disposition_cooldown_signal(
+                    context_beliefs,
                     crate::components::disposition::DispositionKind::Herbalism,
-                    res.time.tick,
-                    res.constants
-                        .planning_substrate
-                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_caretaking:
-                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
-                    recent_disposition_failures.as_deref(),
+                crate::systems::plan_substrate::disposition_cooldown_signal(
+                    context_beliefs,
                     crate::components::disposition::DispositionKind::Caretaking,
-                    res.time.tick,
-                    res.constants
-                        .planning_substrate
-                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_building:
-                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
-                    recent_disposition_failures.as_deref(),
+                crate::systems::plan_substrate::disposition_cooldown_signal(
+                    context_beliefs,
                     crate::components::disposition::DispositionKind::Building,
-                    res.time.tick,
-                    res.constants
-                        .planning_substrate
-                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_mating:
-                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
-                    recent_disposition_failures.as_deref(),
+                crate::systems::plan_substrate::disposition_cooldown_signal(
+                    context_beliefs,
                     crate::components::disposition::DispositionKind::Mating,
-                    res.time.tick,
-                    res.constants
-                        .planning_substrate
-                        .disposition_failure_cooldown_ticks,
                 ),
             disposition_failure_signal_mentoring:
-                crate::systems::plan_substrate::disposition_recent_failure_age_normalized(
-                    recent_disposition_failures.as_deref(),
+                crate::systems::plan_substrate::disposition_cooldown_signal(
+                    context_beliefs,
                     crate::components::disposition::DispositionKind::Mentoring,
-                    res.time.tick,
-                    res.constants
-                        .planning_substrate
-                        .disposition_failure_cooldown_ticks,
                 ),
             memory_resource_found_proximity_sum: memory_sums.0,
             memory_death_proximity_sum: memory_sums.1,

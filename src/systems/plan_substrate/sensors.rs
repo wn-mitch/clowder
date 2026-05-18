@@ -29,6 +29,9 @@ use bevy_ecs::prelude::*;
 
 use crate::ai::curves::Curve;
 use crate::ai::planner::GoapActionKind;
+use crate::components::beliefs::{ContextBeliefs, EnvironmentalContextKey};
+#[cfg(test)]
+use crate::components::beliefs::{Facet, MentalModel};
 use crate::components::physical::Dead;
 use crate::components::physical::Needs;
 use crate::components::{
@@ -114,44 +117,37 @@ pub fn prune_recent_target_failures(
 }
 
 // ---------------------------------------------------------------------------
-// disposition_recent_failure_age_normalized — ticket 123
+// disposition_cooldown_signal — ticket 123 (290 reader cutover from RDF)
 // ---------------------------------------------------------------------------
 
-/// Compute the recently-failed-disposition signal for a given
-/// `DispositionKind` lookup. Parallel in shape to
-/// `target_recent_failure_age_normalized` — only the keying layer
-/// differs (DispositionKind vs `(action, target)`).
+/// Compute the disposition-cooldown signal for a given `DispositionKind`
+/// lookup. Reads `ContextBeliefs[DispositionExecution(kind)].predictability`,
+/// the per-cat self-belief facet populated by `belief_integrator` on
+/// `WitnessableEvent::SelfPlanFailed`.
 ///
-/// Semantics: **1.0 = no penalty**, **0.0 = full penalty (just
-/// failed)**. Scoring is fail-open — a missing
-/// `RecentDispositionFailures` component (cat that never hit a
-/// `make_plan → None` failure) returns 1.0, as does a missing entry
-/// or an expired one.
+/// Semantics: **1.0 = no penalty**, **0.0 = full penalty (just failed)**.
+/// Scoring is fail-open — a missing `ContextBeliefs` component, a missing
+/// `DispositionExecution(kind)` entry, or a predictability facet that has
+/// fully decayed back to the prior all return 1.0.
 ///
-/// Linear ramp: at `age = 0` returns 0.0; at `age >= cooldown_ticks`
-/// returns 1.0; otherwise `age / cooldown_ticks`. Defensive against
-/// `cooldown_ticks == 0` (returns 1.0 — a zero-cooldown means "no
-/// memory", and the consideration should be a no-op).
-pub fn disposition_recent_failure_age_normalized(
-    recent: Option<&RecentDispositionFailures>,
+/// The shape is an EMA of past failures (drop toward 0 on observed failure,
+/// passive decay toward `prior = 1.0` between failures), not the legacy
+/// linear age ramp. Tunables live at `sim_constants.belief_facets.predictability`:
+/// `learning_rate = 1.0` preserves the legacy snap-to-0 contract on a single
+/// failure (matches RDF's `age = 0 → 0.0` semantics); `decay_rate_to_prior`
+/// scales the recovery window (~3000 ticks under default settings).
+pub fn disposition_cooldown_signal(
+    beliefs: Option<&ContextBeliefs>,
     kind: DispositionKind,
-    now: u64,
-    cooldown_ticks: u64,
 ) -> f32 {
-    if cooldown_ticks == 0 {
-        return 1.0;
-    }
-    let Some(recent) = recent else {
+    let Some(beliefs) = beliefs else {
         return 1.0;
     };
-    let Some(failed_tick) = recent.last_failure_tick(kind) else {
+    let key = EnvironmentalContextKey::DispositionExecution(kind);
+    let Some(model) = beliefs.models.get(&key) else {
         return 1.0;
     };
-    let age = now.saturating_sub(failed_tick);
-    if age >= cooldown_ticks {
-        return 1.0;
-    }
-    (age as f32 / cooldown_ticks as f32).clamp(0.0, 1.0)
+    model.predictability.value.clamp(0.0, 1.0)
 }
 
 // ---------------------------------------------------------------------------
@@ -413,106 +409,90 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // disposition_recent_failure_age_normalized (ticket 123)
+    // disposition_cooldown_signal (ticket 290 — RDF reader cutover)
+    //
+    // The sensor is a pure projection of `ContextBeliefs[Disposition
+    // Execution(kind)].predictability.value`. The EMA shape (failure →
+    // value drop, passive decay back toward prior=1.0) is owned by
+    // `belief_integrator` and tested there. These tests assert the
+    // pass-through and fail-open contract only.
     // -----------------------------------------------------------------
+
+    fn beliefs_with_predictability(kind: DispositionKind, value: f32) -> ContextBeliefs {
+        let mut beliefs = ContextBeliefs::default();
+        let model = MentalModel {
+            predictability: Facet {
+                value,
+                ..Facet::from_prior(1.0)
+            },
+            ..Default::default()
+        };
+        beliefs
+            .models
+            .insert(EnvironmentalContextKey::DispositionExecution(kind), model);
+        beliefs
+    }
 
     #[test]
     fn disposition_sensor_no_component_returns_one() {
-        let s =
-            disposition_recent_failure_age_normalized(None, DispositionKind::Hunting, 1000, 4000);
+        let s = disposition_cooldown_signal(None, DispositionKind::Hunting);
         assert_eq!(s, 1.0);
     }
 
     #[test]
-    fn disposition_sensor_no_entry_returns_one() {
-        let recent = RecentDispositionFailures::default();
-        let s = disposition_recent_failure_age_normalized(
-            Some(&recent),
-            DispositionKind::Hunting,
-            1000,
-            4000,
-        );
+    fn disposition_sensor_no_model_entry_returns_one() {
+        let beliefs = ContextBeliefs::default();
+        let s = disposition_cooldown_signal(Some(&beliefs), DispositionKind::Hunting);
         assert_eq!(s, 1.0);
     }
 
     #[test]
     fn disposition_sensor_fresh_failure_returns_zero() {
-        let mut recent = RecentDispositionFailures::default();
-        recent.record(DispositionKind::Herbalism, 1000);
-        let s = disposition_recent_failure_age_normalized(
-            Some(&recent),
-            DispositionKind::Herbalism,
-            1000,
-            4000,
-        );
+        // After a single-snap EMA step (lr=1.0, OBSERVED_FAIL=0.0) the
+        // integrator leaves predictability.value at 0.0 — sensor passes
+        // it through.
+        let beliefs = beliefs_with_predictability(DispositionKind::Herbalism, 0.0);
+        let s = disposition_cooldown_signal(Some(&beliefs), DispositionKind::Herbalism);
         assert_eq!(s, 0.0);
     }
 
     #[test]
-    fn disposition_sensor_full_window_returns_one() {
-        let mut recent = RecentDispositionFailures::default();
-        recent.record(DispositionKind::Foraging, 1000);
-        let s = disposition_recent_failure_age_normalized(
-            Some(&recent),
-            DispositionKind::Foraging,
-            5000,
-            4000,
-        );
+    fn disposition_sensor_full_recovery_returns_one() {
+        // After Pass-B decay back to prior=1.0, sensor returns 1.0.
+        let beliefs = beliefs_with_predictability(DispositionKind::Foraging, 1.0);
+        let s = disposition_cooldown_signal(Some(&beliefs), DispositionKind::Foraging);
         assert_eq!(s, 1.0);
     }
 
     #[test]
-    fn disposition_sensor_midpoint_returns_half() {
-        let mut recent = RecentDispositionFailures::default();
-        recent.record(DispositionKind::Hunting, 1000);
-        let s = disposition_recent_failure_age_normalized(
-            Some(&recent),
-            DispositionKind::Hunting,
-            3000, // age 2000 of 4000 = 0.5
-            4000,
-        );
+    fn disposition_sensor_midpoint_passes_through() {
+        let beliefs = beliefs_with_predictability(DispositionKind::Hunting, 0.5);
+        let s = disposition_cooldown_signal(Some(&beliefs), DispositionKind::Hunting);
         assert!((s - 0.5).abs() < 1e-6);
     }
 
     #[test]
-    fn disposition_sensor_zero_cooldown_returns_one() {
-        let mut recent = RecentDispositionFailures::default();
-        recent.record(DispositionKind::Hunting, 1000);
-        let s = disposition_recent_failure_age_normalized(
-            Some(&recent),
-            DispositionKind::Hunting,
-            1000,
-            0,
-        );
-        assert_eq!(s, 1.0);
-    }
-
-    #[test]
     fn disposition_sensor_distinguishes_kinds() {
-        let mut recent = RecentDispositionFailures::default();
-        recent.record(DispositionKind::Herbalism, 1000);
-        // Different kind → no entry → fail-open
-        let s = disposition_recent_failure_age_normalized(
-            Some(&recent),
-            DispositionKind::Hunting,
-            1500,
-            4000,
-        );
+        // A failure on Herbalism doesn't shadow Hunting's signal — each
+        // disposition gets its own `DispositionExecution(kind)` model.
+        let beliefs = beliefs_with_predictability(DispositionKind::Herbalism, 0.0);
+        let s = disposition_cooldown_signal(Some(&beliefs), DispositionKind::Hunting);
         assert_eq!(s, 1.0);
     }
 
     #[test]
-    fn disposition_sensor_handles_clock_rewind_defensively() {
-        // saturating_sub keeps age at 0 when now < failed_tick — entry
-        // is treated as fresh-failure (signal 0.0), not as expired.
-        let mut recent = RecentDispositionFailures::default();
-        recent.record(DispositionKind::Foraging, 5000);
-        let s = disposition_recent_failure_age_normalized(
-            Some(&recent),
-            DispositionKind::Foraging,
-            100,
-            4000,
+    fn disposition_sensor_clamps_out_of_range() {
+        // Defensive: an out-of-range predictability.value (caller bug or
+        // truncated save data) is clamped to [0, 1] at the read site.
+        let low = beliefs_with_predictability(DispositionKind::Hunting, -0.5);
+        assert_eq!(
+            disposition_cooldown_signal(Some(&low), DispositionKind::Hunting),
+            0.0,
         );
-        assert_eq!(s, 0.0);
+        let high = beliefs_with_predictability(DispositionKind::Hunting, 1.5);
+        assert_eq!(
+            disposition_cooldown_signal(Some(&high), DispositionKind::Hunting),
+            1.0,
+        );
     }
 }

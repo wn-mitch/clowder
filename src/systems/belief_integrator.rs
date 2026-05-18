@@ -480,10 +480,18 @@ fn apply_observation(
                 return;
             }
             let key = EnvironmentalContextKey::DispositionExecution(*disposition);
-            let model = contexts.models.entry(key).or_default();
-            // Failure observed: predictability for this disposition drops
-            // toward 0. EMA, not snap-to-zero — single failures shouldn't
-            // wipe a long history of successful executions.
+            // Predictability's no-observations baseline is 1.0 (reliable),
+            // not the `Facet::default()` zero. Seed via `Facet::from_prior(1.0)`
+            // on first touch so the EMA step from `value=1.0` toward
+            // `OBSERVED_FAIL=0.0` produces a real drop and Pass-B decay
+            // recovers toward the correct prior. (290: this seeding is the
+            // load-bearing fix that lets the sensor at
+            // `plan_substrate::sensors::disposition_cooldown_signal` read a
+            // signal that actually recovers between failures.)
+            let model = contexts.models.entry(key).or_insert_with(|| MentalModel {
+                predictability: Facet::from_prior(1.0),
+                ..MentalModel::default()
+            });
             update_facet(
                 &mut model.predictability,
                 OBSERVED_FAIL,
@@ -1209,6 +1217,112 @@ mod tests {
         assert_eq!(
             entry.estimated_count, 3,
             "additive lower-bound: max(existing 3, witnessed 2) = 3"
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // 290 — SelfPlanFailed predictability EMA trajectory
+    //
+    // These tests assert the load-bearing shape that
+    // `plan_substrate::sensors::disposition_cooldown_signal` reads. The
+    // first failure must snap predictability.value to 0.0 (matches the
+    // legacy RDF `age=0 → 0.0` contract), and Pass-B decay must recover
+    // toward `prior = 1.0`. Without the `Facet::from_prior(1.0)` seed at
+    // entry-creation, both invariants silently fail (value pins at 0.0).
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn self_plan_failed_snaps_predictability_to_zero_on_first_failure() {
+        use crate::components::DispositionKind;
+
+        let (mut world, mut schedule) = test_world(100);
+        let cat = spawn_cat(&mut world, Position::new(10, 10));
+
+        world.write_message(WitnessableEvent::SelfPlanFailed {
+            cat,
+            disposition: DispositionKind::Hunting,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        let beliefs = world.get::<ContextBeliefs>(cat).expect("cat has ContextBeliefs");
+        let model = beliefs
+            .models
+            .get(&EnvironmentalContextKey::DispositionExecution(DispositionKind::Hunting))
+            .expect("SelfPlanFailed should seed a DispositionExecution(Hunting) model");
+        // Pass A snaps `value` 1.0 → 0.0 with lr=1.0. Pass B may fire
+        // within the same `schedule.run` when the cat's entity index is
+        // stagger-aligned with the tick, adding one decay step
+        // (`decay_rate_to_prior=0.00075` × `period=20` × gap=1.0 = 0.015).
+        // Bound the assertion to validate the snap contract without
+        // depending on Bevy's nondeterministic entity-index assignment.
+        assert!(
+            model.predictability.value < 0.05,
+            "single SelfPlanFailed event with lr=1.0 must snap value to ~0.0 \
+             (allowing one Pass-B decay step); got {}",
+            model.predictability.value,
+        );
+        assert_eq!(
+            model.predictability.prior, 1.0,
+            "predictability prior should be seeded to 1.0 (no-observations baseline)"
+        );
+        assert!(model.predictability.strength > 0.0);
+        assert_eq!(model.evidence_count, 1);
+    }
+
+    #[test]
+    fn self_plan_failed_predictability_recovers_toward_prior_via_passive_decay() {
+        use crate::components::DispositionKind;
+
+        let (mut world, mut schedule) = test_world(100);
+        let cat = spawn_cat(&mut world, Position::new(10, 10));
+
+        world.write_message(WitnessableEvent::SelfPlanFailed {
+            cat,
+            disposition: DispositionKind::Foraging,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        // Sanity: post-failure value is at or near 0.0 (see snap test
+        // for the Pass-B-alignment caveat).
+        let value_after_failure = world
+            .get::<ContextBeliefs>(cat)
+            .unwrap()
+            .models
+            .get(&EnvironmentalContextKey::DispositionExecution(DispositionKind::Foraging))
+            .unwrap()
+            .predictability
+            .value;
+        assert!(value_after_failure < 0.05);
+
+        // Run for enough ticks to cross several stagger periods (Pass B
+        // fires once per `decay_stagger_period` per cat). The default
+        // period is 20; 400 ticks → ≥20 passes regardless of phase.
+        for _ in 0..400 {
+            schedule.run(&mut world);
+            let mut time = world.resource_mut::<TimeState>();
+            time.tick += 1;
+        }
+
+        let beliefs = world.get::<ContextBeliefs>(cat).unwrap();
+        let model = beliefs
+            .models
+            .get(&EnvironmentalContextKey::DispositionExecution(DispositionKind::Foraging))
+            .expect("model should still exist (strength has not decayed to zero in 400 ticks)");
+        assert!(
+            model.predictability.value > value_after_failure,
+            "Pass B decay should pull value above the post-failure baseline {} \
+             toward prior=1.0; got {}",
+            value_after_failure,
+            model.predictability.value,
+        );
+        assert!(
+            model.predictability.value < 1.0,
+            "400 ticks is not long enough for full recovery toward prior=1.0; got {}",
+            model.predictability.value
         );
     }
 }
