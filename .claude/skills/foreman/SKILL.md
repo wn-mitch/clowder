@@ -75,10 +75,10 @@ AskUserQuestion sequence:
 - 3 — standard (Recommended)
 - 5+ — confirm explicitly ("yes I want N polecats") — N polecats = N parallel context windows; even subscription-billed this matters for queue-fairness
 
-**Step 2: Wall-clock per polecat.** Default 30m.
-- 30m (Recommended) — enough for layer-walk re-verification + apply + check/test + push on atomic swarm-safe work
-- 20m — tighter; good for known-fast tickets (frontmatter migrations)
-- 60m — looser; for swarm-safe with a substantive code touch
+**Step 2: Wall-clock per polecat.** Default 30 minutes. `--wallclock` takes the value in **minutes** as a positive integer; a trailing `m` or `min` is tolerated (so `--wallclock 30` and `--wallclock 30m` both parse as 30 minutes).
+- 30 (Recommended) — enough for layer-walk re-verification + apply + check/test + push on atomic swarm-safe work
+- 20 — tighter; good for known-fast tickets (frontmatter migrations)
+- 60 — looser; for swarm-safe with a substantive code touch
 
 **Step 3: Dry-run first?** If unsure, run `just foreman-spawn N --dry-run` first to verify the spawn plan (which tickets would be picked, which workspaces would be created) without actually firing the children. The dry-run rolls back its session-new claims, so it's safe.
 

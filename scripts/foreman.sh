@@ -59,7 +59,19 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --json) emit_json="true"; shift ;;
         --spawn) mode="spawn"; spawn_n="$2"; shift 2 ;;
-        --wallclock) wallclock_min="$2"; shift 2 ;;
+        --wallclock)
+            # R1/R2 (ticket 409): the SKILL.md menu shows "30m" / "20m" / "60m"
+            # to the human; tolerate `m` / `min` (case-insensitive) so the
+            # natural typing of the menu hint doesn't blow up bash arithmetic
+            # downstream. Validate numeric so a typo (`30s`, `1h`) errors loud.
+            wallclock_min="${2%[mM]}"
+            wallclock_min="${wallclock_min%[mM][iI][nN]}"
+            if ! [[ "$wallclock_min" =~ ^[1-9][0-9]*$ ]]; then
+                echo "ERROR: --wallclock expects minutes as a positive integer (e.g., 30 or 30m); got '$2'" >&2
+                exit 2
+            fi
+            shift 2
+            ;;
         --dry-run) dry_run="true"; shift ;;
         --watch) mode="watch"; shift ;;
         --land) mode="land"; shift ;;
