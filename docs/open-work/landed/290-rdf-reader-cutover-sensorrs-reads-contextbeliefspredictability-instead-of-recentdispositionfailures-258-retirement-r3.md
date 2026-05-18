@@ -1,7 +1,7 @@
 ---
 id: 290
 title: RDF reader cutover — sensor.rs reads ContextBeliefs.predictability instead of RecentDispositionFailures (258 retirement R3)
-status: ready
+status: done
 cluster: belief-perception
 orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 48196be5d6d7
+landed-on: 2026-05-18
 ---
 
 ## Why
@@ -78,3 +78,4 @@ Implementation order: (a) Rewrite sensor + 7 callers + cats-query type swap in o
 ## Log
 
 - 2026-05-11: opened as 258 follow-on. Substrate-side wiring is the dual-emit landed in 258 (commit `c3bce3500e6e`). This ticket finishes the proxy retirement that 258's scope-decision deferred.
+- 2026-05-18: Cutover landed as two commits: A (sensor rewrite + integrator latent-bug fix + 7-caller swap + tunable inline) and B (RDF/dual-write/prune/constant retire). Four-artifact balance write-up at docs/balance/290-rdf-reader-cutover.md captures iter-1 (kept: lr=1.0 decay=0.00075) and iter-2 (rejected: decay=0.00035 collapsed shelter/health). Iter-1 surfaces +52% bonds_formed / +67% kittens_born / +18% peak_population drift vs pre-290 baseline; survival gates pass cleanly (0 deaths). Drift is substrate-revealing — the EMA's faster mid-cooldown recovery (~0.55 at t=1000 vs legacy 0.25) reads as more colony activity, consistent with pillar #3 (richer perception, better strategy). Future: multi-seed sensitivity sweep on the predictability tunables.
