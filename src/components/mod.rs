@@ -35,6 +35,7 @@ pub mod prev_safety_deficit;
 pub mod prey;
 pub mod recent_disposition_failures;
 pub mod recent_target_failures;
+pub mod recipe;
 pub mod reserved;
 pub mod route_cost_field;
 pub mod sensing;
@@ -105,6 +106,10 @@ pub use prey::{
 };
 pub use recent_disposition_failures::RecentDispositionFailures;
 pub use recent_target_failures::RecentTargetFailures;
+pub use recipe::{
+    CraftedItem, DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeId, RecipeInput,
+    RecipeOutput, StationRequirement,
+};
 pub use reserved::Reserved;
 pub use route_cost_field::{RouteCostField, MAX_COST_BUDGET};
 pub use sensing::{SensoryModifier, SensorySignature, SensorySpecies};

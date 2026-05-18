@@ -1038,6 +1038,12 @@ fn item_sprite_index(kind: ItemKind) -> usize {
         // Build materials
         ItemKind::Wood => 34,  // PLANK
         ItemKind::Stone => 35, // STONEBRICK
+        // 365 — crafted remedies. Reuse the herb-bottle column to
+        // signal "prepared from a herb"; sub-tier-tinted variants
+        // are a Phase 4 polish concern.
+        ItemKind::RemedyHealingPoultice => 20, // WHITEBOTTLE
+        ItemKind::RemedyEnergyTonic => 68,     // PINKBOTTLE
+        ItemKind::RemedyMoodTonic => 84,       // GREENBOTTLE
     }
 }
 

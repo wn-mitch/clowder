@@ -51,6 +51,14 @@ pub enum ItemKind {
     // physical-causality form of materials cats haul to ConstructionSites). ---
     Wood,
     Stone,
+
+    // --- Crafted remedies (ticket 365 — 016 Phase 1a). ---
+    // Real inventory items spawned by `resolve_prepare_remedy`,
+    // consumed by `resolve_apply_remedy`. Replace the prior
+    // search-state-only `Carrying::Remedy` virtual carry.
+    RemedyHealingPoultice,
+    RemedyEnergyTonic,
+    RemedyMoodTonic,
 }
 
 impl ItemKind {
@@ -89,6 +97,12 @@ impl ItemKind {
             Self::Barrel | Self::Crate | Self::Shelf => 0.0,
 
             Self::Wood | Self::Stone => 0.0,
+
+            // Remedies are short-lived just-in-time craft outputs;
+            // the plan chain consumes them within a few ticks of
+            // preparation. Non-decaying keeps the edge case off the
+            // table.
+            Self::RemedyHealingPoultice | Self::RemedyEnergyTonic | Self::RemedyMoodTonic => 0.0,
         }
     }
 
@@ -148,6 +162,15 @@ impl ItemKind {
         )
     }
 
+    /// True iff this item is a crafted remedy (consumed by
+    /// `resolve_apply_remedy`). Mirrors `is_herb()` / `is_food()`.
+    pub fn is_remedy(self) -> bool {
+        matches!(
+            self,
+            Self::RemedyHealingPoultice | Self::RemedyEnergyTonic | Self::RemedyMoodTonic
+        )
+    }
+
     /// Human-readable name for narrative output.
     pub fn name(self) -> &'static str {
         match self {
@@ -181,6 +204,9 @@ impl ItemKind {
             Self::Shelf => "shelf",
             Self::Wood => "wood",
             Self::Stone => "stone",
+            Self::RemedyHealingPoultice => "healing poultice",
+            Self::RemedyEnergyTonic => "energy tonic",
+            Self::RemedyMoodTonic => "mood tonic",
         }
     }
 
@@ -242,6 +268,13 @@ impl ItemKind {
             | Self::ShadowBone
             | Self::Wood
             | Self::Stone => ItemCategory::Material,
+
+            // 365 — first Phase 1a entry in the Remedy category. Phase 1b
+            // (preservation outputs) lands as the PreservedFood category;
+            // Phases 2/3/4 add Tool / Wearable / Decoration.
+            Self::RemedyHealingPoultice | Self::RemedyEnergyTonic | Self::RemedyMoodTonic => {
+                ItemCategory::Remedy
+            }
         }
     }
 
@@ -280,6 +313,11 @@ pub enum ItemCategory {
     Material,
     StorageUpgrade,
     Curiosity,
+    /// Crafted single-use consumables (poultices, tonics). Ticket
+    /// 365 — first 016-phase entry in the category list. Phase 1b
+    /// adds PreservedFood; later phases add Tool / Wearable /
+    /// Decoration.
+    Remedy,
 }
 
 impl ItemCategory {
@@ -292,6 +330,7 @@ impl ItemCategory {
             Self::Material => "Materials",
             Self::StorageUpgrade => "Storage upgrades",
             Self::Curiosity => "Curiosities",
+            Self::Remedy => "Remedies",
         }
     }
 
@@ -301,9 +340,10 @@ impl ItemCategory {
         match self {
             Self::RawFood => 0,
             Self::Herb => 1,
-            Self::Material => 2,
-            Self::StorageUpgrade => 3,
-            Self::Curiosity => 4,
+            Self::Remedy => 2,
+            Self::Material => 3,
+            Self::StorageUpgrade => 4,
+            Self::Curiosity => 5,
         }
     }
 }
@@ -490,8 +530,8 @@ mod tests {
 
     #[test]
     fn every_item_kind_has_a_category() {
-        // Exhaustive over the 30 variants — extend this list when ItemKind grows.
-        let all: [ItemKind; 30] = [
+        // Exhaustive over the 33 variants — extend this list when ItemKind grows.
+        let all: [ItemKind; 33] = [
             ItemKind::RawMouse,
             ItemKind::RawRat,
             ItemKind::RawRabbit,
@@ -522,6 +562,9 @@ mod tests {
             ItemKind::Shelf,
             ItemKind::Wood,
             ItemKind::Stone,
+            ItemKind::RemedyHealingPoultice,
+            ItemKind::RemedyEnergyTonic,
+            ItemKind::RemedyMoodTonic,
         ];
         // Trivially exhaustive (the match in category() is total) — this test
         // exists to make ItemKind growth fail loudly if a future variant gets
@@ -529,7 +572,32 @@ mod tests {
         for kind in all {
             let _ = kind.category();
         }
-        assert_eq!(all.len(), 30);
+        assert_eq!(all.len(), 33);
+    }
+
+    #[test]
+    fn remedies_have_remedy_category() {
+        assert_eq!(
+            ItemKind::RemedyHealingPoultice.category(),
+            ItemCategory::Remedy
+        );
+        assert_eq!(ItemKind::RemedyEnergyTonic.category(), ItemCategory::Remedy);
+        assert_eq!(ItemKind::RemedyMoodTonic.category(), ItemCategory::Remedy);
+    }
+
+    #[test]
+    fn remedies_are_not_food_or_herb() {
+        for r in [
+            ItemKind::RemedyHealingPoultice,
+            ItemKind::RemedyEnergyTonic,
+            ItemKind::RemedyMoodTonic,
+        ] {
+            assert!(r.is_remedy());
+            assert!(!r.is_food());
+            assert!(!r.is_herb());
+            assert_eq!(r.food_value(), 0.0);
+            assert_eq!(r.material(), None);
+        }
     }
 
     #[test]
@@ -547,7 +615,11 @@ mod tests {
     fn category_sort_orders_food_first() {
         assert!(ItemCategory::RawFood.sort_key() < ItemCategory::Herb.sort_key());
         assert!(ItemCategory::Herb.sort_key() < ItemCategory::Material.sort_key());
-        assert!(ItemCategory::Curiosity.sort_key() == 4);
+        // Remedies sort between herbs and materials — closer to herbs
+        // since they share the healing/medicine pool.
+        assert!(ItemCategory::Herb.sort_key() < ItemCategory::Remedy.sort_key());
+        assert!(ItemCategory::Remedy.sort_key() < ItemCategory::Material.sort_key());
+        assert_eq!(ItemCategory::Curiosity.sort_key(), 5);
     }
 
     #[test]

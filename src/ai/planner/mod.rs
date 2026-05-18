@@ -97,16 +97,23 @@ impl Carrying {
     /// `Carrying` state — "the most important thing the cat is
     /// holding right now."
     ///
-    /// Priority cascade: `BuildMaterials > Prey > ForagedFood >
-    /// Herbs > Nothing`. Note the projection only ever produces
-    /// these five variants; `RawFood` / `CookedFood` / `Remedy`
+    /// Priority cascade: `BuildMaterials > Remedy > Prey >
+    /// ForagedFood > Herbs > Nothing`. Note the projection only
+    /// ever produces these six variants; `RawFood` / `CookedFood`
     /// are search-state-only — set during A* expansion by chain
-    /// effects (`SetCarrying(...)`), never produced from a
-    /// runtime inventory snapshot. (Cooked food in inventory
-    /// projects to `Prey` if its `kind` is a raw-prey variant
-    /// with `modifiers.cooked = true`, else `ForagedFood` —
-    /// preserved verbatim from the pre-175 `build_planner_state`
-    /// behavior.)
+    /// effects (`SetCarrying(...)`), never produced from a runtime
+    /// inventory snapshot. (Cooked food in inventory projects to
+    /// `Prey` if its `kind` is a raw-prey variant with
+    /// `modifiers.cooked = true`, else `ForagedFood` — preserved
+    /// verbatim from the pre-175 `build_planner_state` behavior.)
+    ///
+    /// Ticket 365 (016 Phase 1a) added the `Remedy` arm: prepared
+    /// remedies live as real `ItemKind::Remedy*` slots in inventory
+    /// rather than as a search-state-only virtual carry. Remedy
+    /// outranks food because cats craft remedies to apply them — a
+    /// cat holding a remedy and prey wants to apply the remedy
+    /// next, not eat. Build materials still outrank everything
+    /// (delivery contracts).
     ///
     /// Used by both `build_planner_state` (planner-side, ticket
     /// 175) and `scoring::carry_affinity_bonus` (L2 carry-
@@ -124,6 +131,8 @@ impl Carrying {
             .any(|s| s.kind.material().is_some())
         {
             Carrying::BuildMaterials
+        } else if inventory.slots.iter().any(|s| s.kind.is_remedy()) {
+            Carrying::Remedy
         } else if inventory.slots.iter().any(|s| s.kind.is_food()) {
             if inventory.slots.iter().any(|s| {
                 matches!(

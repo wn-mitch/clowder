@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::ai::eval::DseRegistry;
 use crate::ai::methods::MethodRegistry;
 use crate::ai::modifier::default_modifier_pipeline;
+use crate::resources::recipe_registry::RecipeRegistry;
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::SimConstants;
 use crate::systems;
@@ -265,6 +266,84 @@ pub fn register_influence_maps_at_startup(mut registry: ResMut<InfluenceMapRegis
 /// with `id: MethodId("<slug>")` and `blocker: "<ticket-id>"` each on
 /// their own line. See `src/ai/methods/mod.rs` module doc for the full
 /// contract.
+/// Single source of truth for crafting recipe catalog
+/// membership (ticket 365 — 016 Phase 1a).
+///
+/// Empty at landing of Commit 1 by design — types and registry
+/// infrastructure first; recipe data is registered in Commits
+/// 2 (remedy) and 3 (ward) of this ticket. Phase 1b (367) and
+/// later phases add preservation, behavioral tools, wearables,
+/// and decorations as additional entries.
+///
+/// Bespoke per-discipline resolvers (`resolve_prepare_remedy`,
+/// `resolve_set_ward`, `resolve_cook`, …) look up recipe data
+/// from this registry at runtime; HTN methods cite recipes by
+/// `RecipeId` when emitting craft intentions. Cooking, ward
+/// misfire rolls, herbcraft skill growth, and every other
+/// runtime mechanic stay on their own resolvers per `crafting.md`'s
+/// "crafting is an umbrella category" framing.
+pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
+    use crate::components::magic::RemedyKind;
+    use crate::components::recipe::{
+        DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeInput, RecipeOutput,
+        StationRequirement,
+    };
+    use crate::resources::sim_constants::MagicConstants;
+
+    // 365 Commit 2 — herbcraft remedies. One Recipe per
+    // RemedyKind variant. Inputs derive from
+    // `RemedyKind::required_herb()`; the duration carries both
+    // the default and at-workshop tick budgets so the planner /
+    // future tooling can answer "how long does this take at /
+    // away from the workshop?" without re-deriving from
+    // MagicConstants. Output destination is Inventory — prepared
+    // remedies are real ItemKind::Remedy* slots consumed by
+    // resolve_apply_remedy. Discipline = Herbalism (the
+    // ticket-155 split's home for remedy work).
+    let m = MagicConstants::default();
+    // Nominal ticks at canonical SimConfig — registry duration is
+    // metadata for tooling / future planner introspection. Runtime
+    // resolvers continue to read MagicConstants directly with the
+    // live TimeScale, so a per-run variance in tick rate doesn't
+    // require regenerating recipes.
+    let time_scale = crate::resources::time::TimeScale::from_config(
+        &crate::resources::time::SimConfig::default(),
+        16.6667,
+    );
+    let default_ticks = m.prepare_remedy_duration_default.ticks(&time_scale);
+    let workshop_ticks = m.prepare_remedy_duration_workshop.ticks(&time_scale);
+    for remedy in [
+        RemedyKind::HealingPoultice,
+        RemedyKind::EnergyTonic,
+        RemedyKind::MoodTonic,
+    ] {
+        registry.insert(Recipe {
+            id: remedy.recipe_id(),
+            discipline: DisciplineKind::Herbalism,
+            inputs: vec![RecipeInput {
+                kind: remedy.required_herb().to_item_kind(),
+                count: 1,
+            }],
+            station: StationRequirement::Workshop,
+            duration: RecipeDuration::AtStationFaster {
+                default_ticks,
+                at_station_ticks: workshop_ticks,
+            },
+            output: RecipeOutput {
+                item_kind: remedy.to_item_kind(),
+                destination: ItemDestination::Inventory,
+            },
+        });
+    }
+}
+
+/// Startup system that populates [`RecipeRegistry`]. Independent
+/// of the other registries — registration only touches the
+/// resource, no ordering constraint against `setup_world_exclusive`.
+pub fn register_recipes_at_startup(mut registry: ResMut<RecipeRegistry>) {
+    populate_recipe_registry(&mut registry);
+}
+
 pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // 322: Tier-2 dormant methods. The remaining dormant entries
     // (`acquire_stealth_via_*`) carry `ApplicableWhen::PendingSubstrate
@@ -436,6 +515,13 @@ impl Plugin for SimulationPlugin {
         // `register_methods_at_startup`. Tickets 320 onward author
         // methods into `populate_method_registry`.
         app.init_resource::<MethodRegistry>();
+        // Ticket 365 — crafting RecipeRegistry (016 Phase 1a).
+        // Empty at build time and at Commit 1 of 365; populated
+        // by `register_recipes_at_startup`. Commits 2/3 of this
+        // ticket and follow-on phases (367 / 368 / 369 / 370 /
+        // 371 / 372) author recipes into
+        // `populate_recipe_registry`.
+        app.init_resource::<RecipeRegistry>();
         // 176: chronicity tracker for `ColonyStoresChronicallyFull`.
         // Updated by `update_colony_building_markers` once per
         // `ScoringConstants::chronicity_window_ticks` ticks.
@@ -457,6 +543,10 @@ impl Plugin for SimulationPlugin {
         // InfluenceMap registry above: registration only touches the
         // resource, no setup ordering required.
         app.add_systems(Startup, register_methods_at_startup);
+        // 365 — recipe registry. Same independence as the
+        // InfluenceMap / method registries above: registration
+        // only touches the resource, no setup ordering required.
+        app.add_systems(Startup, register_recipes_at_startup);
 
         // Snapshot positions before any simulation system moves entities.
         // The rendering layer interpolates between PreviousPosition and Position.

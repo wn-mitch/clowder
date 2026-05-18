@@ -6318,6 +6318,9 @@ fn dispatch_step_action(
                         tick: ec.time.tick,
                     },
                 );
+                if let Some(ref mut act) = narr.activation {
+                    act.record(Feature::RemedyPrepared);
+                }
             }
             result
         }
@@ -6352,6 +6355,7 @@ fn dispatch_step_action(
                 &mut plan.step_state[step_idx].cached_path,
                 pos,
                 skills,
+                inventory,
                 &ec.map,
                 &path_plan,
                 commands,

@@ -41,6 +41,14 @@ pub enum Feature {
     WardDecay,
     HerbSeasonalCheck,
     RemedyApplied,
+    /// Ticket 365 — Positive. Emitted when `resolve_prepare_remedy`
+    /// Advances (a real `ItemKind::Remedy*` lands in the cat's
+    /// inventory). Upstream of `RemedyApplied`. Classified as
+    /// `expected_to_fire_per_soak() => false` to match
+    /// `RemedyApplied`'s opt-out — herbcraft DSEs require both an
+    /// injured patient and a cat with healing affinity, which not
+    /// every seed-42 soak surfaces.
+    RemedyPrepared,
     PersonalCorruptionEffect,
     CombatResolved,
     InjuryHealed,
@@ -572,6 +580,7 @@ impl Feature {
         Feature::WardDecay,
         Feature::HerbSeasonalCheck,
         Feature::RemedyApplied,
+        Feature::RemedyPrepared,
         Feature::PersonalCorruptionEffect,
         Feature::CombatResolved,
         Feature::InjuryHealed,
@@ -757,6 +766,7 @@ impl Feature {
         match self {
             // --- Positive: healthy-colony wins ---
             Feature::RemedyApplied => Positive,
+            Feature::RemedyPrepared => Positive,
             Feature::InjuryHealed => Positive,
             Feature::BodyPartInjury => Positive,
             Feature::FateAssigned => Positive,
@@ -1061,6 +1071,7 @@ impl Feature {
             Feature::CorruptionHealthDrain => false,
             Feature::PersonalCorruptionEffect => false,
             Feature::RemedyApplied => false,
+            Feature::RemedyPrepared => false,
             Feature::InjuryHealed => false,
             // Mirrors `InjuryHealed` / `CombatResolved`: the seed-42
             // baseline currently has zero cat-vs-wildlife combat firings
@@ -1313,6 +1324,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::WardDecay => "WardDecay",
         Feature::HerbSeasonalCheck => "HerbSeasonalCheck",
         Feature::RemedyApplied => "RemedyApplied",
+        Feature::RemedyPrepared => "RemedyPrepared",
         Feature::PersonalCorruptionEffect => "PersonalCorruptionEffect",
         Feature::CombatResolved => "CombatResolved",
         Feature::InjuryHealed => "InjuryHealed",
@@ -1749,7 +1761,11 @@ mod tests {
         // Ticket 095 Phase 1 added 1 Positive (BodyPartInjury) for the
         // anatomical injury substrate. Enrolled in the seed-42 canary
         // (cats take damage every soak).
-        assert_eq!(positive, 75);
+        // Ticket 365 added 1 Positive (RemedyPrepared) for the
+        // herbcraft items-are-real migration. expected_to_fire_per_soak
+        // is false (mirrors RemedyApplied's opt-out — herbcraft DSEs
+        // need both an injured patient and a herbalism-capable cat).
+        assert_eq!(positive, 76);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -1841,9 +1857,11 @@ mod tests {
         // primitive completions. All ship dormant.
         // Ticket 095 Phase 1: +1 Positive (BodyPartInjury) for the
         // anatomical injury substrate.
+        // Ticket 365: +1 Positive (RemedyPrepared) for the herbcraft
+        // items-are-real migration.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            75
+            76
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

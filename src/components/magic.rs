@@ -388,6 +388,25 @@ impl Inventory {
         self.has_herb(HerbKind::Thornbriar)
     }
 
+    /// Whether the inventory holds a specific prepared remedy.
+    /// Ticket 365 — Phase 1a real-items migration.
+    pub fn has_remedy(&self, kind: RemedyKind) -> bool {
+        let target = kind.to_item_kind();
+        self.slots.iter().any(|s| s.kind == target)
+    }
+
+    /// Remove one instance of a prepared remedy. Returns true
+    /// if found.
+    pub fn take_remedy(&mut self, kind: RemedyKind) -> bool {
+        let target = kind.to_item_kind();
+        if let Some(idx) = self.slots.iter().position(|s| s.kind == target) {
+            self.slots.swap_remove(idx);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Return the first remedy kind that can be prepared from current herbs.
     pub fn first_remedy_kind(&self) -> Option<RemedyKind> {
         use crate::components::items::ItemKind;
@@ -552,6 +571,32 @@ impl RemedyKind {
             Self::HealingPoultice => HerbKind::HealingMoss,
             Self::EnergyTonic => HerbKind::Moonpetal,
             Self::MoodTonic => HerbKind::Calmroot,
+        }
+    }
+
+    /// The `ItemKind` slot a prepared remedy occupies in
+    /// inventory. Ticket 365 — prepared remedies are real inventory
+    /// items (Phase 1a substrate), not a search-state-only virtual
+    /// carry. Symmetric with `HerbKind::to_item_kind`.
+    pub fn to_item_kind(self) -> crate::components::items::ItemKind {
+        use crate::components::items::ItemKind;
+        match self {
+            Self::HealingPoultice => ItemKind::RemedyHealingPoultice,
+            Self::EnergyTonic => ItemKind::RemedyEnergyTonic,
+            Self::MoodTonic => ItemKind::RemedyMoodTonic,
+        }
+    }
+
+    /// Recipe id (ticket 365 — 016 Phase 1a). One recipe per
+    /// remedy. Used by `resolve_prepare_remedy` to attach a
+    /// `CraftedItem` provenance record to inventory and by
+    /// `populate_recipe_registry` to register the catalog entry.
+    pub fn recipe_id(self) -> crate::components::recipe::RecipeId {
+        use crate::components::recipe::RecipeId;
+        match self {
+            Self::HealingPoultice => RecipeId("remedy.healing_poultice"),
+            Self::EnergyTonic => RecipeId("remedy.energy_tonic"),
+            Self::MoodTonic => RecipeId("remedy.mood_tonic"),
         }
     }
 }

@@ -931,6 +931,7 @@ pub fn resolve_magic_task_chains(
                             tick: time.tick,
                         },
                     );
+                    activation.record(Feature::RemedyPrepared);
                 }
                 apply(result, &mut chain);
             }
@@ -955,6 +956,7 @@ pub fn resolve_magic_task_chains(
                     cached,
                     &mut pos,
                     &mut skills,
+                    &mut inventory,
                     &map,
                     &crate::ai::route_cost::CatPathPlan::NoOverlay,
                     &mut commands,

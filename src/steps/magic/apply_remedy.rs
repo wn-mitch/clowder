@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::ai::route_cost::CatPathPlan;
-use crate::components::magic::{RemedyEffect, RemedyKind};
+use crate::components::magic::{Inventory, RemedyEffect, RemedyKind};
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
 use crate::resources::map::TileMap;
@@ -12,19 +12,26 @@ use crate::steps::StepResult;
 /// # GOAP step resolver: `ApplyRemedy`
 ///
 /// **Real-world effect** — paths the healer to the patient, then
-/// applies a `RemedyEffect` component to the patient (healing,
-/// corruption cleanse, etc). Grows herbcraft skill. On
-/// completion, yields a deferred `(patient, healer, fondness)`
-/// gratitude tuple the caller applies to the patient's
-/// relationship with the healer.
+/// consumes a prepared `ItemKind::Remedy*` from the healer's
+/// inventory and applies a `RemedyEffect` Component to the
+/// patient. Grows herbcraft skill. On completion, yields a
+/// deferred `(patient, healer, fondness)` gratitude tuple the
+/// caller applies to the patient's relationship with the
+/// healer. Ticket 365 (016 Phase 1a) added the inventory-
+/// consumption step — prepared remedies are real items in
+/// inventory rather than a search-state-only virtual carry.
 ///
 /// **Plan-level preconditions** — emitted by herbcraft planner
-/// after a successful `PrepareRemedy` step populates the
-/// remedy's expected herb in inventory.
+/// after a successful `PrepareRemedy` step deposits the prepared
+/// `ItemKind::Remedy*` in inventory.
 ///
 /// **Runtime preconditions** — `target_entity` + `target_position`
 /// must be `Some`; Fail if either missing or if the patient is
-/// dead (`!patient_alive`).
+/// dead (`!patient_alive`). After path/patient checks succeed,
+/// `inventory.take_remedy(remedy)` must succeed or Fail("missing
+/// remedy in inventory") — guards against the prepared remedy
+/// being lost (e.g. a future drop/transfer between PrepareRemedy
+/// and ApplyRemedy).
 ///
 /// **Witness** — returns `(StepResult, Option<(Entity, Entity,
 /// f32)>)`; the `Option` payload is the gratitude deferred-
@@ -47,6 +54,7 @@ pub fn resolve_apply_remedy(
     cached_path: &mut Option<Vec<Position>>,
     pos: &mut Position,
     skills: &mut Skills,
+    inventory: &mut Inventory,
     map: &TileMap,
     path_plan: &CatPathPlan<'_>,
     commands: &mut Commands,
@@ -78,6 +86,12 @@ pub fn resolve_apply_remedy(
     };
     if !patient_alive {
         return (StepResult::Fail("patient no longer alive".into()), None);
+    }
+    if !inventory.take_remedy(remedy) {
+        return (
+            StepResult::Fail("missing remedy in inventory".into()),
+            None,
+        );
     }
     commands.entity(patient).insert(RemedyEffect {
         kind: remedy,
@@ -124,6 +138,7 @@ mod tests {
         let m = MagicConstants::default();
         let mut pos = Position::new(0, 0);
         let mut skills = Skills::default();
+        let mut inventory = Inventory::default();
         let mut cached_path = None;
         let cat = world.spawn_empty().id();
 
@@ -137,6 +152,7 @@ mod tests {
             &mut cached_path,
             &mut pos,
             &mut skills,
+            &mut inventory,
             &map,
             &CatPathPlan::NoOverlay,
             &mut commands,
@@ -161,6 +177,10 @@ mod tests {
         let m = MagicConstants::default();
         let mut pos = Position::new(2, 2);
         let mut skills = Skills::default();
+        let mut inventory = Inventory::default();
+        // Carry a remedy so the dead-patient guard fires before
+        // (and not after) inventory consumption.
+        inventory.add_item(RemedyKind::HealingPoultice.to_item_kind());
         let mut cached_path = None;
         let cat = world.spawn_empty().id();
         let patient = world.spawn_empty().id();
@@ -175,6 +195,7 @@ mod tests {
             &mut cached_path,
             &mut pos,
             &mut skills,
+            &mut inventory,
             &map,
             &CatPathPlan::NoOverlay,
             &mut commands,
@@ -187,6 +208,9 @@ mod tests {
             "expected 'patient no longer alive' Fail, got {result:?}"
         );
         assert!(gratitude.is_none());
+        // Failure should NOT consume the remedy — preserves the
+        // pillar that fail paths leave the world unchanged.
+        assert!(inventory.has_remedy(RemedyKind::HealingPoultice));
     }
 
     #[test]
@@ -199,6 +223,7 @@ mod tests {
         let m = MagicConstants::default();
         let mut pos = Position::new(2, 2);
         let mut skills = Skills::default();
+        let mut inventory = Inventory::default();
         let mut cached_path = None;
         let cat = world.spawn_empty().id();
 
@@ -212,6 +237,7 @@ mod tests {
             &mut cached_path,
             &mut pos,
             &mut skills,
+            &mut inventory,
             &map,
             &CatPathPlan::NoOverlay,
             &mut commands,
@@ -222,6 +248,91 @@ mod tests {
         assert!(
             matches!(result, StepResult::Fail(ref reason) if reason == "no patient for remedy"),
             "expected 'no patient for remedy' Fail, got {result:?}"
+        );
+        assert!(gratitude.is_none());
+    }
+
+    #[test]
+    fn apply_remedy_consumes_inventory_remedy_on_success() {
+        let mut world = make_commands_world();
+        let mut state: SystemState<Commands> = SystemState::new(&mut world);
+
+        let map = TileMap::new(5, 5, crate::resources::map::Terrain::Grass);
+        let mut log = NarrativeLog::default();
+        let m = MagicConstants::default();
+        let mut pos = Position::new(2, 2);
+        let mut skills = Skills::default();
+        let mut inventory = Inventory::default();
+        inventory.add_item(RemedyKind::HealingPoultice.to_item_kind());
+        let mut cached_path = None;
+        let cat = world.spawn_empty().id();
+        let patient = world.spawn_empty().id();
+
+        let mut commands = state.get_mut(&mut world);
+        let (result, gratitude) = resolve_apply_remedy(
+            RemedyKind::HealingPoultice,
+            cat,
+            None, // skip movement
+            Some(patient),
+            true, // patient alive
+            &mut cached_path,
+            &mut pos,
+            &mut skills,
+            &mut inventory,
+            &map,
+            &CatPathPlan::NoOverlay,
+            &mut commands,
+            &mut log,
+            100,
+            &m,
+        );
+
+        assert!(matches!(result, StepResult::Advance));
+        assert!(gratitude.is_some(), "gratitude tuple should be emitted");
+        assert!(
+            !inventory.has_remedy(RemedyKind::HealingPoultice),
+            "remedy slot should be consumed on Advance"
+        );
+        assert_eq!(inventory.slots.len(), 0);
+    }
+
+    #[test]
+    fn apply_remedy_fails_without_inventory_remedy() {
+        let mut world = make_commands_world();
+        let mut state: SystemState<Commands> = SystemState::new(&mut world);
+
+        let map = TileMap::new(5, 5, crate::resources::map::Terrain::Grass);
+        let mut log = NarrativeLog::default();
+        let m = MagicConstants::default();
+        let mut pos = Position::new(2, 2);
+        let mut skills = Skills::default();
+        // Empty inventory — no prepared remedy to apply.
+        let mut inventory = Inventory::default();
+        let mut cached_path = None;
+        let cat = world.spawn_empty().id();
+        let patient = world.spawn_empty().id();
+
+        let mut commands = state.get_mut(&mut world);
+        let (result, gratitude) = resolve_apply_remedy(
+            RemedyKind::HealingPoultice,
+            cat,
+            None,
+            Some(patient),
+            true,
+            &mut cached_path,
+            &mut pos,
+            &mut skills,
+            &mut inventory,
+            &map,
+            &CatPathPlan::NoOverlay,
+            &mut commands,
+            &mut log,
+            100,
+            &m,
+        );
+        assert!(
+            matches!(result, StepResult::Fail(ref reason) if reason == "missing remedy in inventory"),
+            "expected 'missing remedy in inventory' Fail, got {result:?}"
         );
         assert!(gratitude.is_none());
     }
