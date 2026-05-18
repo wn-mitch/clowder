@@ -3,6 +3,7 @@ id: 416
 title: Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior
 status: ready
 cluster: life-cycle
+orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
 added: 2026-05-18
 parked: null

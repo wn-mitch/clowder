@@ -3,6 +3,7 @@ id: 415
 title: PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-18
 parked: null
