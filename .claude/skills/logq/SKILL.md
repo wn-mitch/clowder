@@ -116,6 +116,7 @@ just q --rationale "<why>" <subtool> <log_dir> [flags]
 
 - **`/diagnose-run`** produces a fixed-shape, diff-stable *report*. `just q` produces *query results*. Don't conflate them. `/diagnose-run`'s trailing "Threads to pull" section (when present) emits `just q …` commands — follow them.
 - **`docs/diagnostics/log-queries.md`** is the source of truth for the underlying jq recipes. Each subtool's code cites the section it wraps. If `just q` disagrees with the recipe, the recipe wins; file the bug.
+- **`just similar`** — semantic retrieval across all prose artifacts (tickets, balance docs, DSE doc-comments). `just q` answers "what happened in this run tick-by-tick"; `just similar` answers "what other tickets or balance threads look like this anomaly." Use `similar` when a run anomaly or death pattern reminds you of prior work — e.g. `just similar 'starvation spike after schedule change'`.
 
 ## Troubleshooting
 

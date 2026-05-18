@@ -105,6 +105,7 @@ just inspect Calcifer --events logs/baseline-2026-04-25/sweep/42-1/events.jsonl
 - **`just q trace <log_dir> <cat> --layer=L3`** — chosen-action distribution from the trace sidecar. Confirm `inspect`'s action distribution against this if joinability is in question.
 - **`clowder-focal-cat` subagent** — full L1/L2/L3 trace analysis. Use after `inspect` when the cat has a trace sidecar and you want the decision-landscape diagnostics.
 - **`just q deaths <log_dir>`** — colony-wide death incidence. Use when the question is "which cats died" rather than "tell me about this one cat."
+- **`just similar`** — semantic retrieval across prose artifacts. After `inspect` surfaces a behavioral pattern (e.g. "pathological Patrol absorption", "chronic hunger despite foraging"), use `just similar '<description of the pattern>'` to find tickets and balance docs that describe the same cat behavior — e.g. `just similar 'cat keeps patrolling instead of eating'`.
 
 ## Non-goals
 

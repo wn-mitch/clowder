@@ -97,3 +97,9 @@ if ! just verdict logs/tuned-42 > /dev/null; then
   echo "run regressed; investigate"
 fi
 ```
+
+## Relationship to neighbouring tools
+
+- **`just q` / `/logq`** — per-tick drill-down. Use `verdict` as the first gate; drill with `just q` when `verdict` returns `fail` or `concern` and you need to know specifics.
+- **`just similar`** — semantic retrieval across prose artifacts. When `verdict` returns `fail`, use `similar` against the failing-metric description or the collapse pattern to surface prior tickets and balance threads with the same fingerprint — e.g. `just similar 'starvation spike'` or `just similar <prior-ticket-id> --corpus landed,balance`.
+- **`/diagnose-run`** — long-form narrative collapse report. Use after a `fail` verdict when the `next_steps` hints point at a full overview rather than a targeted drill-down.

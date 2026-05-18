@@ -110,6 +110,7 @@ just explain magic.thornward_decay_rate --text
 - **`just rebuild-sensitivity-map`** — populates the `sensitivity` field. Quarterly cadence (~6h sweep); don't run unless the map is genuinely stale.
 - **`src/resources/sim_constants.rs`** — source of truth for fields and `///` doc comments. To *change* a constant, edit this file directly.
 - **`docs/balance/*.md`** — appended to as iterations land. `explain` is the orientation tool *before* the balance work begins.
+- **`just similar`** — semantic retrieval across tickets, balance docs, and DSE doc-comments. After `explain` orients you on what a knob does and where it's read, use `just similar <ticket-id>` or `just similar '<knob-concept>'` to find which other tickets and balance threads are conceptually adjacent to the same mechanism.
 
 ## Non-goals
 
