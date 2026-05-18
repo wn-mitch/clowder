@@ -17,8 +17,8 @@ _Last generated: 2026-05-18._
 | In progress | 6 |
 | Ready | 114 |
 | Parked | 15 |
-| Blocked | 39 |
-| **Open total** | **174** |
+| Blocked | 38 |
+| **Open total** | **173** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -185,14 +185,14 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 
-### process-discipline (6 ready, 1 blocked)
+### process-discipline (6 ready)
 
 - **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
 - **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
 - **[302](docs/open-work/tickets/302-investigate-just-soak-vs-just-sweep-non-determinism-on-identical-seedbinary.md)** — investigate just soak vs just sweep non-determinism on identical seed/binary — _[process-discipline] · added 2026-05-12_
 - **[306](docs/open-work/tickets/306-corpus-tagging-pass-backfill-clusterinitiative-across-active-and-landed-tickets.md)** — Corpus tagging pass — backfill cluster+initiative across active and landed tickets — _[process-discipline] · added 2026-05-13_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
-- **[409](docs/open-work/tickets/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings — _[process-discipline] · added 2026-05-18_
+- **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
 
 ### buildings-zones (5 ready, 2 blocked)
 
@@ -438,7 +438,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
-- **[409](docs/open-work/tickets/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings — _[process-discipline] · added 2026-05-18_
+- **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
 
 ## Parked (15)
 
@@ -458,7 +458,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
 
-## Blocked (39)
+## Blocked (38)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -498,20 +498,20 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[390](docs/open-work/tickets/390-fate-seeded-prophecy-from-generated-history.md)** — Fate-seeded prophecy from generated history — _[magic-mythic] · blocked-by 388 · added 2026-05-16_
 - **[391](docs/open-work/tickets/391-narrative-template-historical-reference-pre-sim-figures-cited-in-first-sim-week.md)** — Narrative-template historical reference (pre-sim figures cited in first sim-week) — _[magic-mythic] · blocked-by 387, 388 · added 2026-05-16_
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
-- **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · blocked-by 409 · added 2026-05-18_
 
 ## Pre-existing (2)
 
 - **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
 - **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
 
-## Landed archive (256)
+## Landed archive (257)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (191)
+### 2026-05 (192)
 
 - **[410](docs/open-work/landed/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) _(2026-05-18)_
+- **[409](docs/open-work/landed/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings _(2026-05-18)_
 - **[400](docs/open-work/landed/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design _(2026-05-18)_
 - **[399](docs/open-work/landed/399-l2-parentingactivity-express-non-primary-caretaker-parent-roles-per-7m2-design.md)** — L2 ParentingActivity — express non-primary-caretaker parent roles per §7.M.2 (design) _(2026-05-17)_
 - **[398](docs/open-work/landed/398-7m2-raiseoffspringaspiration-kitten-rearing-as-nested-intention-aspiration.md)** — §7.M.2 RaiseOffspringAspiration — kitten-rearing as nested-Intention aspiration _(2026-05-17)_

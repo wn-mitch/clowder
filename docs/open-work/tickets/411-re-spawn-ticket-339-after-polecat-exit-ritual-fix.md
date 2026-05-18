@@ -1,13 +1,13 @@
 ---
 id: 411
 title: re-spawn ticket 339 after polecat exit-ritual fix
-status: blocked
+status: ready
 cluster: process-discipline
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-18
 parked: null
-blocked-by: [409]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
