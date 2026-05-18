@@ -1,7 +1,7 @@
 ---
 id: 339
 title: CatSnapshot gains goal_stack + active_aspirations fields
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: swarm-safe
 initiative: [smarter-cats]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Why

@@ -14,37 +14,38 @@ _Last generated: 2026-05-18._
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
-| Ready | 114 |
+| In progress | 7 |
+| Ready | 113 |
 | Parked | 15 |
-| Blocked | 38 |
-| **Open total** | **173** |
-| Pre-existing | 2 |
+| Blocked | 39 |
+| **Open total** | **174** |
+| Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (6 in-progress · 0 ready blockers · 5 next-recommended)
+## Active focus (7 in-progress · 0 ready blockers · 5 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
 ### In progress
 
-- **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _[ai-substrate] · parked 2026-04-21 · added 2026-04-20_
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _[life-cycle] · added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
+- **[066](docs/open-work/tickets/066-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _[ai-substrate] · parked 2026-04-21 · added 2026-04-20_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
+- **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
 ### Next-recommended (from `just next`)
 
-- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.92_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.91_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
-- **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · score 0.91_
+- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.91_
+- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.91_
+- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.91_
 
 ## Epic progress (3)
 
@@ -56,16 +57,17 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 
-## In progress (6)
+## In progress (7)
 
-- **[001](docs/open-work/tickets/001-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _[ai-substrate] · parked 2026-04-21 · added 2026-04-20_
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[032](docs/open-work/tickets/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat — _[life-cycle] · added 2026-04-26_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
+- **[066](docs/open-work/tickets/066-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure — _[ai-substrate] · parked 2026-04-21 · added 2026-04-20_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
+- **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (114)
+## Ready by cluster (113)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -209,18 +211,17 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
 
-### tooling-diagnostics-ui (4 ready)
+### tooling-diagnostics-ui (3 ready)
 
-- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 
-## Ready by initiative (76 tag-memberships across 9 initiatives)
+## Ready by initiative (75 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
-### smarter-cats (17 open, 28 landed)
+### smarter-cats (16 open, 29 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
@@ -229,7 +230,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
@@ -323,7 +323,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (114)
+## Ready (113)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -409,7 +409,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[339](docs/open-work/tickets/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields — _[tooling-diagnostics-ui] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
 - **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
@@ -458,7 +457,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
 
-## Blocked (38)
+## Blocked (39)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -498,21 +497,25 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[390](docs/open-work/tickets/390-fate-seeded-prophecy-from-generated-history.md)** — Fate-seeded prophecy from generated history — _[magic-mythic] · blocked-by 388 · added 2026-05-16_
 - **[391](docs/open-work/tickets/391-narrative-template-historical-reference-pre-sim-figures-cited-in-first-sim-week.md)** — Narrative-template historical reference (pre-sim figures cited in first sim-week) — _[magic-mythic] · blocked-by 387, 388 · added 2026-05-16_
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
+- **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _added 2026-04-14_
 
-## Pre-existing (2)
-
-- **[PE-002](docs/open-work/pre-existing/dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker
-- **[PE-003](docs/open-work/pre-existing/substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references
-
-## Landed archive (257)
+## Landed archive (268)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (192)
+### 2026-05 (202)
 
 - **[410](docs/open-work/landed/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) _(2026-05-18)_
 - **[409](docs/open-work/landed/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings _(2026-05-18)_
 - **[400](docs/open-work/landed/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design _(2026-05-18)_
+- **[339](docs/open-work/landed/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields _(2026-05-18)_
+- **[133](docs/open-work/landed/133-renumbered-to-141.md)** — Stub for missing ID 133 _(2026-05-18)_
+- **[132](docs/open-work/landed/132-renumbered-to-140.md)** — Stub for missing ID 132 _(2026-05-18)_
+- **[131](docs/open-work/landed/131-renumbered-to-139.md)** — Stub for missing ID 131 _(2026-05-18)_
+- **[070](docs/open-work/landed/070-no-historical-trace.md)** — Stub for missing ID 070 _(2026-05-18)_
+- **[069](docs/open-work/landed/069-folded-into-024.md)** — Folded into ticket 024 _(2026-05-18)_
+- **[068](docs/open-work/landed/068-folded-into-014.md)** — Folded into ticket 014 _(2026-05-18)_
+- **[067](docs/open-work/landed/067-folded-into-014.md)** — Folded into ticket 014 _(2026-05-18)_
 - **[399](docs/open-work/landed/399-l2-parentingactivity-express-non-primary-caretaker-parent-roles-per-7m2-design.md)** — L2 ParentingActivity — express non-primary-caretaker parent roles per §7.M.2 (design) _(2026-05-17)_
 - **[398](docs/open-work/landed/398-7m2-raiseoffspringaspiration-kitten-rearing-as-nested-intention-aspiration.md)** — §7.M.2 RaiseOffspringAspiration — kitten-rearing as nested-Intention aspiration _(2026-05-17)_
 - **[397](docs/open-work/landed/397-rear-kitten-arc-clean-completion-exposes-kitten-survival-regression.md)** — rear_kitten arc clean completion exposes kitten survival regression _(2026-05-17)_
@@ -632,6 +635,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[109](docs/open-work/landed/109-intraspecies-conflict-response.md)** — IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response _(2026-05-07)_
 - **[108](docs/open-work/landed/108-threat-proximity-adrenaline.md)** — ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement _(2026-05-07)_
 - **[027b](docs/open-work/landed/027b-l2-pairing-activity.md)** — L2 PairingActivity — substrate-aware structural commitment layer (027 Bug 3 successor) _(2026-05-07)_
+- **[201](docs/open-work/landed/201-criticalhealth-hunt-to-starvation-reproducer.md)** — CriticalHealth interrupt drives "hunt-to-starvation" plan churn — concrete reproducer for ticket 119 _(2026-05-06)_
 - **[198](docs/open-work/landed/198-substrate-fires-landing-gate.md)** — Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1) _(2026-05-06)_
 - **[197](docs/open-work/landed/197-explore-agent-prompt-template.md)** — Explore-agent prompt template (194 P8, subsumes P6) _(2026-05-06)_
 - **[196](docs/open-work/landed/196-verdict-substrate-fired-probe.md)** — verdict.py substrate-fired-≥1× probe (194 P7) _(2026-05-06)_
@@ -651,6 +655,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[118](docs/open-work/landed/118-modifier-lift-vs-plan-completion-momentum.md)** — Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first _(2026-05-06)_
 - **[176](docs/open-work/landed/176-deposit-overflow-load-bearing-rot.md)** — cats need real inventory reasoning — trash, build-more-stores, satiation-aware hunting _(2026-05-05)_
 - **[175](docs/open-work/landed/175-goal-unreachable-root-cause.md)** — GoalUnreachable plan-failure root-cause investigation (172 follow-on) _(2026-05-05)_
+- **[174](docs/open-work/landed/174-crafting-split-balance-cascade.md)** — Balance hypothesis for the wards-and-kittens unblock cascade (155 follow-on) _(2026-05-05)_
 - **[172](docs/open-work/landed/172-crafting-split-plan-failure-triage.md)** — Plan-failure triage on Cooking + Herbalism (155 follow-on) _(2026-05-05)_
 - **[171](docs/open-work/landed/171-hasgarden-ecs-level-wiring.md)** — Promote HasGarden to ECS-level singleton writer (parity with 168/169) _(2026-05-05)_
 - **[169](docs/open-work/landed/169-author-construction-and-damaged-building-markers.md)** — Author HasConstructionSite + HasDamagedBuilding markers (buildings.rs) _(2026-05-05)_
@@ -703,7 +708,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[047](docs/open-work/landed/047-critical-health-interrupt-treadmill.md)** — CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates _(2026-05-01)_
 - **[027](docs/open-work/landed/027-mating-cadence-three-bug-cascade.md)** — Mating cadence — three-bug cascade blocking MatingOccurred _(2026-05-01)_
 
-### 2026-04 (65)
+### 2026-04 (66)
 
 - **[094](docs/open-work/landed/094-eat-vs-forage-imbalance.md)** — Eat-vs-Forage IAUS imbalance — colony hauls food but doesn't consume it _(2026-04-30)_
 - **[092](docs/open-work/landed/092-unify-markersnapshot-plannerstate-statepredicate-feasibility.md)** — Unify MarkerSnapshot ↔ PlannerState/StatePredicate feasibility languages _(2026-04-30)_
@@ -712,10 +717,13 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[085](docs/open-work/landed/085-build-pressure-farming-gate-disjunctive-food-or-herb-demand.md)** — Build-pressure farming gate: disjunctive food-or-herb demand _(2026-04-30)_
 - **[083](docs/open-work/landed/083-l2-pairingactivity-farming-dormancy-reconciliation.md)** — L2 PairingActivity Farming dormancy reconciliation _(2026-04-29)_
 - **[082](docs/open-work/landed/082-027b-l2-pairingactivity-reactivation-on-the-hardened-substra.md)** — 027b L2 PairingActivity reactivation on the hardened substrate _(2026-04-29)_
+- **[080](docs/open-work/landed/080-resource-reservation-eligibility.md)** — Resource reservation — Reserved component + EligibilityFilter::require_unreserved _(2026-04-29)_
 - **[079](docs/open-work/landed/079-check-iaus-coherence-sh-process-gate-against-macgyvered-pins.md)** — `check_iaus_coherence.sh` process gate against MacGyvered pins _(2026-04-29)_
+- **[078](docs/open-work/landed/078-pairing-intention-consideration.md)** — Backport bond_score's Intention pin to a target_pairing_intention Consideration _(2026-04-29)_
 - **[077](docs/open-work/landed/077-anxiety-cadence-root-cause-investigation-no-op-close.md)** — anxiety-cadence root-cause investigation (no-op close) _(2026-04-29)_
+- **[075](docs/open-work/landed/075-commitment-tenure-modifier.md)** — CommitmentTenure Modifier (anti-oscillation hysteresis on disposition switching) _(2026-04-29)_
+- **[074](docs/open-work/landed/074-eligibility-require-alive-and-step-validate.md)** — EligibilityFilter::require_alive + step-resolver validate_target _(2026-04-29)_
 - **[073](docs/open-work/landed/073-wave-2-substrate-hardening.md)** — Wave 2 substrate hardening _(2026-04-29)_
-- **[072](docs/open-work/landed/072-plan-substrate-module-extraction-refactor-2026-04-29.md)** — `plan_substrate` module extraction (refactor) _(2026-04-29)_
 - **[072](docs/open-work/landed/072-plan-substrate-module-extraction-refactor.md)** — plan_substrate module extraction (refactor) _(2026-04-29)_
 - **[PE-001](docs/open-work/landed/PE-001-test-harness-drift-retired.md)** — Test-harness drift retired _(2026-04-28)_
 - **[065](docs/open-work/landed/065-l2-10-7-spatialconsideration-roster-sweep-cat-self-state-dse.md)** — §L2.10.7 SpatialConsideration roster sweep (cat self-state DSEs + fox dispositions) _(2026-04-28)_
@@ -736,16 +744,14 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[036](docs/open-work/landed/036-goap-rs-crafting-hint-derivation-drops-the-cook-branch.md)** — `goap.rs` crafting_hint derivation drops the Cook branch _(2026-04-26)_
 - **[031](docs/open-work/landed/031-balance-tooling-composition-layer-verdict-hypothesize-sweep.md)** — Balance-tooling composition layer (verdict / hypothesize / sweep-stats / fingerprint / explain / bisect-canary / promote) _(2026-04-26)_
 - **[2026-04-25](docs/open-work/landed/2026-04-25-respect-restoration-iteration-2-witness-magnitude-tune.md)** — Respect restoration — iteration 2 (witness magnitude tune) _(2026-04-25)_
+- **[030](docs/open-work/landed/030-unify-headless-and-windowed-build-pipeline.md)** — Unify headless and windowed build pipeline — kill the manual mirror _(2026-04-25)_
 - **[028](docs/open-work/landed/028-observer-registration-regression-unified-headless-windowed-p.md)** — observer registration regression + unified headless/windowed pipeline _(2026-04-25)_
-- **[014](docs/open-work/landed/014-4-2-state-marker-trio-incombat-oncorruptedtile-onspecialterr.md)** — §4.2 State marker trio — `InCombat` / `OnCorruptedTile` / `OnSpecialTerrain` authors _(2026-04-25)_
 - **[2026-04-24](docs/open-work/landed/2026-04-24-acceptance-mastery-restoration-iteration-1.md)** — Acceptance & mastery restoration — iteration 1 _(2026-04-24)_
 - **[2026-04-24](docs/open-work/landed/2026-04-24-guarding-safety-recovered-achievement-believed-recipe.md)** — Guarding safety-recovered achievement_believed recipe _(2026-04-24)_
 - **[2026-04-24](docs/open-work/landed/2026-04-24-phase-6a-7-commitment-gate-resolve-goap-plans-split.md)** — Phase 6a §7 commitment gate + `resolve_goap_plans` split _(2026-04-24)_
 - **[2026-04-24](docs/open-work/landed/2026-04-24-respect-witness-multiplier-ghost-twin-relocation.md)** — Respect witness-multiplier — ghost-twin relocation _(2026-04-24)_
 - **[024](docs/open-work/landed/024-7-w-fulfillment-register-mvp-container-social-warmth-axis.md)** — §7.W Fulfillment register — MVP container + social_warmth axis _(2026-04-24)_
-- **[024](docs/open-work/landed/024-7-w-fulfillment-register-mvp-warmth-split-phase-3.md)** — §7.W Fulfillment register MVP + warmth split phase 3 _(2026-04-24)_
 - **[022](docs/open-work/landed/022-11-target-taking-trace-fan-out-8-dse-hooks-l2-lookup-fix.md)** — §11 target-taking trace fan-out — 8 DSE hooks + L2 lookup fix _(2026-04-24)_
-- **[014](docs/open-work/landed/014-4-marker-author-systems-batch-1.md)** — §4 marker author systems batch 1 _(2026-04-24)_
 - **[012](docs/open-work/landed/012-warmth-split-temperature-need-vs-social-warmth-fulfillment-a.md)** — Warmth split — temperature need vs social-warmth fulfillment axis _(2026-04-24)_
 - **[001](docs/open-work/landed/001-explore-dse-rebalance-sub-2-saturation-curve.md)** — Explore DSE rebalance — Sub-2 saturation curve _(2026-04-24)_
 - **[2026-04-23](docs/open-work/landed/2026-04-23-13-1-rows-1-3-incapacitated-consumer-cutover-inline-branch-r.md)** — §13.1 rows 1–3 — Incapacitated consumer cutover + inline-branch retirement _(2026-04-23)_
