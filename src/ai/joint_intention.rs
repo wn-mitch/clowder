@@ -480,6 +480,115 @@ impl JointIntentionExt for JointIntention {
     }
 }
 
+// ---------------------------------------------------------------------------
+// InLaw adoption rule — ticket 400
+// ---------------------------------------------------------------------------
+
+/// Ticket 400 — InLaw adoption on `PracticeStage::CourtshipBonded`
+/// transition. When a `JointIntention { practice: Courtship }` advances
+/// to `CourtshipBonded`, each partner's biological parents gain an
+/// `InLaw`-kind `RelationshipTo` entry on their `ParentingActivity`
+/// pointing at the other partner. Mirrored both directions: my parents
+/// get InLaw entries toward my new mate; my mate's parents get InLaw
+/// entries toward me.
+///
+/// **Detection.** Runs after [`author_joint_intentions`] (which sets
+/// `joint.stage_entered_tick = now_tick` on advance). A cat with
+/// `joint.stage == CourtshipBonded && joint.stage_entered_tick == now_tick`
+/// just transitioned this tick.
+///
+/// **Reverse-lookup.** Biological-parent identification scans all
+/// `ParentingActivity` Components for entries with `kind = Biological`
+/// and `target = X`: each such owner is one of X's biological parents.
+/// `KittenDependency` is unusable for this — adults shed the Component
+/// when they mature.
+///
+/// **Idempotency.** `ParentingActivity::has_kind` guards against
+/// duplicate InLaw entries. If a JointIntention briefly drops and
+/// re-enters Bonded, the rule fires again but does not duplicate.
+///
+/// **No alloparenting yet.** Only `Biological`-kind parents propagate
+/// InLaw status. `BondFormed` and `Adopted` parental adoption rules
+/// land in follow-on tickets 403 / 404 and will participate naturally
+/// in this same rule (any cat carrying a parental stance toward X
+/// gains InLaw toward X's new mate).
+#[allow(clippy::type_complexity)]
+pub fn apply_inlaw_adoption_on_bonded(
+    time: Res<TimeState>,
+    joints: Query<(Entity, &JointIntention), Without<Dead>>,
+    mut parenting: bevy_ecs::system::ParamSet<(
+        Query<(Entity, &crate::components::parenting_activity::ParentingActivity)>,
+        Query<&mut crate::components::parenting_activity::ParentingActivity>,
+    )>,
+) {
+    use crate::components::parenting_activity::{ParentalKind, RelationshipTo};
+
+    let now_tick = time.tick;
+
+    // 1. Find cats that just entered CourtshipBonded this tick.
+    let fresh_bonds: Vec<(Entity, Entity)> = joints
+        .iter()
+        .filter_map(|(entity, joint)| {
+            (joint.stage == PracticeStage::CourtshipBonded
+                && joint.stage_entered_tick == now_tick)
+                .then_some((entity, joint.partner))
+        })
+        .collect();
+    if fresh_bonds.is_empty() {
+        return;
+    }
+
+    // 2. Build reverse-lookup: child -> Vec<parent_entity> via
+    // ParentingActivity scan. Only Biological-kind entries propagate
+    // InLaw status in 400.
+    let mut parents_of: HashMap<Entity, Vec<Entity>> = HashMap::new();
+    {
+        let read = parenting.p0();
+        for (cat, pa) in read.iter() {
+            for rel in &pa.relationships {
+                if rel.kind == ParentalKind::Biological {
+                    parents_of.entry(rel.target).or_default().push(cat);
+                }
+            }
+        }
+    }
+
+    // 3. Determine InLaw insertions per (parent_to_modify, target_inlaw).
+    // Mirror in both directions per the design.
+    let mut insertions: Vec<(Entity, Entity)> = Vec::new();
+    for (entity, partner) in &fresh_bonds {
+        if let Some(my_parents) = parents_of.get(entity) {
+            for &p in my_parents {
+                insertions.push((p, *partner));
+            }
+        }
+        if let Some(partner_parents) = parents_of.get(partner) {
+            for &p in partner_parents {
+                insertions.push((p, *entity));
+            }
+        }
+    }
+    if insertions.is_empty() {
+        return;
+    }
+
+    // 4. Apply insertions via the mutable arm of the ParamSet.
+    let mut write = parenting.p1();
+    for (parent_entity, in_law_target) in insertions {
+        if let Ok(mut pa) = write.get_mut(parent_entity) {
+            if pa.has_kind(in_law_target, ParentalKind::InLaw) {
+                continue;
+            }
+            pa.relationships.push(RelationshipTo::new(
+                in_law_target,
+                ParentalKind::InLaw,
+                None,
+                now_tick,
+            ));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

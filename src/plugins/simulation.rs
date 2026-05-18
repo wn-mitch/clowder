@@ -440,6 +440,10 @@ impl Plugin for SimulationPlugin {
         // Updated by `update_colony_building_markers` once per
         // `ScoringConstants::chronicity_window_ticks` ticks.
         app.init_resource::<crate::resources::stores_pressure::StoresPressureTracker>();
+        // Ticket 400 — per-cat parenting-bias scalar map. Populated each
+        // tick by `parenting_activity::populate_parenting_scalars`; read
+        // at `ScoringContext` build time and by `ParentingActivityModifier`.
+        app.init_resource::<crate::systems::parenting_activity::ParentingScalars>();
         app.add_systems(
             Startup,
             register_dses_at_startup.after(crate::plugins::setup::setup_world_exclusive),
@@ -743,7 +747,32 @@ impl Plugin for SimulationPlugin {
                             // The passive aspiration adoption picker
                             // explicitly skips Kinship (see
                             // `select_aspirations` / `adopt_new_aspirations`).
+                            //
+                            // Ticket 400 — 398's mother-only gate
+                            // widened to all parents (mother OR father)
+                            // now that ParentingActivityModifier
+                            // handles dispersion personality-conditionally.
                             systems::aspirations::adopt_kinship_aspiration,
+                            // Ticket 400 — ParentingActivity + InLaw
+                            // adoption bundle. Sync the Biological-kind
+                            // entries (mirrors update_parent_markers's
+                            // KittenDependency-presence pattern), apply
+                            // the InLaw rule on fresh CourtshipBonded
+                            // transitions (depends on
+                            // author_joint_intentions having set
+                            // stage_entered_tick = now_tick earlier in
+                            // this chain), then tick engagement
+                            // gradients and populate the per-cat
+                            // scalar bundle for ScoringContext. Grouped
+                            // to stay under Bevy's 20-system
+                            // outer-tuple limit.
+                            (
+                                systems::parenting_activity::update_parenting_activity_biological,
+                                crate::ai::joint_intention::apply_inlaw_adoption_on_bonded,
+                                systems::parenting_activity::tick_parental_engagement,
+                                systems::parenting_activity::populate_parenting_scalars,
+                            )
+                                .chain(),
                             // Ticket 014 §4 sensing batch — broad-phase
                             // target-existence: HasThreatNearby,
                             // HasSocialTarget, HasHerbsNearby, PreyNearby,

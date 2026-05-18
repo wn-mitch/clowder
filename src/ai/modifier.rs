@@ -1903,6 +1903,90 @@ impl ScoreModifier for KittenCryCaretakeLift {
 }
 
 // ---------------------------------------------------------------------------
+// ParentingActivityModifier — ticket 400
+// ---------------------------------------------------------------------------
+
+/// 400 — additive lift on Caretake / Hunt / Patrol / Mentor DSEs sourced
+/// from the cat's `ParentingActivity` Component. Per-cat per-DSE lift is
+/// computed by [`crate::systems::parenting_activity::populate_parenting_scalars`]
+/// as a sum across the cat's `RelationshipTo` entries — each entry
+/// contributes `scale_<dim>(personality) × bond_strength × parental_engagement`
+/// to its DSE's bias channel.
+///
+/// **Replaces 398's uniform Kinship `AspirationLift(+0.2 Caretake)`.**
+/// 398's stopgap added a flat +0.2 to every adopted parent's Caretake
+/// score, triggering the `HandoffItem` cascade when both parents
+/// committed. 400's modifier disperses the lift personality-conditionally:
+/// a high-presence mother carries a large `caretake_bias_sum`; a
+/// low-presence diligent father carries a small `caretake_bias_sum` but
+/// a large `provision_bias_sum` (Hunt lift), avoiding the Caretake
+/// competition. The companion `Kinship`-domain neutering in
+/// `compute_aspiration_action_counts` retires the uniform lift.
+///
+/// **JointIntention-aware suppression.** For Caretake, the bias sum is
+/// multiplied by `parenting_caretake_suppression_factor` (1.0 default;
+/// `joint_suppression_factor` ≈ 0.3 when a partner has a held Caretake
+/// against one of our dependents). Resolves the two-high-compassion-
+/// parents corner case the personality dispersion alone cannot — yield
+/// to the partner already on it without fully dropping (so the second
+/// parent snaps in if the first lapses).
+///
+/// **Gated-boost contract:** returns `score` unchanged on `score <= 0`
+/// — parenting drive doesn't conjure DSE-eligibility into existence
+/// (mirrors the 088 / 047 / 102 / 106 / 156 conventions). Cats without
+/// `ParentingActivity` see zero scalars and zero lift.
+pub struct ParentingActivityModifier;
+
+impl ParentingActivityModifier {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for ParentingActivityModifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ScoreModifier for ParentingActivityModifier {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if score <= 0.0 {
+            return score;
+        }
+        let lift = match dse_id.0 {
+            CARETAKE => {
+                let bias = fetch("parenting_caretake_bias_sum", ctx.cat).max(0.0);
+                let suppression =
+                    fetch("parenting_caretake_suppression_factor", ctx.cat).clamp(0.0, 1.0);
+                bias * suppression
+            }
+            HUNT => fetch("parenting_provision_bias_sum", ctx.cat).max(0.0),
+            PATROL => fetch("parenting_protect_bias_sum", ctx.cat).max(0.0),
+            MENTOR => {
+                fetch("parenting_cultural_teach_bias_sum", ctx.cat).max(0.0)
+                    + fetch("parenting_autonomy_teach_bias_sum", ctx.cat).max(0.0)
+            }
+            _ => 0.0,
+        };
+        if lift <= 0.0 {
+            return score;
+        }
+        score + lift
+    }
+
+    fn name(&self) -> &'static str {
+        "parenting_activity"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // FoodSecurityGroomLift — ticket 209
 // ---------------------------------------------------------------------------
 
@@ -3545,6 +3629,14 @@ pub fn default_modifier_pipeline(
     // the Phase-4 weight-rebalance regression (verified empirically
     // — see KittenCryCaretakeLift doc-comment).
     pipeline.push(Box::new(KittenCryCaretakeLift::new(sc)));
+    // Ticket 400 — `ParentingActivityModifier` lifts Caretake / Hunt /
+    // Patrol / Mentor DSEs by per-cat parental-bias sums computed from
+    // the cat's `ParentingActivity` Component. Replaces 398's uniform
+    // Kinship `AspirationLift(+0.2 Caretake)` (now Kinship-neutered in
+    // `compute_aspiration_action_counts`). Registered after the
+    // Caretake-specific `KittenCryCaretakeLift` so both compose under
+    // the saturating-additive cap.
+    pipeline.push(Box::new(ParentingActivityModifier::new()));
     // 209 — `FoodSecurityGroomLift` and `TensionDefusionGroomLift`
     // both target GroomOther multiplicatively. Registered after
     // `KittenCryCaretakeLift` so the lifts compose with each other
@@ -4440,7 +4532,10 @@ mod tests {
         // 126: bumped 35 → 36 with `IntentionMomentum`.
         // 251: dropped 36 → 35 by retiring `AcuteHealthAdrenalineFlee`
         // (load moved into Sleep DSE's `health_deficit` Logistic axis).
-        assert_eq!(pipeline.len(), 35, "expected 35 registered modifiers");
+        // 400: bumped 35 → 36 with `ParentingActivityModifier` (single
+        // multi-DSE modifier replacing 398's uniform Kinship
+        // AspirationLift on Caretake).
+        assert_eq!(pipeline.len(), 36, "expected 36 registered modifiers");
     }
 
     // -----------------------------------------------------------------------

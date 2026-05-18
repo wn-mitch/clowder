@@ -69,6 +69,14 @@ pub struct ColonyContext<'w> {
     /// `ctx.action_affordances.read(cat, target, kind)` inside
     /// their consideration closures.
     pub action_affordances: Res<'w, crate::resources::action_affordances::ActionAffordances>,
+    /// Ticket 400 — per-cat parenting-bias scalars. Populated each tick
+    /// by `parenting_activity::populate_parenting_scalars`. Read at
+    /// `ScoringContext` build time to populate `parental_engagement`
+    /// (Caretake DSE's gradient axis) and the six modifier-pipeline
+    /// scalars (the five `parenting_*_bias_sum` fields plus
+    /// `parenting_caretake_suppression_factor`). Default-zero bundle
+    /// for cats without `ParentingActivity` Component.
+    pub parenting_scalars: Res<'w, crate::systems::parenting_activity::ParentingScalars>,
 }
 
 pub mod actions;
@@ -101,6 +109,7 @@ pub mod memory;
 pub mod mood;
 pub mod narrative;
 pub mod needs;
+pub mod parenting_activity;
 pub mod personality_events;
 pub mod personality_friction;
 pub mod plan_substrate;

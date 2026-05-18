@@ -83,6 +83,14 @@ pub struct SimConstants {
     /// (substrate-only at 364 land; richer skill attribution lives downstream).
     #[serde(default)]
     pub kitten_rearing: KittenRearingConstants,
+    /// Ticket 400 — L2 ParentingActivity tunables. Five-scale composition
+    /// asymptote weights (presence/provision/protection/cultural/autonomy),
+    /// engagement EMA rates, proximity gating range, matured-residual factor,
+    /// and JointIntention coordination-suppression factor. Per the 399
+    /// design plan, these are starting-point values; tuning belongs to
+    /// follow-on 408 under the four-artifact methodology.
+    #[serde(default)]
+    pub parenting: ParentingActivityConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -6381,6 +6389,84 @@ impl Default for KittenRearingConstants {
             teach_done_threshold: 0.66,
             release_threshold: 0.95,
             teach_curriculum_size: 5,
+        }
+    }
+}
+
+// ---------- ParentingActivityConstants (ticket 400) ----------
+
+/// Tunables for the L2 `ParentingActivity` substrate (ticket 400). The
+/// `parental_engagement` gradient on each `RelationshipTo` ramps toward an
+/// asymptote computed by weighting five orthogonal personality scales —
+/// **Presence** (compassion + warmth), **Provision** (diligence + loyalty),
+/// **Protection** (boldness + temper), **Cultural** (tradition + ambition),
+/// **Autonomy** (curiosity + patience + (1 − overprotection)). The asymptote
+/// weights deliberately lean toward Presence (`w_presence = 0.30`) per the
+/// 399 design's values stance: a hard-working low-presence parent lands at
+/// moderate engagement, visibly different from a high-presence partner.
+///
+/// The `ParentingActivityModifier` (`src/ai/modifier.rs`) reads the
+/// engagement gradient × per-scale bias formulas to lift Caretake / Hunt /
+/// Patrol / Mentor DSE scores personality-conditionally; this replaces 398's
+/// uniform `AspirationLift(+0.2 Caretake)` for the Kinship `RaiseOffspring`
+/// aspiration. The `joint_suppression_factor` resolves the
+/// two-high-compassion-parents corner case (yields to a partner already
+/// holding Caretake for our dependent) without re-introducing an L3 override.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ParentingActivityConstants {
+    /// Per-tick EMA build rate toward the personality-derived asymptote
+    /// while the cat is in tile-range of the target OR performing a
+    /// parental-class action toward the target. `engagement +=
+    /// (asymptote - engagement) * engagement_build_rate`.
+    pub engagement_build_rate: f32,
+    /// Per-tick EMA decay rate while out-of-range and not performing a
+    /// parental-class action. `engagement -= engagement * engagement_decay_rate`.
+    /// Build is ~10× faster than decay so the gradient stabilizes near the
+    /// asymptote under typical proximity patterns; absence (e.g., the
+    /// single-working-mother Hunt-while-away case) does not snap the bond.
+    pub engagement_decay_rate: f32,
+    /// Manhattan/Euclidean tile range within which the target is considered
+    /// "present" for engagement-build purposes (parallel to other
+    /// proximity-gated systems like `bond_proximity_range`).
+    pub engagement_range_tiles: f32,
+    /// Multiplier applied to the asymptote once the dependent kitten reaches
+    /// `maturity >= 1.0` (the `KittenDependency`-removal threshold). Engagement
+    /// decays toward `matured_residual_factor × asymptote` rather than zero —
+    /// "still your mother." `0.15` per 399 design.
+    pub matured_residual_factor: f32,
+    /// Multiplier applied to `caretake_bias` when a partner has a held
+    /// Caretake intention targeting one of our dependents. `0.3` per 399 —
+    /// yields without fully suppressing (so a high-compassion second parent
+    /// can still snap to Caretake if the first lapses).
+    pub joint_suppression_factor: f32,
+    /// Asymptote weight on the Presence scale. Default `0.30` (highest of
+    /// the five) per 399's values stance — presence is load-bearing for
+    /// parental engagement.
+    pub w_presence: f32,
+    /// Asymptote weight on the Provision scale. Default `0.20`.
+    pub w_provision: f32,
+    /// Asymptote weight on the Protection scale. Default `0.20`.
+    pub w_protection: f32,
+    /// Asymptote weight on the Cultural scale. Default `0.15`.
+    pub w_cultural: f32,
+    /// Asymptote weight on the Autonomy scale. Default `0.15`. Sum across
+    /// all five weights = 1.00.
+    pub w_autonomy: f32,
+}
+
+impl Default for ParentingActivityConstants {
+    fn default() -> Self {
+        Self {
+            engagement_build_rate: 0.001,
+            engagement_decay_rate: 0.0001,
+            engagement_range_tiles: 5.0,
+            matured_residual_factor: 0.15,
+            joint_suppression_factor: 0.3,
+            w_presence: 0.30,
+            w_provision: 0.20,
+            w_protection: 0.20,
+            w_cultural: 0.15,
+            w_autonomy: 0.15,
         }
     }
 }

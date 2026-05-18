@@ -27,6 +27,7 @@ pub mod magic;
 pub mod markers;
 pub mod mental;
 pub mod mourning;
+pub mod parenting_activity;
 pub mod personality;
 pub mod physical;
 pub mod pregnancy;
@@ -90,6 +91,7 @@ pub use magic::{
 };
 pub use mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 pub use mourning::Mourning;
+pub use parenting_activity::{ParentalKind, ParentingActivity, RelationshipTo};
 pub use personality::Personality;
 pub use physical::{
     Dead, Health, InjurySource, Needs, Position, PreviousPosition,

@@ -820,24 +820,25 @@ pub fn update_mentoring_target_markers(
 /// Ticket 398 — event-driven adoption + drop of `RAISE_OFFSPRING_ASPIRATION`.
 ///
 /// §7.M.2 frames RaiseOffspringAspiration as a post-partum aspiration
-/// (a mother adopts on first kitten; persists across the dependency
+/// (a parent adopts on first kitten; persists across the dependency
 /// window; drops when no more dependent kittens). Unlike the other
 /// 14 chains which adopt via the passive personality-scored picker,
-/// Kinship is **event-driven**: presence-in-`KittenDependency.mother`
+/// Kinship is **event-driven**: presence-in-`KittenDependency.{mother,father}`
 /// is the trigger.
 ///
-/// **Mother-only adoption (not father).** §7.M.2's spec model has the
-/// father shifting to a provisioner role via the L2 `ParentingActivity`
-/// substrate (Hunt-bias for diligent personality, etc.). Without L2
-/// landed, lifting Caretake's score for fathers via the L1
-/// `AspirationLift` (`compute_aspiration_action_counts`) causes them
-/// to over-attempt Caretake while the mother is already handling it,
-/// inflating `HandoffItem` plan-failure rates. The narrow L1-only
-/// landing scopes Kinship to mothers; father provisioning is L2
-/// follow-on.
+/// **Both parents adopt (ticket 400 widening).** 398's original landing
+/// scoped adoption to mothers only — the `is_mother` filter was a
+/// stopgap to prevent low-compassion fathers from over-attempting
+/// Caretake via the L1 `AspirationLift` (the `HandoffItem` cascade).
+/// 400 pulls that boundary forward by replacing the uniform Caretake
+/// lift with the personality-conditional `ParentingActivityModifier`
+/// (see `src/ai/modifier.rs`), so fathers now adopt the aspiration but
+/// only over-attempt Caretake when their `scale_presence` (compassion +
+/// warmth) is actually high. Low-compassion diligent fathers receive a
+/// provision_bias instead (Hunt-DSE lift), per the 399 design.
 ///
 /// **Drops when no more dependent kittens.** When a cat is no longer
-/// the mother of any living kitten (kittens matured or died), the
+/// a parent of any living kitten (kittens matured or died), the
 /// aspiration is removed from `Aspirations.active` — it doesn't move
 /// to `completed` (no narrative-worthy completion event; the cat may
 /// have another litter later). This makes the chain effectively
@@ -847,7 +848,7 @@ pub fn update_mentoring_target_markers(
 /// ActionCount(9999) progress tracker is deliberately unreachable
 /// (the spec's natural completion is §7.7.a Elder transition).
 /// `check_aspiration_abandonment` would otherwise drop the aspiration
-/// on low-compassion mothers after 2000 ticks of stagnation; the
+/// on low-compassion parents after 2000 ticks of stagnation; the
 /// abandonment system has a sibling guard to skip Kinship.
 ///
 /// Sibling of `update_parent_markers` in Chain 2a — runs after the
@@ -865,22 +866,30 @@ pub fn adopt_kinship_aspiration(
     const KINSHIP_CHAIN_NAME: &str = "Raise Offspring";
 
     use std::collections::HashSet;
-    // Build the set of mother Entities with at least one living dependent kitten.
-    let mothers: HashSet<Entity> = kittens
-        .iter()
-        .filter_map(|dep| dep.mother)
-        .collect();
+    // Build the set of parent Entities (mother OR father) with at least
+    // one living dependent kitten. Ticket 400 widens 398's mother-only
+    // gate now that ParentingActivityModifier handles per-parent
+    // dispersion personality-conditionally.
+    let mut parents: HashSet<Entity> = HashSet::new();
+    for dep in kittens.iter() {
+        if let Some(m) = dep.mother {
+            parents.insert(m);
+        }
+        if let Some(f) = dep.father {
+            parents.insert(f);
+        }
+    }
 
     for (entity, name, mut aspirations) in &mut query {
-        let is_mother = mothers.contains(&entity);
+        let is_parent = parents.contains(&entity);
         let kinship_active_idx = aspirations
             .active
             .iter()
             .position(|a| a.chain_name == KINSHIP_CHAIN_NAME);
 
-        match (is_mother, kinship_active_idx) {
+        match (is_parent, kinship_active_idx) {
             (true, None) => {
-                // Newly mother — adopt.
+                // Newly parent (mother or father) — adopt.
                 aspirations.active.push(ActiveAspiration {
                     chain_name: KINSHIP_CHAIN_NAME.to_string(),
                     domain: AspirationDomain::Kinship,

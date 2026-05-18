@@ -1,11 +1,21 @@
 //! `Caretake` — Social-urgency peer (§3.3.2 anchor = 1.0).
 //!
 //! Per §2.3 + §3.1.1 row 1509: `WeightedSum` of 3 axes —
-//! kitten_urgency, compassion, is_parent. RtEO composition: parent
-//! bonus drives low-compassion parents (bloodline override);
-//! compassion drives non-parents responding to hungry kittens.
-//! `is_parent` is a 0/1 axis — the non-trivial RtEO weight encodes
-//! the bloodline-override signal numerically.
+//! kitten_urgency, compassion, parental_engagement. RtEO composition:
+//! the parental-engagement axis drives gradient sensitivity to
+//! lifelong parental commitment; compassion drives non-parents
+//! responding to hungry kittens.
+//!
+//! Ticket 400 — `parental_engagement` replaces the prior binary
+//! `is_parent_of_hungry_kitten` axis (0/1, populated from
+//! `caretake_resolution.is_parent`). The new gradient is sourced from
+//! `ParentingActivity` Component's max `parental_engagement` across
+//! `RelationshipTo` entries (see `src/systems/parenting_activity.rs`):
+//! actively-parenting cats with high `scale_presence` saturate near
+//! the personality-derived asymptote (typically 0.3-0.7); non-parents
+//! sit at 0.0. The `ParentingActivityModifier` (in `src/ai/modifier.rs`)
+//! adds the personality-conditional lift on top, replacing 398's
+//! uniform Kinship `AspirationLift(+0.2)`.
 //!
 //! Ticket 156 — kitten-cry perception is composed at the **modifier
 //! layer** (`KittenCryCaretakeLift` in `src/ai/modifier.rs`) rather
@@ -37,7 +47,11 @@ pub const KITTEN_URGENCY_INPUT: &str = "kitten_urgency";
 /// gets its own key so bond-weighting only amplifies care-for-hungry-
 /// kitten decisions, not unrelated compassion-gated actions.
 pub const COMPASSION_INPUT: &str = "caretake_compassion";
-pub const IS_PARENT_INPUT: &str = "is_parent_of_hungry_kitten";
+/// Ticket 400 — gradient axis replacing 398's binary
+/// `is_parent_of_hungry_kitten`. Populated by `ctx_scalars` from
+/// `ScoringContext.parental_engagement` (max of
+/// `ParentingActivity.relationships[i].parental_engagement`).
+pub const PARENTAL_ENGAGEMENT_INPUT: &str = "parental_engagement";
 
 pub struct CaretakeDse {
     id: DseId,
@@ -69,7 +83,7 @@ impl CaretakeDse {
                     linear.clone(),
                 )),
                 Consideration::Scalar(ScalarConsideration::new(COMPASSION_INPUT, linear.clone())),
-                Consideration::Scalar(ScalarConsideration::new(IS_PARENT_INPUT, linear)),
+                Consideration::Scalar(ScalarConsideration::new(PARENTAL_ENGAGEMENT_INPUT, linear)),
                 Consideration::Scalar(ScalarConsideration::new(
                     "colony_food_security",
                     lift_curve,

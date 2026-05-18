@@ -405,6 +405,13 @@ pub struct ScoringContext<'a> {
     pub hungry_kitten_urgency: f32,
     /// Whether this cat is a parent of the hungriest nearby kitten.
     pub is_parent_of_hungry_kitten: bool,
+    /// Ticket 400 — full bundle of L2 parenting scalars consumed by
+    /// the Caretake DSE's gradient axis (`parental_engagement_max`)
+    /// and by `ParentingActivityModifier` (5 bias sums + Caretake
+    /// JointIntention-aware suppression factor). Populated by the
+    /// builders from the [`ParentingScalars`] resource lookup; default
+    /// zero for cats without a `ParentingActivity` Component.
+    pub parenting: crate::systems::parenting_activity::ParentingScalarBundle,
     /// Hearing-channel perception of nearby kitten distress cries,
     /// sampled from `KittenCryMap` at the cat's tile (0.0–1.0). Painted
     /// by `update_kitten_cry_map` for any kitten whose hunger drops
@@ -811,6 +818,30 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         } else {
             0.0
         },
+    );
+    // Ticket 400 — gradient axis read by Caretake DSE (replaces
+    // `is_parent_of_hungry_kitten` as the parental signal) +
+    // ParentingActivityModifier inputs (5 bias sums + Caretake
+    // JointIntention-aware suppression factor). All zero for cats
+    // without `ParentingActivity`.
+    m.insert(
+        "parental_engagement",
+        ctx.parenting.parental_engagement_max.clamp(0.0, 1.0),
+    );
+    m.insert("parenting_caretake_bias_sum", ctx.parenting.caretake_bias_sum.max(0.0));
+    m.insert("parenting_provision_bias_sum", ctx.parenting.provision_bias_sum.max(0.0));
+    m.insert("parenting_protect_bias_sum", ctx.parenting.protect_bias_sum.max(0.0));
+    m.insert(
+        "parenting_cultural_teach_bias_sum",
+        ctx.parenting.cultural_teach_bias_sum.max(0.0),
+    );
+    m.insert(
+        "parenting_autonomy_teach_bias_sum",
+        ctx.parenting.autonomy_teach_bias_sum.max(0.0),
+    );
+    m.insert(
+        "parenting_caretake_suppression_factor",
+        ctx.parenting.caretake_suppression_factor.clamp(0.0, 1.0),
     );
     m.insert(
         "kitten_cry_perceived",
@@ -2192,11 +2223,29 @@ pub fn colony_priority_ordinal(
 
 /// Per-action aspiration counts: how many active aspirations include
 /// each action in their domain. Used by `AspirationLift`.
+///
+/// **Ticket 400 — Kinship-domain neutering.** `Kinship` aspirations
+/// (`RaiseOffspring`) used to contribute to `aspiration_action_caretake`
+/// via this function, which the `AspirationLift` modifier read as a
+/// uniform `+0.2` Caretake lift on every adopted parent. That uniform
+/// lift was 398's stopgap and triggered the `HandoffItem` cascade when
+/// both parents committed. 400 retires the uniform lift in favor of
+/// `ParentingActivityModifier`'s personality-conditional dispersion —
+/// so this function now SKIPS Kinship-domain aspirations entirely.
+/// The aspiration still exists for narrative tracking; only its
+/// AspirationLift contribution is zeroed.
 pub fn compute_aspiration_action_counts(
     aspirations: &crate::components::aspirations::Aspirations,
 ) -> [f32; CASCADE_COUNTS_LEN] {
+    use crate::components::aspirations::AspirationDomain;
     let mut counts = [0.0_f32; CASCADE_COUNTS_LEN];
     for asp in &aspirations.active {
+        // Ticket 400 — Kinship aspirations no longer lift Caretake
+        // here; the personality-conditional bias lives in
+        // `ParentingActivityModifier` (`src/ai/modifier.rs`).
+        if asp.domain == AspirationDomain::Kinship {
+            continue;
+        }
         for action in asp.domain.matching_actions() {
             let idx = *action as usize;
             if idx < CASCADE_COUNTS_LEN {
@@ -3089,6 +3138,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            parenting: Default::default(),
             kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
@@ -3291,6 +3341,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            parenting: Default::default(),
             kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
@@ -3516,6 +3567,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            parenting: Default::default(),
             kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
@@ -3805,6 +3857,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            parenting: Default::default(),
             kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
@@ -3955,6 +4008,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            parenting: Default::default(),
             kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
@@ -4110,6 +4164,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            parenting: Default::default(),
             kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
@@ -4445,6 +4500,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            parenting: Default::default(),
             kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
@@ -4577,6 +4633,7 @@ mod tests {
             tradition_location_bonus: 0.0,
             hungry_kitten_urgency: 0.0,
             is_parent_of_hungry_kitten: false,
+            parenting: Default::default(),
             kitten_cry_perceived: 0.0,
             caretake_compassion_bond_scale: 1.0,
             unexplored_nearby: 1.0,
