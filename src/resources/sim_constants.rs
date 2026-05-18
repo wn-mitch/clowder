@@ -7315,14 +7315,6 @@ pub struct PlanningSubstrateConstants {
     /// per ticket 073's Out-of-scope note. Quarterly
     /// `just rebuild-sensitivity-map` will re-tune.
     pub target_failure_cooldown_ticks: u64,
-    /// Ticket 123 — how long a `PlanningFailed/no_plan_found` penalty
-    /// persists for the offending disposition on a cat's
-    /// `RecentDispositionFailures` map. Default `4000` ≈ 1 sim-hour at
-    /// the 1000-ticks-per-day scale; half the target-failure window
-    /// because dispositions are coarser-grained than per-target
-    /// failures and we want recovery on the same in-day timescale.
-    /// Quarterly `just rebuild-sensitivity-map` will re-tune.
-    pub disposition_failure_cooldown_ticks: u64,
 }
 
 impl Default for PlanningSubstrateConstants {
@@ -7330,7 +7322,6 @@ impl Default for PlanningSubstrateConstants {
         Self {
             reservation_ttl_ticks: 600,
             target_failure_cooldown_ticks: 8000,
-            disposition_failure_cooldown_ticks: 4000,
         }
     }
 }

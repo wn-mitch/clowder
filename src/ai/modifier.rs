@@ -2803,23 +2803,25 @@ impl ScoreModifier for IntraspeciesConflictResponseFreeze {
 ///   belief ("the colony has a Midden / Stores / etc.") and
 ///   *resource-state-aware* belief ("that specific Stores has free
 ///   capacity right now"). Resource-state-aware belief revision is
-///   the Talk-of-the-Town epic (§12.4 / cluster C3); until it lands,
-///   the cooldown damps for `disposition_failure_cooldown_ticks`
-///   after a `make_plan → None` event so the cat doesn't slam the
-///   planner with the same failing intent every tick when the
-///   categorical marker said yes but the run-time visit failed.
+///   the Talk-of-the-Town epic (§12.4 / cluster C3); 258 landed the
+///   C3 substrate and 290 cut the cooldown reader over to
+///   `ContextBeliefs[DispositionExecution(kind)].predictability`, so
+///   the IAUS reads the EMA-of-self-confidence facet directly rather
+///   than the legacy `RecentDispositionFailures` proxy. The damping
+///   role is unchanged: the cat doesn't slam the planner with the
+///   same failing intent every tick when the categorical marker said
+///   yes but the run-time visit failed.
 ///
-/// - **`RecentDispositionFailures` is a temporary memory proxy.**
-///   §12.1 of the substrate refactor names that the substrate has no
-///   general memory→scoring coupling today. The typed-failure-flavor
-///   components in tree (`RecentDispositionFailures`,
-///   `RecentTargetFailures`, `HuntingPriors::record_failed_search`,
-///   plus future per-event maps) are one-off proxies that consolidate
-///   under ToT's unified `Memory` consumer. New failure-flavors should
-///   not be added in this shape; new dispositions should reach for
-///   TargetExistence first, the cooldown last (and only when the
-///   resource-state-aware gap is genuinely load-bearing for that
-///   disposition).
+/// - **The proxy retirement landed in 290.** §12.1 of the substrate
+///   refactor named that the substrate had no general memory→scoring
+///   coupling at the time. The typed-failure-flavor components (RDF
+///   ✓ retired, `RecentTargetFailures` → 292,
+///   `HuntingPriors::record_failed_search` → 293, future per-event
+///   maps) consolidate under ToT's unified `Memory` consumer family.
+///   New failure-flavors should not be added in the legacy proxy
+///   shape; new dispositions should reach for TargetExistence first,
+///   the cooldown last (and only when the resource-state-aware gap
+///   is genuinely load-bearing for that disposition).
 pub struct DispositionFailureCooldown;
 
 impl DispositionFailureCooldown {

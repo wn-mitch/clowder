@@ -1355,22 +1355,13 @@ pub fn evaluate_and_plan(
                 Option<&crate::components::fate::FatedLove>,
                 Option<&crate::components::fate::FatedRival>,
                 Option<&crate::components::fulfillment::Fulfillment>,
-                // Ticket 123 — IAUS-side mirror of the planner's
-                // `make_plan → None` veto. Lazy-inserted on first
-                // failure; `None` here means the cat has never failed
-                // a disposition and the consideration scores 1.0
-                // (no penalty). (290 Commit A: superseded as the read
-                // source by the adjacent `ContextBeliefs`; still held
-                // here for the dual-write block below until Commit B
-                // retires the proxy.)
-                Option<&mut crate::components::RecentDispositionFailures>,
-                // Ticket 290 (Commit A) — `ContextBeliefs` from the C3
-                // subjective belief substrate (258). The
-                // `DispositionExecution(kind)` entry's `predictability`
-                // facet is the new read source for
-                // `disposition_cooldown_signal`. `None` means
-                // ContextBeliefs hasn't spawned yet (test paths) — the
-                // sensor fail-opens to 1.0.
+                // Ticket 290 — `ContextBeliefs` from the C3 subjective
+                // belief substrate (258). The `DispositionExecution(kind)`
+                // entry's `predictability` facet is the read source for
+                // `disposition_cooldown_signal` (Ticket 123 IAUS-side
+                // mirror of the planner's `make_plan → None` veto).
+                // `None` means ContextBeliefs hasn't spawned yet (test
+                // paths) — the sensor fail-opens to 1.0.
                 Option<&crate::components::beliefs::ContextBeliefs>,
                 // Ticket 108 — last tick's `safety_deficit` snapshot
                 // for the `ThreatProximityAdrenaline` rising-only
@@ -1683,10 +1674,9 @@ pub fn evaluate_and_plan(
     let action_snapshot: Vec<(Entity, Position, Action)> = query
         .iter()
         .map(
-            |(
-                (entity, _, _, _, pos, _, _, _, _),
-                (_, _, current, _, _, _, _, _, _, _, _, _),
-            )| { (entity, *pos, current.action) },
+            |((entity, _, _, _, pos, _, _, _, _), (_, _, current, _, _, _, _, _, _, _, _))| {
+                (entity, *pos, current.action)
+            },
         )
         .collect();
 
@@ -1754,7 +1744,6 @@ pub fn evaluate_and_plan(
             fated_love,
             fated_rival,
             fulfillment,
-            mut recent_disposition_failures,
             context_beliefs,
             prev_safety_deficit,
             focal_age,
@@ -3347,24 +3336,14 @@ pub fn evaluate_and_plan(
             };
             // Ticket 123 — author the disposition-failure memory
             // before the event push. The IAUS-side cooldown reads
-            // this on the next tick to suppress the same-disposition
-            // re-pick (3059 wasted planning rounds in seed-42's
-            // 1500-tick cold-start window came from the unbroken
-            // retry loop). Lazy-insert via Commands when the cat
-            // doesn't yet have the component — Commands buffer until
-            // apply, but the cooldown signal degrades gracefully
-            // (single-tick miss vs the 4000-tick cooldown window).
-            if let Some(ref mut recent) = recent_disposition_failures {
-                recent.record(chosen, res.time.tick);
-            } else {
-                let mut fresh = crate::components::RecentDispositionFailures::default();
-                fresh.record(chosen, res.time.tick);
-                commands.entity(entity).insert(fresh);
-            }
-            // 258 — dual-emit. `belief_integrator` consumes this to
-            // populate ContextBeliefs[DispositionExecution(chosen)].
-            // The RDF write above stays load-bearing for the IAUS
-            // cooldown until the reader migrates (follow-on ticket).
+            // ContextBeliefs[DispositionExecution(chosen)].predictability
+            // on the next tick to suppress the same-disposition re-pick
+            // (3059 wasted planning rounds in seed-42's 1500-tick
+            // cold-start window came from the unbroken retry loop).
+            // 290 (Commit B) — sole writer is now the WitnessableEvent
+            // emit; belief_integrator's SelfPlanFailed handler updates
+            // the predictability facet. RDF + its lazy-insert path
+            // retired.
             res.witnessable.write(
                 crate::messages::witnessable_event::WitnessableEvent::SelfPlanFailed {
                     cat: entity,

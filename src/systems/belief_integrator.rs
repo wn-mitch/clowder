@@ -1246,10 +1246,14 @@ mod tests {
         });
         schedule.run(&mut world);
 
-        let beliefs = world.get::<ContextBeliefs>(cat).expect("cat has ContextBeliefs");
+        let beliefs = world
+            .get::<ContextBeliefs>(cat)
+            .expect("cat has ContextBeliefs");
         let model = beliefs
             .models
-            .get(&EnvironmentalContextKey::DispositionExecution(DispositionKind::Hunting))
+            .get(&EnvironmentalContextKey::DispositionExecution(
+                DispositionKind::Hunting,
+            ))
             .expect("SelfPlanFailed should seed a DispositionExecution(Hunting) model");
         // Pass A snaps `value` 1.0 → 0.0 with lr=1.0. Pass B may fire
         // within the same `schedule.run` when the cat's entity index is
@@ -1292,7 +1296,9 @@ mod tests {
             .get::<ContextBeliefs>(cat)
             .unwrap()
             .models
-            .get(&EnvironmentalContextKey::DispositionExecution(DispositionKind::Foraging))
+            .get(&EnvironmentalContextKey::DispositionExecution(
+                DispositionKind::Foraging,
+            ))
             .unwrap()
             .predictability
             .value;
@@ -1310,7 +1316,9 @@ mod tests {
         let beliefs = world.get::<ContextBeliefs>(cat).unwrap();
         let model = beliefs
             .models
-            .get(&EnvironmentalContextKey::DispositionExecution(DispositionKind::Foraging))
+            .get(&EnvironmentalContextKey::DispositionExecution(
+                DispositionKind::Foraging,
+            ))
             .expect("model should still exist (strength has not decayed to zero in 400 ticks)");
         assert!(
             model.predictability.value > value_after_failure,

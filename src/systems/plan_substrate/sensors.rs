@@ -34,9 +34,7 @@ use crate::components::beliefs::{ContextBeliefs, EnvironmentalContextKey};
 use crate::components::beliefs::{Facet, MentalModel};
 use crate::components::physical::Dead;
 use crate::components::physical::Needs;
-use crate::components::{
-    DispositionKind, PrevSafetyDeficit, RecentDispositionFailures, RecentTargetFailures,
-};
+use crate::components::{DispositionKind, PrevSafetyDeficit, RecentTargetFailures};
 use crate::resources::sim_constants::SimConstants;
 
 /// Compute the recently-failed-target signal for a given
@@ -136,10 +134,7 @@ pub fn prune_recent_target_failures(
 /// `learning_rate = 1.0` preserves the legacy snap-to-0 contract on a single
 /// failure (matches RDF's `age = 0 → 0.0` semantics); `decay_rate_to_prior`
 /// scales the recovery window (~3000 ticks under default settings).
-pub fn disposition_cooldown_signal(
-    beliefs: Option<&ContextBeliefs>,
-    kind: DispositionKind,
-) -> f32 {
+pub fn disposition_cooldown_signal(beliefs: Option<&ContextBeliefs>, kind: DispositionKind) -> f32 {
     let Some(beliefs) = beliefs else {
         return 1.0;
     };
@@ -148,38 +143,6 @@ pub fn disposition_cooldown_signal(
         return 1.0;
     };
     model.predictability.value.clamp(0.0, 1.0)
-}
-
-// ---------------------------------------------------------------------------
-// prune_recent_disposition_failures — chain 2a decay-batch maintenance system
-// ---------------------------------------------------------------------------
-
-/// Bound per-cat `RecentDispositionFailures` map size by expiring
-/// entries older than `disposition_failure_cooldown_ticks`. Slotted
-/// into chain 2a's decay batch next to `prune_recent_target_failures`
-/// so the substrate-owned per-cat data structures all share a single
-/// passive-decay lane.
-///
-/// Skipped on `Dead` cats (the pruner is a per-tick visit; a freshly-
-/// dead cat's component will be cleaned up by `cleanup_dead`).
-pub fn prune_recent_disposition_failures(
-    constants: Res<SimConstants>,
-    time: Res<crate::resources::time::TimeState>,
-    mut query: Query<&mut RecentDispositionFailures, Without<Dead>>,
-) {
-    let cooldown = constants
-        .planning_substrate
-        .disposition_failure_cooldown_ticks;
-    if cooldown == 0 {
-        return;
-    }
-    let now = time.tick;
-    for mut recent in &mut query {
-        if recent.is_empty() {
-            continue;
-        }
-        let _removed = recent.prune_expired(now, cooldown);
-    }
 }
 
 // ---------------------------------------------------------------------------
