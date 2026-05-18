@@ -1,6 +1,7 @@
 ---
 id: 016
 title: Crafting — items, recipes, stations (epic dashboard)
+epic: true
 status: in-progress
 cluster: items-crafting
 orchestration: substrate-sensitive

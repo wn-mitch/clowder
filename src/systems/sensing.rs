@@ -821,19 +821,21 @@ pub fn update_target_existence_markers(
         ),
     >,
     prey_q: Query<&Position, (With<crate::components::prey::PreyAnimal>, Without<Dead>)>,
-    carcass_q: Query<(&crate::components::wildlife::Carcass, &Position), Without<Dead>>,
     relationships: Res<crate::resources::relationships::Relationships>,
     dse_registry: Res<crate::ai::eval::DseRegistry>,
     faction_relations: Res<crate::ai::faction::FactionRelations>,
     time: Res<crate::resources::time::TimeState>,
     constants: Res<crate::resources::sim_constants::SimConstants>,
+    // Ticket 064 (§5.6.3 #6) — carcass scent sampled at the cat's own
+    // tile; replaces the per-pair `observer_smells_at` scan that consumed
+    // a `carcass_q` snapshot.
+    carcass_scent_map: Res<crate::resources::CarcassScentMap>,
 ) {
     use crate::components::markers::{
         CarcassNearby, HasHerbsNearby, HasSocialTarget, HasThreatNearby, HasUnburiedCorpse,
         PreyNearby,
     };
     let d = &constants.disposition;
-    let sc = &constants.scoring;
     let cat_profile = &constants.sensory.cat;
 
     let cat_positions: Vec<(Entity, Position)> =
@@ -847,18 +849,12 @@ pub fn update_target_existence_markers(
         wildlife_q.iter().map(|(w, p)| (w.species, *p)).collect();
     let herb_positions: Vec<Position> = herb_q.iter().copied().collect();
     let prey_positions: Vec<Position> = prey_q.iter().copied().collect();
-    let carcass_positions: Vec<Position> = carcass_q
-        .iter()
-        .filter(|(c, _)| !c.cleansed || !c.harvested)
-        .map(|(_, p)| *p)
-        .collect();
     // 035: dead-cat positions for HasUnburiedCorpse marker authoring.
     let dead_cat_positions: Vec<Position> = dead_cats_q.iter().copied().collect();
 
     let threat_range = d.wildlife_threat_range;
     let herb_range = d.herb_detection_range as f32;
     let prey_range = d.prey_detection_range as f32;
-    let carcass_range = sc.carcass_detection_range as f32;
     let burial_range = d.burial_sense_range;
 
     for (entity, pos, cur_threat, cur_social, cur_herbs, cur_prey, cur_carcass, cur_unburied) in
@@ -952,16 +948,9 @@ pub fn update_target_existence_markers(
             )
         });
 
-        let want_carcass = carcass_positions.iter().any(|cp| {
-            observer_smells_at(
-                crate::components::SensorySpecies::Cat,
-                *pos,
-                cat_profile,
-                *cp,
-                crate::components::SensorySignature::CARCASS,
-                carcass_range,
-            )
-        });
+        // Ticket 064 (§5.6.3 #6 cutover) — sample CarcassScentMap at the
+        // cat's own tile. Replaces per-pair `observer_smells_at` scan.
+        let want_carcass = carcass_scent_map.get(pos.x, pos.y) > 0.0;
 
         // 035: HasUnburiedCorpse — any unburied dead colony cat within
         // burial_sense_range Manhattan tiles. Plain Manhattan rather
@@ -1673,7 +1662,7 @@ mod tests {
     use crate::components::identity::Species;
     use crate::components::magic::{GrowthStage, Harvestable, Herb, HerbKind};
     use crate::components::physical::DeathCause;
-    use crate::components::wildlife::{Carcass, WildAnimal};
+    use crate::components::wildlife::WildAnimal;
     use crate::resources::relationships::Relationships;
     use crate::resources::sim_constants::SimConstants;
     use crate::resources::time::TimeState;
@@ -1683,6 +1672,9 @@ mod tests {
         world.insert_resource(SimConstants::default());
         world.insert_resource(TimeState::default());
         world.insert_resource(Relationships::default());
+        // Ticket 064 (§5.6.3 #6 cutover) — system now reads carcass
+        // scent from this map instead of iterating Carcass queries.
+        world.insert_resource(crate::resources::CarcassScentMap::default());
         // §9.1 base stance matrix — required by `update_target_existence_markers`
         // since it threads `&res.faction_relations` into `resolve_socialize_target`.
         world.insert_resource(crate::ai::faction::FactionRelations::canonical());
@@ -1732,20 +1724,9 @@ mod tests {
             .id()
     }
 
-    fn spawn_carcass(world: &mut World, x: i32, y: i32) -> Entity {
-        world
-            .spawn((
-                Carcass {
-                    prey_kind: PreyKind::Mouse,
-                    age_ticks: 0,
-                    corruption_rate: 0.0,
-                    cleansed: false,
-                    harvested: false,
-                },
-                Position::new(x, y),
-            ))
-            .id()
-    }
+    // Ticket 064: `spawn_carcass` retired — carcass-related tests now
+    // deposit on `CarcassScentMap` directly. `Carcass`/`PreyKind` imports
+    // remain in case follow-on tests need them.
 
     #[test]
     fn solo_cat_no_target_markers() {
@@ -1848,10 +1829,14 @@ mod tests {
     }
 
     #[test]
-    fn carcass_in_range_flags_carcass_nearby() {
+    fn carcass_scent_at_position_flags_carcass_nearby() {
+        // Ticket 064: marker now reads `CarcassScentMap` at the cat's
+        // own tile (vs the old per-pair `observer_smells_at` scan).
         let (mut world, mut schedule) = target_existence_setup();
         let cat = spawn_cat(&mut world, 0, 0);
-        let _c = spawn_carcass(&mut world, 5, 0);
+        world
+            .resource_mut::<crate::resources::CarcassScentMap>()
+            .deposit(0, 0, 0.5);
         schedule.run(&mut world);
         assert!(world
             .entity(cat)
@@ -1859,20 +1844,13 @@ mod tests {
     }
 
     #[test]
-    fn fully_processed_carcass_excluded() {
+    fn no_carcass_scent_no_marker() {
+        // Default `CarcassScentMap` is all-zero; no marker should fire.
+        // Replaces the pre-064 `fully_processed_carcass_excluded` test —
+        // the producer no longer deposits on cleansed-and-harvested
+        // carcasses, so absence of scent is the equivalent invariant.
         let (mut world, mut schedule) = target_existence_setup();
         let cat = spawn_cat(&mut world, 0, 0);
-        // Both cleansed and harvested → filtered out.
-        world.spawn((
-            Carcass {
-                prey_kind: PreyKind::Mouse,
-                age_ticks: 0,
-                corruption_rate: 0.0,
-                cleansed: true,
-                harvested: true,
-            },
-            Position::new(5, 0),
-        ));
         schedule.run(&mut world);
         assert!(!world
             .entity(cat)

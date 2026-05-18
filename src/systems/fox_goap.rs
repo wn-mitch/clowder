@@ -179,6 +179,9 @@ fn build_scoring_context<'a>(
         local_prey_belief,
         cats_nearby,
         ward_nearby: false,
+        // Ticket 064: substrate stub. 0.0 until `FoxDispositionKind::Scavenging`
+        // lands; that follow-on will read `CarcassScentMap` at `fox_pos`.
+        carcass_scent_at_position: 0.0,
         local_threat_level: 0.0,
         local_exploration_coverage: 0.0,
         befriended_ally,

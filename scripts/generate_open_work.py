@@ -65,8 +65,14 @@ OPEN_STATUSES = ("in-progress", "ready", "parked", "blocked")
 # Epic progress
 # ---------------------------------------------------------------------------
 #
-# An "epic" is a ticket file whose name ends in `-epic.md`. Epics own a
-# roster of child tickets. We derive their progress by:
+# A ticket file is an "epic" if either:
+#   - its filename ends in `-epic.md` (the original convention — 060 / 093 /
+#     095), or
+#   - its frontmatter carries `epic: true` (added 2026-05-18 so dashboards
+#     can be promoted in place without renaming and breaking the dozens of
+#     inbound `(NNN-slug.md)` links — e.g. 128 / 016).
+#
+# Epics own a roster of child tickets. We derive their progress by:
 #   1. Locating an `## Open child tickets` (or `### ...`) section in the
 #      epic body. If absent, scan the whole body — covers phased epics that
 #      reference children inline (e.g. 095).
@@ -141,15 +147,32 @@ def _extract_roster_segment(body: str) -> tuple[str, str]:
 
 
 def discover_epics(repo_root: Path) -> list[Ticket]:
-    """Return all epics across tickets/ and landed/, sorted by id."""
+    """Return all epics across tickets/ and landed/, sorted by id.
+
+    Detection is the union of two signals — see the section comment above
+    for the rationale (filename suffix for legacy, frontmatter flag for
+    in-place promotions).
+    """
     epics: list[Ticket] = []
+    seen: set[Path] = set()
     for sub in ("tickets", "landed"):
         d = repo_root / "docs" / "open-work" / sub
         if not d.exists():
             continue
-        for p in sorted(d.glob(f"*{_EPIC_FILENAME_SUFFIX}")):
+        for p in sorted(d.glob("*.md")):
+            if p.name.startswith("_") or p.name.lower() == "readme.md":
+                continue
+            if p in seen:
+                continue
             text = p.read_text(encoding="utf-8")
             fm = parse_frontmatter(text)
+            is_epic = (
+                p.name.endswith(_EPIC_FILENAME_SUFFIX)
+                or fm.get("epic") is True
+            )
+            if not is_epic:
+                continue
+            seen.add(p)
             body = text.split("---", 2)[-1] if text.startswith("---") else text
             epics.append(Ticket(path=p, frontmatter=fm, body=body))
     epics.sort(key=lambda t: t.id)

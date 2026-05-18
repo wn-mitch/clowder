@@ -6,9 +6,11 @@
 """
 Epic progress tracker for Clowder.
 
-Walks `docs/open-work/tickets/*-epic.md` (and the landed mirror), parses each
-epic's roster section for child-ticket references, and reports per-epic
-completion: total children, done, in-progress, ready, blocked, parked.
+Walks every ticket under `docs/open-work/tickets/` (and the landed mirror),
+selects the ones that are epics — filename ends in `-epic.md`, or
+frontmatter carries `epic: true` — parses each epic's roster section for
+child-ticket references, and reports per-epic completion: total children,
+done, in-progress, ready, blocked, parked.
 
 Source of truth: each epic's `## Open child tickets — full roster` table
 (or, for phased epics without a roster, inline child references in the body).

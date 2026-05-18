@@ -404,7 +404,7 @@ impl HarvestDse {
                 Consideration::Scalar(ScalarConsideration::new("curiosity", linear())),
                 Consideration::Scalar(ScalarConsideration::new("herbcraft_skill", linear())),
                 Consideration::Scalar(ScalarConsideration::new(
-                    "carcass_count_saturated",
+                    "carcass_scent_at_position",
                     linear(),
                 )),
             ],

@@ -984,13 +984,10 @@ pub fn evaluate_dispositions(
             // belief entry for this bucket" reading, which is the
             // dormant scoring outcome anyway.
             patrol_threat_recency: 0.0,
-            // Ticket 014 §4 sensing batch — read via marker. Disposition
-            // path doesn't carry a carcass-count snapshot; the marker
-            // is the truthful source. `nearby_carcass_count` stays 0
-            // here because the field is unused on this code path
-            // (no DSE input reads it; goap.rs provides the count).
+            // Ticket 014 §4 sensing batch — read via marker. After ticket
+            // 064 the marker is authored from `CarcassScentMap > 0`; the
+            // magnitude axis lives on `carcass_scent_at_position` above.
             carcass_nearby,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             // Ticket 014 Magic colony batch — read via marker. Disposition
             // path doesn't populate WardsUnderSiege (no wildlife_ai_query

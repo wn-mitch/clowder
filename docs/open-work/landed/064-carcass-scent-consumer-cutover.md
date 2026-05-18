@@ -1,7 +1,7 @@
 ---
 id: 064
 title: Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6)
-status: ready
+status: done
 cluster: belief-perception
 orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Why
@@ -706,3 +706,4 @@ changes are needed.
 
 <!-- linkages:end -->
 ## Log
+- 2026-05-18: Verdict 'concern' with characteristic metrics undefined (CarcassHarvested/Cleansed = 0 in both baseline and observed; chain-rare on seed-42 per feedback_chain_rare_events). Structural verification: L1 trace emits carcass_scent map records every tick at Simba (92,907 records); per-pair observer_smells_at retired in goap.rs evaluate_and_plan + sensing.rs update_target_existence_markers; HarvestDse rebound to existing carcass_scent_at_position scalar (collapsing duplicate-substrate vs ticket 220's field). Fox-side stub added for the future FoxDispositionKind::Scavenging.

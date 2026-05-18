@@ -15,10 +15,10 @@ _Last generated: 2026-05-18._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 113 |
+| Ready | 112 |
 | Parked | 15 |
 | Blocked | 39 |
-| **Open total** | **171** |
+| **Open total** | **170** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -44,15 +44,17 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.91_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
 
-## Epic progress (3)
+## Epic progress (5)
 
 Per-epic completion derived from each epic's roster table (or inline child references for phased epics).
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 4 | 29 (1 / 20 / 6 / 2) | `▰▱▱▱▱▱▱▱▱▱` 12% |
+| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 8 | 0 | 8 (0 / 2 / 6 / 0) | `▱▱▱▱▱▱▱▱▱▱` 0% |
+| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 5 | 28 (1 / 19 / 6 / 2) | `▰▰▱▱▱▱▱▱▱▱` 15% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
+| **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 26 | 16 | 10 (0 / 6 / 2 / 2) | `▰▰▰▰▰▰▱▱▱▱` 62% |
 
 ## In progress (4)
 
@@ -61,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (113)
+## Ready by cluster (112)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -118,10 +120,9 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 
-### belief-perception (12 ready, 4 blocked)
+### belief-perception (11 ready, 4 blocked)
 
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
-- **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _[belief-perception] · added 2026-04-27_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[belief-perception] · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
@@ -211,7 +212,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 
-## Ready by initiative (79 tag-memberships across 9 initiatives)
+## Ready by initiative (78 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -235,21 +236,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
 
-### full-sensory-perception (12 open, 4 landed)
-
-- **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
-- **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _[belief-perception] · added 2026-04-27_
-- **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[belief-perception] · added 2026-05-01_
-- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
-- **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _[belief-perception] · added 2026-05-08_
-- **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _[belief-perception] · added 2026-05-08_
-- **[279](docs/open-work/tickets/279-body-cue-driven-joint-adoption-compose-127-with-242-243.md)** — Body-cue-driven joint adoption (compose 127 with 242 + 243) — _[social-coordination] · added 2026-05-11_
-- **[280](docs/open-work/tickets/280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md)** — Mental model of partner JointIntention (compose 127 with 258 C3 mental models) — _[social-coordination] · added 2026-05-11_
-- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
-- **[292](docs/open-work/tickets/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) — _[belief-perception] · added 2026-05-11_
-- **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
-- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
-
 ### mythic-texture (12 open, 1 landed)
 
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -264,6 +250,20 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[404](docs/open-work/tickets/404-adopted-parental-adoption-orphan-integration-399-follow-on-mythic-texture.md)** — Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
+
+### full-sensory-perception (11 open, 5 landed)
+
+- **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
+- **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[belief-perception] · added 2026-05-01_
+- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
+- **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _[belief-perception] · added 2026-05-08_
+- **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _[belief-perception] · added 2026-05-08_
+- **[279](docs/open-work/tickets/279-body-cue-driven-joint-adoption-compose-127-with-242-243.md)** — Body-cue-driven joint adoption (compose 127 with 242 + 243) — _[social-coordination] · added 2026-05-11_
+- **[280](docs/open-work/tickets/280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md)** — Mental model of partner JointIntention (compose 127 with 258 C3 mental models) — _[social-coordination] · added 2026-05-11_
+- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
+- **[292](docs/open-work/tickets/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) — _[belief-perception] · added 2026-05-11_
+- **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
+- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 
 ### generational-continuity (9 open, 3 landed)
 
@@ -321,7 +321,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (113)
+## Ready (112)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -332,7 +332,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _[items-crafting] · added 2026-04-26_
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _[buildings-zones] · added 2026-04-27_
-- **[064](docs/open-work/tickets/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) — _[belief-perception] · added 2026-04-27_
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _[wildlife] · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
@@ -497,11 +496,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
 - **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 
-## Landed archive (273)
+## Landed archive (274)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (207)
+### 2026-05 (208)
 
 - **[410](docs/open-work/landed/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) _(2026-05-18)_
 - **[409](docs/open-work/landed/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings _(2026-05-18)_
@@ -518,6 +517,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[068](docs/open-work/landed/068-folded-into-014.md)** — Folded into ticket 014 _(2026-05-18)_
 - **[067](docs/open-work/landed/067-folded-into-014.md)** — Folded into ticket 014 _(2026-05-18)_
 - **[066](docs/open-work/landed/066-explore-dominance-over-targeted-leisure.md)** — Explore dominance over targeted leisure _(2026-05-18)_
+- **[064](docs/open-work/landed/064-carcass-scent-consumer-cutover.md)** — Carcass-scent consumer cutover — replace observer_smells_at (§5.6.3 row #6) _(2026-05-18)_
 - **[032](docs/open-work/landed/032-starvation-cat-biology-realignment.md)** — Starvation rebalance — align with IRL cat biology, interesting not cutthroat _(2026-05-18)_
 - **[399](docs/open-work/landed/399-l2-parentingactivity-express-non-primary-caretaker-parent-roles-per-7m2-design.md)** — L2 ParentingActivity — express non-primary-caretaker parent roles per §7.M.2 (design) _(2026-05-17)_
 - **[398](docs/open-work/landed/398-7m2-raiseoffspringaspiration-kitten-rearing-as-nested-intention-aspiration.md)** — §7.M.2 RaiseOffspringAspiration — kitten-rearing as nested-Intention aspiration _(2026-05-17)_

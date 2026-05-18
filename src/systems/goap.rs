@@ -122,14 +122,9 @@ pub struct WorldStateQueries<'w, 's> {
     pub active_directive_query: Query<'w, 's, &'static ActiveDirective>,
     // Ticket 014 Mentoring batch — `skills_query` retired alongside the
     // `has_mentoring_target_fn` closure (its only consumer).
-    pub carcass_query: Query<
-        'w,
-        's,
-        (
-            &'static crate::components::wildlife::Carcass,
-            &'static Position,
-        ),
-    >,
+    // Ticket 064 (§5.6.3 #6 cutover) retired the `carcass_query` snapshot
+    // here; carcass scent is sampled from `ColonyContext.carcass_scent_map`.
+    // The mutable resolver query lives on `MagicResolverParams`.
     pub wildlife_ai_query:
         Query<'w, 's, &'static crate::components::wildlife::WildlifeAiState, With<WildAnimal>>,
     pub stored_items_query: Query<'w, 's, &'static crate::components::building::StoredItems>,
@@ -1434,14 +1429,6 @@ pub fn evaluate_and_plan(
     markers.set_colony(markers::ThornbriarAvailable::KEY, thornbriar_available);
     markers.set_colony(markers::WardStrengthLow::KEY, ward_strength_low);
 
-    // Snapshot actionable carcasses for scoring.
-    let carcass_positions: Vec<Position> = world_state
-        .carcass_query
-        .iter()
-        .filter(|(c, _)| !c.cleansed || !c.harvested)
-        .map(|(_, p)| *p)
-        .collect();
-
     // Territory corruption — max corruption in the ring around colony center.
     let territory_max_corruption = {
         let mc = &res.constants.magic;
@@ -1733,30 +1720,16 @@ pub fn evaluate_and_plan(
         }
 
         // Ticket 014 §4 sensing batch — `has_herbs_nearby` /
-        // `prey_nearby` now read from `MarkerSnapshot`. The inline
-        // `observer_sees_at` scans retire here. `nearby_carcass_count`
-        // remains an inline count: the count is consumed by ScoringContext
-        // separately from the boolean `carcass_nearby` marker (used by
-        // magic_harvest siblings as a magnitude axis), so the count
-        // computation stays here while the boolean reads from snapshot.
+        // `prey_nearby` now read from `MarkerSnapshot`. Ticket 064 (§5.6.3
+        // #6 cutover) further retired the inline `nearby_carcass_count`
+        // loop: carcass-aware DSEs now consume the `carcass_scent_at_position`
+        // perception scalar (read from `CarcassScentMap` at ScoringContext
+        // build time), and the boolean facet still reads from
+        // `MarkerSnapshot::CarcassNearby`.
         let has_herbs_nearby = markers.has(markers::HasHerbsNearby::KEY, entity);
         let prey_nearby = markers.has(markers::PreyNearby::KEY, entity);
         let has_threat_nearby = markers.has(markers::HasThreatNearby::KEY, entity);
         let has_social_target = markers.has(markers::HasSocialTarget::KEY, entity);
-
-        let nearby_carcass_count = carcass_positions
-            .iter()
-            .filter(|cp| {
-                crate::systems::sensing::observer_smells_at(
-                    crate::components::SensorySpecies::Cat,
-                    *pos,
-                    &res.constants.sensory.cat,
-                    **cp,
-                    crate::components::SensorySignature::CARCASS,
-                    sc.carcass_detection_range as f32,
-                )
-            })
-            .count();
 
         let (on_corrupted_tile, tile_corruption, on_special_terrain) =
             if res.map.in_bounds(pos.x, pos.y) {
@@ -2098,12 +2071,11 @@ pub fn evaluate_and_plan(
                     lb.models.get(&key).map(|m| m.recency_of_threat_cue.value)
                 })
                 .unwrap_or(0.0),
-            // Ticket 014 §4 sensing batch — read via marker. The
-            // marker's predicate is "any uncleansed-or-unharvested
-            // carcass within carcass_detection_range" (matches the
-            // `nearby_carcass_count > 0` invariant exactly).
+            // Ticket 014 §4 sensing batch — read via marker. After ticket
+            // 064 the marker's predicate is "CarcassScentMap > 0 at this
+            // cat's tile", and `carcass_scent_at_position` provides the
+            // magnitude axis (see `carcass_scent_at_position` field above).
             carcass_nearby: markers.has(markers::CarcassNearby::KEY, entity),
-            nearby_carcass_count,
             territory_max_corruption,
             // Ticket 014 Magic colony batch — read via marker.
             wards_under_siege: markers.has(markers::WardsUnderSiege::KEY, entity),

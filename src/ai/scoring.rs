@@ -496,9 +496,9 @@ pub struct ScoringContext<'a> {
     pub patrol_threat_recency: f32,
     // --- Corruption/carcass/siege context ---
     /// Whether uncleansed/unharvested carcasses are within detection range.
+    /// After ticket 064 the marker reads `CarcassScentMap > 0` at the cat's
+    /// own tile; the magnitude axis lives on `carcass_scent_at_position`.
     pub carcass_nearby: bool,
-    /// Count of nearby actionable carcasses (uncleansed or unharvested).
-    pub nearby_carcass_count: usize,
     /// Max corruption of any tile in the territory ring around colony center (0.0–1.0).
     pub territory_max_corruption: f32,
     /// Whether any ward is currently being encircled by a shadow fox.
@@ -916,12 +916,6 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
     m.insert(
         "nearby_corruption_level",
         ctx.nearby_corruption_level.clamp(0.0, 1.0),
-    );
-    // Saturating-count for Harvest carcass axis — cap at 3 per the
-    // old inline `min(3)`.
-    m.insert(
-        "carcass_count_saturated",
-        (ctx.nearby_carcass_count.min(3) as f32) / 3.0,
     );
     m.insert(
         "on_special_terrain",
@@ -3158,7 +3152,6 @@ mod tests {
             ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
             day_phase: DayPhase::Dawn,
@@ -3361,7 +3354,6 @@ mod tests {
             ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
             day_phase: DayPhase::Dawn,
@@ -3587,7 +3579,6 @@ mod tests {
             ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
             day_phase: DayPhase::Dawn,
@@ -3877,7 +3868,6 @@ mod tests {
             ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
             day_phase: DayPhase::Dawn,
@@ -4028,7 +4018,6 @@ mod tests {
             ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
             day_phase: DayPhase::Dawn,
@@ -4184,7 +4173,6 @@ mod tests {
             ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
             day_phase: DayPhase::Dawn,
@@ -4520,7 +4508,6 @@ mod tests {
             ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
             day_phase: DayPhase::Dawn,
@@ -4653,7 +4640,6 @@ mod tests {
             ward_intent_at_position: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
-            nearby_carcass_count: 0,
             territory_max_corruption: 0.0,
             wards_under_siege: false,
             day_phase: DayPhase::Dawn,

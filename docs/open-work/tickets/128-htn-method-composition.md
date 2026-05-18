@@ -1,6 +1,7 @@
 ---
 id: 128
 title: HTN method composition — epic
+epic: true
 status: in-progress
 cluster: ai-substrate
 orchestration: coherent-block

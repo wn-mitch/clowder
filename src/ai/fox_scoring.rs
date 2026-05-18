@@ -56,6 +56,12 @@ pub struct FoxScoringContext<'a> {
     pub cats_nearby: usize,
     /// Whether a ward is within detection radius.
     pub ward_nearby: bool,
+    /// Ticket 064: carcass scent intensity at the fox's current tile,
+    /// sampled from `CarcassScentMap` (range 0.0–1.0). Substrate stub
+    /// for the future `FoxDispositionKind::Scavenging` DSE; wired to 0.0
+    /// here until that disposition lands and starts reading the map.
+    /// Mirrors the cat-side `ScoringContext::carcass_scent_at_position`.
+    pub carcass_scent_at_position: f32,
     /// Threat level at the fox's current location (from FoxThreatMemory).
     pub local_threat_level: f32,
     /// Exploration coverage around current position (from FoxExplorationMap).
@@ -201,6 +207,13 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
     // Dummy "one" scalar for the fox Dispersing lifecycle-intercept
     // axis. Matches the cat-side convention.
     m.insert("one", 1.0);
+    // Ticket 064: carcass-scent perception stub; 0.0 until
+    // `FoxDispositionKind::Scavenging` lands and starts reading
+    // `CarcassScentMap` in `build_scoring_context`.
+    m.insert(
+        "carcass_scent_at_position",
+        ctx.carcass_scent_at_position.clamp(0.0, 1.0),
+    );
     m
 }
 
@@ -534,6 +547,7 @@ mod tests {
             local_prey_belief: 0.5,
             cats_nearby: 0,
             ward_nearby: false,
+            carcass_scent_at_position: 0.0,
             local_threat_level: 0.0,
             local_exploration_coverage: 0.0,
             befriended_ally: false,
