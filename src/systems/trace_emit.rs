@@ -41,6 +41,8 @@ use bevy_ecs::system::SystemState;
 use crate::ai::CurrentAction;
 use crate::components::disposition::Disposition;
 use crate::components::goap_plan::GoapPlan;
+use crate::components::held_goal_stack::HeldGoalStack;
+use crate::components::held_intention::IntentionSource;
 use crate::components::identity::{Name, Species};
 use crate::components::physical::{Dead, Position};
 use crate::components::sensing::SensorySpecies;
@@ -49,8 +51,9 @@ use crate::resources::time::TimeState;
 use crate::resources::trace_log::{
     AttenuationBreakdown, BeliefProxySummary, CapturedDse, CommitmentCapture, CompositionSummary,
     ConsiderationContribution, EligibilitySummary, FocalScoreCapture, FocalTraceTarget,
-    IntentionSummary, ModifierApplication, MomentumSummary, PlanFailureCapture, PlanStateSummary,
-    SoftmaxSummary, SpatialRef, TraceEntry, TraceLog, TraceRecord,
+    IntentionSummary, MethodFrameTraceRecord, ModifierApplication, MomentumSummary,
+    PlanFailureCapture, PlanStateSummary, SoftmaxSummary, SpatialRef, TraceEntry, TraceLog,
+    TraceRecord,
 };
 use crate::systems::influence_map::{
     channel_label, Attenuation, Faction, InfluenceMapRegistry, MapMetadata,
@@ -93,6 +96,7 @@ pub fn emit_focal_trace(world: &mut World) {
                 &'static CurrentAction,
                 Option<&'static Disposition>,
                 Option<&'static GoapPlan>,
+                Option<&'static HeldGoalStack>,
             ),
             (With<Species>, Without<Dead>),
         >,
@@ -112,6 +116,9 @@ pub fn emit_focal_trace(world: &mut World) {
         last_scores: Vec<(crate::ai::Action, f32)>,
         goap_plan_steps: Vec<String>,
         momentum_preempted: bool,
+        /// Ticket 337 — `HeldGoalStack` frames walked at snapshot time.
+        /// Empty when the focal cat has no active method frames.
+        method_stack: Vec<MethodFrameTraceRecord>,
     }
     let snapshot_and_capture: Option<(
         FocalSnapshot,
@@ -126,11 +133,13 @@ pub fn emit_focal_trace(world: &mut World) {
             cats.get(e).ok().map(|row| (e, row))
         } else {
             cats.iter()
-                .find(|(_, name, _, _, _, _)| name.0 == target.name)
+                .find(|(_, name, _, _, _, _, _)| name.0 == target.name)
                 .map(|row| (row.0, row))
         };
 
-        let Some((entity, (_, name, pos, current, disposition, goap_plan))) = focal else {
+        let Some((entity, (_, name, pos, current, disposition, goap_plan, held_goal_stack))) =
+            focal
+        else {
             return;
         };
 
@@ -155,6 +164,9 @@ pub fn emit_focal_trace(world: &mut World) {
                 })
                 .unwrap_or_default(),
             momentum_preempted: captured.momentum_preempted,
+            method_stack: held_goal_stack
+                .map(method_stack_from_goal_stack)
+                .unwrap_or_default(),
         };
         Some((snapshot, captured))
     };
@@ -245,7 +257,7 @@ pub fn emit_focal_trace(world: &mut World) {
         trace_log.push(TraceEntry {
             tick: snapshot.tick,
             cat: snapshot.cat_name.clone(),
-            record: l3_commitment_record(row),
+            record: l3_commitment_record(row, snapshot.method_stack.clone()),
         });
     }
     for row in &captured.plan_failures {
@@ -440,7 +452,12 @@ fn l2_record_for(
 }
 
 /// Build a §11.3 L3Commitment record from one captured gate decision.
-fn l3_commitment_record(row: &CommitmentCapture) -> TraceRecord {
+/// `method_stack` is the focal cat's `HeldGoalStack` walked at snapshot
+/// time (ticket 337). Empty for cats running primitive Intentions.
+fn l3_commitment_record(
+    row: &CommitmentCapture,
+    method_stack: Vec<MethodFrameTraceRecord>,
+) -> TraceRecord {
     TraceRecord::L3Commitment {
         disposition: row.disposition.clone(),
         strategy: row.strategy.to_string(),
@@ -462,6 +479,7 @@ fn l3_commitment_record(row: &CommitmentCapture) -> TraceRecord {
         // `None` (omitted under skip_serializing_if for back-compat).
         momentum: None,
         abandon_reason: row.abandon_reason.map(str::to_string),
+        method_stack,
     }
 }
 
@@ -536,6 +554,41 @@ fn emit_l1_record(
             top_contributors: Vec::new(),
         },
     });
+}
+
+/// Walk a `HeldGoalStack` and return one `MethodFrameTraceRecord` per
+/// frame, in adoption order (root first, active leaf last). Per §11.5:
+/// no per-method special-casing — the walk is purely structural.
+///
+/// `target` is emitted as `None` in Phase 1 because `GoalFrame.target`
+/// holds an `Entity` (runtime-unstable) and name-resolution would
+/// require an additional world query. Downstream tooling treats `null`
+/// as "no named target" (same meaning as an unbound method).
+fn method_stack_from_goal_stack(stack: &HeldGoalStack) -> Vec<MethodFrameTraceRecord> {
+    stack
+        .frames
+        .iter()
+        .map(|frame| MethodFrameTraceRecord {
+            method: frame.method.to_string(),
+            goal: frame.goal_label.to_string(),
+            sub_goal_index: frame.sub_goal_index,
+            sub_goal_count: frame.sub_goal_count,
+            target: None,
+            source: intention_source_slug(&frame.source),
+        })
+        .collect()
+}
+
+/// Convert an `IntentionSource` to the canonical source-slug string used
+/// in `MethodFrameTraceRecord.source` and `GoalFrameSnapshot.source`.
+/// Matches the schema defined in `docs/systems/htn-methods.md` §Trace:
+/// `"self"` / `"coordinator"` / `"aspiration:<chain-name>"`.
+fn intention_source_slug(source: &IntentionSource) -> String {
+    match source {
+        IntentionSource::SelfMotivated => "self".to_string(),
+        IntentionSource::CoordinatorDirective { .. } => "coordinator".to_string(),
+        IntentionSource::AspirationEmitted { chain } => format!("aspiration:{chain}"),
+    }
 }
 
 /// Compact kebab-case slug for the `Faction` enum, used in the L1

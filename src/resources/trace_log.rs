@@ -247,6 +247,35 @@ pub struct MomentumSummary {
     pub decay_factor: f32,
 }
 
+/// One frame from [`HeldGoalStack`](crate::components::held_goal_stack::HeldGoalStack)
+/// serialized into an `L3Commitment` trace record. Per §11.5 registry-walk
+/// discipline, the trace emitter walks the frames without any per-method
+/// special-casing — new methods in the registry automatically appear here.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct MethodFrameTraceRecord {
+    /// Stable slug matching `MethodId.0`.
+    pub method: String,
+    /// `GoalFrame.goal_label` — the goal-state label this method was
+    /// selected for.
+    pub goal: String,
+    /// Current cursor within the method's sub-goal list.
+    pub sub_goal_index: usize,
+    /// Total sub-goal count for the method (captured at push-time from
+    /// `GoalFrame.sub_goal_count`). Serialized as `"of"` to match the
+    /// `docs/systems/htn-methods.md` §Trace JSON schema (`"sub_goal_index": 0, "of": 4`).
+    #[serde(rename = "of")]
+    pub sub_goal_count: usize,
+    /// Stable name slug for the bound target entity, if any. `None` when
+    /// the method carries no bound target or name-resolution is unavailable
+    /// at trace time. Emitted as `null` in JSON.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    /// Human-readable source — `"self"` / `"coordinator"` /
+    /// `"aspiration:<chain-name>"`. Matches the `GoalFrameSnapshot.source`
+    /// strings named in the §Trace inspection surface.
+    pub source: String,
+}
+
 // ---------------------------------------------------------------------------
 // TraceRecord — L1 / L2 / L3 variants per §11.3
 // ---------------------------------------------------------------------------
@@ -347,6 +376,14 @@ pub enum TraceRecord {
         /// decisions, fulfilment drops, and pre-126 records.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         abandon_reason: Option<String>,
+        /// Ticket 337 — snapshot of the focal cat's `HeldGoalStack` at
+        /// gate-evaluation time, walked registry-style per §11.5. Empty
+        /// when the cat has no active method frames (pre-128 behavior or
+        /// cats running primitive Intentions with no method decomposition).
+        /// Backward-compat: pre-337 records omit the field; diff tooling
+        /// treats absence as an empty stack.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        method_stack: Vec<MethodFrameTraceRecord>,
     },
     /// Plan-failure branch fired — a plan was terminated by something
     /// other than `achievement_believed`. Distinct from `L3Commitment`
