@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [needs.md]
 related-balance: [healthy-colony.md]
-landed-at: pending
+landed-at: a7123aa7908e
 landed-on: 2026-05-18
 ---
 
