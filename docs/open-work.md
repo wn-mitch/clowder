@@ -15,10 +15,10 @@ _Last generated: 2026-05-18._
 | Status | Count |
 |---|---|
 | In progress | 6 |
-| Ready | 106 |
+| Ready | 107 |
 | Parked | 15 |
 | Blocked | 46 |
-| **Open total** | **173** |
+| **Open total** | **174** |
 | Pre-existing | 2 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -65,7 +65,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[148](docs/open-work/tickets/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility — _[ai-substrate] · added 2026-05-02_
 
-## Ready by cluster (106)
+## Ready by cluster (107)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -178,6 +178,15 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 
+### process-discipline (6 ready)
+
+- **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
+- **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
+- **[302](docs/open-work/tickets/302-investigate-just-soak-vs-just-sweep-non-determinism-on-identical-seedbinary.md)** — investigate just soak vs just sweep non-determinism on identical seed/binary — _[process-discipline] · added 2026-05-12_
+- **[306](docs/open-work/tickets/306-corpus-tagging-pass-backfill-clusterinitiative-across-active-and-landed-tickets.md)** — Corpus tagging pass — backfill cluster+initiative across active and landed tickets — _[process-discipline] · added 2026-05-13_
+- **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
+- **[409](docs/open-work/tickets/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings — _[process-discipline] · added 2026-05-18_
+
 ### buildings-zones (5 ready, 2 blocked)
 
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _[buildings-zones] · added 2026-04-27_
@@ -185,14 +194,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[237](docs/open-work/tickets/237-gravesite-selection-corpse-transport-plan-multi-axis-site-scoring-proximate-to-other-graves-safe-low-corruption-beautiful.md)** — Gravesite selection — corpse transport plan + multi-axis site scoring (proximate to other graves, safe, low-corruption, beautiful) — _[buildings-zones] · added 2026-05-08_
 - **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
-
-### process-discipline (5 ready)
-
-- **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
-- **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
-- **[302](docs/open-work/tickets/302-investigate-just-soak-vs-just-sweep-non-determinism-on-identical-seedbinary.md)** — investigate just soak vs just sweep non-determinism on identical seed/binary — _[process-discipline] · added 2026-05-12_
-- **[306](docs/open-work/tickets/306-corpus-tagging-pass-backfill-clusterinitiative-across-active-and-landed-tickets.md)** — Corpus tagging pass — backfill cluster+initiative across active and landed tickets — _[process-discipline] · added 2026-05-13_
-- **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 
 ### magic-mythic (4 ready, 4 blocked)
 
@@ -308,7 +309,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[400](docs/open-work/tickets/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design — _[social-coordination] · added 2026-05-17_
 
-## Ready (106)
+## Ready (107)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -416,6 +417,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 - **[400](docs/open-work/tickets/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design — _[social-coordination] · added 2026-05-17_
+- **[409](docs/open-work/tickets/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings — _[process-discipline] · added 2026-05-18_
 
 ## Parked (15)
 
