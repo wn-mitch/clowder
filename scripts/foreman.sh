@@ -290,6 +290,17 @@ spawn_one_polecat() {
         return 1
     fi
 
+    # R1 (ticket 363): defense-in-depth orchestration guard before spawning.
+    # pick_top_ready_swarm_safe filters by orchestration, but this catches
+    # race conditions (retag between filter and spawn) and any future caller
+    # that bypasses pick_top_ready_swarm_safe.
+    local ticket_orch
+    ticket_orch=$(awk -F': *' '/^orchestration:/ { print $2; exit }' "$tfile" | tr -d ' ')
+    if [[ "$ticket_orch" != "swarm-safe" ]]; then
+        echo "foreman: REFUSED ticket $tid — orchestration=${ticket_orch:-unset} (polecat-eligible: swarm-safe only)" >&2
+        return 1
+    fi
+
     local slug="swarmpole-$tid"
     local workspace="$SESSIONS_ROOT/$slug"
 

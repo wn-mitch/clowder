@@ -118,6 +118,14 @@ claim_under_lock() {
                 echo "ERROR: ticket $tid_trimmed is already in-progress (refusing to claim)" >&2
                 exit 1
             fi
+            # R3 (ticket 363): enforce orchestration/track match at claim time.
+            # Prevents coherent-block tickets from being claimed as swarm-safe
+            # regardless of which caller reaches session-new (foreman, /work, manual).
+            ticket_orch=$(awk -F': *' '/^orchestration:/ { print $2; exit }' "$tfile" | tr -d ' ')
+            if [[ -n "$ticket_orch" && "$ticket_orch" != "$track" ]]; then
+                echo "ERROR: ticket $tid_trimmed has orchestration=$ticket_orch but --track $track (mismatch — wrong queue?)" >&2
+                exit 1
+            fi
         done
         # All clear — write the claim
         for tid in "${ticket_ids[@]}"; do

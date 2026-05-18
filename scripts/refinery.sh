@@ -22,6 +22,7 @@
 #
 # --auto gate (run per session BEFORE step 1):
 #   a. track == swarm-safe (whitelist enforced HERE and at flag-parse)
+#   a2. ticket frontmatter orchestration == swarm-safe (ticket 363 defense-in-depth)
 #   b. jj status shows no uncommitted working-copy edits in the workspace
 #   c. cd <workspace> && just check && just test exits 0
 # Sessions that fail the gate are reported (gate-fail) but not landed.
@@ -249,6 +250,34 @@ auto_gate() {
     if [[ "$track" != "$AUTO_WHITELIST_TRACK" ]]; then
         printf '%s\t%s\t%s\n' "$slug" "wrong-track" "track=$track (auto allowed only on $AUTO_WHITELIST_TRACK)"
         return 0
+    fi
+
+    # R2 (ticket 363): defense-in-depth — verify ticket frontmatter orchestration
+    # in addition to session-info track. session-info is written at claim time;
+    # if a ticket was misclassified (tagged swarm-safe) and later corrected, the
+    # session-info still says swarm-safe. The frontmatter is ground truth.
+    if [[ -f "$info_file" ]]; then
+        local ticket_ids_str
+        ticket_ids_str=$(python3 -c "
+import json,sys
+info=json.load(open(sys.argv[1]))
+print(' '.join(str(t) for t in info.get('tickets',[])))
+" "$info_file" 2>/dev/null || echo "")
+        for tid in $ticket_ids_str; do
+            [[ -z "$tid" ]] && continue
+            local unpadded padded tfile ticket_orch
+            unpadded=$(echo "$tid" | sed 's/^0*//'); [[ -z "$unpadded" ]] && unpadded="0"
+            padded=$(printf "%03d" "$unpadded" 2>/dev/null || echo "$tid")
+            tfile=$(ls "$REPO_ROOT/docs/open-work/tickets/${padded}-"*.md 2>/dev/null | head -1 || true)
+            if [[ -n "$tfile" && -f "$tfile" ]]; then
+                ticket_orch=$(awk -F': *' '/^orchestration:/ { print $2; exit }' "$tfile" | tr -d ' ')
+                if [[ -n "$ticket_orch" && "$ticket_orch" != "$AUTO_WHITELIST_TRACK" ]]; then
+                    printf '%s\t%s\t%s\n' "$slug" "wrong-track" \
+                        "ticket $tid frontmatter has orchestration=$ticket_orch (session-info=$track — misclassification; manual --land required)"
+                    return 0
+                fi
+            fi
+        done
     fi
 
     # Must be fast-forwardable (no rebase needed for auto-land; conflict resolution
