@@ -1,5 +1,5 @@
 ---
-id: PE-003
+id: 413
 title: Substrate stub catalogue — orphan markers + invalid consideration string-name references
 status: in-progress
 cluster: ai-substrate
@@ -138,3 +138,7 @@ Per ticket 160 §"Out of scope":
   the marker shape proves out.
 - Implementing the unwired substrate items themselves — that's
   tickets 168 / 169 / 170.
+
+## Log
+
+- 2026-05-18: Renumbered from id `PE-003` → `413` and moved out of `docs/open-work/pre-existing/` into `docs/open-work/tickets/` during Linear migration prep. `pre-existing/` is being retired — the long-lived stragglers are now first-class tickets.
