@@ -763,6 +763,67 @@ mod tests {
     }
 
     #[test]
+    fn l1_aspiration_record_serializes_with_emit_walk() {
+        let entry = TraceEntry {
+            tick: 42,
+            cat: "Whiskers".into(),
+            record: TraceRecord::L1Aspiration {
+                aspiration: "hunting-mastery".into(),
+                milestone: 2,
+                emit_walk: vec![
+                    EmitWalkRow {
+                        label: "hunt_high_value_prey".into(),
+                        applicable: true,
+                        method_live: true,
+                        emitted: true,
+                    },
+                    EmitWalkRow {
+                        label: "hunt_patrol_domain".into(),
+                        applicable: false,
+                        method_live: true,
+                        emitted: false,
+                    },
+                ],
+                fallback_used: false,
+            },
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("\"layer\":\"L1Aspiration\""));
+        assert!(json.contains("\"aspiration\":\"hunting-mastery\""));
+        assert!(json.contains("\"milestone\":2"));
+        assert!(json.contains("\"hunt_high_value_prey\""));
+        assert!(json.contains("\"method_live\":true"));
+        assert!(json.contains("\"emitted\":true"));
+        assert!(json.contains("\"fallback_used\":false"));
+        // Two-row walk is present.
+        assert!(json.contains("\"hunt_patrol_domain\""));
+    }
+
+    #[test]
+    fn l1_aspiration_fallback_record_serializes() {
+        // Verify the fallback_used flag round-trips correctly.
+        let entry = TraceEntry {
+            tick: 100,
+            cat: "Simba".into(),
+            record: TraceRecord::L1Aspiration {
+                aspiration: "warrior-path".into(),
+                milestone: 0,
+                emit_walk: vec![EmitWalkRow {
+                    label: "engage_threat".into(),
+                    applicable: true,
+                    method_live: true,
+                    emitted: true,
+                }],
+                fallback_used: true,
+            },
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("\"layer\":\"L1Aspiration\""));
+        assert!(json.contains("\"fallback_used\":true"));
+        assert!(json.contains("\"emitted\":true"));
+    }
+
+    #[test]
     fn focal_capture_accumulates_and_drains() {
         use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, Intention, Termination};
         use crate::ai::eval::EvalTrace;

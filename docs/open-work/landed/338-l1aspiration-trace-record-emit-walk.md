@@ -1,7 +1,7 @@
 ---
 id: 338
 title: L1Aspiration trace record — emit-walk per aspiration
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: swarm-safe
 initiative: [smarter-cats]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: e7cf3d05d374
+landed-on: 2026-05-17
 ---
 
 ## Why

@@ -217,9 +217,18 @@ fn compute_outcome(
             } else {
                 // Step 3: domain-affinity fallback. Step-4 silent
                 // quiet is the natural empty-Option fall-through.
-                let step3_row = step3_domain_fallback(world, snap.entity, chain, asp);
+                let (step3_row, step3_walk) =
+                    step3_domain_fallback(world, snap.entity, chain, asp);
                 let fallback_used = step3_row.is_some();
-                (step3_row, step2_walk, fallback_used)
+                // Combine the two walks: step2's authored-emit rows
+                // (empty when the milestone has no emits) followed
+                // by step3's registry-walked domain-affinity
+                // candidates. Concatenation preserves the "no
+                // authored emit matched, so tried these" narrative
+                // in the L1Aspiration trace record.
+                let combined_walk =
+                    step2_walk.into_iter().chain(step3_walk).collect();
+                (step3_row, combined_walk, fallback_used)
             }
         };
 
@@ -326,9 +335,14 @@ fn step2_emits_walk(
 }
 
 /// Step 3 — domain-affinity fallback. Walks the `MethodRegistry` for
-/// any `Live` method whose `domain == Some(chain.domain)` and whose
-/// `applicable_when` predicate holds. Returns `None` when no method
-/// matches (the picker then falls through to step 4 silent quiet).
+/// any method whose `domain == Some(chain.domain)`. Returns the first
+/// `Live`-and-applicable method as the chosen emission (or `None` when
+/// no method matches — step 4 silent quiet). The second return value
+/// is the full walk of every domain-matching registry entry, with
+/// per-entry `method_live` / `applicable` / `emitted` fields — this
+/// is the §11.5 registry-walk trace that #338 adds so
+/// `L1Aspiration.emit_walk` is populated even for milestones with no
+/// authored `emits[]` rows.
 ///
 /// The fallback emits with `Priority::Tertiary` and
 /// `CommitmentStrategy::OpenMinded` as a defensive default — the
@@ -340,29 +354,40 @@ fn step3_domain_fallback(
     entity: Entity,
     chain: &'static AspirationChain,
     asp: &ActiveAspiration,
-) -> Option<EmissionRow> {
+) -> (Option<EmissionRow>, Vec<EmitWalkRow>) {
     let method_registry = world.resource::<MethodRegistry>();
+    let mut walk: Vec<EmitWalkRow> = Vec::new();
+    let mut chosen: Option<EmissionRow> = None;
+
     for method in method_registry.iter() {
         if method.domain != Some(chain.domain) {
             continue;
         }
+        let method_live = matches!(&method.applicable_when, ApplicableWhen::Live(_));
         let applicable = match &method.applicable_when {
             ApplicableWhen::Live(check) => check(world, entity),
             ApplicableWhen::PendingSubstrate { .. } => false,
         };
-        if !applicable {
-            continue;
-        }
-        return Some(EmissionRow {
-            chain: chain.name,
-            milestone_index: asp.current_milestone,
-            label: method.goal_label,
-            strategy: CommitmentStrategy::OpenMinded,
-            priority: Priority::Tertiary,
-            fallback_used: true,
+        let emitted = chosen.is_none() && method_live && applicable;
+        walk.push(EmitWalkRow {
+            label: method.goal_label.to_string(),
+            applicable,
+            method_live,
+            emitted,
         });
+        if emitted {
+            chosen = Some(EmissionRow {
+                chain: chain.name,
+                milestone_index: asp.current_milestone,
+                label: method.goal_label,
+                strategy: CommitmentStrategy::OpenMinded,
+                priority: Priority::Tertiary,
+                fallback_used: true,
+            });
+        }
     }
-    None
+
+    (chosen, walk)
 }
 
 fn apply_outcome(world: &mut World, outcome: CatOutcome) {
