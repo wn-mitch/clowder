@@ -1,7 +1,7 @@
 ---
 id: 410
 title: L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern)
-status: ready
+status: done
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [smarter-cats]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Why
