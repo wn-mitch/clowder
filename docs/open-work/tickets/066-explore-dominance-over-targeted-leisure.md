@@ -1,5 +1,5 @@
 ---
-id: 001
+id: 066
 title: Explore dominance over targeted leisure
 status: in-progress
 cluster: ai-substrate
@@ -133,6 +133,7 @@ before it's scoped.
 
 ## Log
 
+- 2026-05-18: Renumbered from id 001 → 066 during Linear migration prep (id 001 collided with landed/001-explore-dse-rebalance-sub-2-saturation-curve). Linear's per-team issue counter is unique, so id-colliding files had to be split across distinct NNN.
 - 2026-05-11: Current canonical baseline `post-127-joint-intention`
   (commit `4bcae2de`, seed 42) footer shows `play: 14` (Phase 0: 348;
   Phase 1: 109). The 2026-04-24 four-fix landing (passive exploration
