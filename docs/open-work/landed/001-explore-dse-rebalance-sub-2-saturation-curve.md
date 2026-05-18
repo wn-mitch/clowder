@@ -2,7 +2,8 @@
 id: 001
 title: Explore DSE rebalance — Sub-2 saturation curve
 status: done
-cluster: null
+cluster: ai-substrate
+initiative: []
 landed-at: null
 landed-on: 2026-04-24
 ---

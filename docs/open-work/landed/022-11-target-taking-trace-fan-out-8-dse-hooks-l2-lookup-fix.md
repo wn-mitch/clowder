@@ -3,6 +3,7 @@ id: 022
 title: §11 target-taking trace fan-out — 8 DSE hooks + L2 lookup fix
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: c49056f
 landed-on: 2026-04-24
 ---

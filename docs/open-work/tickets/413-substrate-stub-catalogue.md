@@ -4,6 +4,7 @@ title: Substrate stub catalogue — orphan markers + invalid consideration strin
 status: in-progress
 cluster: ai-substrate
 orchestration: substrate-sensitive
+initiative: []
 added: 2026-05-05
 parked: null
 priority: medium

@@ -3,6 +3,7 @@ id: 116
 title: Bereavement — bond-specific grief modifier on partner/friend death
 status: done
 cluster: emotional-fidelity
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

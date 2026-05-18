@@ -3,6 +3,7 @@ id: 252
 title: Fleeing disposition (230) adoption audit — why FleeTargetPicked = 0 in seed-42 healthy
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-09
 parked: null
 blocked-by: []

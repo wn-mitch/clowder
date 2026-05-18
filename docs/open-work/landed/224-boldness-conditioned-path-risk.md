@@ -3,6 +3,7 @@ id: 224
 title: boldness-conditioned path risk
 status: done
 cluster: pathfinder-risk-awareness
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

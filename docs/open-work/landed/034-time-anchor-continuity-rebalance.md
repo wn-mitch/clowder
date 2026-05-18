@@ -3,6 +3,7 @@ id: 034
 title: Time-anchor continuity rebalance — restore play/grooming/mythic-texture under fixed prey-scent
 status: superseded
 cluster: ai-substrate
+initiative: []
 added: 2026-04-26
 parked: null
 blocked-by: []

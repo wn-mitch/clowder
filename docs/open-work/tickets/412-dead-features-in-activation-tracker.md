@@ -2,8 +2,9 @@
 id: 412
 title: Three permanently dead features in activation tracker
 status: blocked
-cluster: null
+cluster: ai-substrate
 orchestration: substrate-sensitive
+initiative: []
 added: 2026-04-14
 parked: null
 priority: low

@@ -2,7 +2,7 @@
 id: 2026-04-22
 title: "Phase 5a — silent-advance audit: `StepOutcome<W>` + contract + never-fired canary"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-22
 ---

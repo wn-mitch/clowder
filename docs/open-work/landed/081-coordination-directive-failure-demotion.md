@@ -3,6 +3,7 @@ id: 081
 title: Coordination directive-failure demotion (colony-side stuck-loop guard)
 status: done
 cluster: planning-substrate
+initiative: []
 added: 2026-04-29
 parked: 2026-04-29
 blocked-by: []

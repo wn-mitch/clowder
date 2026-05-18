@@ -3,6 +3,7 @@ id: 2026-04-24
 title: "Acceptance & mastery restoration — iteration 1"
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: 00deb6f
 landed-on: 2026-04-24
 ---

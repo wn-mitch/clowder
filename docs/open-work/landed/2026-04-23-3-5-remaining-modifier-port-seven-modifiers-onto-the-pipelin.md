@@ -2,7 +2,7 @@
 id: 2026-04-23
 title: §3.5 remaining-modifier port — seven modifiers onto the pipeline + inline retirement
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-23
 ---

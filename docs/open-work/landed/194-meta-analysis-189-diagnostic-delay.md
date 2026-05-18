@@ -3,6 +3,7 @@ id: 194
 title: Meta — why 189's root cause took three reframes and a full wave-closeout to surface
 status: done
 cluster: process-discipline
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

@@ -3,6 +3,7 @@ id: 158
 title: GroomedOther never-fired post-154 — split Action::Groom + extract DispositionKind::Grooming
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-03
 parked: null
 blocked-by: []

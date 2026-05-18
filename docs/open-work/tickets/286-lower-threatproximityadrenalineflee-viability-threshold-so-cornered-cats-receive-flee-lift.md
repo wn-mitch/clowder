@@ -3,6 +3,7 @@ id: 286
 title: Lower ThreatProximityAdrenalineFlee viability threshold so cornered cats receive flee_lift
 status: ready
 cluster: ai-substrate
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-11
 parked: null

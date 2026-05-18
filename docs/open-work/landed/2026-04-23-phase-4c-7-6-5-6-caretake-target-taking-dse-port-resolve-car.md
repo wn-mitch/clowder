@@ -2,7 +2,7 @@
 id: 2026-04-23
 title: "Phase 4c.7 — §6.5.6 `Caretake` target-taking DSE port + `resolve_caretake` retirement"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: feedbac
 landed-on: 2026-04-23
 ---

@@ -3,6 +3,7 @@ id: 088
 title: Body-distress Modifier — uniform self-care promotion under §L2.10 Modifier substrate
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-04-30
 landed-at: null
 landed-on: 2026-05-01

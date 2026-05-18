@@ -3,6 +3,7 @@ id: 182
 title: Courtship + burial canary regression on post-176 soak (pre-existing or 176-induced?)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

@@ -3,6 +3,7 @@ id: 165
 title: Post-d1722a33 GroomedOther affiliative redistribution starves entire kitten cohort on seed-42 (wontfix — bereavement-orphan, working as intended)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-04
 parked: null
 blocked-by: []

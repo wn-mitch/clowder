@@ -3,6 +3,7 @@ id: 029
 title: Cross-run log database — collate baseline + diagnostic archives for SQL-style queries
 status: done
 cluster: tooling-diagnostics-ui
+initiative: []
 added: 2026-04-25
 parked: null
 blocked-by: []

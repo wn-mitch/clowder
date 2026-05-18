@@ -3,6 +3,7 @@ id: 215
 title: tune tension_defusion_groom_weight
 status: blocked
 cluster: social-coordination
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-07
 parked: null

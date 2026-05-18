@@ -3,6 +3,7 @@ id: 2026-04-20
 title: Phase 2B — Scent as influence map
 status: done
 cluster: belief-perception
+initiative: []
 landed-at: null
 landed-on: 2026-04-20
 ---

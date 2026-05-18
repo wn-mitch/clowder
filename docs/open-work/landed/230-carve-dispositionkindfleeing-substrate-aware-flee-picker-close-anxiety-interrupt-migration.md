@@ -3,6 +3,7 @@ id: 230
 title: Carve DispositionKind::Fleeing + substrate-aware flee picker (close anxiety-interrupt migration)
 status: done
 cluster: pathfinder-risk-awareness
+initiative: []
 added: 2026-05-08
 parked: null
 blocked-by: []

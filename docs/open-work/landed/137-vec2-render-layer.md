@@ -3,6 +3,7 @@ id: 137
 title: Phase 0 — Vec2 render layer (visual interpolation, no sim-state change)
 status: done
 cluster: substrate-migration
+initiative: []
 added: 2026-05-02
 parked: null
 blocked-by: []

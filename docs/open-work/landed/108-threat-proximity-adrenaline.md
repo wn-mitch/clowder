@@ -3,6 +3,7 @@ id: 108
 title: ThreatProximityAdrenaline modifier — substrate axis for CriticalSafety interrupt retirement
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

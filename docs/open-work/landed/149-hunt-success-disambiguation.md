@@ -3,6 +3,7 @@ id: 149
 title: Hunt-success disambiguation — instrument per-discrete-attempt outcomes
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-02
 parked: null
 blocked-by: []

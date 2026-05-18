@@ -3,6 +3,7 @@ id: 086
 title: Find a triggering scenario for Farm DSE canary (CropTended / CropHarvested)
 status: done
 cluster: balance
+initiative: []
 added: 2026-04-30
 parked: null
 blocked-by: []

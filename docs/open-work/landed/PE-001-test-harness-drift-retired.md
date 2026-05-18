@@ -2,7 +2,8 @@
 id: PE-001
 title: Test-harness drift retired
 status: done
-cluster: null
+cluster: tooling-diagnostics-ui
+initiative: []
 landed-at: 04aef57b
 landed-on: 2026-04-28
 ---

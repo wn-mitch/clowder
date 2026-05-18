@@ -3,6 +3,7 @@ id: 151
 title: Bugfix discipline — force a structural candidate in every fix-shape decision tree
 status: done
 cluster: process
+initiative: []
 added: 2026-05-03
 parked: null
 blocked-by: []

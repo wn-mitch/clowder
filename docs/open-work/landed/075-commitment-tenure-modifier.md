@@ -3,6 +3,7 @@ id: 075
 title: CommitmentTenure Modifier (anti-oscillation hysteresis on disposition switching)
 status: done
 cluster: planning-substrate
+initiative: []
 added: 2026-04-29
 parked: null
 blocked-by: [072]

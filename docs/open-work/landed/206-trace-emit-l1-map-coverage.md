@@ -3,6 +3,7 @@ id: 206
 title: trace_emit L1 walk skips five InfluenceMaps — Food / Garden / Construction / KittenCry / Herb
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

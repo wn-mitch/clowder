@@ -3,6 +3,7 @@ id: 201
 title: CriticalHealth interrupt drives "hunt-to-starvation" plan churn — concrete reproducer for ticket 119
 status: dropped
 cluster: ai-substrate
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: [119]

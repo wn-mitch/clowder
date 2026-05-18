@@ -3,6 +3,7 @@ id: 107
 title: ExhaustionPressure modifier — substrate axis for Exhaustion interrupt retirement
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

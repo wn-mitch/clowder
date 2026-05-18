@@ -2,7 +2,7 @@
 id: 2026-04-24
 title: Respect witness-multiplier — ghost-twin relocation
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 608c6e3f
 landed-on: 2026-04-24
 ---

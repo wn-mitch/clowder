@@ -2,7 +2,8 @@
 id: 030
 title: Unify headless and windowed build pipeline — kill the manual mirror
 status: done
-cluster: null
+cluster: tooling-diagnostics-ui
+initiative: []
 added: 2026-04-25
 parked: null
 blocked-by: []

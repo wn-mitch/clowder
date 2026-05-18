@@ -3,6 +3,7 @@ id: 166
 title: kittens_surviving footer field has zero increment-sites — substrate-bypass shape
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-04
 parked: null
 blocked-by: []

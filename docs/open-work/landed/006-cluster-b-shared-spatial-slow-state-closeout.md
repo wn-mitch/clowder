@@ -3,6 +3,7 @@ id: 006
 title: Cluster-B shared spatial slow-state closeout
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: 10989775
 landed-on: 2026-04-27
 ---

@@ -3,6 +3,7 @@ id: 271
 title: Restore substrate Flee score lift on critical-health + active-threat (251 balance follow-on)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-10
 parked: null
 blocked-by: []

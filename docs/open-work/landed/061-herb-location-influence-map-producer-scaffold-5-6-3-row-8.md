@@ -3,6 +3,7 @@ id: 061
 title: "Herb-location influence map producer scaffold (§5.6.3 row #8)"
 status: done
 cluster: belief-perception
+initiative: []
 landed-at: 52546f4
 landed-on: 2026-04-28
 ---

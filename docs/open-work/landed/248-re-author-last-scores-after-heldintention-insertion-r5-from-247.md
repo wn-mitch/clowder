@@ -3,6 +3,7 @@ id: 248
 title: Re-author last_scores after HeldIntention insertion (R5 from 247)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-08
 parked: null
 blocked-by: []

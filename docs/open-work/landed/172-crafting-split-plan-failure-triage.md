@@ -3,6 +3,7 @@ id: 172
 title: Plan-failure triage on Cooking + Herbalism (155 follow-on)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

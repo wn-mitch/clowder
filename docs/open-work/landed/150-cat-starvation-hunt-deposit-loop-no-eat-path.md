@@ -3,6 +3,7 @@ id: 150
 title: Cat starvation despite active food production — hunt-deposit loop has no eat path
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-03
 parked: null
 blocked-by: []

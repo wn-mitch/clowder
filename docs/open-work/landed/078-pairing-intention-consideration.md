@@ -3,6 +3,7 @@ id: 078
 title: Backport bond_score's Intention pin to a target_pairing_intention Consideration
 status: done
 cluster: planning-substrate
+initiative: []
 added: 2026-04-29
 parked: null
 blocked-by: [072]

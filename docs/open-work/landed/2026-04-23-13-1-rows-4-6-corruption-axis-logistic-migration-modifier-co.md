@@ -2,7 +2,7 @@
 id: 2026-04-23
 title: §13.1 rows 4–6 — corruption-axis Logistic migration + modifier/constant retirement
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-23
 ---

@@ -3,6 +3,7 @@ id: 196
 title: verdict.py substrate-fired-≥1× probe (194 P7)
 status: done
 cluster: process-discipline
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

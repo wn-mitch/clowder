@@ -3,6 +3,7 @@ id: 157
 title: Burial continuity canary dark on post-154 soak — verify eligibility against new death distribution
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-03
 parked: null
 blocked-by: []

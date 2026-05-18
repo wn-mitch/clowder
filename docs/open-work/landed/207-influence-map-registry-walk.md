@@ -3,6 +3,7 @@ id: 207
 title: Phase 2D — InfluenceMap registry walk in emit_focal_trace
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

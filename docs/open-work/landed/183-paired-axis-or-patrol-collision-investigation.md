@@ -3,6 +3,7 @@ id: 183
 title: Paired-axis lift on higher-tier DSEs OR Patrol-collision investigation (181 follow-on)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

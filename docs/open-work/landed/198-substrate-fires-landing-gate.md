@@ -3,6 +3,7 @@ id: 198
 title: Substrate-fires landing gate — DSE curve-non-zero requires sibling scenario (194 P1)
 status: done
 cluster: process-discipline
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

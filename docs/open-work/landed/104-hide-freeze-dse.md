@@ -3,6 +3,7 @@ id: 104
 title: Hide/Freeze DSE — predator-avoidance third valence ("remain still and hope")
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

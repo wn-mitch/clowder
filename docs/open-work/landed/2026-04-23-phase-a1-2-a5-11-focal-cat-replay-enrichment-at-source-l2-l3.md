@@ -2,7 +2,7 @@
 id: 2026-04-23
 title: "Phase A1.2 (A5) — §11 focal-cat replay enrichment: at-source L2/L3 trace capture"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-23
 ---

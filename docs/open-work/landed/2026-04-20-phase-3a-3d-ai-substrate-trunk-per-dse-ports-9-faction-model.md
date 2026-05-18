@@ -2,7 +2,7 @@
 id: 2026-04-20
 title: Phase 3a–3d — AI substrate trunk + per-DSE ports + §9 faction model
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 03e9b23
 landed-on: 2026-04-20
 ---

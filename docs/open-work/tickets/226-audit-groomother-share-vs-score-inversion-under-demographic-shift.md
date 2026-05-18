@@ -3,6 +3,7 @@ id: 226
 title: audit GroomOther share-vs-score inversion under demographic shift
 status: ready
 cluster: ai-substrate
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-07
 parked: null

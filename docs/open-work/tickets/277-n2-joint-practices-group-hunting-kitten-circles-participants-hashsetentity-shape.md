@@ -4,7 +4,7 @@ title: N>2 joint practices (group hunting / kitten circles) — participants: Ha
 status: ready
 cluster: social-coordination
 orchestration: substrate-sensitive
-initiative: []
+initiative: [smarter-cats]
 added: 2026-05-11
 parked: null
 blocked-by: []

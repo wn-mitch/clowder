@@ -3,6 +3,7 @@ id: 046
 title: FightTarget combat-advantage uses skill-points difference, not damage-per-tick exchange — cats engage threats they can't survive
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-04-27
 parked: null
 blocked-by: []

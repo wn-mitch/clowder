@@ -3,6 +3,7 @@ id: 071
 title: Planning-substrate hardening — gird against the stuck-cat bug class (sub-epic)
 status: done
 cluster: planning-substrate
+initiative: []
 added: 2026-04-29
 parked: null
 blocked-by: []

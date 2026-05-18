@@ -3,6 +3,7 @@ id: 258
 title: C3 worked design — subjective belief substrate (mental models + facets + evidence typology)
 status: done
 cluster: C
+initiative: []
 added: 2026-05-10
 parked: null
 blocked-by: []

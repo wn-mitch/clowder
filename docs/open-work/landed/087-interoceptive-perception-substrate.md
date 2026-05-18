@@ -3,6 +3,7 @@ id: 087
 title: Interoceptive perception substrate
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: fc4e1ab8
 landed-on: 2026-04-30
 ---

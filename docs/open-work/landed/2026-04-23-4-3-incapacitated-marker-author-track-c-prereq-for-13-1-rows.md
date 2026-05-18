@@ -2,7 +2,7 @@
 id: 2026-04-23
 title: "§4.3 `Incapacitated` marker author — Track C prereq for §13.1 rows 1–3"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-23
 ---

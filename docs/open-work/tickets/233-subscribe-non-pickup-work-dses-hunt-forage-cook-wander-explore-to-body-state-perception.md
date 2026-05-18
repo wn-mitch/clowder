@@ -3,6 +3,7 @@ id: 233
 title: Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception
 status: ready
 cluster: ai-substrate
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-08
 parked: null

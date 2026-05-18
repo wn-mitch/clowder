@@ -2,7 +2,8 @@
 id: 131
 title: Stub for missing ID 131
 status: dropped
-cluster: null
+cluster: ai-substrate
+initiative: []
 added: 2026-05-18
 parked: null
 blocked-by: []

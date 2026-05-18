@@ -3,6 +3,7 @@ id: 079
 title: "`check_iaus_coherence.sh` process gate against MacGyvered pins"
 status: done
 cluster: process-discipline
+initiative: []
 landed-at: 8edbae3
 landed-on: 2026-04-29
 ---

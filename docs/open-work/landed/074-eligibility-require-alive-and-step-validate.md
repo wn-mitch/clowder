@@ -3,6 +3,7 @@ id: 074
 title: EligibilityFilter::require_alive + step-resolver validate_target
 status: done
 cluster: planning-substrate
+initiative: []
 added: 2026-04-29
 parked: null
 blocked-by: [072]

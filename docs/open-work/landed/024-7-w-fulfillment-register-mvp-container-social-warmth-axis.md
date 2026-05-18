@@ -3,6 +3,7 @@ id: 024
 title: §7.W Fulfillment register — MVP container + social_warmth axis
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: fc7f5e9
 landed-on: 2026-04-24
 ---

@@ -3,6 +3,7 @@ id: 123
 title: RecentDispositionFailures cooldown so cats stop spamming dispositions the planner can't satisfy
 status: done
 cluster: substrate-over-override
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

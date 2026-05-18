@@ -3,6 +3,7 @@ id: 256
 title: Patrol DSE recalibration — influence-map-driven smart pathing + wildlife deterrent affect (post-252 cascade root cause)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-10
 parked: null
 blocked-by: []

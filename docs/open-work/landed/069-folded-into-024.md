@@ -2,7 +2,8 @@
 id: 069
 title: Folded into ticket 024
 status: dropped
-cluster: null
+cluster: process-discipline
+initiative: []
 added: 2026-05-18
 parked: null
 blocked-by: []

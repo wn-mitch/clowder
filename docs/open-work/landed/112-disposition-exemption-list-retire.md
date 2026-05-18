@@ -3,6 +3,7 @@ id: 112
 title: Retire per-disposition exemption lists (Resting/Hunting/Foraging/Guarding) — substrate replacement via commitment momentum
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

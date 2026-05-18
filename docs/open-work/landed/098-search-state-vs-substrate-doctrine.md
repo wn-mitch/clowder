@@ -3,6 +3,7 @@ id: 098
 title: Document the substrate-vs-search-state boundary in `docs/systems/ai-substrate-refactor.md`
 status: done
 cluster: docs
+initiative: []
 added: 2026-04-30
 parked: null
 blocked-by: []

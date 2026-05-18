@@ -3,6 +3,7 @@ id: 195
 title: Plan-template stub-comment lint extension (194 P2)
 status: done
 cluster: process-discipline
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

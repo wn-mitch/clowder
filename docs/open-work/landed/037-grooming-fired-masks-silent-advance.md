@@ -3,6 +3,7 @@ id: 037
 title: GroomingFired event masks silent-advance — continuity canary lies when target picker returns None
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-04-26
 parked: null
 blocked-by: []

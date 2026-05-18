@@ -2,7 +2,7 @@
 id: 2026-04-24
 title: Guarding safety-recovered achievement_believed recipe
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 18301685
 landed-on: 2026-04-24
 ---

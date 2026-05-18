@@ -3,6 +3,7 @@ id: 099
 title: Feature emission for §3.5.1 Modifiers — colony-wide canary surface for substrate-lift signals
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: 2026-05-01
 blocked-by: []

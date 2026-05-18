@@ -3,6 +3,7 @@ id: 246
 title: Wire IntentionMomentum lift via ScoringContext (replace strict-floor preempt patch)
 status: done
 cluster: C
+initiative: []
 added: 2026-05-08
 parked: null
 blocked-by: []

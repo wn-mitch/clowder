@@ -3,6 +3,7 @@ id: 302
 title: investigate just soak vs just sweep non-determinism on identical seed/binary
 status: ready
 cluster: process-discipline
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-12
 parked: null

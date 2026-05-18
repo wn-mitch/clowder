@@ -3,6 +3,7 @@ id: 076
 title: LastResortPromotion Modifier + no-target step resolvers (spiral-of-failure escalation)
 status: done
 cluster: planning-substrate
+initiative: []
 added: 2026-04-29
 parked: 2026-04-29
 blocked-by: []

@@ -3,6 +3,7 @@ id: 082
 title: 027b L2 PairingActivity reactivation on the hardened substrate
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: 43cc38a
 landed-on: 2026-04-29
 ---

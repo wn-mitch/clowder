@@ -3,6 +3,7 @@ id: 254
 title: PickFleeTarget witness contract — rebind so substrate-aware Fleeing can pick a target post-252
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-10
 parked: null
 blocked-by: []

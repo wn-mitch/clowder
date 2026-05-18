@@ -2,7 +2,7 @@
 id: 2026-04-22
 title: Phase 4c.4 — Alloparenting Reframe A + GOAP Caretake fix + Farming canaries
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: 1261224
 landed-on: 2026-04-22
 ---

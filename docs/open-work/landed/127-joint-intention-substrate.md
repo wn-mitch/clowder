@@ -3,6 +3,7 @@ id: 127
 title: Joint-intention substrate for two-cat practices
 status: done
 cluster: C
+initiative: []
 added: 2026-05-02
 parked: null
 blocked-by: []

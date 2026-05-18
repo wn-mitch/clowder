@@ -4,7 +4,7 @@ title: Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md)
 status: ready
 cluster: wildlife
 orchestration: substrate-sensitive
-initiative: []
+initiative: [predator-prey-dynamics]
 added: 2026-05-15
 parked: null
 blocked-by: []

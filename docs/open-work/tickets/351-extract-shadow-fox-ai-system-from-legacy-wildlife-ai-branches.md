@@ -4,7 +4,7 @@ title: Extract shadow_fox_ai system from legacy wildlife_ai branches
 status: ready
 cluster: wildlife
 orchestration: substrate-sensitive
-initiative: []
+initiative: [predator-prey-dynamics]
 added: 2026-05-15
 parked: null
 blocked-by: []

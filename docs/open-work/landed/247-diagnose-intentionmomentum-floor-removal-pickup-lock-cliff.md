@@ -3,6 +3,7 @@ id: 247
 title: Diagnose IntentionMomentum + floor-removal PickUp-lock cliff
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-08
 parked: null
 blocked-by: []

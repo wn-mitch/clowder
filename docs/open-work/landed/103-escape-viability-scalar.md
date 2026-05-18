@@ -3,6 +3,7 @@ id: 103
 title: escape_viability perception scalar — first-class predicate for adrenaline-valence gates
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

@@ -3,6 +3,7 @@ id: 260
 title: Fox scent-marking signposts — territorial boundaries without ward keying
 status: done
 cluster: wildlife
+initiative: [predator-prey-dynamics]
 added: 2026-05-10
 parked: null
 blocked-by: []

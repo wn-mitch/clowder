@@ -3,6 +3,7 @@ id: 122
 title: Socialize IAUS scoring elects plans the OpenMinded gate drops on the same tick
 status: done
 cluster: substrate-over-override
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

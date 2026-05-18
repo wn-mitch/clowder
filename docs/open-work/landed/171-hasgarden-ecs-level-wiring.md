@@ -3,6 +3,7 @@ id: 171
 title: Promote HasGarden to ECS-level singleton writer (parity with 168/169)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

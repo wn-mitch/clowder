@@ -3,6 +3,7 @@ id: 161
 title: Seed-42 colony collapse after ticket 158 — Bevy scheduler perturbation cascade
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-04
 parked: null
 blocked-by: []

@@ -3,6 +3,7 @@ id: 066
 title: Explore dominance over targeted leisure
 status: in-progress
 cluster: ai-substrate
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-04-20
 parked: 2026-04-21

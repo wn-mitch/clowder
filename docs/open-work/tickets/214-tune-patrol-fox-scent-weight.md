@@ -3,6 +3,7 @@ id: 214
 title: tune patrol_fox_scent_weight
 status: parked
 cluster: combat-threat
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-07
 parked: 2026-05-07

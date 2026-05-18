@@ -3,6 +3,7 @@ id: 035
 title: Burial — implement the §5 broaden-sideways capability so the continuity canary can pass
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-04-26
 parked: null
 blocked-by: []

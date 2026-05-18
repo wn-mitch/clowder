@@ -3,6 +3,7 @@ id: 109
 title: IntraspeciesConflictResponse — full four-valence (fight/flight/freeze/fawn) social response
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

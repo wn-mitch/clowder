@@ -3,6 +3,7 @@ id: 089
 title: Interoceptive self-anchors — spatial self-perception (OwnInjurySite, OwnSafeRestSpot)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-04-30
 parked: null
 blocked-by: []

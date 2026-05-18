@@ -3,6 +3,7 @@ id: 223
 title: cat paths respect fox-scent + corruption
 status: done
 cluster: pathfinder-risk-awareness
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

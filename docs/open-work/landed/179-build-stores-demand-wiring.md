@@ -3,6 +3,7 @@ id: 179
 title: ColonyStoresChronicallyFull → Build DSE consumer + Coordinator BuildStores directive (176 follow-on)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

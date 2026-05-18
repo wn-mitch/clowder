@@ -3,6 +3,7 @@ id: 175
 title: GoalUnreachable plan-failure root-cause investigation (172 follow-on)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

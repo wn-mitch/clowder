@@ -3,6 +3,7 @@ id: 146
 title: 088 BodyDistressPromotion courtship-coverage investigation
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-02
 parked: null
 blocked-by: []

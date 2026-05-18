@@ -4,7 +4,7 @@ title: extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce)
 status: ready
 cluster: ai-substrate
 orchestration: substrate-sensitive
-initiative: []
+initiative: [predator-prey-dynamics]
 added: 2026-05-13
 parked: null
 blocked-by: []

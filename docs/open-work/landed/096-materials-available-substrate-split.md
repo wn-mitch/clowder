@@ -3,6 +3,7 @@ id: 096
 title: Split `PlannerState.materials_available` into marker-backed entry + per-plan search field
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-04-30
 parked: null
 blocked-by: []

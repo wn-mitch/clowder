@@ -3,6 +3,7 @@ id: 093
 title: Substrate-over-override — retire control-yanking hacks in favor of IAUS levers
 status: done
 cluster: substrate-over-override
+initiative: []
 added: 2026-04-30
 parked: null
 blocked-by: []

@@ -2,7 +2,7 @@
 id: 2026-04-22
 title: "Phase 4c.1 — §6.5.1 `Socialize` target-taking DSE port"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: db7362b
 landed-on: 2026-04-22
 ---

@@ -2,7 +2,8 @@
 id: 068
 title: Folded into ticket 014
 status: dropped
-cluster: null
+cluster: ai-substrate
+initiative: []
 added: 2026-05-18
 parked: null
 blocked-by: []

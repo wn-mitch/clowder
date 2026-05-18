@@ -3,6 +3,7 @@ id: 250
 title: Demote BurialPerformed — move to neutral feature and remove from continuity canary set
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-08
 parked: null
 blocked-by: []

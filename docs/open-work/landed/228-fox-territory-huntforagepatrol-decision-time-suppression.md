@@ -3,6 +3,7 @@ id: 228
 title: cat route-cost field as L1 perception + Field Consideration variant
 status: done
 cluster: pathfinder-risk-awareness
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

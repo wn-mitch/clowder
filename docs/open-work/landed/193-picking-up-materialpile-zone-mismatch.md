@@ -3,6 +3,7 @@ id: 193
 title: PickingUp plan template routes to MaterialPile but eligibility latches on Carcass — 3302 unreachable plans / soak
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

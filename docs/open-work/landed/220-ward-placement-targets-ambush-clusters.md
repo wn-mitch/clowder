@@ -3,6 +3,7 @@ id: 220
 title: ward placement targets ambush clusters
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

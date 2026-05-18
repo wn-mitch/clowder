@@ -3,6 +3,7 @@ id: 253
 title: RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores
 status: ready
 cluster: ai-substrate
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-09
 parked: null

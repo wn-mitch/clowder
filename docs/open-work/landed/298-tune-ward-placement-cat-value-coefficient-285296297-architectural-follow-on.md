@@ -3,6 +3,7 @@ id: 298
 title: tune ward placement cat_value coefficient (285+296+297 architectural follow-on)
 status: done
 cluster: balance
+initiative: []
 added: 2026-05-12
 parked: null
 blocked-by: []

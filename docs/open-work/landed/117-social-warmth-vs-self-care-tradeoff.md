@@ -3,6 +3,7 @@ id: 117
 title: Characterize social-warmth max shift under 047 substrate (Phase 3 surfaced -96% on max)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

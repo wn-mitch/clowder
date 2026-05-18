@@ -3,6 +3,7 @@ id: 077
 title: anxiety-cadence root-cause investigation (no-op close)
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: 32e67f69
 landed-on: 2026-04-29
 ---

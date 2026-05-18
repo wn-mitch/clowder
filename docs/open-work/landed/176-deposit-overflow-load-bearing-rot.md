@@ -3,6 +3,7 @@ id: 176
 title: cats need real inventory reasoning — trash, build-more-stores, satiation-aware hunting
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

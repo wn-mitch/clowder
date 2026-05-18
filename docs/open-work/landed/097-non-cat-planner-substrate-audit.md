@@ -3,6 +3,7 @@ id: 097
 title: Audit fox / hawk / snake planners for the parallel-feasibility-language smell 092 retired for cats
 status: done
 cluster: ai-substrate
+initiative: [smarter-cats]
 added: 2026-04-30
 parked: null
 blocked-by: []

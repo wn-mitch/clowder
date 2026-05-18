@@ -2,7 +2,7 @@
 id: 2026-04-22
 title: "Phase 4c.6 — §6.5 per-DSE target-taking closeout: Groom-other + Hunt + Fight + ApplyRemedy + Build + `find_social_target` retirement"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: feedbac
 landed-on: 2026-04-22
 ---

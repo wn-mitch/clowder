@@ -2,7 +2,7 @@
 id: 2026-04-23
 title: "Phase 4b.5 — §4 colony-scoped marker batch: `HasFunctionalKitchen` + `HasRawFoodInStores` + `WardStrengthLow`"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-23
 ---

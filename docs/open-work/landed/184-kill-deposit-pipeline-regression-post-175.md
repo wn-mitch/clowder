@@ -3,6 +3,7 @@ id: 184
 title: Hunt kill→stockpile pipeline regressed under L3 bandwidth pressure (root cause - CanHunt over-gated on Injured)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

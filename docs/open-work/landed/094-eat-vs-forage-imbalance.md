@@ -3,6 +3,7 @@ id: 094
 title: Eat-vs-Forage IAUS imbalance — colony hauls food but doesn't consume it
 status: done
 cluster: substrate-over-override
+initiative: []
 landed-at: null
 landed-on: 2026-04-30
 ---

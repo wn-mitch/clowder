@@ -3,6 +3,7 @@ id: 154
 title: Extract Mentoring from Socializing — split DispositionKind so MentoredCat fires
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-03
 parked: null
 blocked-by: []

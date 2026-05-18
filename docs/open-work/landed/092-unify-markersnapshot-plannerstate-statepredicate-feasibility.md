@@ -3,6 +3,7 @@ id: 092
 title: Unify MarkerSnapshot ↔ PlannerState/StatePredicate feasibility languages
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: null
 landed-on: 2026-04-30
 ---

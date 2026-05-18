@@ -3,6 +3,7 @@ id: 188
 title: Handoff target-picker — pick the recipient cat at L2
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

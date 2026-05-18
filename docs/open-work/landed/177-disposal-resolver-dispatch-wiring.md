@@ -3,6 +3,7 @@ id: 177
 title: Wire Trash/Handoff/PickUp resolvers into GOAP dispatch (176 follow-on)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

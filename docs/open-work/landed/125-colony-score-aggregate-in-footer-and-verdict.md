@@ -3,6 +3,7 @@ id: 125
 title: Surface `ColonyScore.aggregate` in the footer and add numerical-delta gating to `just verdict`
 status: done
 cluster: tooling
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

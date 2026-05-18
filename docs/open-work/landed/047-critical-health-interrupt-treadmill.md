@@ -3,6 +3,7 @@ id: 047
 title: CriticalHealth interrupt is a treadmill, not a brake — replan picks the same disposition while damage accumulates
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-04-27
 parked: null
 blocked-by: []

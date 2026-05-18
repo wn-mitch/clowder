@@ -3,6 +3,7 @@ id: 121
 title: Cats stand around for ~1500 ticks at game start until first kitchen lands
 status: done
 cluster: substrate-over-override
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

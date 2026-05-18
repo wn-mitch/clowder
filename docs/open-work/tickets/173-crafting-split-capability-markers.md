@@ -3,6 +3,7 @@ id: 173
 title: IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on)
 status: parked
 cluster: ai-substrate
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-05
 parked: 2026-05-05

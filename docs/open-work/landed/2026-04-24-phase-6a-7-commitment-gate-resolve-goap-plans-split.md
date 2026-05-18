@@ -2,7 +2,7 @@
 id: 2026-04-24
 title: "Phase 6a §7 commitment gate + `resolve_goap_plans` split"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-24
 ---

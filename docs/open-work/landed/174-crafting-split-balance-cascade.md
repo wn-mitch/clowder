@@ -3,6 +3,7 @@ id: 174
 title: Balance hypothesis for the wards-and-kittens unblock cascade (155 follow-on)
 status: dropped
 cluster: balance
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

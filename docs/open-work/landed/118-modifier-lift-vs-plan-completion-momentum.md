@@ -3,6 +3,7 @@ id: 118
 title: Modifier lifts gated by plan-completion momentum — substrate raises score but cat completes mid-plan first
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

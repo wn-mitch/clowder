@@ -3,6 +3,7 @@ id: 225
 title: audit Patrol L3 share rise under additive coordinator-DSE lift
 status: ready
 cluster: ai-substrate
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-07
 parked: null

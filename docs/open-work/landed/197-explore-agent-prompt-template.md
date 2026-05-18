@@ -3,6 +3,7 @@ id: 197
 title: Explore-agent prompt template (194 P8, subsumes P6)
 status: done
 cluster: process-discipline
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

@@ -3,6 +3,7 @@ id: 185
 title: Extend PickingUp DSE on a HasGroundCarcass colony marker — emergent scavenging
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

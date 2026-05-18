@@ -3,6 +3,7 @@ id: 282
 title: Temporal-integration doctrine for perception signals — decay stale, accumulate sustained
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-11
 parked: null
 blocked-by: []

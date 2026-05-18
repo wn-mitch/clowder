@@ -2,7 +2,7 @@
 id: 2026-04-22
 title: "Phase 4b.4 — §4 `HasGarden` marker port"
 status: done
-cluster: null
+cluster: ai-substrate
 landed-at: null
 landed-on: 2026-04-22
 ---

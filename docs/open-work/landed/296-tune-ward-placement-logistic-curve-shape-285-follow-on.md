@@ -3,6 +3,7 @@ id: 296
 title: tune ward placement Logistic curve shape (285 follow-on)
 status: done
 cluster: balance
+initiative: []
 added: 2026-05-12
 parked: null
 blocked-by: []

@@ -2,7 +2,8 @@
 id: 014
 title: Phase 4 follow-ons closeout
 status: done
-cluster: null
+cluster: ai-substrate
+initiative: []
 landed-at: 453ea83
 landed-on: 2026-04-27
 ---

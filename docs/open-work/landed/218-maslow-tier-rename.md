@@ -3,6 +3,7 @@ id: 218
 title: Rename Maslow `Level N` → `Tier N` to disambiguate from substrate `L1/L2/L3`
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

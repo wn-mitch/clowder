@@ -3,6 +3,7 @@ id: 169
 title: Author HasConstructionSite + HasDamagedBuilding markers (buildings.rs)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-05
 parked: null
 blocked-by: []

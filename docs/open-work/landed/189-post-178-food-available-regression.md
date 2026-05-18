@@ -3,6 +3,7 @@ id: 189
 title: Post-178 food_available regression — layer-walk diagnosis
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-06
 parked: null
 blocked-by: []

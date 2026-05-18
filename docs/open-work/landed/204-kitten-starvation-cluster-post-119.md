@@ -3,6 +3,7 @@ id: 204
 title: Kitten-starvation cluster surfaced by 119 substrate activation — bonding/mating cascade vs adult-feeding bandwidth
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-07
 parked: null
 blocked-by: []

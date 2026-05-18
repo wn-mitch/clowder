@@ -3,6 +3,7 @@ id: 284
 title: tune ward placement ambush + carcass anchor weights
 status: done
 cluster: balance
+initiative: []
 added: 2026-05-11
 parked: null
 blocked-by: []

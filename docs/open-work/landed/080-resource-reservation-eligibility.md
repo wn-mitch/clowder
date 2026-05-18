@@ -3,6 +3,7 @@ id: 080
 title: Resource reservation — Reserved component + EligibilityFilter::require_unreserved
 status: done
 cluster: planning-substrate
+initiative: []
 added: 2026-04-29
 parked: null
 blocked-by: [072]

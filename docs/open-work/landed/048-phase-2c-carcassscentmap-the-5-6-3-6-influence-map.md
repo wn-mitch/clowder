@@ -3,6 +3,7 @@ id: 048
 title: "Phase 2C CarcassScentMap, the §5.6.3 #6 influence map"
 status: done
 cluster: belief-perception
+initiative: []
 landed-at: 405740b7
 landed-on: 2026-04-27
 ---

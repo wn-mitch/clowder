@@ -2,7 +2,8 @@
 id: 072
 title: plan_substrate module extraction (refactor)
 status: done
-cluster: null
+cluster: ai-substrate
+initiative: []
 landed-at: dd527fd7
 landed-on: 2026-04-29
 ---

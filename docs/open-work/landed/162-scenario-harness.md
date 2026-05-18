@@ -3,6 +3,7 @@ id: 162
 title: Scenario harness — fast deterministic "what wins" experiments for AI decision triage
 status: done
 cluster: tooling
+initiative: []
 added: 2026-05-04
 parked: null
 blocked-by: []

@@ -3,6 +3,7 @@ id: 297
 title: ward placement needs fox-patrol-topology perception axis (285 follow-on)
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-12
 parked: null
 blocked-by: []

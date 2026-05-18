@@ -3,6 +3,7 @@ id: 2026-04-22
 title: Phase 4a — softmax-over-Intentions + §3.5 modifier port + Adult-window retune
 status: done
 cluster: ai-substrate
+initiative: []
 landed-at: c4552dc
 landed-on: 2026-04-22
 ---

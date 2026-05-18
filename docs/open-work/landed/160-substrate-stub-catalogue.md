@@ -3,6 +3,7 @@ id: 160
 title: Substrate stub catalogue + lint — fail the build on orphan markers
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-04
 parked: null
 blocked-by: []

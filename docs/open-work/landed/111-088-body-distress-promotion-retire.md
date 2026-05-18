@@ -3,6 +3,7 @@ id: 111
 title: Retire 088 BodyDistressPromotion once kind-specific modifiers cover its surface
 status: done
 cluster: ai-substrate
+initiative: []
 added: 2026-05-01
 parked: null
 blocked-by: []

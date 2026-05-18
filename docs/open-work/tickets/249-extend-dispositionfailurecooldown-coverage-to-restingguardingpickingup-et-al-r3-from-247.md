@@ -3,6 +3,7 @@ id: 249
 title: Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247)
 status: parked
 cluster: ai-substrate
+initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-08
 parked: 2026-05-09
