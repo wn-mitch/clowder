@@ -66,8 +66,9 @@ The refinery:
 - Runs `jj git fetch` to refresh origin bookmarks (ticket 409: prevents stale-local-view masking a polecat's push)
 - Rebases `session/<slug>` onto current `main` (if behind)
 - Advances `main` to the session's head
+- Runs `just land <id> --commit "..."` once per ticket the session claimed (ticket 409 R7: refinery is the single writer of the bookkeeping commits — frontmatter flip + landed-at backfill + index regen — so concurrent polecat sessions can never race on `main`)
 - Forgets `session/<slug>`
-- Calls `session-done.sh <slug> --no-release` to clean up the workspace (the tickets were already set to `done` via `just land` inside the session)
+- Calls `session-done.sh <slug> --no-release` to clean up the workspace
 
 If the rebase has conflicts, the refinery aborts and names the conflict. Resolve in the session's workspace (`cd ~/clowder-sessions/<slug>`), commit, push, retry.
 
@@ -133,7 +134,7 @@ The master Claude session at `~/clowder` is the foreman. Each polecat is a `clau
 The polecat is given a stricter prompt than `session-new --print-prompt` (which is for human sessions). It's instructed to:
 - Never ask the user a question. If anything's ambiguous, abandon and log via `/agent-feedback`, exit without pushing.
 - Run `just check && just test` before pushing. If they fail, abandon — never commit broken state.
-- Exit ceremony: `just check && just test` → `jj describe -m "..."` → `just land <id>` → `jj git push --bookmark session/<slug> --allow-new` → print `polecat-done: <slug>` and exit.
+- Exit ceremony: `just check && just test` → `jj describe -m "..."` → `jj git push --bookmark session/<slug> --allow-new` → verify the push reached origin → print `polecat-done: <slug>` and exit. Polecats no longer run `just land <id>` themselves — the master refinery is the single writer of the bookkeeping commits (ticket 409: prevents concurrent main-bookmark advances).
 
 ### The `[foreman]` recipe group
 

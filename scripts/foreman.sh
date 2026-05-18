@@ -179,6 +179,9 @@ Constraints (load-bearing):
   abandon: print "polecat-abandoned: $slug <one-line reason>" to stdout and
   exit immediately. Do not push the bookmark.
 - Stay on session/$slug. Never touch main; never edit other bookmarks.
+- DO NOT run \`just land\` — the master refinery owns ticket-status flip
+  and index regen after your bookmark lands. Polecats that run \`just
+  land\` race each other on the shared main bookmark (ticket 409).
 - Swarm-safe scope only: docs / frontmatter / mechanical refactor / atomic
   work with an already-verified layer-walk. If you discover this work
   actually requires substrate-sensitive judgment (a layer-walk row marked
@@ -223,13 +226,13 @@ Reason: abandoning at prompt-read time burns ~1 minute; abandoning after
 Exit ceremony (non-optional, in this exact order):
   1. Run \`just check && just test\` inside this workspace. If either fails,
      abandon (do NOT proceed to step 2).
-  2. Commit your work with jj (jj describe -m "<conventional message>"
-     references ticket $tid).
-  3. Run \`just land $tid\` to flip the ticket to status: done and
-     regenerate docs/open-work.md.
-  4. \`jj git push --bookmark session/$slug --allow-new\` (the master
+  2. Commit your work with jj (\`jj describe -m "<conventional message>"\`
+     references ticket $tid). DO NOT run \`just land\` — the master
+     refinery handles ticket-status flip + index regen after your
+     bookmark lands (ticket 409: prevents concurrent main-bookmark races).
+  3. \`jj git push --bookmark session/$slug --allow-new\` (the master
      refinery picks up bookmarks from here).
-  5. Print "polecat-done: $slug ticket-$tid" to stdout and exit.
+  4. Print "polecat-done: $slug ticket-$tid" to stdout and exit.
 
 If you abandon at any point, print "polecat-abandoned: $slug <reason>"
 and exit WITHOUT pushing the bookmark. The master foreman will detect

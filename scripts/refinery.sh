@@ -221,12 +221,55 @@ land() {
         }
     fi
 
-    # Move main to the session's head (no merge commit — fast-forward style)
+    # Move main to the session's head (no merge commit — fast-forward style).
+    # This carries the polecat's feature commit(s) onto main but does NOT
+    # yet flip ticket frontmatter — R7 (ticket 409) makes refinery the
+    # single writer of the bookkeeping commits, not the polecat.
     jj bookmark set main -r "bookmarks(\"$bm\")" --allow-backwards >/dev/null 2>&1 || {
         echo "ERROR: failed to advance main to $bm" >&2
         exit 1
     }
     echo "refinery: main advanced to $bm head"
+
+    # R7 (ticket 409): polecats no longer run `just land <tid>` inside
+    # their workspace (that produced N concurrent main-bookmark advances →
+    # divergent heads in the 2026-05-17 batch). Refinery is now the single
+    # writer: position @ on top of the session tip, then run `just land
+    # <tid> --commit ...` for each ticket the session claimed. Each call
+    # produces 2 stable commits (frontmatter flip + landed-at backfill)
+    # plus an empty @, then we advance main to @-.
+    local info_file="$SESSIONS_ROOT/$slug/.session-info.json"
+    if [[ -f "$info_file" ]]; then
+        local ticket_ids
+        ticket_ids=$(python3 -c "
+import json, sys
+print(' '.join(str(t) for t in json.load(open(sys.argv[1])).get('tickets', [])))
+" "$info_file" 2>/dev/null || echo "")
+        local tid
+        for tid in $ticket_ids; do
+            [[ -z "$tid" ]] && continue
+            echo "refinery: running 'just land $tid --commit ...' from master workspace"
+            # Move @ to a fresh empty child of main so just-land's file edits
+            # land on top of main, not in some unrelated working copy.
+            jj new main -m '(working copy)' >/dev/null 2>&1 || {
+                echo "ERROR: failed to position working copy on main for 'just land $tid'" >&2
+                exit 1
+            }
+            if ! just land "$tid" --commit "docs: land $tid (refinery, after session/$slug)"; then
+                echo "ERROR: 'just land $tid' failed after main advance — manual fix required" >&2
+                echo "       main is at $bm tip; ticket $tid frontmatter is unflipped." >&2
+                echo "       Re-run 'just land $tid --commit \"docs: land $tid\"' manually." >&2
+                exit 1
+            fi
+            # just-land --commit ended with empty @; @- is the backfill
+            # commit. Advance main to it so the next ticket (if any) lands
+            # on top, and so the final main carries the bookkeeping.
+            jj bookmark set main -r @- --allow-backwards >/dev/null 2>&1 || {
+                echo "ERROR: failed to advance main past 'just land $tid' bookkeeping" >&2
+                exit 1
+            }
+        done
+    fi
 
     # Forget the session bookmark
     jj bookmark forget "$bm"
