@@ -1,7 +1,7 @@
 ---
 id: 399
 title: L2 ParentingActivity — express non-primary-caretaker parent roles per §7.M.2 (design)
-status: ready
+status: done
 cluster: social-coordination
 initiative: [smarter-cats, htn-method-composition]
 added: 2026-05-17
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-17
 ---
 
 ## Why
@@ -151,17 +151,91 @@ a parameter tuning.
    - Event-driven (partner death drops provisioner role; grief
      cascade per §7.7.b)?
 
-## Scope (after design questions resolve)
+## Scope (resolved 2026-05-17)
 
-Choose one shape from §"Design open questions" and implement:
+Design ticket — the ## Scope below records the resolved substrate shape.
+Implementation ships in **ticket 400** (`L2 ParentingActivity —
+implementation per 399 design`), blocked-by this design ticket.
 
-- The substrate Component / Aspiration / Marker that holds role state.
-- The personality → role mapping (pure-function or system).
-- The modifier(s) in `src/ai/modifier.rs` that bias DSE weights by
-  role × personality (mirroring `JointIntention`'s bias pattern).
-- Lifecycle adoption + drop (where appropriate, alongside or in place
-  of `adopt_kinship_aspiration`).
-- L2 trace records so the role is visible in focal-cat traces.
+### Resolved substrate shape
+
+- `ParentingActivity` Component carrying `Vec<RelationshipTo>` where each
+  entry has `(target, kind, bond_strength, parental_engagement, partner,
+  entered_tick, last_interaction_tick)`. Lifelong per cat (only
+  self-death terminates); persists through kitten maturity (engagement
+  decays to ~0.15× residual), kitten death (frustrated target-taking =
+  grief texture), and partner death (partner→None, re-asymptote from own
+  Personality).
+- `ParentalKind` enum: `Biological` + `InLaw` ship in 400; `BondFormed`
+  (ticket 403) and `Adopted` (ticket 404) declared but unwired.
+- 5-scale composition serving DOUBLE duty as both engagement-asymptote
+  inputs AND bias-output dimensions:
+  - **Presence** (compassion + warmth) → lifts `caretake_bias`
+  - **Provision** (diligence + loyalty) → lifts `provision_bias` (Hunt)
+  - **Protection** (boldness + temper) → lifts `protect_bias` (Patrol);
+    anxiety modulates target-taking to flight-flavor for helicopter
+    archetypes
+  - **Cultural commitment** (tradition + ambition) → lifts
+    `cultural_teach_bias`; also boosts RitualWitness rate (when ritual
+    substrate ships in 405)
+  - **Autonomy-fostering** (curiosity + patience + (1 - overprotection))
+    → lifts `autonomy_teach_bias`; suppresses overcontrol
+- Asymptote weights lean toward Presence per values stance: `W_N=0.30,
+  W_D=0.20, W_P=0.20, W_C=0.15, W_A=0.15` (starting point; 408 balance-
+  tunes).
+- L1 adoption gate change: drop `is_mother` (sex) gate at
+  `src/systems/aspirations.rs:856-916`; widen to `Has<Parent>` (any sex).
+- L2 modifier replaces uniform `AspirationLift(+0.2 Caretake)` with the
+  new personality-conditional `ParentingActivityModifier`.
+- Corner-case mitigation: JointIntention-aware suppression — if partner
+  has `HeldIntention(Caretake, target ∈ my dependents)`, my
+  `caretake_bias ×= 0.3` (substrate-side coordination; resolves the
+  two-high-compassion-parents HandoffItem cascade).
+- InLaw adoption rule (~30 lines, ships in 400): on
+  `JointIntention.stage` transition to `Bonded`, mirror InLaw
+  RelationshipTo entries on each partner's biological parents toward the
+  other partner.
+
+### Design notes (philosophical)
+
+Values stance encoded in substrate (deliberate, not accidental):
+asymptote weights lean toward Presence per user's stance "you can be
+hard working but your kids need presence too." Hard-working union man
+lands at moderate-low engagement (~0.45), NOT full engagement —
+visibly different from a partner who scores high on presence. This
+diverges slightly from §7.M.2's spec text (symmetric provisioner-role)
+and that divergence is conscious.
+
+Parenthood is encoded as a **relational stance, not a biological fact**
+(Biological / InLaw / BondFormed / Adopted are first-class kinds; biology
+is one strong trigger, not the only one). **Lifecycle endings preserve
+substrate state, not destroy it** (kitten death → persistent state with
+frustrated target-taking IS grief).
+
+### Plan file
+
+Complete substrate-shape design, implementation phases, formula text,
+file modification list, tuning constants, verification commands, and
+philosophical notes live at
+`/Users/will.mitchell/.claude/plans/let-s-start-399-i-m-jaunty-dawn.md`.
+
+### Follow-on tickets opened with this design (all blocked-by 400)
+
+- **400** — L2 ParentingActivity — implementation per 399 design
+  (blocked-by 399)
+- **401** — Hunt target-axis toward partner_Stores_proximity
+- **402** — Patrol target-axis toward nest_proximity + anxiety
+  flight-flavor
+- **403** — BondFormed parental adoption (mythic-texture canary
+  contributor)
+- **404** — Adopted parental adoption (orphan integration;
+  mythic-texture canary contributor)
+- **405** — Family ritual substrate (RitualKind + RitualWitness +
+  bond-multiplier transmission)
+- **406** — Mastery substrate (enables teach_skill_bias)
+- **407** — §7.7.b grief cascade proper (builds on 400 persistence
+  foundation)
+- **408** — Parental engagement asymptote weights — balance tuning
 
 ## Out of scope
 
@@ -209,6 +283,16 @@ Once implementation lands:
 - Pebblekit-67-equivalent kittens still survive (398's survival gate
   intact under the new substrate).
 
+## Related work
+
+<!-- linkages:start -->
+<!-- generated by `just similar-link-report` on 2026-05-17 — review and prune; pairs above threshold that aren't already cross-referenced. -->
+
+- · **159** (ready, life-cycle, score 0.87 (cross-cluster)) — Parent grief consumer for kitten / dependent death
+- · **  1** (in-progress, ai-substrate, score 0.86 (cross-cluster)) — Explore dominance over targeted leisure
+- ✓ landed ** 90** (done, ai-substrate, score 0.86 (cross-cluster)) — L4/L5 self-perception — mastery-confidence, purpose-clarity, esteem-distress
+
+<!-- linkages:end -->
 ## Log
 
 - 2026-05-17: opened as a 398 follow-on after the mother-only L1
@@ -217,3 +301,18 @@ Once implementation lands:
   anchors ("hard working union man," "left to go get cigarettes")
   ground the design space. Framing: this is an expression-design
   question, not a bug.
+- 2026-05-17: design conversation resolved 8 topics (L1 adoption gate,
+  bias-axis composition, binary-to-gradient promotions, target-taking
+  refinements, lifecycle/grief boundary, alloparenting scope, "the
+  mess" archetype handling, family ritual substrate scope). Final
+  substrate shape recorded in `## Scope`. Implementation lands in
+  ticket 400; eight further follow-on tickets (401-408) opened
+  blocked-by 400. Plan file at
+  `/Users/will.mitchell/.claude/plans/let-s-start-399-i-m-jaunty-dawn.md`.
+  User stance: parenthood is a relational stance (not biology);
+  presence-gates-dedication in engagement; lifecycle endings preserve
+  state with frustrated expression. Memories saved for: concept words
+  ground in mechanical substrate, kin-mechanisms generalize to bonds,
+  substrate encodes user's morals, lifecycle endings preserve state,
+  parenthood is relational stance, BondFormed/Adopted are
+  mythic-texture canary contributors.
