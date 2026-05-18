@@ -232,7 +232,20 @@ Exit ceremony (non-optional, in this exact order):
      bookmark lands (ticket 409: prevents concurrent main-bookmark races).
   3. \`jj git push --bookmark session/$slug --allow-new\` (the master
      refinery picks up bookmarks from here).
-  4. Print "polecat-done: $slug ticket-$tid" to stdout and exit.
+  4. Verify your push reached origin BEFORE printing done (ticket 409 R4
+     — collapses silent-done-with-no-push to explicit-abandon):
+     a. \`jj log -r "main..session/$slug" --no-graph -T 'change_id ++ "\n"'\`
+        must print ≥1 line. If it prints nothing, your commit isn't on
+        the bookmark — abandon.
+     b. \`jj git push --dry-run --bookmark session/$slug\` must report
+        "Nothing changed" / "already pushed" (re-running the push as a
+        no-op confirms origin agrees with local). If it reports new work
+        to push or errors, abandon.
+     If either check fails, print "polecat-abandoned: $slug push-failed"
+     and exit WITHOUT printing polecat-done. The master foreman will
+     archive your workspace via archive_abandoned_polecat + session_done.
+  5. Only if step 4 passes: print "polecat-done: $slug ticket-$tid" to
+     stdout and exit.
 
 If you abandon at any point, print "polecat-abandoned: $slug <reason>"
 and exit WITHOUT pushing the bookmark. The master foreman will detect
