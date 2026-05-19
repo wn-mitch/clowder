@@ -1,7 +1,7 @@
 ---
 id: 142
 title: IntraspeciesConflictResponseFreeze — hold-position low-body-posture social valence
-status: ready
+status: done
 cluster: combat-threat
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 1a085bc0
+landed-on: 2026-05-19
 ---
 
 ## Why

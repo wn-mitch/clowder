@@ -1,7 +1,7 @@
 ---
 id: 170
 title: HideEligible authoring system (Hide DSE Phase 2)
-status: ready
+status: done
 cluster: combat-threat
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 31029c03
+landed-on: 2026-05-19
 ---
 
 ## Why

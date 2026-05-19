@@ -1,7 +1,7 @@
 ---
 id: 268
 title: Hide DSE — wire C3 Belief + ActionAffordance for general threat-response (door-slam scenario)
-status: ready
+status: done
 cluster: combat-threat
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: c4c95b2d
+landed-on: 2026-05-19
 ---
 
 ## Why
