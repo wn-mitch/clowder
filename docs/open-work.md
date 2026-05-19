@@ -8,17 +8,17 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-05-18._
+_Last generated: 2026-05-19._
 
 ## Summary
 
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 113 |
+| Ready | 118 |
 | Parked | 14 |
-| Blocked | 36 |
-| **Open total** | **167** |
+| Blocked | 32 |
+| **Open total** | **168** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -39,8 +39,8 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.91_
+- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
 - **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
 
@@ -63,11 +63,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (113)
+## Ready by cluster (118)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (31 ready, 6 blocked)
+### ai-substrate (32 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -99,11 +99,15 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · added 2026-05-17_
 - **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · added 2026-05-17_
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
+- **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 
-### social-coordination (15 ready, 7 blocked)
+### social-coordination (18 ready, 4 blocked)
 
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
+- **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[social-coordination] · added 2026-05-07_
+- **[215](docs/open-work/tickets/215-tune-tension-defusion-groom-weight.md)** — tune tension_defusion_groom_weight — _[social-coordination] · added 2026-05-07_
+- **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[social-coordination] · added 2026-05-07_
 - **[274](docs/open-work/tickets/274-co-mentoring-practice-on-jointintention-substrate.md)** — Co-mentoring practice on JointIntention substrate — _[social-coordination] · added 2026-05-11_
 - **[275](docs/open-work/tickets/275-joint-cache-stocking-practice-on-jointintention-substrate.md)** — Joint cache-stocking practice on JointIntention substrate — _[social-coordination] · added 2026-05-11_
 - **[276](docs/open-work/tickets/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) — _[social-coordination] · added 2026-05-11_
@@ -207,11 +211,12 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
 
-### tooling-diagnostics-ui (3 ready)
+### tooling-diagnostics-ui (4 ready)
 
 - **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
+- **[417](docs/open-work/tickets/417-haiku-enrichment-for-logq-envelope.md)** — Haiku enrichment for logq envelope — _[tooling-diagnostics-ui] · added 2026-05-19_
 
 ## Ready by initiative (79 tag-memberships across 9 initiatives)
 
@@ -323,7 +328,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (113)
+## Ready (118)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -356,6 +361,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[200](docs/open-work/tickets/200-land-plannerzonemidden-building-singleton-zone-for-trashing.md)** — Land PlannerZone::Midden — building-singleton zone for Trashing — _[buildings-zones] · added 2026-05-06_
 - **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
 - **[205](docs/open-work/tickets/205-social-status-distress-perception-cost.md)** — social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan — _[ai-substrate] · added 2026-05-07_
+- **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[social-coordination] · added 2026-05-07_
+- **[215](docs/open-work/tickets/215-tune-tension-defusion-groom-weight.md)** — tune tension_defusion_groom_weight — _[social-coordination] · added 2026-05-07_
+- **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[social-coordination] · added 2026-05-07_
 - **[217](docs/open-work/tickets/217-scenario-marker-snapshot-wiring-as-a-discipline-requirement.md)** — scenario marker-snapshot wiring as a discipline requirement — _[process-discipline] · added 2026-05-07_
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · added 2026-05-07_
 - **[225](docs/open-work/tickets/225-audit-patrol-l3-share-rise-under-additive-coordinator-dse-lift.md)** — audit Patrol L3 share rise under additive coordinator-DSE lift — _[ai-substrate] · added 2026-05-07_
@@ -436,8 +444,10 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
+- **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
+- **[417](docs/open-work/tickets/417-haiku-enrichment-for-logq-envelope.md)** — Haiku enrichment for logq envelope — _[tooling-diagnostics-ui] · added 2026-05-19_
 
 ## Parked (14)
 
@@ -447,7 +457,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[items-crafting] · parked 2026-04-30 · added 2026-04-29_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[tooling-diagnostics-ui] · parked 2026-05-06 · added 2026-05-06_
 - **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[life-cycle] · parked 2026-05-10 · added 2026-05-07_
-- **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[combat-threat] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
+- **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[combat-threat] · parked 2026-05-07 · added 2026-05-07_
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _[ai-substrate] · parked 2026-05-09 · added 2026-05-08_
 - **[273](docs/open-work/tickets/273-caretake-plans-complete-but-kittenfed-never-fires-kitten-starvation-chronic.md)** — Caretake plans complete but KittenFed never fires — kitten starvation chronic — _[life-cycle] · parked 2026-05-11 · added 2026-05-11_
 - **[342](docs/open-work/tickets/342-phase-2-unordered-method-bodies-partial-order.md)** — Phase-2 :unordered method bodies + partial-order — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
@@ -456,7 +466,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
 
-## Blocked (36)
+## Blocked (32)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -470,9 +480,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[social-coordination] · blocked-by 057 · added 2026-05-02_
 - **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[ai-substrate] · blocked-by 139 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[combat-threat] · blocked-by 145 · added 2026-05-02_
-- **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[social-coordination] · blocked-by 209 · added 2026-05-07_
-- **[215](docs/open-work/tickets/215-tune-tension-defusion-groom-weight.md)** — tune tension_defusion_groom_weight — _[social-coordination] · blocked-by 209 · added 2026-05-07_
-- **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[social-coordination] · blocked-by 209 · added 2026-05-07_
 - **[243](docs/open-work/tickets/243-behavior-observation-l1-channel-target-side-body-cue-physical-marker-reads.md)** — Behavior-observation L1 channel (target-side body-cue + physical marker reads) — _[belief-perception] · blocked-by 242 · added 2026-05-08_
 - **[245](docs/open-work/tickets/245-ambient-predatorprey-behavior-observation-enrichment.md)** — Ambient predator/prey behavior-observation enrichment — _[wildlife] · blocked-by 243 · added 2026-05-08_
 - **[262](docs/open-work/tickets/262-audible-cue-range-falloff-modeling-distance-attenuation-for-alarm-calls-and-distress-cries.md)** — Audible-cue range falloff modeling — distance attenuation for alarm calls and distress cries — _[belief-perception] · blocked-by 244 · added 2026-05-10_
@@ -493,7 +500,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[390](docs/open-work/tickets/390-fate-seeded-prophecy-from-generated-history.md)** — Fate-seeded prophecy from generated history — _[magic-mythic] · blocked-by 388 · added 2026-05-16_
 - **[391](docs/open-work/tickets/391-narrative-template-historical-reference-pre-sim-figures-cited-in-first-sim-week.md)** — Narrative-template historical reference (pre-sim figures cited in first sim-week) — _[magic-mythic] · blocked-by 387, 388 · added 2026-05-16_
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
-- **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 
 ## Landed archive (277)
 
