@@ -77,6 +77,12 @@ q *ARGS:
 test-logq:
     python3 tests/logq/test_envelope.py -v
 
+# Ticket 417: scripts/llm/claude_client — headless `claude` CLI wrapper
+# for presenter-layer enrichment. All subprocess calls mocked; no live
+# network. Same stdlib-unittest pattern as test-logq.
+test-llm:
+    python3 tests/llm/test_claude_client.py -v
+
 # Ticket 125: verdict's colony_score_drift channel — bucket boundaries
 # + escalation logic + per-field shape. Same stdlib-unittest pattern as
 # test-logq. Ticket 396 adds the plan-failure canary test set.
