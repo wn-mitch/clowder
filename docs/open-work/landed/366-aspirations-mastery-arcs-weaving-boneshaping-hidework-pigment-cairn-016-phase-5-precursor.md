@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: pending
+landed-at: 9d41d3ebc5cf
 landed-on: 2026-05-18
 ---
 
