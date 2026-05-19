@@ -4,6 +4,7 @@ use rand::Rng;
 use crate::components::magic::{Inventory, MisfireEffect, Ward, WardKind};
 use crate::components::mental::Mood;
 use crate::components::physical::{Health, Position};
+use crate::components::recipe::CraftedItem;
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
@@ -15,8 +16,11 @@ use crate::steps::StepResult;
 ///
 /// **Real-world effect** — on first tick, rolls a misfire check;
 /// on completion, consumes a Thornbriar herb from inventory and
-/// spawns a `Ward` entity at the actor's position. Grows magic
-/// skill.
+/// spawns a `Ward` entity at the actor's position with a
+/// `CraftedItem` provenance Component (ticket 365 — 016 Phase 1a:
+/// wards are crafted-item world entities, first member of the
+/// WorldPosition-destination recipe family that Phase 4
+/// decorations extend). Grows magic skill.
 ///
 /// **Plan-level preconditions** — emitted by the magic planner
 /// for ward-placement DSEs.
@@ -59,6 +63,7 @@ pub fn resolve_set_ward(
     // validation can isolate the directive-driven subset that the
     // ticket-301 structural change actually shifts.
     via_directive: bool,
+    crafter: Option<Entity>,
 ) -> StepResult {
     if ticks >= m.set_ward_duration.ticks(time_scale) {
         // Consume thornbriar if setting a thornward.
@@ -81,8 +86,20 @@ pub fn resolve_set_ward(
                     return StepResult::Fail("misfire: fizzle".into());
                 }
                 if matches!(misfire, MisfireEffect::InvertedWard) {
-                    // Spawn inverted ward instead.
-                    commands.spawn((Ward::inverted_at(kind), Position::new(pos.x, pos.y)));
+                    // Spawn inverted ward instead. Carries CraftedItem
+                    // even though the misfire path produced an inverted
+                    // outcome — the cat still performed the craft work,
+                    // and provenance attribution matters for the
+                    // narrative layer.
+                    commands.spawn((
+                        Ward::inverted_at(kind),
+                        Position::new(pos.x, pos.y),
+                        CraftedItem {
+                            recipe: ward_recipe_id(kind),
+                            crafter,
+                            crafted_at_tick: tick,
+                        },
+                    ));
                     return StepResult::Advance;
                 }
             }
@@ -97,7 +114,15 @@ pub fn resolve_set_ward(
             ward.decay_rate = m.thornward_decay_rate.per_tick(time_scale);
         }
         let spawn_strength = ward.strength;
-        commands.spawn((ward, Position::new(pos.x, pos.y)));
+        commands.spawn((
+            ward,
+            Position::new(pos.x, pos.y),
+            CraftedItem {
+                recipe: ward_recipe_id(kind),
+                crafter,
+                crafted_at_tick: tick,
+            },
+        ));
         if let Some(elog) = event_log {
             elog.push(
                 tick,
@@ -140,5 +165,96 @@ pub fn resolve_set_ward(
         StepResult::Advance
     } else {
         StepResult::Continue
+    }
+}
+
+/// Recipe id for a ward kind (ticket 365 — 016 Phase 1a). One
+/// recipe per WardKind. Mirrors `RemedyKind::recipe_id`. Used by
+/// `resolve_set_ward` to attach `CraftedItem` provenance and by
+/// `populate_recipe_registry` to register the catalog entries.
+pub fn ward_recipe_id(kind: WardKind) -> crate::components::recipe::RecipeId {
+    use crate::components::recipe::RecipeId;
+    match kind {
+        WardKind::Thornward => RecipeId("ward.thornward"),
+        WardKind::DurableWard => RecipeId("ward.durable"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::magic::HerbKind;
+    use crate::components::recipe::CraftedItem;
+    use crate::resources::sim_constants::SimConstants;
+    use bevy_ecs::system::SystemState;
+    use rand::SeedableRng;
+
+    fn time_scale() -> TimeScale {
+        TimeScale::from_config(&crate::resources::time::SimConfig::default(), 16.6667)
+    }
+
+    #[test]
+    fn thornward_spawn_carries_crafted_item_provenance() {
+        let mut world = World::new();
+        let mut state: SystemState<Commands> = SystemState::new(&mut world);
+
+        let constants = SimConstants::default();
+        let m = &constants.magic;
+        let combat = &constants.combat;
+        let ts = time_scale();
+
+        let mut inventory = Inventory::default();
+        inventory.add_herb(HerbKind::Thornbriar);
+        let mut skills = Skills::default();
+        let mut mood = Mood::default();
+        let mut corruption = Corruption(0.0);
+        let mut health = Health::default();
+        let pos = Position::new(3, 4);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
+        let magic_aff = MagicAffinity(0.0);
+        let mut log = NarrativeLog::default();
+        let crafter = world.spawn_empty().id();
+
+        let required = m.set_ward_duration.ticks(&ts);
+        let mut commands = state.get_mut(&mut world);
+        let result = resolve_set_ward(
+            required,
+            WardKind::Thornward,
+            "Sage",
+            &mut inventory,
+            &magic_aff,
+            &mut skills,
+            &mut mood,
+            &mut corruption,
+            &mut health,
+            &pos,
+            &mut rng,
+            &mut commands,
+            &mut log,
+            None, // no event log
+            500,  // tick
+            m,
+            combat,
+            &ts,
+            false,         // via_directive
+            Some(crafter), // 365: crafter provenance
+        );
+        state.apply(&mut world);
+
+        assert!(matches!(result, StepResult::Advance));
+        assert!(!inventory.has_herb(HerbKind::Thornbriar));
+
+        let mut found = 0_u32;
+        let mut q = world.query::<(&Ward, &Position, &CraftedItem)>();
+        for (ward, ward_pos, ci) in q.iter(&world) {
+            assert_eq!(ward.kind, WardKind::Thornward);
+            assert_eq!(ward_pos.x, pos.x);
+            assert_eq!(ward_pos.y, pos.y);
+            assert_eq!(ci.recipe, ward_recipe_id(WardKind::Thornward));
+            assert_eq!(ci.crafter, Some(crafter));
+            assert_eq!(ci.crafted_at_tick, 500);
+            found += 1;
+        }
+        assert_eq!(found, 1, "exactly one ward spawned with CraftedItem");
     }
 }

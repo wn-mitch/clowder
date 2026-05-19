@@ -283,7 +283,7 @@ pub fn register_influence_maps_at_startup(mut registry: ResMut<InfluenceMapRegis
 /// runtime mechanic stay on their own resolvers per `crafting.md`'s
 /// "crafting is an umbrella category" framing.
 pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
-    use crate::components::magic::RemedyKind;
+    use crate::components::magic::{RemedyKind, WardKind};
     use crate::components::recipe::{
         DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeInput, RecipeOutput,
         StationRequirement,
@@ -335,6 +335,55 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             },
         });
     }
+
+    // 365 Commit 3 — wards. Thornward consumes one Thornbriar
+    // herb at the actor's chosen perimeter position; DurableWard
+    // is the magic-specialist variant (no herb input — magic
+    // skill carries the cost). Both spawn world-position entities
+    // tagged with CraftedItem. Output's item_kind reuses the
+    // input herb for Thornward (the input determines the spell
+    // type — there's no separate "Thornward" ItemKind because
+    // the produced entity is a `Ward` Component, not an `Item`);
+    // for DurableWard with no herb input we use a placeholder
+    // ItemKind that the output-destination machinery doesn't
+    // currently consult. Future tooling that queries recipe
+    // outputs for "what entity to spawn" will key on the
+    // destination + RecipeId, not the placeholder ItemKind.
+    let set_ward_ticks = m.set_ward_duration.ticks(&time_scale);
+    registry.insert(Recipe {
+        id: crate::steps::magic::ward_recipe_id(WardKind::Thornward),
+        discipline: DisciplineKind::Herbalism,
+        inputs: vec![RecipeInput {
+            kind: crate::components::items::ItemKind::HerbThornbriar,
+            count: 1,
+        }],
+        station: StationRequirement::None,
+        duration: RecipeDuration::Fixed {
+            ticks: set_ward_ticks,
+        },
+        output: RecipeOutput {
+            // Placeholder — Ward entities don't carry ItemKind today
+            // (they're their own Component family). Reuses the input
+            // herb as a stand-in for "this recipe consumes Thornbriar
+            // and produces a thornward".
+            item_kind: crate::components::items::ItemKind::HerbThornbriar,
+            destination: ItemDestination::WorldPosition,
+        },
+    });
+    registry.insert(Recipe {
+        id: crate::steps::magic::ward_recipe_id(WardKind::DurableWard),
+        discipline: DisciplineKind::Witchcraft,
+        inputs: vec![],
+        station: StationRequirement::None,
+        duration: RecipeDuration::Fixed {
+            ticks: set_ward_ticks,
+        },
+        output: RecipeOutput {
+            // Placeholder per the Thornward note above.
+            item_kind: crate::components::items::ItemKind::HerbThornbriar,
+            destination: ItemDestination::WorldPosition,
+        },
+    });
 }
 
 /// Startup system that populates [`RecipeRegistry`]. Independent

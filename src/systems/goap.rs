@@ -6212,6 +6212,8 @@ fn dispatch_step_action(
                         // `ActiveDirective::SetWard` whose target the
                         // coordinator chose via `compute_ward_placement`.
                         true,
+                        // 365 — crafter provenance for CraftedItem.
+                        Some(cat_entity),
                     );
                     if matches!(result, crate::steps::StepResult::Advance) {
                         if let Some(ref mut act) = narr.activation {
@@ -6270,6 +6272,8 @@ fn dispatch_step_action(
                     // descending-residual algorithm doesn't touch
                     // this case.
                     false,
+                    // 365 — crafter provenance for CraftedItem.
+                    Some(cat_entity),
                 );
                 if matches!(result, crate::steps::StepResult::Advance) {
                     if let Some(ref mut act) = narr.activation {

@@ -998,6 +998,8 @@ pub fn resolve_magic_task_chains(
                     // default (this path has no coordinator
                     // directive plumbing).
                     false,
+                    // 365 — crafter provenance for CraftedItem.
+                    Some(cat_entity),
                 );
                 if matches!(result, StepResult::Advance)
                     && kind == crate::components::magic::WardKind::Thornward

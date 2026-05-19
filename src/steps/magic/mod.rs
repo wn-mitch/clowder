@@ -11,5 +11,5 @@ pub use cleanse_corruption::resolve_cleanse_corruption;
 pub use gather_herb::resolve_gather_herb;
 pub use prepare_remedy::resolve_prepare_remedy;
 pub use scry::resolve_scry;
-pub use set_ward::resolve_set_ward;
+pub use set_ward::{resolve_set_ward, ward_recipe_id};
 pub use spirit_communion::resolve_spirit_communion;
