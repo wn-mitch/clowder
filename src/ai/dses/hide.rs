@@ -52,6 +52,7 @@ use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
+use crate::resources::sim_constants::ScoringConstants;
 
 /// Scalar input name — same as Flee's, by design. The cat's "feels
 /// unsafe" perception drives both valences; the choice between them
@@ -59,6 +60,32 @@ use crate::components::markers;
 /// `escape_viability < threshold AND combat_winnability < threshold`,
 /// otherwise 047's Flee branch fires).
 pub const SAFETY_DEFICIT_INPUT: &str = "safety_deficit";
+
+/// Ticket 268 — `Affordance(Freeze, self, NearestThreat)` axis. Reads
+/// the 261 substrate's per-(perceiver, target) Freeze affordance
+/// scalar. Conditional 2nd axis: pushed onto the consideration list
+/// only when `hide_affordance_freeze_weight > 0.0`. CP semantics
+/// `c · 0 = 0` would zero the whole product if a weight-0 axis were
+/// included, so dormant ⇒ axis absent ⇒ score bit-identical to the
+/// single-axis form.
+pub const AFFORDANCE_FREEZE_INPUT: &str =
+    crate::resources::action_affordances::AFFORDANCE_FREEZE_INPUT;
+
+/// Ticket 268 — recency-of-threat-cue axis. Reads the cat's
+/// MentalModel facet at the nearest-threat entity OR at
+/// `ContextBeliefs[HereNow]` (max). Conditional 3rd axis behind
+/// `hide_recency_of_threat_cue_weight`.
+pub const RECENCY_OF_THREAT_CUE_INPUT: &str = "hide_recency_of_threat_cue";
+
+/// Ticket 268 — perceived-intent-clarity axis. Reads
+/// `PredatorBeliefs[nearest_threat].perceived_intent_clarity`. The
+/// inverse direction is load-bearing: Hide wins under *unclear*
+/// intent (predator's commitment ambiguous), Flee wins under clear
+/// hostile intent. The activation follow-on encodes the inversion in
+/// the curve shape; the scalar surfaced here is raw clarity.
+/// Conditional 4th axis behind
+/// `hide_perceived_intent_clarity_weight`.
+pub const PERCEIVED_INTENT_CLARITY_INPUT: &str = "hide_perceived_intent_clarity";
 
 pub struct HideDse {
     id: DseId,
@@ -68,7 +95,7 @@ pub struct HideDse {
 }
 
 impl HideDse {
-    pub fn new() -> Self {
+    pub fn new(scoring: &ScoringConstants) -> Self {
         // Linear bounded curve — Hide's organic score caps at 0.5
         // even at full safety_deficit. That's intentional: Hide should
         // never beat Flee (which uses flee_or_fight Logistic with
@@ -81,16 +108,65 @@ impl HideDse {
             intercept: 0.0,
         };
 
+        let mut considerations: Vec<Consideration> = vec![Consideration::Scalar(
+            ScalarConsideration::new(SAFETY_DEFICIT_INPUT, safety_curve),
+        )];
+        let mut weights = vec![1.0_f32];
+
+        // 268: conditional Affordance(Freeze) axis. Ships at weight 0.0
+        // (axis absent — CP-safe). Activation follow-on tunes the weight.
+        let aff_freeze_weight = scoring.hide_affordance_freeze_weight.clamp(0.0, 1.0);
+        if aff_freeze_weight > 0.0 {
+            considerations.push(Consideration::Scalar(ScalarConsideration::new(
+                AFFORDANCE_FREEZE_INPUT,
+                Curve::Linear {
+                    slope: 1.0,
+                    intercept: 0.0,
+                },
+            )));
+            weights.push(aff_freeze_weight);
+        }
+
+        // 268: conditional recency-of-threat-cue axis. Reads
+        // PredatorBeliefs at nearest_threat OR ContextBeliefs[HereNow]
+        // (max). Linear identity over the already-[0,1] facet value.
+        let recency_weight = scoring.hide_recency_of_threat_cue_weight.clamp(0.0, 1.0);
+        if recency_weight > 0.0 {
+            considerations.push(Consideration::Scalar(ScalarConsideration::new(
+                RECENCY_OF_THREAT_CUE_INPUT,
+                Curve::Linear {
+                    slope: 1.0,
+                    intercept: 0.0,
+                },
+            )));
+            weights.push(recency_weight);
+        }
+
+        // 268: conditional perceived-intent-clarity axis. The DSE-side
+        // shape is identity (Linear slope=1); the activation follow-on
+        // chooses inversion direction via the constant's tuned curve
+        // params or via a sibling curve. Shipped as identity here so
+        // the activation thread isn't pre-foreclosed.
+        let intent_weight = scoring.hide_perceived_intent_clarity_weight.clamp(0.0, 1.0);
+        if intent_weight > 0.0 {
+            considerations.push(Consideration::Scalar(ScalarConsideration::new(
+                PERCEIVED_INTENT_CLARITY_INPUT,
+                Curve::Linear {
+                    slope: 1.0,
+                    intercept: 0.0,
+                },
+            )));
+            weights.push(intent_weight);
+        }
+
         Self {
             id: DseId("hide"),
-            considerations: vec![Consideration::Scalar(ScalarConsideration::new(
-                SAFETY_DEFICIT_INPUT,
-                safety_curve,
-            ))],
-            composition: Composition::compensated_product(vec![1.0]),
-            // Phase 1 dormancy gate: `HideEligible` is never authored,
-            // so this filter rejects every candidate. Phase 2/3 lands
-            // the authoring system alongside lift activation.
+            considerations,
+            composition: Composition::compensated_product(weights),
+            // Phase 1 dormancy gate (104): `HideEligible` was never
+            // authored until ticket 170, which lifts the dormancy
+            // contract. The filter still gates against the marker —
+            // unchanged from Phase 1 semantics.
             eligibility: EligibilityFilter::new().require(markers::HideEligible::KEY),
         }
     }
@@ -98,7 +174,7 @@ impl HideDse {
 
 impl Default for HideDse {
     fn default() -> Self {
-        Self::new()
+        Self::new(&ScoringConstants::default())
     }
 }
 
@@ -148,8 +224,8 @@ impl Dse for HideDse {
 }
 
 /// Build the Hide DSE for registration. Called once at plugin load.
-pub fn hide_dse() -> Box<dyn Dse> {
-    Box::new(HideDse::new())
+pub fn hide_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    Box::new(HideDse::new(scoring))
 }
 
 #[cfg(test)]
@@ -160,21 +236,21 @@ mod tests {
 
     #[test]
     fn hide_dse_id_is_stable() {
-        assert_eq!(HideDse::new().id().0, "hide");
+        assert_eq!(HideDse::new(&ScoringConstants::default()).id().0, "hide");
     }
 
     #[test]
     fn hide_dse_is_compensated_product() {
         use crate::ai::composition::CompositionMode;
         assert_eq!(
-            HideDse::new().composition().mode,
+            HideDse::new(&ScoringConstants::default()).composition().mode,
             CompositionMode::CompensatedProduct
         );
     }
 
     #[test]
     fn hide_dse_maslow_tier_is_two() {
-        assert_eq!(HideDse::new().maslow_tier(), 2);
+        assert_eq!(HideDse::new(&ScoringConstants::default()).maslow_tier(), 2);
     }
 
     #[test]
@@ -184,7 +260,7 @@ mod tests {
         // codebase. This test pins the contract — if the filter ever
         // drops the requirement, Hide becomes organically reachable
         // and the bit-identical-baseline invariant breaks.
-        let dse = HideDse::new();
+        let dse = HideDse::new(&ScoringConstants::default());
         assert_eq!(dse.eligibility().required, vec![markers::HideEligible::KEY]);
     }
 
@@ -194,7 +270,7 @@ mod tests {
         // absent (the Phase-1 baseline state), Hide MUST be ineligible
         // regardless of `safety_deficit`. evaluate_single returns None.
         use crate::ai::considerations::LandmarkAnchor;
-        let dse = HideDse::new();
+        let dse = HideDse::new(&ScoringConstants::default());
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |_: &str, _: Entity| false;
         let entity_position = |_: Entity| -> Option<Position> { None };
@@ -231,7 +307,7 @@ mod tests {
         // only win the contest via 105's additive lift, not on its
         // own.
         use crate::ai::considerations::LandmarkAnchor;
-        let dse = HideDse::new();
+        let dse = HideDse::new(&ScoringConstants::default());
         let entity = Entity::from_raw_u32(1).unwrap();
         let has_marker = |key: &str, _: Entity| key == markers::HideEligible::KEY;
         let entity_position = |_: Entity| -> Option<Position> { None };
@@ -265,7 +341,57 @@ mod tests {
 
     #[test]
     fn hide_dse_boxed_registers() {
-        let registry_entry = hide_dse();
+        let registry_entry = hide_dse(&ScoringConstants::default());
         assert_eq!(registry_entry.id().0, "hide");
+    }
+
+    // -----------------------------------------------------------------------
+    // Ticket 268 — conditional-axis pattern verification
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn hide_dse_ships_with_single_axis_at_default_weights() {
+        // Ticket 268 — the three new consideration axes
+        // (Affordance(Freeze), recency_of_threat_cue,
+        // perceived_intent_clarity) ship at weight 0.0 (dormant).
+        // CompensatedProduct semantics `c · 0 = 0` would zero the
+        // whole product if a zero-weight axis were present, so the
+        // axes MUST be absent from the considerations list at
+        // dormant weights.
+        let s = ScoringConstants::default();
+        assert_eq!(s.hide_affordance_freeze_weight, 0.0);
+        assert_eq!(s.hide_recency_of_threat_cue_weight, 0.0);
+        assert_eq!(s.hide_perceived_intent_clarity_weight, 0.0);
+        let dse = HideDse::new(&s);
+        assert_eq!(
+            dse.considerations().len(),
+            1,
+            "dormant weights ⇒ only the safety_deficit axis is present"
+        );
+    }
+
+    #[test]
+    fn hide_dse_axes_appear_when_weights_lifted() {
+        // Ticket 268 — when the activation follow-on lifts any of the
+        // three weights, the matching axis appears in the
+        // considerations list with a Linear identity curve.
+        let mut s = ScoringConstants::default();
+        s.hide_affordance_freeze_weight = 0.5;
+        s.hide_recency_of_threat_cue_weight = 0.3;
+        s.hide_perceived_intent_clarity_weight = 0.2;
+        let dse = HideDse::new(&s);
+        assert_eq!(dse.considerations().len(), 4);
+        let names: Vec<&str> = dse
+            .considerations()
+            .iter()
+            .filter_map(|c| match c {
+                Consideration::Scalar(sc) => Some(sc.name),
+                _ => None,
+            })
+            .collect();
+        assert!(names.contains(&SAFETY_DEFICIT_INPUT));
+        assert!(names.contains(&AFFORDANCE_FREEZE_INPUT));
+        assert!(names.contains(&RECENCY_OF_THREAT_CUE_INPUT));
+        assert!(names.contains(&PERCEIVED_INTENT_CLARITY_INPUT));
     }
 }

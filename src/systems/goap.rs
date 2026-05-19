@@ -279,6 +279,22 @@ pub struct WorldStateQueries<'w, 's> {
     /// system writes once per tick before scoring).
     pub location_beliefs:
         Query<'w, 's, &'static crate::components::beliefs::LocationBeliefs>,
+    /// 268 — read-only `PredatorBeliefs` lookup for the Hide DSE's
+    /// per-target belief-facet scalars (`hide_recency_of_threat_cue`,
+    /// `hide_perceived_intent_clarity`). Reads the cat's MentalModel
+    /// of the `nearest_threat_entity`. Disjoint from the cats query
+    /// for the same reason as `location_beliefs` — read-only on a
+    /// Component the belief_integrator writes once per tick before
+    /// scoring.
+    pub predator_beliefs:
+        Query<'w, 's, &'static crate::components::beliefs::PredatorBeliefs>,
+    /// 268 — read-only `ContextBeliefs` lookup for the ambient-shock
+    /// fallback. When `nearest_threat_entity` is `None` but
+    /// `ContextBeliefs[HereNow].recency_of_threat_cue` is elevated
+    /// (e.g. door-slam), the Hide DSE's recency axis reads from this
+    /// path instead of `PredatorBeliefs`.
+    pub context_beliefs:
+        Query<'w, 's, &'static crate::components::beliefs::ContextBeliefs>,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -2138,6 +2154,41 @@ pub fn evaluate_and_plan(
                     lb.models.get(&key).map(|m| m.recency_of_threat_cue.value)
                 })
                 .unwrap_or(0.0),
+            // 268: Hide DSE belief-facet scalars. Read predator beliefs
+            // at the nearest-threat entity (creature-specific) and
+            // context beliefs at HereNow (ambient). Recency is the max
+            // of the two so either path can drive Hide; intent clarity
+            // only meaningful for a specific entity.
+            hide_recency_of_threat_cue: {
+                let creature_recency = nearest_threat
+                    .map(|&(t, _)| t)
+                    .and_then(|t| {
+                        world_state.predator_beliefs.get(entity).ok().and_then(|pb| {
+                            pb.models.get(&t).map(|m| m.recency_of_threat_cue.value)
+                        })
+                    })
+                    .unwrap_or(0.0);
+                let ambient_recency = world_state
+                    .context_beliefs
+                    .get(entity)
+                    .ok()
+                    .and_then(|cb| {
+                        cb.models
+                            .get(&crate::components::beliefs::EnvironmentalContextKey::HereNow)
+                            .map(|m| m.recency_of_threat_cue.value)
+                    })
+                    .unwrap_or(0.0);
+                creature_recency.max(ambient_recency).clamp(0.0, 1.0)
+            },
+            hide_perceived_intent_clarity: nearest_threat
+                .map(|&(t, _)| t)
+                .and_then(|t| {
+                    world_state.predator_beliefs.get(entity).ok().and_then(|pb| {
+                        pb.models.get(&t).map(|m| m.perceived_intent_clarity.value)
+                    })
+                })
+                .unwrap_or(0.0)
+                .clamp(0.0, 1.0),
             // Ticket 014 §4 sensing batch — read via marker. After ticket
             // 064 the marker's predicate is "CarcassScentMap > 0 at this
             // cat's tile", and `carcass_scent_at_position` provides the

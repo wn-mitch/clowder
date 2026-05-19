@@ -4624,7 +4624,11 @@ mod tests {
         // 400: bumped 35 → 36 with `ParentingActivityModifier` (single
         // multi-DSE modifier replacing 398's uniform Kinship
         // AspirationLift on Caretake).
-        assert_eq!(pipeline.len(), 36, "expected 36 registered modifiers");
+        // 142 (109 Phase B): bumped 36 → 37 with
+        // `IntraspeciesConflictResponseFreeze` (Hide-targeting sibling
+        // of `IntraspeciesConflictResponseFlight`; ships inert at
+        // hide_lift = 0.0).
+        assert_eq!(pipeline.len(), 37, "expected 37 registered modifiers");
     }
 
     // -----------------------------------------------------------------------

@@ -494,6 +494,30 @@ pub struct ScoringContext<'a> {
     /// 294 will eventually fold the colony-shared `RecentAmbushMap`
     /// into this per-cat facet at the source side.
     pub patrol_threat_recency: f32,
+    /// 268: per-cat belief recency-of-threat-cue for the Hide DSE.
+    /// Populated at `ScoringContext` construction as
+    /// `max(PredatorBeliefs[nearest_threat].recency_of_threat_cue,
+    ///      ContextBeliefs[HereNow].recency_of_threat_cue)` so the
+    /// signal lifts on either a creature-specific belief OR an
+    /// ambient-shock-lifted HereNow belief. Defaults to `0.0` when
+    /// the cat has no threat entity AND no HereNow entry. Surfaced
+    /// in `ctx_scalars` as `"hide_recency_of_threat_cue"`. Dormant
+    /// in DSE scoring at land — `hide_recency_of_threat_cue_weight`
+    /// is `0.0` until the activation follow-on lifts it.
+    pub hide_recency_of_threat_cue: f32,
+    /// 268: per-cat `PredatorBeliefs[nearest_threat].perceived_intent_clarity`
+    /// for the Hide DSE. Populated at `ScoringContext` construction;
+    /// defaults to `0.0` when no nearest-threat entity exists OR the
+    /// cat has no belief about that entity. Surfaced in `ctx_scalars`
+    /// as `"hide_perceived_intent_clarity"`. Dormant in DSE scoring
+    /// at land — `hide_perceived_intent_clarity_weight` is `0.0`
+    /// until the activation follow-on lifts it. **Semantics:** Hide
+    /// wins under *unclear* intent (the cat doesn't know if the
+    /// predator is committed); Flee wins under clear-hostile intent.
+    /// The activation follow-on will define the curve direction (the
+    /// DSE-side scalar is the raw clarity; an inverting curve will
+    /// translate clarity-zero → high Hide score).
+    pub hide_perceived_intent_clarity: f32,
     // --- Corruption/carcass/siege context ---
     /// Whether uncleansed/unharvested carcasses are within detection range.
     /// After ticket 064 the marker reads `CarcassScentMap > 0` at the cat's
@@ -972,6 +996,40 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
             .map(|t| ctx.action_affordances.read(inputs.cat, t, crate::resources::action_affordances::ActionKind::Flee))
             .unwrap_or(0.0)
             .clamp(0.0, 1.0),
+    );
+    // 268: Affordance(Freeze, self, NearestThreat) — entity-pair
+    // viability scalar from the 261 substrate. Reads `0.0` when no
+    // nearest-threat entity exists. Dormant in DSE scoring at land
+    // (`hide_affordance_freeze_weight = 0.0`); emitted in
+    // `ctx_scalars` for trace observability. The Hide DSE's
+    // conditional axis pushes onto the consideration list only when
+    // the weight is non-zero. The 261 affordance heuristic composes
+    // proximity + cover proximity + perceived violence capability
+    // into one `[0, 1]` scalar.
+    m.insert(
+        crate::resources::action_affordances::AFFORDANCE_FREEZE_INPUT,
+        ctx.cat_anchors
+            .nearest_threat_entity
+            .map(|t| ctx.action_affordances.read(inputs.cat, t, crate::resources::action_affordances::ActionKind::Freeze))
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0),
+    );
+    // 268: per-cat MentalModel.recency_of_threat_cue precomputed at
+    // ctx-build time (goap.rs). Max of PredatorBeliefs[nearest_threat]
+    // and ContextBeliefs[HereNow]. Dormant in DSE scoring at land
+    // (`hide_recency_of_threat_cue_weight = 0.0`).
+    m.insert(
+        "hide_recency_of_threat_cue",
+        ctx.hide_recency_of_threat_cue.clamp(0.0, 1.0),
+    );
+    // 268: per-cat PredatorBeliefs[nearest_threat].perceived_intent_clarity
+    // precomputed at ctx-build time. Dormant in DSE scoring at land
+    // (`hide_perceived_intent_clarity_weight = 0.0`). Semantics: high
+    // clarity = predator's intent is unambiguous (chasing or
+    // indifferent); low clarity = uncertain, freeze is the safer pick.
+    m.insert(
+        "hide_perceived_intent_clarity",
+        ctx.hide_perceived_intent_clarity.clamp(0.0, 1.0),
     );
     // 220: per-tile carcass-scent sample. Dormant in DSE scoring;
     // emitted for trace observability. The placement consumer in
@@ -3186,6 +3244,8 @@ mod tests {
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
             patrol_threat_recency: 0.0,
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             action_affordances: cached_action_affordances(),
         }
     }
@@ -3388,6 +3448,8 @@ mod tests {
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
             patrol_threat_recency: 0.0,
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             action_affordances: cached_action_affordances(),
         };
         // §L2.10.7: this test sets `food_available: false`,
@@ -3614,6 +3676,8 @@ mod tests {
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
             patrol_threat_recency: 0.0,
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             action_affordances: cached_action_affordances(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
@@ -3903,6 +3967,8 @@ mod tests {
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
             patrol_threat_recency: 0.0,
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             action_affordances: cached_action_affordances(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
@@ -4053,6 +4119,8 @@ mod tests {
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
             patrol_threat_recency: 0.0,
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             action_affordances: cached_action_affordances(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
@@ -4208,6 +4276,8 @@ mod tests {
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
             patrol_threat_recency: 0.0,
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             action_affordances: cached_action_affordances(),
         };
         // Build a per-test MarkerSnapshot with Incapacitated set for
@@ -4543,6 +4613,8 @@ mod tests {
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
             patrol_threat_recency: 0.0,
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             action_affordances: cached_action_affordances(),
         };
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
@@ -4675,6 +4747,8 @@ mod tests {
             intention_momentum_lift_factor: 0.0,
             intention_source_ordinal: 0.0,
             patrol_threat_recency: 0.0,
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             action_affordances: cached_action_affordances(),
         };
 

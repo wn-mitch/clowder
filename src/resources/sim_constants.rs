@@ -2285,6 +2285,37 @@ pub struct ScoringConstants {
     /// axis may shift the ShadowFoxAmbush canary.
     #[serde(default = "default_flee_affordance_weight")]
     pub flee_affordance_weight: f32,
+    /// 268: weight on Hide's conditional Affordance(Freeze, self,
+    /// NearestThreat) axis. Reads `ActionAffordances::read(cat,
+    /// nearest_threat, ActionKind::Freeze)` (substrate 261). The
+    /// affordance heuristic composes proximity + cover proximity +
+    /// perceived-violence-capability into one `[0,1]` scalar. Pushed
+    /// onto Hide's `CompensatedProduct` only when the weight is
+    /// non-zero (CP semantics: `c · 0 = 0` would zero the whole
+    /// product). Ships dormant at 0.0; activation in the balance
+    /// follow-on tracked alongside the Hide activation substrate
+    /// (170 + 142 + 268).
+    #[serde(default = "default_hide_affordance_freeze_weight")]
+    pub hide_affordance_freeze_weight: f32,
+    /// 268: weight on Hide's conditional recency-of-threat-cue axis.
+    /// Reads `max(PredatorBeliefs[nearest_threat].recency_of_threat_cue,
+    /// ContextBeliefs[HereNow].recency_of_threat_cue)` so either a
+    /// creature-specific belief OR an ambient-shock-lifted HereNow
+    /// belief can drive Hide. Pushed onto CP only at non-zero weight.
+    /// Ships dormant at 0.0.
+    #[serde(default = "default_hide_recency_of_threat_cue_weight")]
+    pub hide_recency_of_threat_cue_weight: f32,
+    /// 268: weight on Hide's conditional perceived-intent-clarity
+    /// axis. Reads
+    /// `PredatorBeliefs[nearest_threat].perceived_intent_clarity`.
+    /// Semantics: Hide wins under *unclear* intent (predator's
+    /// commitment ambiguous); Flee wins under clear-hostile intent.
+    /// The activation follow-on chooses the inversion direction via
+    /// the per-axis curve; the substrate scalar surfaced here is raw
+    /// clarity. Pushed onto CP only at non-zero weight. Ships
+    /// dormant at 0.0.
+    #[serde(default = "default_hide_perceived_intent_clarity_weight")]
+    pub hide_perceived_intent_clarity_weight: f32,
     /// 263: weight on Patrol's 6th conditional axis
     /// `patrol_threat_recency` — reads `LocationBeliefs.recency_of_threat_cue`
     /// at the cat's patrol perimeter anchor bucket (substrate 258).
@@ -2965,6 +2996,9 @@ impl Default for ScoringConstants {
             patrol_path_fox_scent_weight: default_patrol_path_fox_scent_weight(),
             patrol_path_corruption_weight: default_patrol_path_corruption_weight(),
             flee_affordance_weight: default_flee_affordance_weight(),
+            hide_affordance_freeze_weight: default_hide_affordance_freeze_weight(),
+            hide_recency_of_threat_cue_weight: default_hide_recency_of_threat_cue_weight(),
+            hide_perceived_intent_clarity_weight: default_hide_perceived_intent_clarity_weight(),
             patrol_threat_recency_weight: default_patrol_threat_recency_weight(),
             hunt_best_predation_weight: default_hunt_best_predation_weight(),
             hunt_stalk_chase_affordance_bias: default_hunt_stalk_chase_affordance_bias(),
@@ -4466,6 +4500,25 @@ fn default_patrol_path_corruption_weight() -> f32 {
 /// 263: Flee `flee_affordance` axis weight. Ships dormant at 0.0;
 /// activation in a follow-on after concordance verification.
 fn default_flee_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 268: Hide `affordance_freeze` axis weight. Ships dormant at 0.0;
+/// activation in the balance follow-on for the Hide-activation
+/// substrate (170 + 142 + 268).
+fn default_hide_affordance_freeze_weight() -> f32 {
+    0.0
+}
+
+/// 268: Hide `hide_recency_of_threat_cue` axis weight. Ships dormant
+/// at 0.0; activation in the balance follow-on.
+fn default_hide_recency_of_threat_cue_weight() -> f32 {
+    0.0
+}
+
+/// 268: Hide `hide_perceived_intent_clarity` axis weight. Ships
+/// dormant at 0.0; activation in the balance follow-on.
+fn default_hide_perceived_intent_clarity_weight() -> f32 {
     0.0
 }
 

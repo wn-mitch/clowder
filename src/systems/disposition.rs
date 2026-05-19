@@ -995,6 +995,11 @@ pub fn evaluate_dispositions(
             // belief entry for this bucket" reading, which is the
             // dormant scoring outcome anyway.
             patrol_threat_recency: 0.0,
+            // 268: same rationale as `patrol_threat_recency` — the
+            // disposition path is unscheduled and the Hide DSE's
+            // belief axes are dormant at land anyway.
+            hide_recency_of_threat_cue: 0.0,
+            hide_perceived_intent_clarity: 0.0,
             // Ticket 014 §4 sensing batch — read via marker. After ticket
             // 064 the marker is authored from `CarcassScentMap > 0`; the
             // magnitude axis lives on `carcass_scent_at_position` above.
