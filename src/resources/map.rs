@@ -192,6 +192,17 @@ impl Terrain {
         matches!(self, Self::DenseForest | Self::Wall)
     }
 
+    /// Whether this terrain offers low cover — a tile a cat can stand on
+    /// that provides concealment without occluding sight (ticket 170, the
+    /// Hide DSE "remain still and hope" predator-response valence).
+    /// Derived: passable, non-zero shelter, sight passes through. Current
+    /// coverage: LightForest, AncientRuin, Den, Hearth, Stores, Workshop,
+    /// Watchtower. Future terrain that fits the shape qualifies
+    /// automatically.
+    pub fn is_low_cover(self) -> bool {
+        self.is_passable() && self.shelter_value() > 0.0 && !self.occludes_sight()
+    }
+
     /// Multiplier on substrate-vibration transmission through this
     /// terrain. Phase 1: 1.0 (neutral) for all; real physics values
     /// land with Phase 5b tremor activation.

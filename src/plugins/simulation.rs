@@ -925,7 +925,17 @@ impl Plugin for SimulationPlugin {
                             // HasSocialTarget, HasHerbsNearby, PreyNearby,
                             // CarcassNearby. Single author owns five
                             // markers to amortize the per-cat sensing scans.
-                            systems::sensing::update_target_existence_markers,
+                            //
+                            // Ticket 170 — `HideEligible` author chained
+                            // after target-existence (it reads the
+                            // just-authored `HasThreatNearby`). Wrapped
+                            // as a sub-tuple to keep the outer chain
+                            // under Bevy's 20-system limit.
+                            (
+                                systems::sensing::update_target_existence_markers,
+                                systems::sensing::update_hide_eligible_markers,
+                            )
+                                .chain(),
                             // Ticket 014 §4 fox markers — 7 authors
                             // grouped into a sub-tuple so the outer
                             // chain stays under Bevy's 20-system tuple

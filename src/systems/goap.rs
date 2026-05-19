@@ -448,6 +448,11 @@ pub struct TargetMarkerQueries<'w, 's> {
             Has<markers::PreyNearby>,
             Has<markers::CarcassNearby>,
             Has<markers::HasUnburiedCorpse>,
+            // Ticket 170 — `HideEligible` snapshot wire. Authored each
+            // tick by `sensing::update_hide_eligible_markers`; mirrored
+            // here so `score_actions` resolves the Hide DSE's
+            // eligibility filter against the same source of truth.
+            Has<markers::HideEligible>,
         ),
     >,
     pub faction_overlay_q: Query<
@@ -1737,7 +1742,9 @@ pub fn evaluate_and_plan(
         }
         // Ticket 014 §4 sensing batch — broad-phase target-existence
         // markers authored by `sensing::update_target_existence_markers`.
-        if let Ok((threat, social, herbs, prey, carcass, unburied)) =
+        // Ticket 170 extends the tuple with `HideEligible` (authored by
+        // the sibling `sensing::update_hide_eligible_markers`).
+        if let Ok((threat, social, herbs, prey, carcass, unburied, hide_eligible)) =
             marker_qs.target_existence_q.get(entity)
         {
             markers.set_entity(markers::HasThreatNearby::KEY, entity, threat);
@@ -1750,6 +1757,9 @@ pub fn evaluate_and_plan(
             // and the Bury DSE's eligibility filter both read from
             // the same source of truth.
             markers.set_entity(markers::HasUnburiedCorpse::KEY, entity, unburied);
+            // Ticket 170 — Hide DSE eligibility filter reads
+            // `HideEligible` via `MarkerSnapshot::has(...)`.
+            markers.set_entity(markers::HideEligible::KEY, entity, hide_eligible);
         }
         // Ticket 049 §9.2 — faction overlay markers (Visitor /
         // HostileVisitor / Banished / BefriendedAlly). The runtime §9.3

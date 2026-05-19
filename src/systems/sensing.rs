@@ -1014,6 +1014,61 @@ fn toggle_target_marker<M: Component + Copy>(
     }
 }
 
+/// Authors `HideEligible` (ticket 170, Hide DSE Phase 2). Predicate:
+/// `Has<HasThreatNearby>` AND a `Terrain::is_low_cover()` tile within
+/// `EscapeViabilityConstants::sprint_radius` (Chebyshev). Reads the
+/// just-authored `HasThreatNearby` rather than re-scanning wildlife —
+/// keeps threat perception single-sourced. Must run **after**
+/// `update_target_existence_markers` in Chain 2a; chain ordering is
+/// sequential in Bevy so registering immediately after the sibling
+/// suffices.
+#[allow(clippy::type_complexity)]
+pub fn update_hide_eligible_markers(
+    mut commands: Commands,
+    cats: Query<
+        (
+            Entity,
+            &Position,
+            Has<markers::HideEligible>,
+            Has<markers::HasThreatNearby>,
+        ),
+        (With<crate::components::identity::Species>, Without<Dead>),
+    >,
+    map: Res<TileMap>,
+    constants: Res<crate::resources::sim_constants::SimConstants>,
+) {
+    let radius = constants.escape_viability.sprint_radius;
+    for (entity, pos, has_hide, has_threat) in cats.iter() {
+        let want = has_threat && has_low_cover_within(pos, radius, &map);
+        toggle_target_marker(
+            &mut commands,
+            entity,
+            want,
+            has_hide,
+            markers::HideEligible,
+        );
+    }
+}
+
+fn has_low_cover_within(center: &Position, radius: i32, map: &TileMap) -> bool {
+    for dy in -radius..=radius {
+        for dx in -radius..=radius {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let x = center.x + dx;
+            let y = center.y + dy;
+            if !map.in_bounds(x, y) {
+                continue;
+            }
+            if map.get(x, y).terrain.is_low_cover() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
