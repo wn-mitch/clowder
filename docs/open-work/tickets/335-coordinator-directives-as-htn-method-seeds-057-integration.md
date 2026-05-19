@@ -88,3 +88,4 @@ catalogue stabilizes.
 ## Log
 
 - 2026-05-14: opened as 128 epic child #17 (Batch E cross-cutting).
+- 2026-05-19: accuracy audit pass — no direct blockers in blocked-by (external blocker 057 noted in Current state is correct). Files referenced exist (htn-methods.md, strategist-coordinator.md), Rust symbols verified.

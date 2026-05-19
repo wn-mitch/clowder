@@ -144,3 +144,4 @@ Per ticket 160 §"Out of scope":
 ## Log
 
 - 2026-05-18: Renumbered from id `PE-003` → `413` and moved out of `docs/open-work/pre-existing/` into `docs/open-work/tickets/` during Linear migration prep. `pre-existing/` is being retired — the long-lived stragglers are now first-class tickets.
+- 2026-05-19: accuracy audit pass — 169, 170 file path refs verified; marker file paths verified at src/components/markers.rs

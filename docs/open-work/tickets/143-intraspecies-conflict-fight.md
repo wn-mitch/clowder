@@ -63,3 +63,4 @@ fires on social-status pressure and reads a different scalar.
 
 - 2026-05-02: Opened as 109 Phase B Fight sub-ticket alongside 109
   Phase A landing.
+- 2026-05-19: accuracy audit pass — all blockers landed, file paths valid, Rust symbols ready for impl.

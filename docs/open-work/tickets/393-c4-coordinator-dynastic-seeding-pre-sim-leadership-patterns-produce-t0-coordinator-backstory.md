@@ -61,3 +61,4 @@ Phase-1 leadership dynamics either exist (use them) or need to be specified (use
 ## Log
 
 - 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])
+- 2026-05-19: accuracy audit pass — blocked-by 57 verified; 7 verified in landed/

@@ -83,3 +83,4 @@ Substrate sketch:
 - 2026-05-05: opened from user direction during ticket 176
   planning. Project memory captured at
   `~/.claude/projects/-Users-will-mitchell-clowder/memory/project_death_smells.md`.
+- 2026-05-19: accuracy audit pass — component design valid, file paths verified, future consumer tickets are soft dependencies (not blockers).

@@ -67,7 +67,8 @@ year.
 
 ## Current state
 
-Blocked by 400 (ParentingActivity Component must exist first).
+Blocked by 400 (ParentingActivity Component must exist first). [UPDATE 2026-05-19: 400
+landed 2026-05-18, now unblocked.]
 
 ## Approach
 
@@ -99,3 +100,4 @@ bond-relationship-formation mechanisms. See plan file
 ## Log
 
 - 2026-05-17: opened as 399 follow-on; blocked by 400.
+- 2026-05-19: accuracy audit pass — 400 landed; status should flip from blocked to ready; marked `[needs-review]` for blocked-by list update

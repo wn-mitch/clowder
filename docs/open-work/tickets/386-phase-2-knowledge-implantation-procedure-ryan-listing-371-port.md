@@ -62,3 +62,4 @@ Single-shot system scheduled exactly between Phase-1 termination and Phase-3 fir
 ## Log
 
 - 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])
+- 2026-05-19: accuracy audit pass — blocked-by 385 verified in tickets/; 258 verified in landed/

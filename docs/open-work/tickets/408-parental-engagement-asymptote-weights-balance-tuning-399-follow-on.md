@@ -53,7 +53,7 @@ the starting-point weights.
 ## Current state
 
 Blocked by 400 (substrate must exist and soak data must be available to
-tune against).
+tune against). [UPDATE 2026-05-19: 400 landed 2026-05-18, now unblocked.]
 
 ## Approach
 
@@ -86,3 +86,4 @@ constraint, not philosophical rebalancing.
 ## Log
 
 - 2026-05-17: opened as 399 follow-on; blocked by 400.
+- 2026-05-19: accuracy audit pass — 400 landed; status should flip from blocked to ready; marked `[needs-review]` for blocked-by list update

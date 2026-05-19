@@ -273,3 +273,4 @@ tradition logic — purely from the axis weights and the ecology.
   (items 10–11). Design principle: behavior emerges from IAUS axis
   weights, not explicit stalk-or-charge branches. Blocked on 062 for
   the per-species scent opportunity-quality read (item 11).
+- 2026-05-19: accuracy audit pass — ready status correct; TremorMap symbol exists in src/resources/; scope items detailed and comprehensive.

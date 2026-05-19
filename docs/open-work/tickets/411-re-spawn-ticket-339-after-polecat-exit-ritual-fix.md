@@ -47,3 +47,4 @@ After 409 lands and `/foreman` is exercised cleanly once for verification, queue
 ## Log
 
 - 2026-05-18: opened after 409 to re-queue lost work from the 2026-05-17 silent-failure batch.
+- 2026-05-19: accuracy audit pass — blocked-by 409 verified in landed/

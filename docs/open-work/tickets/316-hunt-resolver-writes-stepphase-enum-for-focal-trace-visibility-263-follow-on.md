@@ -58,3 +58,4 @@ Blocked-by 263 (the resolver-side affordance bias landed there; this adds the tr
 ## Log
 
 - 2026-05-13: opened as 263 follow-on after the aspirational `StepPhase` enum was identified as load-bearing for trace visibility.
+- 2026-05-19: accuracy audit pass — 263 (blocker) is landed; StepPhase enum and all component types exist; resolve_engage_prey line reference is documented; trace-visibility plumbing is architecturally sound.

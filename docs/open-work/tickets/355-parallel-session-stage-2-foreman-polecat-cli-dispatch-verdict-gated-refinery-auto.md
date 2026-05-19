@@ -83,3 +83,4 @@ User decisions baked in:
 ## Log
 
 - 2026-05-15: opened. Blocked on 354 landing; the Stage-1 commits are still on the local stack as of open-time. Plan at `~/.claude/plans/mighty-foraging-biscuit.md`.
+- 2026-05-19: accuracy audit pass — 354 landed (2026-05-15); blocked-by empty and status ready; all related-work linkages (362/356/363) verified landed or ready

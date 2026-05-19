@@ -50,3 +50,4 @@ See `docs/systems/crafting.md` Phase 4. Hypothesis: on seed-42 `--duration 900`,
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened as 016 epic decomposition (Phase 4; parent 016, blocked-by 370).
+- 2026-05-19: accuracy audit pass — blocked-by 370 exists in tickets/; status blocked verified

@@ -68,3 +68,7 @@ the next external-service triage has a prior to query.
 - ✓ landed **327** (done, ai-substrate, score 0.84 (cross-cluster)) — Combat aspiration_milestone_wrapper + emits tables
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-19: accuracy audit pass — no changes needed (blocked-by empty, related-systems and linkages current)

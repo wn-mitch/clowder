@@ -72,3 +72,4 @@ gesture DSE — see ticket 145), not just a modifier on existing DSEs.
   out-of-scope decision, in light of the C3 substrate's ability to
   model honest cross-species perception. Decision outcome deferred to
   269's audit phase; this ticket retains intraspecies-only scope.
+- 2026-05-19: accuracy audit pass — blocked-by [145] is ready (not landed), audit correctly shows status: blocked is correct; file paths valid.

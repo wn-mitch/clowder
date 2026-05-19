@@ -87,3 +87,4 @@ the message fires at the rejection site, plus a `just q` recipe in
 - 2026-05-14: opened parked as a 056 follow-on (split-out per
   CLAUDE.md antipattern-migration discipline). Unparks when a
   balance investigation surfaces the need for rejection telemetry.
+- 2026-05-19: accuracy audit pass — parked status is correct, no blockers in blocked-by, referenced files exist (ai-substrate-refactor.md).

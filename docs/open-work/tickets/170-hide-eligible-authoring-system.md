@@ -97,3 +97,4 @@ The predicate is spec'd in `src/ai/dses/hide.rs:8-19`:
 
 - 2026-05-05: opened in same commit as 160. Largest of the 160 follow-ons —
   touches sensing + introduces a new behavior into the action distribution.
+- 2026-05-19: accuracy audit pass — DSE spec at hide.rs lines 8-19 verified, file paths valid, Feature name correct.

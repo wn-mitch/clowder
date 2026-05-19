@@ -71,3 +71,4 @@ maps.
 ## Log
 
 - 2026-05-08: opened as 035 follow-on.
+- 2026-05-19: accuracy audit pass — blocker 035 confirmed landed, GraveAuraMap confirmed in src/plugins/setup.rs, no file path issues.

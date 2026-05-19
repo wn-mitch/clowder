@@ -81,3 +81,4 @@ commit (independent of 128's own row pointing at 057).
 
 - 2026-05-14: opened as 128 epic child #23 (Batch E cross-cutting;
   process touchup).
+- 2026-05-19: accuracy audit pass — no blockers in blocked-by (correct), ticket 126 verified landed, ticket 128 verified exists in tickets/, frontmatter file path verified (docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md exists).

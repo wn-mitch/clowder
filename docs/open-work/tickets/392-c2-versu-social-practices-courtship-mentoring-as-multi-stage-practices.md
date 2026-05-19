@@ -61,3 +61,4 @@ Either as HTN methods (composes with 128) or as a dedicated `Practice` substrate
 ## Log
 
 - 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])
+- 2026-05-19: accuracy audit pass — coherent-block status verified; 127 verified in landed/

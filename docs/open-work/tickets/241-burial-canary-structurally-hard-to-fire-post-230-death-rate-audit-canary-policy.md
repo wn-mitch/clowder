@@ -85,3 +85,4 @@ of the canonical soak, the policy choice is real.
   end-to-end test passed (lone_burial scenario fires
   `BurialPerformed = 1`) but the seed-42 soak's burial tally
   remained 0 because deaths_by_cause was empty.
+- 2026-05-19: accuracy audit pass — blocker 035 confirmed landed, Feature::BurialPerformed pattern plausible, no file path issues.

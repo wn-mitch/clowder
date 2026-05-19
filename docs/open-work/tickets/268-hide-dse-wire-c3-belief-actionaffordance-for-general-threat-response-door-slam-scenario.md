@@ -84,3 +84,4 @@ The canonical door-slam scenario is owned by ticket 258 (`belief_ambient_shock_w
 ## Log
 
 - 2026-05-10: opened sibling-to-258. REFRAMED from original "Freeze DSE (new)" plan slot — Hide DSE already exists (104 landed); this is the Belief/Affordance consumer wiring on it. Complements 142 (intraspecies-conflict Modifier on same DSE). Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
+- 2026-05-19: accuracy audit pass — no blockers; related infrastructure (104, 142, 170) confirmed landed or ready per stated design; hide.rs file verified; scenario stub structure confirmed.

@@ -82,3 +82,4 @@ Phase 3 of the continuous-position migration (epic ticket 135). With Phase 2 (#1
 ## Log
 
 - 2026-05-02: Opened as Phase 3 of the 135 continuous-position-migration epic. Blocked-by 131 (Phase 2 substrate); independent of Phase 0 (#137) and Phase 1 (#138).
+- 2026-05-19: accuracy audit pass — blocked status correct; blocked-by [139] correct (Phase 2, not 131 typo, since 139 is Phase 2); steering primitives (seek/arrive/flee/wander) well-scoped; movement integrator and flow-field optimization documented.

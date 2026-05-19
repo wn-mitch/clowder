@@ -84,3 +84,4 @@ DSEs that ship the *capability* before any modifier lifts them.
   blocked-on this ticket. 269 layers Belief facets and `Affordance(Fawn,
   perceiver, target)` reads onto this DSE's existing scoring shape;
   also runs a cross-species audit. Land 145 first, 269 second.
+- 2026-05-19: accuracy audit pass — DSE symbols not yet in codebase (expected pre-impl), file paths and rustdoc requirements verified.

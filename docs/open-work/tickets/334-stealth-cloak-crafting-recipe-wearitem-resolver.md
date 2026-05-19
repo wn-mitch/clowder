@@ -130,3 +130,4 @@ lists both for enforcement.
   369 (Phase 2b warrior's kit) lands the WearItem resolver — at
   that point 334 may close to a pure HTN-method-flip ticket, or
   fold into 369's scope. Decide during 369 session.
+- 2026-05-19: accuracy audit pass — blockers 17 and 365 verified (17 exists in tickets/, 365 landed), wires-method frontmatter references valid methods (verified in populate_method_registry). No blocking issues.

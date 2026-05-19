@@ -55,3 +55,4 @@ value. Single-seed soak + `just verdict`.
 ## Log
 - 2026-05-07: opened from 209 closeout.
 - 2026-05-10: parked. Post-256 regime carries `MatingOccurred` in the baseline `never_fired_expected_positives` list (ticket 257 — Mate election crowded out by Patrol). With no new kittens past the founder population, Caretake's eligibility gate (`hungry_kitten_urgency > 0.0` at `src/ai/scoring.rs:1845`) rarely fires; tuning the food-security lift would produce a frame-diff null-by-eligibility-bottleneck. Resume after 257 (or its substrate-fix descendants) restores reliable kitten births. `blocked-by` repointed 209 → 257; 209 is landed but the real blocker for verifying Caretake tuning is the absence of hungry-kitten windows.
+- 2026-05-19: accuracy audit — parked status correct; ticket 257 is landed; recommend revalidation: kitten births may now be sufficient to unpark this ticket; decision deferred to user.

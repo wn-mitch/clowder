@@ -87,3 +87,4 @@ work once Graves enter its candidate pool.
 - 2026-05-08: opened as 035 follow-on. User redirected from
   RestAtGrave-as-new-DSE to substrate routing through existing rest-
   target picker.
+- 2026-05-19: accuracy audit pass — blocker 035 confirmed landed, LostBonds verified in src/components/grave.rs, no file path issues.

@@ -121,3 +121,4 @@ authoring-side choices follow the rubric. Sketch:
 - 2026-05-11: opened. Surfaced by the perception-accuracy audit
   for ticket 273 (gap #2). Defers detailed design until 282
   (temporal-integration doctrine) lands.
+- 2026-05-19: accuracy audit pass — all file paths verified; 256 (blocker reference in balance doc) is landed; scenario nomenclature matches referenced structure.

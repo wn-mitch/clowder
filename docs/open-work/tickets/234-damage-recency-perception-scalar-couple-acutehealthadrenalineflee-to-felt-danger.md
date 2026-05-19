@@ -173,3 +173,4 @@ question.
   damage" rather than "I am wounded." Modifier reads the new scalar;
   cats with chronic wounds doing chores stop seeing preempts; cats
   that just took an ambush see sharp lurches.
+- 2026-05-19: accuracy audit pass — AcuteHealthAdrenalineFlee verified at src/ai/modifier.rs:1143-1278, threat_proximity_derivative pattern confirmed, no file path issues.

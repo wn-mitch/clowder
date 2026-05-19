@@ -137,3 +137,4 @@ Mirror the Stores-eating substrate to a sibling Den-eating path:
 - 2026-05-16: opened as 190's land-day follow-on. 190's UI work surfaced
   the dark-food gap visually; this ticket closes it by making Den-stashed
   food retrievable. Workshop retrieval parked separately (mid-craft race).
+- 2026-05-19: accuracy audit pass — blocked-by empty and status ready; referenced systems exist (ai-substrate-refactor.md); related-work 189/94/91 landed

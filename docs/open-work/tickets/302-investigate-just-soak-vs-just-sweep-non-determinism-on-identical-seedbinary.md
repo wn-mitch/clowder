@@ -97,3 +97,4 @@ No reproduction harness yet; ticket 300's side-finding has two example output ar
 ## Log
 
 - 2026-05-12: opened on the back of ticket 300's pre-flight side-finding. Empirical anchor: `logs/tuned-42/` (soak) vs `logs/sweep-baseline-halving-ward-placement-candidate-step-from-5-to-2-lets-the-s/42-1/` (sweep) — same commit `5fedc33b` dirty, same binary timestamp `2026-05-12 17:42`, divergent Starvation count.
+- 2026-05-19: accuracy audit pass — all file paths and process flow verified; approach is process-discipline sound; investigation strategy is methodical.

@@ -34,7 +34,7 @@ Full architectural design lives in [`docs/systems/crafting.md`](../../systems/cr
 | 2b | Warrior's kit (8 items, Tanning Frame, material-property substrate) | blocked | [369](369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md) | 365 |
 | 3 | Identity, mentorship, adornment (first wearable producer) | blocked | [370](370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md) | 368, 017 |
 | 4 | Domestic refinement — place-anchored decorations | blocked | [371](371-phase-4-domestic-refinement-place-anchored-decorations-reed-mat-tallow-lamp-scent-censer-carved-comb-wall-hanging-nesting-inlay-016-phase-4.md) | 370 |
-| 5-prereq | Aspirations mastery arcs (Weaving, BoneShaping, Hidework, Pigment, Cairn) | ready | [366](366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md) | — |
+| 5-prereq | Aspirations mastery arcs (Weaving, BoneShaping, Hidework, Pigment, Cairn) | done | [366](../landed/366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md) | — |
 | 5 | Elevated cat-craft (collective / multi-season, triple-gated) | blocked | [372](372-phase-5-elevated-cat-craft-generational-tapestry-shrine-cairn-bone-lattice-lantern-pigment-deepened-textile-multi-cat-nesting-alcove-kitten-cradle-basket-016-phase-5-triple-gated.md) | 371, 366 |
 
 ## Related existing tickets
@@ -77,6 +77,7 @@ Pick up next: Phase 1a — substrate refactor that generalizes `remedy_prep` + `
 
 - 2026-04-22: opened with V=5 F=4 R=3 C=3 H=3 = 540 score; Phase 4 added on promotion from 288 → 540. Phase 5 added (collective / multi-season tier with not-DF guardrail).
 - 2026-05-16: promoted to epic dashboard (128-style — read-only over child tickets). Opened 8 phase children (365 Phase 1a substrate, 366 Phase 5 prereq, 367 Phase 1b recipes, 368 Phase 2 tools, 369 Phase 2b warrior's kit, 370 Phase 3 identity, 371 Phase 4 decorations, 372 Phase 5). Status flipped `ready → in-progress`. 334 (stealth-cloak) re-blocked on 365 + 017.
+- 2026-05-18: 366 Phase 5 prereq landed (9d41d3ebc5cf). Five mastery arcs registered + Skills/SkillKind axes + Recipe.skill_gate field + RecipeRegistry::is_phase5_unlocked predicate. Adoption deferred to 372 (Kinship-pattern skip preserves seed-42 determinism). 372 unblocked; ready to start.
 
 ## Related work
 

@@ -82,3 +82,4 @@ pattern is proven.
 ## Log
 
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 IAUS refactor landed. Still blocked on 020 (NamedLandmark substrate); #18's multi-cat coordination pattern is a soft sequencing dependency, not a hard blocker.
+- 2026-05-19: accuracy audit pass — blocked-by [020] confirmed active; no path issues.

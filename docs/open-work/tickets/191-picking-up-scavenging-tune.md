@@ -79,3 +79,4 @@ Two follow-on items deferred from 185's landing:
   surface in `picking_up.rs::tests` covers curve shape and
   eligibility; the integration scenario + balance loop are
   deferred to here per CLAUDE.md antipattern-migration discipline.
+- 2026-05-19: accuracy audit pass — landed tickets verified, file paths and Feature references valid, methodology matches CLAUDE.md discipline.

@@ -61,3 +61,4 @@ A boundary system mirroring #386's bulk-insert shape but writing to `ColonyKnowl
 ## Log
 
 - 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])
+- 2026-05-19: accuracy audit pass — blocked-by 385, 291 verified; 291 in tickets/

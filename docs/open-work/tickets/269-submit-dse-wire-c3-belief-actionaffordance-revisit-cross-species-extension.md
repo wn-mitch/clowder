@@ -84,3 +84,4 @@ Pre-existing parent framework: 109 (IntraspeciesConflictResponse — full four-v
 ## Log
 
 - 2026-05-10: opened sibling-to-258. REFRAMED from original "Fawn DSE (new)" plan slot — Submit DSE infrastructure already in flight (145, ready). This ticket is the Belief/Affordance consumer wiring + cross-species extension audit. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
+- 2026-05-19: accuracy audit pass — blocker 145 confirmed in tickets/ (ready); submit.rs does not yet exist (aspirational, deferred to implementation); related infrastructure (144, 109) status confirmed.

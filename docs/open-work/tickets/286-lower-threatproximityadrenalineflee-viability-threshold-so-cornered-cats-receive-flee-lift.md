@@ -87,3 +87,4 @@ confirms colony-level survival doesn't regress.
 ## Log
 - 2026-05-11: opened by 271 landing. Named in 271's audit table
   promotion and `docs/balance/271-flee-boldness-axis-shape.md`.
+- 2026-05-19: accuracy audit pass — 271 (blocker/predecessor) is landed; all file paths and Rust symbols verified; scenario hierarchy sound.

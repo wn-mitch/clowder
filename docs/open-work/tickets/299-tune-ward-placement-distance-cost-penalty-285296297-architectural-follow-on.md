@@ -80,3 +80,4 @@ This ticket addresses lever #2. The current penalty (`coordination.rs:1428`, `DI
 <!-- linkages:end -->
 ## Log
 - 2026-05-12: opened as lever #2 of four follow-on tickets from 297's iter-2 architectural finding.
+- 2026-05-19: accuracy audit pass — 285/296/297 (architectural precursors) are landed; all file paths and constants structure verified; regression-test approach is sound.

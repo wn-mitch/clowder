@@ -66,3 +66,4 @@ before both.
 ## Log
 
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 IAUS refactor landed. Still blocked on 016 (crafting items/recipes/stations) for the multi-cat coordination prerequisite.
+- 2026-05-19: accuracy audit pass — blocked-by [016] confirmed active; design docs exist.

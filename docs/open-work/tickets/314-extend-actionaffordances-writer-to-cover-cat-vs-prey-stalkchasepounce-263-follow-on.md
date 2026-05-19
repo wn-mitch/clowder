@@ -67,3 +67,4 @@ Substrates 258 + 261 + 263 (this ticket's parent) all landed. The cat-vs-prey ga
 ## Log
 
 - 2026-05-13: opened as 263 follow-on after the cat-vs-prey gap surfaced during 263 implementation. Blocks 315's activation methodology.
+- 2026-05-19: accuracy audit pass — 263/261 (prerequisites) are landed; affordance_writer.rs verified at correct line ranges; scenario structure sound.

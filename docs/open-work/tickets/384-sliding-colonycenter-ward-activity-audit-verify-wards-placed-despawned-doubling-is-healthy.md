@@ -83,3 +83,4 @@ mechanism is upstream and needs structural review.
 
 - 2026-05-16: opened blocked-by 382 from 382's soak observation —
   ward activity doubled, mechanism unverified.
+- 2026-05-19: accuracy audit pass — 382 verified landed; all file paths verified

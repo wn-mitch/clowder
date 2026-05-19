@@ -47,4 +47,4 @@ How to prove this is done (tests, canaries, balance reports, focal-cat replays).
 
 <!-- linkages:end -->
 ## Log
-- YYYY-MM-DD: decision / observation / blocker
+- 2026-05-19: accuracy audit pass — all file paths and Rust symbols verified; blocked-by empty; 127/258 (prerequisites) are landed.

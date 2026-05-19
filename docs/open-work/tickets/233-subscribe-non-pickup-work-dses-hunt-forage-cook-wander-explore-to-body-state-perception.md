@@ -158,3 +158,4 @@ with a body-state-axis-weight spec.
   231's PickUp gap on the food-production half. Per substrate-over-
   override discipline, fix is to add Considerations rather than gate
   or filter.
+- 2026-05-19: accuracy audit pass — referenced DSE files (hunt.rs, forage.rs, cook.rs, etc.) verified present in src/ai/dses/, body_distress_composite confirmed in src/ai/scoring.rs, no file path issues.

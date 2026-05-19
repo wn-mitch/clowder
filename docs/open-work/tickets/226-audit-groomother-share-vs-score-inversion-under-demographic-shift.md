@@ -74,3 +74,4 @@ share-vs-score behavior across seeds.
 ## Log
 - 2026-05-07: opened from 211 closeout — share inversion needs
   multi-seed confirmation before 213 ships.
+- 2026-05-19: accuracy audit pass — frontmatter clean, no file path issues.

@@ -66,3 +66,4 @@ Aligned with 249's TargetExistence-as-belief-proxy framing — this ticket refin
 ## Log
 
 - 2026-05-02: Opened as a follow-on of work 103. v1 of `escape_viability` ships with marker-only dependent presence (Parent || PairingActivity); positional refinement and WoundedAlly axis bundled here for a future tightening pass.
+- 2026-05-19: accuracy audit pass — ready status correct; WoundedAlly marker + positional refinement both coherent and aligned with 103's escape_viability scalar.

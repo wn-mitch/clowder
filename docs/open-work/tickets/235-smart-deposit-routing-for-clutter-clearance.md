@@ -131,4 +131,5 @@ narrative-bound to one cat.
 
 <!-- linkages:end -->
 ## Log
-- YYYY-MM-DD: opened.
+- 2026-05-08: opened as 231 follow-on per the user's item-routing design intent.
+- 2026-05-19: accuracy audit pass — template placeholders present (layer-walk audit table to be filled), no file path issues, Hot Context section should be removed per user instructions, frontmatter clean.

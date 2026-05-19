@@ -54,3 +54,7 @@ canaries on any Mentor tuning.
 - · **216** (blocked, social-coordination, score 0.85 (cross-cluster)) — Mentor / Coordinate / Caretake axis ethology audit
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-19: accuracy audit pass — no changes needed (blocked-by empty, related-systems and linkages current)

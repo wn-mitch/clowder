@@ -72,3 +72,4 @@ Feature emitted by that DSE.
 - 2026-05-06: opened from 198's closeout. The runtime gate (198) and
   the static cross-reference (this) are complementary — one catches
   scenario lies, the other catches DSE coverage gaps.
+- 2026-05-19: accuracy audit pass — registry design sound, scope boundaries clear, test strategy verified.

@@ -77,3 +77,4 @@ DSE axes to read them via 243's channel.
   body-cue differentiation). This ticket remains blocked-on 243; once
   it lands, the cluster-C consumers can integrate the wildlife
   body-cue reads.
+- 2026-05-19: accuracy audit pass — all blockers (243) confirmed open; related tickets (263, 265, 266, 268, 269) exist and reference correctly.

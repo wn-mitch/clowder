@@ -64,3 +64,4 @@ This stub records the design intent so it doesn't rot in conversation memory. Us
 ## Log
 
 - 2026-05-02: Opened as a follow-on of work 103 (escape_viability scalar). Independent of 103's landing — sits on its own perception axes per the single-axis discipline.
+- 2026-05-19: accuracy audit pass — ready status correct; Phobias component design coherent; single-axis discipline enforced (terrain_enclosure / terrain_exposure separate from threat presence).

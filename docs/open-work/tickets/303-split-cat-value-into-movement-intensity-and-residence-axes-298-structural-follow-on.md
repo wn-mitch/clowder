@@ -72,3 +72,4 @@ The architectural finding from 298 that motivates 303: across 285/296/297/300, f
 ## Log
 
 - 2026-05-12: opened as structural follow-on from ticket 298's iter-1 finding that the cat_value coefficient is too weak a lever to justify a default shift. 298 named this exact split (movement vs. residence) but with reversed labels — 303's scope corrects the framing per the disposition.rs::cat_presence_tick read.
+- 2026-05-19: accuracy audit pass — 298 (predecessor) is landed; all file paths, Rust symbols, and marker/InfluenceMap registry requirements verified; first-light activation discipline cited correctly.

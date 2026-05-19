@@ -81,7 +81,8 @@ lineage texture.
 
 ## Current state
 
-Blocked by 400 (shares `bond_multiplier` infrastructure).
+Blocked by 400 (shares `bond_multiplier` infrastructure). [UPDATE 2026-05-19: 400
+landed 2026-05-18, now unblocked.]
 
 ## Approach
 
@@ -117,3 +118,4 @@ and biasing target-DSE selection within the bound action.
 ## Log
 
 - 2026-05-17: opened as 399 follow-on; blocked by 400.
+- 2026-05-19: accuracy audit pass — 400 landed; status should flip from blocked to ready; marked `[needs-review]` for blocked-by list update

@@ -68,3 +68,4 @@ follow-on for any per-axis behavior that doesn't concord.
 
 - 2026-05-02: Opened from 146 close-out. Inherits 146's saturating
   cap as design-time bound for multi-axis pile-up.
+- 2026-05-19: accuracy audit pass — all referenced landed tickets verified, file paths and resource names correct.

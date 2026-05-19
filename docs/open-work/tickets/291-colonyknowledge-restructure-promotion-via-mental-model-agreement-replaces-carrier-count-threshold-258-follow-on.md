@@ -74,3 +74,4 @@ Hypothesis: with `agreement_quorum=3`, `agreement_epsilon=0.2`, `promotion_stren
 ## Log
 
 - 2026-05-11: opened as 258 follow-on. The pre-258 carrier-count promotion stays load-bearing until this lands; the per-cat substrate sits adjacent. Clean cutover (no dual-write window) per 258's plan-agent recommendation.
+- 2026-05-19: accuracy audit pass — 258 (blocker) is landed; all file paths, Rust symbols, and design doc references verified; four-artifact methodology scope is sound.

@@ -53,3 +53,4 @@ Blocked on 375 (multi-item spawn idiom from prey side is the pattern to reuse fo
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened. Plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`. Follow-on to 375 (cat-side byproduct decomposition for generational continuity).
+- 2026-05-19: accuracy audit pass — blocked-by 375 ready; status blocked verified; design references (crafting.md/naming.md/the-calling.md) all exist

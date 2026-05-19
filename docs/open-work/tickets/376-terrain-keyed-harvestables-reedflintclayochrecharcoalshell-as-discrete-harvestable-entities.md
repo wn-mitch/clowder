@@ -64,3 +64,4 @@ The 016 crafting epic names **reed, flint, clay, pigment (ochre / charcoal), she
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened. Plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`. Sibling to 375.
+- 2026-05-19: accuracy audit pass — blocked-by empty and status ready; Thornbriar referenced pattern exists in code; aspirational Harvestable extension logic

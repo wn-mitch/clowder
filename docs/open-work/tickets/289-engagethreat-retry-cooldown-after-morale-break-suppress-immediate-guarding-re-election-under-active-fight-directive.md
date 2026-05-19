@@ -129,4 +129,5 @@ narrative-bound to one cat.
 
 <!-- linkages:end -->
 ## Log
-- YYYY-MM-DD: opened.
+- 2026-05-11: opened as follow-on from 288 landing (post-verification soak finding). Layer-walk audit table skeleton in place; approach drafted.
+- 2026-05-19: accuracy audit pass — 288 (blocker) is landed; layer-walk structure has placeholder rows (promote before fix-candidate selection); approach is sound.

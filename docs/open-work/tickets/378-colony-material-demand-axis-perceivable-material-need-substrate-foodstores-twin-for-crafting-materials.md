@@ -77,3 +77,4 @@ This ticket lands as the **finishing move** on the input-substrate cluster (375 
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened. Plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`. The destination of the input-substrate trajectory; 375 / 376 / 377 are prerequisites.
+- 2026-05-19: accuracy audit pass — blocked-by entries (375/376) both ready; status blocked verified; design references exist (crafting.md / ai-substrate-refactor.md)

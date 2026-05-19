@@ -189,3 +189,4 @@ proxy doing its job.
   + memory (OwnSleepingSpot / OwnSafeRestSpot) into a "where can
   I rest" belief. Sleep DSE already reads memory anchors via
   spatial axes; only the zone resolver lags.
+- 2026-05-19: accuracy audit pass — no blockers; file paths (goap.rs, interoception) verified; ticket narrative is coherent.

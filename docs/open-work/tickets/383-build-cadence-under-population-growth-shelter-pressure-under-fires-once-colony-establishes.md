@@ -82,3 +82,4 @@ for the empirical anchor.
 
 - 2026-05-16: opened blocked-by 382 from 382's soak observation —
   placement fixed, build cadence is the next bottleneck.
+- 2026-05-19: accuracy audit pass — blocked-by empty and status ready; 382 landed (2026-05-17) per balance doc reference; related-work (179/190/220) all landed

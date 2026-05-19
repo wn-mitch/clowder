@@ -56,3 +56,4 @@ TBD when scope is finalized.
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened as parked. Source: input-substrate design thread (plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`). Blocker for 370's metal-set recipes.
+- 2026-05-19: accuracy audit pass — parked status verified (parked: 2026-05-16); blocked-by empty; design references exist (crafting.md)

@@ -86,3 +86,4 @@ deferred" landing log.
 
 - 2026-04-27: opened from ticket 006 closeout. Inherits the
   deferral ticket 045 logged when `WardCoverageMap` landed.
+- 2026-05-19: accuracy audit pass — ready status correct; WardCoverageMap exists in src/resources/ward_coverage_map.rs; related paths mentioned (ward placement DSE) exist.

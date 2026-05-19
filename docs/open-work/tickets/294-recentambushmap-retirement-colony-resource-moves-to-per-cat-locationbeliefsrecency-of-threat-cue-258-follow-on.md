@@ -72,3 +72,4 @@ Hypothesis: per-cat ambush belief aggregated via belief-agreement preserves ward
 ## Log
 
 - 2026-05-11: opened as 258 follow-on. Per 258's plan-agent: this is the widest-blast-radius retirement of the four proxies; sequenced last. Sibling proxies: 290 (RDF), 292 (RTF), 293 (HuntingPriors).
+- 2026-05-19: accuracy audit pass — 258/219 (prerequisites) are landed; 291 (aggregated-view dependency) is open ready; all file paths and Rust symbols verified.

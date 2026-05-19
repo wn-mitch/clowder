@@ -63,3 +63,4 @@ target-keyed surface or author a sibling `TargetMarkerSnapshot`.
 <!-- linkages:end -->
 ## Log
 - 2026-05-08: opened on 126's C4 landing commit. Blocks 245.
+- 2026-05-19: accuracy audit pass — blocker 242 correctly set in frontmatter, status correctly shows blocked, MarkerSnapshot pattern confirmed in src/plugins/setup.rs.

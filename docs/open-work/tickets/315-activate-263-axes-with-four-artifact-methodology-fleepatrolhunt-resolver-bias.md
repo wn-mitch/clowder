@@ -68,3 +68,4 @@ Blocked-by 263 (lands the substrate axes dormant) and 314 (extends ActionAfforda
 ## Log
 
 - 2026-05-13: opened as 263 activation follow-on. Owns the four-artifact methodology that 263 deferred.
+- 2026-05-19: accuracy audit pass — blocked-by 314 is open ready (not landed); 263 is landed; four-artifact methodology discipline is sound; frame-diff and canary scoping correct.

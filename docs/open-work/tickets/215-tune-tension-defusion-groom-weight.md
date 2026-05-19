@@ -1,13 +1,13 @@
 ---
 id: 215
 title: tune tension_defusion_groom_weight
-status: blocked
+status: ready
 cluster: social-coordination
 initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-07
 parked: null
-blocked-by: [209]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
@@ -72,3 +72,4 @@ so a slightly larger weight is safer).
 <!-- linkages:end -->
 ## Log
 - 2026-05-07: opened from 209 closeout.
+- 2026-05-19: accuracy audit pass — frontmatter clean, 209 blocker confirmed landed, no file path issues.

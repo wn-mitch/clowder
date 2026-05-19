@@ -70,7 +70,7 @@ coordinator vs bad coordinator has an effect."
 
 ## Dependencies
 
-- Blocked by 126 (`IntentionSource` substrate).
+- ~~Blocked by 126~~ — 126 landed (6b0b8940). `IntentionSource` substrate now available.
 - Blocked by 057 (something must actually emit
   `CoordinatorDirective` intentions for the trust axis to lift).
 - ~~Blocked by 081~~ — 081 retired without implementation
@@ -110,3 +110,4 @@ coordinator vs bad coordinator has an effect."
   consumer this ticket originally paired with no longer exists; the
   compliance-by-coordinator metric stands on narrative + tuning
   grounds. No status change — 126 and 057 still block.
+- 2026-05-19: accuracy audit pass — blocked-by [057] correct (126 landed 6b0b8940, so 126 blocker removed from Dependencies); updated Dependencies section with strikethrough and sha.

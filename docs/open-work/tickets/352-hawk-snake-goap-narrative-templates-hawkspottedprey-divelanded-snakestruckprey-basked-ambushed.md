@@ -47,4 +47,4 @@ How to prove this is done (tests, canaries, balance reports, focal-cat replays).
 
 <!-- linkages:end -->
 ## Log
-- YYYY-MM-DD: decision / observation / blocker
+- 2026-05-19: accuracy audit pass — all references verified (wildlife GOAP templates exist in src/); blocked-by empty and status ready

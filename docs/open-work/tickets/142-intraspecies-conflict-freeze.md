@@ -75,3 +75,4 @@ Hide/Freeze DSE infrastructure from ticket 104.
   consumer wiring on the same DSE. They compose — Hide's score
   becomes (intraspecies-conflict Modifier from 142) + (general-threat
   Belief axes from 268). Coordinate land order during impl.
+- 2026-05-19: accuracy audit pass — all blockers landed, file paths valid, Rust symbols exist.

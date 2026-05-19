@@ -119,3 +119,4 @@ Sequence as three commits:
 - 2026-04-27: opened from substrate-refactor audit. Parked-by-default;
   pick up after ticket 052 lands so the `ScoringContext` field-removal
   sweep happens after the last new structural consumer.
+- 2026-05-19: accuracy audit pass — parked status correct; 052 landed (acccdc7) so this is ready to unpark but remains deferred.

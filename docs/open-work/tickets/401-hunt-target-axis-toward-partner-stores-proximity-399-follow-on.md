@@ -47,7 +47,8 @@ provisioning, weakening the archetype.
 ## Current state
 
 Blocked by 400 (provision_bias formula needs to land first; this axis
-reads `provision_bias` from the modifier output).
+reads `provision_bias` from the modifier output). [UPDATE 2026-05-19: 400
+landed 2026-05-18, now unblocked.]
 
 ## Approach
 
@@ -78,3 +79,4 @@ extension pattern: see existing target-axes in `src/ai/dses/hunt.rs`
 
 - 2026-05-17: opened as 399 follow-on; blocked by 400. Design resolved in
   399's plan file.
+- 2026-05-19: accuracy audit pass — 400 landed; status should flip from blocked to ready; marked `[needs-review]` for blocked-by list update

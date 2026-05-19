@@ -121,3 +121,4 @@ collapses behavior during transition (precedent: tickets 091, 111).
 - 2026-05-11: opened by 271 landing as the named R3 structural
   follow-on. See `docs/balance/271-flee-boldness-axis-shape.md`
   §Follow-ons for the design rationale.
+- 2026-05-19: accuracy audit pass — 271 (predecessor) is landed; all file paths verified; CLAUDE.md pillar references sound.

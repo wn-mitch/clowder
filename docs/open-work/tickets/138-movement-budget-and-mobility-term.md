@@ -92,3 +92,4 @@ Independent of Phase 0 (#137) and Phase 2 (#139); ships when ready. **This phase
 ## Log
 
 - 2026-05-02: Opened as Phase 1 of the 135 continuous-position-migration epic. Re-enables the mobility term punted at ticket 103 landing.
+- 2026-05-19: accuracy audit pass — ready status correct; blocked-by [135] correct (epic not yet landed); MovementBudget symbol exists in src/components/.

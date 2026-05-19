@@ -58,3 +58,7 @@ Pre-036 baseline soak at `logs/tuned-42-a879f43-pre-cook-fix/` (FoodCooked = 0; 
 - · **375** (ready, items-crafting, score 0.85) — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ…
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-19: accuracy audit pass — no changes needed (ready, no blocked-by, related-systems and linkages current)

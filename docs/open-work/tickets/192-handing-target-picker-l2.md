@@ -93,3 +93,4 @@ later iterations.
   the L2 target-picker DSE that scales to richer recipient
   policy is split out here per CLAUDE.md antipattern-migration
   discipline.
+- 2026-05-19: accuracy audit pass — DSE pattern mirrors verified, file paths and consideration precedents confirmed.

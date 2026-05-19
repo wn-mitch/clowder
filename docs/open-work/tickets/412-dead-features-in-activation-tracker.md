@@ -1,7 +1,7 @@
 ---
 id: 412
 title: Three permanently dead features in activation tracker
-status: blocked
+status: ready
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -29,3 +29,4 @@ These inflate `features_total` (57) without being able to activate, dragging dow
 ## Log
 
 - 2026-05-18: Renumbered from id `PE-002` → `412` and moved out of `docs/open-work/pre-existing/` into `docs/open-work/tickets/` during Linear migration prep. `pre-existing/` is being retired — the long-lived stragglers are now first-class tickets.
+- 2026-05-19: accuracy audit pass — status should flip from blocked to ready (no blockers in blocked-by field)

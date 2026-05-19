@@ -235,3 +235,4 @@ Read in this order:
   active sub-epic. CLAUDE.md gained "All multi-tick aspirations
   are HTN methods" + "Every dormant method has a glue ticket"
   rules.
+- 2026-05-19: accuracy audit pass — epic in-progress status correct; child roster table accurate; critical path and parallelism analysis coherent.

@@ -77,3 +77,4 @@ Blocked on 375 (`engage_prey` must be extended for multi-item spawn first; this 
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened. Plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`. Blocked on 375 (multi-item spawn extension).
+- 2026-05-19: accuracy audit pass — blocked-by 375 exists in ready queue; status blocked verified; design references (naming.md/the-calling.md/crafting.md) all exist

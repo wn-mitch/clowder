@@ -72,3 +72,4 @@ This is the Desire-layer (per-tick DSE scoring) half of the anticipatory provisi
 ## Log
 
 - 2026-05-13: opened blocked-by 308. Hot context from 260's verification soak: priestess Guarding monopoly during 35k unwarded window, 7-cat ambush wave at (25-39, 20-23) following exhausted thornbriar reserve. This ticket is the Desire-layer half of the anticipatory-provisioning loop.
+- 2026-05-19: accuracy audit pass — 308 (blocker) is open ready; 260 (context event) is landed; all file paths and marker references sound; scenario microexperiment scope is valid.

@@ -9,7 +9,7 @@ added: 2026-05-18
 parked: null
 blocked-by: []
 supersedes: []
-related-systems: [needs.md]
+related-systems: [wiki/needs.md]
 related-balance: [starvation-rebalance.md, routing-the-mating-gate-through-the-body-condition-welfare-a.md]
 landed-at: null
 landed-on: null
@@ -95,3 +95,4 @@ Item-5 verdict: concordant, +43.2% courtship_tally vs baseline.
   was deferred behind the courtship-canary regression (since cleared).
   This ticket completes the actual rebalance by promoting the new
   behavior to ship.
+- 2026-05-19: accuracy audit pass — 032 verified in landed/; needs.md, starvation-rebalance.md, routing-the-mating-gate-* file paths verified

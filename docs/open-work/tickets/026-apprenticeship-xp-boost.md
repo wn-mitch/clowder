@@ -100,3 +100,7 @@ post-soak concordance confirms direction + magnitude.
 - · ** 16** (in-progress, items-crafting, score 0.84 (cross-cluster)) — Crafting — items, recipes, stations (epic dashboard)
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-19: accuracy audit pass — blocked-by references balance doc `mastery-restoration.md` iteration 2 (intentional string reference, not ticket ID); no changes needed

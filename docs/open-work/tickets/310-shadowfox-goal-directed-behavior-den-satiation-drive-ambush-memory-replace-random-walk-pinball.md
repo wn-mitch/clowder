@@ -76,3 +76,4 @@ Order of work likely: (1) lift the satiation drive (smallest mechanism change, b
 ## Log
 
 - 2026-05-13: opened from ticket 260's verification soak discovery. The substrate-honesty work on ward perception revealed that ShadowFox behavior beneath was already shallow (random walk + 5%/tick stalk trigger + no memory). 7-cat ambush wave at (25-39, 20-23) over ticks 1309038-1314568 confirmed the gap. Pre-260's 27-tile ward radius was hiding this; the right response is predator AI substrate, not re-papering with a multiplied ward map.
+- 2026-05-19: accuracy audit pass — 260 (context event) is landed; all file paths verified; BDI-shape mapping is sound; RecentAmbushMap (294 dependency) is live; approach is predator-ecology grounded.

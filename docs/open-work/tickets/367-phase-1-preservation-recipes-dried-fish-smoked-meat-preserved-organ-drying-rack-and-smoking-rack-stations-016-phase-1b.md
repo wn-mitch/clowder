@@ -50,3 +50,4 @@ See `docs/systems/crafting.md` Phase 1 table. Hypothesis: `deaths_by_cause.Starv
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened as 016 epic decomposition (Phase 1b; parent 016, blocked-by 365).
+- 2026-05-19: accuracy audit pass — blocked-by clear (365 landed 2026-05-14); status ready verified; docs/systems/crafting.md exists

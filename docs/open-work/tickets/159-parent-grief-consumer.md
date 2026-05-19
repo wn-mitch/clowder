@@ -145,3 +145,4 @@ handles the rest.
   structural fix. Surfaced by user question "what emotional impacts
   does the kitten death have" — investigation found the existing
   death pipeline has no parent-specific channel.
+- 2026-05-19: accuracy audit pass — layer-walk audit valid, file paths and component names verified, structural-option candidates sound.

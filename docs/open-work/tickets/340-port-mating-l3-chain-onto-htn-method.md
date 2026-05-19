@@ -107,3 +107,4 @@ the harness that sequences them does.
 
 - 2026-05-14: opened as 128 epic child #22 (Batch E cross-cutting;
   worked-example landing).
+- 2026-05-19: accuracy audit — ISSUE FOUND: ticket references `src/components/disposition.rs:1873-1919` as the location of a hand-coded Mating chain, but the file is only 1113 lines total. Assertion that a `MoveTo → Socialize → GroomOther → MateWith` chain exists in that location [needs-review]. Referenced files exist (htn-methods.md, ai-substrate-refactor.md), blocker 323 status=ready is correct. Mating resolve functions verified (resolve_mate_with exists in src/steps/disposition/mate_with.rs).

@@ -92,3 +92,4 @@ narr.witnessable.write(
 ## Log
 
 - 2026-05-12: opened as the deferred Attack arm of 295. Gated on cat-vs-cat aggression substrate, which has no ticket yet — this entry holds the intent until that substrate lands. Mirrors 295's deferrals of `ConspecificStartle` (242) and `AmbientShock` (weather hook) — both also waiting on prerequisite substrate.
+- 2026-05-19: accuracy audit pass — 295 (blocker) is landed; 258 (belief-integrator prerequisite) is landed; WitnessableEvent::Attack variant is present and matches described shape; approach is substrate-stub enforcement sound.

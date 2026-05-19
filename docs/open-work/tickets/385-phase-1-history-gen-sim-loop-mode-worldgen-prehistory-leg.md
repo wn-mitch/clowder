@@ -64,3 +64,4 @@ Mirror the existing windowed-vs-headless factoring of `SimulationPlugin`, adding
 ## Log
 
 - 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])
+- 2026-05-19: accuracy audit pass — all file paths + blocked-by refs verified

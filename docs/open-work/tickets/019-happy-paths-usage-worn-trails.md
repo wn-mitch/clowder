@@ -80,3 +80,7 @@ shipped or is shipping in the same PR.
 - · **249** (parked, ai-substrate, score 0.87 (cross-cluster)) — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al.…
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-19: accuracy audit pass — no changes needed (blocked-by [020] correct, related-systems and linkages current)

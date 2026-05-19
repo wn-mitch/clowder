@@ -93,3 +93,4 @@ system can fetch without coupling to chain-const knowledge.
 - 2026-05-14: opened as a 056 follow-on (split-out per CLAUDE.md
   antipattern-migration discipline). 055's `blocked-by` flipped from
   `[056]` to `[344]` in the same commit.
+- 2026-05-19: accuracy audit pass — no blockers in blocked-by (correct), referenced file exists (ai-substrate-refactor.md), Rust symbols verified (AspirationChain, AspirationRegistry).

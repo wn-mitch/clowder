@@ -95,3 +95,4 @@ the cry-based modifier — caretake should fire even when a kitten
 ## Log
 - 2026-05-07: opened from 210 closeout, blocked on 219 (the
   `RecentAmbushMap` substrate it consumes).
+- 2026-05-19: accuracy audit pass — blocker 219 confirmed landed, status correctly shows ready, RecentAmbushMap confirmed in src/plugins/simulation.rs.

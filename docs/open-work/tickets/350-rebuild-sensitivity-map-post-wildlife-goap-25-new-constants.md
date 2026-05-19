@@ -47,4 +47,4 @@ How to prove this is done (tests, canaries, balance reports, focal-cat replays).
 
 <!-- linkages:end -->
 ## Log
-- YYYY-MM-DD: decision / observation / blocker
+- 2026-05-19: accuracy audit — INCOMPLETE TEMPLATE: ticket body contains template placeholder text. Ticket was opened on 2026-05-15 but never filled in. Note: ticket is marked `orchestration: swarm-safe`, which is appropriate for a rebuild task. [needs-review] for completion or status change.

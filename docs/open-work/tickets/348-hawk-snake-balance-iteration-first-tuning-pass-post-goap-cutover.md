@@ -47,4 +47,4 @@ How to prove this is done (tests, canaries, balance reports, focal-cat replays).
 
 <!-- linkages:end -->
 ## Log
-- YYYY-MM-DD: decision / observation / blocker
+- 2026-05-19: accuracy audit — INCOMPLETE TEMPLATE: ticket body contains template placeholder text ("One paragraph: what problem...", "Concrete deliverable 1/2", etc.). Ticket was opened on 2026-05-15 but never filled in. [needs-review] for whether this should be ready or parked pending content.

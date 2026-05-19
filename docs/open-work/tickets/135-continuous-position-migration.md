@@ -94,3 +94,4 @@ Each phase MUST land its own four-artifact balance check (`just hypothesize <spe
 ## Log
 
 - 2026-05-02: Opened as a deferred follow-on of work 103 (escape_viability mobility-term punt). Originally drafted as a small "per-species cooldowns" ticket; reframed via user feedback into the epic-shape continuous-position migration. Phase tickets 137/138/139/140 opened in the same commit.
+- 2026-05-19: accuracy audit pass — ready status correct; four-phase structure coherent (0=render-only, 1=cadence, 2=Vec2<f32> big lift, 3=steering polish); design constraints and risks well-documented.

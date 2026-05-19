@@ -40,3 +40,7 @@ Also touches `src/systems/disposition.rs:1675–1676, 1717–1718, 1748`
 - ✓ landed **271** (done, ai-substrate, score 0.84 (cross-cluster)) — Restore substrate Flee score lift on critical-health + active-threat (251 balan…
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-19: accuracy audit pass — line numbers in `src/ai/scoring.rs` have shifted (now ~1854-1855 for magic gate) but cited gating behavior still accurate; no edit needed

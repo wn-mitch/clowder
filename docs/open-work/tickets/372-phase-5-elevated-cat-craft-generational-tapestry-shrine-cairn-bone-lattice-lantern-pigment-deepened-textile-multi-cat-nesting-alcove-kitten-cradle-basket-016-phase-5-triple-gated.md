@@ -50,3 +50,4 @@ See `docs/systems/crafting.md` Phase 5 + safeguards against DF-drift. Hypothesis
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened as 016 epic decomposition (Phase 5; parent 016, blocked-by 371 + 366).
+- 2026-05-19: accuracy audit pass — blocked-by entries (371/366) verified (366 landed 2026-05-17); status blocked verified; related-work 381 parked per design

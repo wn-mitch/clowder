@@ -66,3 +66,4 @@ Adjacent to the C3 spinout cluster (256→258) but independent: audible cues exi
 ## Log
 
 - 2026-05-10: opened as parking-lot perception-improvement adjacent to the C3 spinout cluster (ticket 258). Independent; blocked-on 244.
+- 2026-05-19: accuracy audit pass — blocker 244 confirmed open; related work references (242, 267, 282) verified.

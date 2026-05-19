@@ -7,7 +7,7 @@ initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-07
 parked: 2026-05-07
-blocked-by: [209]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]
@@ -85,3 +85,4 @@ modest weight has multiplicative impact). Single-seed
   the substrate refactor. Once 223 lands, both this axis and
   `FoxTerritorySuppression`'s damping branch are subsumed by A*-level
   path-cost; 214 likely retires entirely. Re-evaluate after 224 lands.
+- 2026-05-19: accuracy audit pass — parked status rationale verified, structural tension sound, pathfinder-risk-awareness cluster referenced correctly.

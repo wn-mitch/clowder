@@ -84,3 +84,4 @@ The payoff: predation feels like predation. Prey that bolt at the right moment +
 ## Log
 
 - 2026-05-10: opened sibling-to-258. First prey AI in the codebase. Enabled, not delivered, by the C3 + Affordance substrates landing in the same cluster lifecycle. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
+- 2026-05-19: accuracy audit pass — no blockers; PreyKind enum referenced correctly; aspirational DSE files (prey_bolt, prey_scattergroup) not yet required to exist per implementation phase.

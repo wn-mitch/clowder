@@ -98,7 +98,7 @@ upgrades). Tracked as a separate latent defect.
 ## Current state
 
 - Defect identified during 184 layer-walk audit
-  ([`docs/open-work/tickets/184-kill-deposit-pipeline-regression-post-175.md`](184-kill-deposit-pipeline-regression-post-175.md)).
+  ([`docs/open-work/landed/184-kill-deposit-pipeline-regression-post-175.md`](../landed/184-kill-deposit-pipeline-regression-post-175.md)).
 - No observed user-facing symptoms in the 184 soak
   (`StorageUpgraded == 0` in both pre-181 and post-181 runs,
   consistent with no baskets being deposited successfully — the
@@ -174,3 +174,4 @@ callsite per commit.
   data), but a known silent-loss path the moment basket deposits
   start. Tracked separately so 184 can close cleanly as
   "no defect for the food-stockpile observation."
+- 2026-05-19: accuracy audit pass — fixed link to landed ticket 184, approach candidates sound, test strategy verified.

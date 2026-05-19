@@ -51,7 +51,8 @@ without the substrate-honest target shape.
 
 ## Current state
 
-Blocked by 400 (protect_bias formula needs to land first).
+Blocked by 400 (protect_bias formula needs to land first). [UPDATE 2026-05-19: 400
+landed 2026-05-18, now unblocked.]
 
 ## Approach
 
@@ -85,3 +86,4 @@ side.
 ## Log
 
 - 2026-05-17: opened as 399 follow-on; blocked by 400.
+- 2026-05-19: accuracy audit pass — 400 landed; status should flip from blocked to ready; marked `[needs-review]` for blocked-by list update

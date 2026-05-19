@@ -47,4 +47,5 @@ How to prove this is done (tests, canaries, balance reports, focal-cat replays).
 
 <!-- linkages:end -->
 ## Log
-- YYYY-MM-DD: decision / observation / blocker
+- 2026-05-11: opened as JointIntention practice group stub.
+- 2026-05-19: accuracy audit — ticket body incomplete (template boilerplate with no substantive content). [needs-review] on scope/approach/verification sections before work commences.

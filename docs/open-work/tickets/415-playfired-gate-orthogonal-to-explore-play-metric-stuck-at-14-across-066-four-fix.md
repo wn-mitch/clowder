@@ -101,3 +101,4 @@ Focal-cat replay if PlayFired fires for one cat but not others.
   Working hypothesis: PlayFired emit at personality_events.rs:320 is gated
   by preconditions orthogonal to Explore scoring. Cross-reference 276 in
   case JointIntention-based play is the canonical canary path now.
+- 2026-05-19: accuracy audit pass — 066 verified in landed/; ai-substrate-refactor.md and healthy-colony.md file paths verified

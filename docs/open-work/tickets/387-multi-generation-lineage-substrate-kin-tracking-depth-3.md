@@ -61,3 +61,4 @@ Lineage is colony-scope substrate (a `Resource` mapping `CatId → Lineage`) so 
 ## Log
 
 - 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])
+- 2026-05-19: accuracy audit pass — path reference corrected (social.rs → systems/social.rs); ParentingActivity verified at src/components/parenting_activity.rs

@@ -70,3 +70,4 @@ read from a `BurialFired.spirituality` payload field.
 ## Log
 
 - 2026-05-08: opened as 035 follow-on.
+- 2026-05-19: accuracy audit pass — blocker 035 confirmed landed, Personality.spirituality axis confirmed present, no file path issues.

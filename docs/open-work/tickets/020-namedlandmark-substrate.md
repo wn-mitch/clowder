@@ -81,3 +81,7 @@ to a consumer PR (lean) or bundled with first consumer.
 - ✓ landed **261** (done, ai-substrate, score 0.86 (cross-cluster)) — ActionAffordances substrate — per-action success scalars + ActionKind enum + he…
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-19: accuracy audit pass — no changes needed (ready, no blocked-by, related-systems and linkages current)

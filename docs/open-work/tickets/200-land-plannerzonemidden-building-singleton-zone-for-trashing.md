@@ -78,3 +78,4 @@ also a singleton). Pattern-match on that.
 - 2026-05-06: opened from 195's closeout. Blocks-by 195 because the
   stub-lint must be in place before this ticket's "drop the allowlist
   entry" verification step makes sense.
+- 2026-05-19: accuracy audit pass — PlannerZone enum location verified, zone resolver pattern precedent confirmed, approach sound.

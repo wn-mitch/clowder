@@ -59,3 +59,4 @@ Extend the template enum in `narrative.rs` with historical-reference variants. T
 ## Log
 
 - 2026-05-16: opened as leg of `worldgen-prehistory` coherent-block (see [9])
+- 2026-05-19: accuracy audit pass — blocked-by 387, 388 in tickets/; 54 verified in landed/

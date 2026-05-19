@@ -99,3 +99,4 @@ any `JointDropBranch`, the method frame propagates abandonment.
 ## Log
 
 - 2026-05-14: opened as 128 epic child #5 (Batch B Tier 1).
+- 2026-05-19: accuracy audit pass — no blockers, files referenced exist (htn-methods.md, ai-substrate-refactor.md), Rust symbols verified (JointIntention, GoalFrame, HeldGoalStack, populate_method_registry).

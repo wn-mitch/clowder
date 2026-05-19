@@ -55,7 +55,7 @@ becomes mechanically active.
 ## Current state
 
 Blocked by 400 (teach_skill_bias formula must exist as the consumer
-before mastery is wired in).
+before mastery is wired in). [UPDATE 2026-05-19: 400 landed 2026-05-18, now unblocked.]
 
 ## Approach
 
@@ -90,3 +90,4 @@ separate.
 - 2026-05-17: opened as 399 follow-on; blocked by 400. Consider checking
   90's relationship to this work via `just similar 406` before
   implementation starts.
+- 2026-05-19: accuracy audit pass — 400 landed; status should flip from blocked to ready; marked `[needs-review]` for blocked-by list update

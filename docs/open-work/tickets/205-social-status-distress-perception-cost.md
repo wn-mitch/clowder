@@ -64,3 +64,4 @@ Net asymptotic: **O(N²) per tick on the perception layer alone**, where N is th
 ## Log
 
 - 2026-05-07: Opened in the same commit that lands 109 Phase A's verification. Surfaced via `just verdict` reporting `duration_drift_pct: 25.0%` against `logs/tuned-42-pre-108-109`. Phase B sub-tickets (142/143/144) inherit this cost; optimizing once amortizes across the family.
+- 2026-05-19: accuracy audit pass — perception scalar location verified (src/systems/interoception.rs:316-405), structural-option candidates sound, investigation methodology correct.

@@ -174,3 +174,4 @@ Implementation phases:
   precedent for the cat-side field; 258 belief substrate provides
   the facet shape; 294 / 293 provide the retirement pattern (colony
   per-tick rollup → per-cat belief state).
+- 2026-05-19: accuracy audit pass — blocked-by empty and status ready; ShelterFacet not yet in src/ (aspirational); home_den exists in prey.rs/wildlife.rs but not on canonical cat component yet; 258 belief substrate exists in src/components/beliefs.rs

@@ -71,3 +71,4 @@ time; future tickets extend the vocabulary.
 ## Log
 - 2026-05-08: opened on 126's C4 landing commit per the actor-
   private narrative-discipline framing.
+- 2026-05-19: accuracy audit pass — blocker 126 confirmed landed, body-cues.md is a file to be created by this ticket (OK), no file path issues, status correctly shows ready.

@@ -48,3 +48,4 @@ See `docs/systems/crafting.md` Phase 2. Hypothesis: post-368, grooming / play / 
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened as 016 epic decomposition (Phase 2; parent 016, blocked-by 365).
+- 2026-05-19: accuracy audit pass — blocked-by clear (365 landed 2026-05-14); status ready verified

@@ -1,13 +1,13 @@
 ---
 id: 213
 title: tune groom_food_security_weight
-status: blocked
+status: ready
 cluster: social-coordination
 initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-07
 parked: null
-blocked-by: [209]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]
@@ -65,3 +65,4 @@ doesn't push other axes around).
 <!-- linkages:end -->
 ## Log
 - 2026-05-07: opened from 209 closeout.
+- 2026-05-19: accuracy audit pass — landed ticket 209 verified, blocked-by correctly empty, methodology sound, multi-focal trace convention understood.

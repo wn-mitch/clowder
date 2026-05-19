@@ -74,3 +74,4 @@ per-arc expected-valence targets.
   landed. 056 enumerated the §7.7.1 hard-pair conflict matrix but
   split the per-arc `expected_valence_target` work into ticket 344
   (the actual dependency this ticket needs).
+- 2026-05-19: accuracy audit pass — blocked-by [344] confirmed in tickets/; no changes needed

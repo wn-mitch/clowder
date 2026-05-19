@@ -62,3 +62,4 @@ When unparked: same layered verification pattern as 089 — pure-fn unit tests f
 ## Log
 
 - 2026-05-01: Opened by 089's land commit, per the antipattern-migration follow-up convention codified in `CLAUDE.md` §Long-horizon coordination. Status `ready` rather than `blocked` because the substrate-first path (option 2 above) is unblocked at any time; status will flip to `blocked-by: [<consumer-ticket-id>]` if a downstream consumer ticket lands first and pulls this one in as a dependency.
+- 2026-05-19: accuracy audit pass — ready status correct; LandmarkAnchor enum exists in src/ai/scoring.rs; 089 dependency documented accurately.

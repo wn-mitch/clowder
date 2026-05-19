@@ -107,3 +107,4 @@ emits: &[
 
 - 2026-05-14: opened as 128 epic child #7 (Batch B Tier 1,
   chosen because Hunting is worked-example domain).
+- 2026-05-19: accuracy audit pass — no blockers, referenced files exist (htn-methods.md, aspirations.rs), Rust symbols verified (Milestone, Emit, populate_method_registry).

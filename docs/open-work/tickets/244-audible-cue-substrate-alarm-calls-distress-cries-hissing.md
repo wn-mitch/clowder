@@ -37,7 +37,7 @@ each other.
   texture later wants ambient meowing.
 
 ## Current state
-Blocked-by 126 (lifecycle observability primitive).
+126 (lifecycle observability primitive) landed 2026-05-XX; ticket is now unblocked and ready for work.
 
 ## Approach
 Mirror `KittenCryMap`'s influence-map shape: emitter authors a
@@ -62,3 +62,4 @@ attenuation.
 <!-- linkages:end -->
 ## Log
 - 2026-05-08: opened on 126's C4 landing commit.
+- 2026-05-19: accuracy audit pass — blocker 126 confirmed landed, status correctly shows ready, KittenCryMap influence-map pattern confirmed in codebase.

@@ -72,3 +72,4 @@ the resolver contract surfaces cleanly.
 ## Log
 
 - 2026-05-08: opened as 035 follow-on per the user's monument-system vision.
+- 2026-05-19: accuracy audit pass — blocker 035 confirmed landed, referenced markers and DSE patterns plausible, no file path issues.

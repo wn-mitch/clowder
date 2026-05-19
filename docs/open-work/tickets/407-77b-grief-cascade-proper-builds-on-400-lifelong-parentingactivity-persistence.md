@@ -64,9 +64,9 @@ supersedes one or both, OR 407 builds on top.
 ## Current state
 
 Blocked by 400 (substrate foundation: persistent ParentingActivity
-through kitten death). Coordinate with tickets 53 and 159 — may
-supersede or build on; verify with `just similar 407` and read their
-content before starting.
+through kitten death). [UPDATE 2026-05-19: 400 landed 2026-05-18, now unblocked.]
+Coordinate with tickets 53 and 159 — may supersede or build on; verify with
+`just similar 407` and read their content before starting.
 
 ## Approach
 
@@ -101,3 +101,4 @@ grief-as-frustrated-expression principle.
 
 - 2026-05-17: opened as 399 follow-on; blocked by 400. Coordinate with
   tickets 53 and 159 (overlapping scope from prior design epoch).
+- 2026-05-19: accuracy audit pass — 400 landed; status should flip from blocked to ready; marked `[needs-review]` for blocked-by list update

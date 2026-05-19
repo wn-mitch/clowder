@@ -88,3 +88,4 @@ Pre-existing related work: 143 (IntraspeciesConflictResponseFight) — combat va
 ## Log
 
 - 2026-05-10: opened sibling-to-258 as the substrate-enriched version of 256 R6's deferred Patrol/EngageThreat split. Blocks-on 256; soft-blocks-on 258. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
+- 2026-05-19: accuracy audit pass — no blockers recorded in frontmatter (256/261 soft-blocked as noted in body); patrol.rs exists; aspirational engage_threat.rs correctly deferred to implementation; related infrastructure (143, 256, 263, 261) status verified.

@@ -59,3 +59,4 @@ weights recovery by the fondness of the specific interaction partner.
 
 - 2026-05-01: Opened as tier-1 emotional-fidelity ticket from DSE flattening audit.
   Independent of ticket 114.
+- 2026-05-19: accuracy audit pass — ready status correct; no blocked-by; files socialize.rs and groom_other.rs exist in src/steps/disposition/.

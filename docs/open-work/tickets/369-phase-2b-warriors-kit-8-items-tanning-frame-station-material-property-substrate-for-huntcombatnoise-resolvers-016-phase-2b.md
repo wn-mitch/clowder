@@ -49,3 +49,4 @@ See `docs/systems/crafting.md` Phase 2b + the material-property table (Bone / Fl
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened as 016 epic decomposition (Phase 2b; parent 016, blocked-by 365).
+- 2026-05-19: accuracy audit pass — blocked-by clear (365 landed 2026-05-14); status ready verified; related-work 334/379/377/378 exist in tickets

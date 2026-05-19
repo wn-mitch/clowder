@@ -79,3 +79,4 @@ sibling lifts.
 - 2026-05-07: opened from 211 closeout — Patrol +1.45pp share rise
   with per-cat L2 score dropping -22.4% needs mechanism analysis
   before 212/213 land.
+- 2026-05-19: accuracy audit pass — frontmatter clean, no file path issues.

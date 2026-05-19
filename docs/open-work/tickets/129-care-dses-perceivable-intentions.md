@@ -99,3 +99,4 @@ Not in scope here; this is the placeholder for the design.
   Care DSE for adults + goal-granularity soft-claim + compassion
   personality bias) unchanged and still uncovered by any landed
   ticket.
+- 2026-05-19: accuracy audit pass — blocked status + blocked-by [242, 243] correct; no landed tickets 242 or 243 exist in tickets/ folder.

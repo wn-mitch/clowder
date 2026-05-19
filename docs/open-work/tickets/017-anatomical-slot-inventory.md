@@ -63,3 +63,7 @@ up before either.
 - ✓ landed **  7** (done, ai-substrate, score 0.86 (cross-cluster)) — Deliberation-layer (Cluster C)
 
 <!-- linkages:end -->
+
+## Log
+
+- 2026-05-19: accuracy audit pass — no changes needed (blocked-by [016] correct, related-systems and linkages current)

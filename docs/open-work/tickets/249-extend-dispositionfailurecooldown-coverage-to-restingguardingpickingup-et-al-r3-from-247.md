@@ -258,3 +258,4 @@ follow-ons.
     cats with memory-based sleep spots can sleep without Stores.
     This is the cliff fix at the right layer (zone resolution, not
     DSE eligibility).
+- 2026-05-19: accuracy audit pass — ticket correctly marked parked; three follow-on tickets (251, 253, and unnamed) were spawned and are tracked in this log.

@@ -168,3 +168,4 @@ parking. Reassess once any one of 219/234/243/244/283 lands.
   282 (doctrine) and ticket 283 (fox-scent split) as the first
   two pieces of upstream work. Audit lives at
   `.claude/plans/let-s-work-273-dig-enchanted-wirth.md`.
+- 2026-05-19: accuracy audit pass — parked status correct; layer-walk audit table comprehensive; file paths (growth.rs, scoring.rs, sim_constants.rs, ai/dses/caretake.rs, patrol.rs) verified; related landed tickets (156, 164, 187) confirmed.

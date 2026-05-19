@@ -71,3 +71,4 @@ Parked 2026-05-14. Per
 
 - 2026-05-14: opened parked as 128 epic child #24 (Phase-2
   future enrichment).
+- 2026-05-19: accuracy audit pass — parked status is correct (parked: 2026-05-14), no blockers in blocked-by, referenced files exist (htn-methods.md), Rust symbols verified (Method).

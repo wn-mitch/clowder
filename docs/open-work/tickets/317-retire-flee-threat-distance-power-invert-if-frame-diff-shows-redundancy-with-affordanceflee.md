@@ -60,3 +60,4 @@ Blocked-by 315. The decision flips on activation-soak data.
 ## Log
 
 - 2026-05-13: opened as 263 follow-on after the activation pathway was scoped. Decision conditional on 315's measured shape.
+- 2026-05-19: accuracy audit pass — blocker 315 exists, status=blocked is correct.

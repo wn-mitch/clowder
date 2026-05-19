@@ -92,3 +92,4 @@ Path 2 is more thorough but requires more harness scaffolding.
 <!-- linkages:end -->
 ## Log
 - 2026-05-07: opened from 209 iter-1 diagnosis.
+- 2026-05-19: accuracy audit pass — frontmatter clean, no file path issues, scripts/check_substrate_stubs.sh verified present.

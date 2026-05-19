@@ -77,3 +77,4 @@ Hypothesis: per-cat `LocationBeliefs.prey_yield` aggregated to colony level pres
 ## Log
 
 - 2026-05-11: opened as 258 follow-on. Sequenced behind 291 (agreement-derivation infrastructure shared). Sibling proxies: 290 (RDF), 292 (RTF), 294 (RecentAmbushMap).
+- 2026-05-19: accuracy audit pass — 258 (blocker) is landed; 291 (sequencing blocker) is open ready; all file paths and Rust symbols verified; four-artifact methodology scoped.

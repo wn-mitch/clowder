@@ -76,3 +76,4 @@ through the §7.2 commitment evaluator.
   container retirement. 007's §C4 is satisfied by ticket 128 (HTN
   method composition); 128 is the substrate this row composes against
   when the coordinator DSE lands.
+- 2026-05-19: accuracy audit pass — blocked-by [128] confirmed active; no file path or symbol issues.

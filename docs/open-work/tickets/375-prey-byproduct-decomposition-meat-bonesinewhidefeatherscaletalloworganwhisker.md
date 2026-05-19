@@ -67,3 +67,4 @@ Today: every prey kill in `resolve_engage_prey` spawns exactly one raw-meat item
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened. Plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`. First of the four tickets in the input-substrate cluster (375 / 376 / 377 / 378) plus three follow-ons (379 / 380 / 381).
+- 2026-05-19: accuracy audit pass — blocked-by empty and status ready; docs/systems/crafting.md exists; referenced ItemKind and byproduct logic are aspirational (not yet in code)

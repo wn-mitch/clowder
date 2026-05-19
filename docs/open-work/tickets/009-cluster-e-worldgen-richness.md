@@ -197,3 +197,4 @@ Per CLAUDE.md "Per-block verdict pattern" doctrine, the anchor authors its own c
 
 - 2026-04-27: dropped blocked-by 005 — cluster-A umbrella retired; A1 dependency satisfied by landed work. Status flipped blocked → ready.
 - 2026-05-16: promoted to coherent-block epic. Opened children 385–393; block=`worldgen-prehistory`, anchor=true. Initiatives unioned: `[generational-continuity, mythic-texture, smarter-cats, worldgen-prehistory]`. Long-term aspirational content — the explosion is for legibility (cross-linking with 258 / 280 / 291 / 264 / 265 / 057 / 335 neighbors), not scheduling. See `## Decomposition` + `## Block-verdict pattern`.
+- 2026-05-19: accuracy audit pass — epic; children 385–393 all confirmed active in tickets/.

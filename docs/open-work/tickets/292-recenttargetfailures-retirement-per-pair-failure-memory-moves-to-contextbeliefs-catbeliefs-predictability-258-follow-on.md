@@ -75,3 +75,4 @@ Implementation order: emit-site additions first (substrate populates), tests pas
 ## Log
 
 - 2026-05-11: opened as 258 follow-on. Per-pair failure memory is one of three typed-failure proxies that 258's plan-agent audit identified as belief-substrate-redundant. Sibling proxies: 290 (RecentDispositionFailures), 293 (HuntingPriors), 294 (RecentAmbushMap).
+- 2026-05-19: accuracy audit pass — 258/261 (prerequisites) are landed; all file paths and Rust symbols verified; four-artifact methodology structure sound.

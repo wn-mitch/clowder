@@ -105,3 +105,4 @@ neutral), then a separate balance ticket sets a non-zero bonus.
   activate, or that may activate with a shape that doesn't fit
   either (a) or (b). Unpark when a balance ticket opens for
   Tradition's bonus magnitude.
+- 2026-05-19: accuracy audit pass — parked status + no blocked-by correct; Tradition modifier dormant on production path.

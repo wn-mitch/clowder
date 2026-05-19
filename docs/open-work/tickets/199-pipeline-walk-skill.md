@@ -85,3 +85,4 @@ intent and the parking rationale.
   per recommended triage — defer until a second instance
   demands the per-pipeline funnel view. Cluster
   `process-discipline`.
+- 2026-05-19: accuracy audit pass — parked status rationale verified, skill design deferred appropriately.

@@ -249,3 +249,4 @@ Follow the `CarcassScentMap` pattern in `src/resources/`:
   not a new behavior axis — magic system owns the response). Personality
   table locked: comfort→warmth/(1−independence), cleanliness→anxiety,
   beauty→spirituality, mystery→curiosity, corruption→none.
+- 2026-05-19: accuracy audit pass — ready status correct; blocked-by 100 correct (tremor influence map infrastructure prerequisite); EnvironmentalQualityModifier symbol exists in src/ai/eval.rs.

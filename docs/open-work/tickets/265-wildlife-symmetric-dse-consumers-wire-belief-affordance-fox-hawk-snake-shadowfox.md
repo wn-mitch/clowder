@@ -83,3 +83,4 @@ Also wires species-specific predation actions (Dive on Hawk, Strike on Snake, Am
 ## Log
 
 - 2026-05-10: opened sibling-to-258. Wires Belief + Affordance into wildlife DSE catalog symmetrically. Species clash now happens because both sides perceive the substrate honestly. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
+- 2026-05-19: accuracy audit pass — no blockers; wildlife DSE files (fox_*, hawk_*, snake_*, shadowfox_*) audit deferred to implementation per ticket scope; related work references verified.
