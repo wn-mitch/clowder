@@ -1,7 +1,7 @@
 ---
 id: 084
 title: Herb-stash economy + stash-low signal driving Farm DSE and coordinator build-pressure
-status: in-progress
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [027-l2-pairing-activity.md, 084-farm-herb-ward-demand.md, 085-gardens-multiuse-build-gate.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-19
 ---
 
 ## Why
@@ -129,3 +129,4 @@ Canary re-promotion in `system_activation.rs::expected_to_fire_per_soak` (`Featu
 - 2026-04-30: 085 landed the disjunctive build-pressure gate (`food_demand || herb_demand`) as architectural prep — bit-identical to baseline in seed 42 (gate never fires in this seed's natural dynamics). Empirical investigation showed the gate works structurally (verified via probe: `food_threshold=0.95` + loosened `herb_demand=ward_strength_low` produces a Garden + `HasGarden = true`), but every loosening that makes the gate fire in seed 42 also breaks survival canaries (`courtship 764→0`, `wards_placed 5→1`, 4 wildlife-combat deaths) by redistributing cat-time from social/defense to construction. 084's `farm_herb_pressure` axis remains untestable on seed 42 because the colony never enters the `(ward_strength_low ∧ !ThornbriarAvailable)` regime long enough for Farm to score above competing actions — wild thornbriar respawns; cats gather on the rare absence. Re-blocked on **086** (find a triggering seed/scenario for the Farm canary, e.g. forced-weather destabilization or multi-seed sweep). 085's balance doc captures the empirical evidence at `docs/balance/085-gardens-multiuse-build-gate.md ## Why P1–P3 are unchanged in seed 42`.
 - 2026-05-19: accuracy audit pass — parked status correct; FarmDse exists in src/ai/dses/farm.rs; code changes at 410f544c documented accurately.
 - 2026-05-19: **Reframed and unparked.** Layer-walk against post-382 soak (`logs/tuned-42/`, commit 3e0153fe) confirmed 382's placement fix didn't unblock 084 — FarmDse scored 0.0 every tick across 7,666 evaluations, gated at L2 by `HasGarden::passed=false`. Root cause re-stated: thornbriar is ad-hoc fetch (no stash, no buffer), so the 085 supply-strict check measures a transient state that carries no strategic information. User-driven reframe: refactor herb economy into stash-and-retrieve mirroring the food→Stores→retrieve loop, then drive a `ColonyThornbriarChronicallyLow` marker off stash level (mirror 179's chronic-marker pattern). Title + scope expanded to cover stash mechanic + signal wiring. Design choices: stash extends existing Stores (not new building); thornbriar stays a lightweight `HerbKind` count (not promoted to Item entity); ticket covers both layers (not split). Status: parked → in-progress. Plan archived at `~/.claude/plans/let-s-pick-up-084-polymorphic-backus.md`.
+- 2026-05-19: Landed: gather→deposit pipeline live (108 HerbsDeposited on seed-42), HasStoredThornbriar + ColonyThornbriarChronicallyLow author correctly, hard survival gates hold (0 starvation, 0 ShadowFoxAmbush). Three follow-ons opened: 418 (retrieve-path not electing — HerbsRetrieved=0 despite stash full), 419 (WardPlaced regression 5→2), 420 (play canary drop 254→5 — likely noise). HerbsDeposited promoted to expected_to_fire_per_soak=>true; HerbsRetrieved demoted pending 418; CropTended/CropHarvested stay demoted (Garden still never built — upstream 085 issue).

@@ -1182,15 +1182,16 @@ impl Feature {
             Feature::KittenBorn => false,
             Feature::KittenFed => false,
             Feature::ItemRetrieved => false,
-            // Ticket 084: Commit 1 added the resolvers + actions, Commit 2
-            // wires the plan templates that exercise them. Promoted to
-            // `=> true`: every HerbcraftGather plan now terminates with
-            // DepositHerbs, and HerbcraftSetWard's retrieve-path branch
-            // exercises RetrieveHerbs(Thornbriar) whenever the stash has
-            // thornbriar. Both fire on healthy seed-42 once cats start
-            // gathering — which they do every soak.
+            // Ticket 084 Commit 4 verification (logs/tuned-42, commit
+            // fe8e1f77 over 2d963309): HerbsDeposited fires reliably
+            // (108 events on seed-42), but HerbsRetrieved stays at 0
+            // — HerbcraftSetWard rarely elects the retrieve-path
+            // branch even when stash has thornbriar. The substrate is
+            // in place; the L3 selection / branch-cost calibration is
+            // a tuning follow-on. HerbsRetrieved stays demoted until
+            // that lands.
             Feature::HerbsDeposited => true,
-            Feature::HerbsRetrieved => true,
+            Feature::HerbsRetrieved => false,
             // Ticket 083 — Farm-dormancy reconciliation. Wave 2
             // substrate hardening + L2 PairingActivity raise the
             // food economy (more efficient hunts and cooking, higher
@@ -2065,13 +2066,13 @@ mod tests {
         assert!(!Feature::KittenBorn.expected_to_fire_per_soak());
         assert!(!Feature::KittenFed.expected_to_fire_per_soak());
         assert!(!Feature::ItemRetrieved.expected_to_fire_per_soak());
-        // Ticket 084 Commit 2: plan templates wired — every
-        // HerbcraftGather lands at Stores via DepositHerbs, and
-        // HerbcraftSetWard's retrieve-path uses RetrieveHerbs(Thornbriar).
-        // Both fire whenever Gather/SetWard fire — which they do on
-        // every seed-42 soak.
+        // Ticket 084 Commit 4 — verified post-soak: HerbsDeposited
+        // fires 100+ events per seed-42 soak (gather→deposit pipeline
+        // works); HerbsRetrieved stays at 0 (HerbcraftSetWard's
+        // retrieve-path branch rarely elected — L3 selection tuning
+        // is a follow-on).
         assert!(Feature::HerbsDeposited.expected_to_fire_per_soak());
-        assert!(Feature::HerbsRetrieved.expected_to_fire_per_soak());
+        assert!(!Feature::HerbsRetrieved.expected_to_fire_per_soak());
         assert_eq!(Feature::HerbsDeposited.category(), FeatureCategory::Positive);
         assert_eq!(Feature::HerbsRetrieved.category(), FeatureCategory::Positive);
         // Ticket 083 — Farm-dormancy reconciliation. Demoted: the

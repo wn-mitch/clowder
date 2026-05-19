@@ -33,10 +33,16 @@
 //!   true for the empty iterator (`magic.rs:30-37`), so
 //!   `ctx.ward_strength_low` is true and the colony marker
 //!   `WardStrengthLow` is authored.
-//! - Zero Thornbriar `Herb` entities → `ThornbriarAvailable` stays
-//!   unset → the herb-pressure axis evaluates to 1.0 at scoring
-//!   time (`scoring.rs:764-776`), the load-bearing lift that 084
-//!   added.
+//! - 084 Commit 3 update: `ColonyThornbriarChronicallyLow` is
+//!   pre-inserted on the colony singleton in `setup`. Without this,
+//!   the chronicity window (`chronicity_window_ticks = 1000`)
+//!   wouldn't elapse within the scenario's 80-tick budget and the
+//!   marker would never latch, leaving FarmDse's herb-pressure
+//!   `MarkerConsideration` axis at 0.0. The scenario tests the
+//!   *integration* path (Farm fires → tend → harvest) given the
+//!   chronic-low precondition; it does not test the chronicity-
+//!   latch logic itself — that's covered by buildings.rs unit
+//!   tests (`thornbriar_chronic_low_*`).
 //! - `Bracken`: adult, sated, high diligence. Curiosity and
 //!   boldness pinned low so Explore / Wander don't crowd Farm at
 //!   the L3 softmax in early ticks (Explore plans hold for
@@ -56,6 +62,7 @@
 use bevy_ecs::world::World;
 
 use crate::components::building::{CropKind, CropState};
+use crate::components::markers::{ColonyState, ColonyThornbriarChronicallyLow};
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
 
@@ -73,6 +80,21 @@ pub static SCENARIO: Scenario = Scenario {
 
 fn setup(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);
+
+    // 084 Commit 3: pre-insert the chronicity marker on the colony
+    // singleton. The chronicity-latch logic in
+    // `update_colony_building_markers` samples at 1000-tick boundaries,
+    // far longer than this scenario's 80-tick budget — the marker would
+    // never latch naturally during the run. Authoring it directly is
+    // the integration-test convention (the *latch* mechanism is covered
+    // by `thornbriar_chronic_low_*` unit tests in buildings.rs).
+    let colony = world
+        .query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::query::With<ColonyState>>()
+        .single(world)
+        .expect("ColonyState singleton spawned by init_scenario_world");
+    world
+        .entity_mut(colony)
+        .insert(ColonyThornbriarChronicallyLow);
 
     let garden = spawn_garden_at(world, Position::new(22, 20));
     world.entity_mut(garden).insert(CropState {

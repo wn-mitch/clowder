@@ -18,6 +18,8 @@ import argparse
 
 import altair as alt  # type: ignore[import-not-found]
 
+TICK_ORIGIN = 1_200_000  # absolute-tick origin (60 × ticks_per_season); see CLAUDE.md "Verification"
+
 
 def register(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--archive", default=None,
@@ -79,6 +81,7 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
         FROM colony_scores cs
         JOIN runs r USING (run_id)
         WHERE cs.run_id IN ({run_filter_sql})
+          AND cs.tick >= {TICK_ORIGIN}
     """
     within_df = con.execute(within_sql, params).fetchdf()
 
@@ -107,7 +110,11 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
         alt.Chart(within_df)
         .mark_line(opacity=0.75)
         .encode(
-            x=alt.X("tick:Q", title="tick"),
+            x=alt.X(
+                "tick:Q",
+                title="tick",
+                scale=alt.Scale(domainMin=TICK_ORIGIN, clamp=True),
+            ),
             y=alt.Y("aggregate:Q", title="ColonyScore.aggregate"),
             color=alt.Color(
                 "label:N", title="run",
@@ -125,7 +132,7 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
         .add_params(alt.selection_interval(bind="scales", name="within_zoom"))
     )
 
-    # ------ across-commits panel
+    # ------ across-runs panel (x = soak time, not commit time)
     across_sql = f"""
         SELECT
             r.run_id,
@@ -133,23 +140,26 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
             r.kind,
             r.commit_hash_short,
             r.commit_time,
+            to_timestamp(i.mtime_ns / 1e9) AS soak_time,
             f.final_aggregate,
             f.final_welfare,
             f.final_living_cats
         FROM runs r
         JOIN run_footers f USING (run_id)
+        JOIN ingested_files i
+          ON i.file_path = r.events_path AND i.role = 'events'
         {where}
-        ORDER BY r.commit_time
+        ORDER BY i.mtime_ns
     """
     across_df = con.execute(across_sql, params).fetchdf()
 
     if across_df.empty:
         across_chart = alt.Chart().mark_text(
             text="no footer-complete runs"
-        ).properties(width=520, height=380, title="Across-commits trend")
+        ).properties(width=520, height=380, title="Across-runs trend")
     else:
         base = alt.Chart(across_df).encode(
-            x=alt.X("commit_time:T", title="commit time"),
+            x=alt.X("soak_time:T", title="soak time"),
             color=alt.Color("archive:N", title="archive"),
         )
         points = base.mark_circle(size=70, opacity=0.8).encode(
@@ -158,7 +168,8 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
                 alt.Tooltip("archive:N"),
                 alt.Tooltip("kind:N"),
                 alt.Tooltip("commit_hash_short:N"),
-                alt.Tooltip("commit_time:T"),
+                alt.Tooltip("soak_time:T", title="soak time"),
+                alt.Tooltip("commit_time:T", title="commit time"),
                 alt.Tooltip("final_aggregate:Q", format=".1f"),
                 alt.Tooltip("final_welfare:Q", format=".3f"),
                 alt.Tooltip("final_living_cats:Q"),
@@ -168,14 +179,14 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
             alt.Chart(across_df)
             .mark_line(point=True, strokeDash=[4, 2])
             .encode(
-                x=alt.X("commit_time:T"),
+                x=alt.X("soak_time:T"),
                 y=alt.Y("mean(final_aggregate):Q"),
                 color=alt.Color("archive:N"),
             )
         )
         across_chart = (
             (points + means)
-            .properties(width=520, height=380, title="Across-commits trend")
+            .properties(width=520, height=380, title="Across-runs trend (by soak time)")
             .add_params(alt.selection_interval(bind="scales", name="across_zoom"))
         )
 

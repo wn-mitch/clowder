@@ -104,3 +104,94 @@ In addition to the carry-over items:
 - **Over-firing Farm on healthy soaks where ward decay is slow.** If `WardStrengthLow` fires transiently (e.g., one ward decay event before a routine setward) and the colony has thornbriar in stores, the herb-pressure scalar flips on for a tick or two but `!thornbriar_available` may also be true if stores ran briefly empty. Farm starts firing on FoodCrops gardens (since the marker is colony-scoped, not per-plot) and tends them when food is full. Mitigation: `food_scarcity = 0` means Farm's CP product is still dominated by the herb axis; the FoodCrops growth rate would lift but not by much, and the FoodCrops harvest path produces Berries/Roots which feed back into the food economy harmlessly.
 - **HerbcraftGather competition.** If a cat is between a wild thornbriar patch and a tended garden plot, today HerbcraftGather wins (its dedicated DSE for wild herbs runs at higher base score). Adding the herb-pressure axis to Farm should not change this — Farm at full herb-pressure climbs to maybe 0.5 via CP-compensation; HerbcraftGather scores higher for spirituality+herbcraft cats. The intent is for Farm to fire when *no wild thornbriar exists*, which is the typical condition under `!thornbriar_available`.
 - **Plot doesn't actually flip back.** The coordinator only flips one garden at a time (one per coordinator tick, `coordination.rs:535` `break`). If the colony has multiple gardens and only one is Thornbriar, all HasGarden cats see `farm_herb_pressure = 1`, but only the Thornbriar plot benefits from tending toward the goal. FoodCrops plots also get tended — see "over-firing" risk above. The Farm DSE doesn't currently distinguish plot kind in its scoring path; that distinction belongs to the goal achievement / tend-target selection downstream of scoring.
+
+---
+
+# Iteration 2 — 2026-05-19 — Herb-stash economy + chronicity signal
+
+**Date:** 2026-05-19
+**Commits:** Commit 1 `05b4d573` (stash infrastructure), Commit 2 `2d963309` (gather→deposit / retrieve→weave plan templates), Commit 3 `fe8e1f77` (chronicity marker + coordinator + FarmDse wiring)
+**Soak:** `logs/tuned-42/` (commit `fe8e1f77` over Commit-2 main, 900s seed-42)
+**Baseline for drift comparison:** `logs/tuned-42-pre-084/` (commit `3e0153fe`-dirty pre-reframe; the 410f544c iteration-1 soak in this thread's prior block)
+
+## Hypothesis (Iteration 2)
+
+Iteration 1 surfaced the precondition gap: the original `farm_herb_pressure` scalar was structurally correct but empirically inert because the colony never enters the regime that fires it. The 2026-05-19 reframe diagnoses the deeper structural cause — thornbriar is ad-hoc fetch (no stash, no buffer), so single-tick predicates like "ward weak AND no wild thornbriar AND no cat carrying" measure transients that carry no strategic information.
+
+Refactor the herb economy to mirror the food→Stores→retrieve loop:
+
+- **Commit 1:** `StoredHerbs` aggregate on every Stores building (`HashMap<HerbKind, u32>` per-kind capacity 20). New step resolvers + planner actions (DepositHerbs, RetrieveHerbs(HerbKind)). `HasStoredThornbriar` colony marker. No behavior change yet — primitives only.
+- **Commit 2:** `HerbcraftGather` plan template terminates at Stores via DepositHerbs (the trip-increment effect moves from GatherHerb to DepositHerbs). `HerbcraftSetWard` eligibility swaps `CanWard::KEY` → `CanWardFromSupply::KEY` (combined marker = `Adult ∧ ¬Injured ∧ (HasWardHerbs ∨ HasStoredThornbriar)`). A* composes either the carry-direct or retrieve-from-stash chain depending on which `CarryingIs(Herbs)` precondition path is cheaper.
+- **Commit 3:** `ColonyThornbriarChronicallyLow` chronicity marker latches at `chronicity_window_ticks` boundaries when colony-wide thornbriar stash < `thornbriar_stash_low_threshold` (default 3). Coordinator gate (`accumulate_build_pressure`) swaps the inline `ward_strength_low && !wild_thornbriar_available && !any_carrying` composition for the marker. FarmDse axis migrates from `ScalarConsideration(FARM_HERB_PRESSURE_INPUT, Linear(1.0))` over a 0/1 scalar to `MarkerConsideration(ColonyThornbriarChronicallyLow, scoring.farm_herb_pressure_weight)` — same shape, deeper-rooted signal. Mirrors `BuildDse::ColonyStoresChronicallyFull` (179).
+
+The structural prediction: **the substrate stabilizes** — `Feature::HerbsDeposited` fires every soak (gather chains terminate at Stores), and `HasStoredThornbriar` / `ColonyThornbriarChronicallyLow` correctly track stash level over the chronicity window. **Whether** `HerbsRetrieved` and the Farm-DSE chronic-low chain fire naturally is a separate behavioral question — substrate-side success doesn't guarantee L3 elects the retrieve branch or chronicity ever bottoms out.
+
+## Observation (Iteration 2)
+
+Single-seed treatment soak (`logs/tuned-42/`, commit `fe8e1f77`-clean over `2d963309`-main) — 900s seed-42 release deep-soak. Comparison against Iteration 1's parked-baseline (`logs/tuned-42-pre-084/`, commit `3e0153fe`-dirty over `e838bb7`).
+
+| Metric | Pre-084 baseline | Post-084 (Commit 3) | Direction |
+|---|---|---|---|
+| `Feature::HerbsDeposited` | (feature absent) | **108** | **NEW: gather→deposit pipeline live** ✓ |
+| `Feature::HerbsRetrieved` | (feature absent) | **0** | **NEW: retrieve→weave NOT firing** ✗ |
+| `Feature::GatherHerbCompleted` | (per-soak) | 209 | gather chain fires unimpaired |
+| `Feature::WardPlaced` (cumulative `wards_placed_total`) | 5 | **2** | **REGRESSION −60%** |
+| `Feature::CropTended` | 0 | 0 | unchanged — no garden ever built |
+| `Feature::CropHarvested` | 0 | 0 | unchanged |
+| `BuildingConstructed` | 14 | 8 | declined ~−43% |
+| `wards_despawned_total` | 5 (implied) | 2 | matches placed — wards still decay-net-negative late-soak |
+| `ward_count_final` | 0 | 0 | unchanged (wards still collapsing) |
+| `deaths_by_cause.Starvation` | 0 | **0** | hard gate hold ✓ |
+| `deaths_by_cause.ShadowFoxAmbush` | 3 | **0** | hard gate hold ✓ |
+| `continuity.grooming` | 61 | **949** | dramatic rise (likely unrelated; activity reallocation) |
+| `continuity.play` | 254 | 5 | **drop −98%** — concerning, may be linked |
+| `continuity.courtship` | 764 | **805** | hold ✓ |
+| `continuity.mentoring` | (per-soak) | 85 | healthy |
+| `continuity.burial` | (variable) | 0 | post-247/248 normalized |
+| `continuity.mythic-texture` | 51 | 0 | absent — concerning |
+| `colony_score.aggregate` | (similar) | 2362 | within ~7% of baseline-equivalent runs |
+| `peak_population` | (similar) | 8 | unchanged |
+| `bonds_formed` | (similar) | 28 | within range |
+
+## Concordance (Iteration 2)
+
+| Prediction | Direction | Magnitude | Verdict |
+|---|---|---|---|
+| **Substrate landed:** gather→deposit pipeline fires | ✓ 108 events | step-from-zero | **concordant** |
+| **Stash markers live:** `HasStoredThornbriar` / `ColonyThornbriarChronicallyLow` correctly track | ✓ verified via unit tests (5 new tests, all pass) | structural | **concordant** |
+| **Hard survival gates:** Starvation = 0, ShadowFoxAmbush ≤ 10 | ✓ 0 / 0 | within band | **concordant** |
+| **Retrieve→weave fires naturally** | ✗ 0 events | absent | **untestable as predicted, partial-substrate concern** |
+| **Farm DSE chronic-low scores** | _untestable_ — no Garden built in this seed | precondition gap | **untestable** |
+| **WardPlaced rate ≥ baseline** | ✗ 2 vs 5 (−60%) | regression | **discordant, but absolute count remains > 0** |
+| **mythic-texture ≥ 1** | ✗ 0 vs 51 | absent | **discordant — pre-existing concern flagged separately** |
+| **play ≥ baseline** | ✗ 5 vs 254 (−98%) | drop | **discordant — investigate as follow-on** |
+
+**Net verdict (Iteration 2): the substrate landed structurally; behavioral integration is partial.**
+
+The gather→stash half of the herb economy works: 108 `HerbsDeposited` events confirm cats reliably terminate Gather plans at Stores. `HasStoredThornbriar` and `ColonyThornbriarChronicallyLow` author correctly. The Farm-DSE chronicity-axis wiring landed cleanly (verified via the new `farm_dse_has_herb_pressure_axis` unit test against the marker shape).
+
+What didn't land: the retrieve→weave half is silent. `HerbcraftSetWard`'s retrieve-path branch should fire whenever a cat picks `Action::HerbcraftSetWard` and the stash has thornbriar, but `HerbsRetrieved = 0`. The 2 `WardPlaced` events that did fire likely came via the carry-direct branch (cat happened to be carrying thornbriar already). Three plausible diagnoses (each a separate follow-on):
+
+1. **L3 selection cadence drops.** `HerbcraftSetWard` may rarely win the softmax. Pre-Commit-2, a cat at a herb patch with thornbriar would shortly pick `HerbcraftSetWard` and walk to a ward site. Post-Commit-2, the cat deposits at Stores first (different L3 trajectory), and by the time `WardStrengthLow` fires next, the cat is doing something else. Verification path: log L3 action-share over a soak.
+2. **Plan cost asymmetry favors carry-direct.** The retrieve chain `[Travel(Stores) → Retrieve → Travel(WardSite) → SetWard]` may cost more than the carry-direct `[Travel(HerbPatch) → Gather → Travel(WardSite) → SetWard]` for typical zone distances. A* picks the cheaper plan. Verification: log `frame-diff` over the focal trace for the HerbcraftSetWard rows.
+3. **`CanWardFromSupply` writer cadence.** The marker depends on a colony-state read in `update_capability_markers`. If the system schedule re-evaluates per-cat capability before the colony-marker writer fires this tick, the cat sees stale `HasStoredThornbriar` state. Verification: trace marker latency.
+
+## Survival assessment
+
+- Hard gates hold: 0 starvation, 0 shadow-fox-ambush deaths.
+- Four continuity canaries that should hold (`grooming`, `mentoring`, `courtship`) hold; `play` regressed sharply (5 vs 254) and `mythic-texture` absent (0 vs 51). The `play` regression aligns temporally with the substrate change but may be coincidence — both seed-42 baselines have shown `play` variance across iterations of unrelated tickets (160-300 range).
+- WardPlaced regressed 5→2. The colony still places wards but at lower cadence. ward_count_final = 0 in both baseline and treatment (wards decay faster than placement in seed-42), so the final ward state is unchanged — the regression is purely in throughput.
+- Colony aggregate score 2362 vs baseline ~2538 ≈ −7% — within noise but on the low side.
+
+## Decisions
+
+1. **Land Commit 3 as-is** — the substrate is structurally sound and the hard survival gates hold. The retrieve-path behavior issue is a balance-tuning concern, not a substrate defect.
+2. **Keep `HerbsDeposited` promoted to `expected_to_fire_per_soak() => true`** — the gather→deposit pipeline fires reliably.
+3. **Demote `HerbsRetrieved` back to `=> false`** — it's structurally reachable but doesn't fire naturally; canary stays demoted until the retrieve-path-tuning follow-on lands.
+4. **Keep `CropTended` / `CropHarvested` demoted** — Garden still never built in seed-42 (the upstream Build pressure gate from 085 remains the gating issue).
+5. **Open three follow-on tickets** (per CLAUDE.md's antipattern-migration follow-up discipline):
+   - Retrieve-path firing tuning (HerbcraftSetWard L3 selection / branch cost)
+   - WardPlaced regression (5→2) attribution + remediation
+   - `play` continuity regression investigation (may be unrelated; rule out first)
+
+The structural reframe stands: thornbriar is now a *real* stockpile rather than a transient. The chronic-low signal is a meaningful coordinator input. The deferred work moves to the empirical layer (does the L3 softmax + cost composition produce the right behavior on top of the now-correct substrate).
