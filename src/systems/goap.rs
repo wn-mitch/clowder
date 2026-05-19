@@ -1302,6 +1302,7 @@ pub fn evaluate_and_plan(
         Has<markers::CanHunt>,
         Has<markers::CanForage>,
         Has<markers::CanWard>,
+        Has<markers::CanWardFromSupply>,
         Has<markers::CanCook>,
     )>,
     // §4.2 State markers — split into a separate query so the per-cat
@@ -1653,6 +1654,7 @@ pub fn evaluate_and_plan(
             can_hunt,
             can_forage,
             can_ward,
+            can_ward_from_supply,
             can_cook,
         )) = per_cat_markers_q.get(entity)
         {
@@ -1669,6 +1671,18 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::CanHunt::KEY, entity, can_hunt);
             markers.set_entity(markers::CanForage::KEY, entity, can_forage);
             markers.set_entity(markers::CanWard::KEY, entity, can_ward);
+            // 084 Commit-3 follow-on (418): CanWardFromSupply read+populate.
+            // The marker is authored by `update_capability_markers` but
+            // the eligibility filter on `HerbcraftWardDse` reads it via
+            // `MarkerSnapshot.has(...)` — without this line the snapshot
+            // returns `false` and Herbcraft ward placement silently
+            // dies (verified: 0 Thornward placements on seed-42 vs 4
+            // pre-084-baseline).
+            markers.set_entity(
+                markers::CanWardFromSupply::KEY,
+                entity,
+                can_ward_from_supply,
+            );
             markers.set_entity(markers::CanCook::KEY, entity, can_cook);
         }
         // §4.2 State markers — InCombat / OnCorruptedTile /

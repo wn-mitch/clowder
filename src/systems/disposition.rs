@@ -114,6 +114,7 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::CanHunt>,
             Has<markers::CanForage>,
             Has<markers::CanWard>,
+            Has<markers::CanWardFromSupply>,
             Has<markers::CanCook>,
         ),
     >,
@@ -669,6 +670,7 @@ pub fn evaluate_dispositions(
             can_hunt,
             can_forage,
             can_ward,
+            can_ward_from_supply,
             can_cook,
         )) = side_effects.marker_queries.per_cat.get(entity)
         {
@@ -685,6 +687,15 @@ pub fn evaluate_dispositions(
             markers.set_entity(markers::CanHunt::KEY, entity, can_hunt);
             markers.set_entity(markers::CanForage::KEY, entity, can_forage);
             markers.set_entity(markers::CanWard::KEY, entity, can_ward);
+            // 084 Commit-3 follow-on (418): CanWardFromSupply
+            // population — same plumbing as `goap.rs::evaluate_and_plan`.
+            // Without this, `HerbcraftWardDse`'s eligibility filter
+            // silently fails for cats relying on the colony stash.
+            markers.set_entity(
+                markers::CanWardFromSupply::KEY,
+                entity,
+                can_ward_from_supply,
+            );
             markers.set_entity(markers::CanCook::KEY, entity, can_cook);
         }
         // §4.2 State markers — InCombat / OnCorruptedTile /
