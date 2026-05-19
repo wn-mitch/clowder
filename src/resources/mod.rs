@@ -36,6 +36,7 @@ pub mod sim_constants;
 pub mod snapshot_config;
 pub mod stores_pressure;
 pub mod system_activation;
+pub mod thornbriar_pressure;
 pub mod time;
 pub mod time_units;
 pub mod trace_log;

@@ -2100,6 +2100,24 @@ pub struct ScoringConstants {
     /// the others.
     #[serde(default = "default_stores_herb_capacity_per_kind")]
     pub stores_herb_capacity_per_kind: u32,
+    /// 084 Commit 3: colony-wide thornbriar stash total below which
+    /// `ColonyThornbriarChronicallyLow` latches. Default 3 — calibrated
+    /// for plausibility (a single SetWard consumes one thornbriar; ≥3
+    /// means at least one buffer beyond the current ward demand
+    /// signal). Sampled at `chronicity_window_ticks` boundaries by
+    /// `update_colony_building_markers`. Below threshold across the
+    /// window = chronic low; otherwise the marker clears.
+    #[serde(default = "default_thornbriar_stash_low_threshold")]
+    pub thornbriar_stash_low_threshold: u32,
+    /// 084 Commit 3: FarmDse `farm_herb_pressure` MarkerConsideration
+    /// `present_score` for `ColonyThornbriarChronicallyLow`. Default
+    /// 1.0 preserves the prior `Curve::Linear(1.0, 0.0)` magnitude on
+    /// the now-retired scalar — i.e. firing the marker contributes the
+    /// same effective input to Farm's `CompensatedProduct` as the
+    /// pre-Commit-3 0/1 scalar did. Tune downward to dampen the herb-
+    /// pressure axis without dropping it entirely.
+    #[serde(default = "default_farm_herb_pressure_weight")]
+    pub farm_herb_pressure_weight: f32,
     /// 179: present-score on the `colony_stores_chronically_full`
     /// MarkerConsideration in BuildDse. Lifted from 178's dormant 0.0
     /// once the wave-closeout consumer (179) wired the marker into
@@ -2913,6 +2931,8 @@ impl Default for ScoringConstants {
             chronicity_window_ticks: default_chronicity_window_ticks(),
             chronicity_threshold: default_chronicity_threshold(),
             stores_herb_capacity_per_kind: default_stores_herb_capacity_per_kind(),
+            thornbriar_stash_low_threshold: default_thornbriar_stash_low_threshold(),
+            farm_herb_pressure_weight: default_farm_herb_pressure_weight(),
             build_chronic_full_weight: default_build_chronic_full_weight(),
             hunt_food_security_weight: default_hunt_food_security_weight(),
             forage_food_security_weight: default_forage_food_security_weight(),
@@ -4138,6 +4158,18 @@ fn default_chronicity_threshold() -> f32 {
 /// `ScoringConstants::stores_herb_capacity_per_kind`.
 fn default_stores_herb_capacity_per_kind() -> u32 {
     20
+}
+
+/// 084 Commit 3: chronic-low threshold for the colony thornbriar stash.
+/// See `ScoringConstants::thornbriar_stash_low_threshold`.
+fn default_thornbriar_stash_low_threshold() -> u32 {
+    3
+}
+
+/// 084 Commit 3: FarmDse `farm_herb_pressure` axis present_score. See
+/// `ScoringConstants::farm_herb_pressure_weight`.
+fn default_farm_herb_pressure_weight() -> f32 {
+    1.0
 }
 
 /// 179: Build DSE present-score on the

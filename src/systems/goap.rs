@@ -224,6 +224,7 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::HasGroundCarcass>,
             Has<markers::HasDependentCat>,
             Has<markers::HasStoredThornbriar>,
+            Has<markers::ColonyThornbriarChronicallyLow>,
         ),
         With<markers::ColonyState>,
     >,
@@ -1358,6 +1359,7 @@ pub fn evaluate_and_plan(
         has_ground_carcass,
         has_dependent_cat,
         has_stored_thornbriar,
+        colony_thornbriar_chronically_low,
     ) = world_state.colony_state_query.single().expect(
         "ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)",
     );
@@ -1434,6 +1436,16 @@ pub fn evaluate_and_plan(
     // `update_colony_building_markers` from per-Stores `StoredHerbs`
     // aggregates.
     markers.set_colony(markers::HasStoredThornbriar::KEY, has_stored_thornbriar);
+    // 084 Commit 3: ColonyThornbriarChronicallyLow — chronicity latch
+    // sampled at `chronicity_window_ticks` boundaries against the
+    // colony-wide stash total. Reader (this commit): `FarmDse`'s
+    // `farm_herb_pressure` axis (MarkerConsideration). Reader
+    // (coordinator-side): `accumulate_build_pressure`'s farming-gate
+    // disjunction. Mirrors the `ColonyStoresChronicallyFull` shape.
+    markers.set_colony(
+        markers::ColonyThornbriarChronicallyLow::KEY,
+        colony_thornbriar_chronically_low,
+    );
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query
@@ -3392,6 +3404,13 @@ pub fn resolve_goap_plans(
         if has_stored_thornbriar {
             m.set_colony(markers::HasStoredThornbriar::KEY, true);
         }
+        // 084 Commit 3: ColonyThornbriarChronicallyLow is NOT plumbed
+        // here. It's a DSE-scoring input (via FarmDse's
+        // MarkerConsideration), not a GOAP planner-action precondition.
+        // L2 reads the marker through the `MarkerSnapshot` built in
+        // `evaluate_and_plan` from `colony_state_query`; replan-time
+        // doesn't need to re-fetch it because no `StatePredicate::HasMarker`
+        // in `actions.rs` references it.
         m
     };
 

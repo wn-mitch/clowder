@@ -874,9 +874,21 @@ pub fn accumulate_build_pressure(
         &crate::components::items::Item,
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
     >,
-    wards: Query<&crate::components::magic::Ward>,
-    herbs: Query<&crate::components::magic::Herb, With<crate::components::magic::Harvestable>>,
-    cat_inventories: Query<&crate::components::magic::Inventory, Without<Dead>>,
+    // 084 Commit 3: read `ColonyThornbriarChronicallyLow` off the
+    // `ColonyState` singleton. Replaces the per-tick `wards` + `herbs`
+    // + `cat_inventories` queries that sourced the inline
+    // `ward_strength_low && !wild_thornbriar_available &&
+    // !any_cat_carrying_thornbriar` composition — those measured
+    // transients (cats hold thornbriar for one weaving cycle, wild
+    // patches respawn / get harvested) and carried no strategic signal
+    // for an irreversible build decision. The chronicity marker
+    // latches at window boundaries (`chronicity_window_ticks`) against
+    // the stash level, which is the only steady-state-meaningful
+    // surface for this gate.
+    colony_state_q: Query<
+        Has<crate::components::markers::ColonyThornbriarChronicallyLow>,
+        With<crate::components::markers::ColonyState>,
+    >,
     mut unmet_demand: ResMut<crate::resources::UnmetDemand>,
     mut log: ResMut<NarrativeLog>,
     constants: Res<SimConstants>,
@@ -923,14 +935,13 @@ pub fn accumulate_build_pressure(
     //                  `assess_colony_needs:530` repurposing logic but
     //                  applies a stricter supply check, since building
     //                  is irreversible while repurposing is cheap.
-    let ward_strength_low = crate::systems::magic::is_ward_strength_low(
-        wards.iter(),
-        cc.ward_avg_strength_low_threshold,
-    );
-    let wild_thornbriar_available = crate::systems::magic::is_thornbriar_available(herbs.iter());
-    let any_cat_carrying_thornbriar = cat_inventories
-        .iter()
-        .any(|inv| inv.has_herb(crate::components::magic::HerbKind::Thornbriar));
+    // 084 Commit 3: chronic-low signal on the colony stash. Replaces
+    // the prior `ward_strength_low && !wild_thornbriar_available &&
+    // !any_cat_carrying_thornbriar` inline composition. The marker
+    // already subsumes the strategic question ("is the colony out of
+    // ward herbs over a sustained window?") via the chronicity tracker
+    // — see `update_colony_building_markers` for the latch.
+    let thornbriar_chronically_low = colony_state_q.iter().any(|has| has);
     let has_hearth = has_structure(StructureType::Hearth);
     // ConstructionSite entities only exist while the build is incomplete —
     // they're despawned on completion. So any non-empty iter means there's
@@ -1070,9 +1081,13 @@ pub fn accumulate_build_pressure(
         // Farming pressure — gardens are multiuse (food crops + thornbriar
         // for wards), so accumulate when *either* demand axis fires. See
         // `should_accumulate_farming_pressure` for the truth-table contract.
+        // 084 Commit 3: `herb_demand` is now the chronic-low marker
+        // directly. The prior `ward_strength_low && !wild_thornbriar
+        // && !carrying` composition retired with this commit — those
+        // inputs measured single-tick transients and weren't
+        // strategically meaningful for an irreversible build decision.
         let food_demand = food_fraction < cc.build_pressure_farming_food_threshold;
-        let herb_demand =
-            ward_strength_low && !wild_thornbriar_available && !any_cat_carrying_thornbriar;
+        let herb_demand = thornbriar_chronically_low;
         if should_accumulate_farming_pressure(has_garden, food_demand, herb_demand) {
             pressure.farming += rate;
         } else {

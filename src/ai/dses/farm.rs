@@ -5,15 +5,14 @@
 //!
 //! Per §2.3 + §3.1.1 row 1494: `CompensatedProduct` of four axes —
 //! `food_scarcity` via `scarcity()` (Quadratic(exp=2)), `diligence`
-//! via Linear, `farm_garden_distance` spatial, and (ticket 084)
-//! `farm_herb_pressure` via Linear identity over a 0/1 scalar that
-//! mirrors the `ward_strength_low && !thornbriar_available`
-//! condition the coordinator uses to repurpose a FoodCrops garden
-//! into a Thornbriar plot. The herb-pressure axis is the demand
-//! signal that lets a Thornbriar plot draw a farmer when food
-//! stockpiles are full but ward stockpile is empty — without it,
-//! Farm scored to ~0 via `food_scarcity` and the repurposed plot
-//! sat at growth = 0.
+//! via Linear, `farm_garden_distance` spatial, and (ticket 084 Commit 3)
+//! `farm_herb_pressure` via MarkerConsideration over the
+//! `ColonyThornbriarChronicallyLow` chronicity marker. Commit 1's
+//! Linear-on-0/1-scalar approximation has been retired — the chronicity
+//! marker carries the same 0/1 shape but reflects sustained stash
+//! depletion across `chronicity_window_ticks` rather than transient
+//! per-tick state. Mirrors `BuildDse`'s `ColonyStoresChronicallyFull`
+//! axis (ticket 179).
 //!
 //! Eligibility: `.require("HasGarden")` per §4 port (Phase 4b.4).
 //! Maslow tier 2.
@@ -22,21 +21,26 @@ use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{
-    Consideration, LandmarkAnchor, LandmarkSource, ScalarConsideration, SpatialConsideration,
+    Consideration, LandmarkAnchor, LandmarkSource, MarkerConsideration, ScalarConsideration,
+    SpatialConsideration,
 };
 use crate::ai::curves::{scarcity, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
+use crate::resources::sim_constants::ScoringConstants;
 
 pub const FOOD_SCARCITY_INPUT: &str = "food_scarcity";
 pub const DILIGENCE_INPUT: &str = "diligence";
-/// Ticket 084 — herb/ward demand axis. Scalar is 1.0 when
-/// `ward_strength_low && !thornbriar_available` (the same condition
-/// `coordination.rs::evaluate_coordinators` uses to repurpose a
-/// FoodCrops garden to Thornbriar), 0.0 otherwise. Sourced from
-/// `ctx_scalars` in `scoring.rs`.
+/// Ticket 084 Commit 3 — herb/ward demand axis (chronicity-marker
+/// flavor). Now a `MarkerConsideration` over
+/// `ColonyThornbriarChronicallyLow` rather than the prior 0/1 scalar
+/// sourced from `ctx_scalars`. The marker latches at
+/// `chronicity_window_ticks` boundaries against the colony-wide
+/// thornbriar stash sum; firing it lifts Farm's CompensatedProduct
+/// out of the food-stockpile-full trap by giving Farm a non-food
+/// demand axis.
 pub const FARM_HERB_PRESSURE_INPUT: &str = "farm_herb_pressure";
 
 /// Manhattan range over which the garden-distance curve is normalized.
@@ -51,7 +55,7 @@ pub struct FarmDse {
 }
 
 impl FarmDse {
-    pub fn new() -> Self {
+    pub fn new(scoring: &ScoringConstants) -> Self {
         // §L2.10.7 spatial axis: distance to garden tile via
         // ColonyLandmarks. Composite{Logistic, Invert} shape for the
         // close-enough plateau; ClampMin(0.1) outer floor so distant
@@ -95,19 +99,18 @@ impl FarmDse {
                     FARM_GARDEN_RANGE,
                     garden_distance,
                 )),
-                // Ticket 084 — herb/ward demand axis. Linear identity
-                // over a 0/1 scalar; CP compensation lifts Farm above
-                // zero when this axis fires (1.0) even if
-                // `food_scarcity` is 0 (food stockpile full). Pairs
-                // the DSE's motivation with the coordinator's garden-
-                // repurposing decision so a Thornbriar plot draws a
-                // farmer instead of sitting at growth = 0.
-                Consideration::Scalar(ScalarConsideration::new(
+                // 084 Commit 3 — herb/ward demand axis (chronicity
+                // marker flavor). Mirrors `BuildDse`'s
+                // `ColonyStoresChronicallyFull` axis. Firing this
+                // marker lifts Farm's CompensatedProduct out of the
+                // food-stockpile-full trap, pairing the DSE's
+                // motivation with the coordinator's garden-repurposing
+                // decision so a Thornbriar plot draws a farmer instead
+                // of sitting at growth = 0.
+                Consideration::Marker(MarkerConsideration::new(
                     FARM_HERB_PRESSURE_INPUT,
-                    Curve::Linear {
-                        slope: 1.0,
-                        intercept: 0.0,
-                    },
+                    markers::ColonyThornbriarChronicallyLow::KEY,
+                    scoring.farm_herb_pressure_weight,
                 )),
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
@@ -123,8 +126,10 @@ impl FarmDse {
 }
 
 impl Default for FarmDse {
+    /// Default uses `ScoringConstants::default()` — convenience for
+    /// tests; production routes through `farm_dse(scoring)`.
     fn default() -> Self {
-        Self::new()
+        Self::new(&ScoringConstants::default())
     }
 }
 
@@ -158,8 +163,8 @@ impl Dse for FarmDse {
     }
 }
 
-pub fn farm_dse() -> Box<dyn Dse> {
-    Box::new(FarmDse::new())
+pub fn farm_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    Box::new(FarmDse::new(scoring))
 }
 
 #[cfg(test)]
@@ -168,35 +173,36 @@ mod tests {
 
     #[test]
     fn farm_dse_id_stable() {
-        assert_eq!(FarmDse::new().id().0, "farm");
+        assert_eq!(FarmDse::default().id().0, "farm");
     }
 
     #[test]
     fn farm_is_compensated_product() {
         use crate::ai::composition::CompositionMode;
         assert_eq!(
-            FarmDse::new().composition().mode,
+            FarmDse::default().composition().mode,
             CompositionMode::CompensatedProduct
         );
     }
 
     #[test]
     fn farm_dse_has_herb_pressure_axis() {
-        // Ticket 084 — Farm carries a fourth axis tied to ward/herb
-        // demand so a Thornbriar-repurposed garden draws a farmer
-        // even with food stockpiles full.
-        let dse = FarmDse::new();
-        let inputs: Vec<&str> = dse
+        // 084 Commit 3 — Farm's herb-pressure axis migrated from
+        // ScalarConsideration to MarkerConsideration over the
+        // ColonyThornbriarChronicallyLow chronicity marker. The fourth
+        // axis is now a Marker rather than a Scalar.
+        let dse = FarmDse::default();
+        let herb_axis = dse
             .considerations()
             .iter()
-            .filter_map(|c| match c {
-                Consideration::Scalar(s) => Some(s.name),
+            .find_map(|c| match c {
+                Consideration::Marker(m) if m.name == FARM_HERB_PRESSURE_INPUT => Some(m),
                 _ => None,
             })
-            .collect();
-        assert!(
-            inputs.contains(&FARM_HERB_PRESSURE_INPUT),
-            "FarmDse must read `farm_herb_pressure`; found scalar inputs: {inputs:?}"
+            .expect("FarmDse must include the herb-pressure MarkerConsideration");
+        assert_eq!(
+            herb_axis.marker,
+            markers::ColonyThornbriarChronicallyLow::KEY
         );
         // Composition must carry one weight per consideration.
         assert_eq!(dse.composition().weights.len(), dse.considerations().len());

@@ -413,6 +413,28 @@ impl HasStoredThornbriar {
     pub const KEY: &str = "HasStoredThornbriar";
 }
 
+/// Ticket 084 Commit 3: colony-scoped chronicity marker — total
+/// stashed thornbriar across all Stores has been *below*
+/// `ScoringConstants::thornbriar_stash_low_threshold` for at least one
+/// full `chronicity_window_ticks` window. Mirrors the 179 pattern
+/// (`ColonyStoresChronicallyFull`): a slow-rolling latch that only
+/// flips at window boundaries, filtering out single-tick transients
+/// from gather/retrieve traffic.
+///
+/// Reader 1: the coordinator's `accumulate_build_pressure` Farming
+/// gate (`coordination.rs:~1090`) — drives "we need to commit to a
+/// Garden for thornbriar."
+/// Reader 2: `FarmDse`'s `farm_herb_pressure` axis (replaces the
+/// per-tick scalar with a marker consideration mirroring
+/// `BuildDse::colony_stores_chronically_full`).
+/// Writer: `buildings.rs::update_colony_building_markers` extended
+/// with a `ThornbriarPressureTracker`-backed window latch.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct ColonyThornbriarChronicallyLow;
+impl ColonyThornbriarChronicallyLow {
+    pub const KEY: &str = "ColonyThornbriarChronicallyLow";
+}
+
 /// Per-cat: the nearest reachable construction site has
 /// `materials_complete()` true. Gates the substrate branch of the
 /// `Construct` GOAP action — when set, the planner can plan
@@ -938,6 +960,7 @@ mod tests {
         assert_marker_queryable(HasStoredFood);
         assert_marker_queryable(ThornbriarAvailable);
         assert_marker_queryable(HasStoredThornbriar);
+        assert_marker_queryable(ColonyThornbriarChronicallyLow);
         assert_marker_queryable(MaterialsAvailable);
     }
 

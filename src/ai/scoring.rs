@@ -882,29 +882,14 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         "ward_deficit",
         if ctx.ward_strength_low { 1.0 } else { 0.0 },
     );
-    // Ticket 084 — Farm DSE herb-pressure axis. Mirrors the exact
-    // condition `coordination.rs::evaluate_coordinators` uses to
-    // repurpose a FoodCrops garden into a Thornbriar plot
-    // (`ward_strength_low && !thornbriar_available`). When the
-    // coordinator decides "the colony needs thornbriar," this scalar
-    // signals the same demand to FarmDse, so a cat actually tends the
-    // repurposed plot even with food stockpiles full. Colony-scoped
-    // marker is authored before scoring at `goap.rs:941`; the
-    // `markers.has` lookup ignores the entity parameter for
-    // colony-scoped keys.
-    m.insert(
-        "farm_herb_pressure",
-        if ctx.ward_strength_low
-            && !inputs.markers.has(
-                crate::components::markers::ThornbriarAvailable::KEY,
-                inputs.cat,
-            )
-        {
-            1.0
-        } else {
-            0.0
-        },
-    );
+    // 084 Commit 3: the prior `farm_herb_pressure` scalar entry
+    // (mirroring `ward_strength_low && !thornbriar_available`) was
+    // retired here when FarmDse's herb-pressure axis migrated from
+    // `ScalarConsideration` to `MarkerConsideration` over
+    // `ColonyThornbriarChronicallyLow`. The chronicity marker is
+    // authored by `update_colony_building_markers` and routed through
+    // `MarkerSnapshot.set_colony(...)` at `goap.rs::evaluate_and_plan`
+    // — no scalar plumbing needed.
     m.insert(
         "territory_max_corruption",
         ctx.territory_max_corruption.clamp(0.0, 1.0),
@@ -2939,7 +2924,7 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::mate_dse());
             r.cat_dses.push(crate::ai::dses::patrol_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::build_dse(&scoring));
-            r.cat_dses.push(crate::ai::dses::farm_dse());
+            r.cat_dses.push(crate::ai::dses::farm_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::coordinate_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::explore_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::wander_dse(&scoring));

@@ -492,6 +492,9 @@ pub fn update_colony_building_markers(
     activation: Option<Res<SystemActivation>>,
     time: Res<TimeState>,
     mut tracker: ResMut<crate::resources::stores_pressure::StoresPressureTracker>,
+    mut thornbriar_tracker: ResMut<
+        crate::resources::thornbriar_pressure::ThornbriarPressureTracker,
+    >,
 ) {
     let d = &constants.disposition;
     let bldg_state = scan_colony_buildings(buildings.iter(), d.damaged_building_threshold);
@@ -589,13 +592,39 @@ pub fn update_colony_building_markers(
     // `CanWardFromSupply` combined marker writer. Authored here
     // rather than in items.rs because the aggregation surface is
     // building-side, not inventory-side.
-    let has_stored_thornbriar = stored_herbs
+    let total_thornbriar: u32 = stored_herbs
         .iter()
-        .any(|sh| sh.count(crate::components::magic::HerbKind::Thornbriar) > 0);
+        .map(|sh| sh.count(crate::components::magic::HerbKind::Thornbriar))
+        .sum();
+    let has_stored_thornbriar = total_thornbriar > 0;
     if has_stored_thornbriar {
         em.insert(crate::components::markers::HasStoredThornbriar);
     } else {
         em.remove::<crate::components::markers::HasStoredThornbriar>();
+    }
+
+    // 084 Commit 3: chronicity latch for `ColonyThornbriarChronicallyLow`.
+    // Samples the colony-wide thornbriar count at every
+    // `chronicity_window_ticks` boundary; latches the marker when the
+    // count is below `thornbriar_stash_low_threshold`. Mirrors the
+    // ColonyStoresChronicallyFull block above but samples *state*
+    // (current stash) rather than *event delta* (DepositRejected
+    // count) — see thornbriar_pressure.rs for the structural difference.
+    let thornbriar_chronically_low =
+        if time.tick.saturating_sub(thornbriar_tracker.last_window_tick)
+            >= scoring.chronicity_window_ticks
+        {
+            thornbriar_tracker.last_window_tick = time.tick;
+            thornbriar_tracker.latched_chronic =
+                total_thornbriar < scoring.thornbriar_stash_low_threshold;
+            thornbriar_tracker.latched_chronic
+        } else {
+            thornbriar_tracker.latched_chronic
+        };
+    if thornbriar_chronically_low {
+        em.insert(crate::components::markers::ColonyThornbriarChronicallyLow);
+    } else {
+        em.remove::<crate::components::markers::ColonyThornbriarChronicallyLow>();
     }
 
     let has_ground_carcass = items.iter().any(|item| {
@@ -960,6 +989,12 @@ mod tests {
         // 176: chronicity tracker resource — default-zero so the
         // marker stays cleared in tests that don't exercise it.
         world.insert_resource(crate::resources::stores_pressure::StoresPressureTracker::default());
+        // 084 Commit 3: thornbriar chronicity tracker resource. Default
+        // is `latched_chronic = false` so tests with non-zero stash
+        // (or no Stores at all) start with the marker cleared.
+        world.insert_resource(
+            crate::resources::thornbriar_pressure::ThornbriarPressureTracker::default(),
+        );
         let mut schedule = Schedule::default();
         schedule.add_systems(update_colony_building_markers);
         (world, schedule)
@@ -1113,5 +1148,104 @@ mod tests {
         assert!(!world
             .entity(colony)
             .contains::<markers::HasStoredThornbriar>());
+    }
+
+    // --- ColonyThornbriarChronicallyLow (ticket 084 Commit 3) ---
+
+    /// First-window sample below threshold latches the chronic-low
+    /// marker. Default `thornbriar_stash_low_threshold = 3`; an empty
+    /// stash is therefore chronic-low after one window.
+    #[test]
+    fn thornbriar_chronic_low_latches_at_first_window_when_empty() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        // Stores exists with default-empty StoredHerbs.
+        world.spawn((
+            Structure::new(StructureType::Stores),
+            crate::components::building::StoredItems::default(),
+            crate::components::building::StoredHerbs::default(),
+        ));
+        // Advance the tick past `chronicity_window_ticks` (default 1000)
+        // so the window-boundary computation fires.
+        world.resource_mut::<TimeState>().tick = 1_001;
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(world
+            .entity(colony)
+            .contains::<markers::ColonyThornbriarChronicallyLow>());
+    }
+
+    /// Stash above threshold (≥ 3 thornbriar) keeps the chronic-low
+    /// marker cleared.
+    #[test]
+    fn thornbriar_chronic_low_clears_when_stash_above_threshold() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        let mut sh = crate::components::building::StoredHerbs::default();
+        sh.add(crate::components::magic::HerbKind::Thornbriar, 5, 20);
+        world.spawn((
+            Structure::new(StructureType::Stores),
+            crate::components::building::StoredItems::default(),
+            sh,
+        ));
+        world.resource_mut::<TimeState>().tick = 1_001;
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(!world
+            .entity(colony)
+            .contains::<markers::ColonyThornbriarChronicallyLow>());
+    }
+
+    /// Mid-window the marker stays at the previously-latched value,
+    /// not the current stash state. A burst of thornbriar deposits
+    /// between window boundaries doesn't clear the marker until the
+    /// next sample.
+    #[test]
+    fn thornbriar_chronic_low_stable_between_windows() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        let stores_entity = world
+            .spawn((
+                Structure::new(StructureType::Stores),
+                crate::components::building::StoredItems::default(),
+                crate::components::building::StoredHerbs::default(),
+            ))
+            .id();
+        // First sample at tick > window → latches chronic-low (stash empty).
+        world.resource_mut::<TimeState>().tick = 1_001;
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(world
+            .entity(colony)
+            .contains::<markers::ColonyThornbriarChronicallyLow>());
+
+        // Mid-window deposit: stash now non-empty, but we haven't
+        // crossed the next sample boundary yet (tick 1500 < 1001 + 1000).
+        {
+            let mut stores_mut = world.entity_mut(stores_entity);
+            let mut sh = stores_mut
+                .get_mut::<crate::components::building::StoredHerbs>()
+                .expect("stores has StoredHerbs");
+            sh.add(crate::components::magic::HerbKind::Thornbriar, 10, 20);
+        }
+        world.resource_mut::<TimeState>().tick = 1_500;
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(
+            world
+                .entity(colony)
+                .contains::<markers::ColonyThornbriarChronicallyLow>(),
+            "marker stays latched between window boundaries (1500 < 1001 + 1000)"
+        );
+
+        // Now cross the next sample boundary: tick 2_002 = 1001 + 1001
+        // so saturating_sub(1001) = 1001 ≥ 1000 → recompute. Stash has
+        // 10 thornbriar ≥ 3 threshold, so marker clears.
+        world.resource_mut::<TimeState>().tick = 2_002;
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(
+            !world
+                .entity(colony)
+                .contains::<markers::ColonyThornbriarChronicallyLow>(),
+            "marker clears at next window boundary when stash now exceeds threshold"
+        );
     }
 }

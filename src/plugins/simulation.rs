@@ -80,7 +80,7 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry.cat_dses.push(dses::patrol_dse(scoring));
     registry.cat_dses.push(dses::build_dse(scoring));
     registry.target_taking_dses.push(dses::build_target_dse());
-    registry.cat_dses.push(dses::farm_dse());
+    registry.cat_dses.push(dses::farm_dse(scoring));
     registry.cat_dses.push(dses::coordinate_dse(scoring));
     registry.cat_dses.push(dses::explore_dse(scoring));
     registry.cat_dses.push(dses::wander_dse(scoring));
@@ -578,6 +578,11 @@ impl Plugin for SimulationPlugin {
         // Updated by `update_colony_building_markers` once per
         // `ScoringConstants::chronicity_window_ticks` ticks.
         app.init_resource::<crate::resources::stores_pressure::StoresPressureTracker>();
+        // 084 Commit 3: chronicity tracker for
+        // `ColonyThornbriarChronicallyLow`. Same cadence as
+        // StoresPressureTracker but inverts polarity (samples stash
+        // *state* against a low-water threshold).
+        app.init_resource::<crate::resources::thornbriar_pressure::ThornbriarPressureTracker>();
         // Ticket 400 — per-cat parenting-bias scalar map. Populated each
         // tick by `parenting_activity::populate_parenting_scalars`; read
         // at `ScoringContext` build time and by `ParentingActivityModifier`.
