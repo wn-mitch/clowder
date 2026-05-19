@@ -42,3 +42,4 @@ Either a layer-walk identifying the causal path (and a fix that restores `play �
 ## Log
 
 - 2026-05-19: opened as 084 follow-on. Lowest-priority of the three — likely noise.
+- 2026-05-19: **fixed-by-418 hypothesis falsified.** Re-soaked seed-42 post-418-fix (`logs/tuned-42`, commits ab1f3f38 + c2ad7967): `continuity_tallies.play = 5` (identical to pre-fix). 419 (WardPlaced regression) cleared decisively in the same soak (2 → 21), confirming the marker-snapshot fix landed. So the play regression survives independent of the CanWardFromSupply silent-fail — it's a genuine 084 substrate effect, not a downstream artifact. Re-frame: which of Commits 1 / 2 / 3 introduced it? Likely Commit 2 (plan-template change forces longer commitment chains — fewer L3 windows where Play can win). Next step is `just bisect-canary play 254` against the Commit 1 / 2 / 3 range.

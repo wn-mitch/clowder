@@ -1182,32 +1182,26 @@ impl Feature {
             Feature::KittenBorn => false,
             Feature::KittenFed => false,
             Feature::ItemRetrieved => false,
-            // Ticket 084 Commit 4 verification (logs/tuned-42, commit
-            // fe8e1f77 over 2d963309): HerbsDeposited fires reliably
-            // (108 events on seed-42), but HerbsRetrieved stays at 0
-            // — HerbcraftSetWard rarely elects the retrieve-path
-            // branch even when stash has thornbriar. The substrate is
-            // in place; the L3 selection / branch-cost calibration is
-            // a tuning follow-on. HerbsRetrieved stays demoted until
-            // that lands.
+            // Ticket 418 fix (2026-05-19, post-soak verification):
+            // CanWardFromSupply marker-snapshot population gap closed
+            // → HerbcraftSetWard eligibility now passes → retrieve-path
+            // elects naturally. Verification soak (logs/tuned-42 vs
+            // pre-418-fix baseline): HerbsRetrieved 0 → 18,
+            // WardPlaced 2 → 21 (vs pre-084 baseline 5). Promoted.
             Feature::HerbsDeposited => true,
-            Feature::HerbsRetrieved => false,
-            // Ticket 083 — Farm-dormancy reconciliation. Wave 2
-            // substrate hardening + L2 PairingActivity raise the
-            // food economy (more efficient hunts and cooking, higher
-            // median food_fraction) enough that Farm DSE's
-            // CompensatedProduct(food_scarcity, diligence,
-            // garden_distance) correctly gates dormant on healthy
-            // soaks. The original "silent-dead farming pipeline"
-            // class of bug — Farm firing but `tend`/`harvest` no-ops
-            // — is now a type/test failure under Phase 5a's
-            // `record_if_witnessed` discipline + step-resolver tests
-            // on `tend.rs`/`harvest.rs`, not a runtime canary's job.
-            // Promote back to `true` when ticket 084 ties Farm to
-            // herb/ward stockpile demand so gardens stay productive
-            // when food is full but Thornbriar is short.
-            Feature::CropTended => false,
-            Feature::CropHarvested => false,
+            Feature::HerbsRetrieved => true,
+            // Ticket 083 demoted CropTended / CropHarvested because
+            // Farm DSE correctly gated dormant under abundant food.
+            // Ticket 084 Commit 3 tied Farm to the
+            // `ColonyThornbriarChronicallyLow` chronicity marker; the
+            // 418-fix verification soak (2026-05-19, logs/tuned-42)
+            // observed CropTended 4183, CropHarvested 44 — the
+            // herb-pressure axis correctly lifts Farm under chronic
+            // ward-stockpile scarcity, even with food stockpiles full.
+            // Re-promoted both: the silent-dead farming pipeline is
+            // genuinely behind us.
+            Feature::CropTended => true,
+            Feature::CropHarvested => true,
             // Ticket 080 — `ReservationContended` is exempt until the
             // producer side (`record_target_picked` writes) ships.
             Feature::ReservationContended => false,
@@ -1951,10 +1945,12 @@ mod tests {
         // Rare-legend features are excluded.
         assert!(!missing.contains(&"ShadowFoxBanished"));
         assert!(!missing.contains(&"FateAwakened"));
-        // Ticket 083 — Farm-dormancy reconciliation. Crop features
-        // are demoted; they no longer flag the canary.
-        assert!(!missing.contains(&"CropTended"));
-        assert!(!missing.contains(&"CropHarvested"));
+        // Ticket 084 + 418 fix — Crop features re-promoted after the
+        // herb-pressure chronicity axis lifts Farm under chronic
+        // ward-stockpile scarcity. Verification soak observed
+        // CropTended 4183 / CropHarvested 44 on seed-42.
+        assert!(missing.contains(&"CropTended"));
+        assert!(missing.contains(&"CropHarvested"));
         // Cascade-exempt features are excluded — they cascade from
         // their trunk and don't add independent canary signal.
         assert!(!missing.contains(&"KittenFed"));
@@ -2066,20 +2062,20 @@ mod tests {
         assert!(!Feature::KittenBorn.expected_to_fire_per_soak());
         assert!(!Feature::KittenFed.expected_to_fire_per_soak());
         assert!(!Feature::ItemRetrieved.expected_to_fire_per_soak());
-        // Ticket 084 Commit 4 — verified post-soak: HerbsDeposited
-        // fires 100+ events per seed-42 soak (gather→deposit pipeline
-        // works); HerbsRetrieved stays at 0 (HerbcraftSetWard's
-        // retrieve-path branch rarely elected — L3 selection tuning
-        // is a follow-on).
+        // Ticket 084 + 418 fix — verified post-soak (2026-05-19,
+        // logs/tuned-42): both gather→deposit and retrieve→weave
+        // pipelines fire reliably on seed-42 (HerbsDeposited 115,
+        // HerbsRetrieved 18, WardPlaced 21).
         assert!(Feature::HerbsDeposited.expected_to_fire_per_soak());
-        assert!(!Feature::HerbsRetrieved.expected_to_fire_per_soak());
+        assert!(Feature::HerbsRetrieved.expected_to_fire_per_soak());
         assert_eq!(Feature::HerbsDeposited.category(), FeatureCategory::Positive);
         assert_eq!(Feature::HerbsRetrieved.category(), FeatureCategory::Positive);
-        // Ticket 083 — Farm-dormancy reconciliation. Demoted: the
-        // food-economy lift correctly silences Farm via its
-        // CompensatedProduct gate. Re-promote when ticket 084 ties
-        // Farm to herb/ward demand.
-        assert!(!Feature::CropTended.expected_to_fire_per_soak());
-        assert!(!Feature::CropHarvested.expected_to_fire_per_soak());
+        // Ticket 083 demoted CropTended / CropHarvested under abundant
+        // food. Ticket 084 Commit 3 + 418 fix re-promoted them: the
+        // herb-pressure chronicity axis lifts Farm under chronic
+        // ward-stockpile scarcity. Verification soak observed 4183 +
+        // 44 events on seed-42.
+        assert!(Feature::CropTended.expected_to_fire_per_soak());
+        assert!(Feature::CropHarvested.expected_to_fire_per_soak());
     }
 }

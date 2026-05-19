@@ -1,7 +1,7 @@
 ---
 id: 419
 title: WardPlaced rate regression 5→2 on seed-42 post-084 — investigate Herbcraft eligibility cadence
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-19
 ---
 
 ## Why
@@ -43,3 +43,5 @@ Likely correlated with ticket 418 (retrieve-path not electing): pre-Commit-2, a 
 ## Log
 
 - 2026-05-19: opened as 084 follow-on. `wards_placed_total = 2` in `logs/tuned-42/` vs `5` in `logs/tuned-42-pre-084/`. Likely fixed-by-418.
+- 2026-05-19: **fixed-by-418 confirmed decisively.** Re-soaked seed-42 against current main (commits ab1f3f38 + c2ad7967, post-418-fix): `wards_placed_total = 21` (vs pre-fix 2, vs pre-084 baseline 5). Herbcraft `Thornward` placements restored, and the substrate change overshot the pre-084 baseline by 4× — the stash-and-retrieve economy is structurally healthier for ward placement than the old gather-then-immediately-set chain. `HerbsRetrieved = 18` (was 0). `CropTended = 4183` / `CropHarvested = 44` (were 0) — the entire 084 herb-pressure chain works downstream. Closing as fixed-by-418.
+- 2026-05-19: Verification soak (logs/tuned-42, commits ab1f3f38 + c2ad7967) confirms WardPlaced 2 → 21 post-418-fix, vs pre-084 baseline 5. The marker-snapshot population gap closed by 418 unblocks the entire 084 substrate chain. Closing as fixed-by-418.
