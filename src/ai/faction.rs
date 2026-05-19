@@ -310,6 +310,53 @@ pub fn filter_candidates_by_stance(
     (kept, kept_pos)
 }
 
+/// In-place sibling of [`filter_candidates_by_stance`] — shrinks
+/// `entities` and `positions` to retain only the candidates that pass
+/// the stance requirement (ticket 427 Step 1). Saves the per-tick
+/// `Vec` allocation that the owned-return version pays on every DSE
+/// wrapper that prefilters by stance (fight / hunt / mate / mentor /
+/// caretake / socialize / groom_other / bury / apply_remedy).
+///
+/// Identical semantics to `filter_candidates_by_stance` — same dropping
+/// rules, same iteration order, same closure contracts. The two arrays
+/// stay parallel after retention.
+pub fn filter_candidates_by_stance_in_place(
+    relations: &FactionRelations,
+    observer_species: FactionSpecies,
+    entities: &mut Vec<Entity>,
+    positions: &mut Vec<crate::components::physical::Position>,
+    target_species_of: &dyn Fn(Entity) -> Option<FactionSpecies>,
+    overlays_of: &dyn Fn(Entity) -> StanceOverlays,
+    requirement: &StanceRequirement,
+) {
+    debug_assert_eq!(
+        entities.len(),
+        positions.len(),
+        "candidate/position vec lengths must match"
+    );
+    let observer_is_cat = observer_species.is_cat();
+    let len = entities.len();
+    let mut write_idx = 0usize;
+    for read_idx in 0..len {
+        let entity = entities[read_idx];
+        let pos = positions[read_idx];
+        let Some(target_species) = target_species_of(entity) else {
+            continue;
+        };
+        let base = relations.stance(observer_species, target_species);
+        let resolved = resolve_stance(base, observer_is_cat, overlays_of(entity));
+        if requirement.accepts(resolved) {
+            if write_idx != read_idx {
+                entities[write_idx] = entity;
+                positions[write_idx] = pos;
+            }
+            write_idx += 1;
+        }
+    }
+    entities.truncate(write_idx);
+    positions.truncate(write_idx);
+}
+
 // ---------------------------------------------------------------------------
 // §9.3 StanceRequirement
 // ---------------------------------------------------------------------------

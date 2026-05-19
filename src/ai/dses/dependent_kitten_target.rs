@@ -199,6 +199,8 @@ pub fn resolve_dependent_kitten_target(
     release_threshold: f32,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse_id = dependent_kitten_target_dse_id_for(action);
     let dse = registry
@@ -206,8 +208,8 @@ pub fn resolve_dependent_kitten_target(
         .iter()
         .find(|d| d.id().0 == dse_id.0)?;
 
-    let mut candidates: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
     for kitten in kittens {
         // 395: symmetric — either parent is eligible.
         if kitten.mother != Some(parent) && kitten.father != Some(parent) {
@@ -232,11 +234,11 @@ pub fn resolve_dependent_kitten_target(
         if dist > DEPENDENT_KITTEN_TARGET_RANGE {
             continue;
         }
-        candidates.push(kitten.entity);
-        positions.push(kitten.pos);
+        scratch.entities.push(kitten.entity);
+        scratch.positions.push(kitten.pos);
     }
 
-    if candidates.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
@@ -263,8 +265,8 @@ pub fn resolve_dependent_kitten_target(
     let scored = evaluate_target_taking(
         dse,
         parent,
-        &candidates,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -447,6 +449,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -481,6 +484,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none(), "unrelated kittens should be rejected");
     }
@@ -515,6 +519,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
             out,
@@ -545,6 +550,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none(), "released kittens should be rejected");
     }
@@ -569,6 +575,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none(), "out-of-band maturity should be rejected");
     }
@@ -594,6 +601,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none(), "idle-gap maturity should be rejected");
     }
@@ -622,6 +630,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(target_kitten));
     }
@@ -648,6 +657,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(Entity::from_raw_u32(11).unwrap()));
     }
@@ -672,6 +682,7 @@ mod tests {
             0.95,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }

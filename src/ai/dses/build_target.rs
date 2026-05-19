@@ -193,6 +193,8 @@ pub fn resolve_build_target(
     candidates: &[BuildCandidate],
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -203,26 +205,28 @@ pub fn resolve_build_target(
         return None;
     }
 
-    let mut entities: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
-    let mut kind_map: std::collections::HashMap<Entity, BuildTargetKind> =
-        std::collections::HashMap::new();
-    let mut progress_map: std::collections::HashMap<Entity, f32> = std::collections::HashMap::new();
-    let mut condition_map: std::collections::HashMap<Entity, f32> =
-        std::collections::HashMap::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
+    scratch.build_kind.clear();
+    scratch.map_f32_a.clear();
+    scratch.map_f32_b.clear();
     for c in candidates {
         let dist = cat_pos.manhattan_distance(&c.position) as f32;
         if dist > BUILD_TARGET_RANGE {
             continue;
         }
-        entities.push(c.entity);
-        positions.push(c.position);
-        kind_map.insert(c.entity, c.kind);
-        progress_map.insert(c.entity, c.progress.clamp(0.0, 1.0));
-        condition_map.insert(c.entity, c.condition.clamp(0.0, 1.0));
+        scratch.entities.push(c.entity);
+        scratch.positions.push(c.position);
+        scratch.build_kind.insert(c.entity, c.kind);
+        scratch
+            .map_f32_a
+            .insert(c.entity, c.progress.clamp(0.0, 1.0));
+        scratch
+            .map_f32_b
+            .insert(c.entity, c.condition.clamp(0.0, 1.0));
     }
 
-    if entities.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
@@ -230,6 +234,11 @@ pub fn resolve_build_target(
     // the substrate from `EvalCtx::self_position` to each candidate's
     // tile per §L2.10.7.
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
+    // Reborrow lookup tables as `&` so the per-target closure captures
+    // shared refs; disjoint from `&scratch.entities/positions`.
+    let kind_map = &scratch.build_kind;
+    let progress_map = &scratch.map_f32_a;
+    let condition_map = &scratch.map_f32_b;
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_SITE_TYPE_INPUT => match kind_map.get(&target) {
@@ -281,8 +290,8 @@ pub fn resolve_build_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &entities,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -368,7 +377,9 @@ mod tests {
     fn resolver_returns_none_with_no_registered_dse() {
         let registry = DseRegistry::new();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0, None);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert!(out.is_none());
     }
 
@@ -377,7 +388,9 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(build_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0, None);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert!(out.is_none());
     }
 
@@ -387,7 +400,9 @@ mod tests {
         registry.target_taking_dses.push(build_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = new_build(2, 50, 0, 0.5);
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[far], 0, None);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[far], 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert!(out.is_none());
     }
 
@@ -404,7 +419,9 @@ mod tests {
         // Let's make their progress/condition axes tie to isolate the
         // Cliff's effect.
         let rp = repair(3, 0, 3, 0.5);
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[nb, rp], 0, None);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[nb, rp], 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert_eq!(out, Some(nb.entity));
     }
 
@@ -424,6 +441,7 @@ mod tests {
             &[finishing, breaking_ground],
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(finishing.entity));
     }
@@ -445,6 +463,7 @@ mod tests {
             &[crumbling, scuffed],
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(crumbling.entity));
     }
@@ -456,7 +475,9 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = new_build(2, 2, 0, 0.5);
         let far = new_build(3, 15, 0, 0.5);
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[close, far], 0, None);
+        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[close, far], 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert_eq!(out, Some(close.entity));
     }
 
@@ -490,6 +511,7 @@ mod tests {
             &[finishing, damaged],
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(finishing.entity));
     }

@@ -140,6 +140,7 @@ fn herbcraft_intention(_target: Entity) -> Intention {
 /// Pick the best harvestable herb for `cat` via the registered
 /// [`herbcraft_target_dse`]. Returns `None` iff no eligible candidate
 /// exists in range.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_herbcraft_target(
     registry: &DseRegistry,
     cat: Entity,
@@ -148,6 +149,8 @@ pub fn resolve_herbcraft_target(
     map: &HerbLocationMap,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -158,28 +161,34 @@ pub fn resolve_herbcraft_target(
         return None;
     }
 
-    let mut entities: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
-    let mut density_by_entity: std::collections::HashMap<Entity, f32> =
-        std::collections::HashMap::new();
-    let mut maturity_by_entity: std::collections::HashMap<Entity, f32> =
-        std::collections::HashMap::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
+    scratch.map_f32_a.clear();
+    scratch.map_f32_b.clear();
     for c in candidates {
         let dist = cat_pos.manhattan_distance(&c.position) as f32;
         if dist > HERBCRAFT_TARGET_RANGE {
             continue;
         }
-        entities.push(c.entity);
-        positions.push(c.position);
-        density_by_entity.insert(c.entity, map.total(c.position.x, c.position.y));
-        maturity_by_entity.insert(c.entity, growth_stage_strength(c.growth_stage));
+        scratch.entities.push(c.entity);
+        scratch.positions.push(c.position);
+        scratch
+            .map_f32_a
+            .insert(c.entity, map.total(c.position.x, c.position.y));
+        scratch
+            .map_f32_b
+            .insert(c.entity, growth_stage_strength(c.growth_stage));
     }
 
-    if entities.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
+    // Reborrow as `&` for closure capture (disjoint from
+    // `&scratch.entities/positions` below).
+    let density_by_entity = &scratch.map_f32_a;
+    let maturity_by_entity = &scratch.map_f32_b;
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_HERB_DENSITY_INPUT => density_by_entity.get(&target).copied().unwrap_or(0.0),
@@ -208,8 +217,8 @@ pub fn resolve_herbcraft_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &entities,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -293,7 +302,9 @@ mod tests {
         let registry = DseRegistry::new();
         let map = empty_map();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[], &map, 0, None);
+        let out = resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[], &map, 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert!(out.is_none());
     }
 
@@ -303,7 +314,9 @@ mod tests {
         registry.target_taking_dses.push(herbcraft_target_dse());
         let map = empty_map();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[], &map, 0, None);
+        let out = resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[], &map, 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert!(out.is_none());
     }
 
@@ -316,7 +329,9 @@ mod tests {
         // Beyond HERBCRAFT_TARGET_RANGE (20) Manhattan tiles.
         let far = herb(2, 50, 0, HerbKind::HealingMoss, GrowthStage::Blossom);
         let out =
-            resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[far], &map, 0, None);
+            resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[far], &map, 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert!(out.is_none());
     }
 
@@ -342,6 +357,7 @@ mod tests {
             &map,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close.entity));
     }
@@ -365,6 +381,7 @@ mod tests {
             &map,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(blossom.entity));
     }
@@ -406,6 +423,7 @@ mod tests {
             &map,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(dense.entity));
     }

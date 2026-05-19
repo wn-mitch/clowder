@@ -310,6 +310,8 @@ pub fn resolve_fight_target(
     recent: Option<&RecentTargetFailures>,
     cooldown_ticks: u64,
     activation: Option<&mut SystemActivation>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -322,34 +324,33 @@ pub fn resolve_fight_target(
 
     // Per-candidate species lookup table — built once, reused by the
     // §9.3 prefilter closure.
-    let species_map: std::collections::HashMap<Entity, crate::ai::faction::FactionSpecies> =
-        candidates
-            .iter()
-            .map(|c| {
-                (
-                    c.entity,
-                    crate::ai::faction::FactionSpecies::from_sensory(
-                        crate::components::sensing::SensorySpecies::Wild(c.species),
-                    ),
-                )
-            })
-            .collect();
+    scratch.species_map.clear();
+    for c in candidates {
+        scratch.species_map.insert(
+            c.entity,
+            crate::ai::faction::FactionSpecies::from_sensory(
+                crate::components::sensing::SensorySpecies::Wild(c.species),
+            ),
+        );
+    }
 
     // Filter by range + build lookup tables.
-    let mut entities: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
-    let mut threat_map: std::collections::HashMap<Entity, f32> = std::collections::HashMap::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
+    scratch.map_f32_a.clear();
     for c in candidates {
         let dist = cat_pos.manhattan_distance(&c.position) as f32;
         if dist > FIGHT_TARGET_RANGE {
             continue;
         }
-        entities.push(c.entity);
-        positions.push(c.position);
-        threat_map.insert(c.entity, threat_level_normalized(c.threat_power));
+        scratch.entities.push(c.entity);
+        scratch.positions.push(c.position);
+        scratch
+            .map_f32_a
+            .insert(c.entity, threat_level_normalized(c.threat_power));
     }
 
-    if entities.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
@@ -357,21 +358,22 @@ pub fn resolve_fight_target(
     // stance fails the requirement. Uses `species_map` to map each
     // candidate's `WildSpecies` onto a `FactionSpecies` row.
     if let Some(req) = dse.required_stance() {
+        // Borrow species_map by shared ref so the closure doesn't
+        // conflict with the mutable borrow of entities/positions.
+        let species_map = &scratch.species_map;
         let species_of = |e: Entity| species_map.get(&e).copied();
-        let (filtered, filtered_pos) = crate::ai::faction::filter_candidates_by_stance(
+        crate::ai::faction::filter_candidates_by_stance_in_place(
             relations,
             crate::ai::faction::FactionSpecies::Cat,
-            &entities,
-            &positions,
+            &mut scratch.entities,
+            &mut scratch.positions,
             &species_of,
             stance_overlays,
             req,
         );
-        if filtered.is_empty() {
+        if scratch.entities.is_empty() {
             return None;
         }
-        entities = filtered;
-        positions = filtered_pos;
     }
 
     let ally_score = ally_proximity_normalized(cat_pos, ally_positions);
@@ -381,6 +383,11 @@ pub fn resolve_fight_target(
     // tile per §L2.10.7.
     let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
+    // Ticket 427 Step 1 — reborrow the threat map as `&` so the per-target
+    // fetcher closure captures only a shared reference to one scratch
+    // field. `&scratch.entities` / `&scratch.positions` pass into the
+    // evaluator below as immutable slices over disjoint fields.
+    let threat_map = &scratch.map_f32_a;
     let fetch_target = |name: &str, _cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_THREAT_INPUT => threat_map.get(&target).copied().unwrap_or(0.0),
@@ -430,8 +437,8 @@ pub fn resolve_fight_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &entities,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -594,6 +601,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -618,6 +626,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -643,6 +652,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -670,6 +680,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(shadow.entity));
     }
@@ -707,6 +718,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_some());
     }
@@ -736,6 +748,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close.entity));
     }
@@ -779,6 +792,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
             out,

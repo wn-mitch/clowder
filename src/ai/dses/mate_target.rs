@@ -171,14 +171,16 @@ pub fn resolve_mate_target(
     cooldown_ticks: u64,
     // Activation tracker for `Feature::TargetCooldownApplied`.
     activation: Option<&mut SystemActivation>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
         .iter()
         .find(|d| d.id().0 == "mate_target")?;
 
-    let mut candidates: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
     for (other, other_pos) in cat_positions {
         if *other == cat {
             continue;
@@ -194,11 +196,11 @@ pub fn resolve_mate_target(
         if !matches!(bond, BondType::Partners | BondType::Mates) {
             continue;
         }
-        candidates.push(*other);
-        positions.push(*other_pos);
+        scratch.entities.push(*other);
+        scratch.positions.push(*other_pos);
     }
 
-    if candidates.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
@@ -255,8 +257,8 @@ pub fn resolve_mate_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &candidates,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -324,6 +326,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -355,6 +358,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         // Friends bond doesn't pass the filter — even with romantic=0.9,
         // the resolver returns None. This is the bond-filter fix
@@ -385,6 +389,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(partner));
     }
@@ -419,6 +424,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         // Romantic weight (0.5) dominates fondness weight (0.3125),
         // so the more-romantic partner wins even with lower fondness.
@@ -460,6 +466,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close));
     }
@@ -487,6 +494,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(winner, Some(partner));
         // Verify Intention factory produces Pairing activity.

@@ -264,6 +264,8 @@ pub fn resolve_hunt_target(
     // `(cat, target, kind)` not populated by the writer this tick,
     // which is also the dormant-axis outcome.
     affordances: &ActionAffordances,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -274,54 +276,57 @@ pub fn resolve_hunt_target(
         return None;
     }
 
-    // Pull entity + position parallel-vecs for the evaluator.
-    let mut entities: Vec<Entity> = candidates.iter().map(|c| c.entity).collect();
-    let mut positions: Vec<Position> = candidates.iter().map(|c| c.position).collect();
+    // Pull entity + position parallel-vecs for the evaluator. Also
+    // populate the prey-kind + alertness lookup tables in the same pass
+    // so the per-target fetcher closure can read them via shared
+    // borrow (ticket 427 Step 1).
+    scratch.entities.clear();
+    scratch.positions.clear();
+    scratch.prey_kind_map.clear();
+    scratch.map_f32_a.clear();
+    for c in candidates {
+        scratch.entities.push(c.entity);
+        scratch.positions.push(c.position);
+        scratch.prey_kind_map.insert(c.entity, c.kind);
+        scratch
+            .map_f32_a
+            .insert(c.entity, c.alertness.clamp(0.0, 1.0));
+    }
 
     // §9.3 stance prefilter — drop prey candidates whose resolved
     // stance fails the requirement. `BefriendedAlly` upgrades a Prey
     // base to Ally, which Hunt's `Prey`-only requirement rejects.
     if let Some(req) = dse.required_stance() {
-        let species_lookup: std::collections::HashMap<Entity, crate::ai::faction::FactionSpecies> =
-            candidates
-                .iter()
-                .map(|c| {
-                    (
-                        c.entity,
-                        crate::ai::faction::FactionSpecies::from_sensory(
-                            crate::components::sensing::SensorySpecies::Prey(c.kind),
-                        ),
-                    )
-                })
-                .collect();
-        let species_of = |e: Entity| species_lookup.get(&e).copied();
-        let (filtered, filtered_pos) = crate::ai::faction::filter_candidates_by_stance(
+        scratch.species_map.clear();
+        for c in candidates {
+            scratch.species_map.insert(
+                c.entity,
+                crate::ai::faction::FactionSpecies::from_sensory(
+                    crate::components::sensing::SensorySpecies::Prey(c.kind),
+                ),
+            );
+        }
+        let species_map = &scratch.species_map;
+        let species_of = |e: Entity| species_map.get(&e).copied();
+        crate::ai::faction::filter_candidates_by_stance_in_place(
             relations,
             crate::ai::faction::FactionSpecies::Cat,
-            &entities,
-            &positions,
+            &mut scratch.entities,
+            &mut scratch.positions,
             &species_of,
             stance_overlays,
             req,
         );
-        if filtered.is_empty() {
+        if scratch.entities.is_empty() {
             return None;
         }
-        entities = filtered;
-        positions = filtered_pos;
     }
 
-    // Lookup-table for the per-candidate target fetchers. O(N) size;
-    // tiny — hunt candidate pools are bounded by visual range × prey
-    // density. The spatial axis (`hunt_pursuit_cost`) is computed by
-    // the substrate from `EvalCtx::self_position` to each candidate's
-    // tile, so no nearness branch lives here.
-    let kind_map: std::collections::HashMap<Entity, PreyKind> =
-        candidates.iter().map(|c| (c.entity, c.kind)).collect();
-    let alertness_map: std::collections::HashMap<Entity, f32> = candidates
-        .iter()
-        .map(|c| (c.entity, c.alertness.clamp(0.0, 1.0)))
-        .collect();
+    // Reborrow lookup tables as `&` so the per-target fetcher closure
+    // captures shared references only. Disjoint from `&scratch.entities`
+    // / `&scratch.positions` passed to the evaluator below.
+    let kind_map = &scratch.prey_kind_map;
+    let alertness_map = &scratch.map_f32_a;
 
     let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
@@ -385,8 +390,8 @@ pub fn resolve_hunt_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &entities,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -545,6 +550,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -567,6 +573,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -594,6 +601,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(rabbit.entity));
     }
@@ -625,6 +633,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(relaxed_mouse.entity));
     }
@@ -650,6 +659,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close.entity));
     }
@@ -681,6 +691,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(near_mouse.entity));
     }
@@ -712,6 +723,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(near.entity));
     }
@@ -757,6 +769,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close.entity));
 
@@ -804,6 +817,7 @@ mod tests {
             8000,
             None,
             &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
             out,

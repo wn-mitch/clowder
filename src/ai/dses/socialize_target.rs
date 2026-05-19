@@ -302,6 +302,10 @@ pub fn resolve_socialize_target(
     // Pass `None` from dead-code disposition.rs paths and from tests
     // that don't care.
     activation: Option<&mut SystemActivation>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers. The wrapper
+    // writes into `scratch.entities` / `scratch.positions` instead of
+    // allocating per call; capacity persists across cat-ticks.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     // Find the registered factory output. Fall back to `None` if
     // registration was skipped (tests / partial bootstraps) — callers
@@ -318,20 +322,20 @@ pub fn resolve_socialize_target(
     // outer-gate semantics; per-target distance attenuation happens
     // inside the DSE via the `socialize_target_nearness`
     // SpatialConsideration (§L2.10.7).
-    let mut candidates: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
     for (other, other_pos) in cat_positions {
         if *other == cat {
             continue;
         }
         let dist = cat_pos.manhattan_distance(other_pos) as f32;
         if dist <= SOCIALIZE_TARGET_RANGE {
-            candidates.push(*other);
-            positions.push(*other_pos);
+            scratch.entities.push(*other);
+            scratch.positions.push(*other_pos);
         }
     }
 
-    if candidates.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
@@ -341,20 +345,18 @@ pub fn resolve_socialize_target(
     // a constant `Cat`.
     if let Some(req) = dse.required_stance() {
         let species_of = |_: Entity| Some(crate::ai::faction::FactionSpecies::Cat);
-        let (filtered, filtered_pos) = crate::ai::faction::filter_candidates_by_stance(
+        crate::ai::faction::filter_candidates_by_stance_in_place(
             relations,
             crate::ai::faction::FactionSpecies::Cat,
-            &candidates,
-            &positions,
+            &mut scratch.entities,
+            &mut scratch.positions,
             &species_of,
             stance_overlays,
             req,
         );
-        if filtered.is_empty() {
+        if scratch.entities.is_empty() {
             return None;
         }
-        candidates = filtered;
-        positions = filtered_pos;
     }
 
     // Ticket 073 — track whether any candidate triggered the cooldown
@@ -427,8 +429,8 @@ pub fn resolve_socialize_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &candidates,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -1014,6 +1016,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -1041,6 +1044,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -1078,6 +1082,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(friend));
     }
@@ -1104,6 +1109,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -1144,6 +1150,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(novel));
     }
@@ -1237,6 +1244,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
             out,

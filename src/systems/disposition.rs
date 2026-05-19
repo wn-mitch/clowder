@@ -233,6 +233,11 @@ pub struct ChainResources<'w> {
     /// below makes the prefilter a pass-through here.)
     pub faction_relations: Res<'w, crate::ai::faction::FactionRelations>,
     pub time: Res<'w, TimeState>,
+    /// Ticket 427 Step 1 — scratchpad for target-taking DSE resolvers.
+    /// Threaded for type-correctness because `evaluate_dispositions` is
+    /// not registered in the schedule today (ticket 027b); the resource
+    /// is unused at runtime here but the resolver signatures demand it.
+    pub dse_scratchpad: ResMut<'w, crate::resources::DseTargetScratchpad>,
 }
 
 use crate::resources::narrative_templates::{
@@ -309,6 +314,10 @@ pub struct EvalDispositionSideEffects<'w, 's> {
     /// `nearest_other.respect` reads. Read-only alias of the per-cat
     /// iteration query's `&Needs` borrow.
     pub needs_query: Query<'w, 's, &'static Needs, Without<Dead>>,
+    /// Ticket 427 Step 1 — pre-allocated scratch buffers for the
+    /// target-taking DSE resolvers invoked from `evaluate_dispositions`
+    /// (the caretake / mate pre-checks at the §6.5 scorer site).
+    pub dse_scratchpad: ResMut<'w, crate::resources::DseTargetScratchpad>,
 }
 
 /// Read-only queries over stored-item state + kitten state. Bundled
@@ -602,6 +611,7 @@ pub fn evaluate_dispositions(
             // step-resolution site, not here.
             None,
             parent_marker_active,
+            &mut side_effects.dse_scratchpad,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
         // Non-parent adults with a positive bond to the kitten's mother
@@ -1284,7 +1294,7 @@ pub fn disposition_to_chain(
         ),
         Without<Dead>,
     >,
-    res: ChainResources,
+    mut res: ChainResources,
     constants: Res<SimConstants>,
     mut rng: ResMut<SimRng>,
     mut commands: Commands,
@@ -1415,6 +1425,7 @@ pub fn disposition_to_chain(
             // GOAP step-resolver site (goap.rs: FeedKitten step).
             None,
             false,
+            &mut res.dse_scratchpad,
         );
 
         // §6.5.1 + §6.5.2: resolve target-taking DSE winners once per
@@ -1452,6 +1463,7 @@ pub fn disposition_to_chain(
             None,
             0,
             None,
+            &mut res.dse_scratchpad,
         );
         let mate_target = crate::ai::dses::mate_target::resolve_mate_target(
             &res.dse_registry,
@@ -1466,6 +1478,7 @@ pub fn disposition_to_chain(
             None,
             0,
             None,
+            &mut res.dse_scratchpad,
         );
         // §6.5.3: resolve the mentor target-taking DSE. Skill-gap is the
         // dominant axis; weights renormalized from spec by dropping the
@@ -1490,6 +1503,7 @@ pub fn disposition_to_chain(
             None,
             0,
             None,
+            &mut res.dse_scratchpad,
         );
         // §6.5.4: resolve the groom-other target-taking DSE. Adds
         // target-need-warmth + kinship axes that the legacy
@@ -1517,6 +1531,7 @@ pub fn disposition_to_chain(
             None,
             0,
             None,
+            &mut res.dse_scratchpad,
         );
         // §6.5.7: resolve patient for ApplyRemedy. Replaces the
         // `injured_cats.min_by_key(distance)` legacy pick with the
@@ -1536,6 +1551,7 @@ pub fn disposition_to_chain(
             // coverage for apply_remedy is tracked in the
             // §6.5 multi-focal follow-on.
             None,
+            &mut res.dse_scratchpad,
         );
         // §6.5.8: resolve work-site for Build. Replaces the
         // `(priority, distance)` legacy pick with the progress-
@@ -1576,6 +1592,7 @@ pub fn disposition_to_chain(
             // build_target is tracked in the §6.5 multi-focal
             // follow-on.
             None,
+            &mut res.dse_scratchpad,
         );
 
         let chain = match disposition.kind {

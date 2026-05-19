@@ -220,15 +220,17 @@ pub fn resolve_groom_other_target(
     recent: Option<&RecentTargetFailures>,
     cooldown_ticks: u64,
     activation: Option<&mut SystemActivation>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
         .iter()
         .find(|d| d.id().0 == "groom_other_target")?;
 
-    let mut candidates: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
-    let mut temperatures: std::collections::HashMap<Entity, f32> = std::collections::HashMap::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
+    scratch.map_f32_a.clear();
     for (other, other_pos) in cat_positions {
         if *other == cat {
             continue;
@@ -240,12 +242,12 @@ pub fn resolve_groom_other_target(
         let Some(temp) = temperature_lookup(*other) else {
             continue;
         };
-        candidates.push(*other);
-        positions.push(*other_pos);
-        temperatures.insert(*other, temp);
+        scratch.entities.push(*other);
+        scratch.positions.push(*other_pos);
+        scratch.map_f32_a.insert(*other, temp);
     }
 
-    if candidates.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
@@ -254,6 +256,10 @@ pub fn resolve_groom_other_target(
     // candidate's tile per §L2.10.7.
     let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
+    // Reborrow temperatures as `&` so the closure captures only a
+    // shared reference; disjoint from `&scratch.entities` /
+    // `&scratch.positions` passed to the evaluator below.
+    let temperatures = &scratch.map_f32_a;
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_FONDNESS_INPUT => relationships
@@ -303,8 +309,8 @@ pub fn resolve_groom_other_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &candidates,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -397,6 +403,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -424,6 +431,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -450,6 +458,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -480,6 +489,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -524,6 +534,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(cold));
     }
@@ -558,6 +569,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(kin));
     }
@@ -598,6 +610,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(near_acquaintance));
     }
@@ -633,6 +646,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(friend));
     }
@@ -682,6 +696,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(freezing));
     }
@@ -723,6 +738,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(adjacent));
     }

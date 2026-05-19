@@ -214,6 +214,8 @@ pub fn resolve_caretake_target(
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
     parent_marker_active: bool,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> CaretakeResolution {
     let Some(dse) = registry
         .target_taking_dses
@@ -223,8 +225,8 @@ pub fn resolve_caretake_target(
         return CaretakeResolution::default();
     };
 
-    let mut candidates: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
     let mut any_parent_hit = false;
 
     for kitten in kittens {
@@ -238,8 +240,8 @@ pub fn resolve_caretake_target(
         if kitten.mother == Some(adult) || kitten.father == Some(adult) {
             any_parent_hit = true;
         }
-        candidates.push(kitten.entity);
-        positions.push(kitten.pos);
+        scratch.entities.push(kitten.entity);
+        scratch.positions.push(kitten.pos);
     }
 
     // Ticket 158 — kinship-channel fallback. If the per-tick range
@@ -255,7 +257,7 @@ pub fn resolve_caretake_target(
     // forced the parent to choose a non-Caretake action when their
     // kitten just happened to fall outside the 12-tile gate or above
     // the 0.6-hunger gate.
-    if candidates.is_empty() && parent_marker_active {
+    if scratch.entities.is_empty() && parent_marker_active {
         let closest_own = kittens
             .iter()
             .filter(|k| {
@@ -264,28 +266,29 @@ pub fn resolve_caretake_target(
             })
             .min_by_key(|k| adult_pos.manhattan_distance(&k.pos));
         if let Some(k) = closest_own {
-            candidates.push(k.entity);
-            positions.push(k.pos);
+            scratch.entities.push(k.entity);
+            scratch.positions.push(k.pos);
             any_parent_hit = true;
         }
     }
 
-    if candidates.is_empty() {
+    if scratch.entities.is_empty() {
         return CaretakeResolution::default();
     }
 
     // Per-target lookup tables — keyed on the candidate entity so the
     // target-fetcher closure can resolve without re-scanning.
-    let mut kitten_by_entity: std::collections::HashMap<Entity, KittenState> =
-        std::collections::HashMap::with_capacity(candidates.len());
+    scratch.kitten_by_entity.clear();
     for k in kittens {
-        kitten_by_entity.insert(k.entity, *k);
+        scratch.kitten_by_entity.insert(k.entity, *k);
     }
 
     // Spatial nearness axis (`caretake_target_nearness`) is computed
     // by the substrate from `EvalCtx::self_position` to each
     // candidate's tile per §L2.10.7.
     let fetch_self = |_name: &str, _adult: Entity| -> f32 { 0.0 };
+    // Reborrow kitten map as `&` for the closure capture.
+    let kitten_by_entity = &scratch.kitten_by_entity;
     let fetch_target = |name: &str, _adult: Entity, target: Entity| -> f32 {
         match name {
             TARGET_KITTEN_HUNGER_INPUT => kitten_by_entity
@@ -339,8 +342,8 @@ pub fn resolve_caretake_target(
     let scored = evaluate_target_taking(
         dse,
         adult,
-        &candidates,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -493,6 +496,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
         assert_eq!(out.urgency, 0.0);
@@ -513,6 +517,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
     }
@@ -532,6 +537,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
     }
@@ -552,6 +558,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
     }
@@ -578,6 +585,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(11).unwrap()));
     }
@@ -601,6 +609,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
         assert!(out.urgency > 0.0);
@@ -628,6 +637,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(11).unwrap()));
         assert!(out.is_parent, "own-kitten hit sets is_parent");
@@ -654,6 +664,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
         assert!(
@@ -680,6 +691,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
     }
@@ -711,6 +723,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
             out.target,
@@ -744,6 +757,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
             out.target,
@@ -778,6 +792,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target_mother, Some(mother));
         assert_eq!(out.target_father, Some(father));
@@ -800,6 +815,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_some());
         assert!(
@@ -839,6 +855,7 @@ mod tests {
             0,
             None,
             false,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(baseline.target.is_none());
         assert_eq!(baseline.urgency, 0.0);
@@ -854,6 +871,7 @@ mod tests {
             0,
             None,
             true,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(lifted.target, Some(Entity::from_raw_u32(10).unwrap()));
         assert!(lifted.urgency > 0.0);
@@ -884,6 +902,7 @@ mod tests {
             0,
             None,
             true,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
             out.target,
@@ -912,6 +931,7 @@ mod tests {
             0,
             None,
             true,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
         assert_eq!(out.urgency, 0.0);
@@ -939,6 +959,7 @@ mod tests {
             0,
             None,
             true,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
             out.target,

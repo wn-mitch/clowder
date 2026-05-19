@@ -165,6 +165,7 @@ fn apply_remedy_intention(_target: Entity) -> Intention {
 /// - `candidates` is the caller-built injured-cat snapshot.
 /// - `is_kin(self, target)` — parent-child check (same shape as
 ///   Groom-other §6.5.4).
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_apply_remedy_target(
     registry: &DseRegistry,
     cat: Entity,
@@ -173,6 +174,8 @@ pub fn resolve_apply_remedy_target(
     is_kin: &dyn Fn(Entity, Entity) -> bool,
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -183,20 +186,22 @@ pub fn resolve_apply_remedy_target(
         return None;
     }
 
-    let mut entities: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
-    let mut injury_map: std::collections::HashMap<Entity, f32> = std::collections::HashMap::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
+    scratch.map_f32_a.clear();
     for c in candidates {
         let dist = cat_pos.manhattan_distance(&c.position) as f32;
         if dist > APPLY_REMEDY_TARGET_RANGE {
             continue;
         }
-        entities.push(c.entity);
-        positions.push(c.position);
-        injury_map.insert(c.entity, (1.0 - c.health_fraction).clamp(0.0, 1.0));
+        scratch.entities.push(c.entity);
+        scratch.positions.push(c.position);
+        scratch
+            .map_f32_a
+            .insert(c.entity, (1.0 - c.health_fraction).clamp(0.0, 1.0));
     }
 
-    if entities.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
@@ -204,6 +209,9 @@ pub fn resolve_apply_remedy_target(
     // computed by the substrate from `EvalCtx::self_position` to each
     // candidate's tile per §L2.10.7.
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
+    // Reborrow as `&` so the closure captures a shared reference;
+    // disjoint from `&scratch.entities` / `&scratch.positions` below.
+    let injury_map = &scratch.map_f32_a;
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_INJURY_INPUT => injury_map.get(&target).copied().unwrap_or(0.0),
@@ -233,8 +241,8 @@ pub fn resolve_apply_remedy_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &entities,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -317,7 +325,9 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         let is_kin = |_: Entity, _: Entity| -> bool { false };
         let out =
-            resolve_apply_remedy_target(&registry, cat, Position::new(0, 0), &[], &is_kin, 0, None);
+            resolve_apply_remedy_target(&registry, cat, Position::new(0, 0), &[], &is_kin, 0, None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
         assert!(out.is_none());
     }
 
@@ -336,6 +346,7 @@ mod tests {
             &is_kin,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -360,6 +371,7 @@ mod tests {
             &is_kin,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(severe.entity));
     }
@@ -386,6 +398,7 @@ mod tests {
             &is_kin,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(critical_far.entity));
     }
@@ -406,6 +419,7 @@ mod tests {
             &is_kin,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close.entity));
     }
@@ -427,6 +441,7 @@ mod tests {
             &is_kin,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(kin.entity));
     }
@@ -445,6 +460,7 @@ mod tests {
             &is_kin,
             0,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }

@@ -594,6 +594,12 @@ impl Plugin for SimulationPlugin {
         // tick by `parenting_activity::populate_parenting_scalars`; read
         // at `ScoringContext` build time and by `ParentingActivityModifier`.
         app.init_resource::<crate::systems::parenting_activity::ParentingScalars>();
+        // Ticket 427 Step 1 — pre-allocated scratch for target-taking DSE
+        // resolvers. Threaded through `PlanResources::dse_scratchpad`;
+        // each `resolve_*_target` clears + writes into its own slots so
+        // capacity persists across cat-ticks (~355 MB/soak saved at the
+        // 500-cat projection).
+        app.init_resource::<crate::resources::DseTargetScratchpad>();
         app.add_systems(
             Startup,
             register_dses_at_startup.after(crate::plugins::setup::setup_world_exclusive),

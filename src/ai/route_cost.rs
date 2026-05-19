@@ -58,6 +58,13 @@ pub fn flood_dijkstra(
     overlays: &[WeightedOverlay<'_>],
     max_cost: u32,
     origin_tick: u64,
+    // Ticket 427 Step 2 — caller-provided bucket arena. Replaces the
+    // per-call `Vec<Vec<Position>>` allocation that was the second-largest
+    // alloc hotspot in the 427 survey (~96 MB/soak at 500-cat projection).
+    // The function grows the outer vec to `cap+1`, clears each inner Vec
+    // in-place, then drains by `mem::swap`-out / `mem::swap`-back so inner
+    // Vec capacities persist across calls.
+    buckets: &mut Vec<Vec<Position>>,
 ) -> RouteCostField {
     let width = map.width.max(0) as u32;
     let height = map.height.max(0) as u32;
@@ -68,16 +75,31 @@ pub fn flood_dijkstra(
     }
 
     let cap = max_cost.min(MAX_COST_BUDGET);
-    let mut buckets: Vec<Vec<Position>> = (0..=cap as usize).map(|_| Vec::new()).collect();
+    // Grow the outer Vec only if this call needs more buckets than any
+    // prior call. Clear every existing inner Vec to drop residue without
+    // releasing its capacity.
+    let target_len = cap as usize + 1;
+    if buckets.len() < target_len {
+        buckets.resize_with(target_len, Vec::new);
+    }
+    for b in buckets.iter_mut() {
+        b.clear();
+    }
 
     let from_idx = (from.y as u32 * width + from.x as u32) as usize;
     field.costs[from_idx] = 0;
     buckets[0].push(from);
 
+    // Reusable scratch Vec for the `mem::swap`-drain pattern (preserves
+    // capacity of the bucket we swapped out across the inner loop).
+    let mut current_bucket: Vec<Position> = Vec::new();
+
     for current_cost in 0..=cap as usize {
         // Pull the bucket out so we can mutate `buckets` (push to
-        // higher buckets) while draining the current one.
-        let mut current_bucket = std::mem::take(&mut buckets[current_cost]);
+        // higher buckets) while draining the current one. `mem::swap`
+        // (not `mem::take`) preserves the inner Vec's capacity across
+        // flood calls — `take` would replace with a brand-new empty Vec.
+        std::mem::swap(&mut current_bucket, &mut buckets[current_cost]);
         while let Some(pos) = current_bucket.pop() {
             let pos_idx = (pos.y as u32 * width + pos.x as u32) as usize;
             // Stale entry — a cheaper relaxation already settled this
@@ -110,6 +132,9 @@ pub fn flood_dijkstra(
                 }
             }
         }
+        // Put the now-empty (but capacity-preserved) Vec back so it
+        // can be reused for any later bucket in the next call.
+        std::mem::swap(&mut current_bucket, &mut buckets[current_cost]);
     }
 
     field
@@ -327,7 +352,7 @@ mod tests {
     fn flood_open_terrain_costs_match_chebyshev() {
         let map = open_map();
         let from = Position::new(0, 0);
-        let field = flood_dijkstra(from, &map, &[], MAX_COST_BUDGET, 0);
+        let field = flood_dijkstra(from, &map, &[], MAX_COST_BUDGET, 0, &mut Vec::new());
         assert_eq!(field.cost_at(from), 0);
         // Diagonal: cost = 5 (5 × grass=1).
         assert_eq!(field.cost_at(Position::new(5, 5)), 5);
@@ -352,7 +377,7 @@ mod tests {
         };
         let overlays: [WeightedOverlay; 1] = [WeightedOverlay::new(&blocker, 1.0)];
 
-        let field = flood_dijkstra(Position::new(0, 0), &map, &overlays, MAX_COST_BUDGET, 0);
+        let field = flood_dijkstra(Position::new(0, 0), &map, &overlays, MAX_COST_BUDGET, 0, &mut Vec::new());
 
         // Direct cost to (4,4) on open terrain is 4 (4 diagonal grass
         // steps). Detour via (2,1) or (2,3) adds at most ~1 extra
@@ -378,7 +403,7 @@ mod tests {
         let from = Position::new(0, 0);
         let to = Position::new(7, 5);
 
-        let field = flood_dijkstra(from, &map, &[], MAX_COST_BUDGET, 0);
+        let field = flood_dijkstra(from, &map, &[], MAX_COST_BUDGET, 0, &mut Vec::new());
         let astar = find_path(from, to, &map, &[]).expect("A* path should exist");
 
         // Trace the field-walk.
@@ -410,7 +435,7 @@ mod tests {
         let map = open_map();
         let from = Position::new(0, 0);
         // Budget of 3 — only tiles within ~3 chebyshev steps reachable.
-        let field = flood_dijkstra(from, &map, &[], 3, 0);
+        let field = flood_dijkstra(from, &map, &[], 3, 0, &mut Vec::new());
         assert_eq!(field.cost_at(Position::new(3, 3)), 3);
         // (4,4) needs 4 grass steps = cost 4 > 3, so unreached.
         assert_eq!(
@@ -426,7 +451,7 @@ mod tests {
     #[test]
     fn flood_oob_origin_returns_empty_field() {
         let map = open_map();
-        let field = flood_dijkstra(Position::new(-1, -1), &map, &[], MAX_COST_BUDGET, 0);
+        let field = flood_dijkstra(Position::new(-1, -1), &map, &[], MAX_COST_BUDGET, 0, &mut Vec::new());
         assert_eq!(field.width, 10);
         assert_eq!(field.height, 10);
         for c in &field.costs {
@@ -442,7 +467,7 @@ mod tests {
             map.set(5, y, Terrain::Water);
         }
         // Reach (6,4) only via (5,9) gap.
-        let field = flood_dijkstra(Position::new(4, 4), &map, &[], MAX_COST_BUDGET, 0);
+        let field = flood_dijkstra(Position::new(4, 4), &map, &[], MAX_COST_BUDGET, 0, &mut Vec::new());
         assert_eq!(
             field.cost_at(Position::new(5, 4)),
             MAX_COST_BUDGET,
@@ -459,7 +484,7 @@ mod tests {
     fn step_along_field_none_at_destination() {
         let map = open_map();
         let from = Position::new(3, 3);
-        let field = flood_dijkstra(from, &map, &[], MAX_COST_BUDGET, 0);
+        let field = flood_dijkstra(from, &map, &[], MAX_COST_BUDGET, 0, &mut Vec::new());
         assert!(step_along_field(from, from, &field, &map).is_none());
     }
 }

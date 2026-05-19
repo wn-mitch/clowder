@@ -299,7 +299,7 @@ pub struct WorldStateQueries<'w, 's> {
 
 /// Bundles resources for evaluate_and_plan.
 #[derive(bevy_ecs::system::SystemParam)]
-pub struct PlanResources<'w> {
+pub struct PlanResources<'w, 's> {
     pub map: Res<'w, TileMap>,
     pub food: Res<'w, FoodStores>,
     pub relationships: Res<'w, Relationships>,
@@ -338,6 +338,21 @@ pub struct PlanResources<'w> {
         'w,
         crate::messages::witnessable_event::WitnessableEvent,
     >,
+    /// Ticket 427 Step 1 — pre-allocated scratch buffers for the
+    /// target-taking DSE resolvers (`resolve_*_target` under
+    /// `src/ai/dses/`). Each wrapper clears its own slots and writes
+    /// in-place so the underlying `Vec` / `HashMap` capacities persist
+    /// across cat-ticks. ~355 MB/soak alloc reduction at the 500-cat
+    /// projection.
+    pub dse_scratchpad: ResMut<'w, crate::resources::DseTargetScratchpad>,
+    /// Ticket 427 Step 2 — per-system bucket arena for
+    /// `route_cost::flood_dijkstra`. Bundled into `PlanResources` rather
+    /// than added as a top-level param so `evaluate_and_plan` stays
+    /// under Bevy's 16-param ceiling. Outer Vec grows once to the flood
+    /// budget; inner Vecs preserve capacity via the `mem::swap`-drain
+    /// pattern inside the flood function.
+    pub route_buckets:
+        bevy_ecs::prelude::Local<'s, Vec<Vec<crate::components::physical::Position>>>,
 }
 
 /// Bundles magic resolver dependencies to keep resolve_goap_plans under 16 params.
@@ -712,6 +727,13 @@ pub struct ExecutorContext<'w, 's> {
     /// instead of needing a new SystemParam slot.
     pub action_affordances:
         Res<'w, crate::resources::action_affordances::ActionAffordances>,
+    /// Ticket 427 Step 1 — pre-allocated scratch for target-taking DSE
+    /// resolvers invoked from `resolve_goap_plans`. Same `DseTargetScratchpad`
+    /// resource the planner system reaches through `PlanResources`; Bevy
+    /// serializes the two systems on the `ResMut` overlap (they're
+    /// already sequenced by the broader plan pipeline so the lost
+    /// parallelism is a no-op).
+    pub dse_scratchpad: ResMut<'w, crate::resources::DseTargetScratchpad>,
 }
 
 impl<'w, 's> ExecutorContext<'w, 's> {
@@ -720,17 +742,41 @@ impl<'w, 's> ExecutorContext<'w, 's> {
     /// prefilter can consume. Defaults to an all-`false` overlay when
     /// the entity is not in the query (despawned, dead, etc.).
     pub fn stance_overlays_of(&self, e: Entity) -> crate::ai::faction::StanceOverlays {
-        match self.faction_overlay_q.get(e) {
-            Ok((_, visitor, hostile_visitor, banished, befriended_ally)) => {
-                crate::ai::faction::StanceOverlays {
-                    visitor,
-                    hostile_visitor,
-                    banished,
-                    befriended_ally,
-                }
+        stance_overlays_from_query(&self.faction_overlay_q, e)
+    }
+}
+
+/// Ticket 427 Step 1 — free-function form of
+/// [`ExecutorContext::stance_overlays_of`], capturing only the query
+/// rather than the whole context. Lets callers build stance-overlay
+/// closures whose only capture is `&ec.faction_overlay_q`, leaving
+/// `&mut ec.dse_scratchpad` free as a disjoint field borrow.
+#[allow(clippy::type_complexity)]
+pub fn stance_overlays_from_query(
+    query: &bevy_ecs::prelude::Query<
+        '_,
+        '_,
+        (
+            Entity,
+            bevy_ecs::prelude::Has<crate::components::markers::Visitor>,
+            bevy_ecs::prelude::Has<crate::components::markers::HostileVisitor>,
+            bevy_ecs::prelude::Has<crate::components::markers::Banished>,
+            bevy_ecs::prelude::Has<crate::components::markers::BefriendedAlly>,
+        ),
+        bevy_ecs::prelude::Without<Dead>,
+    >,
+    e: Entity,
+) -> crate::ai::faction::StanceOverlays {
+    match query.get(e) {
+        Ok((_, visitor, hostile_visitor, banished, befriended_ally)) => {
+            crate::ai::faction::StanceOverlays {
+                visitor,
+                hostile_visitor,
+                banished,
+                befriended_ally,
             }
-            Err(_) => crate::ai::faction::StanceOverlays::default(),
         }
+        Err(_) => crate::ai::faction::StanceOverlays::default(),
     }
 }
 
@@ -1611,6 +1657,7 @@ pub fn evaluate_and_plan(
             // step-resolution site (goap.rs: FeedKitten step).
             None,
             parent_marker_active,
+            &mut res.dse_scratchpad,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
         // See disposition.rs companion site.
@@ -1964,6 +2011,7 @@ pub fn evaluate_and_plan(
                 &overlays,
                 sc.route_cost_flood_budget,
                 res.time.tick,
+                &mut res.route_buckets,
             )
         };
 
@@ -5204,41 +5252,49 @@ fn dispatch_step_action(
             )
         }
 
-        GoapActionKind::SearchPrey => resolve_search_prey(
-            &mut plan.step_state[step_idx],
-            ticks,
-            pos,
-            hunting_priors,
-            colony_map,
-            prey_query,
-            den_query,
-            inventory,
-            skills,
-            prey_params,
-            &ec.map,
-            &ec.wind,
-            narr,
-            &ec.time,
-            rng,
-            commands,
-            cat_entity,
-            personality,
-            name,
-            gender,
-            needs,
-            d,
-            &ec.constants.sensory.cat,
-            &ec.dse_registry,
-            &ec.faction_relations,
-            &|e: Entity| ec.stance_overlays_of(e),
-            ec_is_focal(ec, cat_entity),
-            ec.focal_capture.as_deref(),
-            recent_failures,
-            ec.constants
-                .planning_substrate
-                .target_failure_cooldown_ticks,
-            &ec.action_affordances,
-        ),
+        GoapActionKind::SearchPrey => {
+            // Ticket 427 Step 1 — capture only `&ec.faction_overlay_q`
+            // for the stance closure so `&mut ec.dse_scratchpad` is a
+            // disjoint field borrow at the same call site.
+            let faction_overlay_q = &ec.faction_overlay_q;
+            let is_focal = ec_is_focal(ec, cat_entity);
+            resolve_search_prey(
+                &mut plan.step_state[step_idx],
+                ticks,
+                pos,
+                hunting_priors,
+                colony_map,
+                prey_query,
+                den_query,
+                inventory,
+                skills,
+                prey_params,
+                &ec.map,
+                &ec.wind,
+                narr,
+                &ec.time,
+                rng,
+                commands,
+                cat_entity,
+                personality,
+                name,
+                gender,
+                needs,
+                d,
+                &ec.constants.sensory.cat,
+                &ec.dse_registry,
+                &ec.faction_relations,
+                &|e: Entity| stance_overlays_from_query(faction_overlay_q, e),
+                is_focal,
+                ec.focal_capture.as_deref(),
+                recent_failures,
+                ec.constants
+                    .planning_substrate
+                    .target_failure_cooldown_ticks,
+                &ec.action_affordances,
+                &mut ec.dse_scratchpad,
+            )
+        }
 
         GoapActionKind::EngagePrey => {
             // Get prey target from previous SearchPrey step's state, or from
@@ -5432,7 +5488,12 @@ fn dispatch_step_action(
                 } else {
                     None
                 };
-                let stance_overlays = |e: Entity| ec.stance_overlays_of(e);
+                // Ticket 427 Step 1 — capture only `&ec.faction_overlay_q`
+                // (not `&ec`) so `&mut ec.dse_scratchpad` further down
+                // is a disjoint field borrow.
+                let faction_overlay_q = &ec.faction_overlay_q;
+                let stance_overlays =
+                    |e: Entity| stance_overlays_from_query(faction_overlay_q, e);
                 // Ticket 027b §7.M / 127 — look up the L2
                 // JointIntention partner (Courtship practice) so
                 // `socialize_target::bond_score` can pin the Intention
@@ -5466,6 +5527,7 @@ fn dispatch_step_action(
                             .planning_substrate
                             .target_failure_cooldown_ticks,
                         narr.activation.as_deref_mut(),
+                        &mut ec.dse_scratchpad,
                     );
             }
             // §7.W: construct a temporary Fulfillment for cats without the
@@ -5589,6 +5651,7 @@ fn dispatch_step_action(
                             .planning_substrate
                             .target_failure_cooldown_ticks,
                         narr.activation.as_deref_mut(),
+                        &mut ec.dse_scratchpad,
                     );
             }
             // §7.W: construct a temporary Fulfillment for cats without the
@@ -5720,6 +5783,7 @@ fn dispatch_step_action(
                             .planning_substrate
                             .target_failure_cooldown_ticks,
                         narr.activation.as_deref_mut(),
+                        &mut ec.dse_scratchpad,
                     );
             }
             // Ticket 127 — switched from PairingActivity to
@@ -5832,6 +5896,7 @@ fn dispatch_step_action(
                             .planning_substrate
                             .target_failure_cooldown_ticks,
                         narr.activation.as_deref_mut(),
+                        &mut ec.dse_scratchpad,
                     );
             }
             // Stash the deceased's position + name + cause so the
@@ -5973,7 +6038,11 @@ fn dispatch_step_action(
                 } else {
                     None
                 };
-                let stance_overlays = |e: Entity| ec.stance_overlays_of(e);
+                // Ticket 427 Step 1 — capture only `&ec.faction_overlay_q`
+                // so `&mut ec.dse_scratchpad` is a disjoint field borrow.
+                let faction_overlay_q = &ec.faction_overlay_q;
+                let stance_overlays =
+                    |e: Entity| stance_overlays_from_query(faction_overlay_q, e);
                 let picked = crate::ai::dses::fight_target::resolve_fight_target(
                     &ec.dse_registry,
                     cat_entity,
@@ -5991,6 +6060,7 @@ fn dispatch_step_action(
                         .planning_substrate
                         .target_failure_cooldown_ticks,
                     narr.activation.as_deref_mut(),
+                    &mut ec.dse_scratchpad,
                 );
                 plan.step_state[step_idx].target_entity = picked;
                 current.target_entity = picked;
@@ -6091,6 +6161,7 @@ fn dispatch_step_action(
                             .planning_substrate
                             .target_failure_cooldown_ticks,
                         narr.activation.as_deref_mut(),
+                        &mut ec.dse_scratchpad,
                     );
             }
             let target = plan.step_state[step_idx].target_entity;
@@ -6210,6 +6281,7 @@ fn dispatch_step_action(
                         ec.time.tick,
                         focal_hook,
                         parent_marker_active,
+                        &mut ec.dse_scratchpad,
                     )
                     .target;
             }
@@ -7459,6 +7531,7 @@ fn dispatch_htn_kitten_primitive(
                 release_threshold,
                 ec.time.tick,
                 None,
+                &mut ec.dse_scratchpad,
             );
     }
 
@@ -7863,6 +7936,9 @@ fn resolve_search_prey(
     // from `ColonyContext.action_affordances` at the
     // `GoapActionKind::SearchPrey` arm.
     action_affordances: &crate::resources::action_affordances::ActionAffordances,
+    // Ticket 427 Step 1 — DSE target scratchpad threaded through to
+    // `resolve_hunt_target`.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> crate::steps::StepResult {
     use crate::components::magic::ItemSlot;
 
@@ -8038,6 +8114,7 @@ fn resolve_search_prey(
             // axis. Dormant at default — reads return 0.0 and the
             // axis is omitted from the composition anyway.
             action_affordances,
+            scratch,
         );
         if let Some(prey_entity) = picked {
             state.target_entity = Some(prey_entity);

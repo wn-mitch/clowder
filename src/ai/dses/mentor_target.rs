@@ -222,16 +222,17 @@ pub fn resolve_mentor_target(
     recent: Option<&RecentTargetFailures>,
     cooldown_ticks: u64,
     activation: Option<&mut SystemActivation>,
+    // Ticket 427 Step 1 — pre-allocated scratch buffers.
+    scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
         .iter()
         .find(|d| d.id().0 == "mentor_target")?;
 
-    let mut candidates: Vec<Entity> = Vec::new();
-    let mut positions: Vec<Position> = Vec::new();
-    let mut skills_by_entity: std::collections::HashMap<Entity, Skills> =
-        std::collections::HashMap::new();
+    scratch.entities.clear();
+    scratch.positions.clear();
+    scratch.skills_by_entity.clear();
     for (other, other_pos) in cat_positions {
         if *other == cat {
             continue;
@@ -243,12 +244,12 @@ pub fn resolve_mentor_target(
         let Some(other_skills) = skills_lookup(*other) else {
             continue;
         };
-        candidates.push(*other);
-        positions.push(*other_pos);
-        skills_by_entity.insert(*other, other_skills);
+        scratch.entities.push(*other);
+        scratch.positions.push(*other_pos);
+        scratch.skills_by_entity.insert(*other, other_skills);
     }
 
-    if candidates.is_empty() {
+    if scratch.entities.is_empty() {
         return None;
     }
 
@@ -257,6 +258,10 @@ pub fn resolve_mentor_target(
     // tile per §L2.10.7, so no nearness branch lives in `fetch_target`.
     let cooldown_was_applied = std::cell::Cell::new(false);
     let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
+    // Reborrow skills map as `&` so the closure captures only the
+    // shared reference; `&scratch.entities` / `&scratch.positions`
+    // remain free for the evaluator below.
+    let skills_by_entity = &scratch.skills_by_entity;
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_FONDNESS_INPUT => relationships
@@ -305,8 +310,8 @@ pub fn resolve_mentor_target(
     let scored = evaluate_target_taking(
         dse,
         cat,
-        &candidates,
-        &positions,
+        &scratch.entities,
+        &scratch.positions,
         &ctx,
         &fetch_self,
         &fetch_target,
@@ -419,6 +424,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -453,6 +459,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -479,6 +486,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -506,6 +514,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
     }
@@ -556,6 +565,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(novice));
     }
@@ -606,6 +616,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(novice));
     }
@@ -657,6 +668,7 @@ mod tests {
             None,
             8000,
             None,
+            &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close));
     }

@@ -830,6 +830,11 @@ pub fn update_target_existence_markers(
     // tile; replaces the per-pair `observer_smells_at` scan that consumed
     // a `carcass_q` snapshot.
     carcass_scent_map: Res<crate::resources::CarcassScentMap>,
+    // Ticket 427 Step 1 — pre-allocated scratch for the per-cat
+    // `resolve_socialize_target` existence probe further down. One
+    // ResMut covers the whole per-cat loop because this system is
+    // serial.
+    mut dse_scratchpad: ResMut<crate::resources::DseTargetScratchpad>,
 ) {
     use crate::components::markers::{
         CarcassNearby, HasHerbsNearby, HasSocialTarget, HasThreatNearby, HasUnburiedCorpse,
@@ -914,6 +919,7 @@ pub fn update_target_existence_markers(
             None,
             0,
             None,
+            &mut dse_scratchpad,
         )
         .is_some();
 
@@ -1727,6 +1733,10 @@ mod tests {
             .target_taking_dses
             .push(crate::ai::dses::socialize_target_dse());
         world.insert_resource(registry);
+        // Ticket 427 Step 1 — `update_target_existence_markers` now
+        // reaches `DseTargetScratchpad` for the per-cat
+        // `resolve_socialize_target` existence probe.
+        world.insert_resource(crate::resources::DseTargetScratchpad::default());
 
         let mut schedule = Schedule::default();
         schedule.add_systems(update_target_existence_markers);
