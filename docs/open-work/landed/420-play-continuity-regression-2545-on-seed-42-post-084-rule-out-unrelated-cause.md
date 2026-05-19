@@ -1,7 +1,7 @@
 ---
 id: 420
 title: Play continuity regression 254→5 on seed-42 post-084 — rule out unrelated cause
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-19
 ---
 
 ## Why
@@ -43,3 +43,4 @@ Either a layer-walk identifying the causal path (and a fix that restores `play �
 
 - 2026-05-19: opened as 084 follow-on. Lowest-priority of the three — likely noise.
 - 2026-05-19: **fixed-by-418 hypothesis falsified.** Re-soaked seed-42 post-418-fix (`logs/tuned-42`, commits ab1f3f38 + c2ad7967): `continuity_tallies.play = 5` (identical to pre-fix). 419 (WardPlaced regression) cleared decisively in the same soak (2 → 21), confirming the marker-snapshot fix landed. So the play regression survives independent of the CanWardFromSupply silent-fail — it's a genuine 084 substrate effect, not a downstream artifact. Re-frame: which of Commits 1 / 2 / 3 introduced it? Likely Commit 2 (plan-template change forces longer commitment chains — fewer L3 windows where Play can win). Next step is `just bisect-canary play 254` against the Commit 1 / 2 / 3 range.
+- 2026-05-19: Closed without code. The 084 Iteration-2 §Observation table cell read 'Pre-084 baseline play=254 → Post-084 play=5' but the '254' is a stale carryover from Iter-1's 2026-04-29 table (logs/tuned-42-083, commit e838bb7). The actual baseline-of-record for Iter-2 is logs/tuned-42-pre-084 (commit 3e0153fe, 2026-05-18) which had play=7, not 254. Today's logs/tuned-42 (fe8e1f77) has play=5 — a same-binary delta of 7→5, well within continuity-canary noise. A real long-arc decline did happen (play ~250 stable through 2026-04-29, then stepwise down to single digits via 2026-05-04 e9d9ac1d → 2026-05-05 3c7c6c35 → 2026-05-06 25e28f25), but that decline predates 084 by two weeks and is unrelated to the herb-stash / chronicity work. Inverse-correlated with grooming explosion over the same window (60s → 1000–2900). If worth chasing, open a fresh long-arc bisect ticket against the 2026-05-04 → 2026-05-06 commit range — not as a 084 follow-on.

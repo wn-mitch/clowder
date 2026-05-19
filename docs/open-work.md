@@ -15,10 +15,10 @@ _Last generated: 2026-05-19._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 117 |
+| Ready | 116 |
 | Parked | 13 |
 | Blocked | 32 |
-| **Open total** | **166** |
+| **Open total** | **165** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -39,9 +39,9 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.92_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.90_
-- **[420](docs/open-work/tickets/420-play-continuity-regression-2545-on-seed-42-post-084-rule-out-unrelated-cause.md)** — Play continuity regression 254→5 on seed-42 post-084 — rule out unrelated cause — _[ai-substrate] · score 0.90_
-- **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · score 0.90_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
@@ -63,11 +63,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (117)
+## Ready by cluster (116)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (33 ready, 5 blocked)
+### ai-substrate (32 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -101,7 +101,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
 - **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
-- **[420](docs/open-work/tickets/420-play-continuity-regression-2545-on-seed-42-post-084-rule-out-unrelated-cause.md)** — Play continuity regression 254→5 on seed-42 post-084 — rule out unrelated cause — _[ai-substrate] · added 2026-05-19_
 
 ### social-coordination (18 ready, 4 blocked)
 
@@ -327,7 +326,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (117)
+## Ready (116)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -445,7 +444,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
-- **[420](docs/open-work/tickets/420-play-continuity-regression-2545-on-seed-42-post-084-rule-out-unrelated-cause.md)** — Play continuity regression 254→5 on seed-42 post-084 — rule out unrelated cause — _[ai-substrate] · added 2026-05-19_
 
 ## Parked (13)
 
@@ -498,12 +496,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[391](docs/open-work/tickets/391-narrative-template-historical-reference-pre-sim-figures-cited-in-first-sim-week.md)** — Narrative-template historical reference (pre-sim figures cited in first sim-week) — _[magic-mythic] · blocked-by 387, 388 · added 2026-05-16_
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
 
-## Landed archive (282)
+## Landed archive (283)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (216)
+### 2026-05 (217)
 
+- **[420](docs/open-work/landed/420-play-continuity-regression-2545-on-seed-42-post-084-rule-out-unrelated-cause.md)** — Play continuity regression 254→5 on seed-42 post-084 — rule out unrelated cause _(2026-05-19)_
 - **[419](docs/open-work/landed/419-wardplaced-rate-regression-52-on-seed-42-post-084-investigate-herbcraft-eligibility-cadence.md)** — WardPlaced rate regression 5→2 on seed-42 post-084 — investigate Herbcraft eligibility cadence _(2026-05-19)_
 - **[418](docs/open-work/landed/418-herbcraft-retrieve-path-not-electing-herbsretrieved-fires-0-on-seed-42-despite-stash-full.md)** — Herbcraft retrieve-path not electing — HerbsRetrieved fires 0 on seed-42 despite stash full _(2026-05-19)_
 - **[417](docs/open-work/landed/417-haiku-enrichment-for-logq-envelope.md)** — Haiku enrichment for logq envelope _(2026-05-19)_
