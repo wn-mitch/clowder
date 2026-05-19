@@ -3,6 +3,7 @@ id: 418
 title: Herbcraft retrieve-path not electing — HerbsRetrieved fires 0 on seed-42 despite stash full
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-19
 parked: null

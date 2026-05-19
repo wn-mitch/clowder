@@ -3,6 +3,7 @@ id: 420
 title: Play continuity regression 254→5 on seed-42 post-084 — rule out unrelated cause
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-19
 parked: null

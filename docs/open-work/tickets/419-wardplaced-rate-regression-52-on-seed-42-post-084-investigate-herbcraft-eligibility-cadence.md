@@ -3,6 +3,7 @@ id: 419
 title: WardPlaced rate regression 5→2 on seed-42 post-084 — investigate Herbcraft eligibility cadence
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-19
 parked: null

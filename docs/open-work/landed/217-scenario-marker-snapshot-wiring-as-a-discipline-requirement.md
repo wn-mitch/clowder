@@ -1,7 +1,7 @@
 ---
 id: 217
 title: scenario marker-snapshot wiring as a discipline requirement
-status: ready
+status: done
 cluster: process-discipline
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-19
 ---
 
 ## Why
@@ -93,3 +93,5 @@ Path 2 is more thorough but requires more harness scaffolding.
 ## Log
 - 2026-05-07: opened from 209 iter-1 diagnosis.
 - 2026-05-19: accuracy audit pass — frontmatter clean, no file path issues, scripts/check_substrate_stubs.sh verified present.
+- 2026-05-19: **second precedent.** 084 Commit 3 introduced `CanWardFromSupply` with a writer in `capabilities.rs::update_capability_markers`, a reader-via-`Has<>` in the writer's self-check, AND a DSE `.require(CanWardFromSupply::KEY)` in `herbcraft_ward.rs:138` — but no `set_entity(...)` in `goap.rs::evaluate_and_plan`. Result: 0 `Thornward` placements on seed-42 (vs 4 pre-baseline); all `HerbcraftSetWard` plans silently rejected by L2 eligibility. Localized by a sub-soak investigation in ~45min (compared to 209's 25min). The repeat incident confirms the discipline gap is structural, not a one-off — landing the lint now.
+- 2026-05-19: Implemented scripts/check_marker_snapshot_wiring.sh; reuses substrate_stubs.allowlist; wired into just check; CLAUDE.md updated with third substrate-stub clause. Closes 209/084 silent-fail class. Verified by removing CanWardFromSupply population and confirming the lint catches it.
