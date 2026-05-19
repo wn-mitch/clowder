@@ -1925,6 +1925,21 @@ pub struct ScoringConstants {
     /// magnitude mirroring 106's hunger-urgency lift.
     #[serde(default = "default_intraspecies_conflict_flight_lift")]
     pub intraspecies_conflict_flight_lift: f32,
+    /// Ticket 142 (109 Phase B) — `IntraspeciesConflictResponseFreeze`
+    /// Modifier threshold. The `social_status_distress` floor below
+    /// which the Freeze lift is a no-op. Default mirrors Flight's
+    /// threshold so the two valences share onset; the substrate-side
+    /// `HideEligible` gate is what discriminates Hide-vs-Flee.
+    #[serde(default = "default_intraspecies_conflict_freeze_threshold")]
+    pub intraspecies_conflict_freeze_threshold: f32,
+    /// Ticket 142 (109 Phase B) — `IntraspeciesConflictResponseFreeze`
+    /// lift on Hide (subordinate-hold-position valence). **Default 0.0
+    /// (inert)** — ships behind a balance follow-on that tunes the lift
+    /// from 0.0 once the Hide-activation substrate (170 + 268)
+    /// stabilizes. Tuning out of inert before that stabilization is a
+    /// premature substrate-vs-modifier coupling.
+    #[serde(default = "default_intraspecies_conflict_freeze_hide_lift")]
+    pub intraspecies_conflict_freeze_hide_lift: f32,
     /// Ticket 109 (Phase A) — perception radius (Manhattan tiles) for
     /// "nearest other cat" resolution feeding `social_status_distress`.
     /// Cats further than this don't contribute to the social-status
@@ -2860,6 +2875,10 @@ impl Default for ScoringConstants {
             intraspecies_conflict_flight_threshold: default_intraspecies_conflict_flight_threshold(
             ),
             intraspecies_conflict_flight_lift: default_intraspecies_conflict_flight_lift(),
+            intraspecies_conflict_freeze_threshold:
+                default_intraspecies_conflict_freeze_threshold(),
+            intraspecies_conflict_freeze_hide_lift:
+                default_intraspecies_conflict_freeze_hide_lift(),
             social_perception_radius: default_social_perception_radius(),
             social_status_distress_respect_weight: default_social_status_distress_respect_weight(),
             social_status_distress_age_weight: default_social_status_distress_age_weight(),
@@ -4047,6 +4066,22 @@ fn default_intraspecies_conflict_flight_threshold() -> f32 {
 /// 109's Phase A activation commit.
 fn default_intraspecies_conflict_flight_lift() -> f32 {
     0.30
+}
+
+/// Ticket 142 (109 Phase B) — `IntraspeciesConflictResponseFreeze`
+/// threshold. Mirrors Flight's threshold so Hide and Flee share onset
+/// on the social-distress axis; the substrate-side `HideEligible`
+/// eligibility gate is what discriminates which valence is reachable.
+fn default_intraspecies_conflict_freeze_threshold() -> f32 {
+    0.6
+}
+
+/// Ticket 142 (109 Phase B) — `IntraspeciesConflictResponseFreeze`
+/// lift on Hide. **Default 0.0 (inert).** Tuning out of inert is the
+/// balance follow-on tracked alongside the Hide-activation substrate
+/// (170 + 268).
+fn default_intraspecies_conflict_freeze_hide_lift() -> f32 {
+    0.0
 }
 
 /// Ticket 109 (Phase A) — perception radius (Manhattan tiles) for

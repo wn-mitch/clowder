@@ -2626,6 +2626,89 @@ impl ScoreModifier for IntraspeciesConflictResponseFlight {
 }
 
 // ---------------------------------------------------------------------------
+// IntraspeciesConflictResponseFreeze — ticket 142 (109 Phase B)
+// ---------------------------------------------------------------------------
+
+/// Ticket 142 (109 Phase B) — `IntraspeciesConflictResponseFreeze`
+/// Modifier. The Freeze valence of 109's four-valence intraspecies
+/// conflict response framework. Subordinate cat goes still and
+/// low-body in the dominant's space, hoping to de-escalate without
+/// retreating — sibling to Flight (109 Phase A); distinct from 105's
+/// predator-Freeze.
+///
+/// **Trigger:** `social_status_distress >= intraspecies_conflict_freeze_threshold`.
+///
+/// **Transform:** linear pressure ramp — same shape as Flight. Pressure
+/// modifiers share onset semantics across the 088 / 106 / 107 / 109 / 110
+/// family.
+///
+/// **Applies to:** Hide (subordinate-hold-position valence — the cat
+/// freezes rather than withdraws).
+///
+/// **Composition:** Registered immediately after
+/// `IntraspeciesConflictResponseFlight` so both valences fire on the
+/// same `social_status_distress` scalar at full magnitude. The
+/// discriminator between Flight and Freeze is substrate-side, not
+/// modifier-side: Hide DSE's `HideEligible` eligibility gate (ticket
+/// 170 — threat-in-sight AND low-cover-within-sprint-range) filters
+/// Hide candidates; cats without cover route to Flee. The
+/// substrate-over-hacks pillar discourages a hand-tuned choice predicate
+/// here when the substrate already encodes the relevant fact.
+///
+/// **Defaults ship inert (0.0)** per the 142 ticket spec — a balance
+/// follow-on tunes the lift once the Hide-activation substrate
+/// (170 + 268) stabilizes.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`.
+pub struct IntraspeciesConflictResponseFreeze {
+    threshold: f32,
+    hide_lift: f32,
+}
+
+impl IntraspeciesConflictResponseFreeze {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.intraspecies_conflict_freeze_threshold,
+            hide_lift: sc.intraspecies_conflict_freeze_hide_lift,
+        }
+    }
+
+    fn ramp(&self, distress: f32) -> f32 {
+        if distress <= self.threshold {
+            return 0.0;
+        }
+        ((distress - self.threshold) / (1.0 - self.threshold)).clamp(0.0, 1.0)
+    }
+}
+
+impl ScoreModifier for IntraspeciesConflictResponseFreeze {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, HIDE) {
+            return score;
+        }
+        if score <= 0.0 {
+            return score;
+        }
+        let distress = fetch(SOCIAL_STATUS_DISTRESS, ctx.cat).clamp(0.0, 1.0);
+        let ramp = self.ramp(distress);
+        if ramp <= 0.0 {
+            return score;
+        }
+        score + ramp * self.hide_lift
+    }
+
+    fn name(&self) -> &'static str {
+        "intraspecies_conflict_freeze"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // DispositionFailureCooldown
 // ---------------------------------------------------------------------------
 
@@ -3661,6 +3744,12 @@ pub fn default_modifier_pipeline(
     // before the multiplicative damps. The social Flight valence is
     // the substrate analog to 047 / 102 on the social axis.
     pipeline.push(Box::new(IntraspeciesConflictResponseFlight::new(sc)));
+    // Ticket 142 (109 Phase B) — `IntraspeciesConflictResponseFreeze`
+    // registers immediately after the Flight valence so both fire on
+    // the same `social_status_distress` scalar. Substrate-side
+    // `HideEligible` (170) discriminates which DSE is reachable.
+    // Ships inert (lift default 0.0); balance follow-on tunes.
+    pipeline.push(Box::new(IntraspeciesConflictResponseFreeze::new(sc)));
     pipeline.push(Box::new(FleeFoxScentBoost::new(sc)));
     pipeline.push(Box::new(CorruptionTerritorySuppression::new(sc)));
     // §3.5.1 ticket 094 — `StockpileSatiation` registers after the
@@ -6492,6 +6581,7 @@ mod tests {
             FARM,
             WANDER,
             EXPLORE,
+            HIDE,
             IDLE,
         ] {
             let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
@@ -6530,6 +6620,131 @@ mod tests {
         assert!(
             (flee - 0.80).abs() < 1e-5,
             "default-constants Flee saturated lift = 0.50 + 0.30 = 0.80; got {flee}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ticket 142 IntraspeciesConflictResponseFreeze (109 Phase B)
+    // -----------------------------------------------------------------------
+
+    fn test_intraspecies_conflict_freeze() -> IntraspeciesConflictResponseFreeze {
+        IntraspeciesConflictResponseFreeze {
+            threshold: 0.6,
+            hide_lift: 0.30,
+        }
+    }
+
+    #[test]
+    fn intraspecies_conflict_freeze_no_lift_below_threshold() {
+        let modifier = test_intraspecies_conflict_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 0.5,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        assert!(
+            (hide - 0.5).abs() < 1e-6,
+            "below-threshold Hide unchanged; got {hide}"
+        );
+    }
+
+    #[test]
+    fn intraspecies_conflict_freeze_lifts_above_threshold() {
+        // distress = 0.8, threshold = 0.6. ramp = 0.5. Hide += 0.15.
+        let modifier = test_intraspecies_conflict_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 0.8,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        assert!((hide - 0.65).abs() < 1e-5, "Hide half-lift; got {hide}");
+    }
+
+    #[test]
+    fn intraspecies_conflict_freeze_max_lift_at_full_distress() {
+        let modifier = test_intraspecies_conflict_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 1.0,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        assert!(
+            (hide - 0.80).abs() < 1e-5,
+            "Hide full lift +0.30; got {hide}"
+        );
+    }
+
+    #[test]
+    fn intraspecies_conflict_freeze_targets_only_hide() {
+        let modifier = test_intraspecies_conflict_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 1.0,
+            _ => 0.0,
+        };
+        for dse in [
+            EAT,
+            HUNT,
+            FORAGE,
+            GROOM_SELF,
+            SLEEP,
+            GROOM_OTHER,
+            FLEE,
+            FIGHT,
+            MATE,
+            COORDINATE,
+            BUILD,
+            MENTOR,
+            CARETAKE,
+            SOCIALIZE,
+            PATROL,
+            COOK,
+            FARM,
+            WANDER,
+            EXPLORE,
+            IDLE,
+        ] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "non-Hide dse {dse} unchanged at full social distress; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn intraspecies_conflict_freeze_does_not_resurrect_zero_score() {
+        let modifier = test_intraspecies_conflict_freeze();
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 1.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(HIDE), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero-score Hide stays zero — no resurrection");
+    }
+
+    #[test]
+    fn intraspecies_conflict_freeze_ships_inert() {
+        // Ticket 142 ships with default `hide_lift = 0.0` per the
+        // spec — the balance follow-on tunes it once the
+        // Hide-activation substrate (170 + 268) stabilizes. This test
+        // pins the inert default; flipping it requires a deliberate
+        // change to default_intraspecies_conflict_freeze_hide_lift().
+        let constants = crate::resources::sim_constants::SimConstants::default();
+        let modifier = IntraspeciesConflictResponseFreeze::new(&constants.scoring);
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            SOCIAL_STATUS_DISTRESS => 1.0,
+            _ => 0.0,
+        };
+        let hide = modifier.apply(DseId(HIDE), 0.5, &ctx, &fetch);
+        assert!(
+            (hide - 0.5).abs() < 1e-6,
+            "default-constants Hide lift is inert (0.0); got {hide}"
         );
     }
 
