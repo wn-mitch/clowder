@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [027-l2-pairing-activity.md, 084-farm-herb-ward-demand.md, 085-gardens-multiuse-build-gate.md]
-landed-at: pending
+landed-at: 1460b5f850c8
 landed-on: 2026-05-19
 ---
 
