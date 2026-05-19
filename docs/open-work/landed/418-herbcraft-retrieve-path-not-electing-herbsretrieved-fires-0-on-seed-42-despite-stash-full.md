@@ -1,7 +1,7 @@
 ---
 id: 418
 title: Herbcraft retrieve-path not electing — HerbsRetrieved fires 0 on seed-42 despite stash full
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-19
 ---
 
 ## Why
@@ -48,3 +48,4 @@ Layer-walk per CLAUDE.md bugfix discipline to localize:
 ## Log
 
 - 2026-05-19: opened as 084 follow-on. Verified zero retrievals in `logs/tuned-42/` despite 108 deposits and ~100+ thornbriar in stash by end of run.
+- 2026-05-19: Landed via 084-Commit-3 follow-on (2026-05-19). Two-line MarkerSnapshot population fix in goap.rs + disposition.rs. Verified: scripts/check_marker_snapshot_wiring.sh (ticket 217) catches the regression class if removed.
