@@ -125,13 +125,17 @@ impl HerbcraftWardDse {
             id: DseId("herbcraft_ward"),
             considerations,
             composition: Composition::compensated_product(weights),
-            // §4 batch 2: `.require(CanWard)` gates on Adult ∧ ¬Injured
-            // ∧ HasWardHerbs. Retires the `ctx.has_ward_herbs` inline
-            // gate at `scoring.rs:874`.
+            // §4 batch 2: original `.require(CanWard)` gated on Adult ∧
+            // ¬Injured ∧ HasWardHerbs.
+            // 084 Commit 2: swapped to `CanWardFromSupply`, which fires
+            // when the cat either carries thornbriar OR the colony has
+            // ≥1 stashed (HasStoredThornbriar). The GOAP plan branches
+            // into carry-direct or retrieve-first chains naturally via
+            // `CarryingIs(Herbs)` precondition matching at plan time.
             // §4 Phase 4b.5: `.require(WardStrengthLow)` — colony gate.
             // §13.1: `.forbid(Incapacitated)` blocks downed cats.
             eligibility: EligibilityFilter::new()
-                .require(markers::CanWard::KEY)
+                .require(markers::CanWardFromSupply::KEY)
                 .require(markers::WardStrengthLow::KEY)
                 .forbid(markers::Incapacitated::KEY),
         }
@@ -233,12 +237,16 @@ mod tests {
     }
 
     #[test]
-    fn herbcraft_ward_requires_can_ward_and_ward_strength_low() {
-        // §4 batch 2: CanWard (Adult ∧ ¬Injured ∧ HasWardHerbs) + WardStrengthLow.
+    fn herbcraft_ward_requires_can_ward_from_supply_and_ward_strength_low() {
+        // 084 Commit 2: CanWardFromSupply (Adult ∧ ¬Injured ∧
+        // (HasWardHerbs ∨ HasStoredThornbriar)) + WardStrengthLow.
         let dse = HerbcraftWardDse::default();
         assert_eq!(
             dse.eligibility().required,
-            vec![markers::CanWard::KEY, markers::WardStrengthLow::KEY]
+            vec![
+                markers::CanWardFromSupply::KEY,
+                markers::WardStrengthLow::KEY
+            ]
         );
         // §13.1: every non-Eat/Sleep/Idle cat DSE forbids Incapacitated.
         assert_eq!(
@@ -315,7 +323,7 @@ mod tests {
         let has_marker = |key: &str, _: Entity| {
             // Grant the marker set required by the eligibility filter
             // so `evaluate_single` doesn't short-circuit to None.
-            key == markers::CanWard::KEY || key == markers::WardStrengthLow::KEY
+            key == markers::CanWardFromSupply::KEY || key == markers::WardStrengthLow::KEY
         };
         let entity_position = |_: Entity| Some(Position::new(0, 0));
         let anchor_position = |_: LandmarkAnchor| Some(Position::new(0, 0));

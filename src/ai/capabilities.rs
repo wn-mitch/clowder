@@ -30,7 +30,8 @@ use bevy_ecs::prelude::*;
 
 use crate::components::identity::Species;
 use crate::components::markers::{
-    Adult, CanCook, CanForage, CanHunt, CanWard, HasWardHerbs, InCombat, Injured, Kitten, Young,
+    Adult, CanCook, CanForage, CanHunt, CanWard, CanWardFromSupply, ColonyState,
+    HasStoredThornbriar, HasWardHerbs, InCombat, Injured, Kitten, Young,
 };
 use crate::components::physical::{Dead, Position};
 use crate::resources::map::{Terrain, TileMap};
@@ -57,14 +58,22 @@ pub fn update_capability_markers(
             Has<CanHunt>,
             Has<CanForage>,
             Has<CanWard>,
+            Has<CanWardFromSupply>,
             Has<CanCook>,
         ),
         (With<Species>, Without<Dead>),
     >,
+    // 084: colony-scope read for `CanWardFromSupply`. The colony
+    // singleton is spawned once at world init; if it's somehow missing
+    // (test paths that never spawn `ColonyState`), `has_stored_thornbriar`
+    // stays `false` and `CanWardFromSupply` degrades to `CanWard`-with-
+    // herbs-only behaviour — safe default.
+    colony: Query<Has<HasStoredThornbriar>, With<ColonyState>>,
     map: Res<TileMap>,
     constants: Res<SimConstants>,
 ) {
     let d = &constants.disposition;
+    let has_stored_thornbriar = colony.iter().any(|h| h);
 
     for (
         entity,
@@ -78,6 +87,7 @@ pub fn update_capability_markers(
         cur_hunt,
         cur_forage,
         cur_ward,
+        cur_ward_from_supply,
         cur_cook,
     ) in cats.iter()
     {
@@ -110,6 +120,20 @@ pub fn update_capability_markers(
         // CanWard: Adult ∧ ¬Injured ∧ HasWardHerbs
         let want_ward = is_adult && !is_injured && has_ward_herbs;
         toggle(&mut commands, entity, want_ward, cur_ward, CanWard);
+
+        // 084: CanWardFromSupply expands CanWard to cover cats who can
+        // reach a stashed thornbriar — the GOAP planner branches into
+        // either the carry-direct or retrieve-first chain depending on
+        // which `CarryingIs` precondition holds at plan time.
+        let want_ward_supply =
+            is_adult && !is_injured && (has_ward_herbs || has_stored_thornbriar);
+        toggle(
+            &mut commands,
+            entity,
+            want_ward_supply,
+            cur_ward_from_supply,
+            CanWardFromSupply,
+        );
 
         // CanCook: Adult ∧ ¬Injured (colony checks stay on CookDse)
         let want_cook = is_adult && !is_injured;
@@ -350,6 +374,7 @@ mod tests {
         assert!(!world.entity(cat).contains::<CanHunt>());
         assert!(!world.entity(cat).contains::<CanForage>());
         assert!(!world.entity(cat).contains::<CanWard>());
+        assert!(!world.entity(cat).contains::<CanWardFromSupply>());
         assert!(!world.entity(cat).contains::<CanCook>());
     }
 
@@ -464,6 +489,67 @@ mod tests {
         schedule.run(&mut world);
 
         assert!(!world.entity(cat).contains::<CanWard>());
+    }
+
+    // -----------------------------------------------------------------------
+    // CanWardFromSupply (ticket 084 Commit 2)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn adult_with_ward_herbs_gets_can_ward_from_supply() {
+        // Cat carrying thornbriar — fires CanWardFromSupply regardless
+        // of colony stash state.
+        let (mut world, mut schedule) = setup();
+        let cat = spawn_cat(&mut world, 10, 10);
+        world.entity_mut(cat).insert((Adult, HasWardHerbs));
+
+        schedule.run(&mut world);
+
+        assert!(world.entity(cat).contains::<CanWardFromSupply>());
+    }
+
+    #[test]
+    fn adult_with_stash_gets_can_ward_from_supply_without_herbs() {
+        // Cat NOT carrying thornbriar but colony stash has it —
+        // CanWardFromSupply still fires so the retrieve-path plan can
+        // form.
+        let (mut world, mut schedule) = setup();
+        let cat = spawn_cat(&mut world, 10, 10);
+        world.entity_mut(cat).insert(Adult);
+        world.spawn((ColonyState, HasStoredThornbriar));
+
+        schedule.run(&mut world);
+
+        assert!(world.entity(cat).contains::<CanWardFromSupply>());
+        assert!(!world.entity(cat).contains::<CanWard>());
+    }
+
+    #[test]
+    fn no_herbs_no_stash_no_can_ward_from_supply() {
+        // Neither carrying nor stashed thornbriar — combined marker
+        // stays absent and HerbcraftSetWard is ineligible.
+        let (mut world, mut schedule) = setup();
+        let cat = spawn_cat(&mut world, 10, 10);
+        world.entity_mut(cat).insert(Adult);
+        world.spawn(ColonyState); // colony exists but no HasStoredThornbriar
+
+        schedule.run(&mut world);
+
+        assert!(!world.entity(cat).contains::<CanWardFromSupply>());
+    }
+
+    #[test]
+    fn injured_no_can_ward_from_supply_even_with_stash() {
+        // Injury gates apply uniformly across the ward-eligibility
+        // surface.
+        let (mut world, mut schedule) = setup();
+        let cat = spawn_cat(&mut world, 10, 10);
+        world.entity_mut(cat).insert((Adult, HasWardHerbs, Injured));
+        world.spawn((ColonyState, HasStoredThornbriar));
+
+        schedule.run(&mut world);
+
+        assert!(!world.entity(cat).contains::<CanWardFromSupply>());
     }
 
     // -----------------------------------------------------------------------

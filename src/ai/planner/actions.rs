@@ -541,6 +541,11 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                     StateEffect::SetCarrying(Carrying::Nothing),
                 ],
             },
+            // 084 Commit 2: Gather steps no longer trip-increment.
+            // The plan now terminates at Stores with DepositHerbs.
+            // The dual-branch substrate/plan-path mirroring stays
+            // (231's free-slot composition).
+            //
             // 231: substrate-path GatherHerb — cat already has space.
             GoapActionDef {
                 kind: GoapActionKind::GatherHerb,
@@ -549,10 +554,7 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                     StatePredicate::ZoneIs(PlannerZone::HerbPatch),
                     StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
                 ],
-                effects: vec![
-                    StateEffect::SetCarrying(Carrying::Herbs),
-                    StateEffect::IncrementTrips,
-                ],
+                effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
             },
             // 231: plan-path GatherHerb — composes after DropItem.
             GoapActionDef {
@@ -562,8 +564,24 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                     StatePredicate::ZoneIs(PlannerZone::HerbPatch),
                     StatePredicate::HasFreeSlotThisPlan(true),
                 ],
+                effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
+            },
+            // 084 Commit 2: DepositHerbs terminates the gather chain.
+            // The planner sequences `[TravelTo(HerbPatch) → GatherHerb
+            // → TravelTo(Stores) → DepositHerbs]` (TravelTo legs come
+            // from travel_actions). The trip-increment effect satisfies
+            // the `TripsAtLeast(current_trips + 1)` Herbalism goal so
+            // the chain only completes after the cat has actually
+            // deposited at the stash.
+            GoapActionDef {
+                kind: GoapActionKind::DepositHerbs,
+                cost: 1,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Stores),
+                    StatePredicate::CarryingIs(Carrying::Herbs),
+                ],
                 effects: vec![
-                    StateEffect::SetCarrying(Carrying::Herbs),
+                    StateEffect::SetCarrying(Carrying::Nothing),
                     StateEffect::IncrementTrips,
                 ],
             },
@@ -668,6 +686,36 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                 preconditions: vec![
                     StatePredicate::ZoneIs(PlannerZone::HerbPatch),
                     StatePredicate::HasMarker(markers::ThornbriarAvailable::KEY),
+                    StatePredicate::HasFreeSlotThisPlan(true),
+                ],
+                effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
+            },
+            // 084 Commit 2: retrieve-path RetrieveHerbs(Thornbriar) —
+            // the cat picks up a stashed thornbriar from Stores rather
+            // than gathering wild. A* picks whichever chain
+            // (gather-from-wild vs retrieve-from-stash) is cheaper given
+            // ZoneDistances. Substrate-path: free slot available.
+            GoapActionDef {
+                kind: GoapActionKind::RetrieveHerbs(
+                    crate::components::magic::HerbKind::Thornbriar,
+                ),
+                cost: 2,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Stores),
+                    StatePredicate::HasMarker(markers::HasStoredThornbriar::KEY),
+                    StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+                ],
+                effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
+            },
+            // 084 Commit 2: plan-path RetrieveHerbs after DropItem.
+            GoapActionDef {
+                kind: GoapActionKind::RetrieveHerbs(
+                    crate::components::magic::HerbKind::Thornbriar,
+                ),
+                cost: 2,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Stores),
+                    StatePredicate::HasMarker(markers::HasStoredThornbriar::KEY),
                     StatePredicate::HasFreeSlotThisPlan(true),
                 ],
                 effects: vec![StateEffect::SetCarrying(Carrying::Herbs)],
@@ -1035,6 +1083,15 @@ mod tests {
     fn thornbriar_markers() -> MarkerSnapshot {
         let mut m = food_stocked_markers();
         m.set_colony(markers::ThornbriarAvailable::KEY, true);
+        m
+    }
+
+    /// 084: stash-only marker snapshot — colony has stashed thornbriar
+    /// but no wild thornbriar available. Used to exercise the
+    /// retrieve-path branch of `HerbcraftSetWard`.
+    fn stored_thornbriar_markers() -> MarkerSnapshot {
+        let mut m = food_stocked_markers();
+        m.set_colony(markers::HasStoredThornbriar::KEY, true);
         m
     }
 
@@ -1884,6 +1941,128 @@ mod tests {
         assert!(
             drop_idx < pickup_idx,
             "DropItem must come before PickUpItemFromGround; got {kinds:?}"
+        );
+    }
+
+    // --- 084 Commit 2: HerbcraftGather + HerbcraftSetWard plan templates ---
+
+    /// HerbcraftGather plan terminates at Stores via DepositHerbs —
+    /// gather without a deposit terminus no longer trip-increments.
+    #[test]
+    fn gather_plan_ends_with_deposit() {
+        let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(
+            DispositionKind::Herbalism,
+            Action::HerbcraftGather,
+            &distances,
+        );
+        let plan = plan!(
+            start,
+            &actions,
+            &goal,
+            12,
+            1000,
+            markers = food_stocked_markers()
+        )
+        .expect("gather plan should succeed");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(
+            kinds.contains(&GoapActionKind::GatherHerb),
+            "plan must include GatherHerb; got {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&GoapActionKind::DepositHerbs),
+            "plan must terminate with DepositHerbs; got {kinds:?}"
+        );
+        // Ordering: GatherHerb before DepositHerbs.
+        let gather_idx = kinds
+            .iter()
+            .position(|k| *k == GoapActionKind::GatherHerb)
+            .unwrap();
+        let deposit_idx = kinds
+            .iter()
+            .position(|k| *k == GoapActionKind::DepositHerbs)
+            .unwrap();
+        assert!(
+            gather_idx < deposit_idx,
+            "GatherHerb must come before DepositHerbs; got {kinds:?}"
+        );
+    }
+
+    /// HerbcraftSetWard picks the retrieve-from-stash branch when the
+    /// colony stash has thornbriar AND wild thornbriar is unavailable.
+    /// A* should choose `RetrieveHerbs(Thornbriar) → SetWard` rather
+    /// than `GatherHerb → SetWard` (which is gated impossible by the
+    /// `ThornbriarAvailable` marker absent).
+    #[test]
+    fn set_ward_plan_picks_retrieve_path_when_only_stash_available() {
+        let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(
+            DispositionKind::Herbalism,
+            Action::HerbcraftSetWard,
+            &distances,
+        );
+        let plan = plan!(
+            start,
+            &actions,
+            &goal,
+            12,
+            1000,
+            markers = stored_thornbriar_markers()
+        )
+        .expect("retrieve-path plan should succeed when stash has thornbriar");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(
+            kinds.contains(&GoapActionKind::RetrieveHerbs(
+                crate::components::magic::HerbKind::Thornbriar
+            )),
+            "retrieve-path must use RetrieveHerbs(Thornbriar); got {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&GoapActionKind::SetWard),
+            "plan must terminate with SetWard; got {kinds:?}"
+        );
+        assert!(
+            !kinds.contains(&GoapActionKind::GatherHerb),
+            "stash-only regime must not use GatherHerb (wild thornbriar unavailable); got {kinds:?}"
+        );
+    }
+
+    /// HerbcraftSetWard with NEITHER wild thornbriar NOR stash available
+    /// produces no plan — both gather (ThornbriarAvailable absent) and
+    /// retrieve (HasStoredThornbriar absent) branches fail their
+    /// preconditions.
+    #[test]
+    fn set_ward_plan_impossible_when_neither_wild_nor_stash() {
+        let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let distances = basic_distances();
+        let actions = actions_for_disposition(
+            DispositionKind::Herbalism,
+            Action::HerbcraftSetWard,
+            &distances,
+        );
+        let plan = plan!(
+            start,
+            &actions,
+            &goal,
+            12,
+            1000,
+            markers = food_stocked_markers()
+        );
+        assert!(
+            plan.is_err(),
+            "SetWard must be unplannable when neither wild thornbriar nor stash is available"
         );
     }
 }

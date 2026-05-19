@@ -23,7 +23,17 @@ use crate::steps::StepResult;
 /// decorations extend). Grows magic skill.
 ///
 /// **Plan-level preconditions** — emitted by the magic planner
-/// for ward-placement DSEs.
+/// for ward-placement DSEs. 084 Commit 2 added a retrieve-from-
+/// stash branch to the `HerbcraftSetWard` template — when the
+/// chain routes through `RetrieveHerbs(Thornbriar)` first, the
+/// planner-level guarantee is `CarryingIs(Herbs)` by the time
+/// `SetWard` executes (same precondition the gather-from-wild
+/// branch produces). The Fail path below therefore becomes
+/// correctly unreachable on the retrieve-path (planner-side
+/// `CarryingIs(Herbs)` precondition + cat-side `add_herb` succeeded
+/// in the resolver). It stays as defense-in-depth in case
+/// runtime-state divergence ever puts a cat at SetWard without a
+/// thornbriar (e.g. concurrent drop event).
 ///
 /// **Runtime preconditions** — herb consumption may fail; Fail
 /// on `inventory.take_herb(Thornbriar)` miss or misfire fizzle.

@@ -272,6 +272,22 @@ impl CanWard {
     pub const KEY: &str = "CanWard";
 }
 
+/// Ticket 084: combined ward-eligibility marker that expands `CanWard`
+/// to cover cats who can reach a stashed thornbriar even without
+/// currently carrying one. Fires when: `Adult ∧ ¬Injured ∧ (HasWardHerbs
+/// ∨ HasStoredThornbriar)`. Reader: the `HerbcraftSetWard` DSE's
+/// eligibility filter (replaces the `CanWard::KEY` require). Writer:
+/// `capabilities.rs::update_capability_markers` (extended in Commit 2
+/// of 084 to take a colony `HasStoredThornbriar` reference). GOAP then
+/// composes either `[Travel → SetWard]` (carrying-path) or
+/// `[Travel(Stores) → RetrieveHerbs(Thornbriar) → Travel → SetWard]`
+/// (retrieve-path) based on which `CarryingIs` precondition holds.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct CanWardFromSupply;
+impl CanWardFromSupply {
+    pub const KEY: &str = "CanWardFromSupply";
+}
+
 #[derive(Component, Debug, Clone, Copy)]
 pub struct CanCook;
 impl CanCook {
@@ -908,6 +924,7 @@ mod tests {
         assert_marker_queryable(CanHunt);
         assert_marker_queryable(CanForage);
         assert_marker_queryable(CanWard);
+        assert_marker_queryable(CanWardFromSupply);
         assert_marker_queryable(CanCook);
     }
 

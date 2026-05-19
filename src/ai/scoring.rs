@@ -1834,8 +1834,9 @@ pub fn score_actions(
             ));
         }
         // §4 batch 2: inline `ctx.has_ward_herbs` gate retired —
-        // HerbcraftWardDse carries `.require(CanWard::KEY)` which
-        // subsumes Adult ∧ ¬Injured ∧ HasWardHerbs.
+        // HerbcraftWardDse carries `.require(CanWardFromSupply::KEY)`
+        // (084 Commit 2; previously CanWard) which expands the gate to
+        // Adult ∧ ¬Injured ∧ (HasWardHerbs ∨ HasStoredThornbriar).
         let mut ward = score_dse_by_id("herbcraft_ward", ctx, inputs);
         if ward > 0.0 && ctx.wards_under_siege {
             ward += s.herbcraft_ward_siege_bonus * ctx.needs.tier_suppression(2);
@@ -2990,6 +2991,7 @@ mod tests {
             s.set_entity(markers::CanHunt::KEY, cat, true);
             s.set_entity(markers::CanForage::KEY, cat, true);
             s.set_entity(markers::CanWard::KEY, cat, true);
+            s.set_entity(markers::CanWardFromSupply::KEY, cat, true);
             s.set_entity(markers::CanCook::KEY, cat, true);
             s
         })
@@ -3416,6 +3418,7 @@ mod tests {
         markers.set_entity(markers::CanForage::KEY, cat_entity, true);
         markers.set_entity(markers::CanHunt::KEY, cat_entity, true);
         markers.set_entity(markers::CanWard::KEY, cat_entity, true);
+        markers.set_entity(markers::CanWardFromSupply::KEY, cat_entity, true);
         let base = test_eval_inputs();
         let inputs = EvalInputs {
             cat: cat_entity,
