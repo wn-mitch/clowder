@@ -97,8 +97,11 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
         )
 
     if args.max_runs and within_df["label"].nunique() > args.max_runs:
+        # Keep the N most-recent runs (by soak_time), not the N largest
+        # by row count. Long baselines would otherwise crowd out recent
+        # short-soak / scenario / sweep runs that the user is iterating on.
         keep = (
-            within_df.groupby("label")["tick"].count()
+            within_df.groupby("label")["soak_time"].max()
             .sort_values(ascending=False)
             .head(args.max_runs)
             .index.tolist()

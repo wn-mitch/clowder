@@ -7,6 +7,7 @@
 #   "altair>=5.3",
 #   "vl-convert-python>=1.6",
 #   "pandas>=2.0",
+#   "orjson>=3.9",
 # ]
 # ///
 """Cross-run log database for Clowder simulation archives.
@@ -38,6 +39,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import multiprocessing as mp
 import os
 import pkgutil
 import re
@@ -47,11 +49,19 @@ import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any, Iterator
 
 import duckdb  # type: ignore[import-not-found]
+import orjson  # type: ignore[import-not-found]
+import pandas as pd  # type: ignore[import-not-found]
 from tqdm import tqdm  # type: ignore[import-not-found]
+
+
+def _json_dumps(obj: Any) -> str:
+    """orjson.dumps returns bytes; DuckDB JSON column wants str."""
+    return orjson.dumps(obj).decode("utf-8")
 
 # ---------------------------------------------------------------------------
 # Constants
