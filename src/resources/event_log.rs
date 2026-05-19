@@ -202,7 +202,13 @@ pub enum EventKind {
         position: (i32, i32),
         personality: Personality,
         needs: Needs,
-        skills: Skills,
+        /// Boxed to keep the variant within the `large_enum_variant`
+        /// clippy budget — ticket 366 added five Phase 5 discipline
+        /// axes (`weaving`/`bone_shaping`/`hidework`/`pigment`/`cairn`)
+        /// which pushed the unboxed variant past threshold. `Box<T>`
+        /// serializes transparently as `T`, so the JSON shape on
+        /// `events.jsonl` is unchanged.
+        skills: Box<Skills>,
         mood_valence: f32,
         mood_modifier_count: usize,
         health: f32,

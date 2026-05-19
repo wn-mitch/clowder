@@ -1,7 +1,7 @@
 ---
 id: 366
 title: Aspirations mastery arcs — Weaving, BoneShaping, Hidework, Pigment, Cairn (016 Phase 5 precursor)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Why

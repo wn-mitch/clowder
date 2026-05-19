@@ -15,6 +15,7 @@
 
 use bevy_ecs::prelude::*;
 
+use crate::ai::aspirations::SkillKind;
 use crate::components::items::ItemKind;
 
 /// Stable identifier for a recipe. Stringly-typed so registry
@@ -134,6 +135,20 @@ pub struct Recipe {
     pub station: StationRequirement,
     pub duration: RecipeDuration,
     pub output: RecipeOutput,
+    /// OSRS-style skill gate (366 — 016 Phase 5 precursor).
+    ///
+    /// `None` = no skill requirement (Phase ≤4 recipes; e.g. the 365-era
+    /// herbcraft remedies). `Some((skill, level))` = at least one cat
+    /// in the colony must clear `level` on the named axis for the
+    /// recipe to be unlocked. Read by
+    /// [`crate::resources::recipe_registry::RecipeRegistry::is_phase5_unlocked`].
+    ///
+    /// 372 lands the first Phase 5 recipes (Generational Tapestry,
+    /// Shrine-Cairn, Bone-Lattice Lantern, Pigment-Deepened Textile)
+    /// with `Some(...)` gates on the matching mastery axes. Until
+    /// then no recipe carries a `Some` value and the predicate
+    /// returns false.
+    pub skill_gate: Option<(SkillKind, f32)>,
 }
 
 /// Provenance metadata attached to every item produced by a

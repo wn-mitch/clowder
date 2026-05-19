@@ -212,7 +212,7 @@ pub fn emit_cat_snapshots(
                 position: (pos.x, pos.y),
                 personality: personality.clone(),
                 needs: needs.clone(),
-                skills: skills.clone(),
+                skills: Box::new(skills.clone()),
                 mood_valence: effective_valence.clamp(-1.0, 1.0),
                 mood_modifier_count: mood.modifiers.len(),
                 health: health.current,

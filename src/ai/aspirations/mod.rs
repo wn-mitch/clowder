@@ -42,6 +42,7 @@ pub mod herbcraft;
 pub mod hunting;
 pub mod kinship;
 pub mod leadership;
+pub mod mastery;
 pub mod social;
 
 // ---------------------------------------------------------------------------
@@ -71,9 +72,13 @@ pub fn always_false(_world: &World, _entity: Entity) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Typed skill axis for [`ProgressTracker::SkillLevel`]. Mirrors the
-/// six numeric fields on [`crate::components::skills::Skills`]; the
+/// numeric fields on [`crate::components::skills::Skills`]; the
 /// resolver reads the matching field at progress-check time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+///
+/// Phase 5 axes (366 — Weaving / BoneShaping / Hidework / Pigment /
+/// Cairn) ship reader-only; their writers — the discipline-specific
+/// craft actions — land in 372.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum SkillKind {
     Hunting,
     Foraging,
@@ -81,6 +86,11 @@ pub enum SkillKind {
     Building,
     Combat,
     Magic,
+    Weaving,
+    BoneShaping,
+    Hidework,
+    Pigment,
+    Cairn,
 }
 
 impl SkillKind {
@@ -93,6 +103,11 @@ impl SkillKind {
             Self::Building => skills.building,
             Self::Combat => skills.combat,
             Self::Magic => skills.magic,
+            Self::Weaving => skills.weaving,
+            Self::BoneShaping => skills.bone_shaping,
+            Self::Hidework => skills.hidework,
+            Self::Pigment => skills.pigment,
+            Self::Cairn => skills.cairn,
         }
     }
 }
@@ -241,6 +256,12 @@ pub const ALL_CHAINS: &[&AspirationChain] = &[
     &leadership::VOICE_OF_THE_COLONY,
     &leadership::THE_UNIFIER,
     &kinship::RAISE_OFFSPRING_ASPIRATION,
+    // 366 — Phase 5 mastery arcs (016 Phase 5 precursor).
+    &mastery::WEAVING_MASTERY,
+    &mastery::BONE_SHAPING_MASTERY,
+    &mastery::HIDEWORK_MASTERY,
+    &mastery::PIGMENT_MASTERY,
+    &mastery::CAIRN_MASTERY,
 ];
 
 // ---------------------------------------------------------------------------
@@ -372,6 +393,29 @@ mod compatibility_tests {
                 "chain '{}' conflicts with itself",
                 chain.name,
             );
+        }
+    }
+
+    #[test]
+    fn mastery_chains_registered() {
+        // 366 — Phase 5 precursor. The five mastery arcs must be
+        // present in the registry so `select_aspirations` can score
+        // them and `is_phase5_unlocked` finds them by name. Domain
+        // and name pairing is asserted to catch a copy-paste swap
+        // (e.g. CAIRN_MASTERY tagged AspirationDomain::Pigment).
+        let r = registry();
+        for (chain_name, domain) in [
+            ("Weaving Mastery", AspirationDomain::Weaving),
+            ("Bone-Shaping Mastery", AspirationDomain::BoneShaping),
+            ("Hidework Mastery", AspirationDomain::Hidework),
+            ("Pigment Mastery", AspirationDomain::Pigment),
+            ("Cairn Mastery", AspirationDomain::Cairn),
+        ] {
+            let chain = r
+                .chain_by_name(chain_name)
+                .unwrap_or_else(|| panic!("missing chain '{chain_name}'"));
+            assert_eq!(chain.domain, domain, "{chain_name} domain mismatch");
+            assert_eq!(chain.milestones.len(), 6, "{chain_name} milestone count");
         }
     }
 

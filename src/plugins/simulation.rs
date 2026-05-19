@@ -333,6 +333,7 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
                 item_kind: remedy.to_item_kind(),
                 destination: ItemDestination::Inventory,
             },
+            skill_gate: None,
         });
     }
 
@@ -369,6 +370,7 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             item_kind: crate::components::items::ItemKind::HerbThornbriar,
             destination: ItemDestination::WorldPosition,
         },
+        skill_gate: None,
     });
     registry.insert(Recipe {
         id: crate::steps::magic::ward_recipe_id(WardKind::DurableWard),
@@ -383,6 +385,7 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             item_kind: crate::components::items::ItemKind::HerbThornbriar,
             destination: ItemDestination::WorldPosition,
         },
+        skill_gate: None,
     });
 }
 

@@ -40,6 +40,17 @@ fn domain_personality_axis(domain: AspirationDomain, p: &Personality) -> f32 {
         // most tightly coupled to the spec's "compassionate → Caretake-
         // biased" cleavage in §7.M.2).
         AspirationDomain::Kinship => p.compassion,
+        // 366 — Phase 5 mastery arcs. Practical crafts (fiber / bone /
+        // hide) align with `diligence` — patient repetition. Pigment
+        // and Cairn straddle into ritual/ceremony (per crafting.md
+        // §Phase 5 — shrine-cairns cross-register with monuments.md;
+        // pigment-deepened textiles read as colony-age) so they align
+        // with `spirituality`.
+        AspirationDomain::Weaving => p.diligence,
+        AspirationDomain::BoneShaping => p.diligence,
+        AspirationDomain::Hidework => p.diligence,
+        AspirationDomain::Pigment => p.spirituality,
+        AspirationDomain::Cairn => p.spirituality,
     }
 }
 
@@ -99,6 +110,15 @@ fn score_chain(
         // will add a `BecomesParent`/`KittenBorn` event-driven adoption
         // path separate from this passive-scoring loop.
         AspirationDomain::Kinship => 0.0,
+        // 366 — Phase 5 mastery arcs. No memory-type proxy today;
+        // adoption is personality-driven (diligence / spirituality
+        // axis). 372 may surface a CraftEvent memory type once the
+        // discipline actions land.
+        AspirationDomain::Weaving
+        | AspirationDomain::BoneShaping
+        | AspirationDomain::Hidework
+        | AspirationDomain::Pigment
+        | AspirationDomain::Cairn => 0.0,
     };
     score += experience.min(c.experience_cap); // cap experience contribution
 
@@ -248,7 +268,22 @@ pub fn select_aspirations(
             // path (per `learning_bevy_schedule_edge_perturbation`).
             // Event-driven adoption wiring lands as 398 Phase 1c+
             // follow-on once `BecomesParent` plumbing is in place.
-            if chain.domain == AspirationDomain::Kinship {
+            //
+            // 366 — Phase 5 mastery arcs are dormant in 366: the
+            // substrate exists but adoption is deferred to 372
+            // alongside the craft-action substrate (event-driven
+            // adoption on first relevant craft, analogous to Kinship's
+            // post-partum trigger). Skipping here preserves seed-42
+            // determinism, identical pattern to Kinship.
+            if matches!(
+                chain.domain,
+                AspirationDomain::Kinship
+                    | AspirationDomain::Weaving
+                    | AspirationDomain::BoneShaping
+                    | AspirationDomain::Hidework
+                    | AspirationDomain::Pigment
+                    | AspirationDomain::Cairn
+            ) {
                 continue;
             }
             let s = score_chain(
@@ -371,7 +406,19 @@ pub fn check_second_aspiration_slot(
             // Ticket 398 — Kinship is event-driven (see select_aspirations
             // sibling site). Skip before rng-consumption to preserve
             // seed-42 determinism.
-            if chain.domain == AspirationDomain::Kinship {
+            //
+            // 366 — Mastery arcs likewise. Adoption substrate lands
+            // with 372 alongside craft actions; until then they remain
+            // dormant in the registry. Same Kinship rationale.
+            if matches!(
+                chain.domain,
+                AspirationDomain::Kinship
+                    | AspirationDomain::Weaving
+                    | AspirationDomain::BoneShaping
+                    | AspirationDomain::Hidework
+                    | AspirationDomain::Pigment
+                    | AspirationDomain::Cairn
+            ) {
                 continue;
             }
             let s = score_chain(

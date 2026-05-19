@@ -14,6 +14,14 @@ pub struct Skills {
     pub building: f32,
     pub combat: f32,
     pub magic: f32,
+    // 366 — Phase 5 discipline axes (OSRS-style). Writers land in
+    // 372 (craft-action step resolvers). Default 0.0, matching
+    // `magic`'s pre-writer baseline.
+    pub weaving: f32,
+    pub bone_shaping: f32,
+    pub hidework: f32,
+    pub pigment: f32,
+    pub cairn: f32,
 }
 
 impl Default for Skills {
@@ -25,6 +33,11 @@ impl Default for Skills {
             building: 0.1,
             combat: 0.05,
             magic: 0.0,
+            weaving: 0.0,
+            bone_shaping: 0.0,
+            hidework: 0.0,
+            pigment: 0.0,
+            cairn: 0.0,
         }
     }
 }
@@ -32,7 +45,17 @@ impl Default for Skills {
 impl Skills {
     /// Sum of all skill levels.
     pub fn total(&self) -> f32 {
-        self.hunting + self.foraging + self.herbcraft + self.building + self.combat + self.magic
+        self.hunting
+            + self.foraging
+            + self.herbcraft
+            + self.building
+            + self.combat
+            + self.magic
+            + self.weaving
+            + self.bone_shaping
+            + self.hidework
+            + self.pigment
+            + self.cairn
     }
 
     /// Diminishing-returns factor for skill growth.
@@ -109,8 +132,27 @@ mod tests {
             building: 0.0,
             combat: 0.0,
             magic: 0.0,
+            weaving: 0.0,
+            bone_shaping: 0.0,
+            hidework: 0.0,
+            pigment: 0.0,
+            cairn: 0.0,
         };
         assert_eq!(s.growth_rate(), 1.0);
+    }
+
+    #[test]
+    fn default_phase5_axes_start_at_zero() {
+        // 366 — Phase 5 discipline axes ship reader-only; writers
+        // land in 372. Default 0.0 means novice milestone (level
+        // >= 0.0) fires immediately on adoption while apprentice
+        // (0.2) blocks until 372 wires action-driven skill growth.
+        let s = Skills::default();
+        assert_eq!(s.weaving, 0.0);
+        assert_eq!(s.bone_shaping, 0.0);
+        assert_eq!(s.hidework, 0.0);
+        assert_eq!(s.pigment, 0.0);
+        assert_eq!(s.cairn, 0.0);
     }
 
     #[test]

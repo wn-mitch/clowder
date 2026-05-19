@@ -837,6 +837,11 @@ mod tests {
             building: value,
             combat: value,
             magic: value,
+            weaving: value,
+            bone_shaping: value,
+            hidework: value,
+            pigment: value,
+            cairn: value,
         }
     }
 

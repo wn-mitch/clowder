@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 
 use crate::components::recipe::{Recipe, RecipeId};
+use crate::components::skills::Skills;
 
 /// Catalog of every recipe the simulation knows about.
 #[derive(Resource, Default, Debug, Clone)]
@@ -50,6 +51,39 @@ impl RecipeRegistry {
     pub fn is_empty(&self) -> bool {
         self.recipes.is_empty()
     }
+
+    /// Phase 5 gating predicate (366 — 016 Phase 5 precursor).
+    ///
+    /// Walks every recipe carrying a `skill_gate` and returns true
+    /// iff at least one such recipe is currently unlocked by the
+    /// colony — i.e. at least one cat's matching skill axis clears
+    /// the recipe's threshold. OSRS-style: each recipe declares its
+    /// own min-level on a typed `SkillKind` axis.
+    ///
+    /// 366 land: predicate is shape-correct but returns false
+    /// because no recipe carries a `Some(skill_gate)` yet. 372 lands
+    /// the first Phase 5 recipes (Generational Tapestry, Shrine-Cairn,
+    /// Bone-Lattice Lantern, Pigment-Deepened Textile) plus the
+    /// craft-action step resolvers that grow the matching skill
+    /// axes (`weaving` / `bone_shaping` / `hidework` / `pigment` /
+    /// `cairn`); the predicate flips naturally as cats grind past
+    /// the recipe thresholds.
+    ///
+    /// Adoption of a mastery arc does NOT alone unlock recipes —
+    /// the cat must clear the recipe's skill threshold, which only
+    /// becomes possible once 372 wires the action-side skill growth.
+    pub fn is_phase5_unlocked<'a>(
+        &self,
+        colony_skills: impl IntoIterator<Item = &'a Skills>,
+    ) -> bool {
+        let cats: Vec<&Skills> = colony_skills.into_iter().collect();
+        self.iter().any(|recipe| {
+            let Some((skill, threshold)) = recipe.skill_gate else {
+                return false;
+            };
+            cats.iter().any(|s| skill.value(s) >= threshold)
+        })
+    }
 }
 
 #[cfg(test)]
@@ -75,6 +109,7 @@ mod tests {
                 item_kind: ItemKind::HerbHealingMoss,
                 destination: ItemDestination::Inventory,
             },
+            skill_gate: None,
         }
     }
 
@@ -103,5 +138,61 @@ mod tests {
         let mut registry = RecipeRegistry::default();
         registry.insert(sample_recipe("dup"));
         registry.insert(sample_recipe("dup"));
+    }
+
+    // -----------------------------------------------------------------
+    // is_phase5_unlocked (366 — 016 Phase 5 precursor)
+    // -----------------------------------------------------------------
+
+    use crate::ai::aspirations::SkillKind;
+
+    fn gated_recipe(id: &'static str, skill: SkillKind, level: f32) -> Recipe {
+        let mut r = sample_recipe(id);
+        r.skill_gate = Some((skill, level));
+        r
+    }
+
+    #[test]
+    fn is_phase5_unlocked_false_when_no_skill_gated_recipes() {
+        // 365-era recipes carry `skill_gate: None`; the predicate
+        // returns false regardless of how skilled the colony is.
+        let mut registry = RecipeRegistry::default();
+        registry.insert(sample_recipe("herbcraft.healing_poultice"));
+        let mut paragon = Skills::default();
+        paragon.weaving = 5.0;
+        paragon.bone_shaping = 5.0;
+        assert!(!registry.is_phase5_unlocked([&paragon]));
+    }
+
+    #[test]
+    fn is_phase5_unlocked_false_when_skill_below_threshold() {
+        let mut registry = RecipeRegistry::default();
+        registry.insert(gated_recipe("phase5.test_tapestry", SkillKind::Weaving, 1.0));
+        let mut novice = Skills::default();
+        novice.weaving = 0.5;
+        assert!(!registry.is_phase5_unlocked([&novice]));
+    }
+
+    #[test]
+    fn is_phase5_unlocked_true_when_some_cat_clears() {
+        let mut registry = RecipeRegistry::default();
+        registry.insert(gated_recipe("phase5.test_tapestry", SkillKind::Weaving, 1.0));
+        let mut novice = Skills::default();
+        novice.weaving = 0.5;
+        let mut master = Skills::default();
+        master.weaving = 1.5;
+        assert!(registry.is_phase5_unlocked([&novice, &master]));
+    }
+
+    #[test]
+    fn is_phase5_unlocked_checks_named_axis_not_total() {
+        // The predicate must read `SkillKind::Weaving` specifically;
+        // a cat with high `bone_shaping` does not unlock a weaving-
+        // gated recipe.
+        let mut registry = RecipeRegistry::default();
+        registry.insert(gated_recipe("phase5.test_tapestry", SkillKind::Weaving, 1.0));
+        let mut bone_master = Skills::default();
+        bone_master.bone_shaping = 2.0;
+        assert!(!registry.is_phase5_unlocked([&bone_master]));
     }
 }

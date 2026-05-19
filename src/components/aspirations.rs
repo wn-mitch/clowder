@@ -39,6 +39,18 @@ pub enum AspirationDomain {
     /// (provisioning + protection of dependents) that the personality
     /// alignment picks up via `compassion`, not `warmth`.
     Kinship,
+    /// 366 — Phase 5 mastery domains. Each maps 1:1 to a crafting
+    /// discipline in `docs/systems/crafting.md` §Phase 5. Progress
+    /// is read off the matching `Skills` axis (Skills::weaving /
+    /// bone_shaping / hidework / pigment / cairn). `matching_actions`
+    /// returns `&[]` here until 372 lands the discipline-specific
+    /// `Action` variants; the L1 picker still works because mastery
+    /// milestones use `SkillLevel` trackers, not action-count.
+    Weaving,
+    BoneShaping,
+    Hidework,
+    Pigment,
+    Cairn,
 }
 
 impl AspirationDomain {
@@ -59,6 +71,14 @@ impl AspirationDomain {
             Self::Building => &[Action::Build],
             Self::Leadership => &[Action::Coordinate],
             Self::Kinship => &[Action::Caretake],
+            // 366 — Phase 5 mastery domains. 372 fans in the
+            // discipline-specific Action variants (Weave, Knap,
+            // TanHide, MixPigment, LayCairn) and updates these arms.
+            Self::Weaving
+            | Self::BoneShaping
+            | Self::Hidework
+            | Self::Pigment
+            | Self::Cairn => &[],
         }
     }
 }

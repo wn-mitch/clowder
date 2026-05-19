@@ -344,10 +344,7 @@ mod tests {
         Skills {
             hunting,
             foraging,
-            herbcraft: 0.05,
-            building: 0.1,
-            combat: 0.05,
-            magic: 0.0,
+            ..Skills::default()
         }
     }
 
