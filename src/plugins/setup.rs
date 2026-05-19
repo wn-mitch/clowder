@@ -462,6 +462,16 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // §5.6.3 row #6).
     world.insert_resource(crate::resources::CarcassScentMap::default());
 
+    // Insert cover-availability map (ticket 423). Tile-resolution
+    // boolean influence map of "low-cover tile within sprint_radius".
+    // Replaces the per-cat O(radius²) disc scan in
+    // `update_hide_eligible_markers`. Cold-start `dirty = true` so
+    // the first `update_cover_availability_map` tick stamps the
+    // worldgen-established terrain before any HideEligible author
+    // run. Terrain mutators (building completion, magic remedy) call
+    // `mark_dirty()` to schedule re-stamping.
+    world.insert_resource(crate::resources::CoverAvailabilityMap::default());
+
     // 219: colony-shared recent-ambush event memory. Deposits happen
     // inline in `predator_stalk_cats`; exponential decay runs each
     // tick via `update_recent_ambush_map`. Dormant in scoring at

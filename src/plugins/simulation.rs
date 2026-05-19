@@ -174,9 +174,9 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // substrate-vs-search-state boundary.
     use crate::resources::{
         CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, ColonyDistrictMap,
-        ConstructionSiteMap, ExplorationMap, FoodLocationMap, FoxApproachCorridorMap,
-        FoxScentMap, GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap,
-        PreyScentMaps, RecentAmbushMap, TileMap, WardCoverageMap, WardIntentMap,
+        ConstructionSiteMap, CoverAvailabilityMap, ExplorationMap, FoodLocationMap,
+        FoxApproachCorridorMap, FoxScentMap, GardenLocationMap, GraveAuraMap, HerbLocationMap,
+        KittenCryMap, PreyScentMaps, RecentAmbushMap, TileMap, WardCoverageMap, WardIntentMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -199,6 +199,12 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
         });
     }
     registry.register::<CarcassScentMap>();
+    // Ticket 423: cover-availability map. Tile-resolution boolean
+    // (within sprint_radius of any `Terrain::is_low_cover()` tile).
+    // Consumer: `update_hide_eligible_markers`; trace emitter walks
+    // it so soak-trace can verify the marker author reads the same
+    // map the L1 trace reports.
+    registry.register::<CoverAvailabilityMap>();
     // 219: colony-shared recent-ambush event memory. Dormant in
     // scoring at land (no DSE reads it yet); registered so its samples
     // surface in `trace-*.jsonl` for soak-trace verification.
@@ -929,10 +935,17 @@ impl Plugin for SimulationPlugin {
                             //
                             // Ticket 170 — `HideEligible` author chained
                             // after target-existence (it reads the
-                            // just-authored `HasThreatNearby`). Wrapped
+                            // just-authored `HasThreatNearby`).
+                            //
+                            // Ticket 423 — `CoverAvailabilityMap` rebuild
+                            // chained BEFORE the HideEligible author so
+                            // the marker reads the same tick's fresh
+                            // cover map. The map is dirty-flag-gated;
+                            // steady-state ticks pay zero cost. Wrapped
                             // as a sub-tuple to keep the outer chain
                             // under Bevy's 20-system limit.
                             (
+                                crate::resources::update_cover_availability_map,
                                 systems::sensing::update_target_existence_markers,
                                 systems::sensing::update_hide_eligible_markers,
                             )

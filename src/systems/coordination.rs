@@ -1217,6 +1217,7 @@ pub fn spawn_construction_sites(
     construction_sites: Query<&crate::components::building::ConstructionSite>,
     colony_center: Res<crate::resources::ColonyCenter>,
     mut map: ResMut<crate::resources::map::TileMap>,
+    mut cover_map: ResMut<crate::resources::CoverAvailabilityMap>,
     district: Res<crate::resources::ColonyDistrictMap>,
     fox_corridor: Res<crate::resources::FoxApproachCorridorMap>,
     food_location: Res<crate::resources::FoodLocationMap>,
@@ -1348,6 +1349,11 @@ pub fn spawn_construction_sites(
                 }
             }
         }
+        // Ticket 423: invalidate the cover-availability map so the next
+        // `update_cover_availability_map` tick re-stamps the new building's
+        // low-cover footprint (Den / Hearth / Stores / Workshop /
+        // Watchtower are all `is_low_cover()`).
+        cover_map.mark_dirty();
 
         // Spawn the construction site entity. Founding buildings get pre-funded
         // materials (the colony pools what they brought with them).

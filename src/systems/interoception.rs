@@ -1261,6 +1261,7 @@ mod tests {
             terrain_weight: 0.5,
             dependent_weight: 1.0,
             dependent_penalty: 1.0,
+            cover_availability_threshold: 0.5,
         };
         let v = escape_viability(
             Position::new(10, 10),

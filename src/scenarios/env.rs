@@ -97,6 +97,11 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     world.insert_resource(crate::resources::FoxScentMap::default());
     world.insert_resource(crate::resources::PreyScentMaps::default_maps());
     world.insert_resource(crate::resources::CarcassScentMap::default());
+    // Ticket 423: cover-availability map. Required by
+    // `update_cover_availability_map` + `update_hide_eligible_markers`
+    // in Chain 2a. Cold-start `dirty = true` so the first scheduler
+    // tick stamps from `TileMap` before HideEligible reads.
+    world.insert_resource(crate::resources::CoverAvailabilityMap::default());
     // 219: colony-shared recent-ambush event memory.
     world.insert_resource(crate::resources::RecentAmbushMap::default());
     // 312: fox-approach corridor map. Dormant at default

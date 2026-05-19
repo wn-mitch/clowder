@@ -1,7 +1,7 @@
 ---
 id: 423
 title: CoverAvailabilityMap — retire per-cat disc scan in HideEligible authoring
-status: ready
+status: done
 cluster: combat-threat
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-19
 ---
 
 ## Why
@@ -140,3 +140,4 @@ quality family).
   the regression is confounded by 7+ intervening commits; this
   ticket addresses the structural component (per-cat O(radius²)
   scan) independent of that diagnostic.
+- 2026-05-19: Landed via just land + 15-min soak-trace verdict; pre-423 baseline archived at logs/tuned-42-pre-423/. Frame-diff shows no unacknowledged drift on tracked DSEs.

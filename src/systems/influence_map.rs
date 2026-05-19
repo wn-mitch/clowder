@@ -301,6 +301,25 @@ impl InfluenceMap for crate::resources::CarcassScentMap {
     }
 }
 
+impl InfluenceMap for crate::resources::CoverAvailabilityMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // Ticket 423: cover availability is a visual terrain
+            // signal — cats see low-cover tiles within sprint range.
+            // Sight × Neutral mirrors the framing of terrain-property
+            // maps (`ExplorationMap` uses Sight × Observer; cover is
+            // colony-wide-identical so Neutral fits).
+            name: "cover_availability",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::FoxApproachCorridorMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

@@ -7220,6 +7220,14 @@ pub struct EscapeViabilityConstants {
     /// magnitude without disturbing the global weight. Default 1.0.
     #[serde(default = "default_escape_viability_dependent_penalty")]
     pub dependent_penalty: f32,
+    /// Threshold the `CoverAvailabilityMap` cell must exceed for a
+    /// cat to be `HideEligible` (ticket 423). v1 ships boolean cells
+    /// (0.0 / 1.0), so `0.5` is the midpoint — any "cover present"
+    /// cell qualifies. Tuning hook for the 170 balance follow-on if
+    /// the map gains a distance-gradient cell representation.
+    /// Default 0.5.
+    #[serde(default = "default_cover_availability_threshold")]
+    pub cover_availability_threshold: f32,
 }
 
 fn default_escape_viability_sprint_radius() -> i32 {
@@ -7234,6 +7242,9 @@ fn default_escape_viability_dependent_weight() -> f32 {
 fn default_escape_viability_dependent_penalty() -> f32 {
     1.0
 }
+fn default_cover_availability_threshold() -> f32 {
+    0.5
+}
 
 impl Default for EscapeViabilityConstants {
     fn default() -> Self {
@@ -7242,6 +7253,7 @@ impl Default for EscapeViabilityConstants {
             terrain_weight: default_escape_viability_terrain_weight(),
             dependent_weight: default_escape_viability_dependent_weight(),
             dependent_penalty: default_escape_viability_dependent_penalty(),
+            cover_availability_threshold: default_cover_availability_threshold(),
         }
     }
 }

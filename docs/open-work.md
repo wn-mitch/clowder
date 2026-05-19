@@ -15,10 +15,10 @@ _Last generated: 2026-05-19._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 115 |
+| Ready | 114 |
 | Parked | 13 |
 | Blocked | 33 |
-| **Open total** | **165** |
+| **Open total** | **164** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -39,10 +39,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
+- **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · score 0.90_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
-- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
 
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (115)
+## Ready by cluster (114)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -164,7 +164,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
-### combat-threat (9 ready, 2 blocked)
+### combat-threat (8 ready, 2 blocked)
 
 - **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[combat-threat] · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[combat-threat] · added 2026-05-02_
@@ -173,7 +173,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[270](docs/open-work/tickets/270-engagethreat-split-from-patrol-dse-256-r6-follow-on-with-belief-actionaffordance.md)** — EngageThreat split from Patrol DSE (256 R6 follow-on with Belief + ActionAffordance) — _[combat-threat] · added 2026-05-10_
 - **[287](docs/open-work/tickets/287-move-boldness-out-of-fleedse-cp-axes-onto-a-boldnessfleemodulation-modifier-271-r3-structural-follow-on.md)** — Move boldness out of FleeDse CP axes onto a BoldnessFleeModulation modifier (271 R3 structural follow-on) — _[combat-threat] · added 2026-05-11_
 - **[289](docs/open-work/tickets/289-engagethreat-retry-cooldown-after-morale-break-suppress-immediate-guarding-re-election-under-active-fight-directive.md)** — EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive — _[combat-threat] · added 2026-05-11_
-- **[423](docs/open-work/tickets/423-coveravailabilitymap-retire-per-cat-disc-scan-in-hideeligible-authoring.md)** — CoverAvailabilityMap — retire per-cat disc scan in HideEligible authoring — _[combat-threat] · added 2026-05-19_
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 
 ### wildlife (8 ready, 1 blocked)
@@ -325,7 +324,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (115)
+## Ready (114)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -440,7 +439,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 - **[421](docs/open-work/tickets/421-central-material-pile-smart-material-deposit-routing.md)** — Central material pile + smart material-deposit routing — _[items-crafting] · added 2026-05-19_
-- **[423](docs/open-work/tickets/423-coveravailabilitymap-retire-per-cat-disc-scan-in-hideeligible-authoring.md)** — CoverAvailabilityMap — retire per-cat disc scan in HideEligible authoring — _[combat-threat] · added 2026-05-19_
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 
 ## Parked (13)
@@ -495,12 +493,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
 - **[422](docs/open-work/tickets/422-curio-cache-routing-deposit-prefix-on-curio-cache.md)** — Curio Cache routing — deposit-prefix on curio Cache — _[items-crafting] · blocked-by 016 · added 2026-05-19_
 
-## Landed archive (287)
+## Landed archive (288)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (221)
+### 2026-05 (222)
 
+- **[423](docs/open-work/landed/423-coveravailabilitymap-retire-per-cat-disc-scan-in-hideeligible-authoring.md)** — CoverAvailabilityMap — retire per-cat disc scan in HideEligible authoring _(2026-05-19)_
 - **[420](docs/open-work/landed/420-play-continuity-regression-2545-on-seed-42-post-084-rule-out-unrelated-cause.md)** — Play continuity regression 254→5 on seed-42 post-084 — rule out unrelated cause _(2026-05-19)_
 - **[419](docs/open-work/landed/419-wardplaced-rate-regression-52-on-seed-42-post-084-investigate-herbcraft-eligibility-cadence.md)** — WardPlaced rate regression 5→2 on seed-42 post-084 — investigate Herbcraft eligibility cadence _(2026-05-19)_
 - **[418](docs/open-work/landed/418-herbcraft-retrieve-path-not-electing-herbsretrieved-fires-0-on-seed-42-despite-stash-full.md)** — Herbcraft retrieve-path not electing — HerbsRetrieved fires 0 on seed-42 despite stash full _(2026-05-19)_
