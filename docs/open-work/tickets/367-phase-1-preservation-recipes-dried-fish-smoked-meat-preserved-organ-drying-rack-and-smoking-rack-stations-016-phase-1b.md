@@ -1,13 +1,13 @@
 ---
 id: 367
 title: Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b)
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-16
 parked: null
-blocked-by: [365]
+blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []

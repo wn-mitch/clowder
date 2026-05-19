@@ -1,13 +1,13 @@
 ---
 id: 368
 title: Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2)
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-16
 parked: null
-blocked-by: [365]
+blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []

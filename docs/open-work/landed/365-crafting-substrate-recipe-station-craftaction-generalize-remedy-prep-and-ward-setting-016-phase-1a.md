@@ -1,7 +1,7 @@
 ---
 id: 365
 title: Crafting substrate — Recipe + Station + CraftAction; generalize remedy_prep and ward_setting (016 Phase 1a)
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Why
@@ -56,3 +56,4 @@ Layer-walk audit (L1 markers → L2 DSE → L3 softmax → Action→Disposition 
 <!-- linkages:end -->
 ## Log
 - 2026-05-16: opened as 016 epic decomposition (Phase 1a; parent 016).
+- 2026-05-18: Phase 1a substrate landed. Three commits + a finalize commit covering the typed Recipe data layer, the herbcraft remedy items-are-real migration (Carrying::Remedy projected from real inventory items instead of search-state-only), and the Ward CraftedItem provenance tagging. 173 closed in the same series (premise rejected by the 175 GoalUnreachable diagnostic; the 365 substrate keeps bespoke per-discipline DSEs so no eligibility-marker tightening applies). Soak: elapsed_ticks=103164, deaths_by_cause={}, never_fired_expected_positives=[], continuity tallies all fire except mythic-texture (pre-existing failure also present on bare main). Verdict band 'concern' on pre-existing canary only.

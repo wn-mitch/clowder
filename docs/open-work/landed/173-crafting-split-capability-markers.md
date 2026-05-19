@@ -1,7 +1,7 @@
 ---
 id: 173
 title: IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on)
-status: parked
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-18
 ---
 
 ## Why
@@ -116,3 +116,4 @@ authored from inventory + adult-and-not-injured gate, read by
   goal-predicate / action-effect mismatch. Both are different fix-
   shapes from this ticket. Parked pending a new ticket that owns
   the GoalUnreachable root-cause investigation.
+- 2026-05-18: Closed alongside ticket 365 (016 Phase 1a Recipe substrate). The 365 substrate keeps bespoke per-discipline DSEs and resolvers — it doesn't restore this ticket's premise (that a unified capability-marker layer at L1 would tighten the Cooking / Herbalism cull). The 2026-05-05 parked rationale (per-disposition cull is loose because of GoalUnreachable, not eligibility) still stands; ticket 175 (landed) authored the GoalUnreachable root-cause investigation.

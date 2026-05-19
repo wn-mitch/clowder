@@ -7,7 +7,7 @@ orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-16
 parked: null
-blocked-by: [375, 376, 365]
+blocked-by: [375, 376]
 supersedes: []
 related-systems: [crafting.md, ai-substrate-refactor.md]
 related-balance: []

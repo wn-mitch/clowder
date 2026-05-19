@@ -1,13 +1,13 @@
 ---
 id: 369
 title: Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b)
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-16
 parked: null
-blocked-by: [365]
+blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []

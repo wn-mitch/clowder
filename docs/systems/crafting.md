@@ -180,5 +180,37 @@ Phase 5 items are gated by three conditions, *all* required:
 - Phase 5 cross-references `monuments.md` for shrine-cairn scope boundary.
 - `ScavengedMetal` as a material type soft-depends on `ruin-clearings.md` providing it as a loot class; can be stubbed as a zero-probability drop until that system lands.
 
+## Implementation
+
+Ticket 365 (016 Phase 1a) shipped the typed recipe substrate:
+
+- `src/components/recipe.rs` — `Recipe`, `RecipeId`, `RecipeInput`,
+  `RecipeOutput`, `ItemDestination` (`Inventory` / `EquippedSlot` /
+  `WorldPosition`), `StationRequirement`, `RecipeDuration`,
+  `DisciplineKind`, and the `CraftedItem` Component (provenance:
+  recipe id + crafter + tick; no numeric modifier fields per the
+  no-stat-sticks invariant).
+- `src/resources/recipe_registry.rs` — `RecipeRegistry` Resource;
+  populated by `populate_recipe_registry` in
+  `src/plugins/simulation.rs` (mirrors
+  `populate_dse_registry` / `populate_method_registry` /
+  `populate_influence_map_registry`).
+
+Phase 1a recipes registered:
+- Three remedies (`remedy.healing_poultice` / `remedy.energy_tonic` /
+  `remedy.mood_tonic`) — `Inventory` destination. Resolver:
+  `resolve_prepare_remedy`. Consumed by `resolve_apply_remedy`.
+- Two wards (`ward.thornward` / `ward.durable`) — `WorldPosition`
+  destination. Resolver: `resolve_set_ward`. The spawned `Ward`
+  entity is tagged with `CraftedItem`; Ward stays its own
+  Component (the registry's output `item_kind` field is a
+  placeholder for wards — they're not `Item` entities).
+
+Crafting is an umbrella category — bespoke per-discipline DSEs and
+resolvers (`HerbcraftPrepareDse`, `HerbcraftWardDse`, `CookDse`,
+the six witchcraft DSEs, …) remain. Only the recipe *data* layer
+is unified. Selection ("which recipe to make") is BDI/HTN's job
+(aspirations + method registry), not the substrate's.
+
 ## Tuning Notes
 _Record observations and adjustments here during iteration._

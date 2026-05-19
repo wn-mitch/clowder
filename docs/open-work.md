@@ -15,10 +15,10 @@ _Last generated: 2026-05-18._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 112 |
-| Parked | 15 |
-| Blocked | 39 |
-| **Open total** | **170** |
+| Ready | 114 |
+| Parked | 14 |
+| Blocked | 36 |
+| **Open total** | **168** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,8 +40,8 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.92_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
-- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.91_
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.91_
+- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · score 0.91_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
 
 ## Epic progress (5)
@@ -50,7 +50,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 8 | 0 | 8 (0 / 2 / 6 / 0) | `▱▱▱▱▱▱▱▱▱▱` 0% |
+| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 8 | 1 | 7 (0 / 4 / 3 / 0) | `▰▱▱▱▱▱▱▱▱▱` 12% |
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 5 | 28 (1 / 19 / 6 / 2) | `▰▰▱▱▱▱▱▱▱▱` 15% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (112)
+## Ready by cluster (114)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -134,6 +134,20 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 
+### items-crafting (11 ready, 8 blocked)
+
+- **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _[items-crafting] · added 2026-04-26_
+- **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _[items-crafting] · added 2026-04-26_
+- **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _[items-crafting] · added 2026-05-06_
+- **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[items-crafting] · added 2026-05-06_
+- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · added 2026-05-08_
+- **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
+- **[367](docs/open-work/tickets/367-phase-1-preservation-recipes-dried-fish-smoked-meat-preserved-organ-drying-rack-and-smoking-rack-stations-016-phase-1b.md)** — Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b) — _[items-crafting] · added 2026-05-16_
+- **[368](docs/open-work/tickets/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) — _[items-crafting] · added 2026-05-16_
+- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
+- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · added 2026-05-16_
+- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
+
 ### combat-threat (10 ready, 2 blocked)
 
 - **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[combat-threat] · added 2026-05-02_
@@ -159,18 +173,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
-
-### items-crafting (9 ready, 11 blocked)
-
-- **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _[items-crafting] · added 2026-04-26_
-- **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _[items-crafting] · added 2026-04-26_
-- **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _[items-crafting] · added 2026-05-06_
-- **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[items-crafting] · added 2026-05-06_
-- **[235](docs/open-work/tickets/235-smart-deposit-routing-for-clutter-clearance.md)** — Smart deposit routing for clutter clearance — _[items-crafting] · added 2026-05-08_
-- **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
-- **[365](docs/open-work/tickets/365-crafting-substrate-recipe-station-craftaction-generalize-remedy-prep-and-ward-setting-016-phase-1a.md)** — Crafting substrate — Recipe + Station + CraftAction; generalize remedy_prep and ward_setting (016 Phase 1a) — _[items-crafting] · added 2026-05-16_
-- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · added 2026-05-16_
-- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
 
 ### wildlife (8 ready, 1 blocked)
 
@@ -212,7 +214,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 
-## Ready by initiative (78 tag-memberships across 9 initiatives)
+## Ready by initiative (80 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -300,6 +302,15 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
+### world-richness (6 open, 1 landed)
+
+- **[366](docs/open-work/tickets/366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md)** — Aspirations mastery arcs — Weaving, BoneShaping, Hidework, Pigment, Cairn (016 Phase 5 precursor) — _[ai-substrate] · added 2026-05-16_
+- **[367](docs/open-work/tickets/367-phase-1-preservation-recipes-dried-fish-smoked-meat-preserved-organ-drying-rack-and-smoking-rack-stations-016-phase-1b.md)** — Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b) — _[items-crafting] · added 2026-05-16_
+- **[368](docs/open-work/tickets/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) — _[items-crafting] · added 2026-05-16_
+- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
+- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · added 2026-05-16_
+- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
+
 ### worldgen-prehistory (5 open, 0 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -308,20 +319,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
-### world-richness (4 open, 0 landed)
-
-- **[365](docs/open-work/tickets/365-crafting-substrate-recipe-station-craftaction-generalize-remedy-prep-and-ward-setting-016-phase-1a.md)** — Crafting substrate — Recipe + Station + CraftAction; generalize remedy_prep and ward_setting (016 Phase 1a) — _[items-crafting] · added 2026-05-16_
-- **[366](docs/open-work/tickets/366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md)** — Aspirations mastery arcs — Weaving, BoneShaping, Hidework, Pigment, Cairn (016 Phase 5 precursor) — _[ai-substrate] · added 2026-05-16_
-- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · added 2026-05-16_
-- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
-
 ### environmental-simulation (3 open, 1 landed)
 
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _[wildlife] · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (112)
+## Ready (114)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -412,8 +416,10 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[365](docs/open-work/tickets/365-crafting-substrate-recipe-station-craftaction-generalize-remedy-prep-and-ward-setting-016-phase-1a.md)** — Crafting substrate — Recipe + Station + CraftAction; generalize remedy_prep and ward_setting (016 Phase 1a) — _[items-crafting] · added 2026-05-16_
 - **[366](docs/open-work/tickets/366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md)** — Aspirations mastery arcs — Weaving, BoneShaping, Hidework, Pigment, Cairn (016 Phase 5 precursor) — _[ai-substrate] · added 2026-05-16_
+- **[367](docs/open-work/tickets/367-phase-1-preservation-recipes-dried-fish-smoked-meat-preserved-organ-drying-rack-and-smoking-rack-stations-016-phase-1b.md)** — Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b) — _[items-crafting] · added 2026-05-16_
+- **[368](docs/open-work/tickets/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) — _[items-crafting] · added 2026-05-16_
+- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
 - **[373](docs/open-work/tickets/373-denworkshop-food-retrieval-broaden-eat-substrate-beyond-stores-only.md)** — Den/Workshop food retrieval — broaden eat substrate beyond Stores-only — _[ai-substrate] · added 2026-05-16_
 - **[374](docs/open-work/tickets/374-shelter-as-housing-security-belief-per-cat-home-den-facet-replace-per-tick-spatial-shelter-rollup.md)** — Shelter as housing-security belief — per-cat home-den facet, replace per-tick spatial shelter rollup — _[ai-substrate] · added 2026-05-16_
 - **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · added 2026-05-16_
@@ -436,13 +442,12 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
-## Parked (15)
+## Parked (14)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _[life-cycle] · parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _[ai-substrate] · parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _[ai-substrate] · parked 2026-04-27 · added 2026-04-27_
 - **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[items-crafting] · parked 2026-04-30 · added 2026-04-29_
-- **[173](docs/open-work/tickets/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) — _[ai-substrate] · parked 2026-05-05 · added 2026-05-05_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[tooling-diagnostics-ui] · parked 2026-05-06 · added 2026-05-06_
 - **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[life-cycle] · parked 2026-05-10 · added 2026-05-07_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[combat-threat] · parked 2026-05-07 · blocked-by 209 · added 2026-05-07_
@@ -454,7 +459,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[346](docs/open-work/tickets/346-771-aspiration-conflict-rejection-structured-event.md)** — §7.7.1 aspiration conflict-rejection structured event — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
 
-## Blocked (39)
+## Blocked (36)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -477,16 +482,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[269](docs/open-work/tickets/269-submit-dse-wire-c3-belief-actionaffordance-revisit-cross-species-extension.md)** — Submit DSE — wire C3 Belief + ActionAffordance + revisit cross-species extension — _[combat-threat] · blocked-by 145 · added 2026-05-10_
 - **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · blocked-by 314 · added 2026-05-13_
 - **[317](docs/open-work/tickets/317-retire-flee-threat-distance-power-invert-if-frame-diff-shows-redundancy-with-affordanceflee.md)** — retire flee_threat_distance Power-Invert if frame-diff shows redundancy with Affordance(Flee) — _[ai-substrate] · blocked-by 315 · added 2026-05-13_
-- **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · blocked-by 365, 017 · added 2026-05-14_
+- **[334](docs/open-work/tickets/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver — _[items-crafting] · blocked-by 017 · added 2026-05-14_
 - **[340](docs/open-work/tickets/340-port-mating-l3-chain-onto-htn-method.md)** — Port Mating L3 chain onto HTN method — _[ai-substrate] · blocked-by 323 · added 2026-05-14_
-- **[367](docs/open-work/tickets/367-phase-1-preservation-recipes-dried-fish-smoked-meat-preserved-organ-drying-rack-and-smoking-rack-stations-016-phase-1b.md)** — Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b) — _[items-crafting] · blocked-by 365 · added 2026-05-16_
-- **[368](docs/open-work/tickets/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) — _[items-crafting] · blocked-by 365 · added 2026-05-16_
-- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · blocked-by 365 · added 2026-05-16_
 - **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · blocked-by 368, 017 · added 2026-05-16_
 - **[371](docs/open-work/tickets/371-phase-4-domestic-refinement-place-anchored-decorations-reed-mat-tallow-lamp-scent-censer-carved-comb-wall-hanging-nesting-inlay-016-phase-4.md)** — Phase 4 domestic refinement — place-anchored decorations (Reed Mat, Tallow Lamp, Scent Censer, Carved Comb, Wall-Hanging, Nesting Inlay) (016 Phase 4) — _[items-crafting] · blocked-by 370 · added 2026-05-16_
 - **[372](docs/open-work/tickets/372-phase-5-elevated-cat-craft-generational-tapestry-shrine-cairn-bone-lattice-lantern-pigment-deepened-textile-multi-cat-nesting-alcove-kitten-cradle-basket-016-phase-5-triple-gated.md)** — Phase 5 elevated cat-craft — Generational Tapestry, Shrine-Cairn, Bone-Lattice Lantern, Pigment-Deepened Textile, Multi-Cat Nesting Alcove, Kitten-Cradle Basket (016 Phase 5, triple-gated) — _[items-crafting] · blocked-by 371, 366 · added 2026-05-16_
 - **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · blocked-by 375 · added 2026-05-16_
-- **[378](docs/open-work/tickets/378-colony-material-demand-axis-perceivable-material-need-substrate-foodstores-twin-for-crafting-materials.md)** — colony material-demand axis: perceivable material-need substrate (FoodStores twin for crafting materials) — _[ai-perception] · blocked-by 375, 376, 365 · added 2026-05-16_
+- **[378](docs/open-work/tickets/378-colony-material-demand-axis-perceivable-material-need-substrate-foodstores-twin-for-crafting-materials.md)** — colony material-demand axis: perceivable material-need substrate (FoodStores twin for crafting materials) — _[ai-perception] · blocked-by 375, 376 · added 2026-05-16_
 - **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · blocked-by 375 · added 2026-05-16_
 - **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · blocked-by 375 · added 2026-05-16_
 - **[386](docs/open-work/tickets/386-phase-2-knowledge-implantation-procedure-ryan-listing-371-port.md)** — Phase-2 knowledge implantation procedure (Ryan Listing 37.1 port) — _[belief-perception] · blocked-by 385 · added 2026-05-16_
@@ -496,18 +498,20 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
 - **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 
-## Landed archive (274)
+## Landed archive (276)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (208)
+### 2026-05 (210)
 
 - **[410](docs/open-work/landed/410-l2-parentingactivity-handoffitem-cascade-follow-on-400-verdict-concern.md)** — L2 ParentingActivity — HandoffItem cascade follow-on (400 verdict concern) _(2026-05-18)_
 - **[409](docs/open-work/landed/409-polecat-exit-ritual-main-serialization-3-silent-failures-conflicted-main-from-concurrent-landings.md)** — polecat exit-ritual + main-serialization: 3 silent failures + conflicted main from concurrent landings _(2026-05-18)_
 - **[400](docs/open-work/landed/400-l2-parentingactivity-implementation-per-399-design.md)** — L2 ParentingActivity — implementation per 399 design _(2026-05-18)_
+- **[365](docs/open-work/landed/365-crafting-substrate-recipe-station-craftaction-generalize-remedy-prep-and-ward-setting-016-phase-1a.md)** — Crafting substrate — Recipe + Station + CraftAction; generalize remedy_prep and ward_setting (016 Phase 1a) _(2026-05-18)_
 - **[339](docs/open-work/landed/339-catsnapshot-goal-stack-active-aspirations-fields.md)** — CatSnapshot gains goal_stack + active_aspirations fields _(2026-05-18)_
 - **[306](docs/open-work/landed/306-corpus-tagging-pass-backfill-clusterinitiative-across-active-and-landed-tickets.md)** — Corpus tagging pass — backfill cluster+initiative across active and landed tickets _(2026-05-18)_
 - **[290](docs/open-work/landed/290-rdf-reader-cutover-sensorrs-reads-contextbeliefspredictability-instead-of-recentdispositionfailures-258-retirement-r3.md)** — RDF reader cutover — sensor.rs reads ContextBeliefs.predictability instead of RecentDispositionFailures (258 retirement R3) _(2026-05-18)_
+- **[173](docs/open-work/landed/173-crafting-split-capability-markers.md)** — IsHerbalist / IsSpiritualist / HasCorruptionNearby capability markers (155 follow-on) _(2026-05-18)_
 - **[148](docs/open-work/landed/148-courtship-fondness-ceiling-fragility.md)** — Courtship-chain fondness ceiling vs gate fragility _(2026-05-18)_
 - **[133](docs/open-work/landed/133-renumbered-to-141.md)** — Stub for missing ID 133 _(2026-05-18)_
 - **[132](docs/open-work/landed/132-renumbered-to-140.md)** — Stub for missing ID 132 _(2026-05-18)_
