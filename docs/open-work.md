@@ -14,9 +14,9 @@ _Last generated: 2026-05-19._
 
 | Status | Count |
 |---|---|
-| In progress | 4 |
+| In progress | 5 |
 | Ready | 117 |
-| Parked | 14 |
+| Parked | 13 |
 | Blocked | 32 |
 | **Open total** | **167** |
 | Pre-existing | 0 |
@@ -25,7 +25,7 @@ Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (4 in-progress · 0 ready blockers · 5 next-recommended)
+## Active focus (5 in-progress · 0 ready blockers · 5 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
@@ -33,6 +33,7 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
+- **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Herb-stash economy + stash-low signal driving Farm DSE and coordinator build-pressure — _[items-crafting] · added 2026-04-29_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
@@ -56,10 +57,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 | **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 26 | 16 | 10 (0 / 6 / 2 / 2) | `▰▰▰▰▰▰▱▱▱▱` 62% |
 
-## In progress (4)
+## In progress (5)
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
+- **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Herb-stash economy + stash-low signal driving Farm DSE and coordinator build-pressure — _[items-crafting] · added 2026-04-29_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
@@ -447,12 +449,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
-## Parked (14)
+## Parked (13)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _[life-cycle] · parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _[ai-substrate] · parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _[ai-substrate] · parked 2026-04-27 · added 2026-04-27_
-- **[084](docs/open-work/tickets/084-farm-herb-ward-demand-axis.md)** — Farm DSE — tie scoring to herb/ward stockpile demand so gardens stay productive under abundant food — _[items-crafting] · parked 2026-04-30 · added 2026-04-29_
 - **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[tooling-diagnostics-ui] · parked 2026-05-06 · added 2026-05-06_
 - **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[life-cycle] · parked 2026-05-10 · added 2026-05-07_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[combat-threat] · parked 2026-05-07 · added 2026-05-07_
