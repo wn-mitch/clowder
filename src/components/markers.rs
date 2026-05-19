@@ -383,6 +383,20 @@ impl ThornbriarAvailable {
     pub const KEY: &str = "ThornbriarAvailable";
 }
 
+/// Ticket 084: ≥1 Thornbriar count exists in the colony's
+/// `StoredHerbs` aggregate (summed across all Stores buildings).
+/// Authored by `buildings.rs::update_colony_building_markers`.
+/// Read by `HerbcraftSetWard`'s `CanWardFromSupply` eligibility gate
+/// in Commit 2, and by `RetrieveHerbs(Thornbriar)` planner action
+/// preconditions. Distinct from `ThornbriarAvailable` which gates on
+/// *wild* harvestable thornbriar entities — this marker gates on
+/// *stashed* thornbriar inside Stores.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasStoredThornbriar;
+impl HasStoredThornbriar {
+    pub const KEY: &str = "HasStoredThornbriar";
+}
+
 /// Per-cat: the nearest reachable construction site has
 /// `materials_complete()` true. Gates the substrate branch of the
 /// `Construct` GOAP action — when set, the planner can plan
@@ -906,6 +920,7 @@ mod tests {
         assert_marker_queryable(HasRawFoodInStores);
         assert_marker_queryable(HasStoredFood);
         assert_marker_queryable(ThornbriarAvailable);
+        assert_marker_queryable(HasStoredThornbriar);
         assert_marker_queryable(MaterialsAvailable);
     }
 

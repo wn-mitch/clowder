@@ -105,6 +105,12 @@ pub fn resolve_construct(
             commands.entity(target).insert(Structure::new(blueprint));
             if blueprint == StructureType::Stores {
                 commands.entity(target).insert(StoredItems::default());
+                // 084: every Stores carries a `StoredHerbs` aggregate so
+                // the `DepositHerbs` / `RetrieveHerbs(_)` GOAP actions
+                // have a sink/source the moment the building completes.
+                commands
+                    .entity(target)
+                    .insert(crate::components::building::StoredHerbs::default());
             }
             // §Phase 4c.4 farming repair: Gardens used to ship without a
             // `CropState` component, so `TendCrops`'s target-resolution

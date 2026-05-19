@@ -480,6 +480,7 @@ pub fn update_colony_building_markers(
     colony: Single<Entity, With<crate::components::markers::ColonyState>>,
     buildings: Query<(&Structure, Option<&ConstructionSite>)>,
     stored_items: Query<&crate::components::building::StoredItems>,
+    stored_herbs: Query<&crate::components::building::StoredHerbs>,
     items: Query<
         &crate::components::items::Item,
         bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
@@ -582,6 +583,21 @@ pub fn update_colony_building_markers(
     // resolve a target. Pre-193 this gated on `Carcass` component
     // entities, which the resolver cannot pick up — driving the
     // 1367/10kt `PickingUp:GoalUnreachable` cascade.
+    // 084: HasStoredThornbriar — ≥1 thornbriar count across all
+    // Stores' `StoredHerbs` aggregates. Reader: the `RetrieveHerbs(Thornbriar)`
+    // planner action precondition (Commit 2 of ticket 084) and the
+    // `CanWardFromSupply` combined marker writer. Authored here
+    // rather than in items.rs because the aggregation surface is
+    // building-side, not inventory-side.
+    let has_stored_thornbriar = stored_herbs
+        .iter()
+        .any(|sh| sh.count(crate::components::magic::HerbKind::Thornbriar) > 0);
+    if has_stored_thornbriar {
+        em.insert(crate::components::markers::HasStoredThornbriar);
+    } else {
+        em.remove::<crate::components::markers::HasStoredThornbriar>();
+    }
+
     let has_ground_carcass = items.iter().any(|item| {
         matches!(
             item.location,
@@ -1045,5 +1061,57 @@ mod tests {
         schedule.run(&mut world);
         let colony = colony_entity(&mut world);
         assert!(!world.entity(colony).contains::<markers::HasGarden>());
+    }
+
+    // --- HasStoredThornbriar (ticket 084) ---
+
+    #[test]
+    fn colony_thornbriar_marker_set_when_stash_nonzero() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        let mut sh = crate::components::building::StoredHerbs::default();
+        sh.add(crate::components::magic::HerbKind::Thornbriar, 1, 20);
+        world.spawn((
+            Structure::new(StructureType::Stores),
+            crate::components::building::StoredItems::default(),
+            sh,
+        ));
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(world
+            .entity(colony)
+            .contains::<markers::HasStoredThornbriar>());
+    }
+
+    #[test]
+    fn colony_thornbriar_marker_cleared_when_stash_empty() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        // Stores with empty StoredHerbs.
+        world.spawn((
+            Structure::new(StructureType::Stores),
+            crate::components::building::StoredItems::default(),
+            crate::components::building::StoredHerbs::default(),
+        ));
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(!world
+            .entity(colony)
+            .contains::<markers::HasStoredThornbriar>());
+    }
+
+    #[test]
+    fn colony_thornbriar_marker_ignores_non_thornbriar_herbs() {
+        let (mut world, mut schedule) = setup_colony_markers();
+        let mut sh = crate::components::building::StoredHerbs::default();
+        sh.add(crate::components::magic::HerbKind::HealingMoss, 5, 20);
+        world.spawn((
+            Structure::new(StructureType::Stores),
+            crate::components::building::StoredItems::default(),
+            sh,
+        ));
+        schedule.run(&mut world);
+        let colony = colony_entity(&mut world);
+        assert!(!world
+            .entity(colony)
+            .contains::<markers::HasStoredThornbriar>());
     }
 }

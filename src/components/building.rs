@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use bevy_ecs::prelude::*;
 
 use crate::components::items::Item;
+use crate::components::magic::HerbKind;
 use crate::components::physical::Position;
 use crate::components::task_chain::{FailurePolicy, Material, StepKind, TaskChain, TaskStep};
 
@@ -433,6 +436,58 @@ impl StoredItems {
     }
 }
 
+/// Ticket 084: per-Stores aggregate count of stashed herbs, keyed by
+/// `HerbKind`. Sibling to `StoredItems` (food/material Entities), but
+/// herbs stash as a lightweight count rather than spawned Item entities
+/// — matches the existing `Inventory.slots` herb representation, where
+/// herb slots carry no Entity identity and no per-instance modifiers.
+/// Capacity is per-kind and provided by the caller (sourced from
+/// `ScoringConstants::stores_herb_capacity_per_kind`).
+///
+/// Lifecycle:
+/// - Inserted on every `StructureType::Stores` at construction
+///   (`steps/building/construct.rs`).
+/// - Mutated by `resolve_deposit_herbs_to_stores` (add) and
+///   `resolve_retrieve_herbs_from_stores(kind)` (take).
+/// - Aggregated by `update_colony_building_markers` to author
+///   `HasStoredThornbriar` and (Commit 3) `ColonyThornbriarChronicallyLow`.
+#[derive(Component, Debug, Clone, Default)]
+pub struct StoredHerbs {
+    pub counts: HashMap<HerbKind, u32>,
+}
+
+impl StoredHerbs {
+    /// Count of stashed herbs of one kind.
+    pub fn count(&self, kind: HerbKind) -> u32 {
+        self.counts.get(&kind).copied().unwrap_or(0)
+    }
+
+    /// Attempt to add `n` herbs of `kind`, capped at `capacity_per_kind`.
+    /// Returns the number actually added (0 if already at cap, `n` if
+    /// fully absorbed, partial otherwise — items-are-real discipline
+    /// applies: the caller MUST retain the un-added remainder rather
+    /// than silently destroying it).
+    pub fn add(&mut self, kind: HerbKind, n: u32, capacity_per_kind: u32) -> u32 {
+        let current = self.count(kind);
+        let room = capacity_per_kind.saturating_sub(current);
+        let added = n.min(room);
+        if added > 0 {
+            *self.counts.entry(kind).or_insert(0) += added;
+        }
+        added
+    }
+
+    /// Remove one herb of `kind`. Returns true if one was present.
+    pub fn take(&mut self, kind: HerbKind) -> bool {
+        let entry = self.counts.entry(kind).or_insert(0);
+        if *entry == 0 {
+            return false;
+        }
+        *entry -= 1;
+        true
+    }
+}
+
 // ---------------------------------------------------------------------------
 // GateState component
 // ---------------------------------------------------------------------------
@@ -664,5 +719,46 @@ mod tests {
         let e = world.spawn_empty().id();
         let mut storage = StoredItems::default();
         assert!(!storage.remove(e));
+    }
+
+    // --- StoredHerbs (ticket 084) ---
+
+    #[test]
+    fn stored_herbs_round_trip() {
+        let mut sh = StoredHerbs::default();
+        assert_eq!(sh.count(HerbKind::Thornbriar), 0);
+        assert_eq!(sh.add(HerbKind::Thornbriar, 3, 20), 3);
+        assert_eq!(sh.count(HerbKind::Thornbriar), 3);
+        assert!(sh.take(HerbKind::Thornbriar));
+        assert_eq!(sh.count(HerbKind::Thornbriar), 2);
+        assert!(sh.take(HerbKind::Thornbriar));
+        assert!(sh.take(HerbKind::Thornbriar));
+        assert_eq!(sh.count(HerbKind::Thornbriar), 0);
+        assert!(!sh.take(HerbKind::Thornbriar));
+    }
+
+    #[test]
+    fn stored_herbs_respects_capacity() {
+        let mut sh = StoredHerbs::default();
+        // Capacity 5, attempt to add 8 — accepts 5, signals 3 unabsorbed
+        // remain in caller's possession (items-are-real).
+        assert_eq!(sh.add(HerbKind::Thornbriar, 8, 5), 5);
+        assert_eq!(sh.count(HerbKind::Thornbriar), 5);
+        // Already at cap — further adds return 0.
+        assert_eq!(sh.add(HerbKind::Thornbriar, 1, 5), 0);
+        assert_eq!(sh.count(HerbKind::Thornbriar), 5);
+    }
+
+    #[test]
+    fn stored_herbs_independent_per_kind() {
+        let mut sh = StoredHerbs::default();
+        sh.add(HerbKind::Thornbriar, 4, 20);
+        sh.add(HerbKind::HealingMoss, 2, 20);
+        assert_eq!(sh.count(HerbKind::Thornbriar), 4);
+        assert_eq!(sh.count(HerbKind::HealingMoss), 2);
+        // Taking Thornbriar doesn't affect HealingMoss.
+        sh.take(HerbKind::Thornbriar);
+        assert_eq!(sh.count(HerbKind::Thornbriar), 3);
+        assert_eq!(sh.count(HerbKind::HealingMoss), 2);
     }
 }

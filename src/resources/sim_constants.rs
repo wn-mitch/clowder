@@ -2091,6 +2091,15 @@ pub struct ScoringConstants {
     /// toward "more Stores."
     #[serde(default = "default_chronicity_threshold")]
     pub chronicity_threshold: f32,
+    /// 084: per-kind capacity for `StoredHerbs` on each `Stores`
+    /// building. Default 20 — large enough to buffer multiple
+    /// ward-weaving cycles between gather trips, small enough to keep
+    /// `ColonyThornbriarChronicallyLow` responsive when wild
+    /// thornbriar availability drops. Per-kind so the four `HerbKind`s
+    /// each have their own ceiling and one species can't crowd out
+    /// the others.
+    #[serde(default = "default_stores_herb_capacity_per_kind")]
+    pub stores_herb_capacity_per_kind: u32,
     /// 179: present-score on the `colony_stores_chronically_full`
     /// MarkerConsideration in BuildDse. Lifted from 178's dormant 0.0
     /// once the wave-closeout consumer (179) wired the marker into
@@ -2903,6 +2912,7 @@ impl Default for ScoringConstants {
             carry_affinity_bonus: default_carry_affinity_bonus(),
             chronicity_window_ticks: default_chronicity_window_ticks(),
             chronicity_threshold: default_chronicity_threshold(),
+            stores_herb_capacity_per_kind: default_stores_herb_capacity_per_kind(),
             build_chronic_full_weight: default_build_chronic_full_weight(),
             hunt_food_security_weight: default_hunt_food_security_weight(),
             forage_food_security_weight: default_forage_food_security_weight(),
@@ -4122,6 +4132,12 @@ fn default_chronicity_window_ticks() -> u64 {
 /// `ScoringConstants::chronicity_threshold`.
 fn default_chronicity_threshold() -> f32 {
     0.10
+}
+
+/// 084: per-kind herb-stash capacity on Stores. See
+/// `ScoringConstants::stores_herb_capacity_per_kind`.
+fn default_stores_herb_capacity_per_kind() -> u32 {
+    20
 }
 
 /// 179: Build DSE present-score on the

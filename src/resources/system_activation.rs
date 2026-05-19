@@ -113,6 +113,22 @@ pub enum Feature {
     DepositRejected,
     DepositFailedNoStore,
     ItemRetrieved,
+    /// Ticket 084: a cat deposited ≥1 herb of any `HerbKind` into a
+    /// Stores building's `StoredHerbs` via the `DepositHerbs` GOAP
+    /// action. Positive — the gather→stash half of the herb economy
+    /// fired. Classified `=> true` in `expected_to_fire_per_soak`
+    /// because Commit 2 wires every `HerbcraftGather` plan to
+    /// terminate at Stores, and Gather fires on healthy seed-42.
+    HerbsDeposited,
+    /// Ticket 084: a cat retrieved ≥1 herb of a specific `HerbKind`
+    /// from a Stores building's `StoredHerbs` via the
+    /// `RetrieveHerbs(kind)` GOAP action. Positive — the
+    /// retrieve→weave half of the herb economy fired. Classified
+    /// `=> true` in `expected_to_fire_per_soak` because Commit 2
+    /// wires every `HerbcraftSetWard` plan to either carry-direct
+    /// OR retrieve-first, and the colony enters the retrieve-path
+    /// regime whenever wild thornbriar isn't immediately at hand.
+    HerbsRetrieved,
     /// A cat finished cooking a raw food item at a Kitchen, flipping its
     /// `cooked` flag. Eating the item later grants a hunger multiplier.
     FoodCooked,
@@ -615,6 +631,8 @@ impl Feature {
         Feature::DepositRejected,
         Feature::DepositFailedNoStore,
         Feature::ItemRetrieved,
+        Feature::HerbsDeposited,
+        Feature::HerbsRetrieved,
         Feature::FoodCooked,
         Feature::KittenBorn,
         Feature::GestationAdvanced,
@@ -789,6 +807,8 @@ impl Feature {
             Feature::SpiritCommunion => Positive,
             Feature::StorageUpgraded => Positive,
             Feature::ItemRetrieved => Positive,
+            Feature::HerbsDeposited => Positive,
+            Feature::HerbsRetrieved => Positive,
             Feature::FoodCooked => Positive,
             Feature::KittenBorn => Positive,
             Feature::GestationAdvanced => Positive,
@@ -1162,6 +1182,12 @@ impl Feature {
             Feature::KittenBorn => false,
             Feature::KittenFed => false,
             Feature::ItemRetrieved => false,
+            // Ticket 084: Commit 1 lands the resolvers + actions but no
+            // plan template emits them yet. Commit 2 lands the
+            // gather→deposit / retrieve→weave plan templates that
+            // exercise these and promotes both to `=> true`.
+            Feature::HerbsDeposited => false,
+            Feature::HerbsRetrieved => false,
             // Ticket 083 — Farm-dormancy reconciliation. Wave 2
             // substrate hardening + L2 PairingActivity raise the
             // food economy (more efficient hunts and cooking, higher
@@ -1361,6 +1387,8 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::DepositRejected => "DepositRejected",
         Feature::DepositFailedNoStore => "DepositFailedNoStore",
         Feature::ItemRetrieved => "ItemRetrieved",
+        Feature::HerbsDeposited => "HerbsDeposited",
+        Feature::HerbsRetrieved => "HerbsRetrieved",
         Feature::FoodCooked => "FoodCooked",
         Feature::KittenBorn => "KittenBorn",
         Feature::GestationAdvanced => "GestationAdvanced",
@@ -1765,7 +1793,11 @@ mod tests {
         // herbcraft items-are-real migration. expected_to_fire_per_soak
         // is false (mirrors RemedyApplied's opt-out — herbcraft DSEs
         // need both an injured patient and a herbalism-capable cat).
-        assert_eq!(positive, 76);
+        // Ticket 084 Commit 1: +2 Positive (HerbsDeposited, HerbsRetrieved)
+        // for the herb-stash economy. Both ship `expected_to_fire_per_soak()
+        // => false` in Commit 1; Commit 2's plan-template wiring promotes
+        // them to `=> true`.
+        assert_eq!(positive, 78);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -1859,9 +1891,11 @@ mod tests {
         // anatomical injury substrate.
         // Ticket 365: +1 Positive (RemedyPrepared) for the herbcraft
         // items-are-real migration.
+        // Ticket 084 Commit 1: +2 Positive (HerbsDeposited, HerbsRetrieved)
+        // for the herb-stash economy.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            76
+            78
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
@@ -2028,6 +2062,12 @@ mod tests {
         assert!(!Feature::KittenBorn.expected_to_fire_per_soak());
         assert!(!Feature::KittenFed.expected_to_fire_per_soak());
         assert!(!Feature::ItemRetrieved.expected_to_fire_per_soak());
+        // Ticket 084 Commit 1: resolvers + actions land, plan templates
+        // wire in Commit 2. Both flip to `=> true` then.
+        assert!(!Feature::HerbsDeposited.expected_to_fire_per_soak());
+        assert!(!Feature::HerbsRetrieved.expected_to_fire_per_soak());
+        assert_eq!(Feature::HerbsDeposited.category(), FeatureCategory::Positive);
+        assert_eq!(Feature::HerbsRetrieved.category(), FeatureCategory::Positive);
         // Ticket 083 — Farm-dormancy reconciliation. Demoted: the
         // food-economy lift correctly silences Farm via its
         // CompensatedProduct gate. Re-promote when ticket 084 ties

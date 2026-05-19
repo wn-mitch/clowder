@@ -357,6 +357,13 @@ impl GoapActionKind {
             // `HerbcraftRemedy` chain reports `HerbcraftRemedy`, not
             // `HerbcraftGather`.
             Self::GatherHerb | Self::PrepareRemedy | Self::ApplyRemedy => chosen_action,
+            // 084: herb-stash deposit/retrieve steps live under the
+            // Herbcraft chains — `DepositHerbs` terminates the
+            // `HerbcraftGather` plan (Commit 2), `RetrieveHerbs(_)`
+            // sits at the head of the retrieve-path branch of
+            // `HerbcraftSetWard` (Commit 2). Both inherit the chosen
+            // sub-action label so `CurrentAction` stays stable.
+            Self::DepositHerbs | Self::RetrieveHerbs(_) => chosen_action,
             // SetWard is shared between Herbalism (HerbcraftSetWard) and
             // Witchcraft (MagicDurableWard); the chosen_action carries
             // the disambiguation.

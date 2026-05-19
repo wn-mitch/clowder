@@ -223,6 +223,7 @@ pub struct WorldStateQueries<'w, 's> {
             Has<markers::HasMidden>,
             Has<markers::HasGroundCarcass>,
             Has<markers::HasDependentCat>,
+            Has<markers::HasStoredThornbriar>,
         ),
         With<markers::ColonyState>,
     >,
@@ -418,6 +419,13 @@ pub struct BuildingResolverParams<'w, 's> {
             Without<crate::components::items::BuildMaterialItem>,
         ),
     >,
+    /// Ticket 084 — mutable per-Stores herb-stash aggregate. Disjoint
+    /// from the `buildings` query above (which doesn't borrow
+    /// `StoredHerbs`) and from the top-level `stores_query`
+    /// (`&mut StoredItems`, different component). Used by the
+    /// `DepositHerbs` / `RetrieveHerbs(_)` dispatch arms in
+    /// `dispatch_step_action`.
+    pub stored_herbs: Query<'w, 's, &'static mut crate::components::building::StoredHerbs>,
 }
 
 /// Bundles resources for resolve_goap_plans.
@@ -1349,6 +1357,7 @@ pub fn evaluate_and_plan(
         has_midden,
         has_ground_carcass,
         has_dependent_cat,
+        has_stored_thornbriar,
     ) = world_state.colony_state_query.single().expect(
         "ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)",
     );
@@ -1419,6 +1428,12 @@ pub fn evaluate_and_plan(
     // care-dependent cat (currently any living kitten). Adults give
     // care to dependents.
     markers.set_colony(markers::HasDependentCat::KEY, has_dependent_cat);
+    // 084: HasStoredThornbriar — gates the `RetrieveHerbs(Thornbriar)`
+    // planner action precondition and (Commit 2) the
+    // `CanWardFromSupply` combined eligibility marker. Authored by
+    // `update_colony_building_markers` from per-Stores `StoredHerbs`
+    // aggregates.
+    markers.set_colony(markers::HasStoredThornbriar::KEY, has_stored_thornbriar);
 
     let herb_positions: Vec<(Entity, Position, HerbKind)> = world_state
         .herb_query
@@ -3363,6 +3378,19 @@ pub fn resolve_goap_plans(
         );
         if thornbriar_available {
             m.set_colony(markers::ThornbriarAvailable::KEY, true);
+        }
+        // 084: HasStoredThornbriar at plan time so the
+        // `RetrieveHerbs(Thornbriar)` planner action's precondition
+        // resolves correctly during mid-execution replans. Source the
+        // current stash level directly from `building_params.stored_herbs`
+        // (same source the `update_colony_building_markers` writer reads)
+        // so plan-time and L2 marker state match.
+        let has_stored_thornbriar = building_params
+            .stored_herbs
+            .iter()
+            .any(|sh| sh.count(crate::components::magic::HerbKind::Thornbriar) > 0);
+        if has_stored_thornbriar {
+            m.set_colony(markers::HasStoredThornbriar::KEY, true);
         }
         m
     };
@@ -6104,6 +6132,60 @@ fn dispatch_step_action(
                 commands,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::ItemRetrieved);
+            outcome.result
+        }
+
+        // 084: herb-stash deposit / retrieve. Mirrors the food-side
+        // dispatch arms — `DepositHerbs` resolves the nearest Stores
+        // and transfers every inventory herb slot into `StoredHerbs`;
+        // `RetrieveHerbs(kind)` takes one herb of `kind` from
+        // `StoredHerbs` back into the actor's inventory. Witnesses
+        // gate `HerbsDeposited` / `HerbsRetrieved` Feature emission
+        // per the StepOutcome contract.
+        GoapActionKind::DepositHerbs => {
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .stores_entities
+                    .iter()
+                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .map(|(e, _)| *e);
+            }
+            let capacity = ec.constants.scoring.stores_herb_capacity_per_kind;
+            let outcome = crate::steps::disposition::resolve_deposit_herbs_to_stores(
+                plan.step_state[step_idx].target_entity,
+                inventory,
+                &mut building_params.stored_herbs,
+                capacity,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::HerbsDeposited);
+            outcome.result
+        }
+
+        GoapActionKind::RetrieveHerbs(kind) => {
+            if plan.step_state[step_idx].target_entity.is_none() {
+                // Pick the nearest Stores that actually has ≥1 of `kind`
+                // stashed. Without this filter the cat would happily
+                // walk to an empty stash and `unwitnessed(Advance)` —
+                // wasted travel.
+                plan.step_state[step_idx].target_entity = snaps
+                    .stores_entities
+                    .iter()
+                    .filter(|(e, _)| {
+                        building_params
+                            .stored_herbs
+                            .get(*e)
+                            .is_ok_and(|sh| sh.count(kind) > 0)
+                    })
+                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .map(|(e, _)| *e);
+            }
+            let outcome = crate::steps::disposition::resolve_retrieve_herbs_from_stores(
+                plan.step_state[step_idx].target_entity,
+                kind,
+                inventory,
+                &mut building_params.stored_herbs,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::HerbsRetrieved);
             outcome.result
         }
 

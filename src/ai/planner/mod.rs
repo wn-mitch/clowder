@@ -241,6 +241,15 @@ pub enum GoapActionKind {
     RetrieveRawFood,
     Cook,
     DepositCookedFood,
+    // 084: Herb-stash deposit + retrieve. DepositHerbs transfers
+    // every herb-kind slot from a cat's `Inventory` into the nearest
+    // Stores' `StoredHerbs`. RetrieveHerbs(kind) is the inverse —
+    // pulls one count of `kind` from `StoredHerbs` back into
+    // `Inventory.slots`. Mirrors `DepositFood`/`RetrieveFoodForKitten`
+    // shape but operates on the per-kind count surface rather than
+    // the Entity-backed `StoredItems` surface.
+    DepositHerbs,
+    RetrieveHerbs(crate::components::magic::HerbKind),
     // Cleansing
     CleanseCorruption,
     HarvestCarcass,
