@@ -1,7 +1,7 @@
 ---
 id: 417
 title: Haiku enrichment for logq envelope
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-19
 ---
 
 ## Why

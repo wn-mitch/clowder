@@ -659,5 +659,275 @@ class EnvelopeToTextTests(unittest.TestCase):
         self.assertIn("just q cat-timeline", out)
 
 
+# ── ticket 417: Haiku enrichment ────────────────────────────────────────────
+
+class EnvelopeSerializationDeterminismTests(unittest.TestCase):
+    """Strict-presenter contract (per ticket 010): the LLM never mutates
+    sim state, and the enrichment fields are absent when not populated.
+
+    The CI audit is the byte-identical invariant: stripping `hint` and
+    `next_reasoned` from an enriched envelope's JSON yields the
+    pre-417 JSON. Same shape as 010's
+    `rm -rf logs/biographies && just soak 42 → byte-identical events.jsonl`.
+    """
+
+    def _base_envelope(self) -> Envelope:
+        return Envelope(
+            query={"subtool": "deaths", "log_dir": "logs/tuned-42"},
+            scan_stats={"scanned": 100, "returned": 2,
+                        "more_available": False, "narrow_by": []},
+            results=[
+                {"id": "tick:1200045:Death:Cedar",
+                 "summary": "tick=1200045 cause=Starvation"},
+                {"id": "tick:1200090:Death:Heron",
+                 "summary": "tick=1200090 cause=Starvation"},
+            ],
+            narrative="2 starvation deaths in seed 42.",
+            next=["just q cat-timeline logs/tuned-42 Cedar"],
+        )
+
+    def test_unenriched_envelope_omits_enrichment_keys(self):
+        """An envelope with `hint=None, next_reasoned=None` must serialize
+        to JSON that does NOT contain those keys at all — preserves
+        byte-identical compatibility with pre-417 envelopes."""
+        env = self._base_envelope()
+        data = json.loads(env.to_json())
+        self.assertNotIn("hint", data)
+        self.assertNotIn("next_reasoned", data)
+        self.assertEqual(
+            sorted(data.keys()),
+            ["narrative", "next", "query", "results", "scan_stats"],
+        )
+
+    def test_enriched_minus_enrichment_equals_unenriched(self):
+        """The strict-presenter CI audit. Build the same envelope twice,
+        fill enrichment on one, and assert the JSON differs only in the
+        two enrichment keys."""
+        plain = self._base_envelope()
+        enriched = self._base_envelope()
+        enriched.hint = "Both deaths within 45 ticks — clustered, not steady drip."
+        enriched.next_reasoned = {
+            "status": "ok",
+            "suggestions": [
+                {"cmd": "just q deaths logs/tuned-42 --cause=Starvation",
+                 "why": "2 starvation deaths in a 45-tick window"},
+            ],
+            "elapsed_ms": 1234,
+            "model": "claude-haiku-4-5",
+        }
+        plain_json = json.loads(plain.to_json())
+        enriched_json = json.loads(enriched.to_json())
+        # Strip enrichment keys from the enriched version → must equal plain.
+        stripped = {k: v for k, v in enriched_json.items()
+                    if k not in ("hint", "next_reasoned")}
+        self.assertEqual(stripped, plain_json)
+
+    def test_enriched_serialization_includes_enrichment_keys(self):
+        env = self._base_envelope()
+        env.hint = "demographic cluster"
+        env.next_reasoned = {"status": "ok", "suggestions": [], "elapsed_ms": 50}
+        data = json.loads(env.to_json())
+        self.assertEqual(data["hint"], "demographic cluster")
+        self.assertEqual(data["next_reasoned"]["status"], "ok")
+
+    def test_existing_next_field_never_mutated(self):
+        """Pillar of the strict-presenter contract: even when enrichment
+        is filled, the deterministic `next` list stays exactly as the
+        subtool built it."""
+        env = self._base_envelope()
+        original_next = list(env.next)
+        env.hint = "x"
+        env.next_reasoned = {
+            "status": "ok",
+            "suggestions": [{"cmd": "just q deaths logs/x", "why": "y"}],
+            "elapsed_ms": 0,
+        }
+        self.assertEqual(env.next, original_next)
+
+
+class EnvelopeToTextEnrichmentTests(unittest.TestCase):
+    """Text rendering of the enrichment fields."""
+
+    def _enriched(self) -> Envelope:
+        return Envelope(
+            query={"subtool": "anomalies", "log_dir": "logs/tuned-42"},
+            scan_stats={"scanned": 1, "returned": 1,
+                        "more_available": False, "narrow_by": []},
+            results=[{"id": "anomaly:starvation",
+                      "summary": "starvation_deaths=2"}],
+            narrative="2 starvation deaths.",
+            next=["just q deaths logs/tuned-42"],
+            hint="Looks demographic — both kittens.",
+            next_reasoned={
+                "status": "ok",
+                "suggestions": [
+                    {"cmd": "just q deaths logs/tuned-42 --cause=Starvation",
+                     "why": "2 starvation deaths in a 45-tick window"},
+                ],
+                "elapsed_ms": 1234,
+            },
+        )
+
+    def test_to_text_includes_hint_when_set(self):
+        out = self._enriched().to_text()
+        self.assertIn("hint:", out)
+        self.assertIn("Looks demographic", out)
+
+    def test_to_text_includes_reasoned_suggestions(self):
+        out = self._enriched().to_text()
+        self.assertIn("next (reasoned", out)
+        self.assertIn("--cause=Starvation", out)
+        self.assertIn("45-tick window", out)
+
+    def test_to_text_omits_hint_when_none(self):
+        env = self._enriched()
+        env.hint = None
+        out = env.to_text()
+        self.assertNotIn("hint:", out)
+
+    def test_to_text_omits_reasoned_when_no_suggestions(self):
+        env = self._enriched()
+        env.next_reasoned = {"status": "timeout", "suggestions": [],
+                             "elapsed_ms": 8000}
+        out = env.to_text()
+        self.assertNotIn("next (reasoned", out)
+
+
+class TruncateForHaikuTests(unittest.TestCase):
+    def test_small_envelope_passes_through(self):
+        small = {
+            "query": {"subtool": "deaths"},
+            "results": [{"id": "tick:1:x", "summary": "x"}],
+            "narrative": "small",
+        }
+        out = logq_mod._truncate_for_haiku(small, max_bytes=10_000)
+        self.assertIs(out, small)
+        self.assertNotIn("_truncated", out)
+
+    def test_large_envelope_drops_trailing_results(self):
+        # 200 results, each ~50 bytes of JSON — well over 1KB.
+        big = {
+            "query": {"subtool": "events"},
+            "results": [{"id": f"tick:{i}:E", "summary": f"event_{i}"}
+                        for i in range(200)],
+            "narrative": "many events",
+        }
+        out = logq_mod._truncate_for_haiku(big, max_bytes=1024)
+        self.assertTrue(out.get("_truncated"))
+        self.assertIn("_truncated_note", out)
+        self.assertLess(len(out["results"]), 200)
+        self.assertLessEqual(len(json.dumps(out, default=str)), 1024)
+
+    def test_truncation_preserves_other_fields(self):
+        big = {
+            "query": {"subtool": "events"},
+            "results": [{"id": f"x{i}", "summary": "x" * 100}
+                        for i in range(50)],
+            "narrative": "test",
+            "scan_stats": {"scanned": 50, "returned": 50},
+        }
+        out = logq_mod._truncate_for_haiku(big, max_bytes=500)
+        self.assertEqual(out["query"], big["query"])
+        self.assertEqual(out["narrative"], "test")
+        self.assertEqual(out["scan_stats"], big["scan_stats"])
+
+
+class EnrichmentHookTests(unittest.TestCase):
+    """`_enrich_envelope` mutates `env.hint` / `env.next_reasoned` only,
+    never `env.next`. Excluded subtools and disabled flags short-circuit
+    without calling the client."""
+
+    def _args(self, subtool: str, *, enrich=False, no_enrich=False,
+              enrich_timeout=8.0):
+        import argparse
+        ns = argparse.Namespace(
+            subtool=subtool,
+            enrich=enrich,
+            no_enrich=no_enrich,
+            enrich_timeout=enrich_timeout,
+        )
+        return ns
+
+    def _envelope(self) -> Envelope:
+        return Envelope(
+            query={"subtool": "deaths", "log_dir": "logs/x"},
+            scan_stats={"scanned": 1, "returned": 1,
+                        "more_available": False, "narrow_by": []},
+            results=[{"id": "a", "summary": "b"}],
+            narrative="x",
+            next=["just q cat-timeline logs/x A"],
+        )
+
+    def test_skipped_for_excluded_subtool(self):
+        env = self._envelope()
+        args = self._args("footer", enrich=True)
+        status, elapsed = logq_mod._enrich_envelope(env, args)
+        self.assertIsNone(status)
+        self.assertIsNone(elapsed)
+        self.assertIsNone(env.hint)
+        self.assertIsNone(env.next_reasoned)
+
+    def test_skipped_when_no_enrich_flag(self):
+        env = self._envelope()
+        args = self._args("deaths", enrich=True, no_enrich=True)
+        status, _ = logq_mod._enrich_envelope(env, args)
+        self.assertIsNone(status)
+        self.assertIsNone(env.next_reasoned)
+
+    def test_skipped_when_disabled(self):
+        env = self._envelope()
+        # Neither flag, no env var set → skipped.
+        args = self._args("deaths")
+        # Clear env to make sure LOGQ_ENRICH isn't leaking from the
+        # test runner's shell.
+        import unittest.mock as umock, os
+        with umock.patch.dict(os.environ, {}, clear=True):
+            status, _ = logq_mod._enrich_envelope(env, args)
+        self.assertIsNone(status)
+
+    def test_fills_envelope_on_successful_call(self):
+        env = self._envelope()
+        args = self._args("deaths", enrich=True)
+        fake_meta = {"status": "ok", "elapsed_ms": 1500,
+                     "stderr_tail": "", "model": "claude-haiku-4-5"}
+        fake_parsed = {
+            "hint": "cluster detected",
+            "suggestions": [
+                {"cmd": "just q deaths logs/x --cause=Starvation",
+                 "why": "narrowing"},
+            ],
+        }
+        import unittest.mock as umock
+        with umock.patch.object(logq_mod, "call_haiku_json",
+                                 return_value=(fake_parsed, fake_meta)):
+            status, elapsed = logq_mod._enrich_envelope(env, args)
+        self.assertEqual(status, "ok")
+        self.assertEqual(elapsed, 1500)
+        self.assertEqual(env.hint, "cluster detected")
+        self.assertEqual(env.next_reasoned["status"], "ok")
+        self.assertEqual(len(env.next_reasoned["suggestions"]), 1)
+        # Existing `next` field is untouched.
+        self.assertEqual(env.next, ["just q cat-timeline logs/x A"])
+
+    def test_records_failure_status_without_filling_hint(self):
+        env = self._envelope()
+        args = self._args("anomalies", enrich=True)
+        fake_meta = {"status": "timeout", "elapsed_ms": 8000,
+                     "stderr_tail": "", "model": "claude-haiku-4-5"}
+        import unittest.mock as umock
+        with umock.patch.object(logq_mod, "call_haiku_json",
+                                 return_value=(None, fake_meta)):
+            status, elapsed = logq_mod._enrich_envelope(env, args)
+        self.assertEqual(status, "timeout")
+        self.assertEqual(elapsed, 8000)
+        # Hint stays None when call failed.
+        self.assertIsNone(env.hint)
+        # next_reasoned carries the failure status discriminator.
+        self.assertEqual(env.next_reasoned["status"], "timeout")
+        self.assertEqual(env.next_reasoned["suggestions"], [])
+        # Existing `next` field is still untouched.
+        self.assertEqual(env.next, ["just q cat-timeline logs/x A"])
+
+
 if __name__ == "__main__":
     unittest.main()

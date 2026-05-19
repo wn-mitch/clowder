@@ -79,6 +79,8 @@ def append_call_history(
     rationale: str | None,
     exit_code: int,
     commit: str | None = None,
+    enrichment_status: str | None = None,
+    enrichment_elapsed_ms: int | None = None,
 ) -> None:
     """Append one JSON line to logs/agent-call-history.jsonl.
 
@@ -86,6 +88,10 @@ def append_call_history(
     tool that's calling it. Writes are best-effort; if the disk is full
     or the parent directory can't be created, swallow the error and
     move on. Set ``CLOWDER_AGENT_LOG_DEBUG=1`` to surface failures.
+
+    ``enrichment_status`` / ``enrichment_elapsed_ms`` are populated by
+    ticket 417's Haiku-enrichment hook in `just q`. Absent (None) on
+    tools that don't enrich or calls where enrichment was disabled.
     """
     record = {
         "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
@@ -96,6 +102,10 @@ def append_call_history(
         "commit": commit if commit is not None else _commit_hash(),
         "exit_code": int(exit_code),
     }
+    if enrichment_status is not None:
+        record["enrichment_status"] = enrichment_status
+    if enrichment_elapsed_ms is not None:
+        record["enrichment_elapsed_ms"] = int(enrichment_elapsed_ms)
     try:
         HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
         with HISTORY_PATH.open("a") as f:

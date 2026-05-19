@@ -33,9 +33,27 @@ class Envelope:
     results: list[dict[str, Any]] = field(default_factory=list)
     narrative: str = ""
     next: list[str] = field(default_factory=list)
+    # Ticket 417: optional Haiku-generated enrichment. Absent (None) when
+    # enrichment is off, disabled, or failed — never mutates the
+    # deterministic `next` field above. Strict-presenter contract per
+    # ticket 010.
+    hint: str | None = None
+    next_reasoned: dict | None = None
 
     def to_json(self, *, indent: int | None = None) -> str:
-        return json.dumps(asdict(self), indent=indent, default=_json_default)
+        return json.dumps(self.serializable_dict(), indent=indent,
+                          default=_json_default)
+
+    def serializable_dict(self) -> dict[str, Any]:
+        """Like `asdict(self)` but drops `hint` / `next_reasoned` when
+        unset, so envelopes without enrichment serialize byte-identically
+        to pre-ticket-417 envelopes."""
+        d = asdict(self)
+        if self.hint is None:
+            d.pop("hint", None)
+        if self.next_reasoned is None:
+            d.pop("next_reasoned", None)
+        return d
 
     def to_text(self) -> str:
         lines: list[str] = []
@@ -50,6 +68,9 @@ class Envelope:
         if self.narrative:
             lines.append("")
             lines.append(self.narrative)
+        if self.hint:
+            lines.append("")
+            lines.append(f"hint: {self.hint}")
         if self.results:
             lines.append("")
             for r in self.results:
@@ -59,6 +80,19 @@ class Envelope:
             lines.append("next:")
             for n in self.next:
                 lines.append(f"  $ {n}")
+        if self.next_reasoned:
+            sugs = self.next_reasoned.get("suggestions") or []
+            if sugs:
+                lines.append("")
+                lines.append(
+                    f"next (reasoned, status={self.next_reasoned.get('status', '?')}):"
+                )
+                for s in sugs:
+                    cmd = s.get("cmd", "?")
+                    why = s.get("why", "")
+                    lines.append(f"  $ {cmd}")
+                    if why:
+                        lines.append(f"      — {why}")
         return "\n".join(lines)
 
 

@@ -43,6 +43,151 @@ else:
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _agent_call_log import append_call_history  # type: ignore[no-redef]  # noqa: E402
 
+# Ticket 417: optional Haiku enrichment for the envelope's `next` field.
+# The client lives at scripts/llm/claude_client.py and routes through the
+# user's `claude` CLI subscription (no ANTHROPIC_API_KEY). Import is
+# best-effort — if the llm package or the `claude` binary is missing,
+# enrichment is silently skipped.
+try:
+    from llm.claude_client import (  # type: ignore[no-redef]  # noqa: E402
+        call_haiku_json,
+        enrichment_enabled_via_env,
+    )
+    _LLM_AVAILABLE = True
+except ImportError:
+    _LLM_AVAILABLE = False
+    call_haiku_json = None  # type: ignore[assignment]
+    enrichment_enabled_via_env = lambda: False  # type: ignore[assignment]
+
+# Subtools whose envelopes carry enough judgment-call signal for Haiku
+# to add meaningful suggestions. Excluded for first ship: `footer` (raw
+# dict, no judgment to add), `events`/`actions`/`hunt-success` (large
+# repetitive lists), `trace` (already-structured per-tick rows). Add
+# more after a week of usage if proven valuable.
+ENRICH_SUBTOOLS = frozenset({
+    "run-summary", "deaths", "anomalies", "cat-timeline", "narrative",
+})
+
+# Cap the JSON payload size sent to Haiku — large `cat-timeline` and
+# `events` envelopes can hit 50KB+ raw; clipping the `results` tail
+# keeps the model fast and cheap. The truncation is signaled in the
+# payload so the model knows it's seeing a sample.
+_MAX_ENRICH_PAYLOAD_BYTES = 8 * 1024
+
+# Real-world Haiku-via-CLI latency in this repo runs ~15-20s typical
+# under healthy API conditions (the headless `claude` startup loads
+# hooks/LSP/plugins for OAuth auth; we can't use `--bare` because it
+# would force ANTHROPIC_API_KEY auth and break subscription billing).
+# Set with headroom so opt-in callers get a useful answer; override per
+# call with `--enrich-timeout`. The single retry doubles the worst
+# case — so during API incidents the wall caps near 2× this value.
+_DEFAULT_ENRICH_TIMEOUT_SECS = 20.0
+
+# Prompts shipped under scripts/llm/prompts/.
+_PROMPTS_DIR = Path(__file__).resolve().parent.parent / "llm" / "prompts"
+
+
+def _enrichment_enabled(args: argparse.Namespace) -> bool:
+    """CLI flags override env var; otherwise consult env.
+
+    `--no-enrich` always wins (lets a caller force-off for a single
+    invocation even with `LOGQ_ENRICH=1` set). `--enrich` then
+    overrides the env default. With neither flag, fall back to env.
+    """
+    if not _LLM_AVAILABLE:
+        return False
+    if getattr(args, "no_enrich", False):
+        return False
+    if getattr(args, "enrich", False):
+        return True
+    return enrichment_enabled_via_env()
+
+
+def _truncate_for_haiku(env_dict: dict[str, Any],
+                        max_bytes: int = _MAX_ENRICH_PAYLOAD_BYTES) -> dict[str, Any]:
+    """Drop trailing `results` past `max_bytes`, with a truncation note.
+
+    Returns the original dict unchanged when it already fits. The
+    annotation (`_truncated: true` + `_truncated_note`) tells the model
+    it's seeing a sample so it doesn't reason as if the dataset is
+    complete. Measurement includes the annotation so the returned dict
+    is genuinely within budget.
+    """
+    if len(json.dumps(env_dict, default=str)) <= max_bytes:
+        return env_dict
+
+    original_results = list(env_dict.get("results") or [])
+    n = len(original_results)
+    while n > 0:
+        candidate = dict(env_dict)
+        candidate["results"] = original_results[:n]
+        candidate["_truncated"] = True
+        candidate["_truncated_note"] = (
+            f"results clipped to {n}/{len(original_results)} "
+            f"entries to fit the {max_bytes}-byte Haiku context"
+        )
+        if len(json.dumps(candidate, default=str)) <= max_bytes:
+            return candidate
+        n -= 1
+
+    # Even an empty results list doesn't fit — surface that honestly
+    # rather than returning oversized content.
+    out = dict(env_dict)
+    out["results"] = []
+    out["_truncated"] = True
+    out["_truncated_note"] = (
+        f"results clipped to 0/{len(original_results)} entries "
+        f"(envelope structure alone exceeds {max_bytes} bytes)"
+    )
+    return out
+
+
+def _enrich_envelope(env: Envelope,
+                     args: argparse.Namespace) -> tuple[str | None, int | None]:
+    """Mutate `env` in place with Haiku-generated `hint` + `next_reasoned`.
+
+    Returns `(status, elapsed_ms)` for telemetry; both `None` when
+    enrichment was skipped (flag/env said no, subtool not in
+    ENRICH_SUBTOOLS, or LLM package missing).
+
+    Strict-presenter contract: never mutates `env.next` or any other
+    field besides `hint` and `next_reasoned`. Even on success, if the
+    model returns empty suggestions, the existing `next` field is the
+    authoritative drill suggestion.
+    """
+    if not _enrichment_enabled(args) or args.subtool not in ENRICH_SUBTOOLS:
+        return None, None
+
+    assert call_haiku_json is not None  # narrowed by _LLM_AVAILABLE check
+
+    payload = _truncate_for_haiku(env.serializable_dict())
+    timeout = getattr(args, "enrich_timeout", _DEFAULT_ENRICH_TIMEOUT_SECS)
+    parsed, meta = call_haiku_json(
+        user_payload=payload,
+        system_prompt_path=_PROMPTS_DIR / "logq_enrich.md",
+        schema_path=_PROMPTS_DIR / "logq_enrich.schema.json",
+        timeout_secs=timeout,
+    )
+
+    status: str = meta["status"]
+    elapsed_ms: int = meta["elapsed_ms"]
+
+    if parsed is not None:
+        env.hint = parsed.get("hint") or None
+        env.next_reasoned = {
+            "status": "ok",
+            "suggestions": parsed.get("suggestions", []),
+            "elapsed_ms": elapsed_ms,
+            "model": meta.get("model"),
+        }
+    else:
+        env.next_reasoned = {
+            "status": status,
+            "suggestions": [],
+            "elapsed_ms": elapsed_ms,
+        }
+    return status, elapsed_ms
+
 
 # ── shared helpers ──────────────────────────────────────────────────────────
 
@@ -1616,6 +1761,20 @@ def build_parser() -> argparse.ArgumentParser:
                         "name and args; lets future review surface patterns of "
                         "what callers were trying to figure out. Always pass "
                         "when invoked by an agent.")
+    # Ticket 417: Haiku enrichment of the `next` field. Off by default
+    # for first ship; opt in via `LOGQ_ENRICH=1` env var or `--enrich`
+    # CLI flag. `--no-enrich` always wins (lets a caller force-off for
+    # one call even with LOGQ_ENRICH=1 set in the shell).
+    p.add_argument("--enrich", action="store_true",
+                   help="Force Haiku enrichment of `next` ON for this call. "
+                        "Overrides LOGQ_ENRICH=0.")
+    p.add_argument("--no-enrich", action="store_true",
+                   help="Force Haiku enrichment of `next` OFF for this call. "
+                        "Overrides LOGQ_ENRICH=1 and --enrich.")
+    p.add_argument("--enrich-timeout", type=float,
+                   default=_DEFAULT_ENRICH_TIMEOUT_SECS,
+                   help=f"Seconds before the Haiku call times out "
+                        f"(default {_DEFAULT_ENRICH_TIMEOUT_SECS:g}).")
     sub = p.add_subparsers(dest="subtool", required=True)
 
     s = sub.add_parser("run-summary", help="Header + footer + joinability check.")
@@ -1739,9 +1898,12 @@ def main(argv: list[str] | None = None) -> int:
         append_call_history(tool="q", subtool=args.subtool, args=args,
                             rationale=args.rationale, exit_code=2)
         return 2
+    enrichment_status, enrichment_elapsed_ms = _enrich_envelope(env, args)
     emit(env, fmt=args.format)
     append_call_history(tool="q", subtool=args.subtool, args=args,
-                        rationale=args.rationale, exit_code=0)
+                        rationale=args.rationale, exit_code=0,
+                        enrichment_status=enrichment_status,
+                        enrichment_elapsed_ms=enrichment_elapsed_ms)
     return 0
 
 
