@@ -71,8 +71,12 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
             r.focal,
             r.forced_weather,
             r.commit_hash_short,
+            to_timestamp(i.mtime_ns / 1e9) AS soak_time,
+            strftime(to_timestamp(i.mtime_ns / 1e9), '%Y-%m-%d %H:%M') AS soak_time_label,
             COALESCE(
-                r.archive || '/' || CAST(r.seed AS VARCHAR)
+                strftime(to_timestamp(i.mtime_ns / 1e9), '%Y-%m-%d %H:%M')
+                  || '  ' || r.archive
+                  || '/' || CAST(r.seed AS VARCHAR)
                   || COALESCE('-' || CAST(r.rep AS VARCHAR), '')
                   || COALESCE('-' || r.focal, '')
                   || COALESCE('-' || r.forced_weather, ''),
@@ -80,6 +84,8 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
             ) AS label
         FROM colony_scores cs
         JOIN runs r USING (run_id)
+        JOIN ingested_files i
+          ON i.file_path = r.events_path AND i.role = 'events'
         WHERE cs.run_id IN ({run_filter_sql})
           AND cs.tick >= {TICK_ORIGIN}
     """
@@ -117,11 +123,13 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
             ),
             y=alt.Y("aggregate:Q", title="ColonyScore.aggregate"),
             color=alt.Color(
-                "label:N", title="run",
+                "label:N", title="run (soak time + archive)",
                 legend=alt.Legend(columns=1, symbolLimit=80),
+                sort=alt.SortField(field="soak_time", order="descending"),
             ),
             tooltip=[
                 alt.Tooltip("label:N", title="run"),
+                alt.Tooltip("soak_time:T", title="soak time"),
                 alt.Tooltip("tick:Q", format=","),
                 alt.Tooltip("aggregate:Q", format=".1f"),
                 alt.Tooltip("welfare:Q", format=".3f"),
@@ -184,8 +192,24 @@ def build(con, args: argparse.Namespace) -> alt.Chart:
                 color=alt.Color("archive:N"),
             )
         )
+        # Overall trendline: LOESS smoother across all runs, ignoring archive.
+        # LOESS handles non-monotonic trajectories better than OLS here, since
+        # the score trajectory across commits is non-linear (regressions +
+        # recoveries during balance work).
+        trend = (
+            alt.Chart(across_df)
+            .transform_loess(
+                on="soak_time", loess="final_aggregate", bandwidth=0.4,
+            )
+            .mark_line(color="#222", strokeWidth=2.5, opacity=0.85)
+            .encode(
+                x=alt.X("soak_time:T"),
+                y=alt.Y("final_aggregate:Q"),
+            )
+        )
         across_chart = (
-            (points + means)
+            (points + means + trend)
+            .resolve_scale(color="independent")
             .properties(width=520, height=380, title="Across-runs trend (by soak time)")
             .add_params(alt.selection_interval(bind="scales", name="across_zoom"))
         )

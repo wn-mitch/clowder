@@ -350,6 +350,61 @@ impl HasFreeSlot {
     pub const KEY: &str = "HasFreeSlot";
 }
 
+/// 235: per-cat marker — the cat's inventory contains at least one
+/// build material (Wood/Stone/Moss/DriedGrass/Feather/ShadowBone).
+/// Authored by `items.rs::update_inventory_markers` from
+/// `inventory.has_any_material()`.
+///
+/// Reader lands with the 235-follow-on ticket that introduces the
+/// central material pile destination + materials-deposit-prefix branch
+/// in plan templates. Allowlisted in `scripts/substrate_stubs.allowlist`
+/// under that follow-on id until the reader ships.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasMaterialsInInventory;
+impl HasMaterialsInInventory {
+    pub const KEY: &str = "HasMaterialsInInventory";
+}
+
+/// 235: per-cat marker — the cat's inventory contains at least one
+/// curio (ShinyPebble/GlassShard/ColorfulShell). Authored by
+/// `items.rs::update_inventory_markers` from
+/// `inventory.has_any_curio()`.
+///
+/// Reader lands with ticket 16's Cache building (the curio sink). Curios
+/// stay droppable-anywhere (v1 from 231) until that destination exists.
+/// Allowlisted in `scripts/substrate_stubs.allowlist` under ticket 16
+/// until the reader ships.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasCuriosInInventory;
+impl HasCuriosInInventory {
+    pub const KEY: &str = "HasCuriosInInventory";
+}
+
+/// 235: per-cat marker — at least one `Stores` building is within
+/// `DispositionConstants::herb_stash_reachable_radius` Manhattan tiles
+/// of this cat's position. Authored by
+/// `goap.rs::herb_stash_accessible_for` in the per-cat MarkerSnapshot
+/// loop (twin call sites: `evaluate_and_plan` and
+/// `build_planner_markers`, both required for snapshot/planner-replay
+/// parity).
+///
+/// Read on the deposit-prefix branch of pickup-class plan templates
+/// (PickingUp / Cooking / Caretaking / Herbalism / Hunting). Combined
+/// with `HasHerbsInInventory` + `CarryingIs(Herbs)` precondition + the
+/// existing `ZoneIs(Stores)` constraint, A* composes
+/// `[TravelTo(Stores), DepositHerbs(prefix), <goal-action>]` as an
+/// alternative to `[DropItem, <goal-action>]` when the stash is
+/// reachable, picking by cost. Far-from-stores cats fall back to the
+/// DropItem prefix because the marker is false.
+///
+/// Sibling pattern to `MaterialsAvailable` (per-cat reachability author
+/// at `goap.rs::materials_available_for`).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasHerbStashAccessible;
+impl HasHerbStashAccessible {
+    pub const KEY: &str = "HasHerbStashAccessible";
+}
+
 // ---------------------------------------------------------------------------
 // Colony singleton
 // ---------------------------------------------------------------------------

@@ -106,7 +106,22 @@ pub static SCENARIO: Scenario = Scenario {
     // `tests/scenarios.rs::chokepoint_defense_isthmus_corks_corridor`
     // using scenario-matched geometry + pre-deposits. Same opt-out
     // rationale as `ward_placement.rs` for the same DSE.
-    expected_features: &["CropHarvested", "GatherHerbCompleted"],
+    //
+    // 235: original gate `GatherHerbCompleted` was stale post-084
+    // and post-235. The L3 election in this fixture (single
+    // diligence/patience-pinned cat + ample mature garden + already-
+    // provisioned thornbriar in hand) routes the cat into Farm work
+    // (CropTended → CropHarvested) for the entire 250-tick window;
+    // herbalism dynamics never reach Feature emission. Asserting
+    // `CropHarvested` alone preserves the substrate-fires gate's
+    // contract — the fixture is alive and the workpinned cat is
+    // working — without claiming an emission grain the scenario
+    // doesn't actually exercise. Same opt-out rationale already
+    // applied to `WardPlaced` above; the architectural claim about
+    // corridor-driven ward placement is asserted directly against
+    // `compute_ward_placement` in
+    // `tests/scenarios.rs::chokepoint_defense_isthmus_corks_corridor`.
+    expected_features: &["CropHarvested"],
 };
 
 const MAP_WIDTH: i32 = 60;

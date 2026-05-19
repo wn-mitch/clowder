@@ -1304,6 +1304,10 @@ pub fn evaluate_and_plan(
         Has<markers::CanWard>,
         Has<markers::CanWardFromSupply>,
         Has<markers::CanCook>,
+        // 235: per-class inventory-content markers (siblings to
+        // HasHerbsInInventory). Written by `items::update_inventory_markers`.
+        Has<markers::HasMaterialsInInventory>,
+        Has<markers::HasCuriosInInventory>,
     )>,
     // §4.2 State markers — split into a separate query so the per-cat
     // tuple stays small and future State authors can extend here.
@@ -1656,6 +1660,8 @@ pub fn evaluate_and_plan(
             can_ward,
             can_ward_from_supply,
             can_cook,
+            has_materials,
+            has_curios,
         )) = per_cat_markers_q.get(entity)
         {
             markers.set_entity(markers::Injured::KEY, entity, injured);
@@ -1684,6 +1690,16 @@ pub fn evaluate_and_plan(
                 can_ward_from_supply,
             );
             markers.set_entity(markers::CanCook::KEY, entity, can_cook);
+            // 235: per-class inventory-content markers (scaffolding for
+            // class-specific deposit routing — reader for HasMaterialsIn-
+            // Inventory ships with the 235-follow-on material-pile ticket;
+            // reader for HasCuriosInInventory ships with ticket 16's Cache).
+            markers.set_entity(
+                markers::HasMaterialsInInventory::KEY,
+                entity,
+                has_materials,
+            );
+            markers.set_entity(markers::HasCuriosInInventory::KEY, entity, has_curios);
         }
         // §4.2 State markers — InCombat / OnCorruptedTile /
         // OnSpecialTerrain. Authored in Chain 2a alongside the other §4
@@ -2584,6 +2600,15 @@ pub fn evaluate_and_plan(
             markers::HasFreeSlot::KEY,
             entity,
             !inventory.is_full(),
+        );
+        // Ticket 235: author the per-cat `HasHerbStashAccessible`
+        // substrate marker. Gates the deposit-prefix branch of pickup-
+        // class plan templates so far-from-stash cats don't route
+        // through the stash on cost-marginal detours.
+        markers.set_entity(
+            markers::HasHerbStashAccessible::KEY,
+            entity,
+            herb_stash_accessible_for(pos, &stores_positions, d.herb_stash_reachable_radius),
         );
         let planner_state = build_planner_state(
             pos,
@@ -3512,6 +3537,7 @@ pub fn resolve_goap_plans(
     // (`MaterialsDeliveredThisPlan(true)`) covers the in-flight
     // haul→deliver→construct compose case where the marker still reads
     // false at plan entry.
+    let herb_stash_radius = ec.constants.disposition.herb_stash_reachable_radius;
     for ((entity, _, _, pos, _, _, inventory, _, _), _) in &cats {
         planner_markers.set_entity(
             markers::MaterialsAvailable::KEY,
@@ -3529,6 +3555,15 @@ pub fn resolve_goap_plans(
             markers::HasFreeSlot::KEY,
             entity,
             !inventory.is_full(),
+        );
+        // Ticket 235: per-cat HasHerbStashAccessible (sibling of
+        // MaterialsAvailable). Snapshot parity with the
+        // `evaluate_and_plan` author site is required for the
+        // planner-replay path.
+        planner_markers.set_entity(
+            markers::HasHerbStashAccessible::KEY,
+            entity,
+            herb_stash_accessible_for(pos, &stores_positions, herb_stash_radius),
         );
     }
 
@@ -9272,6 +9307,30 @@ fn materials_available_for(
                 .unwrap_or(true)
         })
         .unwrap_or(true)
+}
+
+/// Ticket 235 substrate authoring: returns whether at least one `Stores`
+/// building is within `radius` Manhattan tiles of this cat. Authors the
+/// per-cat `HasHerbStashAccessible` marker, which the deposit-prefix
+/// branch of pickup-class plan templates reads to decide whether
+/// `[TravelTo(Stores), DepositHerbs(prefix), <goal>]` is a viable
+/// alternative to `[DropItem, <goal>]` for freeing an inventory slot.
+///
+/// Returns `false` when no Stores exist (degenerate early-game state)
+/// — the deposit branch becomes structurally inapplicable, A\* falls
+/// back to DropItem.
+///
+/// Mirrors the per-cat geometric shape of `materials_available_for`.
+/// Pathfinding is left to the resolver at execution time; Manhattan is
+/// the right grain for plan-template gating.
+fn herb_stash_accessible_for(
+    pos: &Position,
+    stores_positions: &[Position],
+    radius: i32,
+) -> bool {
+    stores_positions
+        .iter()
+        .any(|sp| pos.manhattan_distance(sp) <= radius)
 }
 
 #[allow(clippy::too_many_arguments)]

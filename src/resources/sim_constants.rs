@@ -3632,6 +3632,23 @@ pub struct DispositionConstants {
     /// mode being guarded against.
     #[serde(default = "default_intention_preempt_strength_regime_boundary")]
     pub intention_preempt_strength_regime_boundary: f32,
+    /// 235: Manhattan radius within which a Stores building counts as
+    /// "reachable" for the deposit-prefix branch of pickup-class plan
+    /// templates. Read by `goap.rs::herb_stash_accessible_for` to
+    /// author the per-cat `HasHerbStashAccessible` marker. When the
+    /// marker is true, A\* may compose `[TravelTo(Stores),
+    /// DepositHerbs(prefix), <goal-action>]` instead of `[DropItem,
+    /// <goal-action>]`; when false, the cat falls back to DropItem.
+    ///
+    /// Tuning rationale: the deposit branch's effective cost includes
+    /// `TravelTo(Stores)`, so cats far from the stash naturally fall
+    /// back to DropItem on cost arithmetic alone. The radius gate is
+    /// a behavioral guard against the degenerate "cat traverses half
+    /// the map to deposit one herb before hunting" case — it caps
+    /// detour eligibility at a roughly-third-of-map distance even
+    /// when cost arithmetic would otherwise permit it.
+    #[serde(default = "default_herb_stash_reachable_radius")]
+    pub herb_stash_reachable_radius: i32,
 }
 
 fn default_true() -> bool {
@@ -3729,6 +3746,14 @@ fn default_intention_preempt_margin() -> f32 {
 /// `logs/tuned-42-post-248-boundary-zero-collapsed/`.
 fn default_intention_preempt_strength_regime_boundary() -> f32 {
     0.5
+}
+
+/// 235 default — 60 Manhattan tiles ≈ ⅓ of a typical 200-tile map
+/// diagonal. Wide enough that a cat working mid-map can still route
+/// through the stash, narrow enough that cross-map detours are
+/// suppressed.
+fn default_herb_stash_reachable_radius() -> i32 {
+    60
 }
 
 fn default_cook_base_score() -> f32 {
@@ -4930,6 +4955,7 @@ impl Default for DispositionConstants {
             intention_preempt_margin: default_intention_preempt_margin(),
             intention_preempt_strength_regime_boundary:
                 default_intention_preempt_strength_regime_boundary(),
+            herb_stash_reachable_radius: default_herb_stash_reachable_radius(),
         }
     }
 }

@@ -388,6 +388,26 @@ impl Inventory {
         self.has_herb(HerbKind::Thornbriar)
     }
 
+    /// Whether the inventory contains any build material (Wood, Stone,
+    /// Moss, DriedGrass, Feather, ShadowBone). Mirrors `has_any_herb`'s
+    /// shape; reads `ItemKind::category()` for a single source of truth.
+    /// Ticket 235.
+    pub fn has_any_material(&self) -> bool {
+        use crate::components::items::ItemCategory;
+        self.slots
+            .iter()
+            .any(|s| s.kind.category() == ItemCategory::Material)
+    }
+
+    /// Whether the inventory contains any curio (ShinyPebble, GlassShard,
+    /// ColorfulShell). Ticket 235.
+    pub fn has_any_curio(&self) -> bool {
+        use crate::components::items::ItemCategory;
+        self.slots
+            .iter()
+            .any(|s| s.kind.category() == ItemCategory::Curiosity)
+    }
+
     /// Whether the inventory holds a specific prepared remedy.
     /// Ticket 365 — Phase 1a real-items migration.
     pub fn has_remedy(&self, kind: RemedyKind) -> bool {

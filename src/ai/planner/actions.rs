@@ -70,21 +70,77 @@ pub fn fleeing_actions() -> Vec<GoapActionDef> {
 
 pub fn hunting_actions() -> Vec<GoapActionDef> {
     vec![
-        // Ticket 091: SearchPrey/EngagePrey intentionally do NOT require
-        // `CarryingIs(Carrying::Nothing)`. The runtime resolver gates on
-        // `inventory.is_full()`, not on a specific Carrying state — a
-        // cat carrying herbs from an aborted Crafting plan can still
-        // hunt as long as the inventory has a free slot. Pre-091 the
-        // planner's `CarryingIs(Carrying::Nothing)` precondition was a
-        // permanent veto for any cat with leftover items, which made
-        // Hunting plans uniformly unreachable for the post-founding
-        // colony (zero PlanCreated{disposition:"Hunting"} across 1.2M
-        // ticks for 8 cats). Mirrors the same fix applied to
-        // `caretaking_actions::RetrieveFoodForKitten` in Phase 4c.4.
+        // Ticket 091: SearchPrey/EngagePrey did NOT require
+        // `CarryingIs(Carrying::Nothing)` because the runtime resolver
+        // gated on `inventory.is_full()`. The pre-091 planner's
+        // `CarryingIs(Carrying::Nothing)` precondition was a permanent
+        // veto for any cat with leftover items, which made Hunting
+        // plans uniformly unreachable for the post-founding colony
+        // (zero PlanCreated{disposition:"Hunting"} across 1.2M ticks
+        // for 8 cats).
+        //
+        // Ticket 235 promotes the slot-availability gate back into the
+        // planner, but in the *positive* substrate form (`HasFreeSlot`
+        // marker on the substrate-path; `HasFreeSlotThisPlan(true)` on
+        // the plan-path after a prefix step) rather than the negative
+        // `CarryingIs(Carrying::Nothing)` 091 had to remove. Cats with
+        // leftover items now compose `[DropItem, SearchPrey, ...]` or
+        // — when a stash is reachable — `[TravelTo(Stores),
+        // DepositHerbs(prefix), TravelTo(HuntingGround), SearchPrey,
+        // ...]`, mirroring the picking_up_actions / cooking_actions
+        // composition introduced in 231.
+        GoapActionDef {
+            kind: GoapActionKind::DropItem,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
+        // 235: DepositHerbs-as-prefix alternative — route through Stores
+        // when carrying herbs and stash is reachable.
+        GoapActionDef {
+            kind: GoapActionKind::DepositHerbs,
+            cost: 1,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::CarryingIs(Carrying::Herbs),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasHerbStashAccessible::KEY,
+                ),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasHerbsInInventory::KEY,
+                ),
+            ],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
+        // 235: substrate-path SearchPrey — fires when the cat already
+        // has a free slot. Gating on `SearchPrey` (not `EngagePrey`)
+        // forces the prefix to fire BEFORE the cat commits to a hunting
+        // ground; otherwise an empty-slotted cat could search, fail to
+        // engage, and waste the trip.
         GoapActionDef {
             kind: GoapActionKind::SearchPrey,
             cost: 3,
-            preconditions: vec![StatePredicate::ZoneIs(PlannerZone::HuntingGround)],
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::HuntingGround),
+                StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+            ],
+            effects: vec![StateEffect::SetPreyFound(true)],
+        },
+        // 235: plan-path SearchPrey — fires after a prefix
+        // (DropItem or DepositHerbs) sets HasFreeSlotThisPlan(true).
+        GoapActionDef {
+            kind: GoapActionKind::SearchPrey,
+            cost: 3,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::HuntingGround),
+                StatePredicate::HasFreeSlotThisPlan(true),
+            ],
             effects: vec![StateEffect::SetPreyFound(true)],
         },
         GoapActionDef {
@@ -399,6 +455,33 @@ pub fn picking_up_actions() -> Vec<GoapActionDef> {
                 StateEffect::SetCarrying(Carrying::Nothing),
             ],
         },
+        // 235: DepositHerbs-as-prefix means-to-end action. Same
+        // free-slot effect as DropItem above, but routed through the
+        // herb stash so the cat's carried herbs land usefully instead
+        // of in the dirt. Gated on `HasHerbStashAccessible` so cats
+        // far from any Stores fall back to DropItem. A* splices
+        // `TravelTo(Stores)` from `travel_actions` automatically to
+        // satisfy `ZoneIs(Stores)`; effective cost is
+        // `travel_to_stores + 1`, which wins over DropItem (cost 1)
+        // only when the cat is at/near the stash.
+        GoapActionDef {
+            kind: GoapActionKind::DepositHerbs,
+            cost: 1,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::CarryingIs(Carrying::Herbs),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasHerbStashAccessible::KEY,
+                ),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasHerbsInInventory::KEY,
+                ),
+            ],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
         // 231: substrate-path pickup. Fires when the cat already has a
         // free slot.
         GoapActionDef {
@@ -541,6 +624,31 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                     StateEffect::SetCarrying(Carrying::Nothing),
                 ],
             },
+            // 235: DepositHerbs-as-prefix alternative — the cat
+            // routes through Stores to stash carried herbs rather
+            // than dropping them at HerbPatch. A* distinguishes
+            // this from the terminal DepositHerbs below by effects:
+            // the prefix omits `IncrementTrips` so the goal isn't
+            // satisfied here. State-dedup keeps both branches alive
+            // when their post-states diverge (trip count).
+            GoapActionDef {
+                kind: GoapActionKind::DepositHerbs,
+                cost: 1,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Stores),
+                    StatePredicate::CarryingIs(Carrying::Herbs),
+                    StatePredicate::HasMarker(
+                        crate::components::markers::HasHerbStashAccessible::KEY,
+                    ),
+                    StatePredicate::HasMarker(
+                        crate::components::markers::HasHerbsInInventory::KEY,
+                    ),
+                ],
+                effects: vec![
+                    StateEffect::SetHasFreeSlotThisPlan(true),
+                    StateEffect::SetCarrying(Carrying::Nothing),
+                ],
+            },
             // 084 Commit 2: Gather steps no longer trip-increment.
             // The plan now terminates at Stores with DepositHerbs.
             // The dual-branch substrate/plan-path mirroring stays
@@ -604,6 +712,26 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                     StateEffect::SetCarrying(Carrying::Nothing),
                 ],
             },
+            // 235: DepositHerbs-as-prefix alternative — route through
+            // Stores instead of dropping at HerbPatch.
+            GoapActionDef {
+                kind: GoapActionKind::DepositHerbs,
+                cost: 1,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Stores),
+                    StatePredicate::CarryingIs(Carrying::Herbs),
+                    StatePredicate::HasMarker(
+                        crate::components::markers::HasHerbStashAccessible::KEY,
+                    ),
+                    StatePredicate::HasMarker(
+                        crate::components::markers::HasHerbsInInventory::KEY,
+                    ),
+                ],
+                effects: vec![
+                    StateEffect::SetHasFreeSlotThisPlan(true),
+                    StateEffect::SetCarrying(Carrying::Nothing),
+                ],
+            },
             // 231: substrate-path GatherHerb.
             GoapActionDef {
                 kind: GoapActionKind::GatherHerb,
@@ -662,6 +790,28 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                 kind: GoapActionKind::DropItem,
                 cost: 1,
                 preconditions: vec![],
+                effects: vec![
+                    StateEffect::SetHasFreeSlotThisPlan(true),
+                    StateEffect::SetCarrying(Carrying::Nothing),
+                ],
+            },
+            // 235: DepositHerbs-as-prefix alternative — route through
+            // Stores. For SetWard, the cat may already pass through
+            // Stores to RetrieveHerbs(Thornbriar); the deposit prefix
+            // composes cleanly with that retrieval branch.
+            GoapActionDef {
+                kind: GoapActionKind::DepositHerbs,
+                cost: 1,
+                preconditions: vec![
+                    StatePredicate::ZoneIs(PlannerZone::Stores),
+                    StatePredicate::CarryingIs(Carrying::Herbs),
+                    StatePredicate::HasMarker(
+                        crate::components::markers::HasHerbStashAccessible::KEY,
+                    ),
+                    StatePredicate::HasMarker(
+                        crate::components::markers::HasHerbsInInventory::KEY,
+                    ),
+                ],
                 effects: vec![
                     StateEffect::SetHasFreeSlotThisPlan(true),
                     StateEffect::SetCarrying(Carrying::Nothing),
@@ -831,6 +981,28 @@ pub fn cooking_actions() -> Vec<GoapActionDef> {
                 StateEffect::SetCarrying(Carrying::Nothing),
             ],
         },
+        // 235: DepositHerbs-as-prefix alternative — herbs land at the
+        // stash instead of the kitchen approach tile. Gated on
+        // HasHerbStashAccessible; falls back to DropItem when stash
+        // is out of range.
+        GoapActionDef {
+            kind: GoapActionKind::DepositHerbs,
+            cost: 1,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::CarryingIs(Carrying::Herbs),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasHerbStashAccessible::KEY,
+                ),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasHerbsInInventory::KEY,
+                ),
+            ],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
         GoapActionDef {
             kind: GoapActionKind::RetrieveRawFood,
             cost: 2,
@@ -933,6 +1105,26 @@ pub fn caretaking_actions() -> Vec<GoapActionDef> {
             kind: GoapActionKind::DropItem,
             cost: 1,
             preconditions: vec![],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
+        // 235: DepositHerbs-as-prefix alternative when the cat is
+        // carrying herbs and a stash is reachable.
+        GoapActionDef {
+            kind: GoapActionKind::DepositHerbs,
+            cost: 1,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::CarryingIs(Carrying::Herbs),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasHerbStashAccessible::KEY,
+                ),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasHerbsInInventory::KEY,
+                ),
+            ],
             effects: vec![
                 StateEffect::SetHasFreeSlotThisPlan(true),
                 StateEffect::SetCarrying(Carrying::Nothing),

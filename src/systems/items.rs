@@ -6,7 +6,8 @@ use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::{item_display_name, Item};
 use crate::components::magic::{Inventory, ResourceKind};
 use crate::components::markers::{
-    HasFreeSlot, HasHerbsInInventory, HasLowWardReserve, HasRemedyHerbs, HasWardHerbs,
+    HasCuriosInInventory, HasFreeSlot, HasHerbsInInventory, HasLowWardReserve,
+    HasMaterialsInInventory, HasRemedyHerbs, HasWardHerbs,
 };
 use crate::components::physical::Dead;
 use crate::resources::colony_reserves::ColonyReserves;
@@ -21,8 +22,9 @@ use crate::resources::time::TimeState;
 // ---------------------------------------------------------------------------
 
 /// Author `HasHerbsInInventory`, `HasRemedyHerbs`, `HasWardHerbs`,
-/// and (231) `HasFreeSlot` markers on living cats based on their
-/// current inventory contents.
+/// `HasFreeSlot` (231), and `HasMaterialsInInventory` /
+/// `HasCuriosInInventory` (235) markers on living cats based on
+/// their current inventory contents.
 ///
 /// **Predicate fidelity.** The booleans authored here must match the inline
 /// `ScoringContext` field computations in `goap.rs` / `disposition.rs`:
@@ -30,6 +32,8 @@ use crate::resources::time::TimeState;
 /// - `has_remedy_herbs` → `inventory.has_remedy_herb()`
 /// - `has_ward_herbs` → `inventory.has_ward_herb()`
 /// - `has_free_slot` → `!inventory.is_full()` (231)
+/// - `has_materials_in_inventory` → `inventory.has_any_material()` (235)
+/// - `has_curios_in_inventory` → `inventory.has_any_curio()` (235)
 ///
 /// **Ordering.** Runs in Chain 2a before the GOAP/disposition scoring
 /// pipeline, so `MarkerSnapshot` population can read `Has<M>` booleans
@@ -45,6 +49,8 @@ pub fn update_inventory_markers(
             Has<HasRemedyHerbs>,
             Has<HasWardHerbs>,
             Has<HasFreeSlot>,
+            Has<HasMaterialsInInventory>,
+            Has<HasCuriosInInventory>,
         ),
         Without<Dead>,
     >,
@@ -56,12 +62,16 @@ pub fn update_inventory_markers(
         has_remedy_marker,
         has_ward_marker,
         has_free_slot_marker,
+        has_materials_marker,
+        has_curios_marker,
     ) in cats.iter()
     {
         let has_herbs = inventory.has_any_herb();
         let has_remedy = inventory.has_remedy_herb();
         let has_ward = inventory.has_ward_herb();
         let has_free_slot = !inventory.is_full();
+        let has_materials = inventory.has_any_material();
+        let has_curios = inventory.has_any_curio();
 
         match (has_herbs, has_herbs_marker) {
             (true, false) => {
@@ -96,6 +106,24 @@ pub fn update_inventory_markers(
             }
             (false, true) => {
                 commands.entity(entity).remove::<HasFreeSlot>();
+            }
+            _ => {}
+        }
+        match (has_materials, has_materials_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasMaterialsInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasMaterialsInInventory>();
+            }
+            _ => {}
+        }
+        match (has_curios, has_curios_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasCuriosInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasCuriosInInventory>();
             }
             _ => {}
         }
