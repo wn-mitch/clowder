@@ -354,6 +354,19 @@ fn resolve_zone_position(
     }
 }
 
+/// Ticket 427 Step 3 — SystemParam bundle to keep `fox_evaluate_and_plan`
+/// under Bevy's 16-param ceiling after adding the per-system planner
+/// scratch arena. Bundles three existing read-only resources +
+/// `Local<PlannerScratch<FoxDomain>>` into one slot.
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct FoxPlanScoring<'w, 's> {
+    pub dse_registry: Res<'w, DseRegistry>,
+    pub modifier_pipeline: Res<'w, ModifierPipeline>,
+    pub event_log: Option<ResMut<'w, EventLog>>,
+    pub planner_scratch:
+        bevy_ecs::prelude::Local<'s, crate::ai::planner::core::PlannerScratch<FoxDomain>>,
+}
+
 // ---------------------------------------------------------------------------
 // fox_evaluate_and_plan — insert FoxGoapPlan for planless foxes
 // ---------------------------------------------------------------------------
@@ -397,9 +410,9 @@ pub fn fox_evaluate_and_plan(
     time: Res<TimeState>,
     constants: Res<SimConstants>,
     config: Res<SimConfig>,
-    dse_registry: Res<DseRegistry>,
-    modifier_pipeline: Res<ModifierPipeline>,
-    mut event_log: Option<ResMut<EventLog>>,
+    // Ticket 427 Step 3 — bundled to free a param slot for the new
+    // planner scratch arena (held inside this bundle as a Local).
+    mut scoring: FoxPlanScoring,
     // Ticket 014 §4 fox markers — authored by `fox_spatial::update_*`.
     // Bundled so `EvalCtx::has_marker` sees truthful values from the
     // populated snapshot.
@@ -488,8 +501,8 @@ pub fn fox_evaluate_and_plan(
             cat: fox_entity,
             position: *fox_pos,
             tick: time.tick,
-            dse_registry: &dse_registry,
-            modifier_pipeline: &modifier_pipeline,
+            dse_registry: &scoring.dse_registry,
+            modifier_pipeline: &scoring.modifier_pipeline,
             markers: &fox_markers,
             colony_landmarks: &Default::default(),
             exploration_map: &Default::default(),
@@ -510,11 +523,18 @@ pub fn fox_evaluate_and_plan(
         let actions = actions_for_disposition(chosen);
         let goal = goal_for_disposition(chosen);
 
-        let Some(steps) = make_plan::<FoxDomain>(planner_state, &actions, &goal, 12, 1000) else {
+        let Some(steps) = make_plan::<FoxDomain>(
+            planner_state,
+            &actions,
+            &goal,
+            12,
+            1000,
+            &mut scoring.planner_scratch,
+        ) else {
             continue; // no plan — try again next tick
         };
 
-        if let Some(ref mut log) = event_log {
+        if let Some(ref mut log) = scoring.event_log {
             log.push(
                 time.tick,
                 EventKind::FoxPlanCreated {

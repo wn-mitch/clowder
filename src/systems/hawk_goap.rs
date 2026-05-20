@@ -108,6 +108,12 @@ pub fn hawk_evaluate_and_plan(
     dse_registry: Res<DseRegistry>,
     modifier_pipeline: Res<ModifierPipeline>,
     constants: Res<SimConstants>,
+    // Ticket 427 Step 3 — per-system A* arena. Local (not Resource) so
+    // hawk's planning system doesn't serialize with fox/snake — their
+    // parallel-chain scheduling stays intact.
+    mut planner_scratch: bevy_ecs::prelude::Local<
+        crate::ai::planner::core::PlannerScratch<HawkDomain>,
+    >,
 ) {
     let hc = &constants.hawk_ecology;
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
@@ -161,7 +167,14 @@ pub fn hawk_evaluate_and_plan(
         let actions = actions_for_disposition(chosen);
         let goal = goal_for_disposition(chosen);
 
-        let Some(steps) = make_plan::<HawkDomain>(planner_state, &actions, &goal, 8, 500) else {
+        let Some(steps) = make_plan::<HawkDomain>(
+            planner_state,
+            &actions,
+            &goal,
+            8,
+            500,
+            &mut planner_scratch,
+        ) else {
             continue;
         };
 

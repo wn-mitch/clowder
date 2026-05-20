@@ -117,6 +117,10 @@ pub fn snake_evaluate_and_plan(
     dse_registry: Res<DseRegistry>,
     modifier_pipeline: Res<ModifierPipeline>,
     constants: Res<SimConstants>,
+    // Ticket 427 Step 3 — per-system A* arena.
+    mut planner_scratch: bevy_ecs::prelude::Local<
+        crate::ai::planner::core::PlannerScratch<SnakeDomain>,
+    >,
 ) {
     let sc = &constants.snake_ecology;
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
@@ -180,7 +184,14 @@ pub fn snake_evaluate_and_plan(
         let actions = actions_for_disposition(chosen);
         let goal = goal_for_disposition(chosen);
 
-        let Some(steps) = make_plan::<SnakeDomain>(planner_state, &actions, &goal, 8, 500) else {
+        let Some(steps) = make_plan::<SnakeDomain>(
+            planner_state,
+            &actions,
+            &goal,
+            8,
+            500,
+            &mut planner_scratch,
+        ) else {
             continue;
         };
 

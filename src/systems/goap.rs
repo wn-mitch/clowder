@@ -353,6 +353,12 @@ pub struct PlanResources<'w, 's> {
     /// pattern inside the flood function.
     pub route_buckets:
         bevy_ecs::prelude::Local<'s, Vec<Vec<crate::components::physical::Position>>>,
+    /// Ticket 427 Step 3 — cat A* planner scratch arena. Held as
+    /// `Local<>` inside `PlanResources` so `evaluate_and_plan` stays
+    /// under Bevy's 16-param ceiling. Preserves `Vec<SearchNode>` +
+    /// `BinaryHeap` + `HashMap` capacities across cat-ticks (~20 MB/
+    /// soak saved per the 427 survey).
+    pub planner_scratch: bevy_ecs::prelude::Local<'s, crate::ai::planner::CatPlannerScratch>,
 }
 
 /// Bundles magic resolver dependencies to keep resolve_goap_plans under 16 params.
@@ -734,6 +740,12 @@ pub struct ExecutorContext<'w, 's> {
     /// already sequenced by the broader plan pipeline so the lost
     /// parallelism is a no-op).
     pub dse_scratchpad: ResMut<'w, crate::resources::DseTargetScratchpad>,
+    /// Ticket 427 Step 3 — cat A* planner scratch for the replan
+    /// fallback paths inside `resolve_goap_plans`. Separate `Local<>`
+    /// from `PlanResources.planner_scratch` because the two systems
+    /// own independent scratch lifetimes; both preserve capacity
+    /// across cat-ticks within their own loop.
+    pub planner_scratch: bevy_ecs::prelude::Local<'s, crate::ai::planner::CatPlannerScratch>,
 }
 
 impl<'w, 's> ExecutorContext<'w, 's> {
@@ -2810,7 +2822,15 @@ pub fn evaluate_and_plan(
             goal_for_disposition(chosen, 0, &plan_ctx)
         };
 
-        let plan_outcome = make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx);
+        let plan_outcome = make_plan(
+            planner_state,
+            &actions,
+            &goal,
+            12,
+            1000,
+            &plan_ctx,
+            &mut res.planner_scratch,
+        );
         if let Ok(steps) = plan_outcome {
             // 150 R5a: an empty plan means the goal is *already*
             // satisfied at planning time (e.g., the cat picked Eating
@@ -4110,7 +4130,7 @@ pub fn resolve_goap_plans(
                 let goal = goal_for_disposition(plan.kind, plan.trips_done, &plan_ctx);
 
                 if let Ok(new_steps) =
-                    make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx)
+                    make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx, &mut ec.planner_scratch)
                 {
                     plan.replan(new_steps);
                 } else {
@@ -4534,7 +4554,7 @@ pub fn resolve_goap_plans(
                 let goal = goal_for_disposition(plan.kind, plan.trips_done, &plan_ctx);
 
                 if let Ok(new_steps) =
-                    make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx)
+                    make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx, &mut ec.planner_scratch)
                 {
                     if plan.replan(new_steps) {
                         if let Some(ref mut log) = ec.event_log {

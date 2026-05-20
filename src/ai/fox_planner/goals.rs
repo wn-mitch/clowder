@@ -160,7 +160,9 @@ mod tests {
 
         let goal = goal_for_disposition(FoxDispositionKind::Feeding);
         let actions = feeding_actions();
-        let plan = core::make_plan::<super::super::FoxDomain>(start, &actions, &goal, 12, 1000)
+        let plan = core::make_plan::<super::super::FoxDomain>(start, &actions, &goal, 12, 1000,
+            &mut crate::ai::planner::core::PlannerScratch::<super::super::FoxDomain>::default(),
+        )
             .expect("should find feeding plan");
 
         assert!(!plan.is_empty());

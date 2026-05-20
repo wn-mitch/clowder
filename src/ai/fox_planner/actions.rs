@@ -293,7 +293,9 @@ mod tests {
             predicates: vec![Pred::HungerOk(true)],
         };
 
-        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000)
+        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000,
+            &mut crate::ai::planner::core::PlannerScratch::<FoxDomain>::default(),
+        )
             .expect("should find hunting plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -308,7 +310,9 @@ mod tests {
             predicates: vec![Pred::CubsFed(true)],
         };
 
-        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000)
+        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000,
+            &mut crate::ai::planner::core::PlannerScratch::<FoxDomain>::default(),
+        )
             .expect("should find feeding plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -325,7 +329,9 @@ mod tests {
             predicates: vec![Pred::TerritoryMarked(true)],
         };
 
-        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000)
+        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000,
+            &mut crate::ai::planner::core::PlannerScratch::<FoxDomain>::default(),
+        )
             .expect("should find patrol plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -340,7 +346,9 @@ mod tests {
             predicates: vec![Pred::HungerOk(true)],
         };
 
-        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000)
+        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000,
+            &mut crate::ai::planner::core::PlannerScratch::<FoxDomain>::default(),
+        )
             .expect("should find raiding plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
@@ -355,7 +363,9 @@ mod tests {
             predicates: vec![Pred::DenSecured(true)],
         };
 
-        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000)
+        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000,
+            &mut crate::ai::planner::core::PlannerScratch::<FoxDomain>::default(),
+        )
             .expect("should find dispersal plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();

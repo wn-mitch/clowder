@@ -92,13 +92,44 @@ pub struct PlannedStep<D: GoapDomain> {
 // ---------------------------------------------------------------------------
 
 /// Search node in the A* arena.
-struct SearchNode<D: GoapDomain> {
+pub struct SearchNode<D: GoapDomain> {
     state: D::State,
     g_cost: u32,
     parent: Option<usize>,
     action: Option<D::ActionKind>,
     action_cost: u32,
     depth: usize,
+}
+
+/// Ticket 427 Step 3 — A* search scratch arena. Replaces the per-call
+/// `Vec::with_capacity(256)` + `BinaryHeap::new()` + `HashMap::new()`
+/// allocations that the 427 perf survey flagged as the third-largest
+/// alloc hotspot. Held as `Local<PlannerScratch<D>>` at each species'
+/// planning system so the three planners (fox / hawk / snake) don't
+/// contend for one shared resource — they run in parallel chains per
+/// `src/plugins/simulation.rs`.
+pub struct PlannerScratch<D: GoapDomain> {
+    pub arena: Vec<SearchNode<D>>,
+    pub open: BinaryHeap<Reverse<(u32, usize)>>,
+    pub best_g: HashMap<D::State, u32>,
+}
+
+impl<D: GoapDomain> Default for PlannerScratch<D> {
+    fn default() -> Self {
+        Self {
+            arena: Vec::with_capacity(256),
+            open: BinaryHeap::new(),
+            best_g: HashMap::new(),
+        }
+    }
+}
+
+impl<D: GoapDomain> PlannerScratch<D> {
+    fn reset(&mut self) {
+        self.arena.clear();
+        self.open.clear();
+        self.best_g.clear();
+    }
 }
 
 /// Run A* search to find a plan that satisfies `goal` from `start`.
@@ -110,20 +141,19 @@ pub fn make_plan<D: GoapDomain>(
     goal: &Goal<D>,
     max_depth: usize,
     max_nodes: usize,
+    scratch: &mut PlannerScratch<D>,
 ) -> Option<Vec<PlannedStep<D>>> {
     // Early exit: already at goal.
     if goal.is_satisfied(&start) {
         return Some(Vec::new());
     }
 
-    // Arena of search nodes.
-    let mut arena: Vec<SearchNode<D>> = Vec::with_capacity(256);
-
-    // Open set: min-heap by (f_cost, insertion order for tiebreak).
-    let mut open: BinaryHeap<Reverse<(u32, usize)>> = BinaryHeap::new();
-
-    // Best known g_cost per state.
-    let mut best_g: HashMap<D::State, u32> = HashMap::new();
+    scratch.reset();
+    let PlannerScratch {
+        arena,
+        open,
+        best_g,
+    } = scratch;
 
     // Seed with start state.
     let h = goal.heuristic(&start);
@@ -157,7 +187,7 @@ pub fn make_plan<D: GoapDomain>(
         // Goal check at dequeue — this node has the lowest f-cost among
         // unvisited nodes, so if it satisfies the goal it's optimal.
         if goal.is_satisfied(&arena[node_idx].state) {
-            return Some(reconstruct_path(&arena, node_idx));
+            return Some(reconstruct_path(arena, node_idx));
         }
 
         if depth >= max_depth {
@@ -340,8 +370,9 @@ mod tests {
             predicates: vec![TestPred::Delivered(true)],
         };
 
+        let mut scratch = PlannerScratch::<TestDomain>::default();
         let plan =
-            make_plan::<TestDomain>(start, &test_actions(), &goal, 10, 1000).expect("should plan");
+            make_plan::<TestDomain>(start, &test_actions(), &goal, 10, 1000, &mut scratch).expect("should plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
@@ -367,8 +398,9 @@ mod tests {
             predicates: vec![TestPred::Delivered(true)],
         };
 
+        let mut scratch = PlannerScratch::<TestDomain>::default();
         let plan =
-            make_plan::<TestDomain>(start, &test_actions(), &goal, 10, 1000).expect("should plan");
+            make_plan::<TestDomain>(start, &test_actions(), &goal, 10, 1000, &mut scratch).expect("should plan");
         assert!(plan.is_empty());
     }
 
@@ -392,7 +424,8 @@ mod tests {
             effects: vec![TestEffect::SetAtA(true)],
         }];
 
-        let plan = make_plan::<TestDomain>(start, &actions, &goal, 10, 1000);
+        let mut scratch = PlannerScratch::<TestDomain>::default();
+        let plan = make_plan::<TestDomain>(start, &actions, &goal, 10, 1000, &mut scratch);
         assert!(plan.is_none());
     }
 }

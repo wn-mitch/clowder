@@ -548,7 +548,7 @@ impl ZoneDistances {
 // ---------------------------------------------------------------------------
 
 /// Search node in the A* arena.
-struct SearchNode {
+pub struct SearchNode {
     state: PlannerState,
     g_cost: u32,
     parent: Option<usize>,
@@ -610,6 +610,34 @@ impl PlanningFailureReason {
 /// search bounds; the typed reason flows out to
 /// `EventKind::PlanningFailed` so the headless footer can attribute
 /// failures by cause (172).
+/// Ticket 427 Step 3 — A* search scratch arena for the concrete cat
+/// planner. Mirrors `core::PlannerScratch<D>` but holds the cat's
+/// non-generic `SearchNode` / `PlannerState` types. Threaded as
+/// `Local<CatPlannerScratch>` from `evaluate_and_plan`.
+pub struct CatPlannerScratch {
+    pub arena: Vec<SearchNode>,
+    pub open: BinaryHeap<Reverse<(u32, usize)>>,
+    pub best_g: HashMap<PlannerState, u32>,
+}
+
+impl Default for CatPlannerScratch {
+    fn default() -> Self {
+        Self {
+            arena: Vec::with_capacity(256),
+            open: BinaryHeap::new(),
+            best_g: HashMap::new(),
+        }
+    }
+}
+
+impl CatPlannerScratch {
+    fn reset(&mut self) {
+        self.arena.clear();
+        self.open.clear();
+        self.best_g.clear();
+    }
+}
+
 pub fn make_plan(
     start: PlannerState,
     actions: &[GoapActionDef],
@@ -617,6 +645,7 @@ pub fn make_plan(
     max_depth: usize,
     max_nodes: usize,
     ctx: &PlanContext<'_>,
+    scratch: &mut CatPlannerScratch,
 ) -> Result<Vec<PlannedStep>, PlanningFailureReason> {
     // Early exit: already at goal.
     if goal.is_satisfied(&start, ctx) {
@@ -632,14 +661,12 @@ pub fn make_plan(
         return Err(PlanningFailureReason::NoApplicableActions);
     }
 
-    // Arena of search nodes.
-    let mut arena: Vec<SearchNode> = Vec::with_capacity(256);
-
-    // Open set: min-heap by (f_cost, insertion order for tiebreak).
-    let mut open: BinaryHeap<Reverse<(u32, usize)>> = BinaryHeap::new();
-
-    // Best known g_cost per state.
-    let mut best_g: HashMap<PlannerState, u32> = HashMap::new();
+    scratch.reset();
+    let CatPlannerScratch {
+        arena,
+        open,
+        best_g,
+    } = scratch;
 
     // Seed with start state.
     let h = goal.heuristic(&start, ctx);
@@ -673,7 +700,7 @@ pub fn make_plan(
         // Goal check at dequeue — this node has the lowest f-cost among
         // unvisited nodes, so if it satisfies the goal it's optimal.
         if goal.is_satisfied(&arena[node_idx].state, ctx) {
-            return Ok(reconstruct_path(&arena, node_idx));
+            return Ok(reconstruct_path(arena, node_idx));
         }
 
         if depth >= max_depth {
@@ -780,7 +807,8 @@ mod tests {
                 markers: &markers,
                 entity,
             };
-            make_plan($start, $actions, $goal, $depth, $nodes, &ctx)
+            let mut scratch = CatPlannerScratch::default();
+            make_plan($start, $actions, $goal, $depth, $nodes, &ctx, &mut scratch)
         }};
     }
 
@@ -1074,7 +1102,8 @@ mod tests {
             markers: &markers,
             entity,
         };
-        let plan = make_plan(start, &[], &goal, 12, 1000, &ctx).expect("should find plan");
+        let mut scratch = CatPlannerScratch::default();
+        let plan = make_plan(start, &[], &goal, 12, 1000, &ctx, &mut scratch).expect("should find plan");
         assert!(plan.is_empty());
     }
 

@@ -1300,7 +1300,8 @@ mod tests {
                 markers: &markers,
                 entity: test_entity(),
             };
-            make_plan($start, $actions, $goal, $depth, $nodes, &ctx)
+            let mut scratch = crate::ai::planner::CatPlannerScratch::default();
+            make_plan($start, $actions, $goal, $depth, $nodes, &ctx, &mut scratch)
         }};
         ($start:expr, $actions:expr, $goal:expr, $depth:expr, $nodes:expr) => {{
             plan!(
