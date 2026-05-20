@@ -15,10 +15,10 @@ _Last generated: 2026-05-20._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 116 |
+| Ready | 117 |
 | Parked | 13 |
 | Blocked | 34 |
-| **Open total** | **167** |
+| **Open total** | **168** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -39,10 +39,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.92_
+- **[431](docs/open-work/tickets/431-hot-frame-catalog-per-tick-vs-event-driven-audit-of-top-10-cpu-consumers.md)** — Hot-frame catalog: per-tick vs event-driven audit of top-10 CPU consumers — _[tooling-diagnostics-ui] · score 0.92_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
 - **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · score 0.91_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
 
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (116)
+## Ready by cluster (117)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -210,11 +210,12 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
 
-### tooling-diagnostics-ui (3 ready)
+### tooling-diagnostics-ui (4 ready)
 
 - **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
+- **[431](docs/open-work/tickets/431-hot-frame-catalog-per-tick-vs-event-driven-audit-of-top-10-cpu-consumers.md)** — Hot-frame catalog: per-tick vs event-driven audit of top-10 CPU consumers — _[tooling-diagnostics-ui] · added 2026-05-20_
 
 ## Ready by initiative (79 tag-memberships across 9 initiatives)
 
@@ -326,7 +327,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (116)
+## Ready (117)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -444,6 +445,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 - **[426](docs/open-work/tickets/426-update-mate-eligibility-markers-event-driven-haseligiblemate-via-matingeligibilitychanged-message.md)** — update_mate_eligibility_markers event-driven HasEligibleMate via MatingEligibilityChanged Message — _[ai-substrate] · added 2026-05-19_
 - **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
+- **[431](docs/open-work/tickets/431-hot-frame-catalog-per-tick-vs-event-driven-audit-of-top-10-cpu-consumers.md)** — Hot-frame catalog: per-tick vs event-driven audit of top-10 CPU consumers — _[tooling-diagnostics-ui] · added 2026-05-20_
 
 ## Parked (13)
 
@@ -498,12 +500,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[422](docs/open-work/tickets/422-curio-cache-routing-deposit-prefix-on-curio-cache.md)** — Curio Cache routing — deposit-prefix on curio Cache — _[items-crafting] · blocked-by 016 · added 2026-05-19_
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · blocked-by 205 · added 2026-05-19_
 
-## Landed archive (290)
+## Landed archive (291)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (224)
+### 2026-05 (225)
 
+- **[430](docs/open-work/landed/430-add-just-flamegraph-recipe-macos-dtrace-setup-doc.md)** — Add just flamegraph recipe + macOS dtrace setup doc _(2026-05-20)_
 - **[428](docs/open-work/landed/428-handoffitem-goap-path-resolver-reads-empty-kitten-snapshot-substrate-stub-silent-fail.md)** — HandoffItem goap-path resolver reads empty kitten_snapshot — substrate-stub silent fail _(2026-05-20)_
 - **[427](docs/open-work/landed/427-per-tick-allocation-hotspots-scratch-buffer-reuse-vec-hashmap-arenas-across-dse-target-filters-route-cost-planner.md)** — Per-tick allocation hotspots scratch buffer reuse Vec HashMap arenas across DSE target filters route_cost planner _(2026-05-19)_
 - **[423](docs/open-work/landed/423-coveravailabilitymap-retire-per-cat-disc-scan-in-hideeligible-authoring.md)** — CoverAvailabilityMap — retire per-cat disc scan in HideEligible authoring _(2026-05-19)_

@@ -177,6 +177,47 @@ soak-trace SEED="42" FOCAL_CAT="Simba" DURATION="900":
       --event-log logs/tuned-{{SEED}}/events.jsonl \
       --trace-log logs/tuned-{{SEED}}/trace-{{FOCAL_CAT}}.jsonl
 
+# Ticket 430 — sampling profile via `samply` against the
+# `profile.profiling` Cargo profile (release + embedded debug
+# symbols via packed .dSYM). Captures `DURATION` seconds (default
+# 60s) of CPU samples at 997 Hz; writes profile JSON + symbol
+# sidecar to `logs/flamegraphs/<seed>-<commit>/`. Analyze with
+# `python3 scripts/profiling/samply_top.py <profile-dir>` (or load
+# in https://profiler.firefox.com).
+#
+# macOS notes: `cargo-flamegraph` 0.6.x requires full Xcode (uses
+# xctrace); samply doesn't, but needs the dSYM bundle that
+# `[profile.profiling]` with `split-debuginfo = "packed"` produces.
+# No sudo needed.
+#
+# Usage:
+#   just flamegraph                # seed=42, 60s
+#   just flamegraph 17 30          # seed=17, 30s
+flamegraph SEED="42" DURATION="60":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v samply >/dev/null 2>&1; then
+      echo "error: samply not installed. Run: brew install samply" >&2
+      exit 1
+    fi
+    SHA=$(jj log -r '@-' --no-graph -T 'commit_id.short()' 2>/dev/null || git rev-parse --short HEAD)
+    OUTDIR="logs/flamegraphs/{{SEED}}-${SHA}"
+    mkdir -p "${OUTDIR}"
+    echo "Building profile binary (cargo build --profile profiling)..."
+    cargo build --profile profiling --quiet
+    echo "Recording ${DURATION}s sample profile @ 997Hz..."
+    samply record \
+      --save-only --no-open \
+      --output "${OUTDIR}/profile.json.gz" \
+      --rate 997 \
+      --unstable-presymbolicate \
+      -- target/profiling/clowder \
+         --headless --seed {{SEED}} --duration {{DURATION}} \
+         --log /tmp/flamegraph.narrative.jsonl \
+         --event-log /tmp/flamegraph.events.jsonl
+    echo "wrote ${OUTDIR}/profile.json.gz + .syms.json"
+    echo "  open in https://profiler.firefox.com or analyze via scripts/profiling/samply_top.py"
+
 # Ticket 162 — scenario microexperiment harness. Runs a registered
 # scenario (preset cats, preloaded needs/personality/markers) for a
 # small number of ticks and prints per-tick winning DSE + final-tick

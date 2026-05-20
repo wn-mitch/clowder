@@ -35,3 +35,18 @@ opt-level = 2
 opt-level = 3
 lto = "thin"
 strip = true
+
+# Ticket 430 — release-equivalent build + symbol info for sampling
+# profilers (samply, cargo flamegraph). Production builds keep
+# `--release` (stripped); perf investigations use `--profile
+# profiling`. `split-debuginfo = "packed"` is load-bearing on macOS:
+# rustc emits a `.dSYM` bundle at link time (before per-object debug
+# files are cleaned). `"off"` does NOT embed DWARF in the executable
+# on macOS — it just skips the split step, leaving symbols in
+# transient object files. samply auto-discovers the sibling
+# `<binary>.dSYM` bundle and symbolicates from it.
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = false
+split-debuginfo = "packed"
