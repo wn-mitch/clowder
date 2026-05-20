@@ -50,6 +50,20 @@ struct CliArgs {
 }
 
 fn main() {
+    // Stage H gate (ticket 431) — early-exit print of the binary's baked
+    // GIT_HASH / dirty flag, used by `just _check-binary-fresh` to refuse
+    // long-running soaks against a stale binary whose baked commit ≠ HEAD.
+    // Must run before parse_args() so it works regardless of other flags.
+    if std::env::args().any(|a| a == "--print-build-info") {
+        println!(
+            "commit={} short={} dirty={}",
+            env!("GIT_HASH"),
+            env!("GIT_HASH_SHORT"),
+            env!("GIT_DIRTY"),
+        );
+        return;
+    }
+
     let args = parse_args();
 
     if args.headless {

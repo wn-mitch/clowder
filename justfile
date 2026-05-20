@@ -16,26 +16,49 @@ load:
 headless *ARGS:
     cargo run -- --headless {{ARGS}}
 
-# Canonical 15-min deep-soak at a fixed seed. Release build, writes to
-# logs/tuned-<seed>/{events,narrative}.jsonl. See CLAUDE.md and
-# docs/diagnostics/log-queries.md for verification.
-#
-# Refuses to overwrite an existing logs/tuned-<seed>/events.jsonl —
-# rename it to a versioned name first (e.g.
-# `mv logs/tuned-42 logs/tuned-42-<suffix>`).
-soak SEED="42":
+# Stage H gate (ticket 431) — refuses if target/release/clowder's baked
+# commit ≠ HEAD. build.rs already reruns on .git/HEAD changes, but a
+# stale incremental cache can leave the binary baked at an older commit.
+# The gate forces a `cargo build --release` and verifies the baked
+# GIT_HASH via `clowder --print-build-info` before any soak commits to a
+# long-running run.
+_check-binary-fresh:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -s "logs/tuned-{{SEED}}/events.jsonl" ]; then
-      echo "REFUSED: logs/tuned-{{SEED}}/events.jsonl exists." >&2
-      echo "  Rename to a versioned name first, e.g.:" >&2
-      echo "    mv logs/tuned-{{SEED}} logs/tuned-{{SEED}}-\$(git rev-parse --short HEAD)" >&2
+    cargo build --release --quiet
+    BAKED=$(target/release/clowder --print-build-info | sed -n 's/^commit=\([^ ]*\).*/\1/p')
+    HEAD=$(git rev-parse HEAD)
+    if [ "$BAKED" != "$HEAD" ]; then
+      echo "REFUSED: target/release/clowder baked commit $BAKED ≠ HEAD $HEAD" >&2
+      echo "  build.rs may not have rerun on the last commit; try:" >&2
+      echo "    cargo clean -p clowder && cargo build --release" >&2
       exit 2
     fi
-    mkdir -p logs/tuned-{{SEED}}
+
+# Canonical 15-min deep-soak at a fixed seed. Release build, writes to
+# logs/tuned-<seed>-<commit_short>/{events,narrative}.jsonl. See CLAUDE.md
+# and docs/diagnostics/log-queries.md for verification.
+#
+# Archive directory naming convention is enforced (ticket 431 Stage H):
+# the `<commit_short>` suffix makes `ls logs/` self-validating without
+# `jq` on the header. Refuses to overwrite if the same seed × commit has
+# already been soaked (genuine re-run case only).
+soak SEED="42": _check-binary-fresh
+    #!/usr/bin/env bash
+    set -euo pipefail
+    SHORT_HASH=$(git rev-parse --short HEAD)
+    OUTDIR="logs/tuned-{{SEED}}-${SHORT_HASH}"
+    if [ -s "${OUTDIR}/events.jsonl" ]; then
+      echo "REFUSED: ${OUTDIR}/events.jsonl exists (same seed × commit)." >&2
+      echo "  Either commit your changes (so commit_short advances) or" >&2
+      echo "  rename the existing directory if it captures a different run:" >&2
+      echo "    mv ${OUTDIR} ${OUTDIR}-<suffix>" >&2
+      exit 2
+    fi
+    mkdir -p "${OUTDIR}"
     cargo run --release -- --headless --seed {{SEED}} --duration 900 \
-      --log logs/tuned-{{SEED}}/narrative.jsonl \
-      --event-log logs/tuned-{{SEED}}/events.jsonl
+      --log "${OUTDIR}/narrative.jsonl" \
+      --event-log "${OUTDIR}/events.jsonl"
 
 # Run the canary checks (starvation, shadowfox, activation, wipeout)
 # against an events.jsonl. Exits non-zero on any failure. Default target
@@ -158,24 +181,28 @@ next *ARGS:
     @uv run scripts/similar/next.py {{ARGS}}
 
 # Deep-soak with a focal-cat trace sidecar. Writes to
-# logs/tuned-<seed>/{events,narrative,trace-<focal>}.jsonl. Trace
-# records decompose per-tick L1/L2/L3 state for one focal cat per §11
-# of docs/systems/ai-substrate-refactor.md.
-soak-trace SEED="42" FOCAL_CAT="Simba" DURATION="900":
+# logs/tuned-<seed>-<commit_short>/{events,narrative,trace-<focal>}.jsonl.
+# Trace records decompose per-tick L1/L2/L3 state for one focal cat per
+# §11 of docs/systems/ai-substrate-refactor.md. Archive naming + binary-
+# freshness gate match `just soak` (ticket 431 Stage H).
+soak-trace SEED="42" FOCAL_CAT="Simba" DURATION="900": _check-binary-fresh
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -s "logs/tuned-{{SEED}}/events.jsonl" ] || [ -s "logs/tuned-{{SEED}}/trace-{{FOCAL_CAT}}.jsonl" ]; then
-      echo "REFUSED: logs/tuned-{{SEED}}/ already has soak-trace output." >&2
-      echo "  Rename to a versioned name first, e.g.:" >&2
-      echo "    mv logs/tuned-{{SEED}} logs/tuned-{{SEED}}-\$(git rev-parse --short HEAD)" >&2
+    SHORT_HASH=$(git rev-parse --short HEAD)
+    OUTDIR="logs/tuned-{{SEED}}-${SHORT_HASH}"
+    if [ -s "${OUTDIR}/events.jsonl" ] || [ -s "${OUTDIR}/trace-{{FOCAL_CAT}}.jsonl" ]; then
+      echo "REFUSED: ${OUTDIR}/ already has soak-trace output (same seed × commit)." >&2
+      echo "  Either commit your changes (so commit_short advances) or" >&2
+      echo "  rename the existing directory if it captures a different run:" >&2
+      echo "    mv ${OUTDIR} ${OUTDIR}-<suffix>" >&2
       exit 2
     fi
-    mkdir -p logs/tuned-{{SEED}}
+    mkdir -p "${OUTDIR}"
     cargo run --release -- --headless --seed {{SEED}} --duration {{DURATION}} \
       --focal-cat {{FOCAL_CAT}} \
-      --log logs/tuned-{{SEED}}/narrative.jsonl \
-      --event-log logs/tuned-{{SEED}}/events.jsonl \
-      --trace-log logs/tuned-{{SEED}}/trace-{{FOCAL_CAT}}.jsonl
+      --log "${OUTDIR}/narrative.jsonl" \
+      --event-log "${OUTDIR}/events.jsonl" \
+      --trace-log "${OUTDIR}/trace-{{FOCAL_CAT}}.jsonl"
 
 # Ticket 430 — sampling profile via `samply` against the
 # `profile.profiling` Cargo profile (release + embedded debug
@@ -240,12 +267,12 @@ scenario *ARGS:
 #   just frame-diff logs/baseline-pre-substrate-refactor/trace-Simba.jsonl \
 #                   logs/tuned-42/trace-Simba.jsonl \
 #                   docs/balance/substrate-phase-3.md
-frame-diff BASELINE NEW HYPOTHESIS="":
+frame-diff BASELINE NEW HYPOTHESIS="" *EXTRA_ARGS="":
     #!/usr/bin/env bash
     if [[ -n "{{HYPOTHESIS}}" ]]; then
-        uv run scripts/frame_diff.py {{BASELINE}} {{NEW}} --hypothesis {{HYPOTHESIS}}
+        uv run scripts/frame_diff.py {{BASELINE}} {{NEW}} --hypothesis {{HYPOTHESIS}} {{EXTRA_ARGS}}
     else
-        uv run scripts/frame_diff.py {{BASELINE}} {{NEW}}
+        uv run scripts/frame_diff.py {{BASELINE}} {{NEW}} {{EXTRA_ARGS}}
     fi
 
 # One-call run validation. Composes check-canaries + check-continuity +

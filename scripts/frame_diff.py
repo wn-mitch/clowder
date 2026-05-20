@@ -233,6 +233,17 @@ def main():
         action="store_true",
         help="Exit non-zero on any drift (Phase 2 mode).",
     )
+    p.add_argument(
+        "--allow-cross-commit",
+        action="store_true",
+        help=(
+            "Permit comparison across traces with different commit_hash. "
+            "Default is exit 2 — the cross-commit deltas confound the "
+            "intended Stage→Stage substrate-change signal with whatever "
+            "schedule-edge perturbation lives between the commits (per "
+            "ticket 431's mis-labeled-archive failure mode)."
+        ),
+    )
     args = p.parse_args()
 
     for path in (args.baseline, args.new):
@@ -245,12 +256,22 @@ def main():
 
     ok, reason = headers_match(base_hdr, new_hdr)
     if not ok:
-        print(f"header mismatch: {reason}")
+        print(f"header mismatch: {reason}", file=sys.stderr)
         if base_hdr and new_hdr:
             for key in ("commit_hash_short", "seed"):
-                print(f"  baseline {key}: {base_hdr.get(key)}")
-                print(f"  new      {key}: {new_hdr.get(key)}")
-        print("(diff proceeds; results are advisory only)")
+                print(f"  baseline {key}: {base_hdr.get(key)}", file=sys.stderr)
+                print(f"  new      {key}: {new_hdr.get(key)}", file=sys.stderr)
+        if not args.allow_cross_commit:
+            print(
+                "error: traces are not directly comparable. Re-run with "
+                "--allow-cross-commit to override (results then advisory only).",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        print(
+            "(--allow-cross-commit set; diff proceeds; results are advisory only)",
+            file=sys.stderr,
+        )
     else:
         print(f"headers match — traces are directly comparable")
         print(
