@@ -3697,12 +3697,17 @@ pub fn resolve_goap_plans(
     }
 
     // Count cats adjacent to each construction site (for multi-builder bonuses).
+    // Ticket 427 Step 5 — `with_capacity` pre-sizes from the
+    // building-snapshot length so the HashMap avoids rehash churn as it
+    // fills. Full alloc elimination (move to `Local<...>`) deferred
+    // because `StepSnapshots` would need an `'a` lifetime parameter,
+    // which ripples through ~80 read sites.
     let builders_per_site: HashMap<Entity, usize> = {
         let cat_pos_list: Vec<Position> = cats
             .iter()
             .map(|((_, _, _, pos, _, _, _, _, _), _)| *pos)
             .collect();
-        let mut counts = HashMap::new();
+        let mut counts = HashMap::with_capacity(building_snapshot.len());
         for (site_e, _, site_pos, is_site, _) in &building_snapshot {
             if *is_site {
                 let n = cat_pos_list
@@ -3734,7 +3739,10 @@ pub fn resolve_goap_plans(
             .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _))| (e, *g))
             .collect(),
         cat_tile_counts: {
-            let mut counts = HashMap::new();
+            // Ticket 427 Step 5 — pre-size to cat count (a cat-tile-count
+            // HashMap is bounded above by the number of cats).
+            let cat_count = cats.iter().count();
+            let mut counts = HashMap::with_capacity(cat_count);
             for ((_, _, _, pos, _, _, _, _, _), _) in &cats {
                 *counts.entry(*pos).or_insert(0) += 1;
             }
