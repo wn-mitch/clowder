@@ -53,6 +53,7 @@ pub mod lone_burial;
 pub mod mate_chain;
 pub mod parenting_caretake_kitten_absent;
 pub mod parenting_caretake_kitten_present;
+pub mod parenting_handoff_recipient_resolution;
 pub mod parenting_father_provisions;
 pub mod parenting_grief_kitten_death;
 pub mod parenting_joint_suppression;
@@ -267,6 +268,10 @@ pub const ALL: &[&Scenario] = &[
     // Closes the canary regression on the 400 verdict.
     &parenting_caretake_kitten_absent::SCENARIO,
     &parenting_caretake_kitten_present::SCENARIO,
+    // [DRAFT — pending review] L3-resolver companion to the 410
+    // scenarios. Surfaces the goap-path `HandoffItem` empty-snapshot
+    // defect (afk-overnight-2026-05-19 soak: 177k canary fires).
+    &parenting_handoff_recipient_resolution::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.
