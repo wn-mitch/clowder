@@ -570,6 +570,10 @@ impl Plugin for SimulationPlugin {
         // system. Single-site registration — eliminates the prior
         // three-mirror burden flagged in CLAUDE.md.
         app.insert_resource(crate::ai::faction::FactionRelations::canonical());
+        // 431 Stage B — cache of cat pairs within passive_familiarity_range.
+        // Built incrementally on CatMoved by `update_near_pair_cache`; read
+        // by `passive_familiarity` for the per-tick delta application.
+        app.init_resource::<crate::resources::near_pair_cache::NearPairCache>();
         app.init_resource::<DseRegistry>();
         // Ticket 207 — InfluenceMapRegistry replaces the hand-bundled
         // `L1Maps` SystemParam in `trace_emit.rs`. Empty at build time;
@@ -1097,6 +1101,12 @@ impl Plugin for SimulationPlugin {
                     // (Stage B: NearPairCache; Stage C: per-cat
                     // RouteCostCache) consume up-to-date deltas.
                     systems::cat_movement::emit_cat_moved_messages,
+                    // 431 Stage B — rebuild the near-pair cache from the
+                    // CatMoved deltas (with first-tick bootstrap from the
+                    // cats query). Replaces the legacy per-tick O(N²)
+                    // pair sweep that ran inside `passive_familiarity`
+                    // (64.43% inclusive CPU at the 2026-05-20 baseline).
+                    systems::social::update_near_pair_cache,
                     systems::social::passive_familiarity,
                     systems::personality_friction::personality_friction,
                     systems::social::check_bonds,

@@ -1,39 +1,142 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use bevy_ecs::prelude::*;
 
 use crate::components::building::Structure;
 use crate::components::identity::{Age, Gender, LifeStage, Name, Orientation};
 use crate::components::physical::{Dead, Position};
+use crate::messages::cat_moved::CatMoved;
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
+use crate::resources::near_pair_cache::{normalize_pair, NearPairCache};
 use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeScale, TimeState};
 
 // ---------------------------------------------------------------------------
-// passive_familiarity system
+// passive_familiarity — event-driven (ticket 431 Stage B)
 // ---------------------------------------------------------------------------
 
-/// Each tick, cats within Manhattan distance <= 2 of each other gain a small
-/// amount of familiarity. Proximity naturally builds recognition over time.
+/// Maintains `NearPairCache` in response to cat movement. Authored by
+/// ticket 431 Stage B as the event-driven replacement for the per-tick
+/// O(N²) sweep that pre-Stage-B `passive_familiarity` ran every tick
+/// (64.43% inclusive CPU per the 2026-05-20 flamegraph).
+///
+/// The cache is rebuilt incrementally on each `CatMoved` event: the
+/// moving cat's existing pairings are dropped, then re-inserted by
+/// re-scanning live cat positions for distances within
+/// `passive_familiarity_range`. Despawned cats are pruned by
+/// intersecting against the current cats query each tick. Newborn cats
+/// (in the current live set but not in `last_seen`) are added to the
+/// re-scan set so they enter the cache on their first tick — without
+/// this, a cat spawned post-bootstrap wouldn't get passive familiarity
+/// until it first moved.
+///
+/// First-tick bootstrap: when the cache is empty AND no `CatMoved`
+/// events arrived (e.g. tick 1 after world setup), every live cat is
+/// treated as "newly appeared" and the full O(N²) pair set materializes
+/// — identical work to the legacy `passive_familiarity` loop, but
+/// amortized over the entire run. Subsequent ticks see only the
+/// incremental work for movers + newborns.
 #[allow(clippy::type_complexity)]
+pub fn update_near_pair_cache(
+    mut cache: ResMut<NearPairCache>,
+    mut reader: MessageReader<CatMoved>,
+    cats: Query<(Entity, &Position), (Without<Dead>, Without<Structure>)>,
+    constants: Res<SimConstants>,
+) {
+    let range = constants.social.passive_familiarity_range;
+
+    // Snapshot live cats + positions. The `BTreeSet` ensures `live` (and
+    // downstream `to_rescan`) iterate in entity-index order, matching
+    // `NearPairCache`'s pair canonicalization for stable insert order
+    // in the cache. Float-determinism for `passive_familiarity` does
+    // not actually depend on this (one `+= delta` per independent
+    // pair entry per tick), but determinism-safe by construction is
+    // cheaper to reason about than determinism-by-accident.
+    let cats_vec: Vec<(Entity, Position)> = cats.iter().map(|(e, p)| (e, *p)).collect();
+    let live: BTreeSet<Entity> = cats_vec.iter().map(|(e, _)| *e).collect();
+
+    // Drop entries whose either endpoint is no longer live. Cheap O(pairs)
+    // walk — pairs is bounded by O(N²) but typically much smaller (only
+    // entries within range survive).
+    cache
+        .pairs
+        .retain(|&(a, b), _| live.contains(&a) && live.contains(&b));
+
+    // Drain `CatMoved` and collect the set of moved entities. Filter out
+    // events for cats that died this tick — their entries were already
+    // pruned by the retain above.
+    let moved: BTreeSet<Entity> = reader
+        .read()
+        .map(|m| m.entity)
+        .filter(|e| live.contains(e))
+        .collect();
+
+    // Newborn detection: cats present in `live` but absent from
+    // `last_seen`. On the very first tick after world setup `last_seen`
+    // is empty and `live` is all founders — this is the bootstrap path.
+    let newborns: BTreeSet<Entity> = live.difference(&cache.last_seen).copied().collect();
+
+    // Combined re-scan set. Moved cats must drop+re-derive their entries;
+    // newborns must materialize fresh entries (no prior state to drop).
+    let to_rescan: BTreeSet<Entity> = moved.union(&newborns).copied().collect();
+
+    // Drop existing entries for moved cats. (Newborns by definition have
+    // none, so the retain skips them implicitly.)
+    if !moved.is_empty() {
+        cache
+            .pairs
+            .retain(|&(a, b), _| !moved.contains(&a) && !moved.contains(&b));
+    }
+
+    // Re-insert pairs for cats needing a re-scan. The position lookup is
+    // O(N) in the worst case (per cat), but the outer loop is O(rescan)
+    // — typically 1–3 movers per tick plus 0 newborns in steady state,
+    // vs the pre-Stage-B O(N²) sweep every tick.
+    for rescan_entity in &to_rescan {
+        let Some(&(_, rescan_pos)) = cats_vec.iter().find(|(e, _)| e == rescan_entity) else {
+            continue;
+        };
+        for (other, other_pos) in cats_vec.iter() {
+            if *other == *rescan_entity {
+                continue;
+            }
+            let dist = other_pos.manhattan_distance(&rescan_pos);
+            if dist <= range {
+                let key = normalize_pair(*rescan_entity, *other);
+                cache.pairs.insert(key, dist);
+            }
+        }
+    }
+
+    // Record the live set for next-tick newborn detection.
+    cache.last_seen = live;
+}
+
+/// Applies the per-tick familiarity delta to every cached near-pair.
+/// Reads `NearPairCache` (built by `update_near_pair_cache` from
+/// `CatMoved` events) and calls `Relationships::modify_familiarity`
+/// once per pair, in `BTreeMap` key order.
+///
+/// Pre-Stage-B this system ran the O(N²) pair-distance sweep itself
+/// (64.43% inclusive CPU at the 2026-05-20 baseline). Stage B retires
+/// the sweep — the work moves to `update_near_pair_cache`, which only
+/// runs on movement, so most ticks see only the small per-pair iteration
+/// below.
 pub fn passive_familiarity(
-    query: Query<(Entity, &Position), (Without<Dead>, Without<Structure>)>,
+    cache: Res<NearPairCache>,
     mut relationships: ResMut<Relationships>,
     constants: Res<SimConstants>,
     time_scale: Res<TimeScale>,
 ) {
-    let c = &constants.social;
-    let passive_familiarity_rate = c.passive_familiarity_rate.per_tick(&time_scale);
-    let cats: Vec<(Entity, Position)> = query.iter().map(|(e, p)| (e, *p)).collect();
-    for i in 0..cats.len() {
-        for j in (i + 1)..cats.len() {
-            if cats[i].1.manhattan_distance(&cats[j].1) <= c.passive_familiarity_range {
-                relationships.modify_familiarity(cats[i].0, cats[j].0, passive_familiarity_rate);
-            }
-        }
+    let passive_familiarity_rate = constants
+        .social
+        .passive_familiarity_rate
+        .per_tick(&time_scale);
+    for (&(a, b), _dist) in cache.pairs.iter() {
+        relationships.modify_familiarity(a, b, passive_familiarity_rate);
     }
 }
 
@@ -452,8 +555,15 @@ mod tests {
         world.insert_resource(NarrativeLog::default());
         world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(SystemActivation::default());
+        // 431 Stage B — NearPairCache substrate. The cache update system
+        // bootstraps on first run when the cache is empty AND no CatMoved
+        // events arrived (which is the test case here, since there's no
+        // movement). The `Messages<CatMoved>` resource lets `MessageReader`
+        // construct cleanly with zero events.
+        world.insert_resource(crate::resources::near_pair_cache::NearPairCache::default());
+        world.insert_resource(bevy_ecs::message::Messages::<CatMoved>::default());
         let mut schedule = Schedule::default();
-        schedule.add_systems(passive_familiarity);
+        schedule.add_systems((update_near_pair_cache, passive_familiarity).chain());
         (world, schedule)
     }
 

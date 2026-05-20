@@ -27,6 +27,7 @@ pub mod grave_aura_map;
 pub mod herb_location_map;
 pub mod kitten_cry_map;
 pub mod map;
+pub mod near_pair_cache;
 pub mod narrative;
 pub mod narrative_templates;
 pub mod prey_scent_map;
