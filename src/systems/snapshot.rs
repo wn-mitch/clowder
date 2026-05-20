@@ -76,6 +76,17 @@ pub fn emit_cat_snapshots(
     }
     let season = time.season(&sim_config);
 
+    // Ticket 431 Stage D — system-level arena Vec for the top-3-by-fondness
+    // sort. Pre-Stage-D this allocated a fresh `Vec<(Entity, &Relationship)>`
+    // per cat per snapshot tick via `Relationships::all_for(entity)`
+    // (catalog row #5 in the 2026-05-20 flamegraph — 2.36% inclusive CPU
+    // dominated by the Vec materialization). Arena owns `Relationship`
+    // clones (cheap struct copy — 5 small fields, ~40 bytes) so the Vec's
+    // lifetime can outlive each loop iteration; one allocation per system
+    // run instead of one per cat per run.
+    let mut rels_arena: Vec<(Entity, crate::resources::relationships::Relationship)> =
+        Vec::with_capacity(32);
+
     for (
         (entity, name, pos, personality, needs, skills, mood, health),
         (
@@ -95,15 +106,19 @@ pub fn emit_cat_snapshots(
     {
         let life_stage = age.stage(time.tick, sim_config.ticks_per_season);
         // Build top-3 relationships by |fondness|.
-        let mut rels: Vec<(Entity, &crate::resources::relationships::Relationship)> =
-            relationships.all_for(entity);
-        rels.sort_by(|(_, a), (_, b)| {
+        rels_arena.clear();
+        rels_arena.extend(
+            relationships
+                .iter_for(entity)
+                .map(|(other, rel)| (other, rel.clone())),
+        );
+        rels_arena.sort_by(|(_, a), (_, b)| {
             b.fondness
                 .abs()
                 .partial_cmp(&a.fondness.abs())
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
-        let top_rels: Vec<RelationshipEntry> = rels
+        let top_rels: Vec<RelationshipEntry> = rels_arena
             .iter()
             .take(3)
             .filter_map(|(other, rel)| {
