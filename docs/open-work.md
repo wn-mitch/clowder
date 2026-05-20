@@ -15,10 +15,10 @@ _Last generated: 2026-05-20._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 119 |
+| Ready | 118 |
 | Parked | 13 |
 | Blocked | 34 |
-| **Open total** | **170** |
+| **Open total** | **169** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (119)
+## Ready by cluster (118)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -212,12 +212,11 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
 
-### tooling-diagnostics-ui (4 ready)
+### tooling-diagnostics-ui (3 ready)
 
 - **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
-- **[434](docs/open-work/tickets/434-431-re-baseline-stage-as-perturbation-cost-against-correct-archives.md)** — 431 re-baseline Stage A's perturbation cost against correct archives — _[tooling-diagnostics-ui] · added 2026-05-20_
 
 ## Ready by initiative (79 tag-memberships across 9 initiatives)
 
@@ -329,7 +328,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (119)
+## Ready (118)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -449,7 +448,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · added 2026-05-20_
 - **[433](docs/open-work/tickets/433-431-stage-f-follow-on-colony-marker-snapshot-hoist-cross-system-dedupe.md)** — 431 Stage F follow-on — colony marker-snapshot hoist (cross-system dedupe) — _[ai-substrate] · added 2026-05-20_
-- **[434](docs/open-work/tickets/434-431-re-baseline-stage-as-perturbation-cost-against-correct-archives.md)** — 431 re-baseline Stage A's perturbation cost against correct archives — _[tooling-diagnostics-ui] · added 2026-05-20_
 
 ## Parked (13)
 
