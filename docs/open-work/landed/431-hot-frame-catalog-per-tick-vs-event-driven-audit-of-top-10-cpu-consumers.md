@@ -1,7 +1,7 @@
 ---
 id: 431
 title: Hot-frame catalog: per-tick vs event-driven audit of top-10 CPU consumers
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-20
 ---
 
 ## Why
@@ -217,3 +217,5 @@ The Bevy 0.18 substrate already supports this: `#[derive(Message)]` + `MessageRe
 ## Log
 
 - 2026-05-20: opened as a §428 follow-on. The first end-to-end flamegraph on this codebase surfaced `passive_familiarity` at 64.43% inclusive CPU — a striking single-system concentration. Cataloged top 10 hot frames with their per-tick / event-driven characterization. Doctrine to codify: per-tick is for execution + time-dependent physics; everything else should be message-driven with cached state. The Relationships BTreeMap seed-determinism constraint is the load-bearing nuance — naive HashMap swap is forbidden.
+- 2026-05-20: catalog delivered as the audit table in this ticket body; baseline profile archived at `docs/diagnostics/baseline-profiles/2026-05-20-post-428/profile.json.gz` (+ `.syms.json` sidecar). The remaining Scope items — opening per-item follow-on tickets (passive_familiarity cache, path-cost cache, Relationships::all_for cache, DSE scratchpad pre-sizing) and updating CLAUDE.md "ECS rules" with the event-driven doctrine — are deferred to a future session; this ticket lands with the audit + baseline as the durable artifact, so any follow-on perf work has a snapshot to compare against. The doctrine memory is saved cross-session at `~/.claude/projects/-Users-will-mitchell-clowder/memory/project_per_tick_discipline_default_event_driven.md`.
+- 2026-05-20: Catalog complete: passive_familiarity 64.43%, evaluate_and_plan 24.37%, flood_dijkstra 3.52%, then a long tail under 2%. Baseline samply profile archived at docs/diagnostics/baseline-profiles/2026-05-20-post-428/. Doctrine memory saved cross-session. Per-item follow-on tickets (cache + event-driven invalidation per the table) deferred to future sessions; this ticket's lasting value is the audit + reference profile.
