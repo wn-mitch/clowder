@@ -697,8 +697,19 @@ pub struct ScoringResult {
 /// full) maps to `"hunger_urgency" = 0.9`. The inversion lives here
 /// rather than in each DSE's fetch_scalar so future ports share one
 /// source of truth.
-fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static str, f32> {
-    let mut m = HashMap::new();
+fn ctx_scalars(
+    ctx: &ScoringContext,
+    inputs: &EvalInputs,
+    m: &mut HashMap<&'static str, f32>,
+) {
+    // Ticket 431 Stage E — caller-owned arena. `score_actions` owns one
+    // `HashMap` and passes `&mut` to every `score_dse_by_id` call; this
+    // function clears and re-populates the same allocation each time
+    // instead of allocating a fresh map per DSE (pre-Stage-E: ~48
+    // allocations per cat per scoring pass; post-Stage-E: 1 allocation
+    // per cat per scoring pass, reused across all 48 DSE evaluations).
+    // Mirrors ticket 427's bucket arena pattern.
+    m.clear();
     // Needs-as-urgency (deficit form).
     m.insert("hunger_urgency", (1.0 - ctx.needs.hunger).clamp(0.0, 1.0));
     // Food-stores scarcity (deficit fraction in `[0, 1]`).
@@ -1172,7 +1183,6 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs) -> HashMap<&'static st
         crate::ai::modifier::INTENTION_SOURCE_ORDINAL,
         ctx.intention_source_ordinal,
     );
-    m
 }
 
 /// Ticket 232 — body-state-coupled L3 softmax temperature.
@@ -1428,11 +1438,17 @@ fn day_phase_scalar(phase: DayPhase) -> f32 {
 /// mode/weights, Maslow pre-gate, per-modifier pre/post deltas) into
 /// the capture resource. Non-focal calls take the untraced path and
 /// incur zero capture cost beyond the two `Option` checks below.
-fn score_dse_by_id(dse_id: &str, ctx: &ScoringContext, inputs: &EvalInputs) -> f32 {
+fn score_dse_by_id(
+    dse_id: &str,
+    ctx: &ScoringContext,
+    inputs: &EvalInputs,
+    // Ticket 431 Stage E — caller-owned arena (see `ctx_scalars`).
+    scalars: &mut HashMap<&'static str, f32>,
+) -> f32 {
     let Some(dse) = inputs.dse_registry.cat_dse(dse_id) else {
         return 0.0;
     };
-    let scalars = ctx_scalars(ctx, inputs);
+    ctx_scalars(ctx, inputs, scalars);
     let fetch_scalar =
         |name: &str, _entity: Entity| -> f32 { scalars.get(name).copied().unwrap_or(0.0) };
     // §4 marker lookup — consumes `EvalInputs::markers` populated by
@@ -1693,6 +1709,14 @@ pub fn score_actions(
 ) -> ScoringResult {
     let s = ctx.scoring;
     let mut scores = Vec::with_capacity(12);
+    // Ticket 431 Stage E — `ctx_scalars` arena. One allocation per
+    // `score_actions` call, cleared + reused across all `score_dse_by_id`
+    // invocations below. Pre-Stage-E: ~48 fresh allocations per cat per
+    // scoring pass; post-Stage-E: 1. Pre-size to a comfortable upper
+    // bound on the scalar count (~80 keys today; `with_capacity` here
+    // skips the early HashMap growth re-hashes that the 2026-05-20
+    // flamegraph captured at 1.63% inclusive CPU for the insert path).
+    let mut scalars: HashMap<&'static str, f32> = HashMap::with_capacity(96);
 
     // §13.1 rows 1–3: the inline `if ctx.is_incapacitated` early-return
     // retired. Incapacitation is now enforced as a per-cat §4.3 marker
@@ -1711,7 +1735,7 @@ pub fn score_actions(
     // against `EvalInputs::markers` (populated by the caller from
     // `FoodStores`), returning 0 when the colony has no food.
     {
-        let urgency = score_dse_by_id("eat", ctx, inputs);
+        let urgency = score_dse_by_id("eat", ctx, inputs, &mut scalars);
         if urgency > 0.0 {
             scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
         }
@@ -1723,7 +1747,7 @@ pub fn score_actions(
     // available as a pressure-release valve at low energy even
     // during feeding peaks.
     {
-        let score = score_dse_by_id("sleep", ctx, inputs);
+        let score = score_dse_by_id("sleep", ctx, inputs, &mut scalars);
         scores.push((Action::Sleep, score + jitter(rng, s.jitter_range)));
     }
 
@@ -1731,7 +1755,7 @@ pub fn score_actions(
     // §4 batch 2: inline `ctx.can_hunt` gate retired — HuntDse carries
     // `.require(CanHunt::KEY)`; score_dse_by_id returns 0 on ineligibility.
     {
-        let urgency = score_dse_by_id("hunt", ctx, inputs);
+        let urgency = score_dse_by_id("hunt", ctx, inputs, &mut scalars);
         if urgency > 0.0 {
             scores.push((Action::Hunt, urgency + jitter(rng, s.jitter_range)));
         }
@@ -1741,7 +1765,7 @@ pub fn score_actions(
     // §4 batch 2: inline `ctx.can_forage` gate retired — ForageDse carries
     // `.require(CanForage::KEY)`.
     {
-        let urgency = score_dse_by_id("forage", ctx, inputs);
+        let urgency = score_dse_by_id("forage", ctx, inputs, &mut scalars);
         if urgency > 0.0 {
             scores.push((Action::Forage, urgency + jitter(rng, s.jitter_range)));
         }
@@ -1749,7 +1773,7 @@ pub fn score_actions(
 
     // --- Socialize (§2.3: WS of 6 axes through loneliness + inverted_need_penalty) ---
     if ctx.has_social_target {
-        let score = score_dse_by_id("socialize", ctx, inputs);
+        let score = score_dse_by_id("socialize", ctx, inputs, &mut scalars);
         scores.push((Action::Socialize, score + jitter(rng, s.jitter_range)));
     }
 
@@ -1759,11 +1783,11 @@ pub fn score_actions(
     // resolver. Each Action routes via `from_action` to its own
     // DispositionKind (GroomSelf → Resting, GroomOther → Grooming).
     {
-        let self_score = score_dse_by_id("groom_self", ctx, inputs);
+        let self_score = score_dse_by_id("groom_self", ctx, inputs, &mut scalars);
         scores.push((Action::GroomSelf, self_score + jitter(rng, s.jitter_range)));
     }
     if ctx.has_social_target {
-        let other_score = score_dse_by_id("groom_other", ctx, inputs);
+        let other_score = score_dse_by_id("groom_other", ctx, inputs, &mut scalars);
         scores.push((
             Action::GroomOther,
             other_score + jitter(rng, s.jitter_range),
@@ -1781,25 +1805,25 @@ pub fn score_actions(
         .markers
         .has(crate::components::markers::HasUnburiedCorpse::KEY, inputs.cat)
     {
-        let score = score_dse_by_id("bury", ctx, inputs);
+        let score = score_dse_by_id("bury", ctx, inputs, &mut scalars);
         scores.push((Action::Bury, score + jitter(rng, s.jitter_range)));
     }
 
     // --- Explore (§2.3: CP of curiosity + unexplored_nearby) ---
     {
-        let score = score_dse_by_id("explore", ctx, inputs);
+        let score = score_dse_by_id("explore", ctx, inputs, &mut scalars);
         scores.push((Action::Explore, score + jitter(rng, s.jitter_range)));
     }
 
     // --- Wander (§2.3: WS of curiosity + base_rate + playfulness) ---
     {
-        let score = score_dse_by_id("wander", ctx, inputs);
+        let score = score_dse_by_id("wander", ctx, inputs, &mut scalars);
         scores.push((Action::Wander, score + jitter(rng, s.jitter_range)));
     }
 
     // --- Flee (§2.3: CP of safety_deficit + boldness_inverse) ---
     if ctx.has_threat_nearby || ctx.needs.safety < s.flee_safety_threshold {
-        let score = score_dse_by_id("flee", ctx, inputs);
+        let score = score_dse_by_id("flee", ctx, inputs, &mut scalars);
         scores.push((Action::Flee, score + jitter(rng, s.jitter_range)));
     }
 
@@ -1811,19 +1835,19 @@ pub fn score_actions(
     // health ≥ 0.5) — no external `health_factor` / `safety_factor`
     // multipliers needed.
     if ctx.has_threat_nearby && ctx.allies_fighting_threat >= s.fight_min_allies {
-        let score = score_dse_by_id("fight", ctx, inputs);
+        let score = score_dse_by_id("fight", ctx, inputs, &mut scalars);
         scores.push((Action::Fight, score + jitter(rng, s.jitter_range)));
     }
 
     // --- Patrol (§2.3: CP of safety_deficit + boldness) ---
     if ctx.needs.safety < s.patrol_safety_threshold {
-        let score = score_dse_by_id("patrol", ctx, inputs);
+        let score = score_dse_by_id("patrol", ctx, inputs, &mut scalars);
         scores.push((Action::Patrol, score + jitter(rng, s.jitter_range)));
     }
 
     // --- Build (§2.3: WS of diligence + site_presence + repair_presence) ---
     if ctx.has_construction_site || ctx.has_damaged_building {
-        let score = score_dse_by_id("build", ctx, inputs);
+        let score = score_dse_by_id("build", ctx, inputs, &mut scalars);
         scores.push((Action::Build, score + jitter(rng, s.jitter_range)));
     }
 
@@ -1832,7 +1856,7 @@ pub fn score_actions(
     // Farm DSE's `.require("HasGarden")` eligibility filter resolves
     // against the `HasGarden` colony marker populated by the caller.
     {
-        let urgency = score_dse_by_id("farm", ctx, inputs);
+        let urgency = score_dse_by_id("farm", ctx, inputs, &mut scalars);
         if urgency > 0.0 {
             scores.push((Action::Farm, urgency + jitter(rng, s.jitter_range)));
         }
@@ -1855,7 +1879,7 @@ pub fn score_actions(
     // picks the sub-action directly.
     {
         let gather = if ctx.has_herbs_nearby {
-            score_dse_by_id("herbcraft_gather", ctx, inputs)
+            score_dse_by_id("herbcraft_gather", ctx, inputs, &mut scalars)
         } else {
             0.0
         };
@@ -1866,7 +1890,7 @@ pub fn score_actions(
             ));
         }
         let prepare = if ctx.has_remedy_herbs && ctx.colony_injury_count > 0 {
-            score_dse_by_id("herbcraft_prepare", ctx, inputs)
+            score_dse_by_id("herbcraft_prepare", ctx, inputs, &mut scalars)
         } else {
             0.0
         };
@@ -1880,7 +1904,7 @@ pub fn score_actions(
         // HerbcraftWardDse carries `.require(CanWardFromSupply::KEY)`
         // (084 Commit 2; previously CanWard) which expands the gate to
         // Adult ∧ ¬Injured ∧ (HasWardHerbs ∨ HasStoredThornbriar).
-        let mut ward = score_dse_by_id("herbcraft_ward", ctx, inputs);
+        let mut ward = score_dse_by_id("herbcraft_ward", ctx, inputs, &mut scalars);
         if ward > 0.0 && ctx.wards_under_siege {
             ward += s.herbcraft_ward_siege_bonus * ctx.needs.tier_suppression(2);
         }
@@ -1897,12 +1921,12 @@ pub fn score_actions(
     // retired — softmax now picks the sub-action directly.
     if ctx.magic_affinity > s.magic_affinity_threshold && ctx.magic_skill > s.magic_skill_threshold
     {
-        let scry = score_dse_by_id("magic_scry", ctx, inputs);
+        let scry = score_dse_by_id("magic_scry", ctx, inputs, &mut scalars);
         if scry > 0.0 {
             scores.push((Action::MagicScry, scry + jitter(rng, s.jitter_range)));
         }
         let durable_ward = if ctx.magic_skill > s.magic_durable_ward_skill_threshold {
-            score_dse_by_id("magic_durable_ward", ctx, inputs)
+            score_dse_by_id("magic_durable_ward", ctx, inputs, &mut scalars)
         } else {
             0.0
         };
@@ -1915,14 +1939,14 @@ pub fn score_actions(
         let cleanse = if ctx.on_corrupted_tile
             && ctx.tile_corruption > s.magic_cleanse_corruption_threshold
         {
-            score_dse_by_id("magic_cleanse", ctx, inputs)
+            score_dse_by_id("magic_cleanse", ctx, inputs, &mut scalars)
         } else {
             0.0
         };
         if cleanse > 0.0 {
             scores.push((Action::MagicCleanse, cleanse + jitter(rng, s.jitter_range)));
         }
-        let colony_cleanse = score_dse_by_id("magic_colony_cleanse", ctx, inputs);
+        let colony_cleanse = score_dse_by_id("magic_colony_cleanse", ctx, inputs, &mut scalars);
         if colony_cleanse > 0.0 {
             scores.push((
                 Action::MagicColonyCleanse,
@@ -1930,7 +1954,7 @@ pub fn score_actions(
             ));
         }
         let harvest = if ctx.carcass_nearby {
-            score_dse_by_id("magic_harvest", ctx, inputs)
+            score_dse_by_id("magic_harvest", ctx, inputs, &mut scalars)
         } else {
             0.0
         };
@@ -1938,7 +1962,7 @@ pub fn score_actions(
             scores.push((Action::MagicHarvest, harvest + jitter(rng, s.jitter_range)));
         }
         let commune = if ctx.on_special_terrain {
-            score_dse_by_id("magic_commune", ctx, inputs)
+            score_dse_by_id("magic_commune", ctx, inputs, &mut scalars)
         } else {
             0.0
         };
@@ -1953,7 +1977,7 @@ pub fn score_actions(
     // `.require("IsCoordinatorWithDirectives")` on its EligibilityFilter,
     // so `score_dse_by_id` returns 0.0 for non-coordinator cats.
     {
-        let score = score_dse_by_id("coordinate", ctx, inputs);
+        let score = score_dse_by_id("coordinate", ctx, inputs, &mut scalars);
         if score > 0.0 {
             scores.push((Action::Coordinate, score + jitter(rng, s.jitter_range)));
         }
@@ -1966,7 +1990,7 @@ pub fn score_actions(
     // `score_dse_by_id` returns 0.0 for cats with no mentoring target.
     // (Mirrors the `mate` retire pattern below.)
     {
-        let score = score_dse_by_id("mentor", ctx, inputs);
+        let score = score_dse_by_id("mentor", ctx, inputs, &mut scalars);
         if score > 0.0 {
             scores.push((Action::Mentor, score + jitter(rng, s.jitter_range)));
         }
@@ -1979,7 +2003,7 @@ pub fn score_actions(
     // cats without the marker. (Mirrors the `coordinate` retire pattern
     // ~20 lines above.)
     {
-        let urgency = score_dse_by_id("mate", ctx, inputs);
+        let urgency = score_dse_by_id("mate", ctx, inputs, &mut scalars);
         if urgency > 0.0 {
             scores.push((Action::Mate, urgency + jitter(rng, s.jitter_range)));
         }
@@ -2017,7 +2041,7 @@ pub fn score_actions(
     let hungry_enough_to_cook = ctx.needs.hunger > s.cook_hunger_gate;
     let mut wants_cook_but_no_kitchen = false;
     if hungry_enough_to_cook {
-        let score = score_dse_by_id("cook", ctx, inputs);
+        let score = score_dse_by_id("cook", ctx, inputs, &mut scalars);
         if score > 0.0 {
             scores.push((Action::Cook, score + jitter(rng, s.jitter_range)));
         } else if ctx.has_raw_food_in_stores && !ctx.has_functional_kitchen {
@@ -2068,7 +2092,7 @@ pub fn score_actions(
     let has_dependent_kitten =
         inputs.markers.has(crate::components::markers::Parent::KEY, inputs.cat);
     if has_dependent_kitten || ctx.hungry_kitten_urgency > 0.0 {
-        let mut score = score_dse_by_id("caretake", ctx, inputs);
+        let mut score = score_dse_by_id("caretake", ctx, inputs, &mut scalars);
         if inputs
             .markers
             .has(crate::components::markers::HasJuvenileDependent::KEY, inputs.cat)
@@ -2097,25 +2121,25 @@ pub fn score_actions(
     // every cat — the §3.5.1 modifier pipeline never sees their curves
     // and doesn't lift default-zero scores into the L3 pool.
     {
-        let score = score_dse_by_id("discard", ctx, inputs);
+        let score = score_dse_by_id("discard", ctx, inputs, &mut scalars);
         if score > 0.0 {
             scores.push((Action::Drop, score + jitter(rng, s.jitter_range)));
         }
     }
     {
-        let score = score_dse_by_id("trash", ctx, inputs);
+        let score = score_dse_by_id("trash", ctx, inputs, &mut scalars);
         if score > 0.0 {
             scores.push((Action::Trash, score + jitter(rng, s.jitter_range)));
         }
     }
     {
-        let score = score_dse_by_id("handoff", ctx, inputs);
+        let score = score_dse_by_id("handoff", ctx, inputs, &mut scalars);
         if score > 0.0 {
             scores.push((Action::Handoff, score + jitter(rng, s.jitter_range)));
         }
     }
     {
-        let score = score_dse_by_id("pick_up", ctx, inputs);
+        let score = score_dse_by_id("pick_up", ctx, inputs, &mut scalars);
         if score > 0.0 {
             scores.push((Action::PickUp, score + jitter(rng, s.jitter_range)));
         }
@@ -2127,7 +2151,7 @@ pub fn score_actions(
     // `idle_minimum_floor` — post-composition floor per §2.3 baked
     // into the base axis rather than a §3.5 modifier.
     {
-        let score = score_dse_by_id("idle", ctx, inputs);
+        let score = score_dse_by_id("idle", ctx, inputs, &mut scalars);
         scores.push((Action::Idle, score + jitter(rng, s.jitter_range)));
     }
 
@@ -5544,10 +5568,14 @@ mod tests {
             exploration_map: &exploration_with_frontier,
             ..base
         };
-        let score_fresh = score_dse_by_id("explore", &ctx_fresh, &inputs_fresh);
+        // Ticket 431 Stage E — caller-owned scratch arena.
+        let mut scalars: HashMap<&'static str, f32> = HashMap::new();
+        let score_fresh =
+            score_dse_by_id("explore", &ctx_fresh, &inputs_fresh, &mut scalars);
         // No frontier (default empty map): centroid = None → spatial
         // axis = 0 → CP gates Explore to 0.
-        let score_no_frontier = score_dse_by_id("explore", &ctx_fresh, &test_eval_inputs());
+        let score_no_frontier =
+            score_dse_by_id("explore", &ctx_fresh, &test_eval_inputs(), &mut scalars);
         assert!(
             score_fresh > 0.0,
             "explore should score > 0 with a frontier; got {score_fresh}"
