@@ -1,7 +1,7 @@
 ---
 id: 427
 title: Per-tick allocation hotspots scratch buffer reuse Vec HashMap arenas across DSE target filters route_cost planner
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-19
 ---
 
 ## Why
@@ -148,3 +148,4 @@ End-state:
   Explore subagent — see ticket body for findings table. User
   directive: "dig for other memory costly operations and open in a
   followup ticket." Estimated 3–5% additional tick-rate recovery.
+- 2026-05-19: all 7 steps landed; +3.9% throughput (75903 ticks/900s vs 73035 pre-427 baseline); verdict PASS (survival, continuity, constants_drift clean); frame-diff concordance ok (byte-identical DSE scoring; Δ mean < ±0.01 absolute on all 15 tracked DSEs, drift is from extra ticks running, not from scoring changes)
