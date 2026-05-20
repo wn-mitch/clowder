@@ -125,12 +125,53 @@ pub fn update_near_pair_cache(
 /// the sweep — the work moves to `update_near_pair_cache`, which only
 /// runs on movement, so most ticks see only the small per-pair iteration
 /// below.
+#[allow(clippy::type_complexity)]
 pub fn passive_familiarity(
     cache: Res<NearPairCache>,
     mut relationships: ResMut<Relationships>,
     constants: Res<SimConstants>,
     time_scale: Res<TimeScale>,
+    // 431 Stage B drift investigation — debug-only brute-force pair-set
+    // comparison. Builds the set of `(a, b)` pairs the pre-Stage-B O(N²)
+    // sweep would have visited and panics if it diverges from `cache.pairs`.
+    // First panic localizes the exact tick + pair where `update_near_pair_cache`
+    // diverges from the original loop's invariant. Release builds skip both
+    // params (zero cost).
+    #[cfg(debug_assertions)] cats: Query<
+        (Entity, &Position),
+        (Without<Dead>, Without<Structure>),
+    >,
+    #[cfg(debug_assertions)] time: Res<TimeState>,
 ) {
+    #[cfg(debug_assertions)]
+    {
+        let range = constants.social.passive_familiarity_range;
+        let cats_vec: Vec<(Entity, Position)> = cats.iter().map(|(e, p)| (e, *p)).collect();
+        let mut brute: BTreeSet<(Entity, Entity)> = BTreeSet::new();
+        for i in 0..cats_vec.len() {
+            for j in (i + 1)..cats_vec.len() {
+                if cats_vec[i].1.manhattan_distance(&cats_vec[j].1) <= range {
+                    brute.insert(normalize_pair(cats_vec[i].0, cats_vec[j].0));
+                }
+            }
+        }
+        let cached: BTreeSet<(Entity, Entity)> = cache.pairs.keys().copied().collect();
+        if cached != brute {
+            let only_cache: Vec<(Entity, Entity)> =
+                cached.difference(&brute).copied().collect();
+            let only_brute: Vec<(Entity, Entity)> =
+                brute.difference(&cached).copied().collect();
+            panic!(
+                "NearPairCache divergence at tick {}: only_in_cache={:?}, only_in_brute={:?}, cache_size={}, brute_size={}",
+                time.tick,
+                only_cache,
+                only_brute,
+                cached.len(),
+                brute.len(),
+            );
+        }
+    }
+
     let passive_familiarity_rate = constants
         .social
         .passive_familiarity_rate
