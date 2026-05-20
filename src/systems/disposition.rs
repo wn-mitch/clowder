@@ -1208,11 +1208,13 @@ pub fn evaluate_dispositions(
 
         // Store all gate-open action scores for diagnostics (unchanged from
         // evaluate_actions). Truncation removed 2026-04-20 to match goap.rs.
-        {
-            let mut sorted = scores.clone();
-            sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            current.last_scores = sorted;
-        }
+        // Ticket 427 Step 7 — reuse `current.last_scores`'s existing
+        // allocation across ticks instead of cloning the score Vec each
+        // tick (this site is on the hot path — every cat every tick).
+        current.last_scores.clone_from(&scores);
+        current
+            .last_scores
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Insert the Disposition component. Chain creation happens in disposition_to_chain.
         // adopted_tick is 0 here; resolve_disposition_chains will set it from TimeState.

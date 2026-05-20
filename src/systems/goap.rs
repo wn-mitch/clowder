@@ -2557,11 +2557,14 @@ pub fn evaluate_and_plan(
         // diagnostics. Truncation removed 2026-04-20 so scoring-competition
         // analysis can see ranks beyond the top few (e.g., Mate vs Socialize
         // on shared ticks).
-        {
-            let mut sorted = scores.clone();
-            sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            current.last_scores = sorted;
-        }
+        //
+        // Ticket 427 Step 7 — `clone_from` reuses the existing
+        // `current.last_scores` allocation across cat-ticks instead of
+        // discarding+allocating per call. Hot path: every cat every tick.
+        current.last_scores.clone_from(&scores);
+        current
+            .last_scores
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // 155: post-softmax `CraftingHint` recovery retired. The L3
         // softmax's chosen Action is now itself the sub-mode picker —
