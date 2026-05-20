@@ -14,18 +14,18 @@ _Last generated: 2026-05-20._
 
 | Status | Count |
 |---|---|
-| In progress | 4 |
+| In progress | 5 |
 | Ready | 116 |
 | Parked | 13 |
 | Blocked | 34 |
-| **Open total** | **167** |
+| **Open total** | **168** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (4 in-progress · 0 ready blockers · 5 next-recommended)
+## Active focus (5 in-progress · 0 ready blockers · 5 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
@@ -35,14 +35,15 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
+- **[431](docs/open-work/tickets/431-hot-frame-catalog-per-tick-vs-event-driven-audit-of-top-10-cpu-consumers.md)** — Top-10 hot-frame remediation — passive_familiarity (64% CPU) + per-tick discipline event-driven sweep — _[ai-substrate] · added 2026-05-20_
 
 ### Next-recommended (from `just next`)
 
-- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.92_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
 - **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · score 0.91_
-- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.90_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
+- **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
 
@@ -56,12 +57,13 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 | **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 26 | 16 | 10 (0 / 6 / 2 / 2) | `▰▰▰▰▰▰▱▱▱▱` 62% |
 
-## In progress (4)
+## In progress (5)
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
+- **[431](docs/open-work/tickets/431-hot-frame-catalog-per-tick-vs-event-driven-audit-of-top-10-cpu-consumers.md)** — Top-10 hot-frame remediation — passive_familiarity (64% CPU) + per-tick discipline event-driven sweep — _[ai-substrate] · added 2026-05-20_
 
 ## Ready by cluster (116)
 
@@ -498,13 +500,12 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[422](docs/open-work/tickets/422-curio-cache-routing-deposit-prefix-on-curio-cache.md)** — Curio Cache routing — deposit-prefix on curio Cache — _[items-crafting] · blocked-by 016 · added 2026-05-19_
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · blocked-by 205 · added 2026-05-19_
 
-## Landed archive (292)
+## Landed archive (291)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (226)
+### 2026-05 (225)
 
-- **[431](docs/open-work/landed/431-hot-frame-catalog-per-tick-vs-event-driven-audit-of-top-10-cpu-consumers.md)** — Hot-frame catalog: per-tick vs event-driven audit of top-10 CPU consumers _(2026-05-20)_
 - **[430](docs/open-work/landed/430-add-just-flamegraph-recipe-macos-dtrace-setup-doc.md)** — Add just flamegraph recipe + macOS dtrace setup doc _(2026-05-20)_
 - **[428](docs/open-work/landed/428-handoffitem-goap-path-resolver-reads-empty-kitten-snapshot-substrate-stub-silent-fail.md)** — HandoffItem goap-path resolver reads empty kitten_snapshot — substrate-stub silent fail _(2026-05-20)_
 - **[427](docs/open-work/landed/427-per-tick-allocation-hotspots-scratch-buffer-reuse-vec-hashmap-arenas-across-dse-target-filters-route-cost-planner.md)** — Per-tick allocation hotspots scratch buffer reuse Vec HashMap arenas across DSE target filters route_cost planner _(2026-05-19)_

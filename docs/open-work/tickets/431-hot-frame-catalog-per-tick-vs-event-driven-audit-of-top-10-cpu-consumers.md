@@ -1,8 +1,8 @@
 ---
 id: 431
-title: Hot-frame catalog: per-tick vs event-driven audit of top-10 CPU consumers
-status: done
-cluster: tooling-diagnostics-ui
+title: Top-10 hot-frame remediation — passive_familiarity (64% CPU) + per-tick discipline event-driven sweep
+status: in-progress
+cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-20
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: 6f370d971fff
-landed-on: 2026-05-20
+landed-at: null
+landed-on: null
 ---
 
 ## Why
@@ -25,26 +25,32 @@ This ticket is the **catalog + classification pass** for the top-10 hot CPU cons
 
 ## Scope
 
-- Profile the post-428 binary once more for a clean 60s sample as a reference. Save the resulting `samply` profile (`/tmp/samply-428-sym.json.gz` + `.syms.json`) into `docs/diagnostics/baseline-profiles/2026-05-20-post-428/` so future profiles can be compared against it.
-- Audit each of the top 10 hot frames per the constraint above (per-tick? cachable? event-driven candidate?). For each, name:
-  - Self % and inclusive % from the 2026-05-20 profile
-  - The system's current execution model (per-tick / per-cat / per-event)
-  - The data structure it mutates
-  - Whether the underlying state-change is event-driven (a discrete trigger) or continuous (decay, accumulation)
-  - The substrate that would let us cache / invalidate-on-message instead of per-tick recompute
-  - The seed-determinism constraint (if any — see Relationships note below)
-- Open per-item follow-on tickets for any candidate that scores high enough (cluster-appropriate; some go to `ai-substrate`, some to `social-coordination`, some to `tooling-diagnostics-ui`).
-- Update CLAUDE.md "ECS rules" section with the per-tick discipline doctrine: prefer messages + cache-invalidation over per-tick recompute; surface the seed-determinism trap (`Relationships` uses `BTreeMap`, not `HashMap`, by deliberate choice — see [`src/resources/relationships.rs:55-63`](src/resources/relationships.rs)).
+Implement the five catalog fixes as six independently-verified stages (one commit per stage with a byte-identical `_footer` determinism gate before the next begins). Stages are ordered so each one's substrate becomes available to the next consumer:
+
+- **Stage A** — author `CatMoved { entity, from, to }` Bevy `Message`; emit from every Position-mutation site under `src/steps/`; no consumer yet. Substrate-only verification.
+- **Stage B** — `NearPairCache` resource (`BTreeMap<(Entity,Entity), i32>`, key in `(min, max)` order to preserve the existing `for i / for j>i` float-add order); `update_near_pair_cache` system reads `MessageReader<CatMoved>` and incrementally updates the cache; `passive_familiarity` iterates the cache instead of running an O(N²) sweep. **Expected CPU drop: 64.43% → < 5% inclusive.**
+- **Stage C** — `MapTileChanged` Bevy `Message` + `RouteCostCache` resource keyed by `(Entity, GoalZoneId)`. Invalidate per-cat on `CatMoved`; coarse drop on `MapTileChanged` (refine later if measured). Consumer: `evaluate_and_plan` at [`src/systems/goap.rs:1301`](src/systems/goap.rs) via `cache.get_or_compute(cat, goal_zone)`. Addresses catalog rows #4 (`flood_dijkstra`) + #10 (`find_full_path`).
+- **Stage D** — `RelationshipChanged { a, b }` Bevy `Message` emitted from every `Relationships::modify_*`. Per-entity `all_for_cache: BTreeMap<Entity, Vec<(Entity, Relationship)>>` invalidated on the message. Consumer: `emit_cat_snapshots` at [`src/systems/snapshot.rs:98-99`](src/systems/snapshot.rs). Addresses catalog row #5.
+- **Stage E** — `ctx_scalars` HashMap arena (mirror ticket 427's pattern). Site: [`src/ai/scoring.rs:700-701`](src/ai/scoring.rs); caller `score_dse_by_id` at line ~1435. Pass a caller-owned `&mut HashMap<&'static str, f32>` cleared between calls to retire the per-DSE rehash cost. Addresses catalog row #9.
+- **Stage F** — L1 marker-snapshot hoist (catalog #3 partial). Build `ColonyMarkerSnapshot` once per FixedUpdate in a new `populate_colony_marker_snapshot` system; per-cat `MarkerSnapshot::new()` at [`goap.rs:1480`](src/systems/goap.rs) becomes a thin per-cat overlay. **Decision deferred to end of Stage E**: if overlap with ticket 432's `WorldSnapshots` becomes meaningful, fold this stage into 432 rather than open a parallel substrate.
+- **Stage G** — CLAUDE.md "ECS rules" doctrine update: codify *default to event-driven, justify per-tick* (the legitimate per-tick categories: plan execution, sense+score, time-dependent decay, movement/physics; everything else should be Bevy `Message` + cached state). Capture post-431 flamegraph as `docs/diagnostics/baseline-profiles/2026-05-20-post-431/` for future regression comparison.
+
+Each stage's determinism gate is non-optional: `just soak-trace 42 Mallow` before + after; `_footer` lines must be byte-identical. The catalog (the original open-time investigation) is preserved verbatim below as a record of the diagnostic pass that motivated each stage.
 
 ## Out of scope
 
-- **Implementing any of the per-item optimizations.** Those are per-frame follow-on tickets. This ticket is *naming the work*.
-- **Bench harness or CI perf gates.** Different ticket; this is local-diagnosis-driven.
-- **Optimizing systems below the top 10.** The long tail (`flood_dijkstra` aside) is < 1% each; tackling them is premature.
+- **Bench harness or CI perf gates** — different ticket; this is local-diagnosis-driven.
+- **Optimizing systems below the top 10** — the long tail is < 1% each; premature.
+- **Ticket 432's `WorldSnapshots` cross-system dedupe** — Stage F may coordinate with it but cross-planner `kitten_snapshot` / `cat_positions` stays in 432.
+- **Ticket 205's `CatSpatialIndex`** — 431 builds its own pair-set cache (`NearPairCache`) without a general spatial index. If 205 lands later, `NearPairCache` becomes a thin consumer of it.
+- **`check_bonds` retire** (catalog honorable mention) — runs once per `bond_check_interval`, not per tick; deferred.
+- **`joint_intention::author_joint_intentions`** (honorable mention 0.68% inclusive) — could fire on an `IntentionEmitted` message instead of per-tick; deferred.
 
 ## Current state
 
 Opened 2026-05-20 as a §428 follow-on. The investigation surfaced when verifying §428's drain fix didn't cause the -14.6% wall-clock tick-rate drop — the flamegraph confirmed §428 was 1.88% (effectively free), and the *actual* CPU consumers came into focus. The profile is captured at `/tmp/samply-428-sym.json.gz` (790KB) + `.syms.json` (sidecar). Ticket 430 wires the recipe; this ticket interprets the output.
+
+**2026-05-20 reopened.** Original landing as a "catalog-only" artifact violated the *antipattern follow-ups are non-optional* doctrine in CLAUDE.md. Scope shifted from "name the work" to "implement all five fixes against six independent seed-determinism gates" — see Stages A–G above. The catalog block below is the open-time investigation record, preserved verbatim because each row maps to a stage.
 
 ## The catalog (top 10 hot frames, 2026-05-20 profile)
 
@@ -219,3 +225,4 @@ The Bevy 0.18 substrate already supports this: `#[derive(Message)]` + `MessageRe
 - 2026-05-20: opened as a §428 follow-on. The first end-to-end flamegraph on this codebase surfaced `passive_familiarity` at 64.43% inclusive CPU — a striking single-system concentration. Cataloged top 10 hot frames with their per-tick / event-driven characterization. Doctrine to codify: per-tick is for execution + time-dependent physics; everything else should be message-driven with cached state. The Relationships BTreeMap seed-determinism constraint is the load-bearing nuance — naive HashMap swap is forbidden.
 - 2026-05-20: catalog delivered as the audit table in this ticket body; baseline profile archived at `docs/diagnostics/baseline-profiles/2026-05-20-post-428/profile.json.gz` (+ `.syms.json` sidecar). The remaining Scope items — opening per-item follow-on tickets (passive_familiarity cache, path-cost cache, Relationships::all_for cache, DSE scratchpad pre-sizing) and updating CLAUDE.md "ECS rules" with the event-driven doctrine — are deferred to a future session; this ticket lands with the audit + baseline as the durable artifact, so any follow-on perf work has a snapshot to compare against. The doctrine memory is saved cross-session at `~/.claude/projects/-Users-will-mitchell-clowder/memory/project_per_tick_discipline_default_event_driven.md`.
 - 2026-05-20: Catalog complete: passive_familiarity 64.43%, evaluate_and_plan 24.37%, flood_dijkstra 3.52%, then a long tail under 2%. Baseline samply profile archived at docs/diagnostics/baseline-profiles/2026-05-20-post-428/. Doctrine memory saved cross-session. Per-item follow-on tickets (cache + event-driven invalidation per the table) deferred to future sessions; this ticket's lasting value is the audit + reference profile.
+- 2026-05-20 (reopen): the prior "catalog-only" landing was premature — five concrete fix items were named with file:line precision but never opened as follow-on tickets, violating CLAUDE.md's *antipattern follow-ups are non-optional* doctrine. Per user directive, scope is folded back into 431 itself as a six-stage event-driven sweep (Stages A–G in §Scope). Catalog block below preserved verbatim as the open-time investigation record. Each stage lands as an independent commit gated by byte-identical `_footer` against `just soak-trace 42 Mallow`. Final post-refactor flamegraph captures to `docs/diagnostics/baseline-profiles/2026-05-20-post-431/`.
