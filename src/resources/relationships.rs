@@ -112,18 +112,27 @@ impl Relationships {
 
     /// All relationships involving `entity`, yielding `(other_entity, &Relationship)`.
     pub fn all_for(&self, entity: Entity) -> Vec<(Entity, &Relationship)> {
-        self.data
-            .iter()
-            .filter_map(move |(&(a, b), rel)| {
-                if a == entity {
-                    Some((b, rel))
-                } else if b == entity {
-                    Some((a, rel))
-                } else {
-                    None
-                }
-            })
-            .collect()
+        self.iter_for(entity).collect()
+    }
+
+    /// Ticket 427 Step 4 — no-alloc iterator over relationships
+    /// involving `entity`. Preferred over [`Self::all_for`] when the
+    /// caller only iterates / filters / sums — `all_for` materializes
+    /// the entire Vec which the 427 perf survey flagged as a small but
+    /// avoidable per-tick alloc hotspot (~800 KB/soak).
+    pub fn iter_for(
+        &self,
+        entity: Entity,
+    ) -> impl Iterator<Item = (Entity, &Relationship)> + '_ {
+        self.data.iter().filter_map(move |(&(a, b), rel)| {
+            if a == entity {
+                Some((b, rel))
+            } else if b == entity {
+                Some((a, rel))
+            } else {
+                None
+            }
+        })
     }
 
     /// Iterate over all relationship pairs mutably.

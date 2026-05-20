@@ -36,12 +36,20 @@ pub fn social_weight(
     memory: &Memory,
     constants: &crate::resources::sim_constants::CoordinationConstants,
 ) -> f32 {
-    let rels = relationships.all_for(entity);
-    let positive_fondness_sum: f32 = rels.iter().map(|(_, r)| r.fondness.max(0.0)).sum();
-    let avg_familiarity: f32 = if rels.is_empty() {
+    // Ticket 427 Step 4 — single-pass aggregate over `iter_for` instead
+    // of materializing the full `all_for` Vec.
+    let mut positive_fondness_sum = 0.0f32;
+    let mut familiarity_sum = 0.0f32;
+    let mut count = 0usize;
+    for (_, r) in relationships.iter_for(entity) {
+        positive_fondness_sum += r.fondness.max(0.0);
+        familiarity_sum += r.familiarity;
+        count += 1;
+    }
+    let avg_familiarity: f32 = if count == 0 {
         0.0
     } else {
-        rels.iter().map(|(_, r)| r.familiarity).sum::<f32>() / rels.len() as f32
+        familiarity_sum / count as f32
     };
     let significant_events = memory
         .events

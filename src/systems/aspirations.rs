@@ -574,9 +574,10 @@ pub fn track_milestones(
                 }
                 crate::components::aspirations::ProgressTracker::FormBond { bond_type } => {
                     let target = *bond_type;
+                    // Ticket 427 Step 4 — `.any()` short-circuits; no
+                    // need to materialize the Vec.
                     let has_bond = relationships
-                        .all_for(cat_entity)
-                        .iter()
+                        .iter_for(cat_entity)
                         .any(|(_, rel)| rel.bond.is_some_and(|b| b >= target));
                     if has_bond {
                         asp.last_progress_tick = time.tick;

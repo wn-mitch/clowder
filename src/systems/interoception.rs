@@ -390,16 +390,20 @@ pub fn social_status_distress(
             .get(focal_entity, other_entity)
             .map(|r| r.fondness.clamp(0.0, 1.0))
             .unwrap_or(0.0);
-        let bonds: Vec<f32> = relationships
-            .all_for(other_entity)
-            .into_iter()
-            .filter(|(e, _)| *e != focal_entity)
-            .map(|(_, r)| r.fondness.clamp(0.0, 1.0))
-            .collect();
-        if bonds.is_empty() {
+        // Ticket 427 Step 4 — iterate without allocating the bonds vec.
+        let mut sum = 0.0f32;
+        let mut count = 0usize;
+        for (e, r) in relationships.iter_for(other_entity) {
+            if e == focal_entity {
+                continue;
+            }
+            sum += r.fondness.clamp(0.0, 1.0);
+            count += 1;
+        }
+        if count == 0 {
             0.0
         } else {
-            let avg = bonds.iter().sum::<f32>() / bonds.len() as f32;
+            let avg = sum / count as f32;
             (avg - focal_bond).clamp(0.0, 1.0)
         }
     };
