@@ -608,6 +608,26 @@ pub struct ExecutorContext<'w, 's> {
         &'static mut crate::components::physical::Needs,
         (Without<GoapPlan>, Without<Dead>, Without<Structure>),
     >,
+    /// §428: kitten-recipient handoff drain target. Mirror of
+    /// `kitten_needs` — disjoint from the adult cats query (kittens
+    /// don't carry `GoapPlan`), so the post-loop `HandoffPending`
+    /// drain at `resolve_goap_plans` can grab `&mut Inventory` on a
+    /// kitten recipient without conflicting with the adult-side
+    /// iteration. Without this, kitten-recipient handoffs at
+    /// `goap.rs:4917` silently dropped because `cats.get_many_mut`
+    /// excludes kittens by the `With<GoapPlan>` requirement —
+    /// substrate over-filtering. Per the items-are-real pillar
+    /// (kittens are cats with limited behaviors; their `Inventory`
+    /// is a real slot), the transfer must physically land in the
+    /// kitten's Inventory. Hunger consumption from kitten's own
+    /// Inventory is a separate concern (autoconsume substrate not
+    /// in scope here).
+    pub kitten_inventory_q: bevy_ecs::prelude::Query<
+        'w,
+        's,
+        &'static mut Inventory,
+        (Without<GoapPlan>, Without<Dead>, Without<Structure>),
+    >,
     /// §6.5.4 groom-other kinship lookup — read-only snapshot of
     /// `(kitten_entity) → (mother, father)` pointers. Disjoint from
     /// the mutable `cats` query by `With<KittenDependency>` (kittens
@@ -3816,13 +3836,42 @@ pub fn resolve_goap_plans(
             .iter()
             .map(|(e, _, name, _)| (e, name.0.clone()))
             .collect(),
-        // §Phase 4c.3: kitten snapshot for goap-path Caretake / FeedKitten.
-        // Built from the main cats query itself (immutable pre-loop
-        // iteration) to avoid a separate kitten query that would conflict
-        // with `&mut Needs`. Only kittens with GoapPlan end up here; the
-        // disposition path (`resolve_disposition_chains`) captures
-        // kittens on the chain-building branch separately.
-        kitten_snapshot: Vec::new(),
+        // §428: populate kitten_snapshot from `ec.kitten_parentage`
+        // (entity / pos / parentage) + `ec.kitten_needs.get(entity)`
+        // (immutable hunger lookup). The HandoffItem goap-path resolver
+        // at line 7322 reads this snapshot to recover a recipient when
+        // `target_entity` was cleared mid-plan by one of the eight
+        // `disposition.rs` clear sites. The previous `Vec::new()` was a
+        // substrate-stub class defect (same class as tickets 209 / 084):
+        // marker authored + DSE elects + planner emits, but the resolver
+        // read from an empty Vec and hard-failed with `handoff: no
+        // recipient on disposition (no dependent cat in colony)` 177k+
+        // times per overnight soak.
+        //
+        // The previous "&mut Needs conflict" justification was
+        // misdirected: `kitten_parentage` is `Without<GoapPlan>`,
+        // disjoint from the cats query that holds `&mut Needs` on
+        // adults; `kitten_needs.get()` returns immutable `&Needs` from
+        // the mut query, and its later `get_mut` drain runs sequentially
+        // after snapshot construction.
+        kitten_snapshot: ec
+            .kitten_parentage
+            .iter()
+            .map(|(entity, dep, pos, _released)| {
+                let hunger = ec
+                    .kitten_needs
+                    .get(entity)
+                    .map(|needs| needs.hunger)
+                    .unwrap_or(1.0);
+                crate::ai::caretake_targeting::KittenState {
+                    entity,
+                    pos: *pos,
+                    hunger,
+                    mother: dep.mother,
+                    father: dep.father,
+                }
+            })
+            .collect(),
         building_snapshot,
     };
 
@@ -4876,28 +4925,70 @@ pub fn resolve_goap_plans(
         }
     }
 
-    // Ticket 177: deferred handoffs. The dispatch arm pre-validated the
-    // actor side and queued the (actor, recipient) pair; here we hold
-    // both `&mut Inventory` borrows simultaneously via
-    // `cats.get_many_mut`, which Bevy permits because the entity IDs
-    // are distinct. The actual transfer + Feature emission happen here.
-    // If `get_many_mut` Errs (recipient gone, same-entity self-handoff
-    // sneaks through, etc.), we silently drop — the actor's slot stays
-    // put per `transfer_item_inventory_to_inventory`'s items-are-real
-    // contract, and no Feature fires.
+    // Ticket 177 / §428: deferred handoffs. The dispatch arm pre-
+    // validated the actor side and queued the (actor, recipient) pair.
+    //
+    // Two recipient branches:
+    //   1. Adult recipient — both inventories live on the `cats` query
+    //      (`With<GoapPlan>`); `cats.get_many_mut([actor, recipient])`
+    //      grabs both `&mut Inventory` borrows in one call.
+    //   2. Kitten recipient — kitten is `Without<GoapPlan>` and so
+    //      excluded from `cats`. Per the items-are-real / kittens-are-
+    //      cats pillars, the kitten's `Inventory` is a real slot and the
+    //      transfer must physically land. Use the disjoint
+    //      `ec.kitten_inventory_q` (mirror of `kitten_needs`) to grab
+    //      `&mut Inventory` on the kitten while holding `&mut Inventory`
+    //      on the adult from `cats.get_mut`. The two queries are
+    //      statically disjoint (`With<GoapPlan>` vs `Without<GoapPlan>`),
+    //      so Bevy permits the concurrent mut borrows.
+    //
+    // Pre-§428: the kitten branch silently dropped — the resolver at
+    // goap.rs:7322 found a kitten recipient (post the same ticket's
+    // R2b snapshot populate), pushed `HandoffPending`, and the drain
+    // here Errd on `get_many_mut` because the kitten wasn't in `cats`.
+    // The food never moved, no Feature fired, and the adult was stuck
+    // in a no-op Handing loop (inventory_excess stayed high → Handing
+    // re-elected → same drop). Now both branches land the slot in the
+    // recipient's `Inventory`.
+    //
+    // Hunger consumption from the kitten's own Inventory is a separate
+    // substrate concern (not in scope for §428).
     for pending in std::mem::take(&mut accum.handoff_pending) {
         if pending.actor == pending.recipient {
             continue;
         }
-        let Ok([mut actor_row, mut recipient_row]) =
+        if let Ok([mut actor_row, mut recipient_row]) =
             cats.get_many_mut([pending.actor, pending.recipient])
-        else {
+        {
+            let actor_inv: &mut Inventory = &mut actor_row.0 .6;
+            let recipient_inv: &mut Inventory = &mut recipient_row.0 .6;
+            let outcome = crate::steps::disposition::resolve_handoff(
+                actor_inv,
+                pending.recipient,
+                recipient_inv,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::ItemHandedOff,
+            );
+            continue;
+        }
+        // Adult lookup failed for the pair — try the kitten-recipient
+        // branch. Actor must still be an adult (only adults plan), so
+        // `cats.get_mut(actor)` must succeed; recipient sits in the
+        // disjoint kitten query.
+        let Ok(mut actor_row) = cats.get_mut(pending.actor) else {
+            continue;
+        };
+        let Ok(mut recipient_inv) = ec.kitten_inventory_q.get_mut(pending.recipient) else {
             continue;
         };
         let actor_inv: &mut Inventory = &mut actor_row.0 .6;
-        let recipient_inv: &mut Inventory = &mut recipient_row.0 .6;
-        let outcome =
-            crate::steps::disposition::resolve_handoff(actor_inv, pending.recipient, recipient_inv);
+        let outcome = crate::steps::disposition::resolve_handoff(
+            actor_inv,
+            pending.recipient,
+            &mut recipient_inv,
+        );
         outcome.record_if_witnessed(
             narr.activation.as_deref_mut(),
             crate::resources::system_activation::Feature::ItemHandedOff,

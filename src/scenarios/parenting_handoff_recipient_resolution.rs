@@ -192,7 +192,14 @@ fn inject_handoff_plan(world: &mut World, parent: Entity, current_tick: u64) {
             cost: 1,
         }],
         current_step: 0,
-        kind: DispositionKind::Caretaking,
+        // Match the production canary's disposition: `Handing` is the
+        // DSE whose plan template is `[HandoffItem]` (single-step;
+        // `handing_actions()` in `src/ai/planner/actions.rs:415`).
+        // `Caretaking → [Caretake]` (different chain — uses FeedKitten
+        // for the kitten-side hunger boost, not HandoffItem). The 177k
+        // production canary fires under Handing when an adult has
+        // surplus food and a hungry kitten is in range.
+        kind: DispositionKind::Handing,
         adopted_tick: current_tick.saturating_sub(1),
         trips_done: 0,
         target_trips: 1,
@@ -212,29 +219,41 @@ mod tests {
     use crate::components::physical::Needs;
     use crate::scenarios::runner::build_scenario_app;
 
-    /// The substrate-correctness assertion. The parent has an in-flight
-    /// Caretaking plan with `HandoffItem` as its only step, no
-    /// `target_entity`, food in inventory. The live kitten is
-    /// co-located in the same tile, hunger = 0.05.
+    /// The end-to-end substrate-correctness assertion under the items-
+    /// are-real + kittens-are-cats pillars. Parent has an in-flight
+    /// `Handing` plan with `HandoffItem` as its only step, no
+    /// `target_entity`, 1 RawMouse in inventory. The live kitten Crumb
+    /// is co-located in the same tile, hunger = 0.05.
     ///
-    /// Post-fix the goap-path resolver finds the kitten and the handoff
-    /// completes — Crumb's hunger rises and Magnolia's inventory drops
-    /// from 1 to 0. Pre-fix the resolver iterates the static `Vec::new()`
-    /// snapshot, returns `StepResult::Fail("handoff: no recipient on
-    /// disposition (no dependent cat in colony)")`, and nothing moves.
-    // Ignored until ticket 428's R2b lands — this test is the failing
-    // gate that the fix flips GREEN. Remove `#[ignore]` as part of the
-    // landing PR. Per CLAUDE.md "Tests gate commits", landing a known-
-    // failing test would regress CI; the `#[ignore]` keeps the harness
-    // committable while preserving the assertion shape for the fix PR.
+    /// Three substrate links must all hold for this to pass:
+    ///   1. R2b populate (`goap.rs:3819`) — `kitten_snapshot` is built
+    ///      from `ec.kitten_parentage` + `ec.kitten_needs`, so the
+    ///      resolver at `goap.rs:7322` finds Crumb.
+    ///   2. Drain rebind (`goap.rs:4917`) — the kitten-recipient branch
+    ///      uses `ec.kitten_inventory_q` (disjoint `Without<GoapPlan>`)
+    ///      to grab `&mut Inventory` on Crumb; pre-fix the drain
+    ///      silently dropped because `cats.get_many_mut` excluded
+    ///      kittens.
+    ///   3. Existing `eat_from_inventory` (`systems/needs.rs:301`) —
+    ///      runs over ALL cats including kittens, consumes food from
+    ///      Inventory when hungry, boosts `Needs.hunger`. Already in
+    ///      place; the §428 fixes complete the chain by getting food
+    ///      into the kitten's Inventory in the first place.
+    ///
+    /// Pre-§428 the resolver hard-failed on the empty `kitten_snapshot`;
+    /// even if the resolver were patched alone, the drain silently
+    /// dropped the kitten-recipient transfer (no-op Handing loop).
+    /// Now: Magnolia's slot transfers → Crumb's Inventory → eaten
+    /// same-tick by the autoconsume system → hunger rises.
     #[test]
-    #[ignore = "ticket 428 — fails until goap-path resolver is rebound to a populated kitten roster; un-ignore as part of fix PR"]
     fn goap_path_resolver_finds_live_kitten_with_none_target() {
         let mut app = build_scenario_app(42, &SCENARIO, PARENT_NAME);
         // Drain Startup (scenario setup runs here, including
         // `inject_handoff_plan`); then a single FixedUpdate tick. The
-        // resolver runs in that one tick and either completes the
-        // handoff (post-fix) or emits the canary fail (pre-fix).
+        // resolver runs, the drain transfers the slot to Crumb's
+        // Inventory, and `eat_from_inventory` consumes it within the
+        // same Update — Crumb's hunger rises by `RawMouse.food_value()`
+        // (capped at 1.0).
         app.update();
         app.update();
 
@@ -242,32 +261,30 @@ mod tests {
         let kitten_hunger = read_kitten_hunger(world);
         let parent_inventory_slots = read_parent_inventory_slots(world);
 
-        // Primary assertion: kitten fed (hunger rose). `feed_kitten` is
-        // the resolver downstream of a successful `HandoffItem` —
-        // post-fix this is non-zero, pre-fix the chain never reaches it.
+        // Primary: kitten fed. Three substrate links composed end-to-
+        // end (resolver finds → drain transfers → autoconsume eats).
+        // Pre-§428 hunger stayed at ~0.05 because resolver hard-failed
+        // on the empty snapshot.
         assert!(
             kitten_hunger > 0.05,
-            "goap-path `HandoffItem` resolver must find the co-located \
-             hungry kitten when `target_entity = None` — the substrate \
-             pillar says a cat committed to Caretake should find the \
-             recipient when one exists. Got kitten hunger={kitten_hunger} \
-             (started at 0.05); resolver fell through to the canary \
-             `handoff: no recipient on disposition (no dependent cat in \
-             colony)` because `snaps.kitten_snapshot` is statically \
-             `Vec::new()` at goap.rs:3825."
+            "kitten Crumb's hunger must rise after the chain \
+             (resolver finds → drain transfers → eat_from_inventory \
+             consumes). Got hunger={kitten_hunger}; started at 0.05. \
+             Items are real, kittens are cats: the slot must flow \
+             through the substrate end-to-end."
         );
 
-        // Corroborating assertion: parent's inventory drained. Bracket
-        // assertion in case the handoff transfer mechanics change but
-        // the resolver still finds the kitten — splits "resolver
-        // succeeded" from "the whole feed chain succeeded".
+        // Corroborating: parent's slot drained. Splits "resolver
+        // succeeded" from "the transfer mechanic completed" — if
+        // hunger rose but parent's slot count didn't drop, the
+        // transfer copied instead of moved (different defect).
         assert_eq!(
             parent_inventory_slots, 0,
-            "parent's RawMouse should have transferred to the kitten; \
-             got {parent_inventory_slots} slots still occupied. If this \
-             fails but the hunger assertion passed, the resolver found \
-             the kitten but the transfer mechanism didn't complete \
-             (different defect)."
+            "parent Magnolia's slot count must be 0 after the transfer \
+             (started at 1); got {parent_inventory_slots}. If kitten \
+             hunger rose but parent's slots didn't drop, the transfer \
+             duplicated the slot — `transfer_item_inventory_to_inventory` \
+             is supposed to move, not copy."
         );
     }
 
