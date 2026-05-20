@@ -554,6 +554,12 @@ impl Plugin for SimulationPlugin {
         // `damage_to_body_part` (combat.rs) alongside the legacy `Injury`
         // push during Stage A; becomes the sole signal at Stage B.
         app.add_message::<crate::messages::body_part_injury::BodyPartInjury>();
+        // 431 Stage A — cat-movement substrate. Emitted by
+        // `emit_cat_moved_messages` (cat_movement.rs) once per FixedUpdate
+        // after every cat-stepping resolver. Substrate for event-driven
+        // cache invalidation (Stage B: NearPairCache; Stage C: per-cat
+        // RouteCostCache).
+        app.add_message::<crate::messages::cat_moved::CatMoved>();
 
         // L2 substrate resources (§9 faction + §L2.10). FactionRelations
         // is a constant lookup — fine to insert at build time.
@@ -1085,6 +1091,12 @@ impl Plugin for SimulationPlugin {
                     .chain(),
                 // Chain 4: Social, combat, death, cleanup, narrative
                 (
+                    // 431 Stage A — emit CatMoved messages for cats whose
+                    // Position changed during Chain 3's resolvers. Runs at
+                    // the head of Chain 4 so all per-tick subscribers
+                    // (Stage B: NearPairCache; Stage C: per-cat
+                    // RouteCostCache) consume up-to-date deltas.
+                    systems::cat_movement::emit_cat_moved_messages,
                     systems::social::passive_familiarity,
                     systems::personality_friction::personality_friction,
                     systems::social::check_bonds,

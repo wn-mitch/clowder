@@ -8,5 +8,6 @@
 //! tickets may migrate them here.
 
 pub mod body_part_injury;
+pub mod cat_moved;
 pub mod fox_lifecycle;
 pub mod witnessable_event;

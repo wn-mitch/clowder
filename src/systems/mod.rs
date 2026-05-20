@@ -86,6 +86,7 @@ pub mod aspiration_picker;
 pub mod aspirations;
 pub mod belief_integrator;
 pub mod buildings;
+pub mod cat_movement;
 pub mod colony_knowledge;
 pub mod colony_score;
 pub mod combat;
