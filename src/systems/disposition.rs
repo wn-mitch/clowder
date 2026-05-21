@@ -16,7 +16,7 @@ use crate::components::disposition::{
 };
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
-use crate::components::items::Item;
+use crate::components::items::{Item, ItemKind};
 use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
 use crate::components::markers;
 use crate::components::mental::Memory;
@@ -3678,6 +3678,41 @@ fn dispatch_chain_step(
                                 ),
                             ));
                         }
+
+                        // 367 Commit 6 — organ-drop substrate. After
+                        // the carcass slot pushes, roll a second
+                        // `organ_drop_chance` test for a `RawOrgan`
+                        // slot. Bypass for fish: only mammals + birds
+                        // donate organs in this model (the design
+                        // doc's "organs are the prize part of the
+                        // kill" framing). The drop honours
+                        // `is_full()`; an organ never pushes off the
+                        // primary carcass if the inventory is tight.
+                        //
+                        // The organ inherits `catch_corruption` (same
+                        // tile as the prey) and carries
+                        // `from_organ: true` so the eat path can
+                        // award the organ-specific mood bonus
+                        // (Commit 6 second half). `RawOrgan` items in
+                        // inventory are pickup-time-quality-1.0
+                        // because the cat just produced them — no
+                        // upstream quality source — matching the
+                        // existing carcass slot above.
+                        let is_organ_donor = item_kind != ItemKind::RawFish;
+                        if is_organ_donor
+                            && !inventory.is_full()
+                            && rng.rng.random::<f32>() < constants.crafting.organ_drop_chance
+                        {
+                            let mut organ_modifiers =
+                                crate::components::items::ItemModifiers::with_corruption(
+                                    catch_corruption,
+                                );
+                            organ_modifiers.from_organ = true;
+                            inventory
+                                .slots
+                                .push(ItemSlot::new(ItemKind::RawOrgan, organ_modifiers));
+                        }
+
                         skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
 
                         // Send kill event for den pressure tracking.
@@ -4181,14 +4216,23 @@ fn dispatch_chain_step(
         StepKind::EatAtStores => {
             let step = chain.current_mut().unwrap();
             let target = step.target_entity;
+            // Legacy chain path: `dispatch_chain_step` doesn't carry
+            // `Mood`. Passing `None` skips the 367-Commit-6 organ
+            // mood bump for this code path; the GOAP-side dispatch
+            // (the canonical eat path post-064/091) does receive it.
+            // If the legacy chain ever regains load-bearing share of
+            // eat events, a follow-on can plumb `&mut Mood` through
+            // `dispatch_chain_step`'s signature.
             let outcome = crate::steps::disposition::resolve_eat_at_stores(
                 ticks,
                 target,
                 needs,
+                None,
                 stores_query,
                 items_query,
                 commands,
                 d,
+                &constants.crafting,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::FoodEaten);
             apply_step_result(outcome.result, chain, current);

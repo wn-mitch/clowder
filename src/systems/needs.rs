@@ -1,6 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::identity::{Age, LifeStage, Orientation};
+use crate::components::items::ItemKind;
 use crate::components::magic::Inventory;
 use crate::components::markers::Injured;
 use crate::components::mental::{LocationPreferences, Mood, MoodModifier, MoodSource};
@@ -298,20 +299,65 @@ pub fn decay_grooming(
 /// waiting to deposit at stores. Keeps cats alive during long hunts.
 /// Corruption penalty comes from the item's modifiers (stamped at catch
 /// time), not from the cat's current tile.
+///
+/// 367 Commit 6 — adds an organ-mood bump. When the eaten item carries
+/// `modifiers.from_organ` AND its kind is one of the organ-derived
+/// variants (`RawOrgan` / `PreservedOrgan`), the cat receives a
+/// time-limited mood lift via `MoodModifier`. The dual gate (modifier
+/// plus kind) keeps the bump from spuriously firing on non-organ items
+/// that somehow accumulate `from_organ: true` (defensive — the only
+/// writer is the hunt path, but the cost of a stricter gate is zero).
 pub fn eat_from_inventory(
     constants: Res<SimConstants>,
-    mut query: Query<(&mut Needs, &mut Inventory), Without<Dead>>,
+    mut query: Query<
+        (
+            &mut Needs,
+            &mut Inventory,
+            Option<&mut crate::components::mental::Mood>,
+        ),
+        Without<Dead>,
+    >,
 ) {
     let c = &constants.needs;
-    for (mut needs, mut inventory) in &mut query {
+    let organ_mood_bonus = constants.crafting.organ_mood_bonus;
+    for (mut needs, mut inventory, mood) in &mut query {
         if needs.hunger < c.eat_from_inventory_threshold {
             if let Some((kind, modifiers)) = inventory.take_food() {
                 let freshness = 1.0 - modifiers.corruption * c.corruption_food_penalty;
                 needs.hunger = (needs.hunger + kind.food_value() * freshness).min(1.0);
+                // 367 Commit 6 — organ mood bump. Bounded modifier
+                // (`organ_mood_bonus_duration_ticks` ≈ one phase of
+                // day) so the lift is felt but doesn't dominate the
+                // mood-stack. `MoodSource::Physical` matches the
+                // existing convention for hunger-relief / contentment-
+                // style mood entries.
+                if modifiers.from_organ
+                    && matches!(kind, ItemKind::RawOrgan | ItemKind::PreservedOrgan)
+                {
+                    if let Some(mut mood) = mood {
+                        mood.modifiers.push_back(
+                            MoodModifier::new(
+                                organ_mood_bonus,
+                                ORGAN_MOOD_BONUS_DURATION_TICKS,
+                                "ate organ meat",
+                            )
+                            .with_kind(MoodSource::Physical),
+                        );
+                    }
+                }
             }
         }
     }
 }
+
+/// 367 Commit 6 — wall-clock duration for the organ-mood bump.
+/// 400 ticks ≈ one day-phase at canonical SimConfig; long enough that
+/// the cat feels the lift across the immediate post-meal window, short
+/// enough that it doesn't bleed into the next sleep cycle. Picked as a
+/// local constant rather than a CraftingConstants knob because the
+/// duration is opinionated narrative pacing — the *amount*
+/// (`organ_mood_bonus`) is the load-bearing knob.
+const ORGAN_MOOD_BONUS_DURATION_TICKS: u64 = 400;
 
 // ---------------------------------------------------------------------------
 // bond_proximity_social — friends nearby restore social need

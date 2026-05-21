@@ -5722,10 +5722,12 @@ fn dispatch_step_action(
                 ticks,
                 plan.step_state[step_idx].target_entity,
                 needs,
+                Some(mood),
                 stores_query,
                 items_query,
                 commands,
                 d,
+                &ec.constants.crafting,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::FoodEaten);
             outcome.result

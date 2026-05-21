@@ -1,9 +1,10 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::building::StoredItems;
-use crate::components::items::Item;
+use crate::components::items::{Item, ItemKind};
+use crate::components::mental::{Mood, MoodModifier, MoodSource};
 use crate::components::physical::Needs;
-use crate::resources::sim_constants::DispositionConstants;
+use crate::resources::sim_constants::{CraftingConstants, DispositionConstants};
 use crate::steps::{StepOutcome, StepResult};
 
 /// # GOAP step resolver: `EatAtStores`
@@ -38,10 +39,12 @@ use crate::steps::{StepOutcome, StepResult};
 /// (Positive) to `record_if_witnessed`. Before §Phase 5a there was
 /// no Feature for eating — a blind spot the Starvation canary could
 /// only see once the entire colony was starving.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_eat_at_stores(
     ticks: u64,
     target_entity: Option<Entity>,
     needs: &mut Needs,
+    mood: Option<&mut Mood>,
     stores_query: &mut Query<&mut StoredItems>,
     items_query: &Query<
         &Item,
@@ -49,6 +52,7 @@ pub fn resolve_eat_at_stores(
     >,
     commands: &mut Commands,
     d: &DispositionConstants,
+    crafting: &CraftingConstants,
 ) -> StepOutcome<bool> {
     if ticks < d.eat_at_stores_duration {
         return StepOutcome::unwitnessed(StepResult::Continue);
@@ -83,8 +87,36 @@ pub fn resolve_eat_at_stores(
             1.0
         };
         needs.hunger = (needs.hunger + item.kind.food_value() * freshness * cooked_mult).min(1.0);
+        // 367 Commit 6 — organ mood bump. Mirrors
+        // `eat_from_inventory`'s shape. Stores-side organs are
+        // rarer (cats usually deposit non-organ catches; organs
+        // tend to be eaten directly from inventory while hunting),
+        // but the path exists if the cat deposits organ then later
+        // retrieves.
+        if item.modifiers.from_organ
+            && matches!(item.kind, ItemKind::RawOrgan | ItemKind::PreservedOrgan)
+        {
+            if let Some(mood) = mood {
+                mood.modifiers.push_back(
+                    MoodModifier::new(
+                        crafting.organ_mood_bonus,
+                        ORGAN_MOOD_BONUS_DURATION_TICKS,
+                        "ate organ meat",
+                    )
+                    .with_kind(MoodSource::Physical),
+                );
+            }
+        }
     }
     stored.remove(item_entity);
     commands.entity(item_entity).despawn();
     StepOutcome::witnessed(StepResult::Advance)
 }
+
+/// 367 Commit 6 — wall-clock duration for the organ-mood bump on the
+/// from-stores eat path. Same value as
+/// `systems::needs::ORGAN_MOOD_BONUS_DURATION_TICKS` (the constant is
+/// duplicated rather than hoisted to keep each resolver self-contained
+/// for the step-contract grep; both sites name the same opinionated
+/// duration). Tune both if the bump should outlive a day-phase.
+const ORGAN_MOOD_BONUS_DURATION_TICKS: u64 = 400;
