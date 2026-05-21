@@ -59,6 +59,24 @@ pub enum ItemKind {
     RemedyHealingPoultice,
     RemedyEnergyTonic,
     RemedyMoodTonic,
+
+    // --- Raw organ (ticket 367 — 016 Phase 1b). ---
+    // Prey-byproduct dropped by the hunt resolver on a probabilistic
+    // roll (mammals + birds only; fish are not organ donors). Feeds
+    // a cat directly as a small meal, or is the input to the
+    // `preserve.preserved_organ` recipe at the Drying Rack.
+    RawOrgan,
+
+    // --- Preserved food (ticket 367 — 016 Phase 1b). ---
+    // Crafted, non-spoiling food items produced at the Drying Rack
+    // and Smoking Rack. `decay_rate == 0.0` (the corruption stamped
+    // at the source meat's catch time still rides on the item via
+    // `ItemModifiers.corruption`, but the item's `condition` no
+    // longer decays). Reduced hunger restore per
+    // `docs/systems/crafting.md` Phase 1 table.
+    DriedFish,
+    SmokedMeat,
+    PreservedOrgan,
 }
 
 impl ItemKind {
@@ -103,6 +121,17 @@ impl ItemKind {
             // preparation. Non-decaying keeps the edge case off the
             // table.
             Self::RemedyHealingPoultice | Self::RemedyEnergyTonic | Self::RemedyMoodTonic => 0.0,
+
+            // Raw organ — perishable like other raw prey.
+            Self::RawOrgan => 0.0005,
+
+            // 367: Preserved food doesn't spoil — that's the whole
+            // mechanical point of the Phase 1b preservation pipeline.
+            // The source-meat corruption stamp at hunt time still
+            // rides on the item via `ItemModifiers.corruption`, so a
+            // tainted catch dries into a tainted dried fish; only the
+            // condition-decay clock is frozen.
+            Self::DriedFish | Self::SmokedMeat | Self::PreservedOrgan => 0.0,
         }
     }
 
@@ -159,6 +188,37 @@ impl ItemKind {
                 | Self::Roots
                 | Self::WildOnion
                 | Self::Mushroom
+                | Self::RawOrgan
+                | Self::DriedFish
+                | Self::SmokedMeat
+                | Self::PreservedOrgan
+        )
+    }
+
+    /// True iff this item is a Phase 1b preserved-food output
+    /// (Dried Fish, Smoked Meat, Preserved Organ). Mirrors
+    /// `is_food()` / `is_remedy()`.
+    pub fn is_preserved_food(self) -> bool {
+        matches!(
+            self,
+            Self::DriedFish | Self::SmokedMeat | Self::PreservedOrgan
+        )
+    }
+
+    /// True iff this item is an organ in either raw or preserved
+    /// form. Used by the eat path to grant the small mood bump
+    /// stamped at hunt time via `ItemModifiers.from_organ`.
+    pub fn is_organ(self) -> bool {
+        matches!(self, Self::RawOrgan | Self::PreservedOrgan)
+    }
+
+    /// True iff this item is raw meat suitable for the smoking
+    /// pipeline (mammals + birds). Fish go through the drying
+    /// pipeline instead.
+    pub fn is_raw_meat(self) -> bool {
+        matches!(
+            self,
+            Self::RawMouse | Self::RawRat | Self::RawRabbit | Self::RawBird
         )
     }
 
@@ -207,6 +267,10 @@ impl ItemKind {
             Self::RemedyHealingPoultice => "healing poultice",
             Self::RemedyEnergyTonic => "energy tonic",
             Self::RemedyMoodTonic => "mood tonic",
+            Self::RawOrgan => "organ",
+            Self::DriedFish => "dried fish",
+            Self::SmokedMeat => "smoked meat",
+            Self::PreservedOrgan => "preserved organ",
         }
     }
 
@@ -247,7 +311,8 @@ impl ItemKind {
             | Self::Nuts
             | Self::Roots
             | Self::WildOnion
-            | Self::Mushroom => ItemCategory::RawFood,
+            | Self::Mushroom
+            | Self::RawOrgan => ItemCategory::RawFood,
 
             Self::HerbHealingMoss
             | Self::HerbMoonpetal
@@ -275,6 +340,11 @@ impl ItemKind {
             Self::RemedyHealingPoultice | Self::RemedyEnergyTonic | Self::RemedyMoodTonic => {
                 ItemCategory::Remedy
             }
+
+            // 367 — preservation outputs from Drying Rack / Smoking Rack.
+            Self::DriedFish | Self::SmokedMeat | Self::PreservedOrgan => {
+                ItemCategory::PreservedFood
+            }
         }
     }
 
@@ -291,6 +361,23 @@ impl ItemKind {
             Self::RawFish => 0.7,
             Self::RawBird => 0.6,
             Self::Berries | Self::Nuts | Self::Roots | Self::Mushroom | Self::WildOnion => 0.2,
+            // 367: Raw organ is a small meal — between a foraged
+            // plant and a small carcass. Eats well fresh but
+            // primarily exists as the input to the Preserved
+            // Organ recipe.
+            Self::RawOrgan => 0.4,
+            // 367: Phase 1 preservation ratios from crafting.md
+            // line 50-54. Dried Fish = 0.7× raw fish (0.7 × 0.7
+            // ≈ 0.49). Smoked Meat = 0.8× the canonical raw-rat
+            // value (0.8 × 0.8 = 0.64) — all smoked variants
+            // share one output ItemKind, so the ratio applies
+            // uniformly. Preserved Organ retains the mood bonus
+            // (delivered separately via ItemModifiers.from_organ
+            // in the eat path) rather than carrying a higher
+            // hunger ratio.
+            Self::DriedFish => 0.49,
+            Self::SmokedMeat => 0.64,
+            Self::PreservedOrgan => 0.3,
             _ => 0.0,
         }
     }
@@ -318,6 +405,11 @@ pub enum ItemCategory {
     /// adds PreservedFood; later phases add Tool / Wearable /
     /// Decoration.
     Remedy,
+    /// Crafted, non-spoiling food produced at the Drying Rack and
+    /// Smoking Rack (ticket 367 — 016 Phase 1b). Dried Fish, Smoked
+    /// Meat, Preserved Organ. Sorts alongside raw food in the UI
+    /// rollup — both are "food" from a cat's planning perspective.
+    PreservedFood,
 }
 
 impl ItemCategory {
@@ -326,6 +418,7 @@ impl ItemCategory {
     pub fn label(self) -> &'static str {
         match self {
             Self::RawFood => "Food",
+            Self::PreservedFood => "Preserved food",
             Self::Herb => "Herbs",
             Self::Material => "Materials",
             Self::StorageUpgrade => "Storage upgrades",
@@ -339,11 +432,14 @@ impl ItemCategory {
     pub fn sort_key(self) -> u8 {
         match self {
             Self::RawFood => 0,
-            Self::Herb => 1,
-            Self::Remedy => 2,
-            Self::Material => 3,
-            Self::StorageUpgrade => 4,
-            Self::Curiosity => 5,
+            // 367: Preserved food sorts directly after raw food — both
+            // belong to the colony's food planning view.
+            Self::PreservedFood => 1,
+            Self::Herb => 2,
+            Self::Remedy => 3,
+            Self::Material => 4,
+            Self::StorageUpgrade => 5,
+            Self::Curiosity => 6,
         }
     }
 }
@@ -363,6 +459,15 @@ pub struct ItemModifiers {
     /// hunger-restoration multiplier in `resolve_eat_at_stores`.
     #[serde(default)]
     pub cooked: bool,
+    /// Ticket 367: stamped at hunt time on `ItemKind::RawOrgan` drops,
+    /// preserved across the Drying Rack pipeline onto the resulting
+    /// `ItemKind::PreservedOrgan`. The eat path reads this flag to
+    /// grant a small mood bump — organ meat is the "rich find" of a
+    /// kill in the cat-narrative sense, and the preservation
+    /// pipeline carries that meaning forward. Defaults `false`; the
+    /// `#[serde(default)]` attribute keeps savefile back-compat.
+    #[serde(default)]
+    pub from_organ: bool,
 }
 
 impl ItemModifiers {
@@ -530,8 +635,8 @@ mod tests {
 
     #[test]
     fn every_item_kind_has_a_category() {
-        // Exhaustive over the 33 variants — extend this list when ItemKind grows.
-        let all: [ItemKind; 33] = [
+        // Exhaustive over the 37 variants — extend this list when ItemKind grows.
+        let all: [ItemKind; 37] = [
             ItemKind::RawMouse,
             ItemKind::RawRat,
             ItemKind::RawRabbit,
@@ -565,6 +670,10 @@ mod tests {
             ItemKind::RemedyHealingPoultice,
             ItemKind::RemedyEnergyTonic,
             ItemKind::RemedyMoodTonic,
+            ItemKind::RawOrgan,
+            ItemKind::DriedFish,
+            ItemKind::SmokedMeat,
+            ItemKind::PreservedOrgan,
         ];
         // Trivially exhaustive (the match in category() is total) — this test
         // exists to make ItemKind growth fail loudly if a future variant gets
@@ -572,7 +681,78 @@ mod tests {
         for kind in all {
             let _ = kind.category();
         }
-        assert_eq!(all.len(), 33);
+        assert_eq!(all.len(), 37);
+    }
+
+    #[test]
+    fn preserved_food_is_food_but_does_not_decay() {
+        // 367: the whole point of the preservation pipeline.
+        for k in [
+            ItemKind::DriedFish,
+            ItemKind::SmokedMeat,
+            ItemKind::PreservedOrgan,
+        ] {
+            assert!(k.is_food(), "{k:?} should count as food");
+            assert!(k.is_preserved_food(), "{k:?} should be preserved");
+            assert_eq!(k.decay_rate(), 0.0, "{k:?} must not spoil");
+            assert_eq!(k.category(), ItemCategory::PreservedFood);
+            assert!(k.food_value() > 0.0);
+        }
+    }
+
+    #[test]
+    fn raw_organ_decays_and_categorizes_as_raw_food() {
+        assert!(ItemKind::RawOrgan.is_food());
+        assert!(ItemKind::RawOrgan.is_organ());
+        assert!(!ItemKind::RawOrgan.is_preserved_food());
+        assert_eq!(ItemKind::RawOrgan.category(), ItemCategory::RawFood);
+        assert!(ItemKind::RawOrgan.decay_rate() > 0.0);
+    }
+
+    #[test]
+    fn preservation_ratios_match_crafting_doc() {
+        // crafting.md Phase 1 table:
+        //   Dried Fish    = 0.7× fresh fish (0.7 × 0.7 ≈ 0.49)
+        //   Smoked Meat   = 0.8× canonical raw-rat (0.8 × 0.8 = 0.64)
+        assert!((ItemKind::DriedFish.food_value() - 0.49).abs() < 1e-3);
+        assert!((ItemKind::SmokedMeat.food_value() - 0.64).abs() < 1e-3);
+        // Preserved Organ doesn't claim a hunger ratio — it retains
+        // the mood bonus via ItemModifiers.from_organ on the eat path.
+        assert!(ItemKind::PreservedOrgan.food_value() > 0.0);
+    }
+
+    #[test]
+    fn is_raw_meat_is_mammals_and_birds() {
+        // Smoking pipeline reads `is_raw_meat`. Fish goes through
+        // drying, not smoking — keep it out of the meat set.
+        for k in [
+            ItemKind::RawMouse,
+            ItemKind::RawRat,
+            ItemKind::RawRabbit,
+            ItemKind::RawBird,
+        ] {
+            assert!(k.is_raw_meat(), "{k:?} should be raw meat");
+        }
+        for k in [
+            ItemKind::RawFish,
+            ItemKind::RawOrgan,
+            ItemKind::Berries,
+            ItemKind::DriedFish,
+            ItemKind::SmokedMeat,
+        ] {
+            assert!(!k.is_raw_meat(), "{k:?} must not be classified as raw meat");
+        }
+    }
+
+    #[test]
+    fn from_organ_defaults_false_and_round_trips() {
+        let default = ItemModifiers::default();
+        assert!(!default.from_organ);
+        let stamped = ItemModifiers {
+            from_organ: true,
+            ..ItemModifiers::default()
+        };
+        assert!(stamped.from_organ);
     }
 
     #[test]
@@ -615,11 +795,15 @@ mod tests {
     fn category_sort_orders_food_first() {
         assert!(ItemCategory::RawFood.sort_key() < ItemCategory::Herb.sort_key());
         assert!(ItemCategory::Herb.sort_key() < ItemCategory::Material.sort_key());
+        // 367: Preserved food sorts directly after raw food — both
+        // belong to the colony's food planning view.
+        assert!(ItemCategory::RawFood.sort_key() < ItemCategory::PreservedFood.sort_key());
+        assert!(ItemCategory::PreservedFood.sort_key() < ItemCategory::Herb.sort_key());
         // Remedies sort between herbs and materials — closer to herbs
         // since they share the healing/medicine pool.
         assert!(ItemCategory::Herb.sort_key() < ItemCategory::Remedy.sort_key());
         assert!(ItemCategory::Remedy.sort_key() < ItemCategory::Material.sort_key());
-        assert_eq!(ItemCategory::Curiosity.sort_key(), 5);
+        assert_eq!(ItemCategory::Curiosity.sort_key(), 6);
     }
 
     #[test]
@@ -782,8 +966,8 @@ mod tests {
         let base = ItemKind::RawRat.food_value(); // 0.8
         let raw_mods = ItemModifiers::default();
         let cooked_mods = ItemModifiers {
-            corruption: 0.0,
             cooked: true,
+            ..ItemModifiers::default()
         };
         let freshness = 1.0 - raw_mods.corruption * penalty;
         let raw_value = base * freshness;

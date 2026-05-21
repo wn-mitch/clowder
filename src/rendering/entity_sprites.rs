@@ -1044,6 +1044,14 @@ fn item_sprite_index(kind: ItemKind) -> usize {
         ItemKind::RemedyHealingPoultice => 20, // WHITEBOTTLE
         ItemKind::RemedyEnergyTonic => 68,     // PINKBOTTLE
         ItemKind::RemedyMoodTonic => 84,       // GREENBOTTLE
+        // 367 — raw organ + Phase 1b preservation outputs.
+        // Reuse the closest food-shaped sprites; dedicated icons
+        // are a Phase 4 polish concern (mirrors the remedy comment
+        // above).
+        ItemKind::RawOrgan => 1,        // meat cut
+        ItemKind::DriedFish => 66,      // PEAR (fish shape; signals fish-origin)
+        ItemKind::SmokedMeat => 1,      // meat cut
+        ItemKind::PreservedOrgan => 1,  // meat cut
     }
 }
 
