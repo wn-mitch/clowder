@@ -265,21 +265,10 @@ mod tests {
 
     /// Fixture 1 expectation: cat with RawFish in inventory makes the
     /// left disjunct of `HasDryableAccessible` true, so `dry_food` is
-    /// eligible.
-    ///
-    /// Currently `#[ignore]`d: this scenario surfaced a dispatch-layer
-    /// defect *upstream* of eligibility — `score_actions` in
-    /// `src/ai/scoring.rs` has no `score_dse_by_id("dry_food", ...)`
-    /// call, so `DryFoodDse` is registered in `populate_dse_registry`
-    /// but never invoked, never enters the L2 pool, and `dry_food`
-    /// never surfaces in the trace table (not even as `eligible: false`
-    /// — the ineligible-capture path lives inside `score_dse_by_id`
-    /// itself). Diagnosed by ticket 436. The 367 follow-on commit that
-    /// adds the dispatch branch (mirroring `cook`'s shape at
-    /// `src/ai/scoring.rs:2047-2056`) lifts this `#[ignore]`. Run with
-    /// `cargo test -- --ignored` to confirm it still fails today.
+    /// eligible. Regression gate for ticket 437's dispatch fix in
+    /// `src/ai/scoring.rs::score_actions` — pre-437 the DSE was
+    /// registered but never scored, so no L2 row surfaced at all.
     #[test]
-    #[ignore = "blocked on 367 follow-on: add score_dse_by_id(\"dry_food\", ...) branch to score_actions; see ticket 436 layer-walk row 'L2 DSE dispatch'"]
     fn hot_inventory_makes_dry_food_eligible() {
         let report = run(&SCENARIO_HOT_INVENTORY, None, Some(DEFAULT_TICKS), 42);
         let (eligible, score) = first_dry_food_row(&report).unwrap_or_else(|| {
@@ -298,16 +287,107 @@ mod tests {
         );
     }
 
+    /// Diagnostic dump of every relevant marker on the `ColonyState`
+    /// singleton + focal cat after fixture 2 settles. Useful as a
+    /// next-layer-audit tool when the eligibility assertions below
+    /// fail and the test message can't identify which required marker
+    /// is missing. Always-`#[ignore]`d; not part of the CI gate.
+    /// Run with: `cargo test -- --ignored
+    /// scenarios::drying_chain_eligibility::tests::diagnostic_dump_marker_state_fixture_2`
+    #[test]
+    #[ignore = "diagnostic — run manually when eligibility tests fail to identify the missing marker"]
+    fn diagnostic_dump_marker_state_fixture_2() {
+        use crate::components::identity::Name;
+        use crate::components::markers as m;
+        use crate::scenarios::runner::build_scenario_app;
+
+        let mut app = build_scenario_app(42, &SCENARIO_STORES_HAS_DRYABLE, "Cinder");
+        // Drive the same warm-up as `run()` does.
+        app.update();
+        // Five ticks is plenty for all colony markers to settle.
+        for _ in 0..5 {
+            app.update();
+        }
+        let colony = {
+            let mut q = app
+                .world_mut()
+                .query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::query::With<m::ColonyState>>();
+            let w = app.world();
+            q.iter(w).next().expect("ColonyState singleton missing")
+        };
+        let world = app.world();
+        eprintln!("--- ColonyState markers (fixture 2) ---");
+        eprintln!(
+            "  HasFunctionalDryingRack:           {}",
+            world.entity(colony).contains::<m::HasFunctionalDryingRack>()
+        );
+        eprintln!(
+            "  HasDryableInStores:                {}",
+            world.entity(colony).contains::<m::HasDryableInStores>()
+        );
+        eprintln!(
+            "  HasRawFoodInStores:                {}",
+            world.entity(colony).contains::<m::HasRawFoodInStores>()
+        );
+        eprintln!(
+            "  HasFunctionalKitchen:              {}",
+            world.entity(colony).contains::<m::HasFunctionalKitchen>()
+        );
+
+        // Cat markers. Release the read borrow before issuing the
+        // next mutable query.
+        let _ = world;
+        let cat = {
+            let mut q = app
+                .world_mut()
+                .query::<(bevy_ecs::entity::Entity, &Name)>();
+            let w = app.world();
+            q.iter(w)
+                .find(|(_, n)| n.0 == "Cinder")
+                .map(|(e, _)| e)
+                .expect("focal cat missing")
+        };
+        let world = app.world();
+        eprintln!("--- Cat markers (fixture 2) ---");
+        eprintln!(
+            "  Adult:                             {}",
+            world.entity(cat).contains::<m::Adult>()
+        );
+        eprintln!(
+            "  CanDry:                            {}",
+            world.entity(cat).contains::<m::CanDry>()
+        );
+        eprintln!(
+            "  CanCook:                           {}",
+            world.entity(cat).contains::<m::CanCook>()
+        );
+        eprintln!(
+            "  HasDryableInInventory:             {}",
+            world.entity(cat).contains::<m::HasDryableInInventory>()
+        );
+        eprintln!(
+            "  HasFreeSlot:                       {}",
+            world.entity(cat).contains::<m::HasFreeSlot>()
+        );
+        eprintln!(
+            "  Incapacitated:                     {}",
+            world.entity(cat).contains::<m::Incapacitated>()
+        );
+        eprintln!(
+            "  Injured:                           {}",
+            world.entity(cat).contains::<m::Injured>()
+        );
+
+    }
+
     /// Fixture 2 expectation: empty inventory + Stores with RawFish
     /// makes the right disjunct of `HasDryableAccessible` true (cat
     /// has a free slot AND colony has dryable in stores), so
     /// `dry_food` is eligible. This is the Commit 9 split-shape path.
-    ///
-    /// `#[ignore]`d for the same dispatch-defect reason as
-    /// `hot_inventory_makes_dry_food_eligible` — see that test's
-    /// rustdoc for the diagnosis and the unblocker.
+    /// Same regression-gate role as fixture 1: exercises the
+    /// composite-marker right disjunct rather than the simpler
+    /// inventory-only path.
     #[test]
-    #[ignore = "blocked on 367 follow-on: add score_dse_by_id(\"dry_food\", ...) branch to score_actions; see ticket 436 layer-walk row 'L2 DSE dispatch'"]
     fn stores_has_dryable_makes_dry_food_eligible_via_composite() {
         let report = run(&SCENARIO_STORES_HAS_DRYABLE, None, Some(DEFAULT_TICKS), 42);
         let (eligible, score) = first_dry_food_row(&report).unwrap_or_else(|| {

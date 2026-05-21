@@ -119,10 +119,31 @@ impl CatPreset {
             magic_affinity: 0.0,
             zodiac_sign: ZodiacSign::WarmDen,
             position,
-            // Older than 4 seasons (kitten cutoff at default ticks_per_season
-            // = 1000) so this cat reads back as an Adult after the
-            // `update_life_stage_markers` system runs on tick 1.
-            born_tick: 0,
+            // Scenarios spawn at `start_tick = 60 * ticks_per_season`
+            // (`env::init_scenario_world_with`). With the default
+            // `SimConfig::ticks_per_season = 20_000`, `start_tick =
+            // 1_200_000`. `Age::stage` bins `seasons = age_ticks /
+            // ticks_per_season` as Kitten(0..=3) / Young(4..=11) /
+            // Adult(12..=59) / Elder(>=60).
+            //
+            // Pre-2026-05-21 this was `born_tick: 0` with a stale
+            // comment claiming `ticks_per_season = 1000` — combined
+            // with the current default of 20_000, that placed the
+            // "adult" preset at seasons=60 which is **Elder**, not
+            // Adult. The discrepancy only surfaced when 367/436/437's
+            // preservation scenarios hit `update_capability_markers`'s
+            // strict `Has<Adult>` gate for `CanDry`/`CanCook` — other
+            // scenarios that nominally relied on adulthood (Forage,
+            // Pickup, etc.) never exercised an Adult-gated marker so
+            // the misalignment stayed latent.
+            //
+            // Pin the preset 30 seasons before start_tick — mid-Adult
+            // band (12..=59), well away from Young/Elder edges so a
+            // change to `ticks_per_season` doesn't immediately re-bin
+            // the cat. Computes via the default; scenarios that
+            // override `ticks_per_season` need to also override
+            // `born_tick` via `with_born_tick`.
+            born_tick: 30 * 20_000,
             needs: Needs::default(),
             fulfillment: Fulfillment::default(),
             markers: MarkerSet::default(),

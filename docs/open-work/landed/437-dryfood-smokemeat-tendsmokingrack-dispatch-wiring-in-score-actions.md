@@ -1,7 +1,7 @@
 ---
 id: 437
 title: DryFood / SmokeMeat / TendSmokingRack dispatch wiring in score_actions
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
@@ -71,3 +71,4 @@ R1. Add three `score_dse_by_id` dispatch branches to `score_actions`, one each f
 
 ## Log
 - 2026-05-21: opened from ticket 436's layer-walk audit. The scenario microexperiment isolated a dispatch-layer defect upstream of every `[suspect]` row in 436's original audit — `score_actions` never calls `score_dse_by_id("dry_food", ...)` despite the DSE being registered. Same gap silences `SmokeMeatDse` and `TendSmokingRackDse`. Fix is R1 (3 mechanical dispatch branches mirroring `cook`'s shape); R2 (registry-iterating dispatcher) surfaces as a separate substrate-cleanup ticket post-landing.
+- 2026-05-21: 2026-05-21: landed. Three score_dse_by_id branches added to score_actions (no outer gate — eligibility filter is enough). Adjacent fix: scenarios::preset::CatPreset::adult had a stale born_tick=0 + ticks_per_season=1000 comment, but the default is 20000, so 'adult' preset cats actually read as Elder at start_tick. Adult-gated capabilities (CanDry, CanCook) were silently false; fixture 2's eligibility wouldn't have passed without the preset fix even with dispatch wired. The two previously #[ignore]'d scenario tests now pass as the regression gate; full lib + integration test suites green. Opens [[438]] (retire hand-written dispatcher; iterate DseRegistry instead) blocked-by 437.

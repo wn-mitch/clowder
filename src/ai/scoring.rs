@@ -2055,6 +2055,48 @@ pub fn score_actions(
         }
     }
 
+    // --- 367 Phase-1b preservation dispatch (ticket 437) ---
+    // Three thin pass-through branches that route the registered Phase-1b
+    // DSEs into the L2/L3 pool. No outer gate: preservation is buffer-
+    // building tier-2, not tied to a hunger / kitchen / rack-load
+    // precondition at this layer — each DSE's EligibilityFilter already
+    // gates internally (`CanDry` + `HasFunctionalDryingRack` +
+    // `HasDryableAccessible` for DryFood; siblings analogous). The shape
+    // mirrors the bare branches above (Eat / Sleep / Forage /
+    // Socialize / GroomSelf / etc.) — not the Cook branch's
+    // hunger-gated form, because no analogous precondition exists.
+    //
+    // Precedent: ticket 436's scenario isolated this gap. Pre-437,
+    // `dry_food` / `smoke_meat` / `tend_smoking_rack` were registered
+    // in `populate_dse_registry` but never invoked here, so their
+    // Action variants never reached softmax and the substrate-side
+    // eligibility filter was never consulted. The L2 trace surfaced
+    // the gap as missing-row-entirely (not even `eligible: false`,
+    // because the ineligible-capture path lives inside score_dse_by_id).
+    //
+    // Smoking-side empirical fire-rate stays gated on 367 Commit 10
+    // (multi-ingredient retrieve mirror for `smoking_meat_actions`);
+    // dispatch alone restores the ability to score, not the realised
+    // load rate.
+    {
+        let score = score_dse_by_id("dry_food", ctx, inputs, &mut scalars);
+        if score > 0.0 {
+            scores.push((Action::DryFood, score + jitter(rng, s.jitter_range)));
+        }
+    }
+    {
+        let score = score_dse_by_id("smoke_meat", ctx, inputs, &mut scalars);
+        if score > 0.0 {
+            scores.push((Action::SmokeMeat, score + jitter(rng, s.jitter_range)));
+        }
+    }
+    {
+        let score = score_dse_by_id("tend_smoking_rack", ctx, inputs, &mut scalars);
+        if score > 0.0 {
+            scores.push((Action::TendSmokingRack, score + jitter(rng, s.jitter_range)));
+        }
+    }
+
     // --- Caretake (§2.3: WS of kitten_urgency + compassion + is_parent) ---
     // Ticket 397 Layer 1 — Caretake enters the L2 pool every tick the cat
     // structurally has a dependent kitten (`Parent` marker), not only when
