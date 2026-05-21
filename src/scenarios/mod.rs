@@ -280,6 +280,12 @@ pub const ALL: &[&Scenario] = &[
     &drying_chain_eligibility::SCENARIO_HOT_INVENTORY,
     &drying_chain_eligibility::SCENARIO_STORES_HAS_DRYABLE,
     &drying_chain_eligibility::SCENARIO_EMPTY_STORES,
+    // 439 — resolver-completion fixtures. Eligibility settled at 436/437;
+    // these isolate whether the basic resolver chain completes happy-path
+    // at unit scale so the post-437 soak's "no reachable zone target"
+    // failure can be classified as structural vs state-specific.
+    &drying_chain_eligibility::SCENARIO_RESOLVER_COMPLETES,
+    &drying_chain_eligibility::SCENARIO_RESOLVER_FAR_RACK,
 ];
 
 /// Look up a scenario by its `name` field.

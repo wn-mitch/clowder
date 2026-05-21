@@ -60,17 +60,15 @@ impl SmokeMeatDse {
                         intercept: 0.0,
                     },
                 )),
-                // Smoking Rack reuses `Terrain::Hearth` in stage-1
-                // (`building::StructureType::terrain`); no dedicated
-                // landmark anchor today, so we share `NearestKitchen`
-                // as the food-infrastructure proxy (preservation
-                // stations colocate with kitchen / stores per
-                // `coordination::kind_affinity`). A dedicated
-                // `NearestSmokingRack` lands with the
-                // terrain-visual-polish follow-on.
+                // Ticket 439 retired the `NearestKitchen` Commit-4
+                // placeholder for `NearestSmokingRack` — populated
+                // per-cat from `CatAnchorPositions.nearest_smoking_rack`
+                // (which reads the same `smoking_rack_positions` slice
+                // the planner zone resolver consumes at
+                // `systems/goap.rs:1739`).
                 Consideration::Spatial(SpatialConsideration::new(
                     "smoke_meat_rack_distance",
-                    LandmarkSource::Anchor(LandmarkAnchor::NearestKitchen),
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestSmokingRack),
                     SMOKE_MEAT_RACK_RANGE,
                     rack_distance,
                 )),

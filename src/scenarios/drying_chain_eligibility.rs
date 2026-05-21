@@ -46,6 +46,7 @@ use crate::components::building::{
 use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::magic::Inventory;
 use crate::components::physical::{Needs, Position};
+use crate::components::Personality;
 
 use super::env::{init_scenario_world, spawn_cat};
 use super::preset::{CatPreset, MarkerKind};
@@ -82,6 +83,52 @@ pub static SCENARIO_EMPTY_STORES: Scenario = Scenario {
     default_focal: "Cinder",
     default_ticks: DEFAULT_TICKS,
     setup: setup_empty_stores,
+    expected_features: &[],
+};
+
+// Ticket 439 fixtures 4–5: resolver completion. The 436/437 trio
+// settled eligibility; the post-437 soak surfaced a *next-layer*
+// defect — `TravelTo(DryingRack): no reachable zone target × 1095` and
+// SmokingRack × 719 while `FoodLoadedOnDryingRack` never fires. The
+// layer-walk found marker-writer and zone-resolver predicates aligned
+// on `site.is_none() && condition > 0.2`, which mechanically demands
+// the slice be non-empty whenever the marker fires — yet the failure
+// requires the slice empty at step-exec. These two fixtures isolate
+// whether the basic resolver chain completes happy-path at unit scale.
+// Drying takes 15_000 ticks (`drying_dried_fish_total_ticks`), so we
+// only assert `FoodLoadedOnDryingRack` (the load step's witness), not
+// `FoodDried`.
+const FAR_CAT_POS: Position = Position { x: 5, y: 5 };
+const FAR_RACK_POS: Position = Position { x: 35, y: 35 };
+
+/// Resolver budget: enough ticks for the cat to elect DryFood, plan,
+/// TravelTo the 1-tile-away rack, and execute the DryFood load step.
+const RESOLVER_NEAR_TICKS: u32 = 30;
+/// Far-rack budget: ~60 tiles Manhattan, A* path-follow at ~1 tile/tick,
+/// plus the load step. 90 leaves slack for re-plans.
+const RESOLVER_FAR_TICKS: u32 = 90;
+
+// `expected_features` left empty: the canonical seed-42 softmax draw at
+// tick 0 lands on Forage for ~30% of the L3 pool's probability mass
+// (DryFood scores highest in L2 but only wins ~70%), so the
+// `declared_expected_features_all_fire` integration test in
+// `tests/scenarios.rs` (which runs every scenario at seed=42) can't
+// gate on `FoodLoadedOnDryingRack` deterministically. The unit tests
+// below use a seed where DryFood elects (probed via
+// `diagnostic_probe_seeds_for_dryfood_election`) and assert directly.
+pub static SCENARIO_RESOLVER_COMPLETES: Scenario = Scenario {
+    name: "drying_chain_resolver_completes",
+    default_focal: "Cinder",
+    default_ticks: RESOLVER_NEAR_TICKS,
+    setup: setup_resolver_completes,
+    expected_features: &[],
+};
+
+pub static SCENARIO_RESOLVER_FAR_RACK: Scenario = Scenario {
+    name: "drying_chain_resolver_far_rack",
+    default_focal: "Cinder",
+    default_ticks: RESOLVER_FAR_TICKS,
+    setup: setup_resolver_far_rack,
     expected_features: &[],
 };
 
@@ -155,6 +202,54 @@ fn setup_empty_stores(world: &mut World, seed: u64) {
             .with_marker(MarkerKind::Adult)
             .with_needs(set_dryfood_baseline_needs),
     );
+}
+
+// ---------------------------------------------------------------------
+// Fixture 4: resolver-completes happy path
+// ---------------------------------------------------------------------
+//
+// Same shape as `setup_hot_inventory` but the runner ticks long enough
+// for the cat to elect, plan, travel one tile, and execute the DryFood
+// load step. If the load fires (`FoodLoadedOnDryingRack` records),
+// the resolver chain is structurally intact and the soak's failure is
+// state-specific (rack-destruction or snapshot staleness, not the
+// resolver logic). If it doesn't fire, we've reproduced the soak bug
+// at unit scale and can drill into `goap.rs:8266`'s upstream.
+fn setup_resolver_completes(world: &mut World, seed: u64) {
+    init_scenario_world(world, seed);
+    spawn_drying_rack(world, RACK_POS);
+    spawn_empty_stores(world, STORES_POS);
+    let _focal = spawn_cat(
+        world,
+        CatPreset::adult("Cinder", COLONY_CENTER)
+            .with_marker(MarkerKind::Adult)
+            .with_needs(set_dryfood_baseline_needs)
+            .with_personality(bias_personality_toward_drying),
+    );
+    fill_focal_inventory_with_raw_fish(world, "Cinder", 1);
+}
+
+// ---------------------------------------------------------------------
+// Fixture 5: resolver-completes with a far rack (A* exercise)
+// ---------------------------------------------------------------------
+//
+// Cat at (5,5), rack at (35,35) — 60 tiles Manhattan, traversal under
+// A* gradient-walk. Tests whether the failure mode is reachability or
+// terrain-bound rather than zone-table emptiness. If Fixture 4 passes
+// and this one fails, the bug is in `find_full_path` / `next_step`,
+// not in `resolve_zone_position`.
+fn setup_resolver_far_rack(world: &mut World, seed: u64) {
+    init_scenario_world(world, seed);
+    spawn_drying_rack(world, FAR_RACK_POS);
+    spawn_empty_stores(world, STORES_POS);
+    let _focal = spawn_cat(
+        world,
+        CatPreset::adult("Cinder", FAR_CAT_POS)
+            .with_marker(MarkerKind::Adult)
+            .with_needs(set_dryfood_baseline_needs)
+            .with_personality(bias_personality_toward_drying),
+    );
+    fill_focal_inventory_with_raw_fish(world, "Cinder", 1);
 }
 
 // ---------------------------------------------------------------------
@@ -236,6 +331,18 @@ fn fill_focal_inventory_with_raw_fish(world: &mut World, focal_name: &str, count
 fn set_dryfood_baseline_needs(n: &mut Needs) {
     n.hunger = 0.7;
     n.energy = 0.9;
+}
+
+/// Ticket 439: bias personality to make `DryFoodDse` the deterministic
+/// L3 winner against sibling tier-2 DSEs (Forage, Cook, Wander) in the
+/// resolver-completion fixtures. DryFood's WeightedSum weights
+/// diligence at 0.24 and reads it as `diligence_value * 1.0`; pushing
+/// diligence to 0.95 adds ~0.11 to DryFood's score relative to a
+/// balanced 0.5. Curiosity low keeps Forage's exploration axis down.
+fn bias_personality_toward_drying(p: &mut Personality) {
+    p.diligence = 0.95;
+    p.curiosity = 0.1;
+    p.ambition = 0.8;
 }
 
 // ---------------------------------------------------------------------
@@ -433,5 +540,133 @@ mod tests {
                  has_dryable_in_stores is false."
             ),
         }
+    }
+
+    /// Diagnostic: scan seeds 1–50 and report which give DryFood as the
+    /// L3 softmax draw on tick 0. Helpful when picking a seed for the
+    /// resolver-completion fixtures (the seed needs to actually elect
+    /// DryFood, not just rank it highest).
+    #[test]
+    #[ignore = "diagnostic — manual probe for fixture seed selection"]
+    fn diagnostic_probe_seeds_for_dryfood_election() {
+        for seed in 1u64..50 {
+            let report = run(&SCENARIO_RESOLVER_COMPLETES, None, None, seed);
+            let chosen_t0 = report.ticks.first().and_then(|t| t.chosen.clone());
+            let loaded = report
+                .feature_counts
+                .get("FoodLoadedOnDryingRack")
+                .copied()
+                .unwrap_or(0);
+            eprintln!("seed={seed} tick0={chosen_t0:?} FoodLoadedOnDryingRack={loaded}");
+        }
+    }
+
+    /// Diagnostic: build the scenario app with a DryFood-electing seed,
+    /// tick the full resolver budget, and dump the `EventLog` plan-
+    /// failure tallies + `SystemActivation` feature counts. Used during
+    /// ticket 439's investigation to confirm the load step's witness
+    /// fired. Run with `cargo test -- --ignored
+    /// scenarios::drying_chain_eligibility::tests::diagnostic_dump_resolver_outcome`.
+    #[test]
+    #[ignore = "diagnostic — re-run if resolver completion assertions regress"]
+    fn diagnostic_dump_resolver_outcome() {
+        use crate::resources::event_log::EventLog;
+        use crate::scenarios::runner::build_scenario_app;
+        let mut app = build_scenario_app(
+            RESOLVER_FIXTURE_SEED,
+            &SCENARIO_RESOLVER_COMPLETES,
+            "Cinder",
+        );
+        app.update();
+        for _ in 0..RESOLVER_NEAR_TICKS {
+            app.update();
+        }
+        let world = app.world();
+        let log = world.resource::<EventLog>();
+        eprintln!("plan_failures_by_reason: {:?}", log.plan_failures_by_reason);
+        if let Some(act) =
+            world.get_resource::<crate::resources::system_activation::SystemActivation>()
+        {
+            let mut keys: Vec<_> = act.counts.iter().filter(|(_, c)| **c > 0).collect();
+            keys.sort_by_key(|(_, c)| -(**c as i64));
+            for (f, c) in keys.iter().take(15) {
+                eprintln!("  feature {f:?} count={c}");
+            }
+        }
+    }
+
+    /// Ticket 439 Fixture 4: cat with RawFish adjacent to a built+idle
+    /// DryingRack should elect DryFood, walk one tile, and execute the
+    /// load step within 30 ticks. The witness is
+    /// `Feature::FoodLoadedOnDryingRack` firing ≥1× (drying itself
+    /// takes 15k ticks; the load is the first observable step). If
+    /// this assertion fires, the basic resolver chain is intact and
+    /// the post-437 soak failure is a state-specific phenomenon — the
+    /// next step is to author Fixture 6 (rack-destruction-mid-plan).
+    /// If it doesn't fire, the bug is structural and we drill into
+    /// `goap.rs:8266`'s upstream.
+    /// Seed selected via `diagnostic_probe_seeds_for_dryfood_election`
+    /// — DryFood deterministically wins the softmax draw at tick 0 here
+    /// (per the diagnostic, seeds 1/4/5/7/8/10–14/16–19/21/22/25/26/31/
+    /// 33/36/38–41/43/45/47–49 all elect DryFood at tick 0; seed 42
+    /// happens to land on Forage's ~27% bucket). Seed-1 anchors the
+    /// resolver-completion assertion; the underlying L3 pool is
+    /// well-defined across seeds (see diagnostic — DryFood scores
+    /// highest in L2 in all 49 probes), the seed merely picks which
+    /// softmax bucket the stochastic draw lands in.
+    const RESOLVER_FIXTURE_SEED: u64 = 1;
+
+    #[test]
+    fn resolver_completes_load_step_on_adjacent_rack() {
+        let report = run(&SCENARIO_RESOLVER_COMPLETES, None, None, RESOLVER_FIXTURE_SEED);
+        let loaded = report
+            .feature_counts
+            .get("FoodLoadedOnDryingRack")
+            .copied()
+            .unwrap_or(0);
+        assert!(
+            loaded >= 1,
+            "FoodLoadedOnDryingRack should fire when a cat with RawFish stands \
+             adjacent to a built+idle DryingRack and ticks for {RESOLVER_NEAR_TICKS} \
+             at seed {RESOLVER_FIXTURE_SEED}. Got {loaded}. This is the load-bearing \
+             assertion for ticket 439 — pre-fix the snapshot path between scoring \
+             (goap.rs:1733, via `WorldStateQueries.building_query`) and step-exec \
+             (goap.rs:3813, via `BuildingResolverParams.buildings`) diverged: the \
+             step-exec query filtered out `With<DryingRackState>` for borrow-checker \
+             disjointness, so `drying_rack_positions` was always empty for rack \
+             entities. The fix at goap.rs:3728 chains rack entries from \
+             `building_params.drying_racks`/`smoking_racks` into the snapshot. \
+             Winner counts across run: {:?}",
+            report.winner_counts()
+        );
+    }
+
+    /// Ticket 439 Fixture 5: same shape but rack is ~60 tiles away.
+    /// Exercises A*'s `find_full_path` + greedy fallback. If Fixture 4
+    /// passes and this fails, the failure mode is reachability —
+    /// `resolve_zone_position` returns a position the cat can't path
+    /// to. If both pass, the soak failure is genuinely state-specific.
+    #[test]
+    fn resolver_completes_load_step_on_far_rack() {
+        let report = run(
+            &SCENARIO_RESOLVER_FAR_RACK,
+            None,
+            None,
+            RESOLVER_FIXTURE_SEED,
+        );
+        let loaded = report
+            .feature_counts
+            .get("FoodLoadedOnDryingRack")
+            .copied()
+            .unwrap_or(0);
+        assert!(
+            loaded >= 1,
+            "FoodLoadedOnDryingRack should fire even when the rack is \
+             ~60 tiles away, given a {RESOLVER_FAR_TICKS}-tick budget. \
+             Got {loaded}. If Fixture 4 passed but this didn't, the failure \
+             is in A* / `find_full_path` — `resolve_zone_position` returns a \
+             position the cat can't path to. Winner counts: {:?}",
+            report.winner_counts()
+        );
     }
 }

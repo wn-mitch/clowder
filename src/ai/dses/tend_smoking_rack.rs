@@ -73,9 +73,13 @@ impl TendSmokingRackDse {
                         intercept: 0.0,
                     },
                 )),
+                // Ticket 439 retired the `NearestKitchen` Commit-4
+                // placeholder for `NearestSmokingRack` — same anchor as
+                // SmokeMeat (the cat tending the rack stands at the
+                // rack tile by definition).
                 Consideration::Spatial(SpatialConsideration::new(
                     "tend_smoking_rack_distance",
-                    LandmarkSource::Anchor(LandmarkAnchor::NearestKitchen),
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestSmokingRack),
                     TEND_SMOKING_RACK_RANGE,
                     rack_distance,
                 )),

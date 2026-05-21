@@ -85,16 +85,19 @@ impl DryFoodDse {
                         intercept: 0.0,
                     },
                 )),
-                // Spatial axis: distance to nearest Kitchen (placeholder
-                // landmark — preservation stations colocate with the
-                // food-infrastructure cluster per
-                // `coordination::kind_affinity`). A dedicated
-                // `NearestDryingRack` anchor lives in the visual-polish
-                // follow-on alongside the `Terrain::DryingRack`
-                // variant.
+                // Spatial axis: distance to nearest functional drying
+                // rack. Ticket 439 retired the `NearestKitchen` Commit-4
+                // placeholder in favor of a dedicated `NearestDryingRack`
+                // anchor populated per-cat from
+                // `CatAnchorPositions.nearest_drying_rack` (which reads
+                // from the same `drying_rack_positions` slice the planner
+                // zone resolver consumes — see
+                // `systems/goap.rs:1733`). Co-lands with the
+                // `building_snapshot` fix at `goap.rs:3728` that ensures
+                // rack entities reach the snapshot at all.
                 Consideration::Spatial(SpatialConsideration::new(
                     "dry_food_rack_distance",
-                    LandmarkSource::Anchor(LandmarkAnchor::NearestKitchen),
+                    LandmarkSource::Anchor(LandmarkAnchor::NearestDryingRack),
                     DRY_FOOD_RACK_RANGE,
                     rack_distance,
                 )),

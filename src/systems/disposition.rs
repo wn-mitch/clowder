@@ -1030,6 +1030,27 @@ pub fn evaluate_dispositions(
                     building_query.iter().map(|(_, s, p, site, _)| (s, p, site)),
                     *pos,
                 ),
+                // Ticket 439 — see twin populator in
+                // `systems/goap.rs::evaluate_and_plan`. `building_query`
+                // here carries no `Without<DryingRackState>` filter
+                // (unlike `BuildingResolverParams.buildings`), so it
+                // sees rack entities directly.
+                nearest_drying_rack: building_query
+                    .iter()
+                    .filter(|(_, s, _, site, _)| {
+                        s.kind == crate::components::building::StructureType::DryingRack
+                            && site.is_none()
+                    })
+                    .map(|(_, _, p, _, _)| *p)
+                    .min_by_key(|p| pos.manhattan_distance(p)),
+                nearest_smoking_rack: building_query
+                    .iter()
+                    .filter(|(_, s, _, site, _)| {
+                        s.kind == crate::components::building::StructureType::SmokingRack
+                            && site.is_none()
+                    })
+                    .map(|(_, _, p, _, _)| *p)
+                    .min_by_key(|p| pos.manhattan_distance(p)),
                 // §L2.10.7 Sleep anchor: cats sleep where they are
                 // (no per-cat sleeping-spot component yet).
                 own_sleeping_spot: Some(*pos),

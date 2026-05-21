@@ -170,6 +170,16 @@ fn jitter(rng: &mut impl Rng, range: f32) -> f32 {
 pub struct CatAnchorPositions {
     /// `LandmarkAnchor::NearestConstructionSite` — Build (B6).
     pub nearest_construction_site: Option<Position>,
+    /// `LandmarkAnchor::NearestDryingRack` — DryFood (ticket 439).
+    /// Built per-cat from `evaluate_and_plan`'s `drying_rack_positions`
+    /// slice. `None` when no built rack exists; the DSE's
+    /// `HasFunctionalDryingRack` eligibility gate fires the same
+    /// way, so this is informational for the spatial axis only.
+    pub nearest_drying_rack: Option<Position>,
+    /// `LandmarkAnchor::NearestSmokingRack` — SmokeMeat /
+    /// TendSmokingRack (ticket 439). Same shape as
+    /// `nearest_drying_rack`.
+    pub nearest_smoking_rack: Option<Position>,
     /// `LandmarkAnchor::NearestForageableCluster` — Forage (B7).
     pub nearest_forageable_cluster: Option<Position>,
     /// `LandmarkAnchor::NearestHerbPatch` — HerbcraftGather (B8).
@@ -1482,6 +1492,8 @@ fn score_dse_by_id(
             LandmarkAnchor::TerritoryCorruptionCentroid => inputs.corruption_landmarks.centroid(),
             // Per-cat anchors populated by the ScoringContext builder.
             LandmarkAnchor::NearestConstructionSite => ctx.cat_anchors.nearest_construction_site,
+            LandmarkAnchor::NearestDryingRack => ctx.cat_anchors.nearest_drying_rack,
+            LandmarkAnchor::NearestSmokingRack => ctx.cat_anchors.nearest_smoking_rack,
             LandmarkAnchor::NearestForageableCluster => ctx.cat_anchors.nearest_forageable_cluster,
             LandmarkAnchor::NearestHerbPatch => ctx.cat_anchors.nearest_herb_patch,
             LandmarkAnchor::NearestPerimeterTile => ctx.cat_anchors.nearest_perimeter_tile,
@@ -3059,6 +3071,8 @@ mod tests {
                 own_sleeping_spot: Some(Position::new(0, 0)),
                 nearest_forageable_cluster: Some(Position::new(0, 0)),
                 nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_drying_rack: None,
+                nearest_smoking_rack: None,
                 nearest_herb_patch: Some(Position::new(0, 0)),
                 nearest_perimeter_tile: Some(Position::new(0, 0)),
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
@@ -3263,6 +3277,8 @@ mod tests {
                 own_sleeping_spot: Some(Position::new(0, 0)),
                 nearest_forageable_cluster: Some(Position::new(0, 0)),
                 nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_drying_rack: None,
+                nearest_smoking_rack: None,
                 nearest_herb_patch: Some(Position::new(0, 0)),
                 nearest_perimeter_tile: Some(Position::new(0, 0)),
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
@@ -3491,6 +3507,8 @@ mod tests {
                 own_sleeping_spot: Some(Position::new(0, 0)),
                 nearest_forageable_cluster: Some(Position::new(0, 0)),
                 nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_drying_rack: None,
+                nearest_smoking_rack: None,
                 nearest_herb_patch: Some(Position::new(0, 0)),
                 nearest_perimeter_tile: Some(Position::new(0, 0)),
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
@@ -3782,6 +3800,8 @@ mod tests {
                 own_sleeping_spot: Some(Position::new(0, 0)),
                 nearest_forageable_cluster: Some(Position::new(0, 0)),
                 nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_drying_rack: None,
+                nearest_smoking_rack: None,
                 nearest_herb_patch: Some(Position::new(0, 0)),
                 nearest_perimeter_tile: Some(Position::new(0, 0)),
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
@@ -3934,6 +3954,8 @@ mod tests {
                 own_sleeping_spot: Some(Position::new(0, 0)),
                 nearest_forageable_cluster: Some(Position::new(0, 0)),
                 nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_drying_rack: None,
+                nearest_smoking_rack: None,
                 nearest_herb_patch: Some(Position::new(0, 0)),
                 nearest_perimeter_tile: Some(Position::new(0, 0)),
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
@@ -4091,6 +4113,8 @@ mod tests {
                 own_sleeping_spot: Some(Position::new(0, 0)),
                 nearest_forageable_cluster: Some(Position::new(0, 0)),
                 nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_drying_rack: None,
+                nearest_smoking_rack: None,
                 nearest_herb_patch: Some(Position::new(0, 0)),
                 nearest_perimeter_tile: Some(Position::new(0, 0)),
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
@@ -4428,6 +4452,8 @@ mod tests {
                 own_sleeping_spot: Some(Position::new(0, 0)),
                 nearest_forageable_cluster: Some(Position::new(0, 0)),
                 nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_drying_rack: None,
+                nearest_smoking_rack: None,
                 nearest_herb_patch: Some(Position::new(0, 0)),
                 nearest_perimeter_tile: Some(Position::new(0, 0)),
                 territory_perimeter_anchor: Some(Position::new(0, 0)),
@@ -4562,6 +4588,8 @@ mod tests {
                 own_sleeping_spot: Some(Position::new(0, 0)),
                 nearest_forageable_cluster: Some(Position::new(0, 0)),
                 nearest_construction_site: Some(Position::new(0, 0)),
+                nearest_drying_rack: None,
+                nearest_smoking_rack: None,
                 nearest_herb_patch: Some(Position::new(0, 0)),
                 nearest_perimeter_tile: Some(Position::new(0, 0)),
                 territory_perimeter_anchor: Some(Position::new(0, 0)),

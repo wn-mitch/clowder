@@ -2475,6 +2475,23 @@ pub fn evaluate_and_plan(
                         .map(|(_, s, p, site, _)| (s, p, site)),
                     *pos,
                 ),
+                // Ticket 439 — per-cat nearest-rack anchors. Built from
+                // the same `drying_rack_positions` / `smoking_rack_positions`
+                // slices the planner zone resolver consumes (goap.rs:1733-
+                // 1744), so the L2 spatial axis and the L3 plan target
+                // agree on what counts as a "rack." Pre-439 the three
+                // preservation DSEs (DryFood / SmokeMeat / TendSmokingRack)
+                // used `LandmarkAnchor::NearestKitchen` as a Commit-4
+                // placeholder — see `dry_food.rs:97`, `smoke_meat.rs:73`,
+                // `tend_smoking_rack.rs:78`.
+                nearest_drying_rack: drying_rack_positions
+                    .iter()
+                    .min_by_key(|p| pos.manhattan_distance(p))
+                    .copied(),
+                nearest_smoking_rack: smoking_rack_positions
+                    .iter()
+                    .min_by_key(|p| pos.manhattan_distance(p))
+                    .copied(),
                 // §L2.10.7 Sleep anchor: cats sleep where they are
                 // (no per-cat assigned sleeping spot exists today —
                 // future component could replace this fallback). The
@@ -3725,10 +3742,49 @@ pub fn resolve_goap_plans(
     let mut plans_to_remove: Vec<(Entity, IntentionEnding)> = Vec::new();
 
     // Pre-collect building and herb data to avoid query conflicts with cats.
+    //
+    // Ticket 439 — `BuildingResolverParams.buildings` filters out
+    // `With<DryingRackState>` / `With<SmokingRackState>` to keep
+    // `&mut Structure` disjoint from the read-only `drying_racks` /
+    // `smoking_racks` queries (see comment at the SystemParam
+    // definition above). That static partition means rack entities
+    // never appear in `building_snapshot` unless we chain them in
+    // here from the rack-specific queries. Pre-439 the chain was
+    // missing entirely, so the downstream `drying_rack_positions`
+    // and `smoking_rack_positions` filters (~line 3813-3822) always
+    // returned empty slices for completed racks. Marker writers in
+    // `buildings.rs` use a separate `Query<(&Structure,
+    // Option<&ConstructionSite>)>` *without* the partition, so they
+    // saw the racks correctly — but the step-executor's
+    // `resolve_zone_position::DryingRack` (goap.rs:9777) returned
+    // `None` for the empty slice, surfacing as
+    // `"TravelTo(DryingRack): no reachable zone target"` (1095×
+    // DryingRack + 719× SmokingRack in the post-437 soak
+    // `logs/tuned-42-44a82ba0`; 1178× SmokingRack in the post-438
+    // soak `logs/tuned-42-75deed49`). Rack entities have no
+    // `ConstructionSite` once built (the construction-completion
+    // path at `steps/building/construct.rs:99-141` removes it and
+    // inserts `Structure::new(blueprint)` with `condition: 1.0`
+    // followed by the `DryingRackState::default()` / `SmokingRackState`
+    // insert), so `site.is_some()` on the chained rack rows is
+    // always `false` — they're known-completed by construction.
+    // The `crop` flag is `false` for racks (no `CropState`).
     let building_snapshot: Vec<(Entity, StructureType, Position, bool, bool)> = building_params
         .buildings
         .iter()
         .map(|(e, s, site, crop, p)| (e, s.kind, *p, site.is_some(), crop.is_some()))
+        .chain(
+            building_params
+                .drying_racks
+                .iter()
+                .map(|(e, p, s, _state)| (e, s.kind, *p, false, false)),
+        )
+        .chain(
+            building_params
+                .smoking_racks
+                .iter()
+                .map(|(e, p, s, _state)| (e, s.kind, *p, false, false)),
+        )
         .collect();
 
     let stores_positions: Vec<Position> = building_snapshot

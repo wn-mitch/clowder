@@ -3,6 +3,7 @@ id: 440
 title: migrate simple single-marker score_actions gates to EligibilityFilter
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-21
 parked: null

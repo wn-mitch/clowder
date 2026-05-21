@@ -160,6 +160,19 @@ pub enum LandmarkAnchor {
     NearestForageableCluster,
     /// Nearest active construction site. Build self-state.
     NearestConstructionSite,
+    /// Nearest functional drying-rack tile. DryFood (Phase 1b
+    /// preservation, ticket 367 / 439). Resolves from the per-cat
+    /// `CatAnchorPositions.nearest_drying_rack`, built once per
+    /// scoring tick from `evaluate_and_plan`'s `drying_rack_positions`
+    /// slice. Pre-439 the spatial axis pointed at `NearestKitchen` as
+    /// a documented Commit-4 placeholder (see `dry_food.rs:97`).
+    NearestDryingRack,
+    /// Nearest functional smoking-rack tile. SmokeMeat / TendSmokingRack
+    /// (Phase 1b preservation, ticket 367 / 439). Same shape as
+    /// `NearestDryingRack` but reads
+    /// `CatAnchorPositions.nearest_smoking_rack` /
+    /// `smoking_rack_positions`.
+    NearestSmokingRack,
     /// Nearest herb patch (gather source). HerbcraftGather.
     NearestHerbPatch,
     /// Nearest territory perimeter tile (ward placement). HerbcraftWard.
