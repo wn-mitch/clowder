@@ -1,0 +1,78 @@
+# Ticket 367 Phase 1b preservation — first-light hypothesis spec.
+#
+# Lifts the preservation substrate (DryingRack + SmokingRack +
+# RawOrgan + 6 preserve.* recipes + per-tick drying system + organ
+# mood bump) off zero for the first time. Per the
+# `feedback_dormant_substrate_activation_soak_first` memory,
+# first-light testing uses `just soak-trace` + `just verdict`
+# (does the layer fire?) rather than `just hypothesize` (tighter
+# balance tuning). This spec is authored at first-light so the
+# follow-on Iter-1 tuning ticket has a load-bearing artifact to
+# extend rather than originate.
+#
+# **First-light gate** (canary-style, magnitude-agnostic):
+#   `feature_counts.FoodDried >= 1`
+#
+# A single FoodDried completion on seed-42 within --duration 900
+# confirms the entire load chain works end-to-end: cat hunts fish
+# → loads drying rack → preservation system advances under Clear
+# weather → output Item entity spawns → Feature emits. If this
+# fires, every dependency in the substrate stack is wired.
+# Companion canary: `feature_counts.MeatSmoked >= 1` for the smoke
+# pipeline. `OrganPreserved` is chain-rare (30% organ drop * herb
+# availability * ~2-day cure) and stays expected=false in the
+# never-fired enrollment.
+#
+# **Phase 1 hypothesis** (the load-bearing claim, deferred to Iter
+# 1):
+#   "Preservation-enabled colonies hold deaths_by_cause.Starvation
+#   == 0 on seed-42 --duration 900 while season-3 food-stockpile
+#   median rises ~2×; mortality shifts from late-winter to
+#   non-seasonal causes."
+#
+# Iter 1 (post-first-light) writes a sister spec that targets a
+# food-stockpile-median lift relative to a pre-367 baseline. The
+# first-light run produces the named treatment baseline that Iter 1
+# compares against — landing this commit IS what produces the
+# baseline.
+
+hypothesis: |
+  The 367 preservation substrate (Drying Rack + Smoking Rack +
+  6 preserve.* recipes + per-tick drying system + RawOrgan hunt
+  drop + organ mood bump) is end-to-end load-bearing on seed-42
+  within --duration 900. Cats build at least one rack, hunt prey
+  whose carcass enters inventory, load the rack with raw food (and
+  fuel for smoking), the per-tick drying system advances under
+  Clear weather (or tend cycles advance smoking), and the recipe's
+  output Item entity spawns on the ground at the rack tile. The
+  first-light gate is `feature_counts.FoodDried >= 1` — a single
+  drying completion validates the entire chain. Iter 1 (sister
+  spec authored after this lands) extends to a magnitude
+  prediction on `food_stockpile_season_3_median`.
+
+# All knobs at default — first-light tests the substrate at the
+# constants that shipped with 367 / 4b / 5 / 6 . Iter 1 may
+# adjust `crafting.drying_dried_fish_total_ticks`,
+# `crafting.smoking_tends_needed`, `crafting.organ_drop_chance`,
+# or the preservation-quality-formula coefficients if the magnitude
+# prediction misses.
+constants_patch: {}
+
+prediction:
+  # First-light substrate-activation metric. `feature_counts.FoodDried`
+  # is enrolled in `expected_to_fire_per_soak` (367 Commit 4) and
+  # carries `Positive` valence; the never-fired canary already gates
+  # this in `just verdict`, but the explicit prediction here makes
+  # the substrate-vs-balance separation visible: "did the substrate
+  # activate?" is a yes/no, not a magnitude question.
+  metric: feature_counts.FoodDried
+  direction: increase
+  # Wide band because first-light only validates non-zero firing.
+  # The +∞ upper bound is honest: any non-zero count satisfies the
+  # substrate-activation question. Iter 1 narrows to a load-bearing
+  # magnitude prediction on food-stockpile.
+  rough_magnitude_pct: [1, 100000]
+
+seeds: [42]
+reps: 1
+duration: 900
