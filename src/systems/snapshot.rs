@@ -21,8 +21,8 @@ use crate::resources::sim_constants::SimConstants;
 use crate::resources::snapshot_config::SnapshotConfig;
 use crate::resources::time::{SimConfig, TimeState};
 use crate::systems::parenting_activity::{
-    parental_engagement_asymptote, scale_autonomy, scale_cultural, scale_presence, scale_protection,
-    scale_provision, ParentingScalars,
+    parental_engagement_asymptote, scale_autonomy, scale_cultural, scale_presence,
+    scale_protection, scale_provision, ParentingScalars,
 };
 
 // ---------------------------------------------------------------------------
@@ -138,41 +138,43 @@ pub fn emit_cat_snapshots(
         // Ticket 400 — assemble ParentingActivity snapshot for cats
         // carrying the Component. Asymptote-vs-engagement-max gap is
         // diagnostic for "is engagement converged" in `just inspect`.
-        let parenting = parenting_activity.map(|pa| Box::new({
-            let bundle = parenting_scalars.get(entity);
-            let pc = &constants.parenting;
-            let mut bio = 0;
-            let mut inl = 0;
-            let mut bnd = 0;
-            let mut adp = 0;
-            for rel in &pa.relationships {
-                match rel.kind {
-                    ParentalKind::Biological => bio += 1,
-                    ParentalKind::InLaw => inl += 1,
-                    ParentalKind::BondFormed => bnd += 1,
-                    ParentalKind::Adopted => adp += 1,
+        let parenting = parenting_activity.map(|pa| {
+            Box::new({
+                let bundle = parenting_scalars.get(entity);
+                let pc = &constants.parenting;
+                let mut bio = 0;
+                let mut inl = 0;
+                let mut bnd = 0;
+                let mut adp = 0;
+                for rel in &pa.relationships {
+                    match rel.kind {
+                        ParentalKind::Biological => bio += 1,
+                        ParentalKind::InLaw => inl += 1,
+                        ParentalKind::BondFormed => bnd += 1,
+                        ParentalKind::Adopted => adp += 1,
+                    }
                 }
-            }
-            ParentingSummary {
-                asymptote: parental_engagement_asymptote(personality, 0.0, pc),
-                scale_presence: scale_presence(personality),
-                scale_provision: scale_provision(personality),
-                scale_protection: scale_protection(personality),
-                scale_cultural: scale_cultural(personality),
-                scale_autonomy: scale_autonomy(personality, 0.0),
-                caretake_bias_sum: bundle.caretake_bias_sum,
-                provision_bias_sum: bundle.provision_bias_sum,
-                protect_bias_sum: bundle.protect_bias_sum,
-                cultural_teach_bias_sum: bundle.cultural_teach_bias_sum,
-                autonomy_teach_bias_sum: bundle.autonomy_teach_bias_sum,
-                caretake_suppression_factor: bundle.caretake_suppression_factor,
-                parental_engagement_max: bundle.parental_engagement_max,
-                biological_count: bio,
-                in_law_count: inl,
-                bond_formed_count: bnd,
-                adopted_count: adp,
-            }
-        }));
+                ParentingSummary {
+                    asymptote: parental_engagement_asymptote(personality, 0.0, pc),
+                    scale_presence: scale_presence(personality),
+                    scale_provision: scale_provision(personality),
+                    scale_protection: scale_protection(personality),
+                    scale_cultural: scale_cultural(personality),
+                    scale_autonomy: scale_autonomy(personality, 0.0),
+                    caretake_bias_sum: bundle.caretake_bias_sum,
+                    provision_bias_sum: bundle.provision_bias_sum,
+                    protect_bias_sum: bundle.protect_bias_sum,
+                    cultural_teach_bias_sum: bundle.cultural_teach_bias_sum,
+                    autonomy_teach_bias_sum: bundle.autonomy_teach_bias_sum,
+                    caretake_suppression_factor: bundle.caretake_suppression_factor,
+                    parental_engagement_max: bundle.parental_engagement_max,
+                    biological_count: bio,
+                    in_law_count: inl,
+                    bond_formed_count: bnd,
+                    adopted_count: adp,
+                }
+            })
+        });
 
         // Ticket 339 — serialize HTN goal-stack as stable string slugs.
         let goal_stack_snap: Vec<GoalFrameSnapshot> = goal_stack

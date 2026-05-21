@@ -138,7 +138,10 @@ mod tests {
         ];
         let mut plan = SnakeGoapPlan::new(SnakeDispositionKind::Ambushing, 100, steps);
         assert!(!plan.is_exhausted());
-        assert_eq!(plan.current().unwrap().action, SnakeGoapActionKind::SetAmbush);
+        assert_eq!(
+            plan.current().unwrap().action,
+            SnakeGoapActionKind::SetAmbush
+        );
 
         plan.advance();
         assert_eq!(plan.current().unwrap().action, SnakeGoapActionKind::Strike);

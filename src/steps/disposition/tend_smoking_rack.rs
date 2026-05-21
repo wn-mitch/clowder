@@ -117,11 +117,8 @@ pub fn resolve_tend_smoking_rack(
             // crafter skill via the CraftingConstants formula. See
             // `CraftingConstants::preservation_quality_input_weight`
             // doc-comment for the rationale.
-            let output_quality = preservation_output_quality(
-                load.source_quality,
-                load.crafter_skill,
-                crafting,
-            );
+            let output_quality =
+                preservation_output_quality(load.source_quality, load.crafter_skill, crafting);
             output_spawn = Some(CompletionSpawn {
                 pos: *rack_pos,
                 quality: output_quality,
@@ -251,8 +248,8 @@ mod tests {
         // normalised crafter_skill ≈ (0.025 + 0.03 + 0.4) = 0.455.
         // Perfect input quality → output = 0.7 + 0.455*0.3 ≈ 0.8365.
         let crafting = test_constants();
-        let crafter_skill = (0.05 * 0.5 + 0.1 * 0.3 + crafting.preservation_skill_baseline)
-            .clamp(0.0, 1.0);
+        let crafter_skill =
+            (0.05 * 0.5 + 0.1 * 0.3 + crafting.preservation_skill_baseline).clamp(0.0, 1.0);
         let q = preservation_output_quality(1.0, crafter_skill, &crafting);
         assert!(
             q > 0.80 && q < 0.85,
@@ -266,8 +263,8 @@ mod tests {
         // normalised = clamp(0.75 + 0.3 + 0.4) = clamp(1.45) = 1.0.
         // Mediocre input 0.5 → output = 0.35 + 0.3 = 0.65.
         let crafting = test_constants();
-        let crafter_skill = (1.5 * 0.5 + 1.0 * 0.3 + crafting.preservation_skill_baseline)
-            .clamp(0.0, 1.0);
+        let crafter_skill =
+            (1.5 * 0.5 + 1.0 * 0.3 + crafting.preservation_skill_baseline).clamp(0.0, 1.0);
         let q = preservation_output_quality(0.5, crafter_skill, &crafting);
         assert!(
             q > 0.60 && q < 0.70,

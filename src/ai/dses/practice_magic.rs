@@ -113,7 +113,6 @@ impl crate::ai::dse::CatDse for ScryDse {
     }
 }
 
-
 pub fn scry_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(ScryDse::new())
 }
@@ -214,7 +213,6 @@ impl crate::ai::dse::CatDse for DurableWardDse {
     }
 }
 
-
 pub fn durable_ward_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(DurableWardDse::new())
 }
@@ -306,7 +304,6 @@ impl crate::ai::dse::CatDse for CleanseDse {
         crate::ai::Action::MagicCleanse
     }
 }
-
 
 pub fn cleanse_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CleanseDse::new(scoring))
@@ -406,7 +403,6 @@ impl crate::ai::dse::CatDse for ColonyCleanseDse {
     }
 }
 
-
 pub fn colony_cleanse_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(ColonyCleanseDse::new())
 }
@@ -480,7 +476,6 @@ impl crate::ai::dse::CatDse for HarvestDse {
     }
 }
 
-
 pub fn harvest_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HarvestDse::new())
 }
@@ -552,7 +547,6 @@ impl crate::ai::dse::CatDse for CommuneDse {
         crate::ai::Action::MagicCommune
     }
 }
-
 
 pub fn commune_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CommuneDse::new())

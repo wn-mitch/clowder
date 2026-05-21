@@ -382,12 +382,16 @@ pub enum Feature {
     /// `PairingIntentionEmitted` — same emission semantics, same canary
     /// classification. `expected_to_fire_per_soak() => true` for
     /// Courtship.
-    JointIntentionEmitted { practice: PracticeKind },
+    JointIntentionEmitted {
+        practice: PracticeKind,
+    },
     /// The author's drop gate fired on a held JointIntention. Neutral
     /// — drops are normal state transitions, not an adverse signal
     /// (mirrors `PairingDropped`). Stays
     /// `expected_to_fire_per_soak() => false` (bursty).
-    JointIntentionDropped { practice: PracticeKind },
+    JointIntentionDropped {
+        practice: PracticeKind,
+    },
     /// A practice-biased resolver was invoked with
     /// `target == JointIntention.partner` AND
     /// `joint.practice == bias-reader's practice filter`, applying the
@@ -396,7 +400,9 @@ pub enum Feature {
     /// observable on any healthy chain). Successor to
     /// `PairingBiasApplied`. `expected_to_fire_per_soak() => true` for
     /// Courtship.
-    JointBiasApplied { practice: PracticeKind },
+    JointBiasApplied {
+        practice: PracticeKind,
+    },
     /// The author advanced the cat's `PracticeStage` to the next
     /// observable stage in the practice's transition table (Courtship:
     /// Approach → Courting → Mating → Bonded). Positive — stage
@@ -404,7 +410,9 @@ pub enum Feature {
     /// progressing rather than stalling. `expected_to_fire_per_soak()
     /// => true` for Courtship (any healthy soak crosses
     /// Approach → Courting in the seed-42 window).
-    JointStageAdvanced { practice: PracticeKind },
+    JointStageAdvanced {
+        practice: PracticeKind,
+    },
     /// A paired cat's `PracticeStage` differed from its partner's at
     /// the lower-Entity-index side of the pair this tick — the
     /// substrate hook for "codified irony" (one cat believes they're
@@ -413,7 +421,9 @@ pub enum Feature {
     /// narrative texture, not a regression signal.
     /// `expected_to_fire_per_soak() => false` — a perfectly-synced
     /// healthy colony can have zero mismatch ticks.
-    JointStageMismatchTickAccrued { practice: PracticeKind },
+    JointStageMismatchTickAccrued {
+        practice: PracticeKind,
+    },
 
     /// Ticket 080 — `evaluate_target_taking` gated a candidate to 0.0
     /// because its `Reserved.owner` named a cat other than the scoring
@@ -2064,36 +2074,26 @@ mod tests {
         // expectation (PracticeKind::Courtship in 127); the two
         // Neutral variants (drop + mismatch) are bursty / healthy-
         // sometimes-zero respectively.
-        assert!(
-            Feature::JointIntentionEmitted {
-                practice: PracticeKind::Courtship,
-            }
-            .expected_to_fire_per_soak()
-        );
-        assert!(
-            Feature::JointBiasApplied {
-                practice: PracticeKind::Courtship,
-            }
-            .expected_to_fire_per_soak()
-        );
-        assert!(
-            Feature::JointStageAdvanced {
-                practice: PracticeKind::Courtship,
-            }
-            .expected_to_fire_per_soak()
-        );
-        assert!(
-            !Feature::JointIntentionDropped {
-                practice: PracticeKind::Courtship,
-            }
-            .expected_to_fire_per_soak()
-        );
-        assert!(
-            !Feature::JointStageMismatchTickAccrued {
-                practice: PracticeKind::Courtship,
-            }
-            .expected_to_fire_per_soak()
-        );
+        assert!(Feature::JointIntentionEmitted {
+            practice: PracticeKind::Courtship,
+        }
+        .expected_to_fire_per_soak());
+        assert!(Feature::JointBiasApplied {
+            practice: PracticeKind::Courtship,
+        }
+        .expected_to_fire_per_soak());
+        assert!(Feature::JointStageAdvanced {
+            practice: PracticeKind::Courtship,
+        }
+        .expected_to_fire_per_soak());
+        assert!(!Feature::JointIntentionDropped {
+            practice: PracticeKind::Courtship,
+        }
+        .expected_to_fire_per_soak());
+        assert!(!Feature::JointStageMismatchTickAccrued {
+            practice: PracticeKind::Courtship,
+        }
+        .expected_to_fire_per_soak());
         // Rare-legend events must be exempted.
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
         assert!(!Feature::ShadowFoxDissolved.expected_to_fire_per_soak());
@@ -2124,8 +2124,14 @@ mod tests {
         assert!(!Feature::SnakeRetreated.expected_to_fire_per_soak());
         assert!(!Feature::SnakeDied.expected_to_fire_per_soak());
         // Category assertions — all ten are Positive.
-        assert_eq!(Feature::HawkSpottedPrey.category(), FeatureCategory::Positive);
-        assert_eq!(Feature::SnakeStruckPrey.category(), FeatureCategory::Positive);
+        assert_eq!(
+            Feature::HawkSpottedPrey.category(),
+            FeatureCategory::Positive
+        );
+        assert_eq!(
+            Feature::SnakeStruckPrey.category(),
+            FeatureCategory::Positive
+        );
         assert_eq!(
             Feature::BurialPerformed.category(),
             FeatureCategory::Neutral
@@ -2143,8 +2149,14 @@ mod tests {
         // HerbsRetrieved 18, WardPlaced 21).
         assert!(Feature::HerbsDeposited.expected_to_fire_per_soak());
         assert!(Feature::HerbsRetrieved.expected_to_fire_per_soak());
-        assert_eq!(Feature::HerbsDeposited.category(), FeatureCategory::Positive);
-        assert_eq!(Feature::HerbsRetrieved.category(), FeatureCategory::Positive);
+        assert_eq!(
+            Feature::HerbsDeposited.category(),
+            FeatureCategory::Positive
+        );
+        assert_eq!(
+            Feature::HerbsRetrieved.category(),
+            FeatureCategory::Positive
+        );
         // Ticket 083 demoted CropTended / CropHarvested under abundant
         // food. Ticket 084 Commit 3 + 418 fix re-promoted them: the
         // herb-pressure chronicity axis lifts Farm under chronic

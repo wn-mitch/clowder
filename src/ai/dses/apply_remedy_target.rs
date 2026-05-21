@@ -324,8 +324,14 @@ mod tests {
         registry.target_taking_dses.push(apply_remedy_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let is_kin = |_: Entity, _: Entity| -> bool { false };
-        let out =
-            resolve_apply_remedy_target(&registry, cat, Position::new(0, 0), &[], &is_kin, 0, None,
+        let out = resolve_apply_remedy_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[],
+            &is_kin,
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());

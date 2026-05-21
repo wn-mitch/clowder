@@ -494,9 +494,9 @@ build:
 test:
     cargo test
 
-# Check + clippy + step-resolver contract lint + time-unit lint + IAUS-coherence lint + substrate-stub lint + marker-snapshot-wiring lint (ticket 217) + items-are-real lint + influence-map-registry lint + epic-children roster drift (ticket 318) + orchestration-frontmatter invariants (ticket 354) + score_actions dispatcher invariant (ticket 438)
+# fmt --check + clippy + cargo check + step-resolver contract lint + time-unit lint + IAUS-coherence lint + substrate-stub lint + marker-snapshot-wiring lint (ticket 217) + items-are-real lint + influence-map-registry lint + epic-children roster drift (ticket 318) + orchestration-frontmatter invariants (ticket 354) + score_actions dispatcher invariant (ticket 438). cargo fmt --check + clippy mirror CI's separate jobs so a green `just check` ≈ green CI.
 check:
-    cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh && bash scripts/check_time_units.sh && bash scripts/check_iaus_coherence.sh && bash scripts/check_substrate_stubs.sh && bash scripts/check_marker_snapshot_wiring.sh && bash scripts/check_item_transfers.sh && bash scripts/check_influence_map_registry.sh && bash scripts/check_method_registry.sh && bash scripts/check_epic_children.sh && bash scripts/check_orchestration_frontmatter.sh && bash scripts/check_score_actions_dispatch.sh
+    cargo fmt --check && cargo check --all-targets && cargo clippy --all-targets --all-features -- -D warnings && bash scripts/check_step_contracts.sh && bash scripts/check_time_units.sh && bash scripts/check_iaus_coherence.sh && bash scripts/check_substrate_stubs.sh && bash scripts/check_marker_snapshot_wiring.sh && bash scripts/check_item_transfers.sh && bash scripts/check_influence_map_registry.sh && bash scripts/check_method_registry.sh && bash scripts/check_epic_children.sh && bash scripts/check_orchestration_frontmatter.sh && bash scripts/check_score_actions_dispatch.sh
 
 # [retag] Backfill `orchestration: substrate-sensitive` on every active ticket missing the field. Idempotent. Stage 0 step 4 of ticket 354. Run once at corpus rollout, then `just check` enforces invariants going forward.
 retag-init:

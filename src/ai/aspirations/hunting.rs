@@ -37,8 +37,7 @@ pub const MASTER_OF_THE_HUNT: AspirationChain = AspirationChain {
                 count: 1,
             },
             emits: FIRST_BLOOD_EMITS,
-            narrative_on_complete:
-                "{name} catches {possessive} first prey. A hunter is born.",
+            narrative_on_complete: "{name} catches {possessive} first prey. A hunter is born.",
         },
         Milestone {
             name: "Keen Eye",

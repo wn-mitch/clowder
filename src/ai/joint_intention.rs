@@ -50,15 +50,15 @@
 
 use bevy_ecs::prelude::*;
 
+use crate::ai::mating::{MatingFitness, MatingFitnessParams};
+use crate::components::identity::{LifeStage, Orientation};
 use crate::components::joint_intention::{
-    next_stage, should_drop_joint, JointIntention, JointIntentionDropConfig,
-    JointIntentionProxies, PracticeKind, PracticeStage, StageAdvanceProxies,
+    next_stage, should_drop_joint, JointIntention, JointIntentionDropConfig, JointIntentionProxies,
+    PracticeKind, PracticeStage, StageAdvanceProxies,
 };
 use crate::components::physical::Dead;
-use crate::components::pregnancy::Pregnant;
-use crate::components::identity::{LifeStage, Orientation};
-use crate::ai::mating::{MatingFitness, MatingFitnessParams};
 use crate::components::physical::Position;
+use crate::components::pregnancy::Pregnant;
 use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::sim_constants::{CourtshipPracticeConstants, SimConstants};
 use crate::resources::system_activation::{Feature, SystemActivation};
@@ -262,12 +262,9 @@ pub fn author_joint_intentions(
         if let Some((p_kind, p_partner_entity)) = partner_snapshot.get(&joint.partner) {
             if *p_kind == joint.partner_practice() && *p_partner_entity == entity {
                 // Look up partner's stage from the joints query.
-                if let Some((_, partner_joint)) = joints
-                    .iter()
-                    .find(|(pe, _)| *pe == joint.partner)
+                if let Some((_, partner_joint)) = joints.iter().find(|(pe, _)| *pe == joint.partner)
                 {
-                    if entity.index() < joint.partner.index()
-                        && partner_joint.stage != joint.stage
+                    if entity.index() < joint.partner.index() && partner_joint.stage != joint.stage
                     {
                         mismatch_emissions.push(());
                     }
@@ -316,8 +313,7 @@ pub fn author_joint_intentions(
     // emission predicate changing.
     // -----------------------------------------------------------------
     let practice_constants = &constants.practices.courtship;
-    let positions: Vec<(Entity, Position)> =
-        all_positions.iter().map(|(e, p)| (e, *p)).collect();
+    let positions: Vec<(Entity, Position)> = all_positions.iter().map(|(e, p)| (e, *p)).collect();
 
     for (entity, position) in needs_emit.iter() {
         let Some(self_fit) = fitness.get(&entity).copied() else {
@@ -517,7 +513,10 @@ pub fn apply_inlaw_adoption_on_bonded(
     time: Res<TimeState>,
     joints: Query<(Entity, &JointIntention), Without<Dead>>,
     mut parenting: bevy_ecs::system::ParamSet<(
-        Query<(Entity, &crate::components::parenting_activity::ParentingActivity)>,
+        Query<(
+            Entity,
+            &crate::components::parenting_activity::ParentingActivity,
+        )>,
         Query<&mut crate::components::parenting_activity::ParentingActivity>,
     )>,
 ) {
@@ -529,8 +528,7 @@ pub fn apply_inlaw_adoption_on_bonded(
     let fresh_bonds: Vec<(Entity, Entity)> = joints
         .iter()
         .filter_map(|(entity, joint)| {
-            (joint.stage == PracticeStage::CourtshipBonded
-                && joint.stage_entered_tick == now_tick)
+            (joint.stage == PracticeStage::CourtshipBonded && joint.stage_entered_tick == now_tick)
                 .then_some((entity, joint.partner))
         })
         .collect();

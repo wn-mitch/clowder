@@ -49,9 +49,7 @@ pub static CAT_DSE_REGISTRY: [CatDseRegistration];
 /// Construct every cat DSE in seed-42 dispatch order. Walks
 /// [`CAT_DSE_REGISTRY`], sorts by declared `order`, and calls each
 /// constructor with the supplied `scoring` constants.
-pub fn cat_dse_constructors(
-    scoring: &ScoringConstants,
-) -> Vec<Box<dyn super::dse::CatDse>> {
+pub fn cat_dse_constructors(scoring: &ScoringConstants) -> Vec<Box<dyn super::dse::CatDse>> {
     let mut entries: Vec<&CatDseRegistration> = CAT_DSE_REGISTRY.iter().collect();
     entries.sort_by_key(|e| e.order);
     entries.iter().map(|e| (e.construct)(scoring)).collect()

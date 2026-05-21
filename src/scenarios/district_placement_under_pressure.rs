@@ -45,9 +45,7 @@
 use bevy_ecs::world::World;
 
 use crate::components::building::{Structure, StructureType};
-use crate::components::coordination::{
-    Coordinator, Directive, DirectiveKind, DirectiveQueue,
-};
+use crate::components::coordination::{Coordinator, Directive, DirectiveKind, DirectiveQueue};
 use crate::components::physical::Position;
 
 use super::env::{init_scenario_world, spawn_cat};

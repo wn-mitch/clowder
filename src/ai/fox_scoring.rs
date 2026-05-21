@@ -705,7 +705,11 @@ mod tests {
         let mut markers = crate::ai::scoring::MarkerSnapshot::new();
         let fox_entity = Entity::from_raw_u32(1).unwrap();
         markers.set_entity(crate::components::markers::HasCubs::KEY, fox_entity, true);
-        markers.set_entity(crate::components::markers::CubsHungry::KEY, fox_entity, true);
+        markers.set_entity(
+            crate::components::markers::CubsHungry::KEY,
+            fox_entity,
+            true,
+        );
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
@@ -736,7 +740,11 @@ mod tests {
         let mut markers = crate::ai::scoring::MarkerSnapshot::new();
         let fox_entity = Entity::from_raw_u32(1).unwrap();
         markers.set_entity(crate::components::markers::HasCubs::KEY, fox_entity, true);
-        markers.set_entity(crate::components::markers::CubsHungry::KEY, fox_entity, true);
+        markers.set_entity(
+            crate::components::markers::CubsHungry::KEY,
+            fox_entity,
+            true,
+        );
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
@@ -768,8 +776,11 @@ mod tests {
         let mut markers = crate::ai::scoring::MarkerSnapshot::new();
         let fox_entity = Entity::from_raw_u32(1).unwrap();
         markers.set_entity(crate::components::markers::HasCubs::KEY, fox_entity, true);
-        markers
-            .set_entity(crate::components::markers::CatThreateningDen::KEY, fox_entity, true);
+        markers.set_entity(
+            crate::components::markers::CatThreateningDen::KEY,
+            fox_entity,
+            true,
+        );
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
@@ -827,7 +838,11 @@ mod tests {
         // the test fox entity instead of mutating ctx fields.
         let mut markers = crate::ai::scoring::MarkerSnapshot::new();
         let fox_entity = Entity::from_raw_u32(1).unwrap();
-        markers.set_entity(crate::components::markers::StoreVisible::KEY, fox_entity, true);
+        markers.set_entity(
+            crate::components::markers::StoreVisible::KEY,
+            fox_entity,
+            true,
+        );
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
@@ -866,7 +881,11 @@ mod tests {
         // intercepts at the `score_fox_dispositions` call site.
         let mut markers = crate::ai::scoring::MarkerSnapshot::new();
         let fox_entity = Entity::from_raw_u32(1).unwrap();
-        markers.set_entity(crate::components::markers::StoreVisible::KEY, fox_entity, true);
+        markers.set_entity(
+            crate::components::markers::StoreVisible::KEY,
+            fox_entity,
+            true,
+        );
         let inputs = test_eval_inputs(&registry, &modifiers, &markers);
 
         let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());

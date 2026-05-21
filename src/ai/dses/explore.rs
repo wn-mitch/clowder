@@ -152,7 +152,6 @@ impl crate::ai::dse::CatDse for ExploreDse {
     }
 }
 
-
 pub fn explore_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(ExploreDse::new(scoring))
 }

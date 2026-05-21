@@ -33,13 +33,17 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     // list that surfaced as the silent-failure class diagnosed by
     // tickets 436 / 437.
     // -----------------------------------------------------------------
-    registry.cat_dses.extend(dses::cat_dse_constructors(scoring));
+    registry
+        .cat_dses
+        .extend(dses::cat_dse_constructors(scoring));
 
     // -----------------------------------------------------------------
     // Target-taking DSEs — separate dispatch path under §6.3. Order
     // here doesn't affect `score_actions` jitter sequence.
     // -----------------------------------------------------------------
-    registry.target_taking_dses.push(dses::hunt_target_dse(scoring));
+    registry
+        .target_taking_dses
+        .push(dses::hunt_target_dse(scoring));
     registry.target_taking_dses.push(dses::fight_target_dse());
     registry
         .target_taking_dses

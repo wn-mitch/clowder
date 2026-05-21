@@ -196,10 +196,7 @@ pub enum WildlifeAiState {
     /// (boundary between corrupt and clean tiles), depositing at
     /// `seed_corruption_rate`. Picked when the Entropy drive
     /// dominates.
-    Seeding {
-        frontier_x: i32,
-        frontier_y: i32,
-    },
+    Seeding { frontier_x: i32, frontier_y: i32 },
 }
 
 // ---------------------------------------------------------------------------

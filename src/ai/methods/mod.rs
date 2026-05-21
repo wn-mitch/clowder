@@ -289,12 +289,7 @@ impl MethodRegistry {
     /// Returns `None` when no method matches or when every matching
     /// method is dormant — the L2 evaluator's no-method fallback (the
     /// 126 adoption path) handles both cases identically.
-    pub fn lookup(
-        &self,
-        goal_label: &str,
-        world: &World,
-        entity: Entity,
-    ) -> Option<&Method> {
+    pub fn lookup(&self, goal_label: &str, world: &World, entity: Entity) -> Option<&Method> {
         self.methods.iter().find(|m| {
             m.goal_label == goal_label
                 && match &m.applicable_when {
@@ -335,15 +330,11 @@ impl MethodRegistry {
     /// `check` properly — either by promoting the L2 author to an
     /// exclusive system or by routing the check through a sibling
     /// world-aware system.
-    pub fn lookup_spec_dormant_filtered(
-        &self,
-        goal_label: &str,
-    ) -> Option<MethodPushSpec> {
+    pub fn lookup_spec_dormant_filtered(&self, goal_label: &str) -> Option<MethodPushSpec> {
         self.methods
             .iter()
             .find(|m| {
-                m.goal_label == goal_label
-                    && matches!(m.applicable_when, ApplicableWhen::Live(_))
+                m.goal_label == goal_label && matches!(m.applicable_when, ApplicableWhen::Live(_))
             })
             .map(MethodPushSpec::from_method)
     }

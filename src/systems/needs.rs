@@ -466,10 +466,7 @@ pub fn update_exploration_centroid(mut exploration_map: ResMut<crate::resources:
 /// state. Dead cats filtered via `Without<Dead>`.
 pub fn update_injury_marker(
     mut commands: Commands,
-    cats: Query<
-        (Entity, &crate::components::CatBodyModel, Has<Injured>),
-        Without<Dead>,
-    >,
+    cats: Query<(Entity, &crate::components::CatBodyModel, Has<Injured>), Without<Dead>>,
 ) {
     // 095 Phase 1 Stage B — `Injured` marker derives from anatomical
     // condition: any part at Wounded or worse. Replaces the legacy
@@ -1099,7 +1096,9 @@ mod tests {
     #[test]
     fn healthy_body_no_injured_marker() {
         let (mut world, mut schedule) = setup_injury_marker();
-        let cat = world.spawn((Health::default(), CatBodyModel::default())).id();
+        let cat = world
+            .spawn((Health::default(), CatBodyModel::default()))
+            .id();
         schedule.run(&mut world);
         assert!(!has_injured(&world, cat));
     }

@@ -93,8 +93,13 @@ pub enum StationRequirement {
 /// Workshop (10t vs 15t), so the enum carries both shapes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum RecipeDuration {
-    Fixed { ticks: u64 },
-    AtStationFaster { default_ticks: u64, at_station_ticks: u64 },
+    Fixed {
+        ticks: u64,
+    },
+    AtStationFaster {
+        default_ticks: u64,
+        at_station_ticks: u64,
+    },
 }
 
 /// Discipline that owns the recipe. Cosmetic / filterable

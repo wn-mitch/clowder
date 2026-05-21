@@ -55,7 +55,8 @@ pub const MAPMAKER: AspirationChain = AspirationChain {
                 count: 25,
             },
             emits: EXPLORATION_EMITS,
-            narrative_on_complete: "{name} knows the land by scent, by shadow, by the angle of light.",
+            narrative_on_complete:
+                "{name} knows the land by scent, by shadow, by the angle of light.",
         },
         Milestone {
             name: "Mapmaker",
@@ -68,7 +69,8 @@ pub const MAPMAKER: AspirationChain = AspirationChain {
             narrative_on_complete: "The colony's borders grow wherever {name} treads.",
         },
     ],
-    completion_narrative: "{name} is the Mapmaker. The world is larger because {subject} walked it.",
+    completion_narrative:
+        "{name} is the Mapmaker. The world is larger because {subject} walked it.",
     incompatible_with: &[],
 };
 

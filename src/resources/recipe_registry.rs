@@ -167,7 +167,11 @@ mod tests {
     #[test]
     fn is_phase5_unlocked_false_when_skill_below_threshold() {
         let mut registry = RecipeRegistry::default();
-        registry.insert(gated_recipe("phase5.test_tapestry", SkillKind::Weaving, 1.0));
+        registry.insert(gated_recipe(
+            "phase5.test_tapestry",
+            SkillKind::Weaving,
+            1.0,
+        ));
         let mut novice = Skills::default();
         novice.weaving = 0.5;
         assert!(!registry.is_phase5_unlocked([&novice]));
@@ -176,7 +180,11 @@ mod tests {
     #[test]
     fn is_phase5_unlocked_true_when_some_cat_clears() {
         let mut registry = RecipeRegistry::default();
-        registry.insert(gated_recipe("phase5.test_tapestry", SkillKind::Weaving, 1.0));
+        registry.insert(gated_recipe(
+            "phase5.test_tapestry",
+            SkillKind::Weaving,
+            1.0,
+        ));
         let mut novice = Skills::default();
         novice.weaving = 0.5;
         let mut master = Skills::default();
@@ -190,7 +198,11 @@ mod tests {
         // a cat with high `bone_shaping` does not unlock a weaving-
         // gated recipe.
         let mut registry = RecipeRegistry::default();
-        registry.insert(gated_recipe("phase5.test_tapestry", SkillKind::Weaving, 1.0));
+        registry.insert(gated_recipe(
+            "phase5.test_tapestry",
+            SkillKind::Weaving,
+            1.0,
+        ));
         let mut bone_master = Skills::default();
         bone_master.bone_shaping = 2.0;
         assert!(!registry.is_phase5_unlocked([&bone_master]));

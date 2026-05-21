@@ -57,11 +57,7 @@ pub fn resolve_trash_at_midden(
     midden_pos: Position,
     commands: &mut Commands,
 ) -> StepOutcome<Option<TrashOutcome>> {
-    let Some(slot_idx) = inventory
-        .slots
-        .iter()
-        .position(|s| !s.kind.is_herb())
-    else {
+    let Some(slot_idx) = inventory.slots.iter().position(|s| !s.kind.is_herb()) else {
         return StepOutcome::unwitnessed(StepResult::Fail(
             "trash: no item-slot in inventory".to_string(),
         ));

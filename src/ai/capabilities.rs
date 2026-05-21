@@ -129,8 +129,7 @@ pub fn update_capability_markers(
         // reach a stashed thornbriar — the GOAP planner branches into
         // either the carry-direct or retrieve-first chain depending on
         // which `CarryingIs` precondition holds at plan time.
-        let want_ward_supply =
-            is_adult && !is_injured && (has_ward_herbs || has_stored_thornbriar);
+        let want_ward_supply = is_adult && !is_injured && (has_ward_herbs || has_stored_thornbriar);
         toggle(
             &mut commands,
             entity,

@@ -17,10 +17,10 @@ use crate::components::disposition::{
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::items::{Item, ItemKind};
+use crate::components::joint_intention::{joint_bias_for, PracticeKind};
 use crate::components::magic::{Harvestable, Herb, Inventory, Ward};
 use crate::components::markers;
 use crate::components::mental::Memory;
-use crate::components::joint_intention::{joint_bias_for, PracticeKind};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::prey::{
@@ -79,10 +79,8 @@ pub struct NarrativeEmitter<'w> {
     /// `NarrativeEmitter` (rather than its own SystemParam) because emit
     /// sites are co-located with the `record_if_witnessed` Feature calls
     /// and `joint_interaction` MessageWriter that already live here.
-    pub witnessable: bevy_ecs::message::MessageWriter<
-        'w,
-        crate::messages::witnessable_event::WitnessableEvent,
-    >,
+    pub witnessable:
+        bevy_ecs::message::MessageWriter<'w, crate::messages::witnessable_event::WitnessableEvent>,
 }
 /// §4.3 marker queries for snapshot population. Bundled to avoid
 /// hitting Bevy's 16-parameter system limit. Future marker batches
@@ -3997,8 +3995,7 @@ fn dispatch_chain_step(
                     );
                     let scent_above_threshold = scent_source
                         .map(|(sx, sy)| {
-                            prey_params.prey_scent_maps.get_any(sx, sy)
-                                >= d.scent_detect_threshold
+                            prey_params.prey_scent_maps.get_any(sx, sy) >= d.scent_detect_threshold
                         })
                         .unwrap_or(false);
                     let scented_prey = if scent_above_threshold {

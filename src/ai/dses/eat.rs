@@ -169,7 +169,6 @@ impl crate::ai::dse::CatDse for EatDse {
     }
 }
 
-
 /// Goal predicate: hunger has risen above the satiation threshold (the
 /// cat is full enough that the eat-need is met).
 ///

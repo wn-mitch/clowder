@@ -30,8 +30,8 @@
 use bevy::prelude::{Entity, Resource};
 use std::collections::HashMap;
 
-use crate::ai::dses::build_target::BuildTargetKind;
 use crate::ai::caretake_targeting::KittenState;
+use crate::ai::dses::build_target::BuildTargetKind;
 use crate::ai::faction::FactionSpecies;
 use crate::components::physical::Position;
 use crate::components::prey::PreyKind;

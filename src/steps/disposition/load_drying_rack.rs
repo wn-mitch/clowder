@@ -126,10 +126,9 @@ pub fn resolve_load_drying_rack(
     // no per-tend candidate. Composes herbcraft (preservation-adjacent
     // knowledge) and foraging (raw-food handling) under a baseline
     // floor; see `CraftingConstants::preservation_skill_baseline`.
-    let crafter_skill = (skills.herbcraft * 0.5
-        + skills.foraging * 0.3
-        + crafting.preservation_skill_baseline)
-        .clamp(0.0, 1.0);
+    let crafter_skill =
+        (skills.herbcraft * 0.5 + skills.foraging * 0.3 + crafting.preservation_skill_baseline)
+            .clamp(0.0, 1.0);
 
     // Apply the load via a mutable iteration over racks. We re-enter
     // the loop because the previous borrow has dropped.

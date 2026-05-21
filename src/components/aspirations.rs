@@ -74,11 +74,7 @@ impl AspirationDomain {
             // 366 — Phase 5 mastery domains. 372 fans in the
             // discipline-specific Action variants (Weave, Knap,
             // TanHide, MixPigment, LayCairn) and updates these arms.
-            Self::Weaving
-            | Self::BoneShaping
-            | Self::Hidework
-            | Self::Pigment
-            | Self::Cairn => &[],
+            Self::Weaving | Self::BoneShaping | Self::Hidework | Self::Pigment | Self::Cairn => &[],
         }
     }
 }

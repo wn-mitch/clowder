@@ -106,12 +106,8 @@ pub fn hunting_actions() -> Vec<GoapActionDef> {
             preconditions: vec![
                 StatePredicate::ZoneIs(PlannerZone::Stores),
                 StatePredicate::CarryingIs(Carrying::Herbs),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasHerbStashAccessible::KEY,
-                ),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasHerbsInInventory::KEY,
-                ),
+                StatePredicate::HasMarker(crate::components::markers::HasHerbStashAccessible::KEY),
+                StatePredicate::HasMarker(crate::components::markers::HasHerbsInInventory::KEY),
             ],
             effects: vec![
                 StateEffect::SetHasFreeSlotThisPlan(true),
@@ -587,12 +583,8 @@ pub fn picking_up_actions() -> Vec<GoapActionDef> {
             preconditions: vec![
                 StatePredicate::ZoneIs(PlannerZone::Stores),
                 StatePredicate::CarryingIs(Carrying::Herbs),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasHerbStashAccessible::KEY,
-                ),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasHerbsInInventory::KEY,
-                ),
+                StatePredicate::HasMarker(crate::components::markers::HasHerbStashAccessible::KEY),
+                StatePredicate::HasMarker(crate::components::markers::HasHerbsInInventory::KEY),
             ],
             effects: vec![
                 StateEffect::SetHasFreeSlotThisPlan(true),
@@ -757,9 +749,7 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                     StatePredicate::HasMarker(
                         crate::components::markers::HasHerbStashAccessible::KEY,
                     ),
-                    StatePredicate::HasMarker(
-                        crate::components::markers::HasHerbsInInventory::KEY,
-                    ),
+                    StatePredicate::HasMarker(crate::components::markers::HasHerbsInInventory::KEY),
                 ],
                 effects: vec![
                     StateEffect::SetHasFreeSlotThisPlan(true),
@@ -840,9 +830,7 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                     StatePredicate::HasMarker(
                         crate::components::markers::HasHerbStashAccessible::KEY,
                     ),
-                    StatePredicate::HasMarker(
-                        crate::components::markers::HasHerbsInInventory::KEY,
-                    ),
+                    StatePredicate::HasMarker(crate::components::markers::HasHerbsInInventory::KEY),
                 ],
                 effects: vec![
                     StateEffect::SetHasFreeSlotThisPlan(true),
@@ -925,9 +913,7 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
                     StatePredicate::HasMarker(
                         crate::components::markers::HasHerbStashAccessible::KEY,
                     ),
-                    StatePredicate::HasMarker(
-                        crate::components::markers::HasHerbsInInventory::KEY,
-                    ),
+                    StatePredicate::HasMarker(crate::components::markers::HasHerbsInInventory::KEY),
                 ],
                 effects: vec![
                     StateEffect::SetHasFreeSlotThisPlan(true),
@@ -963,9 +949,7 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
             // (gather-from-wild vs retrieve-from-stash) is cheaper given
             // ZoneDistances. Substrate-path: free slot available.
             GoapActionDef {
-                kind: GoapActionKind::RetrieveHerbs(
-                    crate::components::magic::HerbKind::Thornbriar,
-                ),
+                kind: GoapActionKind::RetrieveHerbs(crate::components::magic::HerbKind::Thornbriar),
                 cost: 2,
                 preconditions: vec![
                     StatePredicate::ZoneIs(PlannerZone::Stores),
@@ -976,9 +960,7 @@ pub fn herbalism_actions(chosen_action: Action) -> Vec<GoapActionDef> {
             },
             // 084 Commit 2: plan-path RetrieveHerbs after DropItem.
             GoapActionDef {
-                kind: GoapActionKind::RetrieveHerbs(
-                    crate::components::magic::HerbKind::Thornbriar,
-                ),
+                kind: GoapActionKind::RetrieveHerbs(crate::components::magic::HerbKind::Thornbriar),
                 cost: 2,
                 preconditions: vec![
                     StatePredicate::ZoneIs(PlannerZone::Stores),
@@ -1108,12 +1090,8 @@ pub fn cooking_actions() -> Vec<GoapActionDef> {
             preconditions: vec![
                 StatePredicate::ZoneIs(PlannerZone::Stores),
                 StatePredicate::CarryingIs(Carrying::Herbs),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasHerbStashAccessible::KEY,
-                ),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasHerbsInInventory::KEY,
-                ),
+                StatePredicate::HasMarker(crate::components::markers::HasHerbStashAccessible::KEY),
+                StatePredicate::HasMarker(crate::components::markers::HasHerbsInInventory::KEY),
             ],
             effects: vec![
                 StateEffect::SetHasFreeSlotThisPlan(true),
@@ -1235,12 +1213,8 @@ pub fn caretaking_actions() -> Vec<GoapActionDef> {
             preconditions: vec![
                 StatePredicate::ZoneIs(PlannerZone::Stores),
                 StatePredicate::CarryingIs(Carrying::Herbs),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasHerbStashAccessible::KEY,
-                ),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasHerbsInInventory::KEY,
-                ),
+                StatePredicate::HasMarker(crate::components::markers::HasHerbStashAccessible::KEY),
+                StatePredicate::HasMarker(crate::components::markers::HasHerbsInInventory::KEY),
             ],
             effects: vec![
                 StateEffect::SetHasFreeSlotThisPlan(true),

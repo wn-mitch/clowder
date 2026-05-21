@@ -41,8 +41,7 @@ fn setup(world: &mut World, seed: u64) {
     // the highest-corruption tile in scan), bypassing the patrol-step
     // branch where `ShadowFoxAvoidedWard` fires.
     {
-        let mut constants =
-            world.resource_mut::<crate::resources::sim_constants::SimConstants>();
+        let mut constants = world.resource_mut::<crate::resources::sim_constants::SimConstants>();
         constants.wildlife.shadow_fox_motivation_tick_cadence = u64::MAX;
     }
 

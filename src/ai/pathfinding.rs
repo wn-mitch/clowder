@@ -125,7 +125,10 @@ pub struct CorruptionOverlay<'a> {
 }
 
 impl<'a> CorruptionOverlay<'a> {
-    pub fn new(tile_map: &'a TileMap, sc: &crate::resources::sim_constants::ScoringConstants) -> Self {
+    pub fn new(
+        tile_map: &'a TileMap,
+        sc: &crate::resources::sim_constants::ScoringConstants,
+    ) -> Self {
         Self {
             tile_map,
             max_cost: sc.corruption_path_cost_max,

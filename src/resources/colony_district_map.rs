@@ -102,8 +102,7 @@ impl ColonyDistrictMap {
     /// defensive structures wanting threat) lives in the placement
     /// scorer, not here.
     pub fn composite(&self, x: i32, y: i32) -> f32 {
-        (self.frontier_at(x, y) - self.crowding_at(x, y) - self.threat_at(x, y))
-            .clamp(0.0, 1.0)
+        (self.frontier_at(x, y) - self.crowding_at(x, y) - self.threat_at(x, y)).clamp(0.0, 1.0)
     }
 
     /// Zero every bucket on every axis. Called at the start of each

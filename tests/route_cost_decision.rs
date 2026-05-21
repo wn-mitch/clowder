@@ -72,9 +72,22 @@ fn bold_route_cost_to_prey_is_strictly_lower_than_timid() {
         WeightedOverlay::new(&corr_overlay, timid_w),
     ];
 
-    let bold_field = flood_dijkstra(BOLD_START, &map, &bold_overlays, sc.route_cost_flood_budget, 0, &mut Vec::new());
-    let timid_field =
-        flood_dijkstra(BOLD_START, &map, &timid_overlays, sc.route_cost_flood_budget, 0, &mut Vec::new());
+    let bold_field = flood_dijkstra(
+        BOLD_START,
+        &map,
+        &bold_overlays,
+        sc.route_cost_flood_budget,
+        0,
+        &mut Vec::new(),
+    );
+    let timid_field = flood_dijkstra(
+        BOLD_START,
+        &map,
+        &timid_overlays,
+        sc.route_cost_flood_budget,
+        0,
+        &mut Vec::new(),
+    );
 
     let bold_cost = bold_field.cost_at(PREY_POS);
     let timid_cost = timid_field.cost_at(PREY_POS);
@@ -115,8 +128,22 @@ fn no_corridor_means_no_bold_timid_difference() {
         WeightedOverlay::new(&fox_overlay, timid_w),
         WeightedOverlay::new(&corr_overlay, timid_w),
     ];
-    let bold = flood_dijkstra(BOLD_START, &map, &bold_overlays, sc.route_cost_flood_budget, 0, &mut Vec::new());
-    let timid = flood_dijkstra(BOLD_START, &map, &timid_overlays, sc.route_cost_flood_budget, 0, &mut Vec::new());
+    let bold = flood_dijkstra(
+        BOLD_START,
+        &map,
+        &bold_overlays,
+        sc.route_cost_flood_budget,
+        0,
+        &mut Vec::new(),
+    );
+    let timid = flood_dijkstra(
+        BOLD_START,
+        &map,
+        &timid_overlays,
+        sc.route_cost_flood_budget,
+        0,
+        &mut Vec::new(),
+    );
     assert_eq!(
         bold.cost_at(PREY_POS),
         timid.cost_at(PREY_POS),

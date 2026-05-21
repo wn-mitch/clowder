@@ -157,7 +157,6 @@ impl crate::ai::dse::CatDse for CookDse {
     }
 }
 
-
 pub fn cook_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CookDse::new())
 }

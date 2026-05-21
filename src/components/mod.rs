@@ -10,18 +10,18 @@ pub mod fertility;
 pub mod fox_goap_plan;
 pub mod fox_personality;
 pub mod fox_spatial;
-pub mod hawk_goap_plan;
 pub mod fulfillment;
 pub mod goap_plan;
 pub mod grave;
 pub mod grooming;
+pub mod hawk_goap_plan;
 pub mod held_goal_stack;
 pub mod held_intention;
 pub mod hunting_priors;
-pub mod joint_intention;
 pub mod identity;
 pub mod item_transfer;
 pub mod items;
+pub mod joint_intention;
 pub mod kitten;
 pub mod magic;
 pub mod markers;
@@ -51,13 +51,13 @@ pub use aspirations::{
     ActiveAspiration, AspirationChain, AspirationDomain, Aspirations, AspirationsInitialized, Emit,
     Milestone, Preference, Preferences, Priority, ProgressTracker, SkillKind,
 };
-pub use body_zones::{
-    BodyPart, BodyPartState, CatBodyModel, PartCategory, PartCondition, CAT_BODY_PART_COUNT,
-};
 pub use beliefs::{
     bucket_position as bucket_location_position, CandidateFacet, CatBeliefs, ContextBeliefs,
     EnvironmentalContextKey, EvidenceKind, Facet, FacetSlot, LocationBeliefs, LocationKey,
     MentalModel, PredatorBeliefs,
+};
+pub use body_zones::{
+    BodyPart, BodyPartState, CatBodyModel, PartCategory, PartCondition, CAT_BODY_PART_COUNT,
 };
 pub use building::{ConstructionSite, CropState, GateState, StoredItems, Structure, StructureType};
 pub use coordination::{
@@ -94,10 +94,7 @@ pub use mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 pub use mourning::Mourning;
 pub use parenting_activity::{ParentalKind, ParentingActivity, RelationshipTo};
 pub use personality::Personality;
-pub use physical::{
-    Dead, Health, InjurySource, Needs, Position, PreviousPosition,
-    RenderPosition,
-};
+pub use physical::{Dead, Health, InjurySource, Needs, Position, PreviousPosition, RenderPosition};
 pub use pregnancy::{GestationStage, Pregnant};
 pub use prev_safety_deficit::PrevSafetyDeficit;
 pub use prey::{

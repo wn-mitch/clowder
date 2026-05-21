@@ -42,8 +42,7 @@ fn setup(world: &mut World, seed: u64) {
     // huge keeps this scenario testing the pre-023 magic/scent-channel
     // avoidance contract.
     {
-        let mut constants =
-            world.resource_mut::<crate::resources::sim_constants::SimConstants>();
+        let mut constants = world.resource_mut::<crate::resources::sim_constants::SimConstants>();
         constants.wildlife.shadow_fox_motivation_tick_cadence = u64::MAX;
     }
 

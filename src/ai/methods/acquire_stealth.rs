@@ -36,9 +36,7 @@
 //! `WornGearTarget`, …) at the same time it flips both methods to
 //! Live, and the placeholders get replaced in the same commit.
 
-use crate::ai::methods::{
-    ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint,
-};
+use crate::ai::methods::{ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint};
 use crate::ai::Action;
 
 /// Construct the dormant `acquire_stealth_via_self_craft` method

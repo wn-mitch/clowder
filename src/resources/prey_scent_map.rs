@@ -266,7 +266,10 @@ impl PreyScentMaps {
         sensory: &SensoryConstants,
         normalizer: f32,
     ) {
-        let base_range = sensory.profile_for(SensorySpecies::Prey(kind)).scent.base_range;
+        let base_range = sensory
+            .profile_for(SensorySpecies::Prey(kind))
+            .scent
+            .base_range;
         let emission_scale = (base_range / normalizer.max(f32::EPSILON)).clamp(0.0, 1.0);
         self.for_kind_mut(kind)
             .deposit(x, y, base_amount * emission_scale);
@@ -358,8 +361,7 @@ mod tests {
     #[test]
     fn prey_scent_test_registry_indexes_all_kinds() {
         let mut maps = PreyScentMaps::new(30, 30, 3);
-        let positions: [(i32, i32); 5] =
-            [(0, 0), (6, 0), (0, 6), (12, 0), (0, 12)];
+        let positions: [(i32, i32); 5] = [(0, 0), (6, 0), (0, 6), (12, 0), (0, 12)];
         for (kind, (x, y)) in ALL_KINDS.iter().zip(positions.iter()) {
             maps.for_kind_mut(*kind).deposit(*x, *y, 1.0);
         }

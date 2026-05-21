@@ -377,7 +377,13 @@ mod tests {
     fn resolver_returns_none_with_no_registered_dse() {
         let registry = DseRegistry::new();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0, None,
+        let out = resolve_build_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[],
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -388,7 +394,13 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(build_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[], 0, None,
+        let out = resolve_build_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[],
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -400,7 +412,13 @@ mod tests {
         registry.target_taking_dses.push(build_target_dse());
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = new_build(2, 50, 0, 0.5);
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[far], 0, None,
+        let out = resolve_build_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[far],
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -419,7 +437,13 @@ mod tests {
         // Let's make their progress/condition axes tie to isolate the
         // Cliff's effect.
         let rp = repair(3, 0, 3, 0.5);
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[nb, rp], 0, None,
+        let out = resolve_build_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[nb, rp],
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(nb.entity));
@@ -475,7 +499,13 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = new_build(2, 2, 0, 0.5);
         let far = new_build(3, 15, 0, 0.5);
-        let out = resolve_build_target(&registry, cat, Position::new(0, 0), &[close, far], 0, None,
+        let out = resolve_build_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[close, far],
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close.entity));

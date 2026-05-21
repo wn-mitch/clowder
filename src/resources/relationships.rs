@@ -120,10 +120,7 @@ impl Relationships {
     /// caller only iterates / filters / sums — `all_for` materializes
     /// the entire Vec which the 427 perf survey flagged as a small but
     /// avoidable per-tick alloc hotspot (~800 KB/soak).
-    pub fn iter_for(
-        &self,
-        entity: Entity,
-    ) -> impl Iterator<Item = (Entity, &Relationship)> + '_ {
+    pub fn iter_for(&self, entity: Entity) -> impl Iterator<Item = (Entity, &Relationship)> + '_ {
         self.data.iter().filter_map(move |(&(a, b), rel)| {
             if a == entity {
                 Some((b, rel))

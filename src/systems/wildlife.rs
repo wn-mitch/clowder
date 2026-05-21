@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
+use crate::ai::hawk_scoring::{HawkNeeds, HawkPersonality};
+use crate::ai::snake_scoring::{SnakeNeeds, SnakePersonality};
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{ConstructionSite, Structure};
 use crate::components::identity::Name;
@@ -10,8 +12,6 @@ use crate::components::magic::Ward;
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::prey::{PreyAnimal, PreyConfig};
-use crate::ai::hawk_scoring::{HawkNeeds, HawkPersonality};
-use crate::ai::snake_scoring::{SnakeNeeds, SnakePersonality};
 use crate::components::wildlife::{
     BehaviorType, FoxAiPhase, FoxDen, FoxLifeStage, FoxSex, FoxState, HawkAiPhase, HawkState,
     ShadowFoxDrives, SnakeAiPhase, SnakeState, WildAnimal, WildSpecies, WildlifeAiState,
@@ -1270,9 +1270,8 @@ pub fn shadowfox_motivation_tick(
 
                 // Entropy: frontier tile (corrupt with a clean neighbor).
                 if tile_corruption > c.shadow_fox_coherence_recovery_threshold {
-                    let has_clean_neighbor = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-                        .iter()
-                        .any(|(ndx, ndy)| {
+                    let has_clean_neighbor =
+                        [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|(ndx, ndy)| {
                             let nx = tx + ndx;
                             let ny = ty + ndy;
                             map.in_bounds(nx, ny) && map.get(nx, ny).corruption < 0.05
@@ -1284,8 +1283,7 @@ pub fn shadowfox_motivation_tick(
                 }
             }
         }
-        let resonance_pressure =
-            (threatened_count as f32 * resonance_weight).min(1.0);
+        let resonance_pressure = (threatened_count as f32 * resonance_weight).min(1.0);
 
         // ---- Dread pressure (Phase C: vulnerability targeting) ----
         // Per-cat score = `(0.5 - 0.5 * mood.valence) * safety_deficit * isolation_factor`,
@@ -1394,11 +1392,13 @@ pub fn shadowfox_motivation_tick(
                         .map(|t| t.manhattan_distance(wp))
                         .unwrap_or(i32::MAX)
                 }))
-                .map(|(_threatened_tile, (ward_pos, _))| WildlifeAiState::Tending {
-                    ward_x: ward_pos.x,
-                    ward_y: ward_pos.y,
-                    angle: 0.0,
-                }),
+                .map(
+                    |(_threatened_tile, (ward_pos, _))| WildlifeAiState::Tending {
+                        ward_x: ward_pos.x,
+                        ward_y: ward_pos.y,
+                        angle: 0.0,
+                    },
+                ),
             2 => nearest_cat.map(|cp| WildlifeAiState::Haunting {
                 target_x: cp.x,
                 target_y: cp.y,
@@ -1747,8 +1747,15 @@ pub fn predator_stalk_cats(
                         .min_by_key(|(_, cp)| wl_pos.manhattan_distance(cp))
                     {
                         let cat_pos = *cat_pos;
-                        if let Ok((_, _, mut cat_health, mut needs, mut mood, name, mut cat_body_model)) =
-                            cats.get_mut(*cat_entity)
+                        if let Ok((
+                            _,
+                            _,
+                            mut cat_health,
+                            mut needs,
+                            mut mood,
+                            name,
+                            mut cat_body_model,
+                        )) = cats.get_mut(*cat_entity)
                         {
                             let tile_corruption = if map.in_bounds(wl_pos.x, wl_pos.y) {
                                 map.get(wl_pos.x, wl_pos.y).corruption
@@ -2275,13 +2282,9 @@ pub fn fox_lifecycle_tick(
     // Ticket 050 — fox-lifecycle messages drive event-driven §4
     // marker authoring (`fox_spatial::update_den_marker` /
     // `update_cub_marker`).
-    mut den_claimed_w: bevy_ecs::message::MessageWriter<
-        crate::messages::fox_lifecycle::DenClaimed,
-    >,
+    mut den_claimed_w: bevy_ecs::message::MessageWriter<crate::messages::fox_lifecycle::DenClaimed>,
     mut den_lost_w: bevy_ecs::message::MessageWriter<crate::messages::fox_lifecycle::DenLost>,
-    mut cubs_born_w: bevy_ecs::message::MessageWriter<
-        crate::messages::fox_lifecycle::CubsBorn,
-    >,
+    mut cubs_born_w: bevy_ecs::message::MessageWriter<crate::messages::fox_lifecycle::CubsBorn>,
 ) {
     let fc = &constants.fox_ecology;
     let cub_duration_ticks = fc.cub_duration.ticks(&time_scale);
@@ -3167,7 +3170,9 @@ pub fn fox_confrontation_tick(
 
             // Try to find the target cat and damage it.
             let target_entity = Entity::from_bits(target_id);
-            if let Ok((_cat_pos, mut cat_health, mut mood, name, mut cat_body_model)) = cats.get_mut(target_entity) {
+            if let Ok((_cat_pos, mut cat_health, mut mood, name, mut cat_body_model)) =
+                cats.get_mut(target_entity)
+            {
                 cat_health.current =
                     (cat_health.current - fc.standoff_damage_on_escalation).max(0.0);
                 // 095 Phase 1 — anatomical substrate is canonical.

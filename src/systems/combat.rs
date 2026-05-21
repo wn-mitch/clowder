@@ -2,16 +2,14 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::ai::{Action, CurrentAction};
+use crate::components::body_zones::{BodyPart, CatBodyModel};
 use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
-use crate::components::body_zones::{BodyPart, CatBodyModel};
-use crate::components::physical::{
-    Dead, Health, InjurySource, Needs, Position,
-};
-use crate::messages::body_part_injury::BodyPartInjury;
+use crate::components::physical::{Dead, Health, InjurySource, Needs, Position};
 use crate::components::skills::Skills;
 use crate::components::wildlife::{WildAnimal, WildlifeAiState};
+use crate::messages::body_part_injury::BodyPartInjury;
 use crate::resources::map::Terrain;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::narrative_templates::{
@@ -1017,7 +1015,10 @@ mod tests {
         };
         writer_state.apply(&mut world);
         assert!(result.is_none(), "below-threshold damage returns None");
-        assert_eq!(model.parts.iter().filter(|p| p.tissue_damage > 0.0).count(), 0);
+        assert_eq!(
+            model.parts.iter().filter(|p| p.tissue_damage > 0.0).count(),
+            0
+        );
         let messages = world.resource::<bevy_ecs::message::Messages<BodyPartInjury>>();
         let mut cursor = messages.get_cursor();
         assert_eq!(cursor.read(messages).count(), 0);
@@ -1034,8 +1035,7 @@ mod tests {
         let mut rng = test_rng();
         let mut activation = SystemActivation::default();
 
-        let mut writer_state =
-            SystemState::<MessageWriter<BodyPartInjury>>::new(&mut world);
+        let mut writer_state = SystemState::<MessageWriter<BodyPartInjury>>::new(&mut world);
         let result = {
             let mut writer = writer_state.get_mut(&mut world);
             damage_to_body_part(
@@ -1082,7 +1082,12 @@ mod tests {
 
         // Feature canary recorded.
         assert!(
-            activation.counts.get(&Feature::BodyPartInjury).copied().unwrap_or(0) >= 1,
+            activation
+                .counts
+                .get(&Feature::BodyPartInjury)
+                .copied()
+                .unwrap_or(0)
+                >= 1,
             "BodyPartInjury feature should be activated"
         );
     }
@@ -1122,8 +1127,7 @@ mod tests {
         );
 
         // No spurious message generation.
-        let mut writer_state =
-            SystemState::<MessageWriter<BodyPartInjury>>::new(&mut world);
+        let mut writer_state = SystemState::<MessageWriter<BodyPartInjury>>::new(&mut world);
         {
             let mut writer = writer_state.get_mut(&mut world);
             // Apply a tiny ear hit to verify the message path still works.

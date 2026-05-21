@@ -136,7 +136,9 @@ impl HeldGoalStack {
 
     /// Single-frame stack — the common case at L2 author time.
     pub fn from_frame(frame: GoalFrame) -> Self {
-        Self { frames: vec![frame] }
+        Self {
+            frames: vec![frame],
+        }
     }
 
     /// Reference to the active (top) frame.

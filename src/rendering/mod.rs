@@ -77,10 +77,7 @@ impl Plugin for RenderingPlugin {
                     .chain()
                     .after(entity_sprites::attach_entity_sprites),
             )
-            .add_systems(
-                Update,
-                action_overlay::toggle_action_overlay,
-            );
+            .add_systems(Update, action_overlay::toggle_action_overlay);
     }
 }
 

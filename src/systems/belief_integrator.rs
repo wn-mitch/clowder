@@ -29,7 +29,9 @@ use crate::components::magic::{Inventory, ResourceKind};
 use crate::components::physical::{Dead, Position};
 use crate::components::wildlife::{WildAnimal, WildSpecies};
 use crate::messages::witnessable_event::WitnessableEvent;
-use crate::resources::sim_constants::{BeliefAxisTunables, BeliefsConstants, SpeciesViolencePriors};
+use crate::resources::sim_constants::{
+    BeliefAxisTunables, BeliefsConstants, SpeciesViolencePriors,
+};
 use crate::resources::time::TimeState;
 use crate::resources::SimConstants;
 
@@ -321,7 +323,9 @@ fn apply_observation(
             }
         }
 
-        WitnessableEvent::Care { caregiver, kitten, .. } => {
+        WitnessableEvent::Care {
+            caregiver, kitten, ..
+        } => {
             if *caregiver != witness {
                 let model = cats.models.entry(*caregiver).or_default();
                 update_facet(
@@ -381,7 +385,10 @@ fn apply_observation(
                 threat_model.last_updated_tick = tick;
                 threat_model.evidence_count = threat_model.evidence_count.saturating_add(1);
             }
-            let ctx_model = contexts.models.entry(EnvironmentalContextKey::HereNow).or_default();
+            let ctx_model = contexts
+                .models
+                .entry(EnvironmentalContextKey::HereNow)
+                .or_default();
             update_facet(
                 &mut ctx_model.recency_of_threat_cue,
                 OBSERVED_MAX,
@@ -393,11 +400,17 @@ fn apply_observation(
             let _ = position;
         }
 
-        WitnessableEvent::Hunt { hunter, success, .. } => {
+        WitnessableEvent::Hunt {
+            hunter, success, ..
+        } => {
             if *hunter == witness {
                 return;
             }
-            let observed = if *success { OBSERVED_MAX } else { OBSERVED_FAIL };
+            let observed = if *success {
+                OBSERVED_MAX
+            } else {
+                OBSERVED_FAIL
+            };
             let model = cats.models.entry(*hunter).or_default();
             update_facet(
                 &mut model.perceived_violence_capability,
@@ -425,7 +438,10 @@ fn apply_observation(
             // perception-acuity × stoicism × state product lands when
             // ticket 242 ships body-cue substrate (door-slam scenario).
             let credibility = relay_credibility(*relay_state);
-            let model = contexts.models.entry(EnvironmentalContextKey::HereNow).or_default();
+            let model = contexts
+                .models
+                .entry(EnvironmentalContextKey::HereNow)
+                .or_default();
             // Scale observed by credibility so a sleepy relay
             // contributes less than an alert one.
             update_facet(
@@ -440,7 +456,10 @@ fn apply_observation(
         }
 
         WitnessableEvent::AmbientShock { intensity, .. } => {
-            let model = contexts.models.entry(EnvironmentalContextKey::HereNow).or_default();
+            let model = contexts
+                .models
+                .entry(EnvironmentalContextKey::HereNow)
+                .or_default();
             update_facet(
                 &mut model.recency_of_threat_cue,
                 intensity.clamp(0.0, 1.0),
@@ -452,9 +471,7 @@ fn apply_observation(
         }
 
         WitnessableEvent::SelfPlanFailed {
-            cat,
-            disposition,
-            ..
+            cat, disposition, ..
         } => {
             // Self-observation: only the cat itself updates its own
             // ContextBeliefs. Other witnesses don't learn from someone
@@ -556,18 +573,42 @@ fn decay_models<K: std::hash::Hash + Eq + Copy>(
     period: u64,
 ) {
     map.retain(|_k, model| {
-        decay_facet(&mut model.perceived_injury_level, &cfg.perceived_injury_level, period);
-        decay_facet(&mut model.perceived_intent_clarity, &cfg.perceived_intent_clarity, period);
-        decay_facet(&mut model.recency_of_threat_cue, &cfg.recency_of_threat_cue, period);
+        decay_facet(
+            &mut model.perceived_injury_level,
+            &cfg.perceived_injury_level,
+            period,
+        );
+        decay_facet(
+            &mut model.perceived_intent_clarity,
+            &cfg.perceived_intent_clarity,
+            period,
+        );
+        decay_facet(
+            &mut model.recency_of_threat_cue,
+            &cfg.recency_of_threat_cue,
+            period,
+        );
         decay_facet(
             &mut model.perceived_violence_capability,
             &cfg.perceived_violence_capability,
             period,
         );
-        decay_facet(&mut model.affiliation_history, &cfg.affiliation_history, period);
+        decay_facet(
+            &mut model.affiliation_history,
+            &cfg.affiliation_history,
+            period,
+        );
         decay_facet(&mut model.predictability, &cfg.predictability, period);
-        decay_facet(&mut model.perceived_hostility, &cfg.perceived_hostility, period);
-        decay_facet(&mut model.perceived_receptivity, &cfg.perceived_receptivity, period);
+        decay_facet(
+            &mut model.perceived_hostility,
+            &cfg.perceived_hostility,
+            period,
+        );
+        decay_facet(
+            &mut model.perceived_receptivity,
+            &cfg.perceived_receptivity,
+            period,
+        );
         model.last_updated_tick = tick;
         let max_strength = [
             model.perceived_injury_level.strength,
@@ -658,7 +699,9 @@ mod tests {
 
         schedule.run(&mut world);
 
-        let cats = world.get::<CatBeliefs>(witness).expect("witness has CatBeliefs");
+        let cats = world
+            .get::<CatBeliefs>(witness)
+            .expect("witness has CatBeliefs");
         let model = cats
             .models
             .get(&actor)
@@ -669,7 +712,10 @@ mod tests {
             model.affiliation_history.value
         );
         assert!(model.affiliation_history.strength > 0.0);
-        assert_eq!(model.affiliation_history.last_source, EvidenceKind::Observation);
+        assert_eq!(
+            model.affiliation_history.last_source,
+            EvidenceKind::Observation
+        );
     }
 
     #[test]
@@ -752,12 +798,18 @@ mod tests {
         schedule.run(&mut world);
 
         let cats = world.get::<CatBeliefs>(witness).unwrap();
-        let model = cats.models.get(&actor).expect("witness holds belief on mating actor");
+        let model = cats
+            .models
+            .get(&actor)
+            .expect("witness holds belief on mating actor");
         assert!(
             model.affiliation_history.value > 0.0,
             "Mate should lift actor's affiliation_history on witnesses"
         );
-        assert_eq!(model.affiliation_history.last_source, EvidenceKind::Observation);
+        assert_eq!(
+            model.affiliation_history.last_source,
+            EvidenceKind::Observation
+        );
     }
 
     #[test]
@@ -777,7 +829,10 @@ mod tests {
         schedule.run(&mut world);
 
         let cats = world.get::<CatBeliefs>(witness).unwrap();
-        let model = cats.models.get(&caregiver).expect("witness holds belief on caregiver");
+        let model = cats
+            .models
+            .get(&caregiver)
+            .expect("witness holds belief on caregiver");
         assert!(
             model.affiliation_history.value > 0.0,
             "Care should lift caregiver's affiliation_history on witnesses"
@@ -801,7 +856,10 @@ mod tests {
         schedule.run(&mut world);
 
         let cats = world.get::<CatBeliefs>(witness).unwrap();
-        let model = cats.models.get(&hunter).expect("witness holds belief on hunter");
+        let model = cats
+            .models
+            .get(&hunter)
+            .expect("witness holds belief on hunter");
         assert!(
             model.perceived_violence_capability.value > 0.0,
             "Hunt success should lift hunter's perceived_violence_capability"
@@ -829,12 +887,18 @@ mod tests {
         schedule.run(&mut world);
 
         let cats = world.get::<CatBeliefs>(witness).unwrap();
-        let fleer_model = cats.models.get(&fleer).expect("witness holds belief on fleer");
+        let fleer_model = cats
+            .models
+            .get(&fleer)
+            .expect("witness holds belief on fleer");
         assert!(
             fleer_model.predictability.value > 0.0,
             "FleeFrom should lift fleer's predictability on witnesses"
         );
-        let threat_model = cats.models.get(&threat).expect("witness holds belief on threat");
+        let threat_model = cats
+            .models
+            .get(&threat)
+            .expect("witness holds belief on threat");
         assert!(
             threat_model.perceived_violence_capability.value > 0.0,
             "FleeFrom should lift threat's perceived_violence_capability on witnesses"
@@ -870,7 +934,10 @@ mod tests {
             "Attack should lift actor's perceived_hostility on witnesses; got {}",
             model.perceived_hostility.value
         );
-        assert_eq!(model.perceived_hostility.last_source, EvidenceKind::Observation);
+        assert_eq!(
+            model.perceived_hostility.last_source,
+            EvidenceKind::Observation
+        );
     }
 
     #[test]
@@ -922,7 +989,14 @@ mod tests {
 
         let cats = world.get::<CatBeliefs>(witness).unwrap();
         assert!(cats.models.get(&actor).unwrap().perceived_receptivity.value > 0.0);
-        assert!(cats.models.get(&target).unwrap().perceived_receptivity.value > 0.0);
+        assert!(
+            cats.models
+                .get(&target)
+                .unwrap()
+                .perceived_receptivity
+                .value
+                > 0.0
+        );
     }
 
     #[test]
@@ -943,11 +1017,21 @@ mod tests {
 
         let cats = world.get::<CatBeliefs>(witness).unwrap();
         assert!(
-            cats.models.get(&caregiver).unwrap().perceived_receptivity.value > 0.0,
+            cats.models
+                .get(&caregiver)
+                .unwrap()
+                .perceived_receptivity
+                .value
+                > 0.0,
             "Care should lift caregiver receptivity"
         );
         assert!(
-            cats.models.get(&kitten).unwrap().perceived_receptivity.value > 0.0,
+            cats.models
+                .get(&kitten)
+                .unwrap()
+                .perceived_receptivity
+                .value
+                > 0.0,
             "Care should lift kitten receptivity"
         );
     }

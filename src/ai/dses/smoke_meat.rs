@@ -124,7 +124,6 @@ impl crate::ai::dse::CatDse for SmokeMeatDse {
     }
 }
 
-
 pub fn smoke_meat_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(SmokeMeatDse::new())
 }

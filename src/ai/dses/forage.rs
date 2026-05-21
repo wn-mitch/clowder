@@ -169,7 +169,6 @@ impl crate::ai::dse::CatDse for ForageDse {
     }
 }
 
-
 pub fn forage_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(ForageDse::new(scoring))
 }

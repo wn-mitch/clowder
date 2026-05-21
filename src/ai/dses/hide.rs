@@ -228,7 +228,6 @@ impl crate::ai::dse::CatDse for HideDse {
     }
 }
 
-
 /// Build the Hide DSE for registration. Called once at plugin load.
 pub fn hide_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HideDse::new(scoring))
@@ -249,7 +248,9 @@ mod tests {
     fn hide_dse_is_compensated_product() {
         use crate::ai::composition::CompositionMode;
         assert_eq!(
-            HideDse::new(&ScoringConstants::default()).composition().mode,
+            HideDse::new(&ScoringConstants::default())
+                .composition()
+                .mode,
             CompositionMode::CompensatedProduct
         );
     }

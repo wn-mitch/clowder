@@ -143,8 +143,7 @@ pub const BONE_SHAPING_MASTERY: AspirationChain = AspirationChain {
                 level: 0.2,
             },
             emits: &[],
-            narrative_on_complete:
-                "{name} files {possessive} first true needle from rib-shard.",
+            narrative_on_complete: "{name} files {possessive} first true needle from rib-shard.",
         },
         Milestone {
             name: "Journeyman Bone-Shaper",
@@ -208,8 +207,7 @@ pub const HIDEWORK_MASTERY: AspirationChain = AspirationChain {
                 level: 0.0,
             },
             emits: &[],
-            narrative_on_complete:
-                "{name} pegs out {possessive} first hide. The work has begun.",
+            narrative_on_complete: "{name} pegs out {possessive} first hide. The work has begun.",
         },
         Milestone {
             name: "Apprentice Hideworker",
@@ -219,8 +217,7 @@ pub const HIDEWORK_MASTERY: AspirationChain = AspirationChain {
                 level: 0.2,
             },
             emits: &[],
-            narrative_on_complete:
-                "{name} cures a pelt that does not stiffen at the first frost.",
+            narrative_on_complete: "{name} cures a pelt that does not stiffen at the first frost.",
         },
         Milestone {
             name: "Journeyman Hideworker",

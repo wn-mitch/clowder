@@ -127,12 +127,7 @@ pub fn update_resource_panel(
         TEXT_COLOR,
     ));
     if counts.is_empty() {
-        children.push(spawn_text(
-            &mut commands,
-            "  (empty)",
-            FONT_SIZE,
-            TEXT_DIM,
-        ));
+        children.push(spawn_text(&mut commands, "  (empty)", FONT_SIZE, TEXT_DIM));
     } else {
         for (category, count) in counts {
             children.push(spawn_text(
@@ -375,11 +370,7 @@ mod tests {
         let mut world = World::new();
         world.spawn(Item::new(ItemKind::RawMouse, 1.0, ItemLocation::OnGround));
         world.spawn(Item::new(ItemKind::RawFish, 1.0, ItemLocation::OnGround));
-        world.spawn(Item::new(
-            ItemKind::HerbCatnip,
-            1.0,
-            ItemLocation::OnGround,
-        ));
+        world.spawn(Item::new(ItemKind::HerbCatnip, 1.0, ItemLocation::OnGround));
         world.spawn(Item::new(ItemKind::Wood, 1.0, ItemLocation::OnGround));
         world.spawn(Item::new(ItemKind::Barrel, 1.0, ItemLocation::OnGround));
         world.spawn(Item::new(
@@ -413,7 +404,11 @@ mod tests {
     #[test]
     fn count_items_by_category_omits_empty_categories() {
         let mut world = World::new();
-        world.spawn(Item::new(ItemKind::HerbCalmroot, 1.0, ItemLocation::OnGround));
+        world.spawn(Item::new(
+            ItemKind::HerbCalmroot,
+            1.0,
+            ItemLocation::OnGround,
+        ));
 
         let counts = count_in_world(&mut world);
 

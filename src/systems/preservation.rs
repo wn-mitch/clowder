@@ -124,7 +124,12 @@ pub fn advance_preservation_drying(
     // Spawn outputs + record Features after the iter_mut borrow drops.
     for c in &completions {
         commands.spawn((
-            Item::with_modifiers(c.output_kind, c.output_quality, ItemLocation::OnGround, c.output_modifiers),
+            Item::with_modifiers(
+                c.output_kind,
+                c.output_quality,
+                ItemLocation::OnGround,
+                c.output_modifiers,
+            ),
             c.pos,
             CraftedItem {
                 recipe: c.recipe_id,
@@ -291,7 +296,11 @@ mod tests {
 
         // Output entity must exist at the rack's position.
         let mut found: Option<(ItemKind, f32)> = None;
-        for (item, pos) in app.world_mut().query::<(&Item, &Position)>().iter(app.world()) {
+        for (item, pos) in app
+            .world_mut()
+            .query::<(&Item, &Position)>()
+            .iter(app.world())
+        {
             if *pos == Position::new(5, 5) {
                 found = Some((item.kind, item.quality));
                 break;
@@ -353,9 +362,6 @@ mod tests {
         );
         // And FoodDried must NOT fire — the recipe variants are
         // distinct Feature emissions.
-        assert_eq!(
-            act.counts.get(&Feature::FoodDried).copied().unwrap_or(0),
-            0,
-        );
+        assert_eq!(act.counts.get(&Feature::FoodDried).copied().unwrap_or(0), 0,);
     }
 }

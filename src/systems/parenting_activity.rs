@@ -206,10 +206,7 @@ impl ParentingScalars {
 pub fn update_parenting_activity_biological(
     mut commands: Commands,
     kittens: Query<(Entity, &KittenDependency), Without<Dead>>,
-    mut parents: Query<
-        (Entity, Option<&mut ParentingActivity>),
-        (With<Species>, Without<Dead>),
-    >,
+    mut parents: Query<(Entity, Option<&mut ParentingActivity>), (With<Species>, Without<Dead>)>,
     time: Res<TimeState>,
 ) {
     let tick = time.tick;
@@ -387,8 +384,7 @@ pub fn populate_parenting_scalars(
         };
         // Collect this owner's dependent set so the suppression check
         // can verify the partner's HeldIntention.target ∈ dependents.
-        let dependents: Vec<Entity> =
-            activity.relationships.iter().map(|r| r.target).collect();
+        let dependents: Vec<Entity> = activity.relationships.iter().map(|r| r.target).collect();
 
         for rel in &activity.relationships {
             // Track max engagement for the DSE-axis replacement (step 5).
@@ -524,12 +520,12 @@ mod tests {
     /// integration glue the scenario tests depend on.
     #[test]
     fn populate_scalars_builds_bundle_for_parenting_cat() {
-        use bevy_ecs::world::World;
-        use crate::resources::sim_constants::SimConstants;
-        use crate::resources::time::TimeState;
         use crate::components::parenting_activity::{
             ParentalKind, ParentingActivity, RelationshipTo,
         };
+        use crate::resources::sim_constants::SimConstants;
+        use crate::resources::time::TimeState;
+        use bevy_ecs::world::World;
 
         let mut world = World::new();
         world.insert_resource(SimConstants::default());
@@ -596,13 +592,13 @@ mod tests {
     /// `caretake_suppression_factor = joint_suppression_factor` (≈ 0.3).
     #[test]
     fn suppression_fires_when_partner_holds_caretake() {
-        use bevy_ecs::world::World;
         use crate::components::held_intention::IntentionSource;
         use crate::components::parenting_activity::{
             ParentalKind, ParentingActivity, RelationshipTo,
         };
         use crate::resources::sim_constants::SimConstants;
         use crate::resources::time::TimeState;
+        use bevy_ecs::world::World;
 
         let mut world = World::new();
         world.insert_resource(SimConstants::default());
@@ -652,23 +648,21 @@ mod tests {
             expiry_tick: None,
             source: IntentionSource::SelfMotivated,
         };
-        world
-            .entity_mut(parent_b)
-            .insert((
-                flat_personality(0.7),
-                ParentingActivity {
-                    relationships: vec![RelationshipTo {
-                        target: kitten,
-                        kind: ParentalKind::Biological,
-                        bond_strength: 1.0,
-                        parental_engagement: 0.5,
-                        partner: Some(parent_a),
-                        entered_tick: 1_000,
-                        last_interaction_tick: 1_000,
-                    }],
-                },
-                held,
-            ));
+        world.entity_mut(parent_b).insert((
+            flat_personality(0.7),
+            ParentingActivity {
+                relationships: vec![RelationshipTo {
+                    target: kitten,
+                    kind: ParentalKind::Biological,
+                    bond_strength: 1.0,
+                    parental_engagement: 0.5,
+                    partner: Some(parent_a),
+                    entered_tick: 1_000,
+                    last_interaction_tick: 1_000,
+                }],
+            },
+            held,
+        ));
 
         let mut schedule = bevy_ecs::schedule::Schedule::default();
         schedule.add_systems(populate_parenting_scalars);
@@ -703,13 +697,13 @@ mod tests {
     /// yields whenever any other adult takes Caretake.
     #[test]
     fn suppression_target_specific_no_cross_litter_yield() {
-        use bevy_ecs::world::World;
         use crate::components::held_intention::IntentionSource;
         use crate::components::parenting_activity::{
             ParentalKind, ParentingActivity, RelationshipTo,
         };
         use crate::resources::sim_constants::SimConstants;
         use crate::resources::time::TimeState;
+        use bevy_ecs::world::World;
 
         let mut world = World::new();
         world.insert_resource(SimConstants::default());

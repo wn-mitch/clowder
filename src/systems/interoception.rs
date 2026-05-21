@@ -54,11 +54,11 @@
 use bevy::prelude::*;
 
 use crate::components::aspirations::Aspirations;
+use crate::components::body_zones::{CatBodyModel, PartCondition};
 use crate::components::markers::{
     BodyDistressed, EsteemDistressed, LackingPurpose, LowHealth, LowMastery, SevereInjury,
 };
 use crate::components::mental::{Memory, MemoryType};
-use crate::components::body_zones::{CatBodyModel, PartCondition};
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::Skills;
 use crate::resources::map::TileMap;
@@ -492,7 +492,11 @@ pub fn author_self_markers(
         // Cats without a `CatBodyModel` (legacy / test fixtures) are
         // treated as uninjured.
         let want_severe_injury = body_model
-            .map(|m| m.parts.iter().any(|p| p.condition >= PartCondition::Mangled))
+            .map(|m| {
+                m.parts
+                    .iter()
+                    .any(|p| p.condition >= PartCondition::Mangled)
+            })
             .unwrap_or(false);
         let want_body_distressed =
             body_distress_composite(needs, health) >= body_distress_threshold;
@@ -579,7 +583,10 @@ mod tests {
         SimConstants::default().combat.body_zone_pain_weights
     }
 
-    fn body_with_damage(part: crate::components::body_zones::BodyPart, tissue: f32) -> CatBodyModel {
+    fn body_with_damage(
+        part: crate::components::body_zones::BodyPart,
+        tissue: f32,
+    ) -> CatBodyModel {
         let c = SimConstants::default();
         let mut model = CatBodyModel::default();
         model.apply_damage(

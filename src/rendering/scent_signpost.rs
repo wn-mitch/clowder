@@ -15,8 +15,8 @@ use bevy::prelude::*;
 
 use crate::rendering::sprite_assets::SpriteAssets;
 use crate::rendering::tilemap_sync::{TILE_PX, TILE_SCALE};
-use crate::resources::CatScentMap;
 use crate::resources::map::TileMap;
+use crate::resources::CatScentMap;
 
 /// Marker on each signpost sprite. Carries the bucket coordinates so
 /// `update_scent_signposts` can index back into `CatScentMap.marks`.

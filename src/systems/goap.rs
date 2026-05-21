@@ -92,10 +92,8 @@ pub struct NarrativeEmitter<'w> {
     /// 258 — C3 belief substrate. Resolvers emit observable side-effects
     /// here; `belief_integrator` consumes the messages and updates each
     /// in-range witness's mental models via EMA.
-    pub witnessable: bevy_ecs::message::MessageWriter<
-        'w,
-        crate::messages::witnessable_event::WitnessableEvent,
-    >,
+    pub witnessable:
+        bevy_ecs::message::MessageWriter<'w, crate::messages::witnessable_event::WitnessableEvent>,
 }
 
 /// Bundles world-state queries for evaluate_and_plan to stay under 16 params.
@@ -252,8 +250,7 @@ pub struct WorldStateQueries<'w, 's> {
     /// is read-only here and the cats query never writes the
     /// component on the same iteration tick (the `belief_integrator`
     /// system writes once per tick before scoring).
-    pub location_beliefs:
-        Query<'w, 's, &'static crate::components::beliefs::LocationBeliefs>,
+    pub location_beliefs: Query<'w, 's, &'static crate::components::beliefs::LocationBeliefs>,
     /// 268 — read-only `PredatorBeliefs` lookup for the Hide DSE's
     /// per-target belief-facet scalars (`hide_recency_of_threat_cue`,
     /// `hide_perceived_intent_clarity`). Reads the cat's MentalModel
@@ -261,15 +258,13 @@ pub struct WorldStateQueries<'w, 's> {
     /// for the same reason as `location_beliefs` — read-only on a
     /// Component the belief_integrator writes once per tick before
     /// scoring.
-    pub predator_beliefs:
-        Query<'w, 's, &'static crate::components::beliefs::PredatorBeliefs>,
+    pub predator_beliefs: Query<'w, 's, &'static crate::components::beliefs::PredatorBeliefs>,
     /// 268 — read-only `ContextBeliefs` lookup for the ambient-shock
     /// fallback. When `nearest_threat_entity` is `None` but
     /// `ContextBeliefs[HereNow].recency_of_threat_cue` is elevated
     /// (e.g. door-slam), the Hide DSE's recency axis reads from this
     /// path instead of `PredatorBeliefs`.
-    pub context_beliefs:
-        Query<'w, 's, &'static crate::components::beliefs::ContextBeliefs>,
+    pub context_beliefs: Query<'w, 's, &'static crate::components::beliefs::ContextBeliefs>,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -309,10 +304,8 @@ pub struct PlanResources<'w, 's> {
     /// `make_plan → None` site. Bundled here rather than as a separate
     /// SystemParam to keep `evaluate_and_plan` under Bevy's 16-param
     /// ceiling.
-    pub witnessable: bevy_ecs::message::MessageWriter<
-        'w,
-        crate::messages::witnessable_event::WitnessableEvent,
-    >,
+    pub witnessable:
+        bevy_ecs::message::MessageWriter<'w, crate::messages::witnessable_event::WitnessableEvent>,
     /// Ticket 427 Step 1 — pre-allocated scratch buffers for the
     /// target-taking DSE resolvers (`resolve_*_target` under
     /// `src/ai/dses/`). Each wrapper clears its own slots and writes
@@ -543,11 +536,7 @@ pub struct TargetMarkerQueries<'w, 's> {
     /// `escape_viability(...)` (this file ~line 1955) which queried
     /// `markers.has(Parent::KEY, entity)` against a snapshot that
     /// never populated the key.
-    pub parent_markers_q: Query<
-        'w,
-        's,
-        (Has<markers::Parent>, Has<markers::HasJuvenileDependent>),
-    >,
+    pub parent_markers_q: Query<'w, 's, (Has<markers::Parent>, Has<markers::HasJuvenileDependent>)>,
     /// Ticket 321 — per-cat L1→L2 picker output. When the cat carries
     /// a non-empty `AspirationEmissions`, the L2 author site replaces
     /// the default `Intention::Activity { Idle }` wrap with
@@ -559,11 +548,8 @@ pub struct TargetMarkerQueries<'w, 's> {
     /// defaults to the 126 Activity-Idle shape. Bundled here rather
     /// than as a standalone `evaluate_and_plan` parameter to keep
     /// the parent system under Bevy's 16-param limit.
-    pub aspiration_emissions_q: Query<
-        'w,
-        's,
-        &'static crate::components::aspiration_emission::AspirationEmissions,
-    >,
+    pub aspiration_emissions_q:
+        Query<'w, 's, &'static crate::components::aspiration_emission::AspirationEmissions>,
     /// Ticket 367 — preservation per-cat markers. Bundled inside
     /// `TargetMarkerQueries` so adding six new `Has<>` rows doesn't
     /// push `evaluate_and_plan` past Bevy's 16-param limit, and so the
@@ -731,34 +717,24 @@ pub struct ExecutorContext<'w, 's> {
     /// trigger (3) check in `resolve_goap_plans`'s per-cat prologue.
     /// Disjoint from the mutable `cats` query because `&HeldIntention`
     /// is read-only.
-    pub held_intentions: bevy_ecs::prelude::Query<
-        'w,
-        's,
-        &'static crate::components::HeldIntention,
-    >,
+    pub held_intentions:
+        bevy_ecs::prelude::Query<'w, 's, &'static crate::components::HeldIntention>,
     /// Ticket 364 — read-only `HeldGoalStack` lookup at the
     /// advance / backtrack hook in `resolve_goap_plans`'s
     /// `plans_to_remove` drain. Consults the stack on Fulfilled
     /// (advance) and Abandoned (backtrack) plan endings; rewrites the
     /// stack via Commands when the method has remaining sub-goals.
     /// Read-only and disjoint from the mutable cats query.
-    pub held_goal_stacks: bevy_ecs::prelude::Query<
-        'w,
-        's,
-        &'static crate::components::HeldGoalStack,
-    >,
+    pub held_goal_stacks:
+        bevy_ecs::prelude::Query<'w, 's, &'static crate::components::HeldGoalStack>,
     /// Ticket 127 — L2 JointIntention lookup (successor to
     /// `PairingActivity`). The `SocializeWith` step resolver reads
     /// this to pin the Intention partner at the top of the
     /// `target_partner_bond` axis. Disjoint from the mutable `cats`
     /// query in `resolve_goap_plans` because `&JointIntention` is
     /// read-only.
-    pub joint_q: bevy_ecs::prelude::Query<
-        'w,
-        's,
-        &'static crate::components::JointIntention,
-        Without<Dead>,
-    >,
+    pub joint_q:
+        bevy_ecs::prelude::Query<'w, 's, &'static crate::components::JointIntention, Without<Dead>>,
     /// 035 — Dead-and-not-Buried colony cat snapshot (Entity, Position,
     /// Name, cause). Disjoint from the `cats` mut query (which filters
     /// `Without<Dead>`). Feeds `dead_cat_positions` /
@@ -769,12 +745,7 @@ pub struct ExecutorContext<'w, 's> {
     pub dead_cats_q: bevy_ecs::prelude::Query<
         'w,
         's,
-        (
-            Entity,
-            &'static Position,
-            &'static Name,
-            &'static Dead,
-        ),
+        (Entity, &'static Position, &'static Name, &'static Dead),
         (
             With<crate::components::identity::Species>,
             Without<markers::Buried>,
@@ -794,8 +765,7 @@ pub struct ExecutorContext<'w, 's> {
     /// resolver's phase-band bias (C5). Threaded here so step
     /// resolvers reach the substrate through the existing context
     /// instead of needing a new SystemParam slot.
-    pub action_affordances:
-        Res<'w, crate::resources::action_affordances::ActionAffordances>,
+    pub action_affordances: Res<'w, crate::resources::action_affordances::ActionAffordances>,
     /// Ticket 427 Step 1 — pre-allocated scratch for target-taking DSE
     /// resolvers invoked from `resolve_goap_plans`. Same `DseTargetScratchpad`
     /// resource the planner system reaches through `PlanResources`; Bevy
@@ -1881,9 +1851,10 @@ pub fn evaluate_and_plan(
             has_fuel,
             has_dryable,
             has_smokeable,
-        ) = marker_qs.preservation_markers_q.get(entity).unwrap_or((
-            false, false, false, false, false, false, false, false,
-        ));
+        ) = marker_qs
+            .preservation_markers_q
+            .get(entity)
+            .unwrap_or((false, false, false, false, false, false, false, false));
         if let Ok((
             injured,
             has_herbs,
@@ -1929,11 +1900,7 @@ pub fn evaluate_and_plan(
             // class-specific deposit routing — reader for HasMaterialsIn-
             // Inventory ships with the 235-follow-on material-pile ticket;
             // reader for HasCuriosInInventory ships with ticket 16's Cache).
-            markers.set_entity(
-                markers::HasMaterialsInInventory::KEY,
-                entity,
-                has_materials,
-            );
+            markers.set_entity(markers::HasMaterialsInInventory::KEY, entity, has_materials);
             markers.set_entity(markers::HasCuriosInInventory::KEY, entity, has_curios);
             // 367 — preservation per-cat markers. Missing any of these
             // set_entity lines would silently mask the new DSE
@@ -1941,32 +1908,12 @@ pub fn evaluate_and_plan(
             // §209 / §084).
             markers.set_entity(markers::CanDry::KEY, entity, can_dry);
             markers.set_entity(markers::CanSmoke::KEY, entity, can_smoke);
-            markers.set_entity(
-                markers::HasRawFishInInventory::KEY,
-                entity,
-                has_raw_fish,
-            );
-            markers.set_entity(
-                markers::HasRawOrganInInventory::KEY,
-                entity,
-                has_raw_organ,
-            );
-            markers.set_entity(
-                markers::HasRawMeatInInventory::KEY,
-                entity,
-                has_raw_meat,
-            );
+            markers.set_entity(markers::HasRawFishInInventory::KEY, entity, has_raw_fish);
+            markers.set_entity(markers::HasRawOrganInInventory::KEY, entity, has_raw_organ);
+            markers.set_entity(markers::HasRawMeatInInventory::KEY, entity, has_raw_meat);
             markers.set_entity(markers::HasFuelInInventory::KEY, entity, has_fuel);
-            markers.set_entity(
-                markers::HasDryableInInventory::KEY,
-                entity,
-                has_dryable,
-            );
-            markers.set_entity(
-                markers::HasSmokeableInInventory::KEY,
-                entity,
-                has_smokeable,
-            );
+            markers.set_entity(markers::HasDryableInInventory::KEY, entity, has_dryable);
+            markers.set_entity(markers::HasSmokeableInInventory::KEY, entity, has_smokeable);
             // 367 follow-on — `HasDryableAccessible` composite. Widens
             // `DryFoodDse` eligibility past "cat already has dryable in
             // inventory" to "cat could conceivably go dry something":
@@ -1978,8 +1925,7 @@ pub fn evaluate_and_plan(
             // the racks-but-zero-loading defect that motivated this
             // commit.
             let has_free_slot = !inventory.is_full();
-            let has_dryable_accessible =
-                has_dryable || (has_free_slot && has_dryable_in_stores);
+            let has_dryable_accessible = has_dryable || (has_free_slot && has_dryable_in_stores);
             markers.set_entity(
                 markers::HasDryableAccessible::KEY,
                 entity,
@@ -2212,10 +2158,12 @@ pub fn evaluate_and_plan(
                 crate::ai::pathfinding::FoxScentOverlay::new(&colony.fox_scent_map, sc);
             let corr_overlay = crate::ai::pathfinding::CorruptionOverlay::new(&res.map, sc);
             let (fox_w, corr_w) = if current.action == Action::Patrol {
-                (sc.patrol_path_fox_scent_weight, sc.patrol_path_corruption_weight)
+                (
+                    sc.patrol_path_fox_scent_weight,
+                    sc.patrol_path_corruption_weight,
+                )
             } else {
-                let w =
-                    crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+                let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
                 (w, w)
             };
             let overlays = [
@@ -2256,9 +2204,7 @@ pub fn evaluate_and_plan(
         // (commit 10+) can sample `cost_at` and walk the gradient
         // in subsequent ticks. Re-inserted on every replan; stale
         // fields are detected by `origin_tick` mismatch.
-        commands
-            .entity(entity)
-            .insert(cat_route_cost_field.clone());
+        commands.entity(entity).insert(cat_route_cost_field.clone());
 
         let ctx = ScoringContext {
             scoring: sc,
@@ -2428,9 +2374,11 @@ pub fn evaluate_and_plan(
                 let creature_recency = nearest_threat
                     .map(|&(t, _)| t)
                     .and_then(|t| {
-                        world_state.predator_beliefs.get(entity).ok().and_then(|pb| {
-                            pb.models.get(&t).map(|m| m.recency_of_threat_cue.value)
-                        })
+                        world_state
+                            .predator_beliefs
+                            .get(entity)
+                            .ok()
+                            .and_then(|pb| pb.models.get(&t).map(|m| m.recency_of_threat_cue.value))
                     })
                     .unwrap_or(0.0);
                 let ambient_recency = world_state
@@ -2448,9 +2396,11 @@ pub fn evaluate_and_plan(
             hide_perceived_intent_clarity: nearest_threat
                 .map(|&(t, _)| t)
                 .and_then(|t| {
-                    world_state.predator_beliefs.get(entity).ok().and_then(|pb| {
-                        pb.models.get(&t).map(|m| m.perceived_intent_clarity.value)
-                    })
+                    world_state
+                        .predator_beliefs
+                        .get(entity)
+                        .ok()
+                        .and_then(|pb| pb.models.get(&t).map(|m| m.perceived_intent_clarity.value))
                 })
                 .unwrap_or(0.0)
                 .clamp(0.0, 1.0),
@@ -2942,11 +2892,7 @@ pub fn evaluate_and_plan(
         // variant of the four pickup-class plan actions; the plan-path
         // variant composes via DropItem-as-prefix
         // (`HasFreeSlotThisPlan(true)`, search-state).
-        markers.set_entity(
-            markers::HasFreeSlot::KEY,
-            entity,
-            !inventory.is_full(),
-        );
+        markers.set_entity(markers::HasFreeSlot::KEY, entity, !inventory.is_full());
         // Ticket 235: author the per-cat `HasHerbStashAccessible`
         // substrate marker. Gates the deposit-prefix branch of pickup-
         // class plan templates so far-from-stash cats don't route
@@ -3183,51 +3129,47 @@ pub fn evaluate_and_plan(
             // the emissions pool is degenerate (Hunting "First Blood"
             // is the only Live emission slice), so the priority
             // override and the formal softmax converge.
-            let strategy =
-                crate::ai::commitment::strategy_for_disposition(chosen);
-            let (held_intention, intention_source) =
-                match marker_qs
-                    .aspiration_emissions_q
-                    .get(entity)
-                    .ok()
-                    .and_then(|e| e.winner().cloned())
-                {
-                    Some(row) => {
-                        let goal = crate::ai::dse::Intention::Goal {
-                            state: crate::ai::dse::GoalState {
-                                label: row.label,
-                                // §Future deferred: auto-derived
-                                // `achieved` predicate. Until then,
-                                // fulfillment fires via 320's
-                                // frame-pop on leaf completion, not
-                                // via this predicate.
-                                achieved: |_world, _entity| false,
-                            },
-                            strategy: row.strategy,
-                        };
-                        let source =
-                            crate::components::IntentionSource::AspirationEmitted {
-                                chain: row.chain,
-                            };
-                        (goal, source)
-                    }
-                    None => {
-                        let activity = crate::ai::dse::Intention::Activity {
-                            // 126: placeholder Intention shape — the
-                            // held DSE's identity rides on
-                            // `held_action` for the modifier's
-                            // round-trip, and `source` records
-                            // provenance. Future tickets (128 HTN,
-                            // 127 joint-intentions) will refine the
-                            // Intention contents from each DSE's
-                            // emit().
-                            kind: crate::ai::dse::ActivityKind::Idle,
-                            termination: crate::ai::dse::Termination::UntilInterrupt,
-                            strategy,
-                        };
-                        (activity, crate::components::IntentionSource::SelfMotivated)
-                    }
-                };
+            let strategy = crate::ai::commitment::strategy_for_disposition(chosen);
+            let (held_intention, intention_source) = match marker_qs
+                .aspiration_emissions_q
+                .get(entity)
+                .ok()
+                .and_then(|e| e.winner().cloned())
+            {
+                Some(row) => {
+                    let goal = crate::ai::dse::Intention::Goal {
+                        state: crate::ai::dse::GoalState {
+                            label: row.label,
+                            // §Future deferred: auto-derived
+                            // `achieved` predicate. Until then,
+                            // fulfillment fires via 320's
+                            // frame-pop on leaf completion, not
+                            // via this predicate.
+                            achieved: |_world, _entity| false,
+                        },
+                        strategy: row.strategy,
+                    };
+                    let source =
+                        crate::components::IntentionSource::AspirationEmitted { chain: row.chain };
+                    (goal, source)
+                }
+                None => {
+                    let activity = crate::ai::dse::Intention::Activity {
+                        // 126: placeholder Intention shape — the
+                        // held DSE's identity rides on
+                        // `held_action` for the modifier's
+                        // round-trip, and `source` records
+                        // provenance. Future tickets (128 HTN,
+                        // 127 joint-intentions) will refine the
+                        // Intention contents from each DSE's
+                        // emit().
+                        kind: crate::ai::dse::ActivityKind::Idle,
+                        termination: crate::ai::dse::Termination::UntilInterrupt,
+                        strategy,
+                    };
+                    (activity, crate::components::IntentionSource::SelfMotivated)
+                }
+            };
             let commitment_strength =
                 crate::components::held_intention::commitment_strength_from_margin(
                     softmax_outcome.margin(),
@@ -3275,8 +3217,7 @@ pub fn evaluate_and_plan(
             // never `Goal`. 321 (picker emits `Goal`-shaped
             // intentions) and 323 (first Live method) are the
             // tickets that exercise this path.
-            if let crate::ai::dse::Intention::Goal { state, .. } = &held.intention
-            {
+            if let crate::ai::dse::Intention::Goal { state, .. } = &held.intention {
                 // 364 — preserve an existing HeldGoalStack when the held
                 // intention's label matches the current top frame's
                 // goal_label. The advance hook (resolve_goap_plans) owns
@@ -3295,57 +3236,53 @@ pub fn evaluate_and_plan(
                 if preserve_existing {
                     // Keep the advance hook's stack as-is.
                 } else {
-                let mut stack = crate::components::HeldGoalStack::empty();
-                let mut next_label: Option<&'static str> = Some(state.label);
-                let mut depth_exceeded = false;
-                while let Some(label) = next_label {
-                    let Some(spec) = res
-                        .method_registry
-                        .lookup_spec_dormant_filtered(label)
-                    else {
-                        // No method for this label; the gate stops
-                        // expanding. If at least one frame was
-                        // already pushed (a parent method whose
-                        // compound sub-goal had no method), the
-                        // stack carries the partial decomposition;
-                        // the leaf is held via `HeldIntention` per
-                        // the 126 no-method fallback.
-                        break;
-                    };
-                    let frame = crate::components::GoalFrame::new(
-                        spec.id,
-                        spec.goal_label,
-                        spec.sub_goals.len(),
-                        res.time.tick,
-                        None,
-                        held.source.clone(),
-                    );
-                    if stack.push(frame).is_err() {
-                        depth_exceeded = true;
-                        break;
-                    }
-                    if let Some(activation) = res.activation.as_deref_mut() {
-                        activation.record(Feature::MethodAdopted);
-                    }
-                    // Step into sub_goals[0]. Compound entries
-                    // recurse via the registry; primitive entries
-                    // terminate the walk — the primitive is held via
-                    // `HeldIntention`.
-                    next_label = match spec.sub_goals.first() {
-                        Some(crate::ai::methods::SubGoal::Goal(g)) => {
-                            Some(g.label)
+                    let mut stack = crate::components::HeldGoalStack::empty();
+                    let mut next_label: Option<&'static str> = Some(state.label);
+                    let mut depth_exceeded = false;
+                    while let Some(label) = next_label {
+                        let Some(spec) = res.method_registry.lookup_spec_dormant_filtered(label)
+                        else {
+                            // No method for this label; the gate stops
+                            // expanding. If at least one frame was
+                            // already pushed (a parent method whose
+                            // compound sub-goal had no method), the
+                            // stack carries the partial decomposition;
+                            // the leaf is held via `HeldIntention` per
+                            // the 126 no-method fallback.
+                            break;
+                        };
+                        let frame = crate::components::GoalFrame::new(
+                            spec.id,
+                            spec.goal_label,
+                            spec.sub_goals.len(),
+                            res.time.tick,
+                            None,
+                            held.source.clone(),
+                        );
+                        if stack.push(frame).is_err() {
+                            depth_exceeded = true;
+                            break;
                         }
-                        _ => None,
-                    };
-                }
-                if depth_exceeded {
-                    if let Some(activation) = res.activation.as_deref_mut() {
-                        activation.record(Feature::MethodDepthExceeded);
+                        if let Some(activation) = res.activation.as_deref_mut() {
+                            activation.record(Feature::MethodAdopted);
+                        }
+                        // Step into sub_goals[0]. Compound entries
+                        // recurse via the registry; primitive entries
+                        // terminate the walk — the primitive is held via
+                        // `HeldIntention`.
+                        next_label = match spec.sub_goals.first() {
+                            Some(crate::ai::methods::SubGoal::Goal(g)) => Some(g.label),
+                            _ => None,
+                        };
                     }
-                }
-                if !stack.is_empty() {
-                    commands.entity(entity).insert(stack);
-                }
+                    if depth_exceeded {
+                        if let Some(activation) = res.activation.as_deref_mut() {
+                            activation.record(Feature::MethodDepthExceeded);
+                        }
+                    }
+                    if !stack.is_empty() {
+                        commands.entity(entity).insert(stack);
+                    }
                 }
             }
 
@@ -3372,8 +3309,7 @@ pub fn evaluate_and_plan(
             // the modifier produce the lift naturally — the inserted
             // `HeldIntention` isn't visible to a query until the next
             // flush — so the lift is written directly.
-            let intention_momentum_lift =
-                commitment_strength * d.intention_momentum_lift;
+            let intention_momentum_lift = commitment_strength * d.intention_momentum_lift;
             if intention_momentum_lift > 0.0 {
                 if let Some(entry) = current
                     .last_scores
@@ -3382,14 +3318,12 @@ pub fn evaluate_and_plan(
                 {
                     entry.1 += intention_momentum_lift;
                 }
-                current.last_scores.sort_by(|a, b| {
-                    b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-                });
+                current
+                    .last_scores
+                    .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             }
             if let Some(activation) = res.activation.as_deref_mut() {
-                activation.record(
-                    crate::resources::system_activation::Feature::IntentionAdopted,
-                );
+                activation.record(crate::resources::system_activation::Feature::IntentionAdopted);
             }
 
             current.ticks_remaining = u64::MAX;
@@ -3603,9 +3537,7 @@ enum StackOutcome {
 /// `sub_goal_index`, recursively pop frames whose sub_goals are
 /// exhausted. Returns `AdvanceTo(updated)` when a sub-goal remains
 /// (anywhere up the stack), `Done` when the stack ran out.
-fn htn_advance_or_pop(
-    stack: crate::components::HeldGoalStack,
-) -> StackOutcome {
+fn htn_advance_or_pop(stack: crate::components::HeldGoalStack) -> StackOutcome {
     let mut updated = stack;
     loop {
         let Some(top) = updated.top_mut() else {
@@ -3631,9 +3563,7 @@ fn htn_advance_or_pop(
 /// function consults `top.method.failure_strategy` and walks
 /// `MethodRegistry::iter_applicable_for(...)` to pick a successor
 /// method, emitting `BacktrackTo(..)` instead.
-fn htn_abandon_or_pop(
-    stack: crate::components::HeldGoalStack,
-) -> StackOutcome {
+fn htn_abandon_or_pop(stack: crate::components::HeldGoalStack) -> StackOutcome {
     let mut updated = stack;
     while updated.pop().is_some() {
         // Abandoning a child propagates to the parent today. When
@@ -3967,11 +3897,7 @@ pub fn resolve_goap_plans(
         // Ticket 231: HasFreeSlot per-cat snapshot from `Inventory`.
         // Read by the substrate-path variant of pickup-class plan
         // actions; the plan-path variant uses HasFreeSlotThisPlan.
-        planner_markers.set_entity(
-            markers::HasFreeSlot::KEY,
-            entity,
-            !inventory.is_full(),
-        );
+        planner_markers.set_entity(markers::HasFreeSlot::KEY, entity, !inventory.is_full());
         // Ticket 235: per-cat HasHerbStashAccessible (sibling of
         // MaterialsAvailable). Snapshot parity with the
         // `evaluate_and_plan` author site is required for the
@@ -4023,7 +3949,9 @@ pub fn resolve_goap_plans(
         // double-borrowing the mutable `cats` query.
         gender: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _))| (e, *g))
+            .map(
+                |((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _))| (e, *g),
+            )
             .collect(),
         cat_tile_counts: {
             // Ticket 427 Step 5 — pre-size to cat count (a cat-tile-count
@@ -4067,7 +3995,9 @@ pub fn resolve_goap_plans(
             .collect(),
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _, _))| health.current < health.max)
+            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _, _))| {
+                health.current < health.max
+            })
             .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
             .collect(),
         // §6.5.3 mentor-target DSE snapshot: candidate-side Skills lookup
@@ -4459,9 +4389,15 @@ pub fn resolve_goap_plans(
                 };
                 let goal = goal_for_disposition(plan.kind, plan.trips_done, &plan_ctx);
 
-                if let Ok(new_steps) =
-                    make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx, &mut ec.planner_scratch)
-                {
+                if let Ok(new_steps) = make_plan(
+                    planner_state,
+                    &actions,
+                    &goal,
+                    12,
+                    1000,
+                    &plan_ctx,
+                    &mut ec.planner_scratch,
+                ) {
                     plan.replan(new_steps);
                 } else {
                     // Can't plan next trip — complete anyway. The typed
@@ -4885,9 +4821,15 @@ pub fn resolve_goap_plans(
                 };
                 let goal = goal_for_disposition(plan.kind, plan.trips_done, &plan_ctx);
 
-                if let Ok(new_steps) =
-                    make_plan(planner_state, &actions, &goal, 12, 1000, &plan_ctx, &mut ec.planner_scratch)
-                {
+                if let Ok(new_steps) = make_plan(
+                    planner_state,
+                    &actions,
+                    &goal,
+                    12,
+                    1000,
+                    &plan_ctx,
+                    &mut ec.planner_scratch,
+                ) {
                     if plan.replan(new_steps) {
                         if let Some(ref mut log) = ec.event_log {
                             log.push(
@@ -5078,11 +5020,7 @@ pub fn resolve_goap_plans(
         // second Live method exists).
         // Otherwise: leave the frame alone via `PreserveStackOnly`
         // (multi-step) or clear it (single-step).
-        let stack_now = ec
-            .held_goal_stacks
-            .get(entity)
-            .ok()
-            .cloned();
+        let stack_now = ec.held_goal_stacks.get(entity).ok().cloned();
         // Read the plan's actual last-step GoapActionKind. The plan is
         // still in the world (the remove command above is deferred); a
         // read-only get on the cats query returns the current
@@ -5090,9 +5028,7 @@ pub fn resolve_goap_plans(
         let plan_last_action_kind: Option<GoapActionKind> = cats
             .get(entity)
             .ok()
-            .and_then(|((_, plan, _, _, _, _, _, _, _), _)| {
-                plan.steps.last().map(|s| s.action)
-            });
+            .and_then(|((_, plan, _, _, _, _, _, _, _), _)| plan.steps.last().map(|s| s.action));
         let plan_was_htn_leaf = matches!(
             plan_last_action_kind,
             Some(
@@ -5111,12 +5047,10 @@ pub fn resolve_goap_plans(
             .map(|f| f.sub_goal_count > 1)
             .unwrap_or(false);
         let stack_outcome = match stack_now {
-            Some(stack) if !stack.is_empty() && plan_was_htn_leaf => {
-                match ending {
-                    IntentionEnding::Fulfilled => htn_advance_or_pop(stack),
-                    IntentionEnding::Abandoned(_) => htn_abandon_or_pop(stack),
-                }
-            }
+            Some(stack) if !stack.is_empty() && plan_was_htn_leaf => match ending {
+                IntentionEnding::Fulfilled => htn_advance_or_pop(stack),
+                IntentionEnding::Abandoned(_) => htn_abandon_or_pop(stack),
+            },
             Some(stack) if !stack.is_empty() && top_is_multi_step => {
                 // Multi-step method, plan wasn't an HTN-leaf dispatch
                 // (the cat was running a non-leaf plan — e.g., a
@@ -5134,14 +5068,10 @@ pub fn resolve_goap_plans(
             .remove::<crate::components::HeldIntention>();
         match &stack_outcome {
             StackOutcome::AdvanceTo(updated_stack) => {
-                commands
-                    .entity(entity)
-                    .insert(updated_stack.clone());
+                commands.entity(entity).insert(updated_stack.clone());
             }
             StackOutcome::BacktrackTo(updated_stack) => {
-                commands
-                    .entity(entity)
-                    .insert(updated_stack.clone());
+                commands.entity(entity).insert(updated_stack.clone());
             }
             StackOutcome::PreserveStackOnly(stack) => {
                 // Re-insert to ensure the stack survives any hypothetical
@@ -5295,9 +5225,7 @@ pub fn resolve_goap_plans(
     //      Grave-aware system (kitten-rest-at-grave, monument
     //      landmarks, etc.).
     for outcome in std::mem::take(&mut accum.bury_completions) {
-        commands
-            .entity(outcome.deceased)
-            .insert(markers::Buried);
+        commands.entity(outcome.deceased).insert(markers::Buried);
         commands.entity(outcome.deceased).despawn();
         commands.spawn((
             crate::components::grave::Grave {
@@ -5333,20 +5261,24 @@ pub fn resolve_goap_plans(
         };
         match advance {
             KittenRearingAdvance::Wean(_) => {
-                commands.entity(target).insert(crate::components::KittenDependency {
-                    mother: dep.mother,
-                    father: dep.father,
-                    maturity: dep.maturity.max(weaned_threshold),
-                    skills_learned: dep.skills_learned,
-                });
+                commands
+                    .entity(target)
+                    .insert(crate::components::KittenDependency {
+                        mother: dep.mother,
+                        father: dep.father,
+                        maturity: dep.maturity.max(weaned_threshold),
+                        skills_learned: dep.skills_learned,
+                    });
             }
             KittenRearingAdvance::Teach(_) => {
-                commands.entity(target).insert(crate::components::KittenDependency {
-                    mother: dep.mother,
-                    father: dep.father,
-                    maturity: dep.maturity.max(teach_done_threshold),
-                    skills_learned: dep.skills_learned.saturating_add(1).min(curriculum_size),
-                });
+                commands
+                    .entity(target)
+                    .insert(crate::components::KittenDependency {
+                        mother: dep.mother,
+                        father: dep.father,
+                        maturity: dep.maturity.max(teach_done_threshold),
+                        skills_learned: dep.skills_learned.saturating_add(1).min(curriculum_size),
+                    });
             }
             KittenRearingAdvance::Release(_) => {
                 // 395 / R13: Release is symbolic — Feature::KittenReleased
@@ -5536,9 +5468,8 @@ fn dispatch_step_action(
             );
             let __corr =
                 crate::ai::pathfinding::CorruptionOverlay::new(&ec.map, &ec.constants.scoring);
-            let __weight = crate::ai::pathfinding::cat_path_weight_from_boldness(
-                personality.boldness,
-            );
+            let __weight =
+                crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
             let __current_tick = ec.time.tick;
             let __window = ec.constants.scoring.route_cost_replan_window_ticks;
             match route_cost_field {
@@ -5890,8 +5821,7 @@ fn dispatch_step_action(
                 // (not `&ec`) so `&mut ec.dse_scratchpad` further down
                 // is a disjoint field borrow.
                 let faction_overlay_q = &ec.faction_overlay_q;
-                let stance_overlays =
-                    |e: Entity| stance_overlays_from_query(faction_overlay_q, e);
+                let stance_overlays = |e: Entity| stance_overlays_from_query(faction_overlay_q, e);
                 // Ticket 027b §7.M / 127 — look up the L2
                 // JointIntention partner (Courtship practice) so
                 // `socialize_target::bond_score` can pin the Intention
@@ -5970,8 +5900,7 @@ fn dispatch_step_action(
                         crate::ai::joint_intention::JointInteractionObserved {
                             entity: cat_entity,
                             partner,
-                            practice:
-                                crate::components::joint_intention::PracticeKind::Courtship,
+                            practice: crate::components::joint_intention::PracticeKind::Courtship,
                             tick: ec.time.tick,
                         },
                     );
@@ -6090,8 +6019,7 @@ fn dispatch_step_action(
                         crate::ai::joint_intention::JointInteractionObserved {
                             entity: cat_entity,
                             partner,
-                            practice:
-                                crate::components::joint_intention::PracticeKind::Courtship,
+                            practice: crate::components::joint_intention::PracticeKind::Courtship,
                             tick: ec.time.tick,
                         },
                     );
@@ -6214,8 +6142,7 @@ fn dispatch_step_action(
                         crate::ai::joint_intention::JointInteractionObserved {
                             entity: cat_entity,
                             partner,
-                            practice:
-                                crate::components::joint_intention::PracticeKind::Courtship,
+                            practice: crate::components::joint_intention::PracticeKind::Courtship,
                             tick: ec.time.tick,
                         },
                     );
@@ -6309,11 +6236,7 @@ fn dispatch_step_action(
                         .find(|(e, _)| *e == t)
                         .map(|(_, p)| *p);
                     let name_opt = snaps.dead_cat_names.get(&t).cloned();
-                    let cause_opt = ec
-                        .dead_cats_q
-                        .get(t)
-                        .ok()
-                        .map(|(_, _, _, dead)| dead.cause);
+                    let cause_opt = ec.dead_cats_q.get(t).ok().map(|(_, _, _, dead)| dead.cause);
                     (pos_opt, name_opt, cause_opt)
                 }
                 None => (None, None, None),
@@ -6439,8 +6362,7 @@ fn dispatch_step_action(
                 // Ticket 427 Step 1 — capture only `&ec.faction_overlay_q`
                 // so `&mut ec.dse_scratchpad` is a disjoint field borrow.
                 let faction_overlay_q = &ec.faction_overlay_q;
-                let stance_overlays =
-                    |e: Entity| stance_overlays_from_query(faction_overlay_q, e);
+                let stance_overlays = |e: Entity| stance_overlays_from_query(faction_overlay_q, e);
                 let picked = crate::ai::dses::fight_target::resolve_fight_target(
                     &ec.dse_registry,
                     cat_entity,
@@ -6808,9 +6730,9 @@ fn dispatch_step_action(
             // the resolver despawns the herb on Advance, so the kind lookup
             // has to happen first. Used to classify the ReserveDeposited
             // emit by ResourceKind on success.
-            let gathered_kind = plan.step_state[step_idx].target_entity.and_then(|e| {
-                magic_params.herb_query.get(e).ok().map(|(_, h, _)| h.kind)
-            });
+            let gathered_kind = plan.step_state[step_idx]
+                .target_entity
+                .and_then(|e| magic_params.herb_query.get(e).ok().map(|(_, h, _)| h.kind));
             let result = crate::steps::magic::resolve_gather_herb(
                 ticks,
                 plan.step_state[step_idx].target_entity,
@@ -7298,8 +7220,7 @@ fn dispatch_step_action(
             // the first dispatch tick before snapshot lookup). The
             // `unwrap_or(*pos)` keeps the staleness check well-defined
             // when the target hasn't been resolved yet.
-            let target_pos = plan
-                .step_state[step_idx]
+            let target_pos = plan.step_state[step_idx]
                 .target_entity
                 .and_then(|e| snaps.construction_positions.iter().find(|(ce, _)| *ce == e))
                 .map(|(_, p)| *p)
@@ -7349,8 +7270,7 @@ fn dispatch_step_action(
                     .min_by_key(|(_, _, gp, _, _)| pos.manhattan_distance(gp))
                     .map(|(e, _, _, _, _)| *e);
             }
-            let target_pos = plan
-                .step_state[step_idx]
+            let target_pos = plan.step_state[step_idx]
                 .target_entity
                 .and_then(|e| {
                     snaps
@@ -7729,8 +7649,7 @@ fn dispatch_step_action(
             }
             let Some(recipient) = plan.step_state[step_idx].target_entity else {
                 return crate::steps::StepResult::Fail(
-                    "handoff: no recipient on disposition (no dependent cat in colony)"
-                        .to_string(),
+                    "handoff: no recipient on disposition (no dependent cat in colony)".to_string(),
                 );
             };
             let has_transferable = !inventory.slots.is_empty();
@@ -7858,45 +7777,39 @@ fn dispatch_step_action(
         // resolver, records the Feature if witnessed, and queues a
         // post-loop drain entry (`accum.kitten_rearing_advances`) that
         // performs the actual component mutation.
-        GoapActionKind::Wean => {
-            dispatch_htn_kitten_primitive(
-                crate::ai::Action::Wean,
-                step_idx,
-                cat_entity,
-                *pos,
-                plan,
-                ec,
-                snaps,
-                accum,
-                narr,
-            )
-        }
-        GoapActionKind::Teach => {
-            dispatch_htn_kitten_primitive(
-                crate::ai::Action::Teach,
-                step_idx,
-                cat_entity,
-                *pos,
-                plan,
-                ec,
-                snaps,
-                accum,
-                narr,
-            )
-        }
-        GoapActionKind::Release => {
-            dispatch_htn_kitten_primitive(
-                crate::ai::Action::Release,
-                step_idx,
-                cat_entity,
-                *pos,
-                plan,
-                ec,
-                snaps,
-                accum,
-                narr,
-            )
-        }
+        GoapActionKind::Wean => dispatch_htn_kitten_primitive(
+            crate::ai::Action::Wean,
+            step_idx,
+            cat_entity,
+            *pos,
+            plan,
+            ec,
+            snaps,
+            accum,
+            narr,
+        ),
+        GoapActionKind::Teach => dispatch_htn_kitten_primitive(
+            crate::ai::Action::Teach,
+            step_idx,
+            cat_entity,
+            *pos,
+            plan,
+            ec,
+            snaps,
+            accum,
+            narr,
+        ),
+        GoapActionKind::Release => dispatch_htn_kitten_primitive(
+            crate::ai::Action::Release,
+            step_idx,
+            cat_entity,
+            *pos,
+            plan,
+            ec,
+            snaps,
+            accum,
+            narr,
+        ),
         // 357: HTN-driven primitives — mourn arc. Real wiring deferred:
         // the §7.7.b grief-event-emission debt authors the `Mourning`
         // marker on colony-mate death. Until that lands, `mourn_at_grave`
@@ -8004,10 +7917,7 @@ fn dispatch_htn_kitten_primitive(
     // `[release_threshold, 1.0)` (the near-mature window — Release
     // fires "at max age").
     if plan.step_state[step_idx].target_entity.is_none() {
-        let kittens = build_dependent_kitten_snapshot(
-            &ec.kitten_parentage,
-            &snaps.cat_positions,
-        );
+        let kittens = build_dependent_kitten_snapshot(&ec.kitten_parentage, &snaps.cat_positions);
         plan.step_state[step_idx].target_entity =
             crate::ai::dses::dependent_kitten_target::resolve_dependent_kitten_target(
                 action,
@@ -8038,11 +7948,10 @@ fn dispatch_htn_kitten_primitive(
         //     `MethodFailure`).
         // 395 extends 333/364's mother-only check to symmetric
         // mother-OR-father per the "both parents pitch in" decision.
-        let is_parent_of_any_dependent = ec.kitten_parentage.iter().any(
-            |(_, dep, _pos, _released)| {
+        let is_parent_of_any_dependent =
+            ec.kitten_parentage.iter().any(|(_, dep, _pos, _released)| {
                 dep.mother == Some(cat_entity) || dep.father == Some(cat_entity)
-            },
-        );
+            });
         if is_parent_of_any_dependent {
             return crate::steps::StepResult::Advance;
         }
@@ -8053,20 +7962,13 @@ fn dispatch_htn_kitten_primitive(
 
     // Read current KittenDependency state via the disjoint
     // `kitten_parentage` query.
-    let dep_state = ec
-        .kitten_parentage
-        .get(target)
-        .ok()
-        .map(|(_, d, _, _)| d);
+    let dep_state = ec.kitten_parentage.get(target).ok().map(|(_, d, _, _)| d);
 
     match action {
         crate::ai::Action::Wean => {
             let current_maturity = dep_state.map(|d| d.maturity).unwrap_or(1.0);
-            let outcome = crate::steps::disposition::resolve_wean(
-                target,
-                current_maturity,
-                weaned_threshold,
-            );
+            let outcome =
+                crate::steps::disposition::resolve_wean(target, current_maturity, weaned_threshold);
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::KittenWeaned);
             if let Some(advanced) = outcome.witness {
                 accum
@@ -8077,7 +7979,9 @@ fn dispatch_htn_kitten_primitive(
         }
         crate::ai::Action::Teach => {
             let current_maturity = dep_state.map(|d| d.maturity).unwrap_or(1.0);
-            let current_skills = dep_state.map(|d| d.skills_learned).unwrap_or(curriculum_size);
+            let current_skills = dep_state
+                .map(|d| d.skills_learned)
+                .unwrap_or(curriculum_size);
             let outcome = crate::steps::disposition::resolve_teach(
                 target,
                 current_maturity,
@@ -8095,10 +7999,7 @@ fn dispatch_htn_kitten_primitive(
         }
         crate::ai::Action::Release => {
             let kitten_has_dependency = dep_state.is_some();
-            let outcome = crate::steps::disposition::resolve_release(
-                target,
-                kitten_has_dependency,
-            );
+            let outcome = crate::steps::disposition::resolve_release(target, kitten_has_dependency);
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::KittenReleased);
             if let Some(advanced) = outcome.witness {
                 accum
@@ -8660,11 +8561,7 @@ fn resolve_search_prey(
 
     // Timeout.
     if ticks > d.search_timeout_ticks {
-        if inventory
-            .slots
-            .iter()
-            .any(|s| s.kind.is_food())
-        {
+        if inventory.slots.iter().any(|s| s.kind.is_food()) {
             // Have food from earlier — advance to deposit.
             return crate::steps::StepResult::Advance;
         }
@@ -8731,7 +8628,9 @@ fn record_hunt_attempt(
     }
     if let Some(w) = witnessable {
         let success = match outcome {
-            HuntOutcome::Killed | HuntOutcome::KilledAndReplanned | HuntOutcome::KilledAndConsumed => Some(true),
+            HuntOutcome::Killed
+            | HuntOutcome::KilledAndReplanned
+            | HuntOutcome::KilledAndConsumed => Some(true),
             HuntOutcome::LostDuringApproach
             | HuntOutcome::LostDuringStalk
             | HuntOutcome::LostDuringChase => Some(false),
@@ -8888,7 +8787,8 @@ fn resolve_engage_prey(
         return crate::steps::StepResult::Fail("prey teleported".into());
     }
 
-    let stalk_start_base = (prey_cfg.alert_radius + d.stalk_start_buffer).max(d.stalk_start_minimum);
+    let stalk_start_base =
+        (prey_cfg.alert_radius + d.stalk_start_buffer).max(d.stalk_start_minimum);
     // 263: affordance-biased stalk-start. Bias is dormant by default;
     // at non-zero `hunt_stalk_chase_affordance_bias`, high stalk
     // affordance widens the stalk band (cat begins stalking from
@@ -9972,11 +9872,7 @@ fn materials_available_for(
 /// Mirrors the per-cat geometric shape of `materials_available_for`.
 /// Pathfinding is left to the resolver at execution time; Manhattan is
 /// the right grain for plan-template gating.
-fn herb_stash_accessible_for(
-    pos: &Position,
-    stores_positions: &[Position],
-    radius: i32,
-) -> bool {
+fn herb_stash_accessible_for(pos: &Position, stores_positions: &[Position], radius: i32) -> bool {
     stores_positions
         .iter()
         .any(|sp| pos.manhattan_distance(sp) <= radius)
@@ -10495,7 +10391,10 @@ mod tests {
                 assert_eq!(top.sub_goal_index, 1);
                 assert_eq!(top.method.0, "rear_kitten");
             }
-            other => panic!("expected AdvanceTo, got {:?}", std::mem::discriminant(&other)),
+            other => panic!(
+                "expected AdvanceTo, got {:?}",
+                std::mem::discriminant(&other)
+            ),
         }
     }
 
@@ -10524,7 +10423,10 @@ mod tests {
                 assert_eq!(top.method.0, "parent_method");
                 assert_eq!(top.sub_goal_index, 1, "parent's index advanced");
             }
-            other => panic!("expected AdvanceTo, got {:?}", std::mem::discriminant(&other)),
+            other => panic!(
+                "expected AdvanceTo, got {:?}",
+                std::mem::discriminant(&other)
+            ),
         }
     }
 

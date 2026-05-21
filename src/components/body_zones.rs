@@ -108,7 +108,16 @@ pub enum PartCategory {
 /// tier; thresholds live in `BodyZoneConstants::condition_thresholds`.
 #[repr(u8)]
 #[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum PartCondition {
     #[default]
@@ -283,10 +292,7 @@ impl CatBodyModel {
 
     /// Iterate (BodyPart, &BodyPartState) pairs in canonical order.
     pub fn iter(&self) -> impl Iterator<Item = (BodyPart, &BodyPartState)> {
-        BodyPart::ALL
-            .iter()
-            .copied()
-            .zip(self.parts.iter())
+        BodyPart::ALL.iter().copied().zip(self.parts.iter())
     }
 }
 
@@ -306,17 +312,34 @@ mod tests {
     ];
 
     fn test_weights() -> [f32; CAT_BODY_PART_COUNT] {
-        [0.5, 0.5, 1.5, 0.8, 3.0, 1.5, 0.8, 1.0, 1.0, 1.0, 1.0, 2.0, 0.5]
+        [
+            0.5, 0.5, 1.5, 0.8, 3.0, 1.5, 0.8, 1.0, 1.0, 1.0, 1.0, 2.0, 0.5,
+        ]
     }
 
     #[test]
     fn condition_from_tissue_damage_matches_spec() {
         let t = &TEST_THRESHOLDS;
-        assert_eq!(PartCondition::from_tissue_damage(0.0, t), PartCondition::Healthy);
-        assert_eq!(PartCondition::from_tissue_damage(0.1, t), PartCondition::Bruised);
-        assert_eq!(PartCondition::from_tissue_damage(0.3, t), PartCondition::Wounded);
-        assert_eq!(PartCondition::from_tissue_damage(0.7, t), PartCondition::Mangled);
-        assert_eq!(PartCondition::from_tissue_damage(0.95, t), PartCondition::Destroyed);
+        assert_eq!(
+            PartCondition::from_tissue_damage(0.0, t),
+            PartCondition::Healthy
+        );
+        assert_eq!(
+            PartCondition::from_tissue_damage(0.1, t),
+            PartCondition::Bruised
+        );
+        assert_eq!(
+            PartCondition::from_tissue_damage(0.3, t),
+            PartCondition::Wounded
+        );
+        assert_eq!(
+            PartCondition::from_tissue_damage(0.7, t),
+            PartCondition::Mangled
+        );
+        assert_eq!(
+            PartCondition::from_tissue_damage(0.95, t),
+            PartCondition::Destroyed
+        );
     }
 
     #[test]

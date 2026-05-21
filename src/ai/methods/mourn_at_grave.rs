@@ -33,9 +33,7 @@
 //! grave-target picker (`pick_grave_for_mourner`) reads
 //! `Mourning.deceased_name` to find the *correct* grave.
 
-use crate::ai::methods::{
-    ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint,
-};
+use crate::ai::methods::{ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint};
 use crate::ai::Action;
 use crate::components::mourning::Mourning;
 use bevy_ecs::prelude::*;

@@ -87,8 +87,7 @@ impl PickingUpDse {
                     health_damping,
                 )),
             ],
-            composition: Composition::compensated_product(vec![1.0, 1.0])
-                .with_compensation(0.0),
+            composition: Composition::compensated_product(vec![1.0, 1.0]).with_compensation(0.0),
             eligibility: EligibilityFilter::new()
                 .forbid(markers::Incapacitated::KEY)
                 .require(markers::HasGroundCarcass::KEY),
@@ -136,7 +135,6 @@ impl crate::ai::dse::CatDse for PickingUpDse {
         crate::ai::Action::PickUp
     }
 }
-
 
 pub fn picking_up_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(PickingUpDse::new())

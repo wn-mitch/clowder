@@ -18,7 +18,8 @@ pub const HEART_OF_THE_COLONY: AspirationChain = AspirationChain {
                 bond_type: BondType::Friends,
             },
             emits: &[],
-            narrative_on_complete: "{name} has found a friend. The world feels a little less large.",
+            narrative_on_complete:
+                "{name} has found a friend. The world feels a little less large.",
         },
         Milestone {
             name: "Trusted Ear",

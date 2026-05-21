@@ -1506,9 +1506,7 @@ impl Default for SpeciesConstants {
 /// string into the events.jsonl header. Variant names are stable
 /// identifiers; new options must be added as new variants rather
 /// than renamed in place.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum WardPlacementSemantics {
     /// Pre-301 behavior. The scorer picks the single highest-scored
     /// candidate tile per coordinator wake. Default.
@@ -1529,9 +1527,7 @@ pub enum WardPlacementSemantics {
 /// fixture; the `InfluenceMap` default replaces it with an argmax over
 /// `ColonyDistrictMap` + per-kind weight tables. Variant names are
 /// stable identifiers; add new variants rather than renaming in place.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum BuildingPlacementSemantics {
     /// Pre-382 behavior. Spiral search outward from `colony_center` to
     /// Manhattan radius 16; returns the first `footprint_valid` tile.
@@ -1561,9 +1557,7 @@ pub enum BuildingPlacementSemantics {
 /// events.jsonl header alongside `WardPlacementSemantics`. Variant
 /// names are stable identifiers; add new variants rather than
 /// renaming in place.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum WardPlacementCatValueComposition {
     /// Pre-313 behavior. `+ ward_placement_cat_value_weight *
     /// cat_value` is added to the score. Rewards proximity to
@@ -2912,10 +2906,10 @@ impl Default for ScoringConstants {
             intraspecies_conflict_flight_threshold: default_intraspecies_conflict_flight_threshold(
             ),
             intraspecies_conflict_flight_lift: default_intraspecies_conflict_flight_lift(),
-            intraspecies_conflict_freeze_threshold:
-                default_intraspecies_conflict_freeze_threshold(),
-            intraspecies_conflict_freeze_hide_lift:
-                default_intraspecies_conflict_freeze_hide_lift(),
+            intraspecies_conflict_freeze_threshold: default_intraspecies_conflict_freeze_threshold(
+            ),
+            intraspecies_conflict_freeze_hide_lift: default_intraspecies_conflict_freeze_hide_lift(
+            ),
             social_perception_radius: default_social_perception_radius(),
             social_status_distress_respect_weight: default_social_status_distress_respect_weight(),
             social_status_distress_age_weight: default_social_status_distress_age_weight(),
@@ -3023,12 +3017,10 @@ impl Default for ScoringConstants {
             ward_fox_approach_corridor_weight: default_ward_fox_approach_corridor_weight(),
             ward_placement_cat_value_composition: default_ward_placement_cat_value_composition(),
             ward_placement_cat_value_gate_floor: default_ward_placement_cat_value_gate_floor(),
-            cat_patrol_deterrent_deposit_per_tick:
-                default_cat_patrol_deterrent_deposit_per_tick(),
+            cat_patrol_deterrent_deposit_per_tick: default_cat_patrol_deterrent_deposit_per_tick(),
             cat_patrol_deterrent_decay_rate: default_cat_patrol_deterrent_decay_rate(),
             cat_patrol_deterrent_path_cost_max: default_cat_patrol_deterrent_path_cost_max(),
-            cat_patrol_deterrent_overlay_weight:
-                default_cat_patrol_deterrent_overlay_weight(),
+            cat_patrol_deterrent_overlay_weight: default_cat_patrol_deterrent_overlay_weight(),
             forage_route_cost_weight: default_forage_route_cost_weight(),
             hunt_route_cost_weight: default_hunt_route_cost_weight(),
             wander_route_cost_weight: default_wander_route_cost_weight(),
@@ -3081,14 +3073,12 @@ impl Default for ScoringConstants {
                 default_building_placement_same_kind_proximity_weight(),
             building_placement_same_kind_proximity_range:
                 default_building_placement_same_kind_proximity_range(),
-            colony_district_structure_halo_radius:
-                default_colony_district_structure_halo_radius(),
+            colony_district_structure_halo_radius: default_colony_district_structure_halo_radius(),
             colony_district_crowding_radius: default_colony_district_crowding_radius(),
             colony_district_cat_scent_scale: default_colony_district_cat_scent_scale(),
             placement_stuck_narrate_threshold_ticks:
                 default_placement_stuck_narrate_threshold_ticks(),
-            colony_center_update_cadence_ticks:
-                default_colony_center_update_cadence_ticks(),
+            colony_center_update_cadence_ticks: default_colony_center_update_cadence_ticks(),
             magic_harvest_carcass_scale: 0.6,
             magic_cleanse_colony_scale: 0.4,
             herbcraft_ward_siege_bonus: 0.4,
@@ -5446,15 +5436,12 @@ impl Default for WildlifeConstants {
             ambush_witness_range: 12,
             ambush_witness_safety_drain: 0.08,
             recent_ambush_half_life_ticks: default_recent_ambush_half_life_ticks(),
-            fox_approach_corridor_deposit_per_tick:
-                default_fox_approach_corridor_deposit_per_tick(),
-            fox_approach_corridor_half_life_ticks:
-                default_fox_approach_corridor_half_life_ticks(),
+            fox_approach_corridor_deposit_per_tick: default_fox_approach_corridor_deposit_per_tick(
+            ),
+            fox_approach_corridor_half_life_ticks: default_fox_approach_corridor_half_life_ticks(),
             shadow_fox_coherence_decay_clean: default_shadow_fox_coherence_decay_clean(),
-            shadow_fox_coherence_recovery_corrupt:
-                default_shadow_fox_coherence_recovery_corrupt(),
-            shadow_fox_coherence_decay_threshold:
-                default_shadow_fox_coherence_decay_threshold(),
+            shadow_fox_coherence_recovery_corrupt: default_shadow_fox_coherence_recovery_corrupt(),
+            shadow_fox_coherence_decay_threshold: default_shadow_fox_coherence_decay_threshold(),
             shadow_fox_coherence_recovery_threshold:
                 default_shadow_fox_coherence_recovery_threshold(),
             shadow_fox_coherence_dissolution_threshold:

@@ -153,7 +153,6 @@ impl crate::ai::dse::CatDse for BuildDse {
     }
 }
 
-
 pub fn build_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(BuildDse::new(scoring))
 }

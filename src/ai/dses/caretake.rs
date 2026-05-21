@@ -98,10 +98,7 @@ impl CaretakeDse {
                 )),
                 Consideration::Scalar(ScalarConsideration::new(COMPASSION_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(PARENTAL_ENGAGEMENT_INPUT, linear)),
-                Consideration::Scalar(ScalarConsideration::new(
-                    "colony_food_security",
-                    lift_curve,
-                )),
+                Consideration::Scalar(ScalarConsideration::new("colony_food_security", lift_curve)),
             ],
             // RtEO sum = 1.0. Urgency dominates (hungry kitten is
             // time-sensitive); compassion is the non-parent driver;
@@ -168,7 +165,6 @@ impl crate::ai::dse::CatDse for CaretakeDse {
         true
     }
 }
-
 
 pub fn caretake_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CaretakeDse::new(scoring))

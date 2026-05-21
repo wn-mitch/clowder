@@ -155,7 +155,12 @@ pub fn hunt_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
     ];
     // Pre-263 weights — three §6.5.5 axes renormalized ×(3/4) plus
     // cooldown at 1/4. Sums to ~1.0.
-    let base_weights = [0.357 * 3.0 / 4.0, 0.357 * 3.0 / 4.0, 0.286 * 3.0 / 4.0, 1.0 / 4.0];
+    let base_weights = [
+        0.357 * 3.0 / 4.0,
+        0.357 * 3.0 / 4.0,
+        0.286 * 3.0 / 4.0,
+        1.0 / 4.0,
+    ];
     let aff_w = scoring.hunt_best_predation_weight.clamp(0.0, 1.0);
     let mut weights: Vec<f32> = if aff_w > 0.0 {
         // Renormalize the four pre-263 weights by (1 - aff_w) so the
@@ -436,7 +441,10 @@ mod tests {
 
     #[test]
     fn hunt_target_dse_id_stable() {
-        assert_eq!(hunt_target_dse(&ScoringConstants::default()).id().0, "hunt_target");
+        assert_eq!(
+            hunt_target_dse(&ScoringConstants::default()).id().0,
+            "hunt_target"
+        );
     }
 
     #[test]
@@ -445,12 +453,21 @@ mod tests {
         // Ticket 263 — affordance 5th axis is conditional on
         // `hunt_best_predation_weight > 0.0`; dormant default keeps
         // the axis count at 4.
-        assert_eq!(hunt_target_dse(&ScoringConstants::default()).per_target_considerations().len(), 4);
+        assert_eq!(
+            hunt_target_dse(&ScoringConstants::default())
+                .per_target_considerations()
+                .len(),
+            4
+        );
     }
 
     #[test]
     fn hunt_target_weights_sum_to_one() {
-        let sum: f32 = hunt_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
+        let sum: f32 = hunt_target_dse(&ScoringConstants::default())
+            .composition()
+            .weights
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-3);
     }
 
@@ -490,7 +507,10 @@ mod tests {
 
     #[test]
     fn hunt_target_uses_best_aggregation() {
-        assert_eq!(hunt_target_dse(&ScoringConstants::default()).aggregation(), TargetAggregation::Best);
+        assert_eq!(
+            hunt_target_dse(&ScoringConstants::default()).aggregation(),
+            TargetAggregation::Best
+        );
     }
 
     #[test]
@@ -558,7 +578,9 @@ mod tests {
     #[test]
     fn resolver_returns_none_with_empty_candidates() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let out = resolve_hunt_target(
             &registry,
@@ -583,7 +605,9 @@ mod tests {
         // §6.1 Partial fix demo: Rabbit (yield=0.8125) wins over Mouse
         // (yield=0.625) when distance and alertness are tied.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let mouse = candidate(2, 3, 0, PreyKind::Mouse, 0.2);
         let rabbit = candidate(3, 0, 3, PreyKind::Rabbit, 0.2);
@@ -615,7 +639,9 @@ mod tests {
         //       Mouse score  = 1.0*0.357 + 0.625*0.357 + 1.0*0.286
         //                    ≈ 0.357 + 0.223 + 0.286 = 0.866
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let alert_rabbit = candidate(2, 1, 0, PreyKind::Rabbit, 0.95);
         let relaxed_mouse = candidate(3, 0, 1, PreyKind::Mouse, 0.0);
@@ -641,7 +667,9 @@ mod tests {
     #[test]
     fn close_prey_outscores_distant_same_species() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = candidate(2, 2, 0, PreyKind::Rabbit, 0.2);
         let far = candidate(3, 12, 0, PreyKind::Rabbit, 0.2);
@@ -673,7 +701,9 @@ mod tests {
         // (its distance crosses the midpoint=range/2) while the Mouse
         // sits near 1.0 (well below the midpoint).
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let near_mouse = candidate(2, 1, 0, PreyKind::Mouse, 0.1);
         let far_rat = candidate(3, 10, 0, PreyKind::Rat, 0.1);
@@ -705,7 +735,9 @@ mod tests {
         // still wins when the quadratic nearness gap is smaller than
         // the yield gap. Verified by the higher-yield test above.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let near = candidate(2, 1, 0, PreyKind::Mouse, 0.2);
         let far = candidate(3, 5, 0, PreyKind::Mouse, 0.2);
@@ -751,7 +783,9 @@ mod tests {
         // (not just argmax different).
         let dse = hunt_target_dse(&ScoringConstants::default());
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = candidate(2, 1, 0, PreyKind::Rabbit, 0.2);
         let far = candidate(3, 14, 0, PreyKind::Rabbit, 0.2);
@@ -790,7 +824,9 @@ mod tests {
         // Prey, so a befriended prey candidate should be filtered out
         // before evaluate_target_taking.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(hunt_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let befriended = candidate(2, 1, 0, PreyKind::Mouse, 0.2);
         let normal = candidate(3, 0, 1, PreyKind::Mouse, 0.2);

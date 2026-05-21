@@ -326,10 +326,15 @@ mod tests {
             predicates: vec![FoxStatePredicate::HungerOk(true)],
         };
 
-        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000,
+        let plan = core::make_plan::<FoxDomain>(
+            start,
+            &actions,
+            &goal,
+            12,
+            1000,
             &mut crate::ai::planner::core::PlannerScratch::<FoxDomain>::default(),
         )
-            .expect("should find fox hunting plan");
+        .expect("should find fox hunting plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
@@ -412,10 +417,15 @@ mod tests {
             predicates: vec![FoxStatePredicate::CubsFed(true)],
         };
 
-        let plan = core::make_plan::<FoxDomain>(start, &actions, &goal, 12, 1000,
+        let plan = core::make_plan::<FoxDomain>(
+            start,
+            &actions,
+            &goal,
+            12,
+            1000,
             &mut crate::ai::planner::core::PlannerScratch::<FoxDomain>::default(),
         )
-            .expect("should find feeding plan");
+        .expect("should find feeding plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(

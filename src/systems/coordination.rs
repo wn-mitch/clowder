@@ -232,10 +232,7 @@ pub fn assess_colony_needs(
     time: Res<TimeState>,
     food: Res<crate::resources::food::FoodStores>,
     mut coordinators: Query<(Entity, &Name, &Skills, &mut DirectiveQueue), With<Coordinator>>,
-    injured_cats: Query<
-        (Entity, &crate::components::CatBodyModel, &Position),
-        Without<Dead>,
-    >,
+    injured_cats: Query<(Entity, &crate::components::CatBodyModel, &Position), Without<Dead>>,
     building_query: Query<(
         Entity,
         &crate::components::building::Structure,
@@ -1337,12 +1334,8 @@ pub fn spawn_construction_sites(
                 // coordinator entity. Same pattern as
                 // `assess_colony_needs` (`coordination.rs:509`) — avoids
                 // threading a shared SimRng through Bevy's 16-param tuple.
-                let seed = time
-                    .tick
-                    .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                    ^ coord_entity.to_bits();
-                let mut local_rng =
-                    rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+                let seed = time.tick.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ coord_entity.to_bits();
+                let mut local_rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
                 compute_building_placement(
                     blueprint,
                     size,
@@ -1624,9 +1617,10 @@ pub(crate) fn compute_building_placement(
             let crowding = district.crowding_at(cx, cy);
             let threat = district.threat_at(cx, cy);
 
-            let district_score = s.building_placement_frontier_weight * aff.frontier_sign * frontier
-                - s.building_placement_crowding_weight * crowding
-                + s.building_placement_threat_weight * aff.threat_sign * threat;
+            let district_score =
+                s.building_placement_frontier_weight * aff.frontier_sign * frontier
+                    - s.building_placement_crowding_weight * crowding
+                    + s.building_placement_threat_weight * aff.threat_sign * threat;
 
             let food_lift = if aff.food_proximity_weight > 0.0 {
                 aff.food_proximity_weight * food_location.get(cx, cy)
@@ -1683,11 +1677,7 @@ pub(crate) fn compute_building_placement(
                 0.0
             };
 
-            let score = district_score
-                + food_lift
-                + garden_lift
-                + defensive_lift
-                + same_kind_lift
+            let score = district_score + food_lift + garden_lift + defensive_lift + same_kind_lift
                 - distance_cost
                 + jitter;
 
@@ -1929,10 +1919,7 @@ pub(crate) fn compute_ward_placement(
     // (0.5, 0.3); 297 adds the fox-intercept weight (default 0.0,
     // dormant at land).
     let w_ambush = constants.scoring.ward_ambush_anchor_weight.clamp(0.0, 1.0);
-    let w_carcass = constants
-        .scoring
-        .ward_recency_anchor_weight
-        .clamp(0.0, 1.0);
+    let w_carcass = constants.scoring.ward_recency_anchor_weight.clamp(0.0, 1.0);
     let w_fox_intercept = constants
         .scoring
         .ward_fox_intercept_anchor_weight
@@ -1944,10 +1931,7 @@ pub(crate) fn compute_ward_placement(
     // sample saturate, which is the escape-the-ceiling property that
     // distinguishes this lift from the inside-the-sum siblings.
     // (Negative values would invert the threat axis; guard at zero.)
-    let w_corridor = constants
-        .scoring
-        .ward_fox_approach_corridor_weight
-        .max(0.0);
+    let w_corridor = constants.scoring.ward_fox_approach_corridor_weight.max(0.0);
     // 298: cat_value tiebreak coefficient, promoted from hardcoded 0.3.
     // Default preserves byte-identical pre-298 behavior. Not clamped —
     // it's a scalar coefficient on a [0, 1] presence value, not a
@@ -1971,8 +1955,7 @@ pub(crate) fn compute_ward_placement(
     // Reads `TileMap.corruption` directly per candidate, not via a
     // populated Resource — adding a per-tick populator to the wildlife
     // chain perturbs seed-42 (ticket 061 precedent: `simulation.rs:314-326`).
-    let fox_intercept_radius_tiles =
-        constants.scoring.fox_intercept_kernel_radius_tiles as i32;
+    let fox_intercept_radius_tiles = constants.scoring.fox_intercept_kernel_radius_tiles as i32;
     let corruption_threshold = constants.magic.shadow_fox_corruption_threshold;
 
     // 301: materialize per-candidate scoring data into a Vec instead of
@@ -2034,8 +2017,8 @@ pub(crate) fn compute_ward_placement(
             0.0
         };
 
-        let threat = (fox_scent.max(corruption) + ambush_lift + carcass_lift + fox_intercept_lift)
-            .min(1.0);
+        let threat =
+            (fox_scent.max(corruption) + ambush_lift + carcass_lift + fox_intercept_lift).min(1.0);
 
         // 312: corridor traffic, sampled per candidate and stored as a
         // pre-computed multiplier on `unaddressed_threat`. Short-circuit
@@ -2079,8 +2062,7 @@ pub(crate) fn compute_ward_placement(
         }
         WardPlacementSemantics::DescendingResidual => {
             let k = constants.scoring.ward_placement_residual_rounds.max(1) as usize;
-            let (pick, round_picks) =
-                select_descending_residual(&scored, cat, k, candidates[0]);
+            let (pick, round_picks) = select_descending_residual(&scored, cat, k, candidates[0]);
             if let Some(intent) = intent_map {
                 // Decay first so stale intent fades before the new
                 // round picks land their fresh stamps.
@@ -2467,10 +2449,7 @@ pub fn update_colony_center(
     time: Res<TimeState>,
     constants: Res<SimConstants>,
 ) {
-    let cadence = constants
-        .scoring
-        .colony_center_update_cadence_ticks
-        .max(1);
+    let cadence = constants.scoring.colony_center_update_cadence_ticks.max(1);
     if !time.tick.is_multiple_of(cadence) {
         return;
     }
@@ -2687,7 +2666,7 @@ mod tests {
             &maps,
             &argmax_constants,
             &mut rng_a,
-        None,
+            None,
         );
         let mut rng_b = rand_chacha::ChaCha8Rng::seed_from_u64(7);
         let residual_pos = compute_ward_placement(
@@ -2697,7 +2676,7 @@ mod tests {
             &maps,
             &residual_k1_constants,
             &mut rng_b,
-        None,
+            None,
         );
         assert_eq!(
             argmax_pos, residual_pos,
@@ -2738,8 +2717,7 @@ mod tests {
             fox_approach_corridor: &fac,
         };
         let mut k1_constants = crate::resources::SimConstants::default();
-        k1_constants.scoring.ward_placement_semantics =
-            WardPlacementSemantics::DescendingResidual;
+        k1_constants.scoring.ward_placement_semantics = WardPlacementSemantics::DescendingResidual;
         k1_constants.scoring.ward_placement_residual_rounds = 1;
         let mut k2_constants = k1_constants.clone();
         k2_constants.scoring.ward_placement_residual_rounds = 2;
@@ -2752,7 +2730,7 @@ mod tests {
             &maps,
             &k1_constants,
             &mut rng_a,
-        None,
+            None,
         );
         let mut rng_b = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let round_1_pick = compute_ward_placement(
@@ -2762,7 +2740,7 @@ mod tests {
             &maps,
             &k2_constants,
             &mut rng_b,
-        None,
+            None,
         );
         // K=2 returns round-1's pick; K=1 returns round-0's pick.
         // The two must differ — the spread invariant. Manhattan ≥ 6
@@ -2808,7 +2786,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
-        None,
+            None,
         );
         assert_eq!(pos, Position::new(12, 10));
     }
@@ -2842,7 +2820,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
-        None,
+            None,
         );
         let dx = (pos.x - 67).abs();
         let dy = (pos.y - 45).abs();
@@ -2887,7 +2865,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
-        None,
+            None,
         );
         assert!(
             pos.manhattan_distance(&Position::new(60, 45)) > 3,
@@ -2923,7 +2901,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
-        None,
+            None,
         );
         let dist_near = pos.manhattan_distance(&Position::new(67, 45));
         let dist_far = pos.manhattan_distance(&Position::new(67, 85));
@@ -2991,7 +2969,7 @@ mod tests {
             &maps_a,
             &constants,
             &mut rng_a,
-        None,
+            None,
         );
         let pos_b = compute_ward_placement(
             &structures,
@@ -3000,7 +2978,7 @@ mod tests {
             &maps_b,
             &constants,
             &mut rng_b,
-        None,
+            None,
         );
         assert_eq!(
             pos_a, pos_b,
@@ -3044,7 +3022,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
-        None,
+            None,
         );
         // The ambush hotspot is +y from the anchor; the fox-scent peak
         // is -y. The +0.5 baseline of the logistic at zero input means
@@ -3093,7 +3071,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
-        None,
+            None,
         );
         assert!(
             pos.y >= 45,
@@ -3138,7 +3116,7 @@ mod tests {
             &maps,
             &constants,
             &mut rng,
-        None,
+            None,
         );
         // Placement should land in the fox-intercept halo around the
         // corruption tile. The halo radius is 20 world tiles (default
@@ -3210,7 +3188,7 @@ mod tests {
             &maps_a,
             &constants,
             &mut rng_a,
-        None,
+            None,
         );
         let pos_b = compute_ward_placement(
             &structures,
@@ -3219,7 +3197,7 @@ mod tests {
             &maps_b,
             &constants,
             &mut rng_b,
-        None,
+            None,
         );
         assert_eq!(
             pos_a, pos_b,
@@ -3318,12 +3296,12 @@ mod tests {
         // cat_value/distance/jitter domain (the 297 iter-2 regime).
         fs.deposit(60, 38, 1.0); // y -7 from anchor
         fs.deposit(60, 52, 1.0); // y +7 from anchor
-        // Add corridor traffic ONLY at the +y rival. `FoxApproachCorridorMap`
-        // is per-tile (bucket_size = 1) — deposit across the +y
-        // candidate's neighborhood so candidate (60, 50) reads the
-        // saturated signal. Without this neighborhood the single-tile
-        // deposit at (60, 52) wouldn't align with any candidate
-        // (placement candidates step by 5).
+                                 // Add corridor traffic ONLY at the +y rival. `FoxApproachCorridorMap`
+                                 // is per-tile (bucket_size = 1) — deposit across the +y
+                                 // candidate's neighborhood so candidate (60, 50) reads the
+                                 // saturated signal. Without this neighborhood the single-tile
+                                 // deposit at (60, 52) wouldn't align with any candidate
+                                 // (placement candidates step by 5).
         for y in 50..=54 {
             for x in 58..=62 {
                 fac.deposit(x, y, 1.0);
@@ -3477,7 +3455,7 @@ mod tests {
         fs.deposit(53, 45, 1.0);
         fs.deposit(67, 45, 1.0);
         cp.deposit(53, 45, 1.0); // peak on -x
-        // +x stays at cat_value = 0 (dead tile).
+                                 // +x stays at cat_value = 0 (dead tile).
         let maps = PlacementMaps {
             fox_scent: &fs,
             cat_scent: &cp,
@@ -4229,15 +4207,8 @@ mod tests {
         // small CatScentMap deposit, here mocked via a direct stamp on
         // the district map's frontier axis), the argmax should
         // strictly prefer the warm tile.
-        let (mut district, fox_corridor, food, garden, tile_map) =
-            empty_building_placement_maps();
-        district.stamp(
-            crate::resources::DistrictAxis::Frontier,
-            60,
-            45,
-            1.0,
-            10.0,
-        );
+        let (mut district, fox_corridor, food, garden, tile_map) = empty_building_placement_maps();
+        district.stamp(crate::resources::DistrictAxis::Frontier, 60, 45, 1.0, 10.0);
         let constants = SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let placement = compute_building_placement(
@@ -4271,20 +4242,8 @@ mod tests {
         // `kind_affinity`, so the argmax should land on the food side.
         let (mut district, fox_corridor, mut food, garden, tile_map) =
             empty_building_placement_maps();
-        district.stamp(
-            crate::resources::DistrictAxis::Frontier,
-            40,
-            45,
-            1.0,
-            15.0,
-        );
-        district.stamp(
-            crate::resources::DistrictAxis::Frontier,
-            80,
-            45,
-            1.0,
-            15.0,
-        );
+        district.stamp(crate::resources::DistrictAxis::Frontier, 40, 45, 1.0, 15.0);
+        district.stamp(crate::resources::DistrictAxis::Frontier, 80, 45, 1.0, 15.0);
         food.stamp(80, 45, 1.0, 15.0);
         let constants = SimConstants::default();
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(7);
@@ -4315,8 +4274,7 @@ mod tests {
         // produce. With zero frontier, zero same-kind proximity, and a
         // distance cost that strictly penalizes every candidate, the
         // argmax never clears the floor.
-        let (district, fox_corridor, food, garden, tile_map) =
-            empty_building_placement_maps();
+        let (district, fox_corridor, food, garden, tile_map) = empty_building_placement_maps();
         let mut constants = SimConstants::default();
         constants.scoring.building_placement_score_floor = 5.0;
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(11);

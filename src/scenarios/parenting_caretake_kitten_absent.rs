@@ -23,9 +23,7 @@
 
 use bevy_ecs::world::World;
 
-use crate::components::parenting_activity::{
-    ParentalKind, ParentingActivity, RelationshipTo,
-};
+use crate::components::parenting_activity::{ParentalKind, ParentingActivity, RelationshipTo};
 use crate::components::physical::Position;
 use crate::systems::parenting_activity::parental_engagement_asymptote;
 
@@ -128,13 +126,10 @@ mod tests {
 
         let world = app.world_mut();
         let has_marker = {
-            let mut q = world.query_filtered::<
-                bevy_ecs::entity::Entity,
-                (
-                    bevy_ecs::query::With<crate::components::markers::ColonyState>,
-                    bevy_ecs::query::With<crate::components::markers::HasDependentCat>,
-                ),
-            >();
+            let mut q = world.query_filtered::<bevy_ecs::entity::Entity, (
+                bevy_ecs::query::With<crate::components::markers::ColonyState>,
+                bevy_ecs::query::With<crate::components::markers::HasDependentCat>,
+            )>();
             q.iter(world).next().is_some()
         };
         assert!(

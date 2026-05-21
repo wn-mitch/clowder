@@ -67,9 +67,7 @@ use bevy_ecs::prelude::*;
 /// `#[non_exhaustive]` so future kinds (e.g., FosterTransitive,
 /// CommunityWard) can extend the enum without breaking archived trace
 /// deserialization.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum ParentalKind {
     /// Biological parenthood — adopted on first tick a `KittenDependency`

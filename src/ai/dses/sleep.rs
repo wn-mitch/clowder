@@ -236,7 +236,6 @@ impl crate::ai::dse::CatDse for SleepDse {
     }
 }
 
-
 pub fn sleep_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(SleepDse::new(scoring))
 }

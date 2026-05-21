@@ -16,7 +16,7 @@
 
 use bevy_ecs::world::World;
 
-use crate::components::physical::{DeathCause, Dead, Position};
+use crate::components::physical::{Dead, DeathCause, Position};
 use crate::resources::Relationships;
 
 use super::env::{init_scenario_world, spawn_cat};

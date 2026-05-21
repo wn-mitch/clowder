@@ -91,7 +91,6 @@ impl crate::ai::dse::CatDse for HandingDse {
     }
 }
 
-
 pub fn handing_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HandingDse::new(scoring))
 }

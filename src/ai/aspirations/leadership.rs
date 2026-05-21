@@ -2,9 +2,7 @@
 //! Ported 1:1 from `assets/narrative/aspirations/leadership.ron`
 //! (retired at 321). #331 fills `emits` on every milestone.
 
-use super::{
-    always_true, AspirationChain, Emit, Milestone, Priority, ProgressTracker,
-};
+use super::{always_true, AspirationChain, Emit, Milestone, Priority, ProgressTracker};
 use crate::ai::dse::CommitmentStrategy;
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;

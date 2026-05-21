@@ -88,10 +88,7 @@ impl CoordinateDse {
                     COORDINATE_PERCH_RANGE,
                     perch_distance,
                 )),
-                Consideration::Scalar(ScalarConsideration::new(
-                    "colony_food_security",
-                    lift_curve,
-                )),
+                Consideration::Scalar(ScalarConsideration::new("colony_food_security", lift_curve)),
             ],
             // RtEO sum = 1.0. Directive count drives, diligence +
             // ambition modulate, perch proximity pulls toward the
@@ -149,7 +146,6 @@ impl crate::ai::dse::CatDse for CoordinateDse {
         crate::ai::Action::Coordinate
     }
 }
-
 
 pub fn coordinate_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CoordinateDse::new(scoring))

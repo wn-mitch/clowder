@@ -457,8 +457,7 @@ mod compatibility_tests {
                 let Some(b) = r.chain_by_name(b_name) else {
                     continue;
                 };
-                if let Some(&(_, b_class)) =
-                    b.incompatible_with.iter().find(|(n, _)| *n == a.name)
+                if let Some(&(_, b_class)) = b.incompatible_with.iter().find(|(n, _)| *n == a.name)
                 {
                     assert_eq!(
                         a_class, b_class,

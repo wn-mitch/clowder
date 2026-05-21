@@ -140,11 +140,7 @@ impl Carrying {
     pub fn from_inventory(inventory: &crate::components::magic::Inventory) -> Self {
         use crate::components::items::ItemKind;
 
-        if inventory
-            .slots
-            .iter()
-            .any(|s| s.kind.material().is_some())
-        {
+        if inventory.slots.iter().any(|s| s.kind.material().is_some()) {
             Carrying::BuildMaterials
         } else if inventory.slots.iter().any(|s| s.kind.is_remedy()) {
             Carrying::Remedy
@@ -1141,7 +1137,8 @@ mod tests {
             entity,
         };
         let mut scratch = CatPlannerScratch::default();
-        let plan = make_plan(start, &[], &goal, 12, 1000, &ctx, &mut scratch).expect("should find plan");
+        let plan =
+            make_plan(start, &[], &goal, 12, 1000, &ctx, &mut scratch).expect("should find plan");
         assert!(plan.is_empty());
     }
 

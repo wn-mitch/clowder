@@ -171,13 +171,8 @@ pub fn update_den_threat_markers(
 #[allow(clippy::type_complexity)]
 pub fn update_cub_marker(
     mut commands: Commands,
-    mut cubs_born_r: bevy_ecs::message::MessageReader<
-        crate::messages::fox_lifecycle::CubsBorn,
-    >,
-    holders: Query<
-        (Entity, &FoxState, Has<markers::HasCubs>),
-        (With<WildAnimal>, Without<Dead>),
-    >,
+    mut cubs_born_r: bevy_ecs::message::MessageReader<crate::messages::fox_lifecycle::CubsBorn>,
+    holders: Query<(Entity, &FoxState, Has<markers::HasCubs>), (With<WildAnimal>, Without<Dead>)>,
     dens: Query<&crate::components::wildlife::FoxDen, Without<FoxState>>,
 ) {
     // Insertion: every `CubsBorn` event names the mother directly.
@@ -276,16 +271,9 @@ pub fn update_juvenile_dispersal_markers(
 #[allow(clippy::type_complexity)]
 pub fn update_den_marker(
     mut commands: Commands,
-    mut den_claimed_r: bevy_ecs::message::MessageReader<
-        crate::messages::fox_lifecycle::DenClaimed,
-    >,
-    mut den_lost_r: bevy_ecs::message::MessageReader<
-        crate::messages::fox_lifecycle::DenLost,
-    >,
-    holders: Query<
-        Has<markers::HasDen>,
-        (With<WildAnimal>, With<FoxState>, Without<Dead>),
-    >,
+    mut den_claimed_r: bevy_ecs::message::MessageReader<crate::messages::fox_lifecycle::DenClaimed>,
+    mut den_lost_r: bevy_ecs::message::MessageReader<crate::messages::fox_lifecycle::DenLost>,
+    holders: Query<Has<markers::HasDen>, (With<WildAnimal>, With<FoxState>, Without<Dead>)>,
 ) {
     for event in den_claimed_r.read() {
         // Defensive: only insert on live fox entities; dead foxes that
@@ -543,10 +531,19 @@ mod tests {
         (world, schedule)
     }
 
-    fn spawn_ward(world: &mut World, x: i32, y: i32, kind: crate::components::magic::WardKind) -> Entity {
+    fn spawn_ward(
+        world: &mut World,
+        x: i32,
+        y: i32,
+        kind: crate::components::magic::WardKind,
+    ) -> Entity {
         let ward = match kind {
-            crate::components::magic::WardKind::Thornward => crate::components::magic::Ward::thornward(),
-            crate::components::magic::WardKind::DurableWard => crate::components::magic::Ward::durable(),
+            crate::components::magic::WardKind::Thornward => {
+                crate::components::magic::Ward::thornward()
+            }
+            crate::components::magic::WardKind::DurableWard => {
+                crate::components::magic::Ward::durable()
+            }
         };
         world.spawn((ward, Position::new(x, y))).id()
     }
@@ -564,7 +561,12 @@ mod tests {
         let (mut world, mut schedule) = setup_ward_detection();
         let fox = spawn_fox(&mut world, 0, 0);
         // Thornward repel_radius == 6.0 at full strength.
-        let _ward = spawn_ward(&mut world, 5, 0, crate::components::magic::WardKind::Thornward);
+        let _ward = spawn_ward(
+            &mut world,
+            5,
+            0,
+            crate::components::magic::WardKind::Thornward,
+        );
         schedule.run(&mut world);
         assert!(world.entity(fox).contains::<markers::WardNearbyFox>());
     }
@@ -574,7 +576,12 @@ mod tests {
         let (mut world, mut schedule) = setup_ward_detection();
         let fox = spawn_fox(&mut world, 0, 0);
         // Thornward repel_radius == 6.0; fox at distance 7 is outside.
-        let _ward = spawn_ward(&mut world, 7, 0, crate::components::magic::WardKind::Thornward);
+        let _ward = spawn_ward(
+            &mut world,
+            7,
+            0,
+            crate::components::magic::WardKind::Thornward,
+        );
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::WardNearbyFox>());
     }
@@ -584,7 +591,12 @@ mod tests {
         let (mut world, mut schedule) = setup_ward_detection();
         let fox = spawn_fox(&mut world, 0, 0);
         // DurableWard repel_radius == 9.0; fox at distance 8 is inside.
-        let _ward = spawn_ward(&mut world, 8, 0, crate::components::magic::WardKind::DurableWard);
+        let _ward = spawn_ward(
+            &mut world,
+            8,
+            0,
+            crate::components::magic::WardKind::DurableWard,
+        );
         schedule.run(&mut world);
         assert!(world.entity(fox).contains::<markers::WardNearbyFox>());
     }
@@ -617,7 +629,12 @@ mod tests {
             ))
             .id();
         // Even with a ward right next door, dead foxes are excluded.
-        let _ward = spawn_ward(&mut world, 0, 1, crate::components::magic::WardKind::Thornward);
+        let _ward = spawn_ward(
+            &mut world,
+            0,
+            1,
+            crate::components::magic::WardKind::Thornward,
+        );
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::WardNearbyFox>());
     }
@@ -635,9 +652,9 @@ mod tests {
         // resource pre-registered. The production plugin
         // (`SimulationPlugin::build`) calls `add_message::<CubsBorn>()`;
         // unit tests bootstrap manually.
-        world.init_resource::<bevy_ecs::message::Messages<
-            crate::messages::fox_lifecycle::CubsBorn,
-        >>();
+        world
+            .init_resource::<bevy_ecs::message::Messages<crate::messages::fox_lifecycle::CubsBorn>>(
+            );
         let mut schedule = Schedule::default();
         schedule.add_systems(update_cub_marker);
         (world, schedule)
@@ -645,9 +662,7 @@ mod tests {
 
     fn write_cubs_born(world: &mut World, mother: Entity, den: Entity) {
         world
-            .resource_mut::<bevy_ecs::message::Messages<
-                crate::messages::fox_lifecycle::CubsBorn,
-            >>()
+            .resource_mut::<bevy_ecs::message::Messages<crate::messages::fox_lifecycle::CubsBorn>>()
             .write(crate::messages::fox_lifecycle::CubsBorn {
                 mother,
                 den,
@@ -708,7 +723,11 @@ mod tests {
 
         // Mother loses her den (abandoned / displaced); reconciliation
         // pass clears HasCubs.
-        world.entity_mut(fox).get_mut::<FoxState>().unwrap().home_den = None;
+        world
+            .entity_mut(fox)
+            .get_mut::<FoxState>()
+            .unwrap()
+            .home_den = None;
         schedule.run(&mut world);
         assert!(!world.entity(fox).contains::<markers::HasCubs>());
     }
@@ -835,9 +854,9 @@ mod tests {
         world.init_resource::<bevy_ecs::message::Messages<
             crate::messages::fox_lifecycle::DenClaimed,
         >>();
-        world.init_resource::<bevy_ecs::message::Messages<
-            crate::messages::fox_lifecycle::DenLost,
-        >>();
+        world
+            .init_resource::<bevy_ecs::message::Messages<crate::messages::fox_lifecycle::DenLost>>(
+            );
         let mut schedule = Schedule::default();
         schedule.add_systems(update_den_marker);
         (world, schedule)
@@ -858,9 +877,7 @@ mod tests {
 
     fn write_den_lost(world: &mut World, fox: Entity, den: Entity) {
         world
-            .resource_mut::<bevy_ecs::message::Messages<
-                crate::messages::fox_lifecycle::DenLost,
-            >>()
+            .resource_mut::<bevy_ecs::message::Messages<crate::messages::fox_lifecycle::DenLost>>()
             .write(crate::messages::fox_lifecycle::DenLost {
                 fox,
                 den,

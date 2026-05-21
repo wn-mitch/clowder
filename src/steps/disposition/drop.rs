@@ -116,38 +116,29 @@ pub fn resolve_drop_item(
     commands: &mut Commands,
 ) -> StepOutcome<Option<DropOutcome>> {
     if inventory.slots.is_empty() {
-        return StepOutcome::unwitnessed(StepResult::Fail(
-            "drop: empty inventory".to_string(),
-        ));
+        return StepOutcome::unwitnessed(StepResult::Fail("drop: empty inventory".to_string()));
     }
 
     let has_remedy_herbs = inventory.has_remedy_herb();
-    let Some((slot_idx, _)) = inventory
-        .slots
-        .iter()
-        .enumerate()
-        .min_by(|(_, a), (_, b)| {
-            drop_priority(
-                a.kind,
-                disposition,
-                hunger_satiation,
-                has_construction_site,
-                has_remedy_herbs,
-            )
-            .total_cmp(&drop_priority(
-                b.kind,
-                disposition,
-                hunger_satiation,
-                has_construction_site,
-                has_remedy_herbs,
-            ))
-        })
-    else {
+    let Some((slot_idx, _)) = inventory.slots.iter().enumerate().min_by(|(_, a), (_, b)| {
+        drop_priority(
+            a.kind,
+            disposition,
+            hunger_satiation,
+            has_construction_site,
+            has_remedy_herbs,
+        )
+        .total_cmp(&drop_priority(
+            b.kind,
+            disposition,
+            hunger_satiation,
+            has_construction_site,
+            has_remedy_herbs,
+        ))
+    }) else {
         // Empty case is handled above; this is unreachable, but keep a
         // belt-and-suspenders Fail path rather than panicking.
-        return StepOutcome::unwitnessed(StepResult::Fail(
-            "drop: empty inventory".to_string(),
-        ));
+        return StepOutcome::unwitnessed(StepResult::Fail("drop: empty inventory".to_string()));
     };
 
     match transfer_item_inventory_to_ground(inventory, slot_idx, cat_pos, commands) {
@@ -205,13 +196,7 @@ mod tests {
             true,
             false,
         );
-        let wood_score = drop_priority(
-            ItemKind::Wood,
-            DispositionKind::Building,
-            1.0,
-            true,
-            false,
-        );
+        let wood_score = drop_priority(ItemKind::Wood, DispositionKind::Building, 1.0, true, false);
         assert!(
             pebble_score < wood_score,
             "pebble {} should drop before wood {} for building cat with site",

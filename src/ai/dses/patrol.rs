@@ -208,7 +208,6 @@ impl crate::ai::dse::CatDse for PatrolDse {
     }
 }
 
-
 pub fn patrol_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(PatrolDse::new(scoring))
 }
@@ -288,12 +287,10 @@ mod tests {
         assert_eq!(s.patrol_threat_recency_weight, 0.0);
         let dse = PatrolDse::new(&s);
         assert!(
-            dse.considerations()
-                .iter()
-                .all(|c| !matches!(
-                    c,
-                    Consideration::Scalar(sc) if sc.name == PATROL_THREAT_RECENCY_INPUT
-                )),
+            dse.considerations().iter().all(|c| !matches!(
+                c,
+                Consideration::Scalar(sc) if sc.name == PATROL_THREAT_RECENCY_INPUT
+            )),
             "patrol_threat_recency axis must be absent at dormant weight"
         );
     }

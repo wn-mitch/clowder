@@ -98,7 +98,6 @@ impl crate::ai::dse::CatDse for GroomSelfDse {
     }
 }
 
-
 pub fn groom_self_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(GroomSelfDse::new())
 }

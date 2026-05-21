@@ -122,7 +122,6 @@ impl crate::ai::dse::CatDse for BuryDse {
     }
 }
 
-
 pub fn bury_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(BuryDse::new())
 }

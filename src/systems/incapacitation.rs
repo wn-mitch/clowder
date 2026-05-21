@@ -56,14 +56,7 @@ use crate::components::physical::Dead;
 /// grace-period window before `cleanup_dead`.
 pub fn update_incapacitation(
     mut commands: Commands,
-    cats: Query<
-        (
-            Entity,
-            &crate::components::CatBodyModel,
-            Has<Incapacitated>,
-        ),
-        Without<Dead>,
-    >,
+    cats: Query<(Entity, &crate::components::CatBodyModel, Has<Incapacitated>), Without<Dead>>,
     constants: Res<crate::resources::sim_constants::SimConstants>,
 ) {
     // 095 Phase 1 Stage B — Incapacitated derives from anatomical pain

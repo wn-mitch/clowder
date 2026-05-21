@@ -130,10 +130,15 @@ mod tests {
         };
         let goal = super::super::goals::goal_for_disposition(SnakeDispositionKind::Ambushing);
         let actions = ambushing_actions();
-        let plan = core::make_plan::<SnakeDomain>(start, &actions, &goal, 8, 500,
+        let plan = core::make_plan::<SnakeDomain>(
+            start,
+            &actions,
+            &goal,
+            8,
+            500,
             &mut crate::ai::planner::core::PlannerScratch::<SnakeDomain>::default(),
         )
-            .expect("should find ambush plan");
+        .expect("should find ambush plan");
 
         assert!(!plan.is_empty());
         assert_eq!(plan.last().unwrap().action, SnakeGoapActionKind::Strike);
@@ -150,10 +155,15 @@ mod tests {
         };
         let goal = super::super::goals::goal_for_disposition(SnakeDispositionKind::Basking);
         let actions = basking_actions();
-        let plan = core::make_plan::<SnakeDomain>(start, &actions, &goal, 8, 500,
+        let plan = core::make_plan::<SnakeDomain>(
+            start,
+            &actions,
+            &goal,
+            8,
+            500,
             &mut crate::ai::planner::core::PlannerScratch::<SnakeDomain>::default(),
         )
-            .expect("should find basking plan");
+        .expect("should find basking plan");
 
         assert!(!plan.is_empty());
         assert_eq!(plan.last().unwrap().action, SnakeGoapActionKind::Bask);
@@ -170,10 +180,15 @@ mod tests {
         };
         let goal = super::super::goals::goal_for_disposition(SnakeDispositionKind::Fleeing);
         let actions = fleeing_actions();
-        let plan = core::make_plan::<SnakeDomain>(start, &actions, &goal, 8, 500,
+        let plan = core::make_plan::<SnakeDomain>(
+            start,
+            &actions,
+            &goal,
+            8,
+            500,
             &mut crate::ai::planner::core::PlannerScratch::<SnakeDomain>::default(),
         )
-            .expect("should find fleeing plan");
+        .expect("should find fleeing plan");
 
         assert!(!plan.is_empty());
     }

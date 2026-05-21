@@ -18,9 +18,7 @@ use bevy_ecs::prelude::*;
 use crate::ai::eval::{DseRegistry, ModifierPipeline};
 use crate::ai::hawk_planner::actions::actions_for_disposition;
 use crate::ai::hawk_planner::goals::goal_for_disposition;
-use crate::ai::hawk_planner::{
-    HawkDomain, HawkGoapActionKind, HawkPlannerState, HawkZone,
-};
+use crate::ai::hawk_planner::{HawkDomain, HawkGoapActionKind, HawkPlannerState, HawkZone};
 use crate::ai::hawk_scoring::{
     score_hawk_dispositions, select_hawk_disposition_softmax, HawkNeeds, HawkPersonality,
     HawkScoringContext,
@@ -70,9 +68,7 @@ pub fn hawk_needs_tick(
 
 /// Populate [`HawkNeeds`] from the hawk's `HawkState` + `Health`. Runs
 /// before scoring so the L2 evaluator reads fresh values.
-pub fn sync_hawk_needs(
-    mut hawks: Query<(&HawkState, &Health, &mut HawkNeeds), With<WildAnimal>>,
-) {
+pub fn sync_hawk_needs(mut hawks: Query<(&HawkState, &Health, &mut HawkNeeds), With<WildAnimal>>) {
     for (hawk_state, health, mut needs) in &mut hawks {
         // `HawkState::hunger` is `0.0 = full, 1.0 = starving`; the L2
         // evaluator reads `HawkNeeds::hunger` with inverse semantics.
@@ -154,11 +150,9 @@ pub fn hawk_evaluate_and_plan(
         };
 
         let scoring_result = score_hawk_dispositions(&ctx, &inputs, &mut rng.rng);
-        let Some(chosen) = select_hawk_disposition_softmax(
-            &scoring_result,
-            &mut rng.rng,
-            hc.softmax_temperature,
-        ) else {
+        let Some(chosen) =
+            select_hawk_disposition_softmax(&scoring_result, &mut rng.rng, hc.softmax_temperature)
+        else {
             continue;
         };
 
@@ -167,14 +161,9 @@ pub fn hawk_evaluate_and_plan(
         let actions = actions_for_disposition(chosen);
         let goal = goal_for_disposition(chosen);
 
-        let Some(steps) = make_plan::<HawkDomain>(
-            planner_state,
-            &actions,
-            &goal,
-            8,
-            500,
-            &mut planner_scratch,
-        ) else {
+        let Some(steps) =
+            make_plan::<HawkDomain>(planner_state, &actions, &goal, 8, 500, &mut planner_scratch)
+        else {
             continue;
         };
 

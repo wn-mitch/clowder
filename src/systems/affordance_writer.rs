@@ -111,8 +111,10 @@ pub fn affordance_writer(
     // Collect cat snapshots + side-table belief refs so the pair loop can
     // read the perceiver's belief Components without re-querying.
     let mut cat_snaps: Vec<CatSnapshot> = Vec::with_capacity(cats.iter().count());
-    let mut cat_beliefs_by_entity: std::collections::HashMap<Entity, (&CatBeliefs, &PredatorBeliefs)> =
-        std::collections::HashMap::new();
+    let mut cat_beliefs_by_entity: std::collections::HashMap<
+        Entity,
+        (&CatBeliefs, &PredatorBeliefs),
+    > = std::collections::HashMap::new();
     for (entity, pos, health, needs, cat_b, pred_b) in cats.iter() {
         cat_snaps.push(CatSnapshot {
             entity,
@@ -188,13 +190,7 @@ pub fn affordance_writer(
             if manhattan(&perceiver.position, &target.position) > sensing {
                 continue;
             }
-            write_wildlife_vs_cat(
-                perceiver,
-                target,
-                cfg,
-                &ward_coverage,
-                &mut affordances,
-            );
+            write_wildlife_vs_cat(perceiver, target, cfg, &ward_coverage, &mut affordances);
         }
     }
 }
@@ -276,7 +272,13 @@ fn write_cat_vs_cat(
         perceiver.entity,
         target.entity,
         ActionKind::Stalk,
-        composite(&pred.stalk, prox, cover_self, my_health, 1.0 - intent_clarity),
+        composite(
+            &pred.stalk,
+            prox,
+            cover_self,
+            my_health,
+            1.0 - intent_clarity,
+        ),
     );
     // Chase — proximity, speed advantage (cat-vs-cat speed is symmetric — use my_health as proxy
     // for "I have stamina to chase"), low target clarity.
@@ -291,7 +293,13 @@ fn write_cat_vs_cat(
         perceiver.entity,
         target.entity,
         ActionKind::Pounce,
-        composite(&pred.pounce, prox, cover_self, 1.0 - intent_clarity, my_health),
+        composite(
+            &pred.pounce,
+            prox,
+            cover_self,
+            1.0 - intent_clarity,
+            my_health,
+        ),
     );
 
     // Dive / Strike / Ambush — species-gated to wildlife predators only.
@@ -325,7 +333,13 @@ fn write_cat_vs_cat(
         perceiver.entity,
         target.entity,
         ActionKind::Freeze,
-        composite(&tr.freeze, cover_self, 1.0 - intent_clarity, my_health, 1.0 - prox),
+        composite(
+            &tr.freeze,
+            cover_self,
+            1.0 - intent_clarity,
+            my_health,
+            1.0 - prox,
+        ),
     );
     // Fawn — adjacency, low hostility, positive affiliation.
     affordances.write(
@@ -342,7 +356,13 @@ fn write_cat_vs_cat(
         perceiver.entity,
         target.entity,
         ActionKind::Threaten,
-        composite(&cl.threaten, prox, my_health, 1.0 - violence_cap, 1.0 - hostility),
+        composite(
+            &cl.threaten,
+            prox,
+            my_health,
+            1.0 - violence_cap,
+            1.0 - hostility,
+        ),
     );
     affordances.write(
         perceiver.entity,
@@ -373,7 +393,13 @@ fn write_cat_vs_cat(
         perceiver.entity,
         target.entity,
         ActionKind::GroomOther,
-        composite(&so.groom_other, prox, bond_pos, 1.0 - hostility, perceiver.social_need),
+        composite(
+            &so.groom_other,
+            prox,
+            bond_pos,
+            1.0 - hostility,
+            perceiver.social_need,
+        ),
     );
     // Mate — fertility proxy (mating_need), bond, receptivity, affiliation.
     affordances.write(
@@ -404,7 +430,13 @@ fn write_cat_vs_cat(
         perceiver.entity,
         target.entity,
         ActionKind::FeedKitten,
-        composite(&so.feed_kitten, target_hunger, my_food_proxy, bond_pos, prox),
+        composite(
+            &so.feed_kitten,
+            target_hunger,
+            my_food_proxy,
+            bond_pos,
+            prox,
+        ),
     );
 
     // Prey-side: cats don't bolt or scatter-group as perceivers. Gate to 0.
@@ -445,19 +477,37 @@ fn write_cat_vs_wildlife(
         perceiver.entity,
         target.entity,
         ActionKind::Stalk,
-        composite(&pred.stalk, prox, cover_self, my_health, 1.0 - intent_clarity),
+        composite(
+            &pred.stalk,
+            prox,
+            cover_self,
+            my_health,
+            1.0 - intent_clarity,
+        ),
     );
     affordances.write(
         perceiver.entity,
         target.entity,
         ActionKind::Chase,
-        composite(&pred.chase, prox, 1.0 - intent_clarity, my_health, 1.0 - scent_at_self),
+        composite(
+            &pred.chase,
+            prox,
+            1.0 - intent_clarity,
+            my_health,
+            1.0 - scent_at_self,
+        ),
     );
     affordances.write(
         perceiver.entity,
         target.entity,
         ActionKind::Pounce,
-        composite(&pred.pounce, prox, cover_self, 1.0 - intent_clarity, my_health),
+        composite(
+            &pred.pounce,
+            prox,
+            cover_self,
+            1.0 - intent_clarity,
+            my_health,
+        ),
     );
     // Species-gated.
     affordances.write(perceiver.entity, target.entity, ActionKind::Dive, 0.0);
@@ -485,7 +535,13 @@ fn write_cat_vs_wildlife(
         perceiver.entity,
         target.entity,
         ActionKind::Freeze,
-        composite(&tr.freeze, cover_self, 1.0 - intent_clarity, my_health, 1.0 - prox),
+        composite(
+            &tr.freeze,
+            cover_self,
+            1.0 - intent_clarity,
+            my_health,
+            1.0 - prox,
+        ),
     );
     // Fawn doesn't apply against wildlife predators.
     affordances.write(perceiver.entity, target.entity, ActionKind::Fawn, 0.0);
@@ -559,7 +615,13 @@ fn write_wildlife_vs_cat(
                 perceiver.entity,
                 target.entity,
                 ActionKind::Stalk,
-                composite(&pred.stalk, prox, cover_self, my_health, 1.0 - cover_at_target),
+                composite(
+                    &pred.stalk,
+                    prox,
+                    cover_self,
+                    my_health,
+                    1.0 - cover_at_target,
+                ),
             );
             affordances.write(
                 perceiver.entity,
@@ -594,13 +656,25 @@ fn write_wildlife_vs_cat(
                 perceiver.entity,
                 target.entity,
                 ActionKind::Strike,
-                composite(&pred.strike, strike_prox, 1.0 - target_health, my_health, 0.5),
+                composite(
+                    &pred.strike,
+                    strike_prox,
+                    1.0 - target_health,
+                    my_health,
+                    0.5,
+                ),
             );
             affordances.write(
                 perceiver.entity,
                 target.entity,
                 ActionKind::Stalk,
-                composite(&pred.stalk, prox, cover_self, my_health, 1.0 - cover_at_target),
+                composite(
+                    &pred.stalk,
+                    prox,
+                    cover_self,
+                    my_health,
+                    1.0 - cover_at_target,
+                ),
             );
         }
         WildSpecies::ShadowFox => {
@@ -609,13 +683,25 @@ fn write_wildlife_vs_cat(
                 perceiver.entity,
                 target.entity,
                 ActionKind::Ambush,
-                composite(&pred.ambush, cover_self, 1.0 - cover_at_target, my_health, prox),
+                composite(
+                    &pred.ambush,
+                    cover_self,
+                    1.0 - cover_at_target,
+                    my_health,
+                    prox,
+                ),
             );
             affordances.write(
                 perceiver.entity,
                 target.entity,
                 ActionKind::Stalk,
-                composite(&pred.stalk, prox, cover_self, my_health, 1.0 - cover_at_target),
+                composite(
+                    &pred.stalk,
+                    prox,
+                    cover_self,
+                    my_health,
+                    1.0 - cover_at_target,
+                ),
             );
             affordances.write(
                 perceiver.entity,
@@ -689,7 +775,10 @@ mod tests {
         let affordances = world.resource::<ActionAffordances>();
         // Socialize and GroomOther are populated; values may be 0.0 under
         // min_eligibility floor but the entries exist (clear + insert pattern).
-        assert!(!affordances.is_empty(), "adjacent pair should populate entries");
+        assert!(
+            !affordances.is_empty(),
+            "adjacent pair should populate entries"
+        );
         // Symmetric reads.
         let socialize_ab = affordances.read(a, b, ActionKind::Socialize);
         let socialize_ba = affordances.read(b, a, ActionKind::Socialize);
@@ -722,7 +811,10 @@ mod tests {
         assert_eq!(pounce, 0.0, "hawks can't pounce (species gate)");
         // Dive eligibility depends on the default weights + min_eligibility; with default
         // 0.25-quartet weights and four ~0.5+ inputs, the composite should clear the 0.10 floor.
-        assert!(dive > 0.0, "hawk's Dive against an adjacent cat should be eligible; got {dive}");
+        assert!(
+            dive > 0.0,
+            "hawk's Dive against an adjacent cat should be eligible; got {dive}"
+        );
     }
 
     #[test]

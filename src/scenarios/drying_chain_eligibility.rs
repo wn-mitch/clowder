@@ -40,9 +40,7 @@
 
 use bevy_ecs::world::World;
 
-use crate::components::building::{
-    DryingRackState, StoredItems, Structure, StructureType,
-};
+use crate::components::building::{DryingRackState, StoredItems, Structure, StructureType};
 use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::magic::Inventory;
 use crate::components::physical::{Needs, Position};
@@ -418,7 +416,8 @@ mod tests {
         let colony = {
             let mut q = app
                 .world_mut()
-                .query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::query::With<m::ColonyState>>();
+                .query_filtered::<bevy_ecs::entity::Entity, bevy_ecs::query::With<m::ColonyState>>(
+                );
             let w = app.world();
             q.iter(w).next().expect("ColonyState singleton missing")
         };
@@ -426,7 +425,9 @@ mod tests {
         eprintln!("--- ColonyState markers (fixture 2) ---");
         eprintln!(
             "  HasFunctionalDryingRack:           {}",
-            world.entity(colony).contains::<m::HasFunctionalDryingRack>()
+            world
+                .entity(colony)
+                .contains::<m::HasFunctionalDryingRack>()
         );
         eprintln!(
             "  HasDryableInStores:                {}",
@@ -445,9 +446,7 @@ mod tests {
         // next mutable query.
         let _ = world;
         let cat = {
-            let mut q = app
-                .world_mut()
-                .query::<(bevy_ecs::entity::Entity, &Name)>();
+            let mut q = app.world_mut().query::<(bevy_ecs::entity::Entity, &Name)>();
             let w = app.world();
             q.iter(w)
                 .find(|(_, n)| n.0 == "Cinder")
@@ -484,7 +483,6 @@ mod tests {
             "  Injured:                           {}",
             world.entity(cat).contains::<m::Injured>()
         );
-
     }
 
     /// Fixture 2 expectation: empty inventory + Stores with RawFish
@@ -618,7 +616,12 @@ mod tests {
 
     #[test]
     fn resolver_completes_load_step_on_adjacent_rack() {
-        let report = run(&SCENARIO_RESOLVER_COMPLETES, None, None, RESOLVER_FIXTURE_SEED);
+        let report = run(
+            &SCENARIO_RESOLVER_COMPLETES,
+            None,
+            None,
+            RESOLVER_FIXTURE_SEED,
+        );
         let loaded = report
             .feature_counts
             .get("FoodLoadedOnDryingRack")

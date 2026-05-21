@@ -11,9 +11,7 @@
 //! 321; the affected milestones now make forward progress where they
 //! previously sat at zero.
 
-use super::{
-    always_true, AspirationChain, Emit, Milestone, Priority, ProgressTracker, SkillKind,
-};
+use super::{always_true, AspirationChain, Emit, Milestone, Priority, ProgressTracker, SkillKind};
 use crate::ai::dse::CommitmentStrategy;
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
@@ -84,8 +82,7 @@ pub const WHISKERWEAVERS_APPRENTICE: AspirationChain = AspirationChain {
                 level: 1.0,
             },
             emits: WHISKERWEAVERS_EMITS,
-            narrative_on_complete:
-                "{name} weaves remedies from root and petal like breathing.",
+            narrative_on_complete: "{name} weaves remedies from root and petal like breathing.",
         },
     ],
     completion_narrative:

@@ -135,7 +135,12 @@ mod tests {
         TileMap::new(width as i32, height as i32, Terrain::Grass)
     }
 
-    fn field_with_costs(width: u32, height: u32, origin: Position, costs: Vec<u32>) -> RouteCostField {
+    fn field_with_costs(
+        width: u32,
+        height: u32,
+        origin: Position,
+        costs: Vec<u32>,
+    ) -> RouteCostField {
         RouteCostField {
             costs,
             width,
@@ -217,13 +222,7 @@ mod tests {
         costs[4] = 0; // (1,1) — cat (flood origin)
         let field = field_with_costs(3, 3, Position::new(1, 1), costs);
         let map = open_map(3, 3);
-        let outcome = resolve_pick_flee_target(
-            Position::new(1, 1),
-            Some(&field),
-            None,
-            8.0,
-            &map,
-        );
+        let outcome = resolve_pick_flee_target(Position::new(1, 1), Some(&field), None, 8.0, &map);
         assert_eq!(outcome.witness, Some(Position::new(1, 0)));
     }
 

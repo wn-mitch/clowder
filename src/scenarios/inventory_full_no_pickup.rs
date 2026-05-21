@@ -173,7 +173,11 @@ mod tests {
             pickup_wins >= 1,
             "PickingUp must elect at L3 at least once when food is on ground; got {counts:?}",
         );
-        let item_dropped = report.feature_counts.get("ItemDropped").copied().unwrap_or(0);
+        let item_dropped = report
+            .feature_counts
+            .get("ItemDropped")
+            .copied()
+            .unwrap_or(0);
         let item_retrieved = report
             .feature_counts
             .get("ItemRetrieved")
@@ -211,7 +215,11 @@ mod tests {
         // and skipped herb slots — DropItem would Fail on a herb-only
         // inventory. Post-231 the ItemSlot collapse + variant-agnostic
         // resolver picks any slot; ItemDropped fires.
-        let item_dropped = report.feature_counts.get("ItemDropped").copied().unwrap_or(0);
+        let item_dropped = report
+            .feature_counts
+            .get("ItemDropped")
+            .copied()
+            .unwrap_or(0);
         let item_retrieved = report
             .feature_counts
             .get("ItemRetrieved")

@@ -186,7 +186,6 @@ impl crate::ai::dse::CatDse for HerbcraftWardDse {
     }
 }
 
-
 pub fn herbcraft_ward_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HerbcraftWardDse::new(scoring))
 }

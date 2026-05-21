@@ -708,11 +708,7 @@ pub struct ScoringResult {
 /// full) maps to `"hunger_urgency" = 0.9`. The inversion lives here
 /// rather than in each DSE's fetch_scalar so future ports share one
 /// source of truth.
-fn ctx_scalars(
-    ctx: &ScoringContext,
-    inputs: &EvalInputs,
-    m: &mut HashMap<&'static str, f32>,
-) {
+fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs, m: &mut HashMap<&'static str, f32>) {
     // Ticket 431 Stage E — caller-owned arena. `score_actions` owns one
     // `HashMap` and passes `&mut` to every `score_dse_by_id` call; this
     // function clears and re-populates the same allocation each time
@@ -874,9 +870,18 @@ fn ctx_scalars(
         "parental_engagement",
         ctx.parenting.parental_engagement_max.clamp(0.0, 1.0),
     );
-    m.insert("parenting_caretake_bias_sum", ctx.parenting.caretake_bias_sum.max(0.0));
-    m.insert("parenting_provision_bias_sum", ctx.parenting.provision_bias_sum.max(0.0));
-    m.insert("parenting_protect_bias_sum", ctx.parenting.protect_bias_sum.max(0.0));
+    m.insert(
+        "parenting_caretake_bias_sum",
+        ctx.parenting.caretake_bias_sum.max(0.0),
+    );
+    m.insert(
+        "parenting_provision_bias_sum",
+        ctx.parenting.provision_bias_sum.max(0.0),
+    );
+    m.insert(
+        "parenting_protect_bias_sum",
+        ctx.parenting.protect_bias_sum.max(0.0),
+    );
     m.insert(
         "parenting_cultural_teach_bias_sum",
         ctx.parenting.cultural_teach_bias_sum.max(0.0),
@@ -1015,7 +1020,13 @@ fn ctx_scalars(
         "flee_affordance",
         ctx.cat_anchors
             .nearest_threat_entity
-            .map(|t| ctx.action_affordances.read(inputs.cat, t, crate::resources::action_affordances::ActionKind::Flee))
+            .map(|t| {
+                ctx.action_affordances.read(
+                    inputs.cat,
+                    t,
+                    crate::resources::action_affordances::ActionKind::Flee,
+                )
+            })
             .unwrap_or(0.0)
             .clamp(0.0, 1.0),
     );
@@ -1032,7 +1043,13 @@ fn ctx_scalars(
         crate::resources::action_affordances::AFFORDANCE_FREEZE_INPUT,
         ctx.cat_anchors
             .nearest_threat_entity
-            .map(|t| ctx.action_affordances.read(inputs.cat, t, crate::resources::action_affordances::ActionKind::Freeze))
+            .map(|t| {
+                ctx.action_affordances.read(
+                    inputs.cat,
+                    t,
+                    crate::resources::action_affordances::ActionKind::Freeze,
+                )
+            })
             .unwrap_or(0.0)
             .clamp(0.0, 1.0),
     );
@@ -1532,17 +1549,16 @@ fn score_dse_by_id(
     // built (modifier-pipeline scoring path; pre-flood test setups)
     // the closure returns `None` and the field consideration scores
     // ~0.0 under closer-is-better curves.
-    let field_cost = |source: crate::ai::considerations::FieldSource,
-                      pos: Position|
-     -> Option<u32> {
-        let field = ctx.route_cost_field?;
-        match source {
-            crate::ai::considerations::FieldSource::OwnRouteCost => {
-                let c = field.cost_at(pos);
-                (c < crate::components::route_cost_field::MAX_COST_BUDGET).then_some(c)
+    let field_cost =
+        |source: crate::ai::considerations::FieldSource, pos: Position| -> Option<u32> {
+            let field = ctx.route_cost_field?;
+            match source {
+                crate::ai::considerations::FieldSource::OwnRouteCost => {
+                    let c = field.cost_at(pos);
+                    (c < crate::components::route_cost_field::MAX_COST_BUDGET).then_some(c)
+                }
             }
-        }
-    };
+        };
 
     let eval_ctx = EvalCtx {
         cat: inputs.cat,
@@ -1879,9 +1895,10 @@ fn pre_dispatch_gates() -> &'static BTreeMap<DseId, PreDispatchGate> {
         // rejects pre-eligibility, which changes pool size for cats
         // with no corpses. Mirror the pool-stability semantic here.
         t.insert(DseId("bury"), |_, inputs| {
-            inputs
-                .markers
-                .has(crate::components::markers::HasUnburiedCorpse::KEY, inputs.cat)
+            inputs.markers.has(
+                crate::components::markers::HasUnburiedCorpse::KEY,
+                inputs.cat,
+            )
         });
         // Flee: `has_threat_nearby OR safety_deficit > flee_safety_threshold`.
         // Composite OR with one threshold-on-continuous arm — not a
@@ -1892,8 +1909,7 @@ fn pre_dispatch_gates() -> &'static BTreeMap<DseId, PreDispatchGate> {
         // Fight: `has_threat_nearby AND allies >= fight_min_allies`.
         // Composite AND with an integer-threshold arm.
         t.insert(DseId("fight"), |ctx, _| {
-            ctx.has_threat_nearby
-                && ctx.allies_fighting_threat >= ctx.scoring.fight_min_allies
+            ctx.has_threat_nearby && ctx.allies_fighting_threat >= ctx.scoring.fight_min_allies
         });
         // Patrol: continuous-threshold-only — `safety < patrol_safety_threshold`.
         t.insert(DseId("patrol"), |ctx, _| {
@@ -1944,7 +1960,9 @@ fn pre_dispatch_gates() -> &'static BTreeMap<DseId, PreDispatchGate> {
         // kitten-urgency. Post-eval hook below adds the durable-
         // commitment L2 lift when HasJuvenileDependent is present.
         t.insert(DseId("caretake"), |ctx, inputs| {
-            inputs.markers.has(crate::components::markers::Parent::KEY, inputs.cat)
+            inputs
+                .markers
+                .has(crate::components::markers::Parent::KEY, inputs.cat)
                 || ctx.hungry_kitten_urgency > 0.0
         });
         t
@@ -1984,10 +2002,10 @@ fn post_eval_hooks() -> &'static BTreeMap<DseId, PostEvalHook> {
         // score so it competes with per-tick DSEs. Clamped at the WS
         // composition ceiling [0.0, 1.0] per learning_clowder_ws_composition_ceiling.
         t.insert(DseId("caretake"), |score, ctx, inputs, _| {
-            if inputs
-                .markers
-                .has(crate::components::markers::HasJuvenileDependent::KEY, inputs.cat)
-            {
+            if inputs.markers.has(
+                crate::components::markers::HasJuvenileDependent::KEY,
+                inputs.cat,
+            ) {
                 (score + ctx.scoring.rear_kitten_caretake_lift).clamp(0.0, 1.0)
             } else {
                 score
@@ -2852,7 +2870,8 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::wander_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::herbcraft_gather_dse());
             r.cat_dses.push(crate::ai::dses::herbcraft_prepare_dse());
-            r.cat_dses.push(crate::ai::dses::herbcraft_ward_dse(&scoring));
+            r.cat_dses
+                .push(crate::ai::dses::herbcraft_ward_dse(&scoring));
             r.cat_dses.push(crate::ai::dses::scry_dse());
             r.cat_dses.push(crate::ai::dses::durable_ward_dse());
             r.cat_dses.push(crate::ai::dses::cleanse_dse(&scoring));
@@ -2933,7 +2952,8 @@ mod tests {
     /// `(perceiver, target, kind)` triple — the substrate's dormant
     /// gate signal, which keeps tests that don't exercise affordance
     /// axes byte-identical pre-263.
-    fn cached_action_affordances() -> &'static crate::resources::action_affordances::ActionAffordances {
+    fn cached_action_affordances(
+    ) -> &'static crate::resources::action_affordances::ActionAffordances {
         static A: OnceLock<crate::resources::action_affordances::ActionAffordances> =
             OnceLock::new();
         A.get_or_init(crate::resources::action_affordances::ActionAffordances::default)
@@ -3082,8 +3102,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
-            nearest_prey: None,
-            wander_target: None,
+                nearest_prey: None,
+                wander_target: None,
             },
             route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
@@ -3288,8 +3308,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
-            nearest_prey: None,
-            wander_target: None,
+                nearest_prey: None,
+                wander_target: None,
             },
             route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
@@ -3518,8 +3538,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
-            nearest_prey: None,
-            wander_target: None,
+                nearest_prey: None,
+                wander_target: None,
             },
             route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
@@ -3811,8 +3831,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
-            nearest_prey: None,
-            wander_target: None,
+                nearest_prey: None,
+                wander_target: None,
             },
             route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
@@ -3965,8 +3985,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
-            nearest_prey: None,
-            wander_target: None,
+                nearest_prey: None,
+                wander_target: None,
             },
             route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
@@ -4013,7 +4033,14 @@ mod tests {
         // counterpart (covered by `gate_reckless_flee_not_when_injured`).
         let mut override_rng = seeded_rng(31);
         assert_eq!(
-            behavior_gate_check(Action::Flee, &personality, false, 1.0, &mut override_rng, &sc),
+            behavior_gate_check(
+                Action::Flee,
+                &personality,
+                false,
+                1.0,
+                &mut override_rng,
+                &sc
+            ),
             Some(Action::Fight),
             "reckless override must flip Flee → Fight for bold healthy cat",
         );
@@ -4124,8 +4151,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
-            nearest_prey: None,
-            wander_target: None,
+                nearest_prey: None,
+                wander_target: None,
             },
             route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
@@ -4463,8 +4490,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
-            nearest_prey: None,
-            wander_target: None,
+                nearest_prey: None,
+                wander_target: None,
             },
             route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
@@ -4599,8 +4626,8 @@ mod tests {
                 coordinator_perch: Some(Position::new(0, 0)),
                 own_safe_rest_spot: Some(Position::new(0, 0)),
                 own_injury_site: Some(Position::new(0, 0)),
-            nearest_prey: None,
-            wander_target: None,
+                nearest_prey: None,
+                wander_target: None,
             },
             route_cost_field: None,
             disposition_failure_signal_hunting: 1.0,
@@ -5220,10 +5247,7 @@ mod tests {
         let t = softmax_temperature(&c, &sc);
         let expected = sc.softmax_temperature_ceiling
             - (sc.softmax_temperature_ceiling - sc.softmax_temperature_floor) * 0.9;
-        assert!(
-            (t - expected).abs() < 1e-6,
-            "expected {expected}, got {t}"
-        );
+        assert!((t - expected).abs() < 1e-6, "expected {expected}, got {t}");
 
         // Saturated case: focus = 1.0 → exactly the floor.
         c.body_distress_composite = 1.0;
@@ -5246,8 +5270,7 @@ mod tests {
         c.body_distress_composite = 0.5;
         c.threat_proximity_derivative = 0.0;
         let t = softmax_temperature(&c, &sc);
-        let expected =
-            (sc.softmax_temperature_ceiling + sc.softmax_temperature_floor) * 0.5;
+        let expected = (sc.softmax_temperature_ceiling + sc.softmax_temperature_floor) * 0.5;
         assert!(
             (t - expected).abs() < 1e-6,
             "midpoint expected {expected}, got {t}"
@@ -5286,8 +5309,7 @@ mod tests {
         // test).
         let sc = ScoringConstants::default();
         let scores = vec![(Action::PickUp, 0.958), (Action::Eat, 0.948)];
-        let target_pickup =
-            DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
+        let target_pickup = DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
         let mut wins_pickup_floor = 0;
         let mut wins_pickup_ceiling = 0;
         const N: u64 = 2000;
@@ -5334,8 +5356,7 @@ mod tests {
         // tick).
         let sc = ScoringConstants::default();
         let scores = vec![(Action::PickUp, 1.00), (Action::Eat, 0.80)];
-        let target_pickup =
-            DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
+        let target_pickup = DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
         let mut wins = 0;
         for seed in 0..200u64 {
             let mut rng = seeded_rng(seed);
@@ -5366,8 +5387,7 @@ mod tests {
         let scores = vec![(Action::PickUp, 0.958), (Action::Eat, 0.948)];
         let mut seen_pickup = 0;
         let mut seen_eat = 0;
-        let target_pickup =
-            DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
+        let target_pickup = DispositionKind::from_action(Action::PickUp).expect("pickup mapping");
         let target_eat = DispositionKind::from_action(Action::Eat).expect("eat mapping");
         for seed in 0..200u64 {
             let mut rng = seeded_rng(seed);
@@ -5426,8 +5446,7 @@ mod tests {
         };
         // Ticket 431 Stage E — caller-owned scratch arena.
         let mut scalars: HashMap<&'static str, f32> = HashMap::new();
-        let score_fresh =
-            score_dse_by_id("explore", &ctx_fresh, &inputs_fresh, &mut scalars);
+        let score_fresh = score_dse_by_id("explore", &ctx_fresh, &inputs_fresh, &mut scalars);
         // No frontier (default empty map): centroid = None → spatial
         // axis = 0 → CP gates Explore to 0.
         let score_no_frontier =

@@ -142,7 +142,10 @@ mod tests {
         assert_eq!(plan.current().unwrap().action, HawkGoapActionKind::SpotPrey);
 
         plan.advance();
-        assert_eq!(plan.current().unwrap().action, HawkGoapActionKind::DiveAttack);
+        assert_eq!(
+            plan.current().unwrap().action,
+            HawkGoapActionKind::DiveAttack
+        );
 
         plan.advance();
         assert!(plan.is_exhausted());

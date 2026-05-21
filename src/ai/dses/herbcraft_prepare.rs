@@ -115,7 +115,6 @@ impl crate::ai::dse::CatDse for HerbcraftPrepareDse {
     }
 }
 
-
 pub fn herbcraft_prepare_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HerbcraftPrepareDse::new())
 }

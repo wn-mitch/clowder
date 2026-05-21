@@ -131,7 +131,6 @@ impl crate::ai::dse::CatDse for FightDse {
     }
 }
 
-
 pub fn fight_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(FightDse::new(scoring))
 }

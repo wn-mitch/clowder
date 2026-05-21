@@ -89,7 +89,10 @@ pub fn bury_target_dse() -> TargetTakingDse {
                 nearness_curve,
             )),
             Consideration::Scalar(ScalarConsideration::new(TARGET_FONDNESS_INPUT, bond_curve)),
-            Consideration::Scalar(ScalarConsideration::new(TARGET_KINSHIP_INPUT, kinship_curve)),
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_KINSHIP_INPUT,
+                kinship_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_RECENT_FAILURE_INPUT,
                 cooldown_curve(),

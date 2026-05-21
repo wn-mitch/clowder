@@ -107,8 +107,7 @@ fn setup_dive_hawk(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);
     spawn_cat(
         world,
-        CatPreset::adult(FOCAL_NAME, Position::new(20, 20))
-            .with_marker(MarkerKind::Adult),
+        CatPreset::adult(FOCAL_NAME, Position::new(20, 20)).with_marker(MarkerKind::Adult),
     );
     // Hawk above (logically) at proximity 2.
     world.spawn((
@@ -134,8 +133,7 @@ fn setup_chase_prey(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);
     spawn_cat(
         world,
-        CatPreset::adult(FOCAL_NAME, Position::new(20, 20))
-            .with_marker(MarkerKind::Adult),
+        CatPreset::adult(FOCAL_NAME, Position::new(20, 20)).with_marker(MarkerKind::Adult),
     );
     world.spawn((
         Position::new(22, 20),
@@ -161,15 +159,13 @@ fn setup_fight_capability_match(world: &mut World, seed: u64) {
     // Healthy focal (full HP).
     spawn_cat(
         world,
-        CatPreset::adult(FOCAL_NAME, Position::new(20, 20))
-            .with_marker(MarkerKind::Adult),
+        CatPreset::adult(FOCAL_NAME, Position::new(20, 20)).with_marker(MarkerKind::Adult),
     );
     // Wounded opponent (partial HP). Use the preset's Adult marker; we
     // mutate Health directly post-spawn via a query.
     let opponent = spawn_cat(
         world,
-        CatPreset::adult("Opponent", Position::new(21, 20))
-            .with_marker(MarkerKind::Adult),
+        CatPreset::adult("Opponent", Position::new(21, 20)).with_marker(MarkerKind::Adult),
     );
     if let Some(mut health) = world.get_mut::<Health>(opponent) {
         health.current = 0.2; // significantly wounded
@@ -266,7 +262,9 @@ mod tests {
 
     /// Read `Affordance(kind, perceiver, target)` from the world's resource.
     fn read_affordance(world: &World, perceiver: Entity, target: Entity, kind: ActionKind) -> f32 {
-        world.resource::<ActionAffordances>().read(perceiver, target, kind)
+        world
+            .resource::<ActionAffordances>()
+            .read(perceiver, target, kind)
     }
 
     #[test]
@@ -303,7 +301,10 @@ mod tests {
         let hawk = hawk_entity(world);
         let dive = read_affordance(world, hawk, probe, ActionKind::Dive);
         let pounce = read_affordance(world, hawk, probe, ActionKind::Pounce);
-        assert!(dive > 0.0, "hawk's Dive against adjacent cat should be eligible; got {dive}");
+        assert!(
+            dive > 0.0,
+            "hawk's Dive against adjacent cat should be eligible; got {dive}"
+        );
         assert_eq!(pounce, 0.0, "hawks can't Pounce — species gate");
     }
 
@@ -314,7 +315,10 @@ mod tests {
         let probe = cat_by_name(world, FOCAL_NAME);
         let fox = fox_entity(world);
         let chase = read_affordance(world, fox, probe, ActionKind::Chase);
-        assert!(chase > 0.0, "fox Chase against cat should be eligible; got {chase}");
+        assert!(
+            chase > 0.0,
+            "fox Chase against cat should be eligible; got {chase}"
+        );
     }
 
     #[test]
@@ -344,7 +348,10 @@ mod tests {
         // Affordance(Flee) value. Strict numeric equivalence is not
         // claimed (the new heuristic composes 4 weighted slots; 103
         // was a single axis).
-        assert!(flee > 0.0, "supersede sanity: Affordance(Flee) should be > 0 in 103's setup; got {flee}");
+        assert!(
+            flee > 0.0,
+            "supersede sanity: Affordance(Flee) should be > 0 in 103's setup; got {flee}"
+        );
     }
 
     #[test]

@@ -312,8 +312,14 @@ mod tests {
         // (sx=1, sy=1) in a 4-wide sector grid → sector_id = 1 + 4.
         let sid = 5;
         let centroid = map.sector_centroid(sid, 4, 3).expect("non-empty");
-        assert!(centroid.x >= 30 && centroid.x < 60, "x in sector: {centroid:?}");
-        assert!(centroid.y >= 30 && centroid.y < 60, "y in sector: {centroid:?}");
+        assert!(
+            centroid.x >= 30 && centroid.x < 60,
+            "x in sector: {centroid:?}"
+        );
+        assert!(
+            centroid.y >= 30 && centroid.y < 60,
+            "y in sector: {centroid:?}"
+        );
         // Other sectors stay empty.
         for sid in 0..12 {
             if sid != 5 {
@@ -331,8 +337,14 @@ mod tests {
         map.stamp_ward(5, 5, 1.0, 7.0);
         map.stamp_ward(25, 25, 1.0, 7.0);
         let centroid = map.sector_centroid(0, 4, 3).expect("non-empty");
-        assert!(centroid.x > 5 && centroid.x < 25, "between wards: {centroid:?}");
-        assert!(centroid.y > 5 && centroid.y < 25, "between wards: {centroid:?}");
+        assert!(
+            centroid.x > 5 && centroid.x < 25,
+            "between wards: {centroid:?}"
+        );
+        assert!(
+            centroid.y > 5 && centroid.y < 25,
+            "between wards: {centroid:?}"
+        );
     }
 
     #[test]

@@ -302,7 +302,14 @@ mod tests {
         let registry = DseRegistry::new();
         let map = empty_map();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[], &map, 0, None,
+        let out = resolve_herbcraft_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[],
+            &map,
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -314,7 +321,14 @@ mod tests {
         registry.target_taking_dses.push(herbcraft_target_dse());
         let map = empty_map();
         let cat = Entity::from_raw_u32(1).unwrap();
-        let out = resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[], &map, 0, None,
+        let out = resolve_herbcraft_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[],
+            &map,
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -328,8 +342,14 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         // Beyond HERBCRAFT_TARGET_RANGE (20) Manhattan tiles.
         let far = herb(2, 50, 0, HerbKind::HealingMoss, GrowthStage::Blossom);
-        let out =
-            resolve_herbcraft_target(&registry, cat, Position::new(0, 0), &[far], &map, 0, None,
+        let out = resolve_herbcraft_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[far],
+            &map,
+            0,
+            None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());

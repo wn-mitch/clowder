@@ -16,9 +16,7 @@
 
 use bevy_ecs::world::World;
 
-use crate::components::parenting_activity::{
-    ParentalKind, ParentingActivity, RelationshipTo,
-};
+use crate::components::parenting_activity::{ParentalKind, ParentingActivity, RelationshipTo};
 use crate::components::physical::Position;
 use crate::systems::parenting_activity::parental_engagement_asymptote;
 

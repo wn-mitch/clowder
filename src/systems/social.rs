@@ -137,10 +137,7 @@ pub fn passive_familiarity(
     // First panic localizes the exact tick + pair where `update_near_pair_cache`
     // diverges from the original loop's invariant. Release builds skip both
     // params (zero cost).
-    #[cfg(debug_assertions)] cats: Query<
-        (Entity, &Position),
-        (Without<Dead>, Without<Structure>),
-    >,
+    #[cfg(debug_assertions)] cats: Query<(Entity, &Position), (Without<Dead>, Without<Structure>)>,
     #[cfg(debug_assertions)] time: Res<TimeState>,
 ) {
     #[cfg(debug_assertions)]
@@ -157,10 +154,8 @@ pub fn passive_familiarity(
         }
         let cached: BTreeSet<(Entity, Entity)> = cache.pairs.keys().copied().collect();
         if cached != brute {
-            let only_cache: Vec<(Entity, Entity)> =
-                cached.difference(&brute).copied().collect();
-            let only_brute: Vec<(Entity, Entity)> =
-                brute.difference(&cached).copied().collect();
+            let only_cache: Vec<(Entity, Entity)> = cached.difference(&brute).copied().collect();
+            let only_brute: Vec<(Entity, Entity)> = brute.difference(&cached).copied().collect();
             panic!(
                 "NearPairCache divergence at tick {}: only_in_cache={:?}, only_in_brute={:?}, cache_size={}, brute_size={}",
                 time.tick,

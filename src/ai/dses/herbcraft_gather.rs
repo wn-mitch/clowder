@@ -132,7 +132,6 @@ impl crate::ai::dse::CatDse for HerbcraftGatherDse {
     }
 }
 
-
 pub fn herbcraft_gather_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HerbcraftGatherDse::new())
 }

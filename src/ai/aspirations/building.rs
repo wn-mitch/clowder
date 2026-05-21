@@ -2,9 +2,7 @@
 //! 1:1 from `assets/narrative/aspirations/building.ron` (retired at
 //! 321). #330 fills `emits` on every milestone.
 
-use super::{
-    always_true, AspirationChain, Emit, Milestone, Priority, ProgressTracker, SkillKind,
-};
+use super::{always_true, AspirationChain, Emit, Milestone, Priority, ProgressTracker, SkillKind};
 use crate::ai::dse::CommitmentStrategy;
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
@@ -75,7 +73,8 @@ pub const THE_ARCHITECT: AspirationChain = AspirationChain {
                 count: 5,
             },
             emits: BUILDING_EMITS,
-            narrative_on_complete: "{name} sees the finished structure before the first beam is laid.",
+            narrative_on_complete:
+                "{name} sees the finished structure before the first beam is laid.",
         },
         Milestone {
             name: "Master Carpenter",
@@ -85,7 +84,8 @@ pub const THE_ARCHITECT: AspirationChain = AspirationChain {
                 count: 25,
             },
             emits: BUILDING_EMITS,
-            narrative_on_complete: "Others bring {name} their plans. {Subject} makes them possible.",
+            narrative_on_complete:
+                "Others bring {name} their plans. {Subject} makes them possible.",
         },
         Milestone {
             name: "The Architect",

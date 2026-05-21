@@ -138,7 +138,6 @@ impl crate::ai::dse::CatDse for TendSmokingRackDse {
     }
 }
 
-
 pub fn tend_smoking_rack_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(TendSmokingRackDse::new())
 }

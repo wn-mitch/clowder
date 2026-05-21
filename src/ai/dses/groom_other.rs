@@ -151,7 +151,6 @@ impl crate::ai::dse::CatDse for GroomOtherDse {
     }
 }
 
-
 pub fn groom_other_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(GroomOtherDse::new())
 }

@@ -377,7 +377,14 @@ mod tests {
         };
         let overlays: [WeightedOverlay; 1] = [WeightedOverlay::new(&blocker, 1.0)];
 
-        let field = flood_dijkstra(Position::new(0, 0), &map, &overlays, MAX_COST_BUDGET, 0, &mut Vec::new());
+        let field = flood_dijkstra(
+            Position::new(0, 0),
+            &map,
+            &overlays,
+            MAX_COST_BUDGET,
+            0,
+            &mut Vec::new(),
+        );
 
         // Direct cost to (4,4) on open terrain is 4 (4 diagonal grass
         // steps). Detour via (2,1) or (2,3) adds at most ~1 extra
@@ -451,7 +458,14 @@ mod tests {
     #[test]
     fn flood_oob_origin_returns_empty_field() {
         let map = open_map();
-        let field = flood_dijkstra(Position::new(-1, -1), &map, &[], MAX_COST_BUDGET, 0, &mut Vec::new());
+        let field = flood_dijkstra(
+            Position::new(-1, -1),
+            &map,
+            &[],
+            MAX_COST_BUDGET,
+            0,
+            &mut Vec::new(),
+        );
         assert_eq!(field.width, 10);
         assert_eq!(field.height, 10);
         for c in &field.costs {
@@ -467,7 +481,14 @@ mod tests {
             map.set(5, y, Terrain::Water);
         }
         // Reach (6,4) only via (5,9) gap.
-        let field = flood_dijkstra(Position::new(4, 4), &map, &[], MAX_COST_BUDGET, 0, &mut Vec::new());
+        let field = flood_dijkstra(
+            Position::new(4, 4),
+            &map,
+            &[],
+            MAX_COST_BUDGET,
+            0,
+            &mut Vec::new(),
+        );
         assert_eq!(
             field.cost_at(Position::new(5, 4)),
             MAX_COST_BUDGET,

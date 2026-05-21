@@ -34,9 +34,7 @@
 //!   §H step-3 domain-affinity fallback for any Hunting-chain
 //!   milestone whose `emits[]` table is empty.
 
-use crate::ai::methods::{
-    ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint,
-};
+use crate::ai::methods::{ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint};
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
 

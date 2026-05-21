@@ -133,7 +133,6 @@ impl crate::ai::dse::CatDse for WanderDse {
     }
 }
 
-
 pub fn wander_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(WanderDse::new(scoring))
 }

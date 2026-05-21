@@ -11,9 +11,7 @@ use crate::ai::planner::core::make_plan;
 use crate::ai::scoring::{EvalInputs, MarkerSnapshot};
 use crate::ai::snake_planner::actions::actions_for_disposition;
 use crate::ai::snake_planner::goals::goal_for_disposition;
-use crate::ai::snake_planner::{
-    SnakeDomain, SnakeGoapActionKind, SnakePlannerState, SnakeZone,
-};
+use crate::ai::snake_planner::{SnakeDomain, SnakeGoapActionKind, SnakePlannerState, SnakeZone};
 use crate::ai::snake_scoring::{
     score_snake_dispositions, select_snake_disposition_softmax, SnakeNeeds, SnakePersonality,
     SnakeScoringContext,
@@ -166,11 +164,9 @@ pub fn snake_evaluate_and_plan(
         };
 
         let scoring_result = score_snake_dispositions(&ctx, &inputs, &mut rng.rng);
-        let Some(chosen) = select_snake_disposition_softmax(
-            &scoring_result,
-            &mut rng.rng,
-            sc.softmax_temperature,
-        ) else {
+        let Some(chosen) =
+            select_snake_disposition_softmax(&scoring_result, &mut rng.rng, sc.softmax_temperature)
+        else {
             continue;
         };
 
@@ -184,14 +180,9 @@ pub fn snake_evaluate_and_plan(
         let actions = actions_for_disposition(chosen);
         let goal = goal_for_disposition(chosen);
 
-        let Some(steps) = make_plan::<SnakeDomain>(
-            planner_state,
-            &actions,
-            &goal,
-            8,
-            500,
-            &mut planner_scratch,
-        ) else {
+        let Some(steps) =
+            make_plan::<SnakeDomain>(planner_state, &actions, &goal, 8, 500, &mut planner_scratch)
+        else {
             continue;
         };
 

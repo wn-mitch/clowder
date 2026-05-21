@@ -656,17 +656,18 @@ pub fn update_colony_building_markers(
     // ColonyStoresChronicallyFull block above but samples *state*
     // (current stash) rather than *event delta* (DepositRejected
     // count) — see thornbriar_pressure.rs for the structural difference.
-    let thornbriar_chronically_low =
-        if time.tick.saturating_sub(thornbriar_tracker.last_window_tick)
-            >= scoring.chronicity_window_ticks
-        {
-            thornbriar_tracker.last_window_tick = time.tick;
-            thornbriar_tracker.latched_chronic =
-                total_thornbriar < scoring.thornbriar_stash_low_threshold;
-            thornbriar_tracker.latched_chronic
-        } else {
-            thornbriar_tracker.latched_chronic
-        };
+    let thornbriar_chronically_low = if time
+        .tick
+        .saturating_sub(thornbriar_tracker.last_window_tick)
+        >= scoring.chronicity_window_ticks
+    {
+        thornbriar_tracker.last_window_tick = time.tick;
+        thornbriar_tracker.latched_chronic =
+            total_thornbriar < scoring.thornbriar_stash_low_threshold;
+        thornbriar_tracker.latched_chronic
+    } else {
+        thornbriar_tracker.latched_chronic
+    };
     if thornbriar_chronically_low {
         em.insert(crate::components::markers::ColonyThornbriarChronicallyLow);
     } else {
@@ -709,8 +710,8 @@ pub fn update_colony_building_markers(
     // i.e., its `DryingRackState.loaded` is `None`. A colony with
     // racks-but-all-loaded gets the marker OFF, which keeps `DryFoodDse`
     // from re-scoring a load action that can't find a target.
-    let has_idle_drying_rack = bldg_state.has_functional_drying_rack
-        && drying_racks.iter().any(|s| s.loaded.is_none());
+    let has_idle_drying_rack =
+        bldg_state.has_functional_drying_rack && drying_racks.iter().any(|s| s.loaded.is_none());
     if has_idle_drying_rack {
         em.insert(crate::components::markers::HasFunctionalDryingRack);
     } else {
@@ -720,8 +721,8 @@ pub fn update_colony_building_markers(
     // Same shape for smoking racks — "functional and idle" gates the
     // load action; the per-rack tend-cooldown gates the Tend DSE
     // separately via `HasLoadedSmokingRackOffCooldown` below.
-    let has_idle_smoking_rack = bldg_state.has_functional_smoking_rack
-        && smoking_racks.iter().any(|s| s.loaded.is_none());
+    let has_idle_smoking_rack =
+        bldg_state.has_functional_smoking_rack && smoking_racks.iter().any(|s| s.loaded.is_none());
     if has_idle_smoking_rack {
         em.insert(crate::components::markers::HasFunctionalSmokingRack);
     } else {
@@ -739,8 +740,7 @@ pub fn update_colony_building_markers(
     let has_loaded_smoking_off_cooldown = smoking_racks.iter().any(|s| {
         s.loaded.is_some()
             && s.progress < 1.0
-            && (s.last_tended_at_tick == 0
-                || now.saturating_sub(s.last_tended_at_tick) >= cooldown)
+            && (s.last_tended_at_tick == 0 || now.saturating_sub(s.last_tended_at_tick) >= cooldown)
     });
     if has_loaded_smoking_off_cooldown {
         em.insert(crate::components::markers::HasLoadedSmokingRackOffCooldown);

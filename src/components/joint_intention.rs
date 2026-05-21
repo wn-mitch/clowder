@@ -559,10 +559,7 @@ pub fn next_stage(proxies: &StageAdvanceProxies) -> Option<PracticeStage> {
             }
         }
         CourtshipCourting => {
-            let bond_ok = matches!(
-                proxies.bond,
-                Some(BondType::Partners | BondType::Mates)
-            );
+            let bond_ok = matches!(proxies.bond, Some(BondType::Partners | BondType::Mates));
             let fertile = match proxies.self_gender {
                 Gender::Tom => !matches!(proxies.season, Season::Winter),
                 _ => matches!(proxies.self_fertility_phase, Some(FertilityPhase::Estrus)),
@@ -905,8 +902,7 @@ mod tests {
     #[test]
     fn bias_multiplier_no_joint_returns_one() {
         let target = entity(1);
-        let (mult, amped) =
-            joint_bias_multiplier(None, target, PracticeKind::Courtship, 1.5);
+        let (mult, amped) = joint_bias_multiplier(None, target, PracticeKind::Courtship, 1.5);
         assert_eq!(mult, 1.0);
         assert!(!amped);
     }

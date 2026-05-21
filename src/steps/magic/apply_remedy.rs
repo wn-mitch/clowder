@@ -88,10 +88,7 @@ pub fn resolve_apply_remedy(
         return (StepResult::Fail("patient no longer alive".into()), None);
     }
     if !inventory.take_remedy(remedy) {
-        return (
-            StepResult::Fail("missing remedy in inventory".into()),
-            None,
-        );
+        return (StepResult::Fail("missing remedy in inventory".into()), None);
     }
     commands.entity(patient).insert(RemedyEffect {
         kind: remedy,

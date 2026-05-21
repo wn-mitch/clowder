@@ -168,7 +168,6 @@ impl crate::ai::dse::CatDse for FarmDse {
     }
 }
 
-
 pub fn farm_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(FarmDse::new(scoring))
 }

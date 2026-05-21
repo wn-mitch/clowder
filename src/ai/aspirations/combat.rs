@@ -125,8 +125,7 @@ pub const SHADOW_FIGHTER: AspirationChain = AspirationChain {
                 count: 5,
             },
             emits: SHADOW_FIGHTER_EMITS,
-            narrative_on_complete:
-                "{name} volunteers for the night patrol. No one asks why.",
+            narrative_on_complete: "{name} volunteers for the night patrol. No one asks why.",
         },
         Milestone {
             name: "Eyes in the Dark",

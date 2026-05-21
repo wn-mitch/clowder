@@ -58,8 +58,8 @@ use bevy_ecs::prelude::*;
 use crate::ai::aspirations::{AspirationChain, Emit, Priority};
 use crate::ai::dse::CommitmentStrategy;
 use crate::ai::methods::{ApplicableWhen, MethodRegistry};
-use crate::components::aspirations::{ActiveAspiration, Aspirations};
 use crate::components::aspiration_emission::{AspirationEmissions, EmissionRow};
+use crate::components::aspirations::{ActiveAspiration, Aspirations};
 use crate::components::held_goal_stack::HeldGoalStack;
 use crate::components::held_intention::IntentionSource;
 use crate::components::identity::Name;
@@ -156,17 +156,16 @@ pub fn pick_aspiration_emissions(world: &mut World) {
 
 fn collect_snapshot(world: &mut World) -> Vec<CatSnapshot> {
     let mut snapshot = Vec::new();
-    let mut q = world.query_filtered::<
-        (Entity, &Aspirations, Option<&HeldGoalStack>, &Name),
-        Without<Dead>,
-    >();
+    let mut q = world
+        .query_filtered::<(Entity, &Aspirations, Option<&HeldGoalStack>, &Name), Without<Dead>>();
     for (entity, asps, stack, name) in q.iter(world) {
-        let in_flight_chain = stack
-            .and_then(|s| s.frames.first())
-            .and_then(|frame| match &frame.source {
-                IntentionSource::AspirationEmitted { chain } => Some(*chain),
-                _ => None,
-            });
+        let in_flight_chain =
+            stack
+                .and_then(|s| s.frames.first())
+                .and_then(|frame| match &frame.source {
+                    IntentionSource::AspirationEmitted { chain } => Some(*chain),
+                    _ => None,
+                });
         snapshot.push(CatSnapshot {
             entity,
             name: name.0.clone(),
@@ -217,8 +216,7 @@ fn compute_outcome(
             } else {
                 // Step 3: domain-affinity fallback. Step-4 silent
                 // quiet is the natural empty-Option fall-through.
-                let (step3_row, step3_walk) =
-                    step3_domain_fallback(world, snap.entity, chain, asp);
+                let (step3_row, step3_walk) = step3_domain_fallback(world, snap.entity, chain, asp);
                 let fallback_used = step3_row.is_some();
                 // Combine the two walks: step2's authored-emit rows
                 // (empty when the milestone has no emits) followed
@@ -226,8 +224,7 @@ fn compute_outcome(
                 // candidates. Concatenation preserves the "no
                 // authored emit matched, so tried these" narrative
                 // in the L1Aspiration trace record.
-                let combined_walk =
-                    step2_walk.into_iter().chain(step3_walk).collect();
+                let combined_walk = step2_walk.into_iter().chain(step3_walk).collect();
                 (step3_row, combined_walk, fallback_used)
             }
         };
@@ -262,7 +259,10 @@ fn compute_outcome(
             }
             // Live method existence check — mirrors step 2's discipline.
             let method_registry = world.resource::<MethodRegistry>();
-            if method_registry.lookup(reactive.label, world, snap.entity).is_none() {
+            if method_registry
+                .lookup(reactive.label, world, snap.entity)
+                .is_none()
+            {
                 continue;
             }
             emissions.rows.push(EmissionRow {
@@ -300,17 +300,14 @@ fn step2_emits_walk(
 
     // Stable sort by priority, preserving registration order within
     // tier (`sort_by_key` is stable).
-    let mut indexed: Vec<(usize, Emit)> =
-        milestone.emits.iter().copied().enumerate().collect();
+    let mut indexed: Vec<(usize, Emit)> = milestone.emits.iter().copied().enumerate().collect();
     indexed.sort_by_key(|(_, e)| e.priority as u8);
 
     let mut walk = Vec::with_capacity(indexed.len());
     let mut chosen: Option<EmissionRow> = None;
 
     for (_, emit) in indexed {
-        let method_live = method_registry
-            .lookup(emit.label, world, entity)
-            .is_some();
+        let method_live = method_registry.lookup(emit.label, world, entity).is_some();
         let applicable = (emit.applicable_when)(world, entity);
         let emitted = chosen.is_none() && method_live && applicable;
         walk.push(EmitWalkRow {

@@ -137,7 +137,6 @@ impl crate::ai::dse::CatDse for IdleDse {
     }
 }
 
-
 pub fn idle_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(IdleDse::new(scoring))
 }

@@ -163,9 +163,7 @@ mod tests {
     /// `src/steps/fox/mod.rs::tests::fox_routes_around_high_deterrent_cell`.
     #[test]
     fn fox_step_toward_uses_deterrent_overlay() {
-        use crate::ai::pathfinding::{
-            find_path, CatPatrolDeterrentOverlay, WeightedOverlay,
-        };
+        use crate::ai::pathfinding::{find_path, CatPatrolDeterrentOverlay, WeightedOverlay};
         use crate::resources::map::{Terrain, TileMap};
         use crate::resources::sim_constants::ScoringConstants;
 
@@ -181,18 +179,8 @@ mod tests {
             &overlay,
             sc.cat_patrol_deterrent_overlay_weight,
         )];
-        let path_with = find_path(
-            Position::new(0, 10),
-            Position::new(19, 10),
-            &map,
-            &weighted,
-        );
-        let path_without = find_path(
-            Position::new(0, 10),
-            Position::new(19, 10),
-            &map,
-            &[],
-        );
+        let path_with = find_path(Position::new(0, 10), Position::new(19, 10), &map, &weighted);
+        let path_without = find_path(Position::new(0, 10), Position::new(19, 10), &map, &[]);
 
         assert!(path_with.is_some() && path_without.is_some());
         // The deterrent-aware path can be longer or equal; the key

@@ -320,7 +320,11 @@ pub fn update_cat_inspect_panel(
         let mut permanent_lines: Vec<String> = Vec::new();
         for (part, state) in body.iter() {
             if state.permanent && state.condition >= PartCondition::Wounded {
-                permanent_lines.push(format!("  {}: {} (permanent)", part.display_name(), part_condition_label(state.condition)));
+                permanent_lines.push(format!(
+                    "  {}: {} (permanent)",
+                    part.display_name(),
+                    part_condition_label(state.condition)
+                ));
             } else if state.condition >= PartCondition::Wounded {
                 let color = match state.condition {
                     PartCondition::Wounded => BAR_RED,
@@ -328,18 +332,32 @@ pub fn update_cat_inspect_panel(
                     _ => TEXT_COLOR,
                 };
                 wounded_lines.push((
-                    format!("  {}: {}", part.display_name(), part_condition_label(state.condition)),
+                    format!(
+                        "  {}: {}",
+                        part.display_name(),
+                        part_condition_label(state.condition)
+                    ),
                     color,
                 ));
             }
         }
         if !wounded_lines.is_empty() || !permanent_lines.is_empty() {
-            children.push(spawn_text(&mut commands, "Body zones", FONT_SIZE, TEXT_COLOR));
+            children.push(spawn_text(
+                &mut commands,
+                "Body zones",
+                FONT_SIZE,
+                TEXT_COLOR,
+            ));
             for (text, color) in &wounded_lines {
                 children.push(spawn_text(&mut commands, text, FONT_SIZE, *color));
             }
             for text in &permanent_lines {
-                children.push(spawn_text(&mut commands, text, FONT_SIZE, Color::srgb(0.7, 0.5, 0.3)));
+                children.push(spawn_text(
+                    &mut commands,
+                    text,
+                    FONT_SIZE,
+                    Color::srgb(0.7, 0.5, 0.3),
+                ));
             }
         }
     }

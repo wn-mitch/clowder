@@ -809,10 +809,7 @@ pub fn update_target_existence_markers(
             Without<markers::Buried>,
         ),
     >,
-    wildlife_q: Query<
-        (&crate::components::wildlife::WildAnimal, &Position),
-        Without<Dead>,
-    >,
+    wildlife_q: Query<(&crate::components::wildlife::WildAnimal, &Position), Without<Dead>>,
     herb_q: Query<
         &Position,
         (
@@ -1050,13 +1047,7 @@ pub fn update_hide_eligible_markers(
     let threshold = constants.escape_viability.cover_availability_threshold;
     for (entity, pos, has_hide, has_threat) in cats.iter() {
         let want = has_threat && cover_map.get(pos.x, pos.y) > threshold;
-        toggle_target_marker(
-            &mut commands,
-            entity,
-            want,
-            has_hide,
-            markers::HideEligible,
-        );
+        toggle_target_marker(&mut commands, entity, want, has_hide, markers::HideEligible);
     }
 }
 

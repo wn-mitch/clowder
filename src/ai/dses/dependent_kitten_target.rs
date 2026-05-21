@@ -278,8 +278,7 @@ pub fn resolve_dependent_kitten_target(
             dse.aggregation(),
             hook.name_lookup,
         ) {
-            hook.capture
-                .set_target_ranking(dse_id.0, ranking, tick);
+            hook.capture.set_target_ranking(dse_id.0, ranking, tick);
         }
     }
 
@@ -310,7 +309,13 @@ pub fn maturity_in_band(
 mod tests {
     use super::*;
 
-    fn kitten(id: u32, x: i32, y: i32, maturity: f32, mother: Option<Entity>) -> DependentKittenState {
+    fn kitten(
+        id: u32,
+        x: i32,
+        y: i32,
+        maturity: f32,
+        mother: Option<Entity>,
+    ) -> DependentKittenState {
         DependentKittenState {
             entity: Entity::from_raw_u32(id).unwrap(),
             pos: Position::new(x, y),
@@ -615,8 +620,8 @@ mod tests {
         let queen = Entity::from_raw_u32(1).unwrap();
         let target_kitten = Entity::from_raw_u32(10).unwrap();
         let kittens = vec![
-            kitten(10, 1, 0, 0.5, Some(queen)), // Teach band
-            kitten(11, 2, 0, 0.1, Some(queen)), // Wean band — excluded
+            kitten(10, 1, 0, 0.5, Some(queen)),  // Teach band
+            kitten(11, 2, 0, 0.1, Some(queen)),  // Wean band — excluded
             kitten(12, 3, 0, 0.97, Some(queen)), // Release band — excluded
         ];
         let out = resolve_dependent_kitten_target(

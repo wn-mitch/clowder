@@ -172,7 +172,6 @@ impl crate::ai::dse::CatDse for DryFoodDse {
     }
 }
 
-
 pub fn dry_food_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(DryFoodDse::new())
 }

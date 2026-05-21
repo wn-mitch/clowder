@@ -94,7 +94,6 @@ impl crate::ai::dse::CatDse for TrashingDse {
     }
 }
 
-
 pub fn trashing_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(TrashingDse::new(scoring))
 }

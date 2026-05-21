@@ -57,10 +57,7 @@ impl MentorDse {
                 Consideration::Scalar(ScalarConsideration::new(WARMTH_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(DILIGENCE_INPUT, linear.clone())),
                 Consideration::Scalar(ScalarConsideration::new(AMBITION_INPUT, linear)),
-                Consideration::Scalar(ScalarConsideration::new(
-                    "colony_food_security",
-                    lift_curve,
-                )),
+                Consideration::Scalar(ScalarConsideration::new("colony_food_security", lift_curve)),
             ],
             // RtEO weights sum to 1.0. Warmth + diligence co-drive;
             // ambition is the status-seeking secondary driver. The
@@ -125,7 +122,6 @@ impl crate::ai::dse::CatDse for MentorDse {
         crate::ai::Action::Mentor
     }
 }
-
 
 pub fn mentor_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(MentorDse::new(scoring))

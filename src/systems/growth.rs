@@ -299,10 +299,7 @@ pub fn update_life_stage_markers(
 #[allow(clippy::type_complexity)]
 pub fn update_parent_markers(
     mut commands: Commands,
-    kittens: Query<
-        (&KittenDependency, Has<markers::RearKittenReleased>),
-        Without<Dead>,
-    >,
+    kittens: Query<(&KittenDependency, Has<markers::RearKittenReleased>), Without<Dead>>,
     cats: Query<
         (
             Entity,
@@ -350,7 +347,9 @@ pub fn update_parent_markers(
         }
         match (juvenile_parents.contains(&entity), has_juvenile) {
             (true, false) => {
-                commands.entity(entity).insert(markers::HasJuvenileDependent);
+                commands
+                    .entity(entity)
+                    .insert(markers::HasJuvenileDependent);
             }
             (false, true) => {
                 commands
@@ -701,11 +700,15 @@ mod tests {
         assert!(world.entity(mother).contains::<markers::Parent>());
         assert!(world.entity(father).contains::<markers::Parent>());
         assert!(
-            world.entity(mother).contains::<markers::HasJuvenileDependent>(),
+            world
+                .entity(mother)
+                .contains::<markers::HasJuvenileDependent>(),
             "mother of early-arc kitten gets HasJuvenileDependent"
         );
         assert!(
-            world.entity(father).contains::<markers::HasJuvenileDependent>(),
+            world
+                .entity(father)
+                .contains::<markers::HasJuvenileDependent>(),
             "father of early-arc kitten gets HasJuvenileDependent"
         );
     }
@@ -724,11 +727,15 @@ mod tests {
         assert!(world.entity(mother).contains::<markers::Parent>());
         assert!(world.entity(father).contains::<markers::Parent>());
         assert!(
-            !world.entity(mother).contains::<markers::HasJuvenileDependent>(),
+            !world
+                .entity(mother)
+                .contains::<markers::HasJuvenileDependent>(),
             "mid-gap kitten does NOT mark HasJuvenileDependent"
         );
         assert!(
-            !world.entity(father).contains::<markers::HasJuvenileDependent>(),
+            !world
+                .entity(father)
+                .contains::<markers::HasJuvenileDependent>(),
             "mid-gap kitten does NOT mark HasJuvenileDependent on father"
         );
     }
@@ -745,10 +752,14 @@ mod tests {
         let _kitten = spawn_kitten_with_maturity(&mut world, mother, father, 0.97);
         schedule.run(&mut world);
         assert!(
-            world.entity(mother).contains::<markers::HasJuvenileDependent>(),
+            world
+                .entity(mother)
+                .contains::<markers::HasJuvenileDependent>(),
             "near-mature unreleased kitten re-authors juvenile marker"
         );
-        assert!(world.entity(father).contains::<markers::HasJuvenileDependent>());
+        assert!(world
+            .entity(father)
+            .contains::<markers::HasJuvenileDependent>());
     }
 
     #[test]
@@ -774,11 +785,15 @@ mod tests {
         schedule.run(&mut world);
         assert!(world.entity(mother).contains::<markers::Parent>());
         assert!(
-            !world.entity(mother).contains::<markers::HasJuvenileDependent>(),
+            !world
+                .entity(mother)
+                .contains::<markers::HasJuvenileDependent>(),
             "released kitten doesn't re-arm the arc emit"
         );
         assert!(
-            !world.entity(father).contains::<markers::HasJuvenileDependent>(),
+            !world
+                .entity(father)
+                .contains::<markers::HasJuvenileDependent>(),
             "released kitten doesn't re-arm father's arc emit either"
         );
     }
@@ -790,7 +805,9 @@ mod tests {
         let father = spawn_adult(&mut world);
         let kitten = spawn_kitten_with_maturity(&mut world, mother, father, 0.1);
         schedule.run(&mut world);
-        assert!(world.entity(mother).contains::<markers::HasJuvenileDependent>());
+        assert!(world
+            .entity(mother)
+            .contains::<markers::HasJuvenileDependent>());
         // Kill the kitten — same §4.3 ordering hazard: marker drops
         // within the same tick.
         world.entity_mut(kitten).insert(Dead {
@@ -798,8 +815,12 @@ mod tests {
             cause: DeathCause::Starvation,
         });
         schedule.run(&mut world);
-        assert!(!world.entity(mother).contains::<markers::HasJuvenileDependent>());
-        assert!(!world.entity(father).contains::<markers::HasJuvenileDependent>());
+        assert!(!world
+            .entity(mother)
+            .contains::<markers::HasJuvenileDependent>());
+        assert!(!world
+            .entity(father)
+            .contains::<markers::HasJuvenileDependent>());
     }
 
     // -----------------------------------------------------------------------

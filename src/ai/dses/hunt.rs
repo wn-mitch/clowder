@@ -187,7 +187,6 @@ impl crate::ai::dse::CatDse for HuntDse {
     }
 }
 
-
 pub fn hunt_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HuntDse::new(scoring))
 }

@@ -34,9 +34,7 @@
 //!   whose `emits[]` table is empty (e.g. SHADOW_FIGHTER, pending its
 //!   own follow-on ticket).
 
-use crate::ai::methods::{
-    ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint,
-};
+use crate::ai::methods::{ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint};
 use crate::ai::Action;
 use crate::components::aspirations::AspirationDomain;
 

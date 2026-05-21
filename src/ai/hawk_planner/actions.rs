@@ -120,10 +120,15 @@ mod tests {
         };
         let goal = super::super::goals::goal_for_disposition(HawkDispositionKind::Hunting);
         let actions = hunting_actions();
-        let plan = core::make_plan::<HawkDomain>(start, &actions, &goal, 8, 500,
+        let plan = core::make_plan::<HawkDomain>(
+            start,
+            &actions,
+            &goal,
+            8,
+            500,
             &mut crate::ai::planner::core::PlannerScratch::<HawkDomain>::default(),
         )
-            .expect("should find hunting plan");
+        .expect("should find hunting plan");
 
         assert!(!plan.is_empty());
         assert_eq!(plan.last().unwrap().action, HawkGoapActionKind::DiveAttack);
@@ -139,10 +144,15 @@ mod tests {
         };
         let goal = super::super::goals::goal_for_disposition(HawkDispositionKind::Fleeing);
         let actions = fleeing_actions();
-        let plan = core::make_plan::<HawkDomain>(start, &actions, &goal, 8, 500,
+        let plan = core::make_plan::<HawkDomain>(
+            start,
+            &actions,
+            &goal,
+            8,
+            500,
             &mut crate::ai::planner::core::PlannerScratch::<HawkDomain>::default(),
         )
-            .expect("should find fleeing plan");
+        .expect("should find fleeing plan");
 
         assert!(!plan.is_empty());
     }
@@ -157,10 +167,15 @@ mod tests {
         };
         let goal = super::super::goals::goal_for_disposition(HawkDispositionKind::Resting);
         let actions = resting_actions();
-        let plan = core::make_plan::<HawkDomain>(start, &actions, &goal, 8, 500,
+        let plan = core::make_plan::<HawkDomain>(
+            start,
+            &actions,
+            &goal,
+            8,
+            500,
             &mut crate::ai::planner::core::PlannerScratch::<HawkDomain>::default(),
         )
-            .expect("should find resting plan");
+        .expect("should find resting plan");
 
         assert!(!plan.is_empty());
         assert_eq!(plan.last().unwrap().action, HawkGoapActionKind::Rest);

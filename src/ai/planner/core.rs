@@ -371,8 +371,8 @@ mod tests {
         };
 
         let mut scratch = PlannerScratch::<TestDomain>::default();
-        let plan =
-            make_plan::<TestDomain>(start, &test_actions(), &goal, 10, 1000, &mut scratch).expect("should plan");
+        let plan = make_plan::<TestDomain>(start, &test_actions(), &goal, 10, 1000, &mut scratch)
+            .expect("should plan");
 
         let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
         assert_eq!(
@@ -399,8 +399,8 @@ mod tests {
         };
 
         let mut scratch = PlannerScratch::<TestDomain>::default();
-        let plan =
-            make_plan::<TestDomain>(start, &test_actions(), &goal, 10, 1000, &mut scratch).expect("should plan");
+        let plan = make_plan::<TestDomain>(start, &test_actions(), &goal, 10, 1000, &mut scratch)
+            .expect("should plan");
         assert!(plan.is_empty());
     }
 

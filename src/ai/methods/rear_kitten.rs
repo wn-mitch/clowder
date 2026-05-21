@@ -37,9 +37,7 @@
 //! mother's `HeldGoalStack` carries the *commitment*; the
 //! relationship carries the *fact*.
 
-use crate::ai::methods::{
-    ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint,
-};
+use crate::ai::methods::{ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint};
 use crate::ai::Action;
 use crate::components::markers::{HasJuvenileDependent, Parent};
 use crate::components::physical::Dead;
@@ -92,9 +90,7 @@ use bevy_ecs::prelude::*;
 /// one merged pass.
 pub fn has_dependent_kitten(world: &World, entity: Entity) -> bool {
     let ent = world.entity(entity);
-    !ent.contains::<Dead>()
-        && ent.contains::<Parent>()
-        && ent.contains::<HasJuvenileDependent>()
+    !ent.contains::<Dead>() && ent.contains::<Parent>() && ent.contains::<HasJuvenileDependent>()
 }
 
 /// Construct the `rear_kitten` method literal. Called by

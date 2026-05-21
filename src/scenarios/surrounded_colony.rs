@@ -119,11 +119,11 @@ const FOX_POSITIONS: [Position; 8] = [
 /// `Gate` composition can saturate without artificial scent
 /// deposits.
 const CAT_OFFSETS: [(i32, i32); 5] = [
-    (0, 0),   // centroid
-    (-3, 0),  // W of centroid
-    (3, 0),   // E of centroid
-    (0, -3),  // N of centroid
-    (0, 3),   // S of centroid
+    (0, 0),  // centroid
+    (-3, 0), // W of centroid
+    (3, 0),  // E of centroid
+    (0, -3), // N of centroid
+    (0, 3),  // S of centroid
 ];
 
 const CAT_NAMES: [&str; 5] = ["Bramble", "Cinder", "Dapple", "Ember", "Fennel"];
@@ -184,12 +184,12 @@ fn spawn_surrounding_foxes(world: &mut World) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::resources::map::{Terrain, TileMap};
     use crate::resources::sim_constants::WardPlacementCatValueComposition;
     use crate::resources::{
         CarcassScentMap, CatScentMap, FoxApproachCorridorMap, FoxScentMap, RecentAmbushMap,
         SimConstants, WardCoverageMap,
     };
-    use crate::resources::map::{Terrain, TileMap};
     use crate::systems::coordination::{compute_ward_placement, PlacementMaps};
     use rand::SeedableRng;
 
@@ -338,8 +338,15 @@ mod tests {
     /// calls, stamping each pick into `ward_coverage` between
     /// calls. Returns the picks in order.
     fn drive_wakes(constants: &SimConstants) -> Vec<Position> {
-        let (fox_scent, cat_scent, mut ward_coverage, tile_map, recent_ambush, carcass_scent, fox_approach_corridor) =
-            build_substrate();
+        let (
+            fox_scent,
+            cat_scent,
+            mut ward_coverage,
+            tile_map,
+            recent_ambush,
+            carcass_scent,
+            fox_approach_corridor,
+        ) = build_substrate();
 
         // Pre-seed: one existing ward at `SEED_WARD` so
         // `compute_ward_placement` runs the scoring loop on the
@@ -380,22 +387,11 @@ mod tests {
             // don't lock all wakes into the same tie-break order.
             let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(313 + wake as u64);
             let pick = compute_ward_placement(
-                &buildings,
-                &wards,
-                anchor,
-                &maps,
-                constants,
-                &mut rng,
-                None,
+                &buildings, &wards, anchor, &maps, constants, &mut rng, None,
             );
             picks.push(pick);
             wards.push((pick, THORNWARD_REPEL_RADIUS));
-            ward_coverage.stamp_ward(
-                pick.x,
-                pick.y,
-                THORNWARD_STRENGTH,
-                THORNWARD_REPEL_RADIUS,
-            );
+            ward_coverage.stamp_ward(pick.x, pick.y, THORNWARD_STRENGTH, THORNWARD_REPEL_RADIUS);
         }
         picks
     }

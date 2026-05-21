@@ -59,9 +59,7 @@ use std::collections::HashMap;
 /// ShadowFox-only. The `affordance_writer` filters by species before
 /// computing the scalar — a hawk asking about its own `Pounce` affordance
 /// against a rabbit reads `0.0` and the substrate gates it.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ActionKind {
     // --- Predation (per-species subset) ---
     /// Universal — predator approaches prey under cover, low alertness.
@@ -241,13 +239,7 @@ impl ActionAffordances {
 
     /// Write a scalar, clamped to `[0, 1]`. Called by `affordance_writer`
     /// per `(perceiver, target, action_kind)` triple per tick.
-    pub fn write(
-        &mut self,
-        perceiver: Entity,
-        target: Entity,
-        kind: ActionKind,
-        score: f32,
-    ) {
+    pub fn write(&mut self, perceiver: Entity, target: Entity, kind: ActionKind, score: f32) {
         self.scalars
             .insert((perceiver, target, kind), score.clamp(0.0, 1.0));
     }

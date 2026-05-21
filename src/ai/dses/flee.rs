@@ -217,7 +217,6 @@ impl crate::ai::dse::CatDse for FleeDse {
     }
 }
 
-
 pub fn flee_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(FleeDse::new(scoring))
 }
@@ -285,7 +284,10 @@ mod tests {
             .expect("boldness axis must exist");
         assert!((c.evaluate(0.0) - 1.0).abs() < 1e-4, "timid cat → 1.0");
         assert!((c.evaluate(0.5) - 0.75).abs() < 1e-4, "mid-bold cat → 0.75");
-        assert!((c.evaluate(1.0) - 0.5).abs() < 1e-4, "fully bold cat → 0.5 (was 0.0 pre-271)");
+        assert!(
+            (c.evaluate(1.0) - 0.5).abs() < 1e-4,
+            "fully bold cat → 0.5 (was 0.0 pre-271)"
+        );
     }
 
     #[test]
@@ -396,9 +398,9 @@ mod tests {
         assert_eq!(s.flee_affordance_weight, 0.0);
         let dse = FleeDse::new(&s);
         assert!(
-            dse.considerations()
-                .iter()
-                .all(|c| !matches!(c, Consideration::Scalar(sc) if sc.name == FLEE_AFFORDANCE_INPUT)),
+            dse.considerations().iter().all(
+                |c| !matches!(c, Consideration::Scalar(sc) if sc.name == FLEE_AFFORDANCE_INPUT)
+            ),
             "flee_affordance axis must be absent at dormant weight"
         );
     }

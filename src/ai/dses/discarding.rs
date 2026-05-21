@@ -90,7 +90,6 @@ impl crate::ai::dse::CatDse for DiscardingDse {
     }
 }
 
-
 pub fn discarding_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(DiscardingDse::new(scoring))
 }

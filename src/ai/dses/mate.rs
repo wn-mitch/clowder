@@ -111,7 +111,6 @@ impl crate::ai::dse::CatDse for MateDse {
     }
 }
 
-
 pub fn mate_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(MateDse::new())
 }

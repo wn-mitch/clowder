@@ -198,7 +198,6 @@ impl crate::ai::dse::CatDse for SocializeDse {
     }
 }
 
-
 pub fn socialize_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(SocializeDse::new())
 }

@@ -525,7 +525,9 @@ pub fn generate_narrative(
             Action::Release => {
                 let options = [
                     format!("{cat} steps back, letting a grown kitten find their own path."),
-                    format!("{cat} releases a no-longer-dependent youngster to the colony at large."),
+                    format!(
+                        "{cat} releases a no-longer-dependent youngster to the colony at large."
+                    ),
                 ];
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Significant)

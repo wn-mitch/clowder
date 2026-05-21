@@ -111,8 +111,7 @@ fn setup_patrol_avoids_high_threat_sector(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);
     let cat = spawn_cat(
         world,
-        CatPreset::adult(FOCAL_NAME, Position::new(20, 20))
-            .with_marker(MarkerKind::Adult),
+        CatPreset::adult(FOCAL_NAME, Position::new(20, 20)).with_marker(MarkerKind::Adult),
     );
     // Pre-stamp the cat's LocationBeliefs at the territory perimeter
     // anchor's bucket with a saturated `recency_of_threat_cue`. The
@@ -239,8 +238,7 @@ mod tests {
     }
 
     fn prey_entity(world: &mut World) -> Entity {
-        let mut q =
-            world.query_filtered::<Entity, With<crate::components::prey::PreyAnimal>>();
+        let mut q = world.query_filtered::<Entity, With<crate::components::prey::PreyAnimal>>();
         q.iter(world).next().expect("prey entity not found")
     }
 
@@ -253,12 +251,7 @@ mod tests {
         app
     }
 
-    fn read_affordance(
-        world: &World,
-        perceiver: Entity,
-        target: Entity,
-        kind: ActionKind,
-    ) -> f32 {
+    fn read_affordance(world: &World, perceiver: Entity, target: Entity, kind: ActionKind) -> f32 {
         world
             .resource::<ActionAffordances>()
             .read(perceiver, target, kind)
@@ -327,8 +320,14 @@ mod tests {
             stalk, 0.0,
             "cat-vs-prey Stalk not yet populated by writer (follow-on); got {stalk}"
         );
-        assert_eq!(chase, 0.0, "cat-vs-prey Chase not yet populated; got {chase}");
-        assert_eq!(pounce, 0.0, "cat-vs-prey Pounce not yet populated; got {pounce}");
+        assert_eq!(
+            chase, 0.0,
+            "cat-vs-prey Chase not yet populated; got {chase}"
+        );
+        assert_eq!(
+            pounce, 0.0,
+            "cat-vs-prey Pounce not yet populated; got {pounce}"
+        );
     }
 
     #[test]

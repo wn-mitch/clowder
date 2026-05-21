@@ -190,10 +190,10 @@ fn make_bar(val: f32, width: usize) -> String {
 fn print_parental_vector(name: &str, snapshots: &[Value]) {
     // Find the latest snapshot that carries a `parenting` block. Earlier
     // snapshots (before the cat became a parent) are skipped.
-    let latest = snapshots
-        .iter()
-        .rev()
-        .find_map(|s| s.get("parenting").and_then(|p| (!p.is_null()).then_some((s, p))));
+    let latest = snapshots.iter().rev().find_map(|s| {
+        s.get("parenting")
+            .and_then(|p| (!p.is_null()).then_some((s, p)))
+    });
     let Some((snap, p)) = latest else {
         return;
     };
@@ -247,9 +247,7 @@ fn print_parental_vector(name: &str, snapshots: &[Value]) {
     let inl = field_u64(p, "in_law_count");
     let bnd = field_u64(p, "bond_formed_count");
     let adp = field_u64(p, "adopted_count");
-    println!(
-        "Relationships: {bio} biological · {inl} in-law · {bnd} bond-formed · {adp} adopted"
-    );
+    println!("Relationships: {bio} biological · {inl} in-law · {bnd} bond-formed · {adp} adopted");
     println!();
 }
 
@@ -577,14 +575,26 @@ fn print_aspirations(name: &str, snapshots: &[Value]) {
         None => println!("    (none active)"),
         Some(snap) => {
             let tick = snap.get("tick").and_then(|v| v.as_u64()).unwrap_or(0);
-            let asps = snap.get("active_aspirations").and_then(|v| v.as_array()).unwrap();
+            let asps = snap
+                .get("active_aspirations")
+                .and_then(|v| v.as_array())
+                .unwrap();
             println!("    (at tick {tick})");
             for (i, asp) in asps.iter().enumerate() {
-                let chain = asp.get("chain_name").and_then(|v| v.as_str()).unwrap_or("?");
+                let chain = asp
+                    .get("chain_name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?");
                 let domain = asp.get("domain").and_then(|v| v.as_str()).unwrap_or("?");
-                let milestone = asp.get("current_milestone").and_then(|v| v.as_u64()).unwrap_or(0);
+                let milestone = asp
+                    .get("current_milestone")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 let progress = asp.get("progress").and_then(|v| v.as_u64()).unwrap_or(0);
-                let adopted = asp.get("adopted_tick").and_then(|v| v.as_u64()).unwrap_or(0);
+                let adopted = asp
+                    .get("adopted_tick")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 println!(
                     "    [{i}] {chain:<24}  domain:{domain:<12}  milestone:{milestone}  progress:{progress:>4}  adopted:tick {adopted}"
                 );
@@ -605,15 +615,31 @@ fn print_aspirations(name: &str, snapshots: &[Value]) {
         Some(snap) => {
             let tick = snap.get("tick").and_then(|v| v.as_u64()).unwrap_or(0);
             let frames = snap.get("goal_stack").and_then(|v| v.as_array()).unwrap();
-            let current_action = snap.get("current_action").and_then(|v| v.as_str()).unwrap_or("?");
+            let current_action = snap
+                .get("current_action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             println!("    (at tick {tick}  leaf action: {current_action})");
             for (depth, frame) in frames.iter().enumerate() {
                 let method = frame.get("method").and_then(|v| v.as_str()).unwrap_or("?");
-                let goal = frame.get("goal_label").and_then(|v| v.as_str()).unwrap_or("?");
-                let sub_i = frame.get("sub_goal_index").and_then(|v| v.as_u64()).unwrap_or(0);
-                let sub_n = frame.get("sub_goal_count").and_then(|v| v.as_u64()).unwrap_or(0);
+                let goal = frame
+                    .get("goal_label")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("?");
+                let sub_i = frame
+                    .get("sub_goal_index")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                let sub_n = frame
+                    .get("sub_goal_count")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
                 let source = frame.get("source").and_then(|v| v.as_str()).unwrap_or("?");
-                let marker = if depth + 1 == frames.len() { " ← active" } else { "" };
+                let marker = if depth + 1 == frames.len() {
+                    " ← active"
+                } else {
+                    ""
+                };
                 println!(
                     "    [{depth}] {method:<26}  goal:{goal:<20}  {sub_i}/{sub_n}  src:{source}{marker}"
                 );
@@ -694,15 +720,13 @@ fn derive_method_history(snapshots: &[Value]) -> Vec<(u64, &'static str, String)
                     history.push((tick, "MethodAdopted", cur.clone()));
                 }
             }
-            (Some(_), Some(cur)) => {
-                // Same top method — check for sub-goal advance.
-                if cur_sub_i > prev_sub_i {
-                    history.push((
-                        tick,
-                        "SubGoalAdvanced",
-                        format!("{cur} [{cur_sub_i}/{sub_n}]"),
-                    ));
-                }
+            (Some(_), Some(cur)) if cur_sub_i > prev_sub_i => {
+                // Same top method — sub-goal advanced.
+                history.push((
+                    tick,
+                    "SubGoalAdvanced",
+                    format!("{cur} [{cur_sub_i}/{sub_n}]"),
+                ));
             }
             _ => {}
         }

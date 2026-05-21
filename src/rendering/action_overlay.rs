@@ -45,7 +45,9 @@ pub fn spawn_action_overlay_labels(
             ))
             .id();
         commands.entity(entity).add_children(&[label]);
-        commands.entity(entity).insert(ActionOverlayLabelEntity(label));
+        commands
+            .entity(entity)
+            .insert(ActionOverlayLabelEntity(label));
     }
 }
 
