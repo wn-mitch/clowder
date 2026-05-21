@@ -38,7 +38,7 @@ use super::considerations::{Consideration, MarkerKey};
 /// Stable identifier for a registered DSE. Kept as a `&'static str`
 /// per §5.6.9's open-set contract — adding a DSE is writing a string
 /// constant, not extending a closed enum.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DseId(pub &'static str);
 
 impl std::fmt::Display for DseId {
@@ -410,6 +410,46 @@ pub trait Dse: Send + Sync + 'static {
     /// election, narrative selection) return `u8::MAX` to opt out
     /// of the gate.
     fn maslow_tier(&self) -> u8;
+}
+
+// ---------------------------------------------------------------------------
+// CatDse sub-trait (ticket 438)
+// ---------------------------------------------------------------------------
+
+/// Cat-side DSEs that participate in the per-tick `score_actions`
+/// dispatcher. Sub-trait of [`Dse`] because cat DSEs emit a
+/// `crate::ai::Action` variant when they win L3 selection, whereas
+/// non-cat DSEs (fox / hawk / snake / aspiration / coordinator /
+/// narrative) emit species- or category-specific dispositions and
+/// have no meaningful `Action` mapping.
+///
+/// Required-by-construction contract: every entry in
+/// [`DseRegistry::cat_dses`](super::eval::DseRegistry::cat_dses)
+/// is a `Box<dyn CatDse>`, so registering a cat DSE without
+/// declaring its `Action` variant is a compile error. Closes the
+/// "registered ⇒ dispatchable" silent-failure class diagnosed by
+/// ticket 436 / 437; mirrors the reverse-direction const fn
+/// [`dse_id_for_action`](crate::ai::modifier::dse_id_for_action).
+pub trait CatDse: Dse {
+    /// The `Action` variant this DSE produces when it wins L3
+    /// selection. Read by the registry-iterating dispatcher in
+    /// `src/ai/scoring.rs::score_actions` to build `(Action, score)`
+    /// tuples without a hand-written switch.
+    fn action(&self) -> crate::ai::Action;
+
+    /// Whether the DSE pushes its `(Action, score)` tuple into the
+    /// L3 softmax pool even when its score is exactly 0.0. Default
+    /// `false` — most DSEs gate on `score > 0.0` so a zero score
+    /// (e.g. ineligible) does not enter the pool and does not
+    /// consume an RNG jitter draw.
+    ///
+    /// Override to `true` for the seven DSEs whose pre-438 dispatch
+    /// branch pushed unconditionally — Sleep / GroomSelf / Explore /
+    /// Wander / Idle / Bury / Caretake. Preserves the RNG-consumption
+    /// pattern that seed-42 determinism depends on.
+    fn always_emit_zero(&self) -> bool {
+        false
+    }
 }
 
 // ---------------------------------------------------------------------------

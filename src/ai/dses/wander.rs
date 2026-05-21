@@ -123,8 +123,18 @@ impl Dse for WanderDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for WanderDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Wander
+    }
 
-pub fn wander_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    fn always_emit_zero(&self) -> bool {
+        true
+    }
+}
+
+
+pub fn wander_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(WanderDse::new(scoring))
 }
 
@@ -186,3 +196,10 @@ mod tests {
         assert!((sum - 1.0).abs() < 1e-4);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static WANDER_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1000,
+        construct: |s| wander_dse(s),
+    };

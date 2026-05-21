@@ -163,6 +163,12 @@ impl Dse for EatDse {
         1
     }
 }
+impl crate::ai::dse::CatDse for EatDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Eat
+    }
+}
+
 
 /// Goal predicate: hunger has risen above the satiation threshold (the
 /// cat is full enough that the eat-need is met).
@@ -193,7 +199,7 @@ fn eat_goal_achieved(world: &World, cat: Entity) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Build the Eat DSE for registration. Called once at plugin load.
-pub fn eat_dse() -> Box<dyn Dse> {
+pub fn eat_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(EatDse::new())
 }
 
@@ -415,3 +421,10 @@ mod tests {
         assert_eq!(registry_entry.id().0, "eat");
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static EAT_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 100,
+        construct: |_| eat_dse(),
+    };

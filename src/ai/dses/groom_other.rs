@@ -145,8 +145,14 @@ impl Dse for GroomOtherDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for GroomOtherDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::GroomOther
+    }
+}
 
-pub fn groom_other_dse() -> Box<dyn Dse> {
+
+pub fn groom_other_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(GroomOtherDse::new())
 }
 
@@ -232,3 +238,10 @@ mod tests {
         assert!((v - 0.3).abs() < 1e-4, "expected 0.3 floor, got {v}");
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static GROOM_OTHER_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 700,
+        construct: |_| groom_other_dse(),
+    };

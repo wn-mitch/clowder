@@ -5,6 +5,57 @@
 //! Phase 3b.2 lands the reference port (Eat). Phase 3c fans out the
 //! remaining 20 cat DSEs, 9 fox DSEs, and 9 Herbcraft/PracticeMagic
 //! siblings through the same template.
+//!
+//! Ticket 438 — cat-DSE auto-discovery via [`linkme`]. Each cat-DSE
+//! file emits a `#[linkme::distributed_slice(CAT_DSE_REGISTRY)] static
+//! X_REGISTRATION: CatDseRegistration = CatDseRegistration { order: N,
+//! construct: |_| x_dse() }` so the central [`populate_dse_registry`]
+//! reads the slice instead of hand-maintaining a parallel list. The
+//! `order` field is the seed-42-load-bearing dispatch order — lower
+//! fires first. Gapped by 100 (100, 200, ...) so future DSEs can
+//! insert without renumbering. Adding a new cat DSE means writing one
+//! constructor + one registration entry in the same file — both
+//! required by construction; missing either is a compile error or a
+//! never-fired-canary failure.
+
+use crate::resources::sim_constants::ScoringConstants;
+
+/// Sortable cat-DSE registration entry consumed by
+/// [`populate_dse_registry`](crate::plugins::simulation::populate_dse_registry).
+/// `order` is the per-tick dispatch order in `score_actions` (the
+/// registry-iterating loop in `src/ai/scoring.rs`) — lower fires first.
+/// Seed-42 determinism depends on this order matching the pre-438
+/// hand-written dispatcher exactly, so changing an existing entry's
+/// `order` is a balance change and must follow the four-artifact
+/// methodology in CLAUDE.md.
+pub struct CatDseRegistration {
+    /// Per-tick dispatch order (low fires first). Gaps of 100 between
+    /// adjacent entries by convention, leaving headroom for insertion.
+    pub order: u16,
+    /// Constructor invoked by `populate_dse_registry` at plugin load.
+    /// `&ScoringConstants` is passed in even for stateless DSEs (most
+    /// constructors ignore it) so the function-pointer type stays
+    /// uniform across the registry.
+    pub construct: fn(&ScoringConstants) -> Box<dyn super::dse::CatDse>,
+}
+
+/// Distributed slice of cat-DSE registrations. Populated by each
+/// `dses/*.rs` file via `#[linkme::distributed_slice(CAT_DSE_REGISTRY)]
+/// static X: CatDseRegistration = ...`. Read by `populate_dse_registry`
+/// after sorting by `order`.
+#[linkme::distributed_slice]
+pub static CAT_DSE_REGISTRY: [CatDseRegistration];
+
+/// Construct every cat DSE in seed-42 dispatch order. Walks
+/// [`CAT_DSE_REGISTRY`], sorts by declared `order`, and calls each
+/// constructor with the supplied `scoring` constants.
+pub fn cat_dse_constructors(
+    scoring: &ScoringConstants,
+) -> Vec<Box<dyn super::dse::CatDse>> {
+    let mut entries: Vec<&CatDseRegistration> = CAT_DSE_REGISTRY.iter().collect();
+    entries.sort_by_key(|e| e.order);
+    entries.iter().map(|e| (e.construct)(scoring)).collect()
+}
 
 pub mod apply_remedy_target;
 pub mod build;

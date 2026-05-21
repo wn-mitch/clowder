@@ -181,8 +181,14 @@ impl Dse for HuntDse {
         1
     }
 }
+impl crate::ai::dse::CatDse for HuntDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Hunt
+    }
+}
 
-pub fn hunt_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn hunt_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HuntDse::new(scoring))
 }
 
@@ -256,3 +262,10 @@ mod tests {
         assert!((sum - 1.0).abs() < 1e-4);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static HUNT_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 300,
+        construct: |s| hunt_dse(s),
+    };

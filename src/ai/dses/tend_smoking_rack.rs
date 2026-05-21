@@ -128,8 +128,14 @@ impl Dse for TendSmokingRackDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for TendSmokingRackDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::TendSmokingRack
+    }
+}
 
-pub fn tend_smoking_rack_dse() -> Box<dyn Dse> {
+
+pub fn tend_smoking_rack_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(TendSmokingRackDse::new())
 }
 
@@ -168,3 +174,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static TEND_SMOKING_RACK_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3200,
+        construct: |_| tend_smoking_rack_dse(),
+    };

@@ -147,8 +147,14 @@ impl Dse for BuildDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for BuildDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Build
+    }
+}
 
-pub fn build_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn build_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(BuildDse::new(scoring))
 }
 
@@ -194,3 +200,10 @@ mod tests {
         assert!(chronic.present_score > 0.0);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static BUILD_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1500,
+        construct: |s| build_dse(s),
+    };

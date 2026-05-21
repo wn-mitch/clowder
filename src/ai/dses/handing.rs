@@ -85,8 +85,14 @@ impl Dse for HandingDse {
         1
     }
 }
+impl crate::ai::dse::CatDse for HandingDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Handoff
+    }
+}
 
-pub fn handing_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn handing_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HandingDse::new(scoring))
 }
 
@@ -140,3 +146,10 @@ mod tests {
         assert_eq!(HandingDse::new(&defaults()).maslow_tier(), 1);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static HANDING_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3600,
+        construct: |s| handing_dse(s),
+    };

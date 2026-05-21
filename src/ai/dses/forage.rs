@@ -163,8 +163,14 @@ impl Dse for ForageDse {
         1
     }
 }
+impl crate::ai::dse::CatDse for ForageDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Forage
+    }
+}
 
-pub fn forage_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn forage_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(ForageDse::new(scoring))
 }
 
@@ -246,3 +252,10 @@ mod tests {
         assert!((sum - 1.0).abs() < 1e-4);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static FORAGE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 400,
+        construct: |s| forage_dse(s),
+    };

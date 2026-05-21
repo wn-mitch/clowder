@@ -120,8 +120,14 @@ impl Dse for MentorDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for MentorDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Mentor
+    }
+}
 
-pub fn mentor_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn mentor_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(MentorDse::new(scoring))
 }
 
@@ -172,3 +178,10 @@ mod tests {
         assert!((weights[3] - 0.10).abs() < 1e-4);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static MENTOR_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2700,
+        construct: |s| mentor_dse(s),
+    };

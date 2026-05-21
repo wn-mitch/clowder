@@ -112,8 +112,18 @@ impl Dse for BuryDse {
         3
     }
 }
+impl crate::ai::dse::CatDse for BuryDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Bury
+    }
 
-pub fn bury_dse() -> Box<dyn Dse> {
+    fn always_emit_zero(&self) -> bool {
+        true
+    }
+}
+
+
+pub fn bury_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(BuryDse::new())
 }
 
@@ -182,3 +192,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static BURY_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 800,
+        construct: |_| bury_dse(),
+    };

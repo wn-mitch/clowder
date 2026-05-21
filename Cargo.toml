@@ -11,6 +11,17 @@ bevy = "0.18"
 bevy_ecs_tilemap = "0.18"
 bevy_ecs = "0.18"
 
+# Ticket 438 — distributed-slice auto-discovery for cat-DSE
+# registrations. Each `src/ai/dses/*.rs` self-registers its DSE via
+# `#[linkme::distributed_slice(CAT_DSE_REGISTRY)]`; the central
+# `populate_dse_registry` reads the slice (sorted by declared dispatch
+# order) and constructs DSEs in seed-42 sequence. Eliminates the
+# parallel hand-maintained list that was the silent-failure surface
+# diagnosed by tickets 436 / 437. Order numbers are declared inline
+# at each registration site, gapped by 100 so future inserts don't
+# have to renumber.
+linkme = "0.3"
+
 rand = "0.9"
 rand_chacha = { version = "0.9", features = ["serde"] }
 noise = "0.9"

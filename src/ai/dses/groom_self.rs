@@ -88,8 +88,18 @@ impl Dse for GroomSelfDse {
         1
     }
 }
+impl crate::ai::dse::CatDse for GroomSelfDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::GroomSelf
+    }
 
-pub fn groom_self_dse() -> Box<dyn Dse> {
+    fn always_emit_zero(&self) -> bool {
+        true
+    }
+}
+
+
+pub fn groom_self_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(GroomSelfDse::new())
 }
 
@@ -116,3 +126,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static GROOM_SELF_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 600,
+        construct: |_| groom_self_dse(),
+    };

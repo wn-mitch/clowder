@@ -127,8 +127,18 @@ impl Dse for IdleDse {
         u8::MAX
     }
 }
+impl crate::ai::dse::CatDse for IdleDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Idle
+    }
 
-pub fn idle_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    fn always_emit_zero(&self) -> bool {
+        true
+    }
+}
+
+
+pub fn idle_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(IdleDse::new(scoring))
 }
 
@@ -193,3 +203,10 @@ mod tests {
         assert!((c.evaluate(0.0) - 0.0).abs() < 1e-4);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static IDLE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3700,
+        construct: |s| idle_dse(s),
+    };

@@ -163,8 +163,14 @@ impl Dse for DryFoodDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for DryFoodDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::DryFood
+    }
+}
 
-pub fn dry_food_dse() -> Box<dyn Dse> {
+
+pub fn dry_food_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(DryFoodDse::new())
 }
 
@@ -206,3 +212,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static DRY_FOOD_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3000,
+        construct: |_| dry_food_dse(),
+    };

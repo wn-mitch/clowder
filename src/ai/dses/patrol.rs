@@ -202,8 +202,14 @@ impl Dse for PatrolDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for PatrolDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Patrol
+    }
+}
 
-pub fn patrol_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn patrol_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(PatrolDse::new(scoring))
 }
 
@@ -434,3 +440,10 @@ mod tests {
         assert_eq!(dse.composition().mode, CompositionMode::CompensatedProduct);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static PATROL_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1400,
+        construct: |s| patrol_dse(s),
+    };

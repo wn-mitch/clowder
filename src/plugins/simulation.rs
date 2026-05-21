@@ -20,46 +20,35 @@ use crate::systems::influence_map::{
 /// do *not* call this function — they cherry-pick a subset.
 pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConstants) {
     use crate::ai::dses;
-    registry.cat_dses.push(dses::eat_dse());
-    registry.cat_dses.push(dses::hunt_dse(scoring));
+
+    // -----------------------------------------------------------------
+    // Cat DSEs — auto-discovered via `linkme::distributed_slice`
+    // (ticket 438). Each `src/ai/dses/*.rs` file declares its own
+    // `CatDseRegistration` entry; `cat_dse_constructors` sorts by
+    // declared `order` (load-bearing for seed-42 — sets the jitter
+    // RNG sequence) and constructs them in dispatch order. Adding
+    // a new cat DSE requires authoring one constructor + one
+    // registration entry in its module; this central function does
+    // not need to be touched. Eliminates the parallel hand-maintained
+    // list that surfaced as the silent-failure class diagnosed by
+    // tickets 436 / 437.
+    // -----------------------------------------------------------------
+    registry.cat_dses.extend(dses::cat_dse_constructors(scoring));
+
+    // -----------------------------------------------------------------
+    // Target-taking DSEs — separate dispatch path under §6.3. Order
+    // here doesn't affect `score_actions` jitter sequence.
+    // -----------------------------------------------------------------
     registry.target_taking_dses.push(dses::hunt_target_dse(scoring));
-    registry.cat_dses.push(dses::forage_dse(scoring));
-    registry.cat_dses.push(dses::cook_dse());
-    // 367 — Phase 1b preservation DSEs. DryFood loads the rack with
-    // raw fish / raw organ; SmokeMeat loads the rack with meat + fuel;
-    // TendSmokingRack advances per-rack progress one cycle at a time.
-    registry.cat_dses.push(dses::dry_food_dse());
-    registry.cat_dses.push(dses::smoke_meat_dse());
-    registry.cat_dses.push(dses::tend_smoking_rack_dse());
-    registry.cat_dses.push(dses::flee_dse(scoring));
-    registry.cat_dses.push(dses::fight_dse(scoring));
-    // Ticket 104 — Hide/Freeze DSE. Ticket 170 lifted the Phase 1
-    // dormancy contract by authoring `HideEligible` per-tick; ticket
-    // 268 added three conditional consideration axes (Affordance(Freeze),
-    // recency-of-threat-cue, perceived-intent-clarity) behind weight
-    // constants that ship at 0.0. A balance follow-on tunes the
-    // weights from 0.0 to behavioral lifts.
-    registry.cat_dses.push(dses::hide_dse(scoring));
     registry.target_taking_dses.push(dses::fight_target_dse());
-    registry.cat_dses.push(dses::sleep_dse(scoring));
-    registry.cat_dses.push(dses::idle_dse(scoring));
-    registry.cat_dses.push(dses::socialize_dse());
     registry
         .target_taking_dses
         .push(dses::socialize_target_dse());
-    registry.cat_dses.push(dses::groom_self_dse());
-    registry.cat_dses.push(dses::groom_other_dse());
     registry
         .target_taking_dses
         .push(dses::groom_other_target_dse());
-    // 035: Bury (self-state + target-taking pair). Gated by the
-    // `HasUnburiedCorpse` substrate marker, so the DSE pair is
-    // dormant for cats with no nearby unburied corpse.
-    registry.cat_dses.push(dses::bury_dse());
     registry.target_taking_dses.push(dses::bury_target_dse());
-    registry.cat_dses.push(dses::mentor_dse(scoring));
     registry.target_taking_dses.push(dses::mentor_target_dse());
-    registry.cat_dses.push(dses::caretake_dse(scoring));
     registry
         .target_taking_dses
         .push(dses::caretake_target_dse());
@@ -82,42 +71,14 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
         .push(dses::dependent_kitten_target::dependent_kitten_target_dse(
             crate::ai::Action::Release,
         ));
-    registry.cat_dses.push(dses::mate_dse());
     registry.target_taking_dses.push(dses::mate_target_dse());
-    registry.cat_dses.push(dses::patrol_dse(scoring));
-    registry.cat_dses.push(dses::build_dse(scoring));
     registry.target_taking_dses.push(dses::build_target_dse());
-    registry.cat_dses.push(dses::farm_dse(scoring));
-    registry.cat_dses.push(dses::coordinate_dse(scoring));
-    registry.cat_dses.push(dses::explore_dse(scoring));
-    registry.cat_dses.push(dses::wander_dse(scoring));
-    registry.cat_dses.push(dses::herbcraft_gather_dse());
     registry
         .target_taking_dses
         .push(dses::herbcraft_target_dse());
-    registry.cat_dses.push(dses::herbcraft_prepare_dse());
     registry
         .target_taking_dses
         .push(dses::apply_remedy_target_dse());
-    registry.cat_dses.push(dses::herbcraft_ward_dse(scoring));
-    registry.cat_dses.push(dses::scry_dse());
-    registry.cat_dses.push(dses::durable_ward_dse());
-    registry.cat_dses.push(dses::cleanse_dse(scoring));
-    registry.cat_dses.push(dses::colony_cleanse_dse());
-    registry.cat_dses.push(dses::harvest_dse());
-    registry.cat_dses.push(dses::commune_dse());
-    // 176: inventory-disposal DSEs ship dormant via default-zero
-    // scoring (Linear slope=0, intercept=0). Registration plumbs
-    // them through L2 / L3 / planner so the substrate is exercised
-    // by the existing canaries (categorization, never-fired, etc.)
-    // while the elections stay zero. Balance-tuning replaces the
-    // zero curves with real overflow / colony-food considerations
-    // in a follow-on once `ColonyStoresChronicallyFull` and the
-    // saturation surfaces land.
-    registry.cat_dses.push(dses::discarding_dse(scoring));
-    registry.cat_dses.push(dses::trashing_dse(scoring));
-    registry.cat_dses.push(dses::handing_dse(scoring));
-    registry.cat_dses.push(dses::picking_up_dse());
     registry.fox_dses.push(dses::fox_patrolling_dse(scoring));
     registry.fox_dses.push(dses::fox_hunting_dse(scoring));
     registry.fox_dses.push(dses::fox_raiding_dse());

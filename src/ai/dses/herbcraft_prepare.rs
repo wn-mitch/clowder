@@ -109,8 +109,14 @@ impl Dse for HerbcraftPrepareDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for HerbcraftPrepareDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::HerbcraftRemedy
+    }
+}
 
-pub fn herbcraft_prepare_dse() -> Box<dyn Dse> {
+
+pub fn herbcraft_prepare_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HerbcraftPrepareDse::new())
 }
 
@@ -123,3 +129,10 @@ mod tests {
         assert_eq!(HerbcraftPrepareDse::new().id().0, "herbcraft_prepare");
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static HERBCRAFT_PREPARE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1800,
+        construct: |_| herbcraft_prepare_dse(),
+    };

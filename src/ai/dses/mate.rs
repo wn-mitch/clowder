@@ -105,8 +105,14 @@ impl Dse for MateDse {
         3
     }
 }
+impl crate::ai::dse::CatDse for MateDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Mate
+    }
+}
 
-pub fn mate_dse() -> Box<dyn Dse> {
+
+pub fn mate_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(MateDse::new())
 }
 
@@ -143,3 +149,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static MATE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2800,
+        construct: |_| mate_dse(),
+    };

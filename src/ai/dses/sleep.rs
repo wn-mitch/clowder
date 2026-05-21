@@ -226,8 +226,18 @@ impl Dse for SleepDse {
         1
     }
 }
+impl crate::ai::dse::CatDse for SleepDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Sleep
+    }
 
-pub fn sleep_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    fn always_emit_zero(&self) -> bool {
+        true
+    }
+}
+
+
+pub fn sleep_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(SleepDse::new(scoring))
 }
 
@@ -396,3 +406,10 @@ mod tests {
         assert!((c.evaluate(NIGHT_KNOT) - s.sleep_night_bonus).abs() < 1e-4);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static SLEEP_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 200,
+        construct: |s| sleep_dse(s),
+    };

@@ -211,8 +211,14 @@ impl Dse for FleeDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for FleeDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Flee
+    }
+}
 
-pub fn flee_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn flee_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(FleeDse::new(scoring))
 }
 
@@ -505,3 +511,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static FLEE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1100,
+        construct: |s| flee_dse(s),
+    };

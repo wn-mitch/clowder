@@ -142,8 +142,18 @@ impl Dse for ExploreDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for ExploreDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Explore
+    }
 
-pub fn explore_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    fn always_emit_zero(&self) -> bool {
+        true
+    }
+}
+
+
+pub fn explore_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(ExploreDse::new(scoring))
 }
 
@@ -247,3 +257,10 @@ mod tests {
         assert!(has_axis);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static EXPLORE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 900,
+        construct: |s| explore_dse(s),
+    };

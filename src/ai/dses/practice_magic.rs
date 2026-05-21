@@ -107,8 +107,14 @@ impl Dse for ScryDse {
         5
     }
 }
+impl crate::ai::dse::CatDse for ScryDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::MagicScry
+    }
+}
 
-pub fn scry_dse() -> Box<dyn Dse> {
+
+pub fn scry_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(ScryDse::new())
 }
 
@@ -202,8 +208,14 @@ impl Dse for DurableWardDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for DurableWardDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::MagicDurableWard
+    }
+}
 
-pub fn durable_ward_dse() -> Box<dyn Dse> {
+
+pub fn durable_ward_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(DurableWardDse::new())
 }
 
@@ -289,8 +301,14 @@ impl Dse for CleanseDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for CleanseDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::MagicCleanse
+    }
+}
 
-pub fn cleanse_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn cleanse_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CleanseDse::new(scoring))
 }
 
@@ -382,8 +400,14 @@ impl Dse for ColonyCleanseDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for ColonyCleanseDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::MagicColonyCleanse
+    }
+}
 
-pub fn colony_cleanse_dse() -> Box<dyn Dse> {
+
+pub fn colony_cleanse_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(ColonyCleanseDse::new())
 }
 
@@ -450,8 +474,14 @@ impl Dse for HarvestDse {
         3
     }
 }
+impl crate::ai::dse::CatDse for HarvestDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::MagicHarvest
+    }
+}
 
-pub fn harvest_dse() -> Box<dyn Dse> {
+
+pub fn harvest_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HarvestDse::new())
 }
 
@@ -517,8 +547,14 @@ impl Dse for CommuneDse {
         5
     }
 }
+impl crate::ai::dse::CatDse for CommuneDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::MagicCommune
+    }
+}
 
-pub fn commune_dse() -> Box<dyn Dse> {
+
+pub fn commune_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CommuneDse::new())
 }
 
@@ -711,3 +747,45 @@ mod tests {
         assert!(approx(spatial.curve.evaluate(1.0), 0.0, 1e-4));
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static SCRY_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2000,
+        construct: |_| scry_dse(),
+    };
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static DURABLE_WARD_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2100,
+        construct: |_| durable_ward_dse(),
+    };
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static CLEANSE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2200,
+        construct: |s| cleanse_dse(s),
+    };
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static COLONY_CLEANSE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2300,
+        construct: |_| colony_cleanse_dse(),
+    };
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static HARVEST_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2400,
+        construct: |_| harvest_dse(),
+    };
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static COMMUNE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2500,
+        construct: |_| commune_dse(),
+    };

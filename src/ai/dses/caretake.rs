@@ -159,8 +159,18 @@ impl Dse for CaretakeDse {
         3
     }
 }
+impl crate::ai::dse::CatDse for CaretakeDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Caretake
+    }
 
-pub fn caretake_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    fn always_emit_zero(&self) -> bool {
+        true
+    }
+}
+
+
+pub fn caretake_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CaretakeDse::new(scoring))
 }
 
@@ -220,3 +230,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static CARETAKE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3300,
+        construct: |s| caretake_dse(s),
+    };

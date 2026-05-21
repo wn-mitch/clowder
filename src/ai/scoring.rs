@@ -1,10 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::OnceLock;
 
 use bevy::prelude::Entity;
 use rand::Rng;
 
 use crate::ai::considerations::LandmarkAnchor;
-use crate::ai::dse::EvalCtx;
+use crate::ai::dse::{DseId, EvalCtx};
 use crate::ai::eval::{evaluate_single, DseRegistry, ModifierPipeline};
 use crate::ai::Action;
 use crate::components::mental::{Memory, MemoryType};
@@ -1708,6 +1709,24 @@ pub fn apply_carry_affinity(
 /// Returns a [`ScoringResult`] containing `(Action, score)` pairs and an
 /// optional herbcraft sub-mode hint. Higher score = more preferred.
 /// The caller should pass the scores to [`select_best_action`].
+///
+/// Ticket 438 — Dispatcher retired. Pre-438 this function was a hand-
+/// written switch with one `score_dse_by_id(<id>, ...)` branch per
+/// `Action` variant; registering a DSE in `populate_dse_registry`
+/// without adding the matching branch was a silent failure (tickets
+/// 436 / 437 diagnosed and patched the dry_food / smoke_meat /
+/// tend_smoking_rack instance). Post-438 the body iterates
+/// `inputs.dse_registry.cat_dses` directly — each `CatDse` declares
+/// its own `Action` variant + `always_emit_zero` flag at the type
+/// level, and the registration site (`populate_dse_registry`) is the
+/// sole place that decides which DSEs participate in scoring. Outer
+/// gates that aren't expressible as `EligibilityFilter` predicates
+/// (composite OR/AND, continuous thresholds, side-effect-bearing
+/// flag writes) live in [`PRE_DISPATCH_GATES`] / [`POST_EVAL_HOOKS`]
+/// keyed by `DseId`. The registration order in `populate_dse_registry`
+/// is load-bearing for seed-42 determinism (it sets the jitter-call
+/// sequence) and was reordered in the 438 commit to match the pre-
+/// retirement `score_actions` dispatch order exactly.
 pub fn score_actions(
     ctx: &ScoringContext,
     inputs: &EvalInputs,
@@ -1735,472 +1754,44 @@ pub fn score_actions(
     // that rode this branch. The `ScoringContext.is_incapacitated`
     // field is retained for non-scoring consumers.
 
-    // --- Eat (§2.3 hangry anchor: Logistic(8, 0.5), recalibrated ticket 044) ---
-    // §4 (Phase 4b.2) retired the outer `ctx.food_available` gate. The
-    // Eat DSE's `.require("HasStoredFood")` eligibility filter resolves
-    // against `EvalInputs::markers` (populated by the caller from
-    // `FoodStores`), returning 0 when the colony has no food.
-    {
-        let urgency = score_dse_by_id("eat", ctx, inputs, &mut scalars);
-        if urgency > 0.0 {
-            scores.push((Action::Eat, urgency + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Sleep (§2.3: WS of energy_deficit + day_phase + injury_rest) ---
-    // The additive-not-multiplicative semantic noted in the old
-    // inline comment is preserved by WS composition — Sleep remains
-    // available as a pressure-release valve at low energy even
-    // during feeding peaks.
-    {
-        let score = score_dse_by_id("sleep", ctx, inputs, &mut scalars);
-        scores.push((Action::Sleep, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Hunt (§2.3: WS of hunger + scarcity + boldness + prey_nearby) ---
-    // §4 batch 2: inline `ctx.can_hunt` gate retired — HuntDse carries
-    // `.require(CanHunt::KEY)`; score_dse_by_id returns 0 on ineligibility.
-    {
-        let urgency = score_dse_by_id("hunt", ctx, inputs, &mut scalars);
-        if urgency > 0.0 {
-            scores.push((Action::Hunt, urgency + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Forage (§2.3: WS of hunger + scarcity + diligence) ---
-    // §4 batch 2: inline `ctx.can_forage` gate retired — ForageDse carries
-    // `.require(CanForage::KEY)`.
-    {
-        let urgency = score_dse_by_id("forage", ctx, inputs, &mut scalars);
-        if urgency > 0.0 {
-            scores.push((Action::Forage, urgency + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Socialize (§2.3: WS of 6 axes through loneliness + inverted_need_penalty) ---
-    if ctx.has_social_target {
-        let score = score_dse_by_id("socialize", ctx, inputs, &mut scalars);
-        scores.push((Action::Socialize, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Groom (158 / §L2.10.10 Phase 3d): sibling DSEs emit distinct
-    // Action variants. The L3 softmax picks GroomSelf vs GroomOther
-    // directly — no `Max`-collapse, no side-channel `self_groom_won`
-    // resolver. Each Action routes via `from_action` to its own
-    // DispositionKind (GroomSelf → Resting, GroomOther → Grooming).
-    {
-        let self_score = score_dse_by_id("groom_self", ctx, inputs, &mut scalars);
-        scores.push((Action::GroomSelf, self_score + jitter(rng, s.jitter_range)));
-    }
-    if ctx.has_social_target {
-        let other_score = score_dse_by_id("groom_other", ctx, inputs, &mut scalars);
-        scores.push((
-            Action::GroomOther,
-            other_score + jitter(rng, s.jitter_range),
-        ));
-    }
-
-    // 035: Bury — gate on the HasUnburiedCorpse substrate marker so
-    // the action is only added to the L3 pool when there's an
-    // unburied colony-mate corpse in range. The DSE's own
-    // EligibilityFilter requires the same marker, so the score would
-    // be 0 anyway, but gating here keeps the L3 softmax pool size
-    // stable for cats with no nearby corpses (preserves seed-42
-    // softmax-mass distributions).
-    if inputs
-        .markers
-        .has(crate::components::markers::HasUnburiedCorpse::KEY, inputs.cat)
-    {
-        let score = score_dse_by_id("bury", ctx, inputs, &mut scalars);
-        scores.push((Action::Bury, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Explore (§2.3: CP of curiosity + unexplored_nearby) ---
-    {
-        let score = score_dse_by_id("explore", ctx, inputs, &mut scalars);
-        scores.push((Action::Explore, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Wander (§2.3: WS of curiosity + base_rate + playfulness) ---
-    {
-        let score = score_dse_by_id("wander", ctx, inputs, &mut scalars);
-        scores.push((Action::Wander, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Flee (§2.3: CP of safety_deficit + boldness_inverse) ---
-    if ctx.has_threat_nearby || ctx.needs.safety < s.flee_safety_threshold {
-        let score = score_dse_by_id("flee", ctx, inputs, &mut scalars);
-        scores.push((Action::Flee, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Fight (§2.3: WS of boldness + combat + health + safety + ally_count) ---
-    // Outer gate retains the original `has_threat_nearby && allies ≥
-    // min` precondition. Inside the DSE: the `fight_gating` Piecewise
-    // curve on the health + safety axes encodes the old suppression
-    // thresholds (drops to ~0.2 at health < 0.3, saturates at
-    // health ≥ 0.5) — no external `health_factor` / `safety_factor`
-    // multipliers needed.
-    if ctx.has_threat_nearby && ctx.allies_fighting_threat >= s.fight_min_allies {
-        let score = score_dse_by_id("fight", ctx, inputs, &mut scalars);
-        scores.push((Action::Fight, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Patrol (§2.3: CP of safety_deficit + boldness) ---
-    if ctx.needs.safety < s.patrol_safety_threshold {
-        let score = score_dse_by_id("patrol", ctx, inputs, &mut scalars);
-        scores.push((Action::Patrol, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Build (§2.3: WS of diligence + site_presence + repair_presence) ---
-    if ctx.has_construction_site || ctx.has_damaged_building {
-        let score = score_dse_by_id("build", ctx, inputs, &mut scalars);
-        scores.push((Action::Build, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Farm (§2.3: CP of food_scarcity + diligence) ---
-    // §4 (Phase 4b.4): the outer `ctx.has_garden` gate retires — the
-    // Farm DSE's `.require("HasGarden")` eligibility filter resolves
-    // against the `HasGarden` colony marker populated by the caller.
-    {
-        let urgency = score_dse_by_id("farm", ctx, inputs, &mut scalars);
-        if urgency > 0.0 {
-            scores.push((Action::Farm, urgency + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Herbcraft (§L2.10.10 sibling split: gather + prepare + ward) ---
-    // Each sub-mode's base score comes from its sibling DSE; the
-    // retired `ward_corruption_emergency_bonus` flat additive (Phase
-    // 4.2 ported it to a modifier; §13.1 retired the modifier) is
-    // absorbed into the Logistic(8, 0.1) axis on
-    // `territory_max_corruption` inside both `herbcraft_gather` and
-    // `herbcraft_ward`. The siege bonus remains inline — it's a
-    // narrower-scope siege response, not a corruption trigger.
-    // 155: the post-softmax `herbcraft_hint` / `magic_hint` tournament
-    // retired in favor of per-sub-action L3 entries.
-    // --- Herbcraft (§155: 3-way sibling split) ---
-    // Each sub-DSE pushes its own (sub-Action, score) pair into the
-    // L3 softmax pool. The post-softmax tournament that picked a
-    // hint between gather / prepare / ward retired — softmax now
-    // picks the sub-action directly.
-    {
-        let gather = if ctx.has_herbs_nearby {
-            score_dse_by_id("herbcraft_gather", ctx, inputs, &mut scalars)
-        } else {
-            0.0
-        };
-        if gather > 0.0 {
-            scores.push((
-                Action::HerbcraftGather,
-                gather + jitter(rng, s.jitter_range),
-            ));
-        }
-        let prepare = if ctx.has_remedy_herbs && ctx.colony_injury_count > 0 {
-            score_dse_by_id("herbcraft_prepare", ctx, inputs, &mut scalars)
-        } else {
-            0.0
-        };
-        if prepare > 0.0 {
-            scores.push((
-                Action::HerbcraftRemedy,
-                prepare + jitter(rng, s.jitter_range),
-            ));
-        }
-        // §4 batch 2: inline `ctx.has_ward_herbs` gate retired —
-        // HerbcraftWardDse carries `.require(CanWardFromSupply::KEY)`
-        // (084 Commit 2; previously CanWard) which expands the gate to
-        // Adult ∧ ¬Injured ∧ (HasWardHerbs ∨ HasStoredThornbriar).
-        let mut ward = score_dse_by_id("herbcraft_ward", ctx, inputs, &mut scalars);
-        if ward > 0.0 && ctx.wards_under_siege {
-            ward += s.herbcraft_ward_siege_bonus * ctx.needs.tier_suppression(2);
-        }
-        if ward > 0.0 {
-            scores.push((Action::HerbcraftSetWard, ward + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- PracticeMagic (§155: 6-way sibling split) ---
-    // Outer gate: `magic_affinity + magic_skill > thresholds`.
-    // Each sub-DSE pushes its own (sub-Action, score) pair. The
-    // post-softmax tournament that picked a hint between scry /
-    // durable_ward / cleanse / colony_cleanse / harvest / commune
-    // retired — softmax now picks the sub-action directly.
-    if ctx.magic_affinity > s.magic_affinity_threshold && ctx.magic_skill > s.magic_skill_threshold
-    {
-        let scry = score_dse_by_id("magic_scry", ctx, inputs, &mut scalars);
-        if scry > 0.0 {
-            scores.push((Action::MagicScry, scry + jitter(rng, s.jitter_range)));
-        }
-        let durable_ward = if ctx.magic_skill > s.magic_durable_ward_skill_threshold {
-            score_dse_by_id("magic_durable_ward", ctx, inputs, &mut scalars)
-        } else {
-            0.0
-        };
-        if durable_ward > 0.0 {
-            scores.push((
-                Action::MagicDurableWard,
-                durable_ward + jitter(rng, s.jitter_range),
-            ));
-        }
-        let cleanse = if ctx.on_corrupted_tile
-            && ctx.tile_corruption > s.magic_cleanse_corruption_threshold
-        {
-            score_dse_by_id("magic_cleanse", ctx, inputs, &mut scalars)
-        } else {
-            0.0
-        };
-        if cleanse > 0.0 {
-            scores.push((Action::MagicCleanse, cleanse + jitter(rng, s.jitter_range)));
-        }
-        let colony_cleanse = score_dse_by_id("magic_colony_cleanse", ctx, inputs, &mut scalars);
-        if colony_cleanse > 0.0 {
-            scores.push((
-                Action::MagicColonyCleanse,
-                colony_cleanse + jitter(rng, s.jitter_range),
-            ));
-        }
-        let harvest = if ctx.carcass_nearby {
-            score_dse_by_id("magic_harvest", ctx, inputs, &mut scalars)
-        } else {
-            0.0
-        };
-        if harvest > 0.0 {
-            scores.push((Action::MagicHarvest, harvest + jitter(rng, s.jitter_range)));
-        }
-        let commune = if ctx.on_special_terrain {
-            score_dse_by_id("magic_commune", ctx, inputs, &mut scalars)
-        } else {
-            0.0
-        };
-        if commune > 0.0 {
-            scores.push((Action::MagicCommune, commune + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Coordinate (§2.3: WS of diligence + directive_count + ambition) ---
-    // §4 batch 1: inline `if ctx.is_coordinator_with_directives` guard
-    // retired. The coordinate DSE now carries
-    // `.require("IsCoordinatorWithDirectives")` on its EligibilityFilter,
-    // so `score_dse_by_id` returns 0.0 for non-coordinator cats.
-    {
-        let score = score_dse_by_id("coordinate", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::Coordinate, score + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Mentor (§2.3: WS of warmth + diligence + ambition) ---
-    // Ticket 014 Mentoring batch: inline `if ctx.has_mentoring_target`
-    // guard retired. `MentorDse` now carries
-    // `.require(HasMentoringTarget::KEY)` on its EligibilityFilter, so
-    // `score_dse_by_id` returns 0.0 for cats with no mentoring target.
-    // (Mirrors the `mate` retire pattern below.)
-    {
-        let score = score_dse_by_id("mentor", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::Mentor, score + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Mate (§2.3: CP of mating_deficit + warmth — Logistic(6, 0.6)) ---
-    // Ticket 027 Bug 2: inline `if ctx.has_eligible_mate` guard
-    // retired. The mate DSE now carries `.require(HasEligibleMate::KEY)`
-    // on its EligibilityFilter, so `score_dse_by_id` returns 0.0 for
-    // cats without the marker. (Mirrors the `coordinate` retire pattern
-    // ~20 lines above.)
-    {
-        let urgency = score_dse_by_id("mate", ctx, inputs, &mut scalars);
-        if urgency > 0.0 {
-            scores.push((Action::Mate, urgency + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Cook (food-production tier; requires a Kitchen, raw food, and the
-    //     cat not to be on the verge of starvation). Diligent cats cook more,
-    //     and urgency scales with food scarcity — cooking is the colony's
-    //     food-buffer multiplier, analogous to Farm. Tier 2 suppression
-    //     (phys only) matches Hunt/Forage: a fed cat will cook; an exhausted
-    //     cat will still sleep first, but safety doesn't gate the action.
-    //     Receives a directive bonus if a `DirectiveKind::Cook` is active.
-    //
-    // §4 marker eligibility (Phase 4b.5): `CookDse` now carries
-    // `.require("HasFunctionalKitchen").require("HasRawFoodInStores")`;
-    // the outer `cook_base_conditions && ctx.has_functional_kitchen`
-    // gate retires. The `hunger > cook_hunger_gate` threshold is a
-    // §4.5 scalar precondition and stays as an inline wrap so a
-    // *starving* cat doesn't wander off to the Kitchen instead of
-    // eating — the gate fires only when the cat is at-least-half-full
-    // (canonical semantic: `hunger=1.0` is sated, `hunger=0.0` is
-    // starving, so `hunger > cook_hunger_gate (0.5)` means "hunger has
-    // some headroom"). See sim_constants doc on `cook_hunger_gate`.
-    // The `wants_cook_but_no_kitchen` latent signal (read by
-    // BuildPressure in `goap.rs`) is preserved by disambiguating the
-    // zero-score case against the raw ScoringContext booleans — "raw
-    // food is present but no kitchen" is still the only trigger.
-    //
-    // 150 hygiene: comment polarity corrected from the pre-150 wording
-    // "so Cook isn't scored while the cat is stuffed" — that read as
-    // the opposite of what the gate does. The variable name
-    // `hungry_enough_to_cook` is also misleading (it actually means
-    // "satiated enough to cook"); the SimConstants doc on
-    // `cook_hunger_gate` is the authoritative reference.
-    let hungry_enough_to_cook = ctx.needs.hunger > s.cook_hunger_gate;
     let mut wants_cook_but_no_kitchen = false;
-    if hungry_enough_to_cook {
-        let score = score_dse_by_id("cook", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::Cook, score + jitter(rng, s.jitter_range)));
-        } else if ctx.has_raw_food_in_stores && !ctx.has_functional_kitchen {
-            wants_cook_but_no_kitchen = true;
-        }
-    }
+    let pre_gates = pre_dispatch_gates();
+    let post_hooks = post_eval_hooks();
 
-    // --- 367 Phase-1b preservation dispatch (ticket 437) ---
-    // Three thin pass-through branches that route the registered Phase-1b
-    // DSEs into the L2/L3 pool. No outer gate: preservation is buffer-
-    // building tier-2, not tied to a hunger / kitchen / rack-load
-    // precondition at this layer — each DSE's EligibilityFilter already
-    // gates internally (`CanDry` + `HasFunctionalDryingRack` +
-    // `HasDryableAccessible` for DryFood; siblings analogous). The shape
-    // mirrors the bare branches above (Eat / Sleep / Forage /
-    // Socialize / GroomSelf / etc.) — not the Cook branch's
-    // hunger-gated form, because no analogous precondition exists.
-    //
-    // Precedent: ticket 436's scenario isolated this gap. Pre-437,
-    // `dry_food` / `smoke_meat` / `tend_smoking_rack` were registered
-    // in `populate_dse_registry` but never invoked here, so their
-    // Action variants never reached softmax and the substrate-side
-    // eligibility filter was never consulted. The L2 trace surfaced
-    // the gap as missing-row-entirely (not even `eligible: false`,
-    // because the ineligible-capture path lives inside score_dse_by_id).
-    //
-    // Smoking-side empirical fire-rate stays gated on 367 Commit 10
-    // (multi-ingredient retrieve mirror for `smoking_meat_actions`);
-    // dispatch alone restores the ability to score, not the realised
-    // load rate.
-    {
-        let score = score_dse_by_id("dry_food", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::DryFood, score + jitter(rng, s.jitter_range)));
+    for dse in &inputs.dse_registry.cat_dses {
+        let id = dse.id();
+        // Outer gate: composite / threshold / side-effect-bearing
+        // predicates that can't (or shouldn't) move into the DSE's
+        // EligibilityFilter live here. Most cat DSEs have no entry;
+        // their eligibility filter is the sole gate.
+        if let Some(gate) = pre_gates.get(&id) {
+            if !gate(ctx, inputs) {
+                continue;
+            }
         }
-    }
-    {
-        let score = score_dse_by_id("smoke_meat", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::SmokeMeat, score + jitter(rng, s.jitter_range)));
+        let mut score = score_dse_by_id(id.0, ctx, inputs, &mut scalars);
+        // Post-evaluation hooks: pre-438 inline tweaks that mutated the
+        // raw DSE score (HerbcraftWard siege bonus, Caretake durable-
+        // commitment lift) or wrote latent signals back to ScoringResult
+        // (Cook's wants_cook_but_no_kitchen).
+        if let Some(hook) = post_hooks.get(&id) {
+            score = hook(
+                score,
+                ctx,
+                inputs,
+                &mut PostEvalSink {
+                    wants_cook_but_no_kitchen: &mut wants_cook_but_no_kitchen,
+                },
+            );
         }
-    }
-    {
-        let score = score_dse_by_id("tend_smoking_rack", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::TendSmokingRack, score + jitter(rng, s.jitter_range)));
+        let emit = if dse.always_emit_zero() {
+            true
+        } else {
+            score > 0.0
+        };
+        if emit {
+            scores.push((dse.action(), score + jitter(rng, s.jitter_range)));
         }
-    }
-
-    // --- Caretake (§2.3: WS of kitten_urgency + compassion + is_parent) ---
-    // Ticket 397 Layer 1 — Caretake enters the L2 pool every tick the cat
-    // structurally has a dependent kitten (`Parent` marker), not only when
-    // an acutely hungry kitten clears the upstream
-    // `caretake_resolution.urgency > 0` gate. Per §L2.10.4, the candidate
-    // pool for the L3 softmax is *all* DSEs whose emit preconditions hold —
-    // and Caretake's emit precondition is "this cat is in a position to
-    // caretake," i.e., has a dependent. Pool-entry vs score magnitude are
-    // distinct concerns: when no kitten is in acute hunger, the existing
-    // `kitten_urgency` axis (Quadratic-amplified hunger deficit at weight
-    // 0.45) keeps the score modest (~compassion-only); Caretake competes
-    // gracefully in softmax without forcing a firing.
-    //
-    // The `hungry_kitten_urgency > 0.0` branch is retained so non-parent
-    // adults responding to colony-kittens (Phase 4c.4 alloparenting
-    // pattern, kinship Cliff non-parent floor 0.6) still enter the pool
-    // under the original signal.
-    //
-    // Ticket 397 Layer 2 — durable-commitment L2 lift. When the cat is
-    // structurally inside a rear_kitten arc window
-    // (`HasJuvenileDependent` marker — set by
-    // `growth::update_parent_markers` during the early window
-    // [0, teach_done) and near-mature window [release_threshold, 1.0)),
-    // bias Caretake's L2 score so it competes with the rest of the cat's
-    // per-tick DSEs. This is the "L2 lift" the user described in
-    // planning ("the cat sees the L1 stimuli but she also knows she
-    // wants to take care of her kitten"). Approximates the spec's full
-    // §L2.10.6 softmax-over-Intentions composition for the narrow
-    // rear_kitten case — the durable commitment manifests as additive
-    // score bias on the corresponding DSE, not as a hard frame-pin that
-    // discards softmax winners. The pin still fires for the
-    // Wean/Teach/Release primitives during the idle space (Layer 3's
-    // pin-Caretake-preempts guard kicks in only when Caretake wins
-    // softmax). Magnitude derived from the observed Cook−Caretake L2
-    // score gap in Pebblekit-67's window (Cook avg 0.355, Caretake avg
-    // 0.101 post-Layer-1 baseline): +0.25 brings Caretake to ~0.35 at
-    // the floor (no acute hunger) and climbs naturally above competitor
-    // DSEs as kitten hunger axis amplifies. Tunable via
-    // `ScoringConstants::rear_kitten_caretake_lift`; balance-doc
-    // iteration after first soak surfaces a tuned value if needed.
-    let has_dependent_kitten =
-        inputs.markers.has(crate::components::markers::Parent::KEY, inputs.cat);
-    if has_dependent_kitten || ctx.hungry_kitten_urgency > 0.0 {
-        let mut score = score_dse_by_id("caretake", ctx, inputs, &mut scalars);
-        if inputs
-            .markers
-            .has(crate::components::markers::HasJuvenileDependent::KEY, inputs.cat)
-        {
-            score = (score + s.rear_kitten_caretake_lift).clamp(0.0, 1.0);
-        }
-        scores.push((Action::Caretake, score + jitter(rng, s.jitter_range)));
-    }
-
-    // --- Disposal DSEs (178: lifted from default-zero) ---
-    // All four DSE entries dispatch through `score_dse_by_id` so the
-    // L2/L3 plumbing is uniform across the disposal substrate.
-    // Eligibility filters keep behaviour conservative:
-    //
-    // - **Discarding** / **Trashing** (178) — gate on
-    //   `ColonyStoresChronicallyFull` so cats don't dispose of food
-    //   the colony's Stores could still accept. Trashing additionally
-    //   gates on `HasMidden`.
-    // - **Handing** (deferred to 188; renamed in 410) — gates on
-    //   `HasDependentCat` (authored by the target picker; co-gates
-    //   Caretake as of 410).
-    // - **PickingUp** (deferred to 185) — gates on `HasGroundCarcass`
-    //   (authored by 185's sensing extension).
-    //
-    // Pre-substrate the Handing / PickingUp eligibility filters reject
-    // every cat — the §3.5.1 modifier pipeline never sees their curves
-    // and doesn't lift default-zero scores into the L3 pool.
-    {
-        let score = score_dse_by_id("discard", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::Drop, score + jitter(rng, s.jitter_range)));
-        }
-    }
-    {
-        let score = score_dse_by_id("trash", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::Trash, score + jitter(rng, s.jitter_range)));
-        }
-    }
-    {
-        let score = score_dse_by_id("handoff", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::Handoff, score + jitter(rng, s.jitter_range)));
-        }
-    }
-    {
-        let score = score_dse_by_id("pick_up", ctx, inputs, &mut scalars);
-        if score > 0.0 {
-            scores.push((Action::PickUp, score + jitter(rng, s.jitter_range)));
-        }
-    }
-
-    // --- Idle (§2.3: WS of base_rate + incuriosity + playfulness_invert) ---
-    // The always-available fallback. The base_rate axis's Linear
-    // intercept carries `idle_base` and ClampMin floors at
-    // `idle_minimum_floor` — post-composition floor per §2.3 baked
-    // into the base axis rather than a §3.5 modifier.
-    {
-        let score = score_dse_by_id("idle", ctx, inputs, &mut scalars);
-        scores.push((Action::Idle, score + jitter(rng, s.jitter_range)));
     }
 
     // §3.5 post-scoring modifiers previously ran as imperative passes
@@ -2217,6 +1808,181 @@ pub fn score_actions(
         scores,
         wants_cook_but_no_kitchen,
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pre-dispatch gates + post-eval hooks (ticket 438)
+// ---------------------------------------------------------------------------
+
+/// Outer gate consulted before `score_dse_by_id`. Returning `false`
+/// skips scoring for this DSE — matches the pre-438 short-circuit
+/// pattern (no `score_dse_by_id` call, no jitter draw, no push).
+/// Composite (OR / AND), continuous-threshold, and side-effect-bearing
+/// gates that can't (or shouldn't) move into the DSE's
+/// [`crate::ai::dse::EligibilityFilter`] live here.
+pub type PreDispatchGate = fn(&ScoringContext, &EvalInputs) -> bool;
+
+/// Post-evaluation hook. Receives the raw DSE score and may mutate it
+/// (e.g. HerbcraftWard's siege bonus, Caretake's durable-commitment
+/// lift) or write a latent signal back to `ScoringResult` via the
+/// [`PostEvalSink`] (Cook's `wants_cook_but_no_kitchen` flag).
+pub type PostEvalHook = fn(f32, &ScoringContext, &EvalInputs, &mut PostEvalSink) -> f32;
+
+/// Mutable handles passed to a [`PostEvalHook`] so it can write latent
+/// signals back into the in-progress [`ScoringResult`]. Kept as a
+/// struct of `&mut` field references rather than `&mut ScoringResult`
+/// because the in-progress result still has its `scores` vec being
+/// pushed-into in the outer loop — keeping the borrows disjoint.
+pub struct PostEvalSink<'a> {
+    pub wants_cook_but_no_kitchen: &'a mut bool,
+}
+
+/// Shared §155 PracticeMagic outer-gate predicate — `magic_affinity >
+/// threshold AND magic_skill > threshold`. Hoisted to a free fn so
+/// each `PreDispatchGate` closure stays capture-free (the `fn`-pointer
+/// alias only accepts non-capturing closures).
+fn magic_outer(ctx: &ScoringContext) -> bool {
+    ctx.magic_affinity > ctx.scoring.magic_affinity_threshold
+        && ctx.magic_skill > ctx.scoring.magic_skill_threshold
+}
+
+/// Lazy-initialized `DseId → PreDispatchGate` table. `BTreeMap` rather
+/// than `HashMap` so iteration order is deterministic (matters when a
+/// future caller walks the table; lookups by key are unaffected).
+fn pre_dispatch_gates() -> &'static BTreeMap<DseId, PreDispatchGate> {
+    static TABLE: OnceLock<BTreeMap<DseId, PreDispatchGate>> = OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut t: BTreeMap<DseId, PreDispatchGate> = BTreeMap::new();
+        // Socialize / GroomOther (§2.3): cat needs a visible peer.
+        // The marker writer is `goap.rs::evaluate_and_plan` setting
+        // `HasSocialTarget` per-entity. Kept in the pre-dispatch table
+        // (not migrated to `.require()` in this PR) so seed-42 is
+        // preserved byte-for-byte — follow-on ticket lifts the gate.
+        t.insert(DseId("socialize"), |ctx, _| ctx.has_social_target);
+        t.insert(DseId("groom_other"), |ctx, _| ctx.has_social_target);
+        // Bury: pre-438 the outer gate was redundant with BuryDse's
+        // own `.require(HasUnburiedCorpse::KEY)` filter (035), but
+        // kept inline to preserve L3 softmax pool stability — the
+        // filter rejects post-eligibility while the outer gate
+        // rejects pre-eligibility, which changes pool size for cats
+        // with no corpses. Mirror the pool-stability semantic here.
+        t.insert(DseId("bury"), |_, inputs| {
+            inputs
+                .markers
+                .has(crate::components::markers::HasUnburiedCorpse::KEY, inputs.cat)
+        });
+        // Flee: `has_threat_nearby OR safety_deficit > flee_safety_threshold`.
+        // Composite OR with one threshold-on-continuous arm — not a
+        // single-marker filter.
+        t.insert(DseId("flee"), |ctx, _| {
+            ctx.has_threat_nearby || ctx.needs.safety < ctx.scoring.flee_safety_threshold
+        });
+        // Fight: `has_threat_nearby AND allies >= fight_min_allies`.
+        // Composite AND with an integer-threshold arm.
+        t.insert(DseId("fight"), |ctx, _| {
+            ctx.has_threat_nearby
+                && ctx.allies_fighting_threat >= ctx.scoring.fight_min_allies
+        });
+        // Patrol: continuous-threshold-only — `safety < patrol_safety_threshold`.
+        t.insert(DseId("patrol"), |ctx, _| {
+            ctx.needs.safety < ctx.scoring.patrol_safety_threshold
+        });
+        // Build: composite OR over two markers (HasConstructionSite,
+        // HasDamagedBuilding). `EligibilityFilter::required` is AND-of-
+        // markers; an OR primitive doesn't exist yet.
+        t.insert(DseId("build"), |ctx, _| {
+            ctx.has_construction_site || ctx.has_damaged_building
+        });
+        // Herbcraft sub-DSEs: each carries its own context precondition
+        // (proximity / inventory / colony-injury count).
+        t.insert(DseId("herbcraft_gather"), |ctx, _| ctx.has_herbs_nearby);
+        t.insert(DseId("herbcraft_prepare"), |ctx, _| {
+            ctx.has_remedy_herbs && ctx.colony_injury_count > 0
+        });
+        // PracticeMagic — shared outer gate on innate affinity + trained
+        // skill (`magic_outer`); sub-DSEs add their own inner conditions
+        // (corruption / carcass / special-terrain / skill-threshold).
+        // Outer condition hoisted to a free fn at module scope so each
+        // closure stays capture-free (PreDispatchGate is an `fn` pointer).
+        t.insert(DseId("magic_scry"), |ctx, _| magic_outer(ctx));
+        t.insert(DseId("magic_durable_ward"), |ctx, _| {
+            magic_outer(ctx) && ctx.magic_skill > ctx.scoring.magic_durable_ward_skill_threshold
+        });
+        t.insert(DseId("magic_cleanse"), |ctx, _| {
+            magic_outer(ctx)
+                && ctx.on_corrupted_tile
+                && ctx.tile_corruption > ctx.scoring.magic_cleanse_corruption_threshold
+        });
+        t.insert(DseId("magic_colony_cleanse"), |ctx, _| magic_outer(ctx));
+        t.insert(DseId("magic_harvest"), |ctx, _| {
+            magic_outer(ctx) && ctx.carcass_nearby
+        });
+        t.insert(DseId("magic_commune"), |ctx, _| {
+            magic_outer(ctx) && ctx.on_special_terrain
+        });
+        // Cook: hunger threshold gate. The §4.5 scalar precondition
+        // means a starving cat doesn't wander off to the Kitchen
+        // instead of eating. The post-eval hook below writes the
+        // `wants_cook_but_no_kitchen` latent signal (read by
+        // BuildPressure in goap.rs).
+        t.insert(DseId("cook"), |ctx, _| {
+            ctx.needs.hunger > ctx.scoring.cook_hunger_gate
+        });
+        // Caretake (397 Layer 1): structural Parent marker OR acute
+        // kitten-urgency. Post-eval hook below adds the durable-
+        // commitment L2 lift when HasJuvenileDependent is present.
+        t.insert(DseId("caretake"), |ctx, inputs| {
+            inputs.markers.has(crate::components::markers::Parent::KEY, inputs.cat)
+                || ctx.hungry_kitten_urgency > 0.0
+        });
+        t
+    })
+}
+
+/// Lazy-initialized `DseId → PostEvalHook` table.
+fn post_eval_hooks() -> &'static BTreeMap<DseId, PostEvalHook> {
+    static TABLE: OnceLock<BTreeMap<DseId, PostEvalHook>> = OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut t: BTreeMap<DseId, PostEvalHook> = BTreeMap::new();
+        // HerbcraftWard siege bonus — narrower-scope siege response
+        // applied post-DSE as a fixed additive (not a Modifier-pipeline
+        // entry) because the bonus is gated on `wards_under_siege`,
+        // which is a colony-level transient state not folded into the
+        // DSE's per-cat consideration scalars.
+        t.insert(DseId("herbcraft_ward"), |score, ctx, _, _| {
+            if score > 0.0 && ctx.wards_under_siege {
+                score + ctx.scoring.herbcraft_ward_siege_bonus * ctx.needs.tier_suppression(2)
+            } else {
+                score
+            }
+        });
+        // Cook — write `wants_cook_but_no_kitchen` when the DSE rejects
+        // (no functional kitchen) but the cat would have desired Cook
+        // (raw food present). Read by BuildPressure in `goap.rs` to
+        // trigger Kitchen construction.
+        t.insert(DseId("cook"), |score, ctx, _, sink| {
+            if score == 0.0 && ctx.has_raw_food_in_stores && !ctx.has_functional_kitchen {
+                *sink.wants_cook_but_no_kitchen = true;
+            }
+            score
+        });
+        // Caretake — durable-commitment L2 lift (§397 Layer 2). When
+        // the cat is in a `rear_kitten` arc window (HasJuvenileDependent
+        // set by `growth::update_parent_markers`), bias Caretake's L2
+        // score so it competes with per-tick DSEs. Clamped at the WS
+        // composition ceiling [0.0, 1.0] per learning_clowder_ws_composition_ceiling.
+        t.insert(DseId("caretake"), |score, ctx, inputs, _| {
+            if inputs
+                .markers
+                .has(crate::components::markers::HasJuvenileDependent::KEY, inputs.cat)
+            {
+                (score + ctx.scoring.rear_kitten_caretake_lift).clamp(0.0, 1.0)
+            } else {
+                score
+            }
+        });
+        t
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -2731,9 +2497,12 @@ pub fn select_disposition_via_intention_softmax_with_trace(
     rng: &mut impl Rng,
     mut sink: Option<&mut SoftmaxCapture>,
 ) -> SoftmaxOutcome {
-    // Build the filtered pool: drop Idle (no-op, not a disposition) and
-    // any zero-scoring actions (the legacy `aggregate_to_dispositions`
-    // also drops zero-scoring dispositions).
+    // Build the filtered pool: drop Idle (no-op, not a disposition),
+    // drop Hide (anxiety-interrupt class — set via a modifier-pipeline
+    // valence, not via L3 softmax selection — has no `DispositionKind`
+    // and would silently mis-fire as Resting), and any zero-scoring
+    // actions (the legacy `aggregate_to_dispositions` also drops
+    // zero-scoring dispositions).
     //
     // 252: `Action::Flee` was previously filtered here as a substrate-stub
     // artifact from when Flee was behavior-gate-only (Fight→Flee swap on
@@ -2744,9 +2513,20 @@ pub fn select_disposition_via_intention_softmax_with_trace(
     // making both writers dead code in cats. The lift restores the
     // substrate-driven Flee election path so the threat substrate can
     // compete on equal footing with every other Action.
+    //
+    // Ticket 438 added Hide to the filter alongside Idle. Pre-438 Hide
+    // was never in the L2 score pool (never dispatched in `score_actions`
+    // — silent registration gap closed by the registry-iterating loop).
+    // Post-438 Hide IS scored and surfaces in `last_scores` / focal L2
+    // traces, but the L3 softmax cannot legitimately select it because
+    // `DispositionKind::from_action(Action::Hide) == None` and the
+    // anxiety-interrupt activation path (modifier 105 / 142) is the
+    // designated wiring per the Phase 1 design (104). Filtering here
+    // keeps Hide's score informational for tuning + balance work
+    // without letting it silently mis-execute as Resting.
     let mut pool: Vec<(Action, f32)> = scores
         .iter()
-        .filter(|(a, s)| !matches!(a, Action::Idle) && *s > 0.0)
+        .filter(|(a, s)| !matches!(a, Action::Idle | Action::Hide) && *s > 0.0)
         .copied()
         .collect();
 

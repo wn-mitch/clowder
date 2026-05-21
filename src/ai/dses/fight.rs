@@ -125,8 +125,14 @@ impl Dse for FightDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for FightDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Fight
+    }
+}
 
-pub fn fight_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn fight_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(FightDse::new(scoring))
 }
 
@@ -199,3 +205,10 @@ mod tests {
         assert!((c.evaluate(1.0) - 1.0).abs() < 0.01);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static FIGHT_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1200,
+        construct: |s| fight_dse(s),
+    };

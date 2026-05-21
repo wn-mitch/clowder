@@ -162,8 +162,14 @@ impl Dse for FarmDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for FarmDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Farm
+    }
+}
 
-pub fn farm_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn farm_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(FarmDse::new(scoring))
 }
 
@@ -208,3 +214,10 @@ mod tests {
         assert_eq!(dse.composition().weights.len(), dse.considerations().len());
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static FARM_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1600,
+        construct: |s| farm_dse(s),
+    };

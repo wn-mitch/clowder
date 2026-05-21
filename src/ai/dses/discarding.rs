@@ -84,8 +84,14 @@ impl Dse for DiscardingDse {
         1
     }
 }
+impl crate::ai::dse::CatDse for DiscardingDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Drop
+    }
+}
 
-pub fn discarding_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn discarding_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(DiscardingDse::new(scoring))
 }
 
@@ -135,3 +141,10 @@ mod tests {
         assert_eq!(DiscardingDse::new(&defaults()).maslow_tier(), 1);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static DISCARDING_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3400,
+        construct: |s| discarding_dse(s),
+    };

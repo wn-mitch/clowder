@@ -180,8 +180,14 @@ impl Dse for HerbcraftWardDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for HerbcraftWardDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::HerbcraftSetWard
+    }
+}
 
-pub fn herbcraft_ward_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn herbcraft_ward_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HerbcraftWardDse::new(scoring))
 }
 
@@ -374,3 +380,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static HERBCRAFT_WARD_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1900,
+        construct: |s| herbcraft_ward_dse(s),
+    };

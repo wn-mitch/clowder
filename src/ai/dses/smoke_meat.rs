@@ -120,8 +120,14 @@ impl Dse for SmokeMeatDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for SmokeMeatDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::SmokeMeat
+    }
+}
 
-pub fn smoke_meat_dse() -> Box<dyn Dse> {
+
+pub fn smoke_meat_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(SmokeMeatDse::new())
 }
 
@@ -158,3 +164,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static SMOKE_MEAT_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3100,
+        construct: |_| smoke_meat_dse(),
+    };

@@ -144,8 +144,14 @@ impl Dse for CoordinateDse {
         4
     }
 }
+impl crate::ai::dse::CatDse for CoordinateDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Coordinate
+    }
+}
 
-pub fn coordinate_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+
+pub fn coordinate_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CoordinateDse::new(scoring))
 }
 
@@ -182,3 +188,10 @@ mod tests {
         assert!((weights[4] - 0.10).abs() < 1e-4);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static COORDINATE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2600,
+        construct: |s| coordinate_dse(s),
+    };

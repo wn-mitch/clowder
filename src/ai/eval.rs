@@ -54,7 +54,12 @@ use super::dse::{CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, Int
 ///   vecs makes the cadence policy grep-able.
 #[derive(Resource, Default)]
 pub struct DseRegistry {
-    pub cat_dses: Vec<Box<dyn Dse>>,
+    /// Cat-side DSEs scored per-tick by `score_actions`. Typed as
+    /// `Box<dyn CatDse>` (ticket 438) so each entry declares its
+    /// `Action` variant at the type level — registering a cat DSE
+    /// without naming its Action is a compile error, closing the
+    /// silent-failure class diagnosed by ticket 436 / 437.
+    pub cat_dses: Vec<Box<dyn super::dse::CatDse>>,
     /// §6.3 target-taking DSEs. Distinct slot and type from `cat_dses`
     /// because the evaluator dispatches differently: regular Dses score
     /// once per cat-tick; target-taking DSEs iterate candidates and
@@ -80,7 +85,7 @@ impl DseRegistry {
         self.cat_dses
             .iter()
             .find(|d| d.id().0 == id)
-            .map(|boxed| boxed.as_ref())
+            .map(|boxed| boxed.as_ref() as &dyn Dse)
     }
 
     /// Find a registered fox DSE by its string id.
@@ -137,7 +142,7 @@ impl DseRegistry {
 ///
 /// Six methods cover the 45-row §L2.10.3 catalog.
 pub trait DseRegistryAppExt {
-    fn add_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self;
+    fn add_dse(&mut self, dse: Box<dyn super::dse::CatDse>) -> &mut Self;
     /// Register a §6.3 target-taking DSE. Distinct from `add_dse`
     /// because target-taking uses a struct-shape type (see
     /// [`crate::ai::target_dse::TargetTakingDse`]), not `Box<dyn Dse>`.
@@ -151,7 +156,7 @@ pub trait DseRegistryAppExt {
 }
 
 impl DseRegistryAppExt for App {
-    fn add_dse(&mut self, dse: Box<dyn Dse>) -> &mut Self {
+    fn add_dse(&mut self, dse: Box<dyn super::dse::CatDse>) -> &mut Self {
         self.world_mut()
             .get_resource_or_insert_with(DseRegistry::new)
             .cat_dses
@@ -953,6 +958,12 @@ mod tests {
         }
         fn maslow_tier(&self) -> u8 {
             self.tier
+        }
+    }
+
+    impl crate::ai::dse::CatDse for TestDse {
+        fn action(&self) -> crate::ai::Action {
+            crate::ai::Action::Idle
         }
     }
 

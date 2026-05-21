@@ -151,8 +151,14 @@ impl Dse for CookDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for CookDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Cook
+    }
+}
 
-pub fn cook_dse() -> Box<dyn Dse> {
+
+pub fn cook_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(CookDse::new())
 }
 
@@ -258,3 +264,10 @@ mod tests {
         assert!(scored.final_score > 0.0);
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static COOK_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 2900,
+        construct: |_| cook_dse(),
+    };

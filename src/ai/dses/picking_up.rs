@@ -131,8 +131,14 @@ impl Dse for PickingUpDse {
         1
     }
 }
+impl crate::ai::dse::CatDse for PickingUpDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::PickUp
+    }
+}
 
-pub fn picking_up_dse() -> Box<dyn Dse> {
+
+pub fn picking_up_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(PickingUpDse::new())
 }
 
@@ -223,3 +229,10 @@ mod tests {
         }
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static PICKING_UP_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3650,
+        construct: |_| picking_up_dse(),
+    };

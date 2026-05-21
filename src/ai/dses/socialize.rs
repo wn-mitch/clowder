@@ -192,8 +192,14 @@ impl Dse for SocializeDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for SocializeDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Socialize
+    }
+}
 
-pub fn socialize_dse() -> Box<dyn Dse> {
+
+pub fn socialize_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(SocializeDse::new())
 }
 
@@ -307,3 +313,10 @@ mod tests {
         );
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static SOCIALIZE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 500,
+        construct: |_| socialize_dse(),
+    };

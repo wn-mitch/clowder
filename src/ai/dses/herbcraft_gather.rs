@@ -126,8 +126,14 @@ impl Dse for HerbcraftGatherDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for HerbcraftGatherDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::HerbcraftGather
+    }
+}
 
-pub fn herbcraft_gather_dse() -> Box<dyn Dse> {
+
+pub fn herbcraft_gather_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HerbcraftGatherDse::new())
 }
 
@@ -175,3 +181,10 @@ mod tests {
         assert!(approx(spatial.curve.evaluate(1.0), 0.1, 1e-2));
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static HERBCRAFT_GATHER_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1700,
+        construct: |_| herbcraft_gather_dse(),
+    };

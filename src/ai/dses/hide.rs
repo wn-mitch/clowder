@@ -222,9 +222,15 @@ impl Dse for HideDse {
         2
     }
 }
+impl crate::ai::dse::CatDse for HideDse {
+    fn action(&self) -> crate::ai::Action {
+        crate::ai::Action::Hide
+    }
+}
+
 
 /// Build the Hide DSE for registration. Called once at plugin load.
-pub fn hide_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+pub fn hide_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(HideDse::new(scoring))
 }
 
@@ -395,3 +401,10 @@ mod tests {
         assert!(names.contains(&PERCEIVED_INTENT_CLARITY_INPUT));
     }
 }
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static HIDE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 1300,
+        construct: |s| hide_dse(s),
+    };
