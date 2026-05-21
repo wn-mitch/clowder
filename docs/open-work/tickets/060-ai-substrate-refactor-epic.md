@@ -43,13 +43,13 @@ this file.
 | Phase | Spec section | State | Owner ticket(s) |
 |---|---|---|---|
 | Phase 1 | §11 instrumentation | ✅ landed | (cluster-A umbrella, retired 005) |
-| Phase 2 | §5 InfluenceMap substrate | ✅ landed (substrate + Cluster B closeout); 🔄 §5.6.3 follow-ons | 006 ✅ landed (10989775), 061 ✅ landed; in flight: [062](062-prey-species-split-maps.md), [063](063-ward-strength-promotion.md), [064](064-carcass-scent-consumer-cutover.md) |
+| Phase 2 | §5 InfluenceMap substrate | ✅ landed (substrate + Cluster B closeout); 🔄 §5.6.3 follow-on | 006 ✅ landed (10989775), 061 ✅ landed; 062 ✅ landed (bdb35a8533fd); 064 ✅ landed (63cd68887c0d); open: [063](063-ward-strength-promotion.md) ready |
 | Phase 3a–3d | §2–§3 / §4 / §9 L2 substrate | ✅ landed | (retired 005) |
 | Phase 4 | §6 target-taking DSEs | ✅ landed | (retired 014) |
 | Phase 4 follow-ons | §4 / §6.5 residue | ✅ landed | 049 ✅ landed (384bf25), 050 ✅ landed (7dfa2796), 051 ✅ landed (238524ea), 052 ✅ landed (acccdc7), 065 ✅ landed |
 | Phase 5 | scattered sites + silent-advance audit | ✅ landed | (retired 005) |
 | Phase 6a | §7 commitment gate | ✅ landed | (retired 005) |
-| Phase 6b | §7.7 aspiration reconsideration | 🔄 in flight | [056](056-aspiration-compatibility-matrix.md), [055](055-mood-drift-threshold-detection.md), [058](058-tradition-unfiltered-loop-fix.md); 053 ready ([053](053-death-event-grief-emission.md)); 057 gated on 128 ([057](057-coordinator-directive-intention-strategy-row.md)); 054 retired 2026-05-14 ([landed/054](../landed/054-fate-event-vocabulary-expansion.md)) |
+| Phase 6b | §7.7 aspiration reconsideration | 🔄 in flight | 056 ✅ landed (3cc14e20d23b); open: [053](053-death-event-grief-emission.md) ready; [055](055-mood-drift-threshold-detection.md) blocked-by 344; [057](057-coordinator-directive-intention-strategy-row.md) blocked-by 128; [058](058-tradition-unfiltered-loop-fix.md) parked; 054 retired 2026-05-14 |
 | Phase 6c | §8 softmax-over-Intentions | ✅ landed | (Phase 4a, retired 014) |
 | Phase 6d | §7.W Fulfillment + axis-capture | ✅ landed | (retired 024 + 012) |
 | Phase 7 | cleanup pass | 💤 parked | [059](059-phase-7-substrate-cleanup.md) |
@@ -65,7 +65,7 @@ substrate's vocabulary and were tracked alongside it:
 |---|---|---|---|
 | §7.M Mating | three-layer model | ✅ landed | 027 ✅ landed (c182fad) |
 | Cluster C narrative | deliberation layer doctrine | ✅ landed | **007 ✅ landed** (0b072423) |
-| Cluster C substrate | BDI + JointIntention + HTN methods | ✅ landed (substrate); 🔄 sub-epic in flight | **126 ✅ landed** (6b0b8940, BDI intention substrate); **127 ✅ landed** (b5455647, joint-intention substrate); **128 🔄 in-progress** ([128](128-htn-method-composition.md) — HTN method composition sub-epic, 25 children #319-#343 opened 2026-05-14, design at [`docs/systems/htn-methods.md`](../../systems/htn-methods.md)); active sibling children: [129](129-care-dses-perceivable-intentions.md) / [130](130-trust-weighted-coordinator-momentum.md); 127 follow-ons: [274](274-co-mentoring-practice-on-jointintention-substrate.md) / [275](275-joint-cache-stocking-practice-on-jointintention-substrate.md) / [276](276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md) / [277](277-n2-joint-practices-group-hunting-kitten-circles-participants-hashsetentity-shape.md) / [278](278-asymmetric-courtship-roles-initiator-responder-on-jointintention.md) / [279](279-body-cue-driven-joint-adoption-compose-127-with-242-243.md) / [280](280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md) |
+| Cluster C substrate | BDI + JointIntention + HTN methods | ✅ landed (substrate); 🔄 sub-epic in flight | **126 ✅ landed** (6b0b8940, BDI intention substrate); **127 ✅ landed** (b5455647, joint-intention substrate); **128 🔄 in-progress** ([128](128-htn-method-composition.md) — HTN method composition sub-epic; 16/26 children landed; Batch B (323-326) + #335/#341 ready; #340 blocked-by #323; #334 blocked-by [17]); active sibling children: [129](129-care-dses-perceivable-intentions.md) / [130](130-trust-weighted-coordinator-momentum.md); 127 follow-ons: [274](274-co-mentoring-practice-on-jointintention-substrate.md) / [275](275-joint-cache-stocking-practice-on-jointintention-substrate.md) / [276](276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md) / [277](277-n2-joint-practices-group-hunting-kitten-circles-participants-hashsetentity-shape.md) / [278](278-asymmetric-courtship-roles-initiator-responder-on-jointintention.md) / [279](279-body-cue-driven-joint-adoption-compose-127-with-242-243.md) / [280](280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md) |
 | Cluster D | formalization (corruption CA, mood Markov, weather Markov) | 🔄 ready | [008](008-cluster-d-formalization-verification.md) |
 | Cluster E | world-gen pre-history fast-forward | 🔄 ready | [009](009-cluster-e-worldgen-richness.md) |
 
@@ -84,8 +84,8 @@ substrate's vocabulary and were tracked alongside it:
 | [062](062-prey-species-split-maps.md) | ✅ landed (bdb35a8533fd) | §5.6.3 #5 | Per-prey-species `PreyScentMap` split |
 | [063](063-ward-strength-promotion.md) | ready | §5.6.3 #3 | Ward-strength as first-class spatial axis |
 | [064](064-carcass-scent-consumer-cutover.md) | ✅ landed (63cd68887c0d) | §5.6.3 #6 | Carcass-scent consumer cutover (balance-affecting) |
-| [128](128-htn-method-composition.md) | 🔄 in flight | Cluster C | HTN method composition — epic (sub-epic, 25 children #319-#343 opened 2026-05-14) |
-| [129](129-care-dses-perceivable-intentions.md) | blocked-by 242 | Cluster C | Care DSEs over perceivable intentions (126 landed) |
+| [128](128-htn-method-composition.md) | 🔄 in flight | Cluster C | HTN method composition — sub-epic; 16/26 children landed; Batch B (323-326) + #335/#341 ready; #334 blocked-by [17]; #340 blocked-by #323 |
+| [129](129-care-dses-perceivable-intentions.md) | blocked-by 242, 243 | Cluster C | Care DSEs over perceivable intentions (126 landed) |
 | [130](130-trust-weighted-coordinator-momentum.md) | blocked-by 057 | Cluster C | Trust-weighted coordinator directive momentum |
 | [264](264-social-dse-consumers-wire-belief-affordance-axes-socialize-groomother-mate-mentor-care-feedkitten.md) | ready | §261 | Social DSE consumers wire belief/affordance axes |
 | [265](265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md) | ready | §261 | Wildlife DSE consumers (fox/hawk/snake/shadowfox) |
@@ -107,7 +107,7 @@ substrate's vocabulary and were tracked alongside it:
 | [316](316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md) | ready | §261 / 263 | Hunt resolver writes StepPhase enum for focal trace |
 | [317](317-retire-flee-threat-distance-power-invert-if-frame-diff-shows-redundancy-with-affordanceflee.md) | blocked-by 315 | §261 / 263 | Retire `flee_threat_distance` if frame-diff shows redundancy |
 
-**Total open: 33** (29 ready, 0 in-progress, 2 blocked, 2 parked).
+**Total open: 28** (19 ready, 1 in-progress, 6 blocked, 2 parked).
 
 Out-of-scope sub-rosters (substrate-adjacent but not refactor work):
 body/audible cue substrate (170, 242–245, 262, 268), intraspecies-conflict
@@ -152,23 +152,33 @@ extended Cluster C and added two new substrate layers:
 9. **059** 💤 parked. `ScoringContext` / `FoxScoringContext`
    removal; spec-vs-code drift reconciliation. Unblocked but not
    yet picked up.
+10. **056** ✅ landed. Aspiration compatibility matrix — §7.7.1
+    base logic (3cc14e20d23b).
+11. **062 / 064** ✅ landed. §5.6.3 follow-ons — per-prey-species
+    `PreyScentMap` split + carcass-scent consumer cutover.
+12. **290** ✅ landed (48196be5d6d7). RDF reader cutover —
+    `ContextBeliefs.predictability` replaces
+    `RecentDispositionFailures`. First §C3 retirement chain item
+    done.
+13. **128** 🔄 in-progress. HTN sub-epic: 16/26 children landed.
+    Batch A (infrastructure) + Batch C (Tier 1 chains) + Batch D
+    dispatch + Batch E inspection all done. Batch B (323-326)
+    ready; #335/#341 ready; #340 blocked-by #323.
 
 **What's the largest remaining spend?** Three parallel tracks of
-roughly equal weight now that Cluster C substrate has landed:
-- **§C3 retirement chain** — 290/291/292/293/294/304 (six ready
-  tickets retiring the old per-cat / colony resources into
-  `ContextBeliefs` / `LocationBeliefs` / `ColonyKnowledge` /
-  WitnessableEvent). These are mechanical cutovers but touch many
-  consumer sites.
+roughly equal weight:
+- **§C3 retirement chain** — 291/292/293/294 + 304 (five ready
+  tickets remaining; 290 landed). Each retires a per-cat / colony
+  resource into the 258 substrate.
 - **Cluster C JointIntention practices** — 274–280 (seven ready
   tickets composing 127's substrate into specific two-cat
   practices). High narrative payoff per landing.
 - **§261 affordance activation** — 314/315/316/317 (with 315 the
   load-bearing four-artifact activation pass).
 
-Independent ready work: §5.6.3 follow-ons (062/063/064), §7.7
-aspiration (053/056), Cluster D (008), Cluster E (009),
-HTN/Care/Trust (128/129/130).
+Independent ready work: §5.6.3 (063), §7.7 aspiration (053),
+Cluster D (009), §261 social/wildlife consumers (264/265),
+HTN/Trust (128/130).
 
 ## Out of scope
 
@@ -186,45 +196,29 @@ HTN/Care/Trust (128/129/130).
 
 ## Current state
 
-As of 2026-05-14 — every original spine-piece has landed
-(052/065/006/126/127/258/261/263/295/027/049/050/051/052/065).
-The substrate refactor has *successfully transitioned from "build
-the substrate" to "drain the consumer-cutover and activation
-queues."* What remains is wide rather than deep:
+As of 2026-05-21. Every original spine-piece has landed. Since
+the 2026-05-14 reconciliation: 056 (aspiration compatibility)
+landed; 062/064 (§5.6.3 follow-ons) landed; 290 (first §C3
+retirement cutover) landed; 128 HTN sub-epic progressed to 16/26
+children landed. Cluster D (008) has also landed.
 
-- **§C3 belief retirement chain** — 290/291/292/293/294 (RDF /
-  ColonyKnowledge / RecentTargetFailures / HuntingPriors /
-  RecentAmbushMap) + 304 (Attack emit). Mechanical but
-  high-coverage; each retires a per-cat or colony resource into the
-  258 substrate.
+- **§C3 belief retirement chain** — 291/292/293/294 + 304 (five
+  ready; 290 landed). Each retires a per-cat or colony resource
+  into the 258 substrate.
 - **§261 affordance activation** — 264/265 (social + wildlife
   consumer wiring), 314/315/316/317 (writer extension + four-artifact
   activation + StepPhase enum + redundant-axis retirement).
 - **Cluster C JointIntention practices** — 274/275/276/277/278/279/280
   (co-mentoring, joint cache-stock, play-bout, N≥2, asymmetric
-  courtship, body-cue adoption, partner mental model) — all
-  unblocked by 127.
-- **§5.6.3 follow-ons** — 062/063/064 (prey scent split, ward
-  strength promotion, carcass scent cutover).
-- **§7.7 aspiration** — 053/056 ready (007 unblocked 053); 054
-  retired 2026-05-14 (umbrella whose three children have divergent
-  natural homes — see [landed/054](../landed/054-fate-event-vocabulary-expansion.md));
-  055 still gated on 056; 057 now gated on 128 (was 007).
-- **Cluster D + Cluster E** — 008, 009 (both ready, large epics).
-- **HTN/Care/Trust** — 128/129 unblocked by 126; 130 still gated
-  on 057.
+  courtship, body-cue adoption, partner mental model) — all ready.
+- **§5.6.3 follow-on** — 063 ready (ward strength promotion); 062/064
+  done.
+- **§7.7 aspiration** — 053 ready; 056 landed; 055 blocked-by 344;
+  057 blocked-by 128; 058 parked.
+- **Cluster E** — 009 ready (large epic).
+- **HTN/Care/Trust** — 128 🔄 in-progress; 129 blocked-by [242, 243];
+  130 blocked-by 057.
 - **Phase 7 cleanup** — 059 parked; unblocked but deferred.
-
-The substrate-refactor program's narrative has shifted: the
-"largest remaining spend" framing (126 BDI substrate) cited
-2026-05-08 has been answered. Today the three parallel tracks
-listed in the Critical path section carry roughly equal weight;
-none is structurally privileged.
-
-For the per-section coverage map, see the audit plan at
-`/Users/will.mitchell/.claude/plans/trying-to-figure-out-luminous-charm.md`
-(may be ephemeral; the source-of-truth tables above replicate its
-findings).
 
 ## Approach
 
@@ -346,3 +340,4 @@ retirement.
 - 2026-05-18: `epic-children --fix` touched 1 roster row(s) (290 landed-but-marked-active). Auto-generated by scripts/epic_children.py.
 - 2026-05-18: `epic-children --fix` touched 1 roster row(s) (064 landed-but-marked-active). Auto-generated by scripts/epic_children.py.
 - 2026-05-19: accuracy audit pass — epic; log entry only per audit discipline.
+- 2026-05-21: full sync. Phase coverage map: Phase 2 §5.6.3 updated (062/064 landed); Phase 6b updated (056 landed, live blockers shown inline). Cluster C row: 128 sub-epic description updated to 16/26 children landed. Roster: 129 blocker corrected to [242, 243]; 128 one-line updated; total count corrected to 28 (19 ready, 1 in-progress, 6 blocked, 2 parked). Critical path: items 10-13 added (056, 062/064, 290, 128 progress). Current state rewritten to 2026-05-21 baseline.

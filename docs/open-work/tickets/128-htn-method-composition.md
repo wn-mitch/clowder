@@ -110,55 +110,52 @@ concurrent windows without rereading the spec:
 
 | Phase | Spec section | State | Owner ticket(s) | Parallelism |
 |---|---|---|---|---|
-| Batch A — Infrastructure | §A-D | 🔄 in flight | [319](319-method-registry-populate-no-stub-enforcement.md) [320](320-heldgoalstack-component-l2-evaluator-integration.md) [321](321-aspirations-milestones-emits-table-l1-l2-picker.md) [322](322-action-enum-stubs-for-dormant-methods.md) | #319 ∥ #322; then #320 ∥ #321 |
-| Batch B — Tier 1 methods | §G | 🔄 blocked on Batch A | [323](323-courtship-method-mirror-jointintention-stages.md) [324](324-gestation-method-mirror-pregnant-stages.md) [325](325-aspiration-milestone-wrapper-hunting.md) [326](326-aspiration-milestone-wrapper-social.md) | 4-way after Batch A |
-| Batch C — Tier 1 chains | §G | 🔄 blocked on #319 + #321 | [327](327-aspiration-milestone-wrapper-combat.md) [328](328-aspiration-milestone-wrapper-herbcraft.md) [329](329-aspiration-milestone-wrapper-exploration.md) [330](330-aspiration-milestone-wrapper-building.md) [331](331-aspiration-milestone-wrapper-leadership.md) | 5-way; overlaps Batch B (8-9-way peak) |
-| Batch D — Tier 2 glue | §G | 🔄 mixed; 332/333 substrate landed, dispatch in #357 | [332](../landed/332-grief-vigil-action-vocabulary.md) [333](../landed/333-kitten-rearing-action-vocabulary.md) [334](334-stealth-cloak-crafting-recipe-wearitem-resolver.md) [357](357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md) | 332+333 landed verdict-skipped; 357 unlocks chosen_action override |
-| Batch E — Cross-cutting surface | §C / §H / inspection | 🔄 mixed | [335](335-coordinator-directives-as-htn-method-seeds-057-integration.md) [336](336-just-inspect-renders-goal-stack-aspiration-set.md) [337](337-l3commitment-trace-method-stack-field.md) [338](338-l1aspiration-trace-record-emit-walk.md) [339](339-catsnapshot-goal-stack-active-aspirations-fields.md) [340](340-port-mating-l3-chain-onto-htn-method.md) [341](341-retarget-057-blocked-by-from-126-to-128.md) | #336-#339 4-way; #335 / #340 own deps; #341 anytime |
+| Batch A — Infrastructure | §A-D | ✅ done | [319](../landed/319-method-registry-populate-no-stub-enforcement.md) [320](../landed/320-heldgoalstack-component-l2-evaluator-integration.md) [321](../landed/321-aspirations-milestones-emits-table-l1-l2-picker.md) [322](../landed/322-action-enum-stubs-for-dormant-methods.md) | — |
+| Batch B — Tier 1 methods | §G | 🔄 in flight (4 ready) | [323](323-courtship-method-mirror-jointintention-stages.md) [324](324-gestation-method-mirror-pregnant-stages.md) [325](325-aspiration-milestone-wrapper-hunting.md) [326](326-aspiration-milestone-wrapper-social.md) | 4-way parallel |
+| Batch C — Tier 1 chains | §G | ✅ done | [327](../landed/327-aspiration-milestone-wrapper-combat.md) [328](../landed/328-aspiration-milestone-wrapper-herbcraft.md) [329](../landed/329-aspiration-milestone-wrapper-exploration.md) [330](../landed/330-aspiration-milestone-wrapper-building.md) [331](../landed/331-aspiration-milestone-wrapper-leadership.md) | — |
+| Batch D — Tier 2 glue | §G | 🔄 mixed; 332/333/357 landed, 334 blocked-by [17] | [332](../landed/332-grief-vigil-action-vocabulary.md) [333](../landed/333-kitten-rearing-action-vocabulary.md) [334](334-stealth-cloak-crafting-recipe-wearitem-resolver.md) [357](../landed/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md) | 332+333+357 done; 334 waiting on crafting substrate (#17) |
+| Batch E — Cross-cutting surface | §C / §H / inspection | 🔄 mixed; 336–339 landed, 335/341 ready, 340 blocked-by #323 | [335](335-coordinator-directives-as-htn-method-seeds-057-integration.md) [336](../landed/336-just-inspect-renders-goal-stack-aspiration-set.md) [337](../landed/337-l3commitment-trace-method-stack-field.md) [338](../landed/338-l1aspiration-trace-record-emit-walk.md) [339](../landed/339-catsnapshot-goal-stack-active-aspirations-fields.md) [340](340-port-mating-l3-chain-onto-htn-method.md) [341](341-retarget-057-blocked-by-from-126-to-128.md) | #335, #341 ready now; #340 after #323 |
 | Parked / future | §H open Qs | 💤 parked | [342](342-phase-2-unordered-method-bodies-partial-order.md) [343](343-emit-cooldown-discipline-per-emit-cooldown-ticks.md) | — |
 
 ## Critical path
 
-Deepest serial chain is 4 hops:
-**#319 → #320 → #323 → #340** (infrastructure → stack-wiring →
-courtship-method → Mating L3 port). Everything else has shorter
-critical paths from infrastructure.
+Batch A is done. Deepest remaining serial chain is **2 hops:
+#323 → #340** (courtship-method → Mating L3 port). All
+infrastructure, most catalogue work (Batch C, Batch D dispatch,
+Batch E inspection) has landed.
 
-**13-way peak parallelism** after Batch A completes (Batches B
-+ C + #336-#339 from E all in flight).
+**6-way current parallelism:** Batch B ready items (323–326) +
+Batch E ready items (335, 341).
 
-Unusually parallel for an ai-substrate epic — most children are
-catalogue authoring (method definitions, emits tables, trace
-fields, inspection-rendering panels) rather than substrate
-stacking. 060 and 093 had deeper sequential chains because their
-work *was* substrate stacking.
+Peak of 13-way has passed — it ran during the window when Batches
+B + C + #336-#339 were all simultaneously in flight.
 
 ## Open child tickets — full roster
 
 | Ticket | Status | Spec home | One-line scope |
 |---|---|---|---|
-| [319](319-method-registry-populate-no-stub-enforcement.md) | ready | §A | `populate_method_registry` + `ApplicableWhen` + `check_method_registry.sh` + `just methods --pending` |
-| [320](320-heldgoalstack-component-l2-evaluator-integration.md) | blocked-by 319 | §B / §C | `HeldGoalStack` Component + L2 evaluator integration at `goap.rs:568-635` |
-| [321](321-aspirations-milestones-emits-table-l1-l2-picker.md) | blocked-by 319 | §H | Extend `Milestone` with `emits[]`; per-tick picker; L1Aspiration trace record opens |
-| [322](322-action-enum-stubs-for-dormant-methods.md) | ready | §G | `Action::WearItem` / `Craft` / `PetitionCoordinator` enum stubs + placeholder resolvers |
-| [323](323-courtship-method-mirror-jointintention-stages.md) | blocked-by 319,320 | §G Tier 1 | Mirror 127 `JointIntention.stage` advance — 4 sub-goals |
-| [324](324-gestation-method-mirror-pregnant-stages.md) | blocked-by 319,320 | §G Tier 1 | Mirror `Pregnant.stage` (Early → Mid → Late) |
-| [325](325-aspiration-milestone-wrapper-hunting.md) | blocked-by 319,321 | §G Tier 1 | Wrap Hunting chain milestones with `emits[]` tables; Live registration |
-| [326](326-aspiration-milestone-wrapper-social.md) | blocked-by 319,321 | §G Tier 1 | Wrap Social chain milestones; Live registration |
-| [327](327-aspiration-milestone-wrapper-combat.md) | blocked-by 319,321 | §G | Wrap Combat chain; flip from PendingSubstrate → Live |
-| [328](328-aspiration-milestone-wrapper-herbcraft.md) | blocked-by 319,321 | §G | Wrap Herbcraft chain; flip to Live |
-| [329](329-aspiration-milestone-wrapper-exploration.md) | blocked-by 319,321 | §G | Wrap Exploration chain; flip to Live |
-| [330](330-aspiration-milestone-wrapper-building.md) | blocked-by 319,321 | §G | Wrap Building chain; flip to Live |
-| [331](331-aspiration-milestone-wrapper-leadership.md) | blocked-by 319,321 | §G | Wrap Leadership chain; flip to Live |
+| [319](../landed/319-method-registry-populate-no-stub-enforcement.md) | landed 2026-05-14 | §A | `populate_method_registry` + `ApplicableWhen` + `check_method_registry.sh` + `just methods --pending` |
+| [320](../landed/320-heldgoalstack-component-l2-evaluator-integration.md) | landed 2026-05-14 | §B / §C | `HeldGoalStack` Component + L2 evaluator integration at `goap.rs:568-635` |
+| [321](../landed/321-aspirations-milestones-emits-table-l1-l2-picker.md) | landed 2026-05-14 | §H | Extend `Milestone` with `emits[]`; per-tick picker; L1Aspiration trace record opens |
+| [322](../landed/322-action-enum-stubs-for-dormant-methods.md) | landed 2026-05-14 | §G | `Action::WearItem` / `Craft` / `PetitionCoordinator` enum stubs + placeholder resolvers |
+| [323](323-courtship-method-mirror-jointintention-stages.md) | ready | §G Tier 1 | Mirror 127 `JointIntention.stage` advance — 4 sub-goals |
+| [324](324-gestation-method-mirror-pregnant-stages.md) | ready | §G Tier 1 | Mirror `Pregnant.stage` (Early → Mid → Late) |
+| [325](325-aspiration-milestone-wrapper-hunting.md) | ready | §G Tier 1 | Wrap Hunting chain milestones with `emits[]` tables; Live registration |
+| [326](326-aspiration-milestone-wrapper-social.md) | ready | §G Tier 1 | Wrap Social chain milestones; Live registration |
+| [327](../landed/327-aspiration-milestone-wrapper-combat.md) | landed 2026-05-14 | §G | Wrap Combat chain; flip from PendingSubstrate → Live |
+| [328](../landed/328-aspiration-milestone-wrapper-herbcraft.md) | landed 2026-05-15 | §G | Wrap Herbcraft chain; flip to Live |
+| [329](../landed/329-aspiration-milestone-wrapper-exploration.md) | landed 2026-05-15 | §G | Wrap Exploration chain; flip to Live |
+| [330](../landed/330-aspiration-milestone-wrapper-building.md) | landed 2026-05-15 | §G | Wrap Building chain; flip to Live |
+| [331](../landed/331-aspiration-milestone-wrapper-leadership.md) | landed 2026-05-15 | §G | Wrap Leadership chain; flip to Live |
 | [332](../landed/332-grief-vigil-action-vocabulary.md) | landed 2026-05-15 | §G Tier 2 | Vigil / GriefSit / ReleaseGrief primitives + Mourning Component; method flipped to Live (dispatch in #357) |
 | [333](../landed/333-kitten-rearing-action-vocabulary.md) | landed 2026-05-15 | §G Tier 2 | Wean / Teach / Release witness-typed resolvers; method flipped to Live (dispatch in #357) |
-| [334](334-stealth-cloak-crafting-recipe-wearitem-resolver.md) | blocked-by 320,322 | §G Tier 2 | Stealth-cloak crafting recipe + WearItem resolver wiring; flips `acquire_stealth_via_*` to Live |
-| [357](357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md) | ready | §G Tier 2 dispatch | HTN-driven action dispatch (DSE / GoapActionKind / plan template) for `mourn_at_grave` and `rear_kitten` primitives — closes the dispatch gap surfaced in #332/#333 layer-walks |
-| [335](335-coordinator-directives-as-htn-method-seeds-057-integration.md) | blocked-by 320 | §C | Coordinator directives as HTN method seeds; 057 integration |
-| [336](336-just-inspect-renders-goal-stack-aspiration-set.md) | blocked-by 320,321 | inspection invariant | `just inspect` renders aspiration set + goal stack + recent method history |
-| [337](337-l3commitment-trace-method-stack-field.md) | blocked-by 320 | §11.5 / trace | L3Commitment trace gains `method_stack` field (registry-walked) |
-| [338](338-l1aspiration-trace-record-emit-walk.md) | blocked-by 321 | §H / §11.5 | New L1Aspiration trace record (emit-walk per active aspiration) |
-| [339](339-catsnapshot-goal-stack-active-aspirations-fields.md) | blocked-by 320,321 | trace | `CatSnapshot.goal_stack` + `active_aspirations` fields in `events.jsonl` |
+| [334](334-stealth-cloak-crafting-recipe-wearitem-resolver.md) | blocked-by [17] | §G Tier 2 | Stealth-cloak crafting recipe + WearItem resolver wiring; flips `acquire_stealth_via_*` to Live |
+| [357](../landed/357-htn-driven-action-dispatch-dse-goapactionkind-plan-template-for-mourn-at-grave-and-rear-kitten-primitives.md) | landed 2026-05-15 | §G Tier 2 dispatch | HTN-driven action dispatch (DSE / GoapActionKind / plan template) for `mourn_at_grave` and `rear_kitten` primitives — closes the dispatch gap surfaced in #332/#333 layer-walks |
+| [335](335-coordinator-directives-as-htn-method-seeds-057-integration.md) | ready | §C | Coordinator directives as HTN method seeds; 057 integration |
+| [336](../landed/336-just-inspect-renders-goal-stack-aspiration-set.md) | landed 2026-05-15 | inspection invariant | `just inspect` renders aspiration set + goal stack + recent method history |
+| [337](../landed/337-l3commitment-trace-method-stack-field.md) | landed 2026-05-17 | §11.5 / trace | L3Commitment trace gains `method_stack` field (registry-walked) |
+| [338](../landed/338-l1aspiration-trace-record-emit-walk.md) | landed 2026-05-17 | §H / §11.5 | New L1Aspiration trace record (emit-walk per active aspiration) |
+| [339](../landed/339-catsnapshot-goal-stack-active-aspirations-fields.md) | landed 2026-05-18 | trace | `CatSnapshot.goal_stack` + `active_aspirations` fields in `events.jsonl` |
 | [340](340-port-mating-l3-chain-onto-htn-method.md) | blocked-by 323 | §G worked example | Port `disposition.rs:1873-1919` mating chain onto `mate_with_goal` method |
 | [341](341-retarget-057-blocked-by-from-126-to-128.md) | ready | process | One-line frontmatter edit on 057 — retarget `blocked-by: [126]` → `blocked-by: [128]` |
 | [342](342-phase-2-unordered-method-bodies-partial-order.md) | parked | §H future | `:unordered` method bodies + partial-order decomposition (SHOP2 keyword) |
@@ -236,3 +233,4 @@ Read in this order:
   are HTN methods" + "Every dormant method has a glue ticket"
   rules.
 - 2026-05-19: accuracy audit pass — epic in-progress status correct; child roster table accurate; critical path and parallelism analysis coherent.
+- 2026-05-21: full status sync — Batch A (319-322) all done; Batch B (323-326) all unblocked → ready; Batch C (327-331) all done; 357 landed; Batch E inspection tickets (336-339) all landed; 335 unblocked → ready; 334 re-blocked on [17] (crafting substrate). Critical path shortened to 2 hops: #323 → #340.
