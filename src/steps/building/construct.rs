@@ -122,6 +122,23 @@ pub fn resolve_construct(
                     .entity(target)
                     .insert(crate::components::building::CropState::default());
             }
+            // 367: preservation stations carry per-rack state from
+            // the moment construction completes. The drying-rack
+            // tick system and the smoking-rack tend resolvers all
+            // query `With<DryingRackState>` / `With<SmokingRackState>`
+            // — missing the insert here would silently exclude the
+            // new rack from the preservation pipeline (same failure
+            // shape as the §Phase 4c.4 farming-repair note above).
+            if blueprint == StructureType::DryingRack {
+                commands
+                    .entity(target)
+                    .insert(crate::components::building::DryingRackState::default());
+            }
+            if blueprint == StructureType::SmokingRack {
+                commands
+                    .entity(target)
+                    .insert(crate::components::building::SmokingRackState::default());
+            }
             if let Some(ref mut score) = colony_score {
                 score.structures_built += 1;
             }

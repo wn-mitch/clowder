@@ -659,6 +659,18 @@ fn building_sprite(
             let h = w / 62.0 * 57.0;
             (assets.stores_texture.clone(), Vec2::new(w, h))
         }
+        // 367: preservation stations reuse workshop / hearth sprites
+        // for stage-1 atomicity (Midden precedent). A follow-on visual
+        // polish ticket adds dedicated rack assets + autotile entries.
+        StructureType::DryingRack => {
+            let w = world_px;
+            let h = w / 35.0 * 44.0;
+            (assets.workshop_texture.clone(), Vec2::new(w, h))
+        }
+        StructureType::SmokingRack => {
+            let w = 2.0 * world_px;
+            (assets.hearth_texture.clone(), Vec2::splat(w))
+        }
     }
 }
 

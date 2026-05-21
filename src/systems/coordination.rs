@@ -1189,6 +1189,8 @@ fn structure_display_name(kind: StructureType) -> &'static str {
         StructureType::Wall => "wall",
         StructureType::Gate => "gate",
         StructureType::Midden => "midden",
+        StructureType::DryingRack => "drying rack",
+        StructureType::SmokingRack => "smoking rack",
     }
 }
 
@@ -1451,7 +1453,12 @@ fn kind_affinity(kind: StructureType, c: &SimConstants) -> KindAffinity {
     use StructureType::*;
     let s = &c.scoring;
     let (threat_sign, frontier_sign, food, garden, defensive, same_kind) = match kind {
-        Stores | Kitchen | Workshop => (
+        // 367: Drying Rack + Smoking Rack are preservation stations —
+        // food-craft adjacents that share the placement profile of the
+        // Kitchen / Workshop / Stores cluster (want proximity to food
+        // stockpile, want same-kind clustering so a colony can run
+        // multiple racks side-by-side).
+        Stores | Kitchen | Workshop | DryingRack | SmokingRack => (
             -1.0,
             1.0,
             s.building_placement_food_proximity_weight,

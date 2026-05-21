@@ -39,6 +39,18 @@ pub enum StructureType {
     /// remain real entities). Future scope: items at the midden decay
     /// faster via the existing rot ecology.
     Midden,
+    /// 367: open-air drying rack. Sun-powered, weather-sensitive. Cats
+    /// load raw fish or raw organ + herb here; per-tick advance only
+    /// when `Weather::Clear`. Output ItemKind (DriedFish / PreservedOrgan)
+    /// spawns onto the rack tile when progress reaches 1.0.
+    /// State lives on a sibling `DryingRackState` Component.
+    DryingRack,
+    /// 367: covered smoking rack. Requires raw meat + 1 fuel load;
+    /// progress advances only via discrete tend-cycles (3 visits per
+    /// craft), with a per-rack cooldown that forces interleaving with
+    /// other actions. State lives on a sibling `SmokingRackState`
+    /// Component.
+    SmokingRack,
 }
 
 impl StructureType {
@@ -64,6 +76,16 @@ impl StructureType {
             // colony-founding wagon-dismantle haul can fund it without
             // blocking other infrastructure.
             Self::Midden => vec![(Material::Wood, 1)],
+            // 367: Drying Rack is a light wood frame in open ground.
+            // No stone — preservation rack, not flame-handling. Cheap
+            // enough that a labor-flush founder colony can stand one
+            // up alongside the kitchen.
+            Self::DryingRack => vec![(Material::Wood, 5)],
+            // 367: Smoking Rack handles smoldering fuel — wants stone
+            // base for flame containment plus wood for the rack frame.
+            // Pricier than the drying rack to match the multi-cycle
+            // labor cost of tending it.
+            Self::SmokingRack => vec![(Material::Stone, 3), (Material::Wood, 4)],
         }
     }
 
@@ -77,6 +99,9 @@ impl StructureType {
             Self::Gate => (2, 1),
             Self::WardPost | Self::Wall => (1, 1),
             Self::Midden => (2, 2),
+            // 367: both preservation stations occupy a 2×2 footprint —
+            // a rack frame and a workspace tile alongside it.
+            Self::DryingRack | Self::SmokingRack => (2, 2),
         }
     }
 
@@ -101,6 +126,13 @@ impl StructureType {
             // away from Stores so the rendering overlap is minimal.
             // A future visual-polish ticket can add `Terrain::Midden`.
             Self::Midden => Terrain::Stores,
+            // 367: same stage-1 reuse precedent as Midden — preservation
+            // stations borrow Workshop / Hearth terrain visually until a
+            // dedicated autotile + palette pipeline ticket lands.
+            // Drying Rack reads as a workshop (open frame structure);
+            // Smoking Rack reads as a hearth (manages combustion).
+            Self::DryingRack => Terrain::Workshop,
+            Self::SmokingRack => Terrain::Hearth,
         }
     }
 
@@ -502,6 +534,119 @@ pub struct GateState {
 }
 
 // ---------------------------------------------------------------------------
+// Preservation station state (ticket 367 — 016 Phase 1b)
+// ---------------------------------------------------------------------------
+
+/// Which recipe is currently loaded on a Drying Rack. Determines the
+/// output `ItemKind` when progress reaches 1.0.
+///
+/// Local enum (rather than a `RecipeId`) so the state Component is
+/// serde-deserializable — `RecipeId` carries `&'static str` keys
+/// that can't round-trip. The two-variant shape mirrors the two
+/// Phase 1b recipes that share the Drying Rack station.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum DryingRecipe {
+    /// `preserve.dried_fish` — input RawFish, ~3 days Clear weather.
+    #[default]
+    DriedFish,
+    /// `preserve.preserved_organ` — input RawOrgan + 1 herb, ~2 days.
+    /// Herb is consumed from cat inventory at load time; quality and
+    /// `from_organ` ride through to the output via `source_modifiers`.
+    PreservedOrgan,
+}
+
+/// Per-load captured state for a Drying Rack. Copied off the source
+/// item at load time; the source `Item` entity is despawned in the same
+/// tick (matches the precedent set by `eat_from_inventory` —
+/// fungible-grade consumption rather than a Source/Transfer/Sink
+/// routed step, see ticket 429).
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DryingLoad {
+    pub recipe: DryingRecipe,
+    /// Carries through to the output `Item::quality`.
+    pub source_quality: f32,
+    /// Corruption + `from_organ` ride through to the output's modifiers.
+    pub source_modifiers: crate::components::items::ItemModifiers,
+}
+
+/// Per-Drying-Rack runtime state (ticket 367). Inserted on
+/// construction completion (see `src/steps/building/construct.rs`).
+/// `progress` advances per tick by `preservation` system only when
+/// `Weather::Clear`; output `Item` spawns on completion.
+#[derive(Component, Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DryingRackState {
+    /// `None` when idle. `Some(_)` after a cat loads raw food (and
+    /// the optional herb).
+    pub loaded: Option<DryingLoad>,
+    /// 0.0 at load time; 1.0 = ready to spawn output.
+    pub progress: f32,
+}
+
+/// Per-load captured state for a Smoking Rack. Same Source/Transfer
+/// caveats as `DryingLoad`. `fuel_loaded` is a boolean — wood is
+/// fungible material with no per-instance provenance, so we don't
+/// track a fuel entity handle (matches the construction-material
+/// consumption pattern).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SmokingLoad {
+    /// Which raw meat is smoking. Stored so the output recipe id can
+    /// be reconstructed for `CraftedItem` provenance even though all
+    /// four smoking recipes share `ItemKind::SmokedMeat` as their
+    /// output.
+    pub source_kind: crate::components::items::ItemKind,
+    pub source_quality: f32,
+    pub source_modifiers: crate::components::items::ItemModifiers,
+}
+
+/// Per-Smoking-Rack runtime state (ticket 367). Inserted on
+/// construction completion. Smoking progress does NOT advance per
+/// tick — it's driven entirely by discrete tend-cycle completions.
+///
+/// Tend cycles are the novel substrate for 367: each tend (a
+/// short, single-tick resolver) increments `tends_completed` and
+/// advances `progress` by `1.0 / tends_needed`. The per-rack
+/// `last_tended_at_tick` + `CraftingConstants::smoking_tend_cooldown_ticks`
+/// cooldown forces interleaving — the cat must do something else for
+/// ~2 sim-hours between tends, producing the "tend, walk away, come
+/// back, tend, ..." rhythm the design doc calls for.
+#[derive(Component, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SmokingRackState {
+    pub loaded: Option<SmokingLoad>,
+    /// True once a cat has burned a fuel load onto the rack. A loaded
+    /// meat without burning fuel still needs a fuel-load action before
+    /// tend cycles begin.
+    pub fuel_loaded: bool,
+    /// 0.0 at load time; 1.0 = ready to spawn `SmokedMeat`.
+    pub progress: f32,
+    /// Absolute tick of the most recent tend; gates the cooldown.
+    /// `0` sentinel means "no tend yet this craft" (the rack-load
+    /// resolver leaves this at 0 so the first tend can fire as soon
+    /// as a cat reaches the rack).
+    pub last_tended_at_tick: u64,
+    /// How many tends have completed this craft.
+    pub tends_completed: u32,
+    /// Total tends required (defaulted to
+    /// `CraftingConstants::smoking_tends_needed`, kept on the state so
+    /// future recipes can declare a variant smoking duration).
+    pub tends_needed: u32,
+}
+
+impl Default for SmokingRackState {
+    fn default() -> Self {
+        Self {
+            loaded: None,
+            fuel_loaded: false,
+            progress: 0.0,
+            last_tended_at_tick: 0,
+            tends_completed: 0,
+            // Default tends_needed — overridden at load time by the
+            // CraftingConstants knob if it differs.
+            tends_needed: 3,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -601,6 +746,8 @@ mod tests {
             StructureType::Wall,
             StructureType::Gate,
             StructureType::Midden,
+            StructureType::DryingRack,
+            StructureType::SmokingRack,
         ];
         for kind in types {
             let cost = kind.material_cost();
