@@ -1,7 +1,7 @@
 ---
 id: 323
 title: courtship_method — mirror JointIntention stages
-status: ready
+status: done
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [smarter-cats]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
@@ -100,3 +100,4 @@ any `JointDropBranch`, the method frame propagates abandonment.
 
 - 2026-05-14: opened as 128 epic child #5 (Batch B Tier 1).
 - 2026-05-19: accuracy audit pass — no blockers, files referenced exist (htn-methods.md, ai-substrate-refactor.md), Rust symbols verified (JointIntention, GoalFrame, HeldGoalStack, populate_method_registry).
+- 2026-05-21: Registered the first Live HTN method that mirrors a 127 JointIntention practice end-to-end. Four primitive sub-goals (approach_partner / allogroom_partner / mate_with_partner / consolidate_bonded) align with the four PracticeStage variants. domain: None matches rear_kitten / mourn_at_grave — Courtship is reactive substrate, not aspirational achievement; emission lands as a follow-on with dispatch wiring (analogous to 333's deferred dispatch). The mate_with_partner sub-goal stays as a primitive Action::Mate here; #340 upgrades it to SubGoal::Goal("mating_event_completed") once mate_with_goal lands.

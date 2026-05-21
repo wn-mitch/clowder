@@ -557,6 +557,22 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // when the row activates. See `src/ai/methods/caretake_kitten.rs`
     // module doc for the full architecture.
     registry.push(crate::ai::methods::caretake_kitten::caretake_kitten());
+
+    // 323: Tier-1 Live HTN method — first method that mirrors a 127
+    // `JointIntention` practice end-to-end. `courtship_method` catches
+    // the `courtship_completed` label on any cat carrying
+    // `JointIntention { practice: Courtship, .. }` and decomposes the
+    // four `PracticeStage` variants (Approach → Courting → Mating →
+    // Bonded) into four primitive sub-goals. 127's
+    // `author_joint_intentions` (wired above in the FixedUpdate
+    // schedule) is the source of truth for stage transitions; this
+    // method's `sub_goal_index` advances in step via the L2
+    // evaluator's primitive-leaf completion contract (320). #340 will
+    // upgrade the third sub-goal (`mate_with_partner`) from a
+    // primitive `Action::Mate` to `SubGoal::Goal(GoalState { label:
+    // "mating_event_completed" })`, recursing into the `mate_with_goal`
+    // method.
+    registry.push(crate::ai::methods::courtship::courtship_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of

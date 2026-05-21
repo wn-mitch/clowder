@@ -426,6 +426,13 @@ pub mod rear_kitten;
 // picker's `MethodRegistry::lookup` check resolves cleanly when the
 // row activates.
 pub mod caretake_kitten;
+// 323: Tier-1 Live HTN method — first method that mirrors a 127
+// `JointIntention` practice end-to-end. `courtship_method` catches the
+// `courtship_completed` label on any cat carrying `JointIntention {
+// practice: Courtship, .. }` and decomposes the four `PracticeStage`
+// values into four primitive sub-goals. See module doc for the
+// stage-sync rationale and the #340 upgrade path.
+pub mod courtship;
 
 // Tests live in `tests.rs` so the bash lint can exclude that path
 // while scanning `src/ai/methods/` for production `Method` literals.
