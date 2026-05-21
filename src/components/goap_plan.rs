@@ -406,10 +406,13 @@ impl GoapActionKind {
             Self::GriefSit => Action::GriefSit,
             Self::ReleaseGrief => Action::ReleaseGrief,
             // 367: preservation actions map directly to their parent
-            // L3 Action labels. Each is a single-step plan (matches
-            // Bury's pattern), so no chain-internal label inheritance
-            // is needed.
-            Self::DryFood => Action::DryFood,
+            // L3 Action labels. The 367-follow-on `RetrieveDryable`
+            // prefix is a chain-internal step that inherits the
+            // `DryFood` Action label so `CurrentAction` stays stable
+            // through the multi-step plan (mirrors the
+            // `RetrieveRawFood | Cook | DepositCookedFood => Cook`
+            // pattern above).
+            Self::RetrieveDryable | Self::DryFood => Action::DryFood,
             Self::SmokeMeat => Action::SmokeMeat,
             Self::TendSmokingRack => Action::TendSmokingRack,
         }

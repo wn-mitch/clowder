@@ -528,6 +528,24 @@ pub fn update_colony_building_markers(
                 .is_ok_and(|it| it.kind.is_food() && !it.modifiers.cooked)
         })
     });
+    // 367 follow-on — `HasDryableInStores`: ≥1 RawFish or RawOrgan
+    // item sits in any `StoredItems`. Distinct from
+    // `HasRawFoodInStores` which fires on any raw food (mammal/bird
+    // carcasses included, which the drying recipes can't accept).
+    // Reader: composite `HasDryableAccessible` per-cat marker in
+    // `goap::evaluate_and_plan`.
+    let has_dryable_in_stores = stored_items.iter().any(|stored| {
+        stored.items.iter().copied().any(|e| {
+            items.get(e).is_ok_and(|it| {
+                !it.modifiers.cooked
+                    && matches!(
+                        it.kind,
+                        crate::components::items::ItemKind::RawFish
+                            | crate::components::items::ItemKind::RawOrgan,
+                    )
+            })
+        })
+    });
     let has_stored_food = !food.is_empty();
 
     // 176: chronicity tracking for `ColonyStoresChronicallyFull`. The
@@ -568,6 +586,11 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasRawFoodInStores);
     } else {
         em.remove::<crate::components::markers::HasRawFoodInStores>();
+    }
+    if has_dryable_in_stores {
+        em.insert(crate::components::markers::HasDryableInStores);
+    } else {
+        em.remove::<crate::components::markers::HasDryableInStores>();
     }
     if has_stored_food {
         em.insert(crate::components::markers::HasStoredFood);

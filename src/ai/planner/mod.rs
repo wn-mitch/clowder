@@ -357,6 +357,14 @@ pub enum GoapActionKind {
     /// completion shape). Drying then advances per-tick under Clear
     /// weather via `systems::preservation`, independent of the cat.
     DryFood,
+    /// 367 follow-on: retrieve one RawFish or RawOrgan from a Stores
+    /// building into the cat's `Inventory`. Sets `Carrying::RawFood`
+    /// (search-state). Mirrors `RetrieveRawFood` for the Cook chain
+    /// but with a tighter item-kind filter (drying recipes can't
+    /// accept RawMouse / RawRat / etc.). Prefix step in the
+    /// `drying_food_actions` plan template; an empty-inventory cat
+    /// reaches the Drying Rack via `[RetrieveDryable, DryFood]`.
+    RetrieveDryable,
     /// 367: load raw meat + fuel onto a Smoking Rack. Single-tick
     /// action; effect is `IncrementTrips`. Smoking progress advances
     /// only on subsequent `TendSmokingRack` cycles.

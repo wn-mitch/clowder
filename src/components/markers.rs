@@ -551,6 +551,45 @@ impl HasFunctionalSmokingRack {
     pub const KEY: &str = "HasFunctionalSmokingRack";
 }
 
+/// 367 follow-on: colony — ≥1 RawFish or RawOrgan item sits in any
+/// `StoredItems` aggregate. Reader: composite per-cat marker
+/// `HasDryableAccessible` populated in `goap::evaluate_and_plan`; the
+/// composite is what `DryFoodDse` eligibility consults. Writer:
+/// `buildings::update_colony_building_markers`.
+///
+/// Distinct from `HasRawFoodInStores`, which fires on *any* raw food
+/// (including RawMouse / RawRat which the drying recipes don't accept).
+/// Pre-existence of this marker is what lets a cat with an empty
+/// inventory still elect `DryFood` — the planner builds a
+/// `[RetrieveDryable, DryFood]` chain.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasDryableInStores;
+impl HasDryableInStores {
+    pub const KEY: &str = "HasDryableInStores";
+}
+
+/// 367 follow-on: per-cat composite — the cat could conceivably elect
+/// `DryFood` this tick. Fires when EITHER the cat already carries a
+/// dryable item (`HasDryableInInventory`) OR the cat has a free
+/// inventory slot AND the colony has a dryable in `StoredItems`
+/// (`HasFreeSlot && HasDryableInStores`). Reader: `DryFoodDse`
+/// eligibility filter. Writer: `goap::evaluate_and_plan` via
+/// `MarkerSnapshot::set_entity`.
+///
+/// Replaces `HasDryableInInventory` in the DSE eligibility list. Pre-
+/// follow-on the narrow inventory marker gated the DSE; cats almost
+/// never held raw fish / organ at score-time (deposit-at-stores drains
+/// inventory on every hunt-return), so `DryFood` never fired even when
+/// a functional rack existed and stores were full of fish.
+/// `HasDryableInInventory` is still authored — runtime resolvers
+/// (`resolve_load_drying_rack`) read it to know whether to consume the
+/// cat's slot or run the retrieve step first.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasDryableAccessible;
+impl HasDryableAccessible {
+    pub const KEY: &str = "HasDryableAccessible";
+}
+
 /// 367: colony — ≥1 loaded Smoking Rack exists in the colony AND its
 /// per-rack tend cooldown has elapsed (i.e. it's ready to be tended
 /// right now). Reader: `TendSmokingRackDse` eligibility filter. Writer:
@@ -1159,6 +1198,8 @@ mod tests {
         assert_marker_queryable(HasLoadedSmokingRackOffCooldown);
         assert_marker_queryable(HasDryableInInventory);
         assert_marker_queryable(HasSmokeableInInventory);
+        assert_marker_queryable(HasDryableInStores);
+        assert_marker_queryable(HasDryableAccessible);
     }
 
     #[test]

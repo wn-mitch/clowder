@@ -331,19 +331,93 @@ pub fn burying_actions() -> Vec<GoapActionDef> {
 }
 
 /// 367: plan template for loading a Drying Rack with raw fish / raw
-/// organ. Single-step `[DryFood]` with `ZoneIs(DryingRack)`
-/// precondition; A* prefixes the right TravelTo from `travel_actions`.
-/// The cat enters the rack zone carrying drying-eligible food in
-/// inventory; the resolver picks the specific recipe (DriedFish vs
-/// PreservedOrgan) from what's actually carried. `IncrementTrips`
-/// completes the single-trip Disposition.
+/// organ.
+///
+/// 367 follow-on (split-shape fix): the original single-step
+/// `[DryFood]` template required the cat to already carry a dryable
+/// item at score-time. On seed-42 cats deposit raw food at Stores
+/// immediately on hunt-return, so the per-cat `HasDryableInInventory`
+/// marker was off whenever scoring ran and `DryFood` never fired even
+/// when a functional rack existed and stores were full of fish. The
+/// chain now mirrors `cooking_actions`'s shape:
+///
+///   `[DropItem?, RetrieveDryable, DryFood]`
+///
+/// - `RetrieveDryable` pulls one RawFish / RawOrgan from Stores into
+///   the cat's `Inventory` and sets `Carrying::RawFood` (search-
+///   state). It's distinct from `RetrieveRawFood` because the drying
+///   recipes can't accept mammal/bird raw meat.
+/// - `DryFood` requires `CarryingIs(Carrying::RawFood)` so A* can
+///   prove the cat ends the retrieve step with the right inventory.
+///   The runtime resolver picks the specific recipe (DriedFish vs
+///   PreservedOrgan) from what's actually carried.
+/// - `DropItem` is the same prefix `cooking_actions` uses for cats
+///   carrying something incompatible (Herbs / BuildMaterials / etc.);
+///   A* skips it for `Carrying::Nothing`.
+/// - Cats already carrying a dryable take the substrate-path
+///   `RetrieveDryable` arm (cost 2, gated on `HasFreeSlot`), reaching
+///   `Carrying::RawFood` via a single retrieve at Stores. The
+///   pre-existing-inventory shortcut (skipping retrieve) is
+///   deliberately *not* wired here — Carrying projects RawFish to
+///   `Carrying::Prey`, not `RawFood`, so a single-step `[DryFood]`
+///   admission would require a second precondition arm and a way for
+///   A* to know which Prey kinds are dryable. The current shape
+///   accepts a one-tick detour to Stores in exchange for plan
+///   simplicity; balance follow-on if the detour proves costly.
 pub fn drying_food_actions() -> Vec<GoapActionDef> {
-    vec![GoapActionDef {
-        kind: GoapActionKind::DryFood,
-        cost: 2,
-        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::DryingRack)],
-        effects: vec![StateEffect::IncrementTrips],
-    }]
+    vec![
+        // 367 follow-on: DropItem prefix mirrors `cooking_actions`. Sets
+        // `HasFreeSlotThisPlan(true)` and `Carrying::Nothing` so the
+        // retrieve step's substrate-path or plan-path precondition is
+        // satisfied for cats entering the chain carrying anything.
+        GoapActionDef {
+            kind: GoapActionKind::DropItem,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
+        // 367 follow-on: substrate-path retrieve. Gated on the live
+        // per-cat `HasFreeSlot` marker. Cost 2 matches
+        // `RetrieveRawFood`.
+        GoapActionDef {
+            kind: GoapActionKind::RetrieveDryable,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+        },
+        // 367 follow-on: plan-path retrieve — for cats whose inventory
+        // is full at chain entry. The DropItem prefix above sets
+        // `HasFreeSlotThisPlan(true)`; this arm consumes that
+        // search-state flag (mirrors `cooking_actions`'s dual-arm
+        // pattern from ticket 231).
+        GoapActionDef {
+            kind: GoapActionKind::RetrieveDryable,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::HasFreeSlotThisPlan(true),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::DryFood,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::DryingRack),
+                StatePredicate::CarryingIs(Carrying::RawFood),
+            ],
+            effects: vec![
+                StateEffect::IncrementTrips,
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
+    ]
 }
 
 /// 367: plan template for loading a Smoking Rack with raw meat + 1

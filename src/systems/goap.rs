@@ -1516,6 +1516,7 @@ pub fn evaluate_and_plan(
         has_functional_drying_rack,
         has_functional_smoking_rack,
         has_loaded_smoking_rack_off_cooldown,
+        has_dryable_in_stores,
     ) = (
         cm.has_functional_kitchen,
         cm.has_raw_food_in_stores,
@@ -1535,6 +1536,7 @@ pub fn evaluate_and_plan(
         cm.has_functional_drying_rack,
         cm.has_functional_smoking_rack,
         cm.has_loaded_smoking_rack_off_cooldown,
+        cm.has_dryable_in_stores,
     );
     let food_fraction = ws.food_fraction;
 
@@ -1630,6 +1632,13 @@ pub fn evaluate_and_plan(
         markers::HasLoadedSmokingRackOffCooldown::KEY,
         has_loaded_smoking_rack_off_cooldown,
     );
+    // 367 follow-on — colony has ≥1 RawFish or RawOrgan in
+    // `StoredItems`. Read by the per-cat `HasDryableAccessible`
+    // composite below; that composite is what `DryFoodDse`
+    // eligibility actually consults. Wired here (not only as a
+    // ColonyState component) because the eligibility filter resolves
+    // markers via the snapshot.
+    markers.set_colony(markers::HasDryableInStores::KEY, has_dryable_in_stores);
     // 084 Commit 3: ColonyThornbriarChronicallyLow — chronicity latch
     // sampled at `chronicity_window_ticks` boundaries against the
     // colony-wide stash total. Reader (this commit): `FarmDse`'s
@@ -1957,6 +1966,24 @@ pub fn evaluate_and_plan(
                 markers::HasSmokeableInInventory::KEY,
                 entity,
                 has_smokeable,
+            );
+            // 367 follow-on — `HasDryableAccessible` composite. Widens
+            // `DryFoodDse` eligibility past "cat already has dryable in
+            // inventory" to "cat could conceivably go dry something":
+            //   has_dryable_inv OR (has_free_slot AND colony has
+            //   dryable in stores).
+            // Without this, a cat that just deposited at Stores has an
+            // empty inventory, the narrow `HasDryableInInventory`
+            // marker is off, and DryFood is permanently ineligible —
+            // the racks-but-zero-loading defect that motivated this
+            // commit.
+            let has_free_slot = !inventory.is_full();
+            let has_dryable_accessible =
+                has_dryable || (has_free_slot && has_dryable_in_stores);
+            markers.set_entity(
+                markers::HasDryableAccessible::KEY,
+                entity,
+                has_dryable_accessible,
             );
         }
         // §4.2 State markers — InCombat / OnCorruptedTile /
@@ -7416,6 +7443,30 @@ fn dispatch_step_action(
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_retrieve_raw_food_from_stores(
+                ticks,
+                plan.step_state[step_idx].target_entity,
+                inventory,
+                stores_query,
+                items_query,
+                commands,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::ItemRetrieved);
+            outcome.result
+        }
+
+        // 367 follow-on — `RetrieveDryable`: tighter item-kind filter
+        // than `RetrieveRawFood` (drying recipes accept only
+        // `RawFish` / `RawOrgan`). Same target-selection +
+        // Feature-emission shape as the sibling above.
+        GoapActionKind::RetrieveDryable => {
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .stores_entities
+                    .iter()
+                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .map(|(e, _)| *e);
+            }
+            let outcome = crate::steps::disposition::resolve_retrieve_dryable_from_stores(
                 ticks,
                 plan.step_state[step_idx].target_entity,
                 inventory,

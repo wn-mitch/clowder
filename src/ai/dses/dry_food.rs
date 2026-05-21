@@ -106,13 +106,23 @@ impl DryFoodDse {
             composition: Composition::weighted_sum(vec![0.32, 0.24, 0.24, 0.20]),
             // CanDry: Adult ∧ ¬Injured (capability-marker doctrine,
             // mirror of CookDse). HasFunctionalDryingRack +
-            // HasDryableInInventory: station + inventory readiness.
-            // forbid Incapacitated: §13.1 — every non-Eat/Sleep/Idle
-            // cat DSE forbids downed cats.
+            // HasDryableAccessible: station + accessibility (the
+            // composite fires when the cat has dryable in inventory OR
+            // a free slot AND the colony has dryable in stores; the
+            // planner inserts a `RetrieveDryable` prefix in the latter
+            // case). forbid Incapacitated: §13.1 — every
+            // non-Eat/Sleep/Idle cat DSE forbids downed cats.
+            //
+            // Pre-follow-on the eligibility used the narrow
+            // `HasDryableInInventory` and DryFood never fired on
+            // seed-42 because cats deposit raw food at Stores
+            // immediately on hunt-return, so the per-cat inventory
+            // marker was off whenever scoring ran. See
+            // `docs/open-work/tickets/367-…` Log entries.
             eligibility: EligibilityFilter::new()
                 .require(markers::CanDry::KEY)
                 .require(markers::HasFunctionalDryingRack::KEY)
-                .require(markers::HasDryableInInventory::KEY)
+                .require(markers::HasDryableAccessible::KEY)
                 .forbid(markers::Incapacitated::KEY),
         }
     }
@@ -187,7 +197,7 @@ mod tests {
             vec![
                 markers::CanDry::KEY,
                 markers::HasFunctionalDryingRack::KEY,
-                markers::HasDryableInInventory::KEY,
+                markers::HasDryableAccessible::KEY,
             ]
         );
         assert_eq!(

@@ -61,6 +61,11 @@ pub struct ColonyMarkerBundle {
     pub has_functional_drying_rack: bool,
     pub has_functional_smoking_rack: bool,
     pub has_loaded_smoking_rack_off_cooldown: bool,
+    /// 367 follow-on — colony has ≥1 RawFish or RawOrgan in
+    /// `StoredItems`. Used to author the per-cat composite
+    /// `HasDryableAccessible` that gates `DryFoodDse` eligibility
+    /// even when the cat's inventory is empty.
+    pub has_dryable_in_stores: bool,
 }
 
 #[derive(Resource, Debug, Default, Clone, Copy)]
