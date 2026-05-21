@@ -1,7 +1,7 @@
 ---
 id: 438
 title: Retire hand-written dispatcher in score_actions — iterate DseRegistry instead
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
