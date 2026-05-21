@@ -3466,7 +3466,7 @@ entirely) surface before the four scalar-only ones.
 | # | Action | Backs ScoringContext (field:line) | Resolver today (file:line) | Max range (tiles) | Curve shape | Note (why this shape) |
 |---|---|---|---|---|---|---|
 | 1 | `Socialize` | `has_social_target:35` (bool) | `disposition.rs:1328–1347` + `goap.rs:3788–3810` | 8 | `Quadratic(exponent=2)` | Gentle convex falloff over colony range. §6.1 Critical: resolver today picks by `fondness × w + (1-familiarity) × w`; curve admits ranking over distance without nulling far partners. |
-| 2 | `Mate` | `has_eligible_mate:111` (bool) | `disposition.rs:1873–1919` | 1 (adjacency) | `Logistic(steepness=20, midpoint=0.5)` | Near-step — mating is physically colocated. Partners/Mates bond is an ECS eligibility filter (§4), not a consideration. §6.1 Critical. |
+| 2 | `Mate` | `has_eligible_mate:111` (bool) | `src/ai/methods/mating.rs — chain shape ported #340` | 1 (adjacency) | `Logistic(steepness=20, midpoint=0.5)` | Near-step — mating is physically colocated. Partners/Mates bond is an ECS eligibility filter (§4), not a consideration. §6.1 Critical. |
 | 3 | `Mentor` | `has_mentoring_target:93` (bool) | `disposition.rs:1352–1377` (sub-action of socializing chain) | 8 | `Quadratic(exponent=2)` | Matches `Socialize` reach — mentors find apprentices in the same colony cluster. §6.1 Critical: resolver today ignores skill-gap entirely; §6.5.3 installs it. |
 | 4 | `Groom` (other) | `has_social_target:35` (bool, shared with `Socialize`) | `disposition.rs:1379–1385` (sub-action of socializing chain) | 1–2 | `Logistic(steepness=15, midpoint=1)` | Close physical range — allogrooming needs adjacency. §6.1 Critical: shared existence-bool with `Socialize`; sibling-DSE split under §L2.10 assigns distinct curves. |
 | 5 | `Hunt` | `prey_nearby:95` (bool) + `hunt_prey_bonus` scalar (ScoringConstants, consumed at `scoring.rs:239`) | `disposition.rs:1172–1193` (chain skeleton); `HuntPrey` step handles target resolution internally via scent/sight | species-dependent (scent/sight range from §5.6.6.1 row `Cat`) | `Quadratic(exponent=2)` | Range bound is the cat's own sensory profile, not a fixed tile count — ties §6.4 to the sensory substrate. §6.1 Partial: resolver picks `min_distance` regardless of yield. |
@@ -3855,7 +3855,7 @@ deletes when §7.4 lands in implementation.
     the partner-loss / season-close horizon).
   - `MateWithGoal` (L3): `chain.steps_completed / 4`. The 4
     chain steps (MoveTo → Socialize → GroomOther → MateWith,
-    `disposition.rs:1873–1919`) remain the execution unit;
+    `src/ai/methods/mating.rs — chain shape ported #340`) remain the execution unit;
     Finish-Him applies in its canonical shape.
 
 ### §7.M Mating — canonical three-layer aspiration showcase
@@ -3887,7 +3887,7 @@ BDI architecture. Two framings drive the placement:
 A Phase-1 audit of the current code surface (committed 2026-04-20)
 named three tensions in today's `DispositionKind::Mating`: a hybrid
 single-event-wrapping-a-4-step-chain shape
-(`disposition.rs:1873–1919`), ambient pair-bond state that already
+(`src/ai/methods/mating.rs — chain shape ported #340`), ambient pair-bond state that already
 exists independently (`relationships.rs:14–17`, evolved by
 `social.rs:100–175`), and no post-mating consequence graph. All
 three dissolve under a three-layer nested-Intention design.
@@ -3979,7 +3979,7 @@ alongside Mastery / Territory arcs).
 
 - **Scope.** A single completed mating event. Replaces today's
   `DispositionKind::Mating` + `build_mating_chain`
-  (`disposition.rs:1873–1919`).
+  (`src/ai/methods/mating.rs — chain shape ported #340`).
 - **Strategy.** `SingleMinded` — the classic goal-shaped default.
   Drop on partner invalidation (moved out of range, died,
   re-partnered) or `GoapPlan::replan_count ≥ max_replans`
@@ -5871,7 +5871,7 @@ curves.
 |---|---|---|---|---|---|
 | `reproduce_aspiration_dse()` | `add_aspiration_dse` | New — no single source site today | WeightedSum | `Aspiration(Reproduce, OpenMinded, ...)` | Layer 1 per §7.M.1. Emits L2 + L3. |
 | `pairing_activity_dse()` | `add_dse` (gated on `Partners+` bond marker, §4) | Absorbs ambient pair-bond drift in `social.rs:100–175` as an explicit activity | WeightedSum | `Activity(Pairing, UntilCondition(partner_lost_or_out_of_season))` | Layer 2 per §7.M.1. |
-| `mate_with_goal_dse()` | `add_target_taking_dse` | `scoring.rs:607–616` + `disposition.rs:1873–1919` mating chain | CompensatedProduct | `Goal(mating_event_completed)` | Layer 3 per §7.M.1. §6.5.2 target set for partner selection. |
+| `mate_with_goal_dse()` | `add_target_taking_dse` | `scoring.rs:607–616` + `src/ai/methods/mating.rs — chain shape ported #340` mating chain | CompensatedProduct | `Goal(mating_event_completed)` | Layer 3 per §7.M.1. §6.5.2 target set for partner selection. |
 
 #### Herbcraft / PracticeMagic sibling DSEs (§L2.10.10)
 

@@ -853,23 +853,25 @@ Whiskers tries a different lever toward milestone 2.
 
 ## Worked example — Mating L3 ported
 
-Today's mating chain in `disposition.rs:1873-1919`:
+**Landed 2026-05-21 (#340).** The legacy mating chain — previously
+hand-coded in `src/systems/disposition.rs::build_mating_chain` as
+`[MoveTo, Socialize, GroomOther, MateWith]` — ports onto the
+registry. Authoritative authoring site:
+[`src/ai/methods/mating.rs`](../../src/ai/methods/mating.rs).
 
-```rust
-build_mating_chain() → [MoveTo, Socialize, GroomOther, MateWith]
-```
-
-Ports to:
+Note that `build_mating_chain` was already dead code at runtime:
+its only call site was inside `disposition_to_chain`, an
+unscheduled function — the live mating path runs through the GOAP
+planner's `mating_actions`. 340's port is therefore structurally
+"port the legacy chain shape onto the registry" without any
+runtime behavior change.
 
 ```rust
 Method {
-    id: "mate_with_goal",
+    id: MethodId("mate_with_goal"),
     goal_label: "mating_event_completed",
-    applicable_when: ApplicableWhen::Live(mate_with_goal_applicable),
+    applicable_when: ApplicableWhen::Live(has_eligible_mate),
     sub_goals: &[
-        SubGoal::Primitive { label: "approach_partner",
-                             action: Action::Navigate,
-                             target_hint: TargetHint::Partner },
         SubGoal::Primitive { label: "socialize_with_partner",
                              action: Action::Socialize,
                              target_hint: TargetHint::Partner },
@@ -881,23 +883,49 @@ Method {
                              target_hint: TargetHint::Partner },
     ],
     failure_strategy: MethodFailure::Abandon,
+    domain: None,
 }
 ```
 
-Behavior is preserved 1:1. What changes:
+**Three primitives, not four.** The pre-land sketch named a fourth
+`approach_partner` primitive with `Action::Navigate`. That `Action`
+variant doesn't exist (the worked example was aspirational), and
+`htn_primitive_actions` already unions
+`travel_actions(distances)` with the single Pattern-B leaf step,
+so the approach is implicit via the planner's travel-action
+injection. The three explicit primitives preserve the hand-coded
+chain's behavior 1:1.
 
-- The chain template moves out of `disposition.rs` into
-  `populate_method_registry`.
-- Mating's L3 commitment becomes inspectable from `just inspect`
-  and trace.
-- The chain's `Action::Navigate` resolver doesn't change; only
-  the harness that sequences it does.
+**`domain: None`.** Mating is reactive substrate (driven by
+`HasEligibleMate` + the outer `courtship_method`'s `SubGoal::Goal`
+recursion), not aspirational achievement. Same panic-class
+avoidance as `rear_kitten` / `mourn_at_grave` / `courtship_method`:
+setting a domain here would expose the method to the §H step-3
+domain-affinity fallback at `aspiration_picker.rs:349`, pushing a
+`GoalFrame` whose multi-step pin would panic against today's
+`htn_primitive_actions` (which doesn't cover `Action::Socialize` /
+`GroomOther` / `Mate` at 340 land). Explicit emission lands as a
+follow-on alongside the dispatch-wiring extension to
+`htn_primitive_actions`.
 
-This is the third Tier-1 method's worked example: the chain
-hand-coded today is registry-driven tomorrow with zero behavior
-change. The substrate earns its keep by making future multi-step
-arcs (stealth-cloak, rear-kitten, mourning-vigil) compose
-through the same vocabulary that Mating uses.
+### Recursion seam (the 128 worked-example screenshot)
+
+`courtship_method`'s third sub-goal upgrades from
+`SubGoal::Primitive { action: Action::Mate, … }` to
+`SubGoal::Goal(GoalState { label: "mating_event_completed", … })`,
+so when a courting cat advances to the Mating stage the L2
+evaluator pushes a *second* `GoalFrame` for `mate_with_goal` onto
+the cat's `HeldGoalStack`:
+
+```text
+depth 0: courtship_method   (sub_goal_index = 2 → mating_event_completed)
+depth 1: mate_with_goal     (sub_goal_index = N → primitive)
+```
+
+That two-deep frame stack is the 128 epic's worked-example
+payoff — registry-driven decomposition end-to-end, with the trace
+surface making the structural commitment legible via the L3 trace's
+`method_stack`.
 
 ## Cross-refs
 

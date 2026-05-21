@@ -15,10 +15,10 @@ _Last generated: 2026-05-21._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 119 |
+| Ready | 118 |
 | Parked | 14 |
 | Blocked | 34 |
-| **Open total** | **171** |
+| **Open total** | **170** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -54,7 +54,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 5 | 28 (1 / 19 / 6 / 2) | `▰▰▱▱▱▱▱▱▱▱` 15% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
-| **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 26 | 17 | 9 (0 / 6 / 1 / 2) | `▰▰▰▰▰▰▱▱▱▱` 65% |
+| **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 26 | 18 | 8 (0 / 5 / 1 / 2) | `▰▰▰▰▰▰▰▱▱▱` 69% |
 
 ## In progress (4)
 
@@ -63,11 +63,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (119)
+## Ready by cluster (118)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (36 ready, 6 blocked)
+### ai-substrate (35 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -90,7 +90,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
-- **[340](docs/open-work/tickets/340-port-mating-l3-chain-onto-htn-method.md)** — Port Mating L3 chain onto HTN method — _[ai-substrate] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
 - **[373](docs/open-work/tickets/373-denworkshop-food-retrieval-broaden-eat-substrate-beyond-stores-only.md)** — Den/Workshop food retrieval — broaden eat substrate beyond Stores-only — _[ai-substrate] · added 2026-05-16_
 - **[374](docs/open-work/tickets/374-shelter-as-housing-security-belief-per-cat-home-den-facet-replace-per-tick-spatial-shelter-rollup.md)** — Shelter as housing-security belief — per-cat home-den facet, replace per-tick spatial shelter rollup — _[ai-substrate] · added 2026-05-16_
@@ -222,11 +221,11 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 
-## Ready by initiative (81 tag-memberships across 9 initiatives)
+## Ready by initiative (79 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
-### smarter-cats (17 open, 32 landed)
+### smarter-cats (16 open, 33 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
@@ -235,7 +234,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[340](docs/open-work/tickets/340-port-mating-l3-chain-onto-htn-method.md)** — Port Mating L3 chain onto HTN method — _[ai-substrate] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
@@ -275,14 +273,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 
-### generational-continuity (10 open, 4 landed)
+### generational-continuity (9 open, 5 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · added 2026-05-07_
 - **[278](docs/open-work/tickets/278-asymmetric-courtship-roles-initiator-responder-on-jointintention.md)** — Asymmetric Courtship roles (Initiator / Responder) on JointIntention — _[social-coordination] · added 2026-05-11_
 - **[279](docs/open-work/tickets/279-body-cue-driven-joint-adoption-compose-127-with-242-243.md)** — Body-cue-driven joint adoption (compose 127 with 242 + 243) — _[social-coordination] · added 2026-05-11_
 - **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
-- **[340](docs/open-work/tickets/340-port-mating-l3-chain-onto-htn-method.md)** — Port Mating L3 chain onto HTN method — _[ai-substrate] · added 2026-05-14_
 - **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
 - **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
@@ -334,7 +331,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (119)
+## Ready (118)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -414,7 +411,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
-- **[340](docs/open-work/tickets/340-port-mating-l3-chain-onto-htn-method.md)** — Port Mating L3 chain onto HTN method — _[ai-substrate] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[344](docs/open-work/tickets/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field — _[ai-substrate] · added 2026-05-14_
 - **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
@@ -510,11 +506,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · blocked-by 205 · added 2026-05-19_
 - **[442](docs/open-work/tickets/442-split-resourcessim-constantsrs-into-a-sim-constants-submodule-per-substruct-family.md)** — Split resources/sim_constants.rs into a sim_constants/ submodule per substruct family — _[ai-substrate] · blocked-by 441 · added 2026-05-21_
 
-## Landed archive (300)
+## Landed archive (301)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (234)
+### 2026-05 (235)
 
 - **[443](docs/open-work/landed/443-smoking-chain-retrieve-step-hassmokeableaccessible-retrievesmokeable-resolvers-367-commit-10.md)** — Smoking chain retrieve step — HasSmokeableAccessible + RetrieveSmokeable resolvers (367 Commit 10) _(2026-05-21)_
 - **[439](docs/open-work/landed/439-planner-zone-resolver-returns-no-reachable-target-for-dryingrack-smokingrack-surfaced-post-437.md)** — Planner zone resolver returns no reachable target for DryingRack / SmokingRack — surfaced post-437 _(2026-05-21)_
@@ -522,6 +518,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[437](docs/open-work/landed/437-dryfood-smokemeat-tendsmokingrack-dispatch-wiring-in-score-actions.md)** — DryFood / SmokeMeat / TendSmokingRack dispatch wiring in score_actions _(2026-05-21)_
 - **[436](docs/open-work/landed/436-drying-chain-microexperiment-scenario-verify-dryfood-dse-eligibility-scoring-in-isolation.md)** — Drying chain microexperiment scenario — verify DryFood DSE eligibility + scoring in isolation _(2026-05-21)_
 - **[367](docs/open-work/landed/367-phase-1-preservation-recipes-dried-fish-smoked-meat-preserved-organ-drying-rack-and-smoking-rack-stations-016-phase-1b.md)** — Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b) _(2026-05-21)_
+- **[340](docs/open-work/landed/340-port-mating-l3-chain-onto-htn-method.md)** — Port Mating L3 chain onto HTN method _(2026-05-21)_
 - **[323](docs/open-work/landed/323-courtship-method-mirror-jointintention-stages.md)** — courtship_method — mirror JointIntention stages _(2026-05-21)_
 - **[433](docs/open-work/landed/433-431-stage-f-follow-on-colony-marker-snapshot-hoist-cross-system-dedupe.md)** — 431 Stage F follow-on — colony marker-snapshot hoist (cross-system dedupe) _(2026-05-20)_
 - **[431](docs/open-work/landed/431-hot-frame-catalog-per-tick-vs-event-driven-audit-of-top-10-cpu-consumers.md)** — Top-10 hot-frame remediation — passive_familiarity (64% CPU) + per-tick discipline event-driven sweep _(2026-05-20)_

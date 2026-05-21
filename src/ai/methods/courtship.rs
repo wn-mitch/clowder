@@ -61,6 +61,7 @@
 //! template / resolver) lands as a follow-on alongside #340's port,
 //! analogous to #332 / #333's deferred dispatch pattern.
 
+use crate::ai::dse::GoalState;
 use crate::ai::methods::{ApplicableWhen, Method, MethodFailure, MethodId, SubGoal, TargetHint};
 use crate::ai::Action;
 use crate::components::joint_intention::{JointIntention, PracticeKind};
@@ -108,17 +109,23 @@ pub fn courtship_method() -> Method {
                 action: Action::GroomOther,
                 target_hint: TargetHint::Partner,
             },
-            // #340 upgrades this row to
-            // `SubGoal::Goal(GoalState { label: "mating_event_completed" })`,
-            // composing the outer Courtship method with the inner
-            // Mating method (`mate_with_goal`). At 323 land the
-            // primitive form keeps the chain executable against
-            // today's planner-driven `Action::Mate`.
-            SubGoal::Primitive {
-                label: "mate_with_partner",
-                action: Action::Mate,
-                target_hint: TargetHint::Partner,
-            },
+            // #340 recursion seam — the third sub-goal decomposes
+            // into `mate_with_goal` via the method registry. When the
+            // L2 evaluator advances `courtship_method` to
+            // `sub_goal_index == 2`, it pushes a new `GoalFrame` for
+            // `mate_with_goal` onto the cat's `HeldGoalStack`,
+            // producing the two-deep frame stack that is the 128
+            // worked-example payoff. Depth-cap (8) is trivially
+            // satisfied (depth 2). The `achieved` predicate stays
+            // `false` so completion flows through the natural
+            // `sub_goal_index` advancement path; the
+            // `failure_strategy: Abandon` on `mate_with_goal` handles
+            // partner-loss / eligibility-loss as method abandonment
+            // rather than premature achievement.
+            SubGoal::Goal(GoalState {
+                label: "mating_event_completed",
+                achieved: |_, _| false,
+            }),
             // Bonded-stage held action: continued partner-presence.
             // No dedicated `Bond` / `Pair` Action exists; the Bonded
             // stage's "post-conception or post-Mates-bond settled

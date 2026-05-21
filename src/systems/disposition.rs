@@ -1713,6 +1713,15 @@ pub fn disposition_to_chain(
                 &mut commands,
             ),
             DispositionKind::Exploring => build_exploring_chain(pos, &res.map, d, &mut rng.rng),
+            // 340: legacy chain-building path. Dead-code arm (the GOAP
+            // planner is the live path via `ai::planner::actions::
+            // mating_actions`), retained for type-system completeness
+            // and as the docstring referent for Mentoring's / Grooming's
+            // "mirrors Mating's single-interaction shape" Pattern-B
+            // comments. The chain's structural shape is authoritatively
+            // owned by `mate_with_goal` in
+            // `src/ai/methods/mating.rs` — see that module for the
+            // registry-driven port (§7.M worked example).
             DispositionKind::Mating => build_mating_chain(mate_target, &cat_pos_list),
             DispositionKind::Caretaking => build_caretaking_chain(
                 caretake_resolution.target,
@@ -2792,6 +2801,24 @@ fn build_exploring_chain(
 /// this function owns only the chain shape. The legacy
 /// `romantic + fondness - 0.05 × dist` mixer and its inline bond
 /// filter retire here in favor of the target-taking DSE's bundle.
+///
+/// # Retired (#340)
+///
+/// This function is dead code at runtime — its only call site is
+/// inside `disposition_to_chain`, which is unscheduled (no plugin
+/// registers it in any `FixedUpdate` stage). The live mating path
+/// runs through the GOAP planner's
+/// [`crate::ai::planner::actions::mating_actions`].
+///
+/// The chain's structural shape is now authoritatively owned by
+/// [`crate::ai::methods::mating::mate_with_goal`] — the registry-
+/// driven HTN method that #340 ported it onto. New consumers should
+/// look there for the chain shape; this function is retained as the
+/// docstring referent for [`build_mentoring_chain`] /
+/// [`build_grooming_chain`]'s "mirrors Mating's single-interaction
+/// shape" Pattern-B comments. A separate cleanup can retire all
+/// three Pattern-B chain-builders atomically once their docstring
+/// references are rewritten.
 fn build_mating_chain(
     mate_target: Option<Entity>,
     cat_positions: &[(Entity, Position)],

@@ -563,16 +563,31 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // the `courtship_completed` label on any cat carrying
     // `JointIntention { practice: Courtship, .. }` and decomposes the
     // four `PracticeStage` variants (Approach → Courting → Mating →
-    // Bonded) into four primitive sub-goals. 127's
-    // `author_joint_intentions` (wired above in the FixedUpdate
-    // schedule) is the source of truth for stage transitions; this
-    // method's `sub_goal_index` advances in step via the L2
-    // evaluator's primitive-leaf completion contract (320). #340 will
-    // upgrade the third sub-goal (`mate_with_partner`) from a
-    // primitive `Action::Mate` to `SubGoal::Goal(GoalState { label:
-    // "mating_event_completed" })`, recursing into the `mate_with_goal`
-    // method.
+    // Bonded) into four sub-goals. 127's `author_joint_intentions`
+    // (wired above in the FixedUpdate schedule) is the source of truth
+    // for stage transitions; this method's `sub_goal_index` advances
+    // in step via the L2 evaluator's primitive-leaf completion contract
+    // (320). #340 (below) upgrades the third sub-goal
+    // (`mate_with_partner`) from `Primitive Action::Mate` to
+    // `SubGoal::Goal(GoalState { label: "mating_event_completed" })`,
+    // recursing into `mate_with_goal`.
     registry.push(crate::ai::methods::courtship::courtship_method());
+
+    // 340: Tier-1 Live HTN method — worked-example landing of the 128
+    // epic. `mate_with_goal` ports the legacy `build_mating_chain`
+    // template (a hand-coded `[MoveTo, Socialize, GroomOther, MateWith]`
+    // that lived in the unscheduled `disposition_to_chain` — dead code
+    // at runtime; the live mating path runs through the GOAP planner's
+    // `mating_actions`) onto the registry as three primitive sub-goals
+    // (`socialize_with_partner` → `groom_partner` → `complete_mating`;
+    // the `Action::Navigate` step from the htn-methods.md worked
+    // example is implicit via `htn_primitive_actions`'s travel-action
+    // injection). `courtship_method`'s third sub-goal recurses into
+    // this method, so the `HeldGoalStack` on a courting cat in the
+    // Mating stage carries a two-deep frame:
+    // `courtship_method` (sub_goal_index=2) → `mate_with_goal`. That
+    // recursion is the worked example screenshot for the 128 epic.
+    registry.push(crate::ai::methods::mating::mate_with_goal());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of

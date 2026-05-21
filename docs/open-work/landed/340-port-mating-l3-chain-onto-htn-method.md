@@ -1,7 +1,7 @@
 ---
 id: 340
 title: Port Mating L3 chain onto HTN method
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: [smarter-cats, generational-continuity]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
@@ -108,3 +108,4 @@ the harness that sequences them does.
 - 2026-05-14: opened as 128 epic child #22 (Batch E cross-cutting;
   worked-example landing).
 - 2026-05-19: accuracy audit — ISSUE FOUND: ticket references `src/components/disposition.rs:1873-1919` as the location of a hand-coded Mating chain, but the file is only 1113 lines total. Assertion that a `MoveTo → Socialize → GroomOther → MateWith` chain exists in that location [needs-review]. Referenced files exist (htn-methods.md, ai-substrate-refactor.md), blocker 323 status=ready is correct. Mating resolve functions verified (resolve_mate_with exists in src/steps/disposition/mate_with.rs).
+- 2026-05-21: Worked-example landing of the 128 epic — registry-driven decomposition end-to-end. mate_with_goal registers Live with three primitives (socialize_with_partner / groom_partner / complete_mating) and domain: None (panic-class avoidance, matching 323 / 333 / 332). Three primitives rather than the docs' aspirational four: Action::Navigate doesn't exist and htn_primitive_actions auto-injects travel_actions, making the approach implicit. Layer-walk found build_mating_chain was already dead at runtime — its only call site is inside the unscheduled disposition_to_chain — so the structural port has zero runtime delta (verified: my soak's drift signals are structurally identical to recent unrelated main archives, both fail vs the stale 095-phase-1a-shadow baseline at bc0dcbeb). The seam: courtship_method's third sub-goal upgrades to SubGoal::Goal(GoalState { label: "mating_event_completed" }), so a courting cat in the Mating stage carries a two-deep frame: courtship_method → mate_with_goal. build_mating_chain retained as a dead-code arm with redirect docstring (kept as the docstring referent for Mentoring's / Grooming's Pattern-B comments; full retirement of all three is a separate atomic refactor). §7.M references in ai-substrate-refactor.md updated; htn-methods.md §Worked example rewritten.

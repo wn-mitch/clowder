@@ -433,6 +433,14 @@ pub mod caretake_kitten;
 // values into four primitive sub-goals. See module doc for the
 // stage-sync rationale and the #340 upgrade path.
 pub mod courtship;
+// 340: Tier-1 Live HTN method — worked-example landing of the 128
+// epic. `mate_with_goal` retargets the legacy `build_mating_chain` (a
+// hand-coded `[Socialize, GroomOther, Mate]` template that lived in
+// the unscheduled `disposition_to_chain`) onto the registry as three
+// primitive sub-goals. Composes with `courtship_method` via the
+// `SubGoal::Goal(GoalState { label: "mating_event_completed" })`
+// recursion seam — see module doc.
+pub mod mating;
 
 // Tests live in `tests.rs` so the bash lint can exclude that path
 // while scanning `src/ai/methods/` for production `Method` literals.

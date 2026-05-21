@@ -91,12 +91,16 @@ fn courtship_method_has_four_sub_goals_one_per_practice_stage() {
     // `rear_kitten` / `mourn_at_grave`. See `courtship.rs` for the
     // panic-class avoided by this discipline.
     assert!(m.domain.is_none());
+    // #340 upgraded the third sub-goal from `Primitive Action::Mate`
+    // to `SubGoal::Goal(GoalState { label: "mating_event_completed" })`,
+    // recursing into `mate_with_goal`. The other three remain
+    // primitives that map to the Approach / Courting / Bonded stages.
     let labels: Vec<&'static str> = m
         .sub_goals
         .iter()
         .map(|sg| match sg {
             SubGoal::Primitive { label, .. } => *label,
-            SubGoal::Goal(_) => "<goal>",
+            SubGoal::Goal(g) => g.label,
         })
         .collect();
     assert_eq!(
@@ -104,10 +108,59 @@ fn courtship_method_has_four_sub_goals_one_per_practice_stage() {
         vec![
             "approach_partner",
             "allogroom_partner",
-            "mate_with_partner",
+            "mating_event_completed",
             "consolidate_bonded",
         ]
     );
+    assert!(matches!(m.sub_goals[2], SubGoal::Goal(_)));
+}
+
+// -----------------------------------------------------------------
+// 340 — mate_with_goal roundtrip + courtship recursion seam
+// -----------------------------------------------------------------
+
+#[test]
+fn mate_with_goal_has_three_primitives_in_chain_order() {
+    let m = super::mating::mate_with_goal();
+    assert_eq!(m.id, MethodId("mate_with_goal"));
+    assert_eq!(m.goal_label, "mating_event_completed");
+    assert_eq!(m.sub_goals.len(), 3);
+    assert_eq!(m.failure_strategy, MethodFailure::Abandon);
+    assert!(m.domain.is_none());
+    let labels: Vec<&'static str> = m
+        .sub_goals
+        .iter()
+        .map(|sg| match sg {
+            SubGoal::Primitive { label, .. } => *label,
+            SubGoal::Goal(g) => g.label,
+        })
+        .collect();
+    assert_eq!(
+        labels,
+        vec!["socialize_with_partner", "groom_partner", "complete_mating",]
+    );
+}
+
+#[test]
+fn courtship_recursion_seam_finds_mate_with_goal_via_registry() {
+    // The §worked-example payoff: courtship_method's third sub-goal
+    // is a SubGoal::Goal whose label resolves to mate_with_goal
+    // through MethodRegistry::lookup_spec_dormant_filtered.
+    let mut registry = MethodRegistry::default();
+    registry.push(super::courtship::courtship_method());
+    registry.push(super::mating::mate_with_goal());
+
+    let courtship = super::courtship::courtship_method();
+    let SubGoal::Goal(seam) = &courtship.sub_goals[2] else {
+        panic!(
+            "courtship_method's third sub-goal must be SubGoal::Goal after the #340 seam upgrade"
+        );
+    };
+    let spec = registry
+        .lookup_spec_dormant_filtered(seam.label)
+        .expect("mate_with_goal must register Live for label mating_event_completed");
+    assert_eq!(spec.id, MethodId("mate_with_goal"));
+    assert_eq!(spec.sub_goals.len(), 3);
 }
 
 #[test]
