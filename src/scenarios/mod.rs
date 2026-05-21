@@ -32,6 +32,7 @@ pub mod colony_reserves_belief;
 pub mod disposal_dispatch;
 pub mod disposal_election;
 pub mod district_placement_under_pressure;
+pub mod drying_chain_eligibility;
 pub mod dying_arc_softmax;
 pub mod env;
 pub mod exploration_ranging;
@@ -272,6 +273,13 @@ pub const ALL: &[&Scenario] = &[
     // scenarios. Surfaces the goap-path `HandoffItem` empty-snapshot
     // defect (afk-overnight-2026-05-19 soak: 177k canary fires).
     &parenting_handoff_recipient_resolution::SCENARIO,
+    // 436 — drying-chain eligibility microexperiment. Three sister
+    // fixtures isolate why `DryFoodDse` is silently filtered in the
+    // post-367-Commit-9 verification soak by exercising the
+    // `HasDryableAccessible` composite-marker disjuncts one at a time.
+    &drying_chain_eligibility::SCENARIO_HOT_INVENTORY,
+    &drying_chain_eligibility::SCENARIO_STORES_HAS_DRYABLE,
+    &drying_chain_eligibility::SCENARIO_EMPTY_STORES,
 ];
 
 /// Look up a scenario by its `name` field.

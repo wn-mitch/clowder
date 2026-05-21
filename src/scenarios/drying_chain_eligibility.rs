@@ -1,0 +1,357 @@
+//! Drying-chain eligibility microexperiment — ticket 436.
+//!
+//! Three sister fixtures isolate why `DryFoodDse` is scoring zero in
+//! the post-367-Commit-9 verification soak (`logs/tuned-42-5598499f`):
+//! the racks are built, `FoodLoadedOnDryingRack` never fires, and
+//! `DryFood` does not appear in any cat's `last_scores` over 108k
+//! post-build ticks. The soak's signal is "DSE silently filtered";
+//! these scenarios answer *which required marker* is the offender by
+//! exercising the four `[suspect]` rows of 436's layer-walk one at a
+//! time in a preloaded world.
+//!
+//! The three fixtures cover the eligibility-shape combinations the
+//! Commit 9 split-shape fix was supposed to widen:
+//!
+//! - **hot_inventory** — cat carries a `RawFish`, functional+idle
+//!   `DryingRack` at the cat's tile, empty Stores. `HasDryableInInventory`
+//!   alone is enough for the `HasDryableAccessible` composite to be
+//!   true (left disjunct), so `DryFoodDse` should be eligible.
+//! - **stores_has_dryable** — cat's inventory empty, Stores has
+//!   one `RawFish` entity stored, functional+idle rack one tile away.
+//!   The right disjunct (`has_free_slot && has_dryable_in_stores`)
+//!   carries the composite; this is the path Commit 9 introduced.
+//! - **empty_stores** — cat's inventory empty, Stores empty,
+//!   functional rack present. Neither disjunct holds; `DryFoodDse`
+//!   should be eligibility-filtered. Negative-control: confirms the
+//!   filter still rejects when nothing is dryable.
+//!
+//! Reading the report: the binary prints an L2 score-column table
+//! per tick. Ineligible rows get `!!` next to the DSE name; eligible
+//! ones get blank space. If `dry_food` shows `!!` in fixture 1 or 2,
+//! the composite marker (or one of its sub-markers) is silently false
+//! and the soak's "DSE never fires" symptom is explained. If `dry_food`
+//! shows blank+nonzero score in fixtures 1 and 2 (and is absent or
+//! `!!` in 3), eligibility is fine and the failure is downstream
+//! (scoring, planning, or resolver).
+//!
+//! Per CLAUDE.md "Scenario microexperiment before a soak" — answering
+//! this with `just soak` would burn 15 minutes per iteration; the
+//! scenario answers it in ~3 seconds.
+
+use bevy_ecs::world::World;
+
+use crate::components::building::{
+    DryingRackState, StoredItems, Structure, StructureType,
+};
+use crate::components::items::{Item, ItemKind, ItemLocation};
+use crate::components::magic::Inventory;
+use crate::components::physical::{Needs, Position};
+
+use super::env::{init_scenario_world, spawn_cat};
+use super::preset::{CatPreset, MarkerKind};
+use super::Scenario;
+
+const COLONY_CENTER: Position = Position { x: 20, y: 20 };
+const RACK_POS: Position = Position { x: 21, y: 20 };
+const STORES_POS: Position = Position { x: 19, y: 20 };
+
+/// Common tick budget. We only need eligibility to settle, which takes
+/// 1–2 ticks (one for the colony-marker writer to fire, one for
+/// `evaluate_and_plan` to read it back). A handful of extra ticks lets
+/// us see whether the chosen action is stable.
+const DEFAULT_TICKS: u32 = 10;
+
+pub static SCENARIO_HOT_INVENTORY: Scenario = Scenario {
+    name: "drying_chain_hot_inventory",
+    default_focal: "Cinder",
+    default_ticks: DEFAULT_TICKS,
+    setup: setup_hot_inventory,
+    expected_features: &[],
+};
+
+pub static SCENARIO_STORES_HAS_DRYABLE: Scenario = Scenario {
+    name: "drying_chain_stores_has_dryable",
+    default_focal: "Cinder",
+    default_ticks: DEFAULT_TICKS,
+    setup: setup_stores_has_dryable,
+    expected_features: &[],
+};
+
+pub static SCENARIO_EMPTY_STORES: Scenario = Scenario {
+    name: "drying_chain_empty_stores",
+    default_focal: "Cinder",
+    default_ticks: DEFAULT_TICKS,
+    setup: setup_empty_stores,
+    expected_features: &[],
+};
+
+// ---------------------------------------------------------------------
+// Fixture 1: hot inventory
+// ---------------------------------------------------------------------
+//
+// One adult cat holding `RawFish` in slot 0. A functional+idle
+// `DryingRack` sits at the cat's tile. An (empty) Stores exists so the
+// FoodStores resource resolves a non-zero capacity (some scoring axes
+// read it). The expected behavior: `HasDryableInInventory` fires on
+// the cat → left disjunct of `HasDryableAccessible` is true →
+// `DryFoodDse` eligibility passes. The composite-marker path on the
+// right disjunct is *not* exercised by this fixture; it's exercised
+// by fixture 2.
+fn setup_hot_inventory(world: &mut World, seed: u64) {
+    init_scenario_world(world, seed);
+    spawn_drying_rack(world, RACK_POS);
+    spawn_empty_stores(world, STORES_POS);
+    let _focal = spawn_cat(
+        world,
+        CatPreset::adult("Cinder", COLONY_CENTER)
+            .with_marker(MarkerKind::Adult)
+            .with_needs(set_dryfood_baseline_needs),
+    );
+    fill_focal_inventory_with_raw_fish(world, "Cinder", 1);
+}
+
+// ---------------------------------------------------------------------
+// Fixture 2: empty inventory + stores has dryable
+// ---------------------------------------------------------------------
+//
+// One adult cat with an empty inventory adjacent to a functional+idle
+// `DryingRack`. A Stores entity at (19,20) holds one `RawFish` Item
+// entity in its `StoredItems` list. Expected behavior:
+// `HasDryableInInventory` is *false* on the cat (left disjunct
+// fails), but `inventory.is_full() == false` AND
+// `HasDryableInStores` is true (right disjunct holds) →
+// `HasDryableAccessible` true → `DryFoodDse` eligibility passes.
+// This is the Commit 9 split-shape path. If this fixture shows
+// `dry_food` as ineligible, Commit 9's composite-marker writer at
+// `goap.rs:1981` is the failing row.
+fn setup_stores_has_dryable(world: &mut World, seed: u64) {
+    init_scenario_world(world, seed);
+    spawn_drying_rack(world, RACK_POS);
+    spawn_stores_with_raw_fish(world, STORES_POS, 1);
+    let _focal = spawn_cat(
+        world,
+        CatPreset::adult("Cinder", COLONY_CENTER)
+            .with_marker(MarkerKind::Adult)
+            .with_needs(set_dryfood_baseline_needs),
+    );
+}
+
+// ---------------------------------------------------------------------
+// Fixture 3: empty inventory + empty stores
+// ---------------------------------------------------------------------
+//
+// Same layout as fixture 2 but the Stores is empty. Neither disjunct
+// of `HasDryableAccessible` holds. Negative control: `DryFoodDse`
+// should be eligibility-filtered. If this row shows `eligible: true`
+// the composite marker is leaky (returning true when nothing is
+// dryable) — the inverse failure mode of fixtures 1 & 2.
+fn setup_empty_stores(world: &mut World, seed: u64) {
+    init_scenario_world(world, seed);
+    spawn_drying_rack(world, RACK_POS);
+    spawn_empty_stores(world, STORES_POS);
+    let _focal = spawn_cat(
+        world,
+        CatPreset::adult("Cinder", COLONY_CENTER)
+            .with_marker(MarkerKind::Adult)
+            .with_needs(set_dryfood_baseline_needs),
+    );
+}
+
+// ---------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------
+
+/// Spawn a fully-functional, idle `DryingRack` structure at `pos`.
+/// Skips the construction-site path (`Structure::new(DryingRack)` ships
+/// `condition: 1.0` → `effectiveness() == 1.0` → satisfies the
+/// `update_colony_building_markers` gate at `buildings.rs:712`).
+fn spawn_drying_rack(world: &mut World, pos: Position) {
+    world.spawn((
+        Structure::new(StructureType::DryingRack),
+        DryingRackState::default(),
+        pos,
+    ));
+}
+
+/// Spawn a Stores building with an empty `StoredItems` list. Required
+/// for the FoodStores resource to derive a non-zero capacity in
+/// `sync_food_stores`; otherwise `food_scarcity` reads a degenerate 0/0.
+fn spawn_empty_stores(world: &mut World, pos: Position) {
+    world.spawn((
+        Structure::new(StructureType::Stores),
+        StoredItems::default(),
+        pos,
+    ));
+}
+
+/// Spawn a Stores building containing `count` `RawFish` Item entities.
+/// Items are spawned with `ItemLocation::StoredIn(stores)` and no
+/// Position component — matches the production deposit shape
+/// (`resolve_deposit_at_stores:141-148`). Required for the
+/// `HasDryableInStores` colony marker to fire (`buildings.rs:537-548`).
+fn spawn_stores_with_raw_fish(world: &mut World, pos: Position, count: usize) {
+    let stores = world
+        .spawn((
+            Structure::new(StructureType::Stores),
+            StoredItems::default(),
+            pos,
+        ))
+        .id();
+    for _ in 0..count {
+        let item = world
+            .spawn(Item::new(
+                ItemKind::RawFish,
+                1.0,
+                ItemLocation::StoredIn(stores),
+            ))
+            .id();
+        let mut em = world.entity_mut(stores);
+        let mut stored = em
+            .get_mut::<StoredItems>()
+            .expect("Stores must have StoredItems");
+        stored.items.push(item);
+    }
+}
+
+fn fill_focal_inventory_with_raw_fish(world: &mut World, focal_name: &str, count: usize) {
+    use crate::components::identity::Name;
+    let mut q = world.query::<(bevy_ecs::entity::Entity, &Name)>();
+    let entity = q
+        .iter(world)
+        .find(|(_, n)| n.0 == focal_name)
+        .map(|(e, _)| e)
+        .expect("focal cat must exist before fill_focal_inventory_with_raw_fish");
+    let mut em = world.entity_mut(entity);
+    let mut inv = em.get_mut::<Inventory>().expect("focal has Inventory");
+    for _ in 0..count {
+        inv.add_item(ItemKind::RawFish);
+    }
+}
+
+/// Set Needs to a profile where DryFood has a fighting chance against
+/// other tier-2 DSEs but Eat / Sleep don't dominate. Hunger 0.7 sits
+/// well above the acute-Eat band but inside the `scarcity()` curve's
+/// productive midrange so the food_scarcity axis carries some signal.
+/// Energy 0.9 keeps Sleep out of the running.
+fn set_dryfood_baseline_needs(n: &mut Needs) {
+    n.hunger = 0.7;
+    n.energy = 0.9;
+}
+
+// ---------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scenarios::runner::run;
+
+    /// Helper: walk the report for the first tick whose L2 table
+    /// includes a row for `dry_food`. Returns the row's `eligible`
+    /// flag and `final_score`. None if `dry_food` never surfaced —
+    /// itself a useful diagnostic (registry mis-wired, or scoring
+    /// pass elided the DSE).
+    fn first_dry_food_row(
+        report: &crate::scenarios::runner::ScenarioReport,
+    ) -> Option<(bool, f32)> {
+        for t in &report.ticks {
+            if let Some(row) = t.l2.iter().find(|r| r.dse == "dry_food") {
+                return Some((row.eligible, row.final_score));
+            }
+        }
+        None
+    }
+
+    /// Fixture 1 expectation: cat with RawFish in inventory makes the
+    /// left disjunct of `HasDryableAccessible` true, so `dry_food` is
+    /// eligible.
+    ///
+    /// Currently `#[ignore]`d: this scenario surfaced a dispatch-layer
+    /// defect *upstream* of eligibility — `score_actions` in
+    /// `src/ai/scoring.rs` has no `score_dse_by_id("dry_food", ...)`
+    /// call, so `DryFoodDse` is registered in `populate_dse_registry`
+    /// but never invoked, never enters the L2 pool, and `dry_food`
+    /// never surfaces in the trace table (not even as `eligible: false`
+    /// — the ineligible-capture path lives inside `score_dse_by_id`
+    /// itself). Diagnosed by ticket 436. The 367 follow-on commit that
+    /// adds the dispatch branch (mirroring `cook`'s shape at
+    /// `src/ai/scoring.rs:2047-2056`) lifts this `#[ignore]`. Run with
+    /// `cargo test -- --ignored` to confirm it still fails today.
+    #[test]
+    #[ignore = "blocked on 367 follow-on: add score_dse_by_id(\"dry_food\", ...) branch to score_actions; see ticket 436 layer-walk row 'L2 DSE dispatch'"]
+    fn hot_inventory_makes_dry_food_eligible() {
+        let report = run(&SCENARIO_HOT_INVENTORY, None, Some(DEFAULT_TICKS), 42);
+        let (eligible, score) = first_dry_food_row(&report).unwrap_or_else(|| {
+            panic!(
+                "dry_food never surfaced in any L2 table — DSE not scoring at all. \
+                 Check populate_dse_registry. Ticks captured: {}",
+                report.ticks.len()
+            )
+        });
+        assert!(
+            eligible,
+            "dry_food should be eligible when cat has RawFish in inventory \
+             (left disjunct of HasDryableAccessible). Got eligible=false, \
+             final_score={score}. This narrows the failure to the per-cat \
+             HasDryableInInventory writer or the composite-marker read in goap.rs."
+        );
+    }
+
+    /// Fixture 2 expectation: empty inventory + Stores with RawFish
+    /// makes the right disjunct of `HasDryableAccessible` true (cat
+    /// has a free slot AND colony has dryable in stores), so
+    /// `dry_food` is eligible. This is the Commit 9 split-shape path.
+    ///
+    /// `#[ignore]`d for the same dispatch-defect reason as
+    /// `hot_inventory_makes_dry_food_eligible` — see that test's
+    /// rustdoc for the diagnosis and the unblocker.
+    #[test]
+    #[ignore = "blocked on 367 follow-on: add score_dse_by_id(\"dry_food\", ...) branch to score_actions; see ticket 436 layer-walk row 'L2 DSE dispatch'"]
+    fn stores_has_dryable_makes_dry_food_eligible_via_composite() {
+        let report = run(&SCENARIO_STORES_HAS_DRYABLE, None, Some(DEFAULT_TICKS), 42);
+        let (eligible, score) = first_dry_food_row(&report).unwrap_or_else(|| {
+            panic!(
+                "dry_food never surfaced in any L2 table. \
+                 Ticks captured: {}",
+                report.ticks.len()
+            )
+        });
+        assert!(
+            eligible,
+            "dry_food should be eligible via the Commit 9 composite-marker path \
+             (empty inv + colony has dryable in Stores). Got eligible=false, \
+             final_score={score}. This is the load-bearing assertion for \
+             ticket 436 — fixture 2 firing means the soak-time silent filtering \
+             is the HasDryableAccessible composite. Inspect the \
+             HasDryableInStores colony marker (buildings.rs:537-548) and the \
+             inventory.is_full() projection at goap.rs:1980."
+        );
+    }
+
+    /// Fixture 3 expectation: nothing dryable anywhere → composite is
+    /// false → `dry_food` ineligibility-filtered. Negative control.
+    /// If `dry_food` shows up *eligible* here, the composite is leaky
+    /// (returning true with empty inputs) and the soak-time
+    /// over-elections of DryFood are downstream of a composite bug,
+    /// not under-elections.
+    #[test]
+    fn empty_stores_filters_dry_food() {
+        let report = run(&SCENARIO_EMPTY_STORES, None, Some(DEFAULT_TICKS), 42);
+        match first_dry_food_row(&report) {
+            None => {
+                // L2 capture path may elide ineligible DSEs entirely.
+                // Either shape is acceptable: absent = filtered, or
+                // present-with-eligible-false = filtered.
+            }
+            Some((eligible, score)) => assert!(
+                !eligible,
+                "dry_food should be filtered when nothing is dryable anywhere. \
+                 Got eligible=true, final_score={score}. The composite marker \
+                 HasDryableAccessible is leaky — verify the right-disjunct \
+                 short-circuit at goap.rs:1981 doesn't return true when \
+                 has_dryable_in_stores is false."
+            ),
+        }
+    }
+}

@@ -38,11 +38,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · score 0.90_
-- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
-- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
+- **[437](docs/open-work/tickets/437-dryfood-smokemeat-tendsmokingrack-dispatch-wiring-in-score-actions.md)** — DryFood / SmokeMeat / TendSmokingRack dispatch wiring in score_actions — _[ai-substrate] · score 0.91_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.90_
 
 ## Epic progress (5)
 
@@ -67,7 +67,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (33 ready, 6 blocked)
+### ai-substrate (34 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -102,6 +102,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[412](docs/open-work/tickets/412-dead-features-in-activation-tracker.md)** — Three permanently dead features in activation tracker — _[ai-substrate] · added 2026-04-14_
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · added 2026-05-18_
 - **[426](docs/open-work/tickets/426-update-mate-eligibility-markers-event-driven-haseligiblemate-via-matingeligibilitychanged-message.md)** — update_mate_eligibility_markers event-driven HasEligibleMate via MatingEligibilityChanged Message — _[ai-substrate] · added 2026-05-19_
+- **[437](docs/open-work/tickets/437-dryfood-smokemeat-tendsmokingrack-dispatch-wiring-in-score-actions.md)** — DryFood / SmokeMeat / TendSmokingRack dispatch wiring in score_actions — _[ai-substrate] · added 2026-05-21_
 
 ### social-coordination (18 ready, 4 blocked)
 
@@ -124,7 +125,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 
-### items-crafting (13 ready, 9 blocked)
+### items-crafting (12 ready, 9 blocked)
 
 - **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _[items-crafting] · added 2026-04-26_
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _[items-crafting] · added 2026-04-26_
@@ -138,7 +139,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[421](docs/open-work/tickets/421-central-material-pile-smart-material-deposit-routing.md)** — Central material pile + smart material-deposit routing — _[items-crafting] · added 2026-05-19_
 - **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
-- **[436](docs/open-work/tickets/436-drying-chain-microexperiment-scenario-verify-dryfood-dse-eligibility-scoring-in-isolation.md)** — Drying chain microexperiment scenario — verify DryFood DSE eligibility + scoring in isolation — _[items-crafting] · added 2026-05-21_
 
 ### belief-perception (11 ready, 4 blocked)
 
@@ -451,7 +451,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
-- **[436](docs/open-work/tickets/436-drying-chain-microexperiment-scenario-verify-dryfood-dse-eligibility-scoring-in-isolation.md)** — Drying chain microexperiment scenario — verify DryFood DSE eligibility + scoring in isolation — _[items-crafting] · added 2026-05-21_
+- **[437](docs/open-work/tickets/437-dryfood-smokemeat-tendsmokingrack-dispatch-wiring-in-score-actions.md)** — DryFood / SmokeMeat / TendSmokingRack dispatch wiring in score_actions — _[ai-substrate] · added 2026-05-21_
 
 ## Parked (14)
 
@@ -507,12 +507,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[422](docs/open-work/tickets/422-curio-cache-routing-deposit-prefix-on-curio-cache.md)** — Curio Cache routing — deposit-prefix on curio Cache — _[items-crafting] · blocked-by 016 · added 2026-05-19_
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · blocked-by 205 · added 2026-05-19_
 
-## Landed archive (294)
+## Landed archive (295)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (228)
+### 2026-05 (229)
 
+- **[436](docs/open-work/landed/436-drying-chain-microexperiment-scenario-verify-dryfood-dse-eligibility-scoring-in-isolation.md)** — Drying chain microexperiment scenario — verify DryFood DSE eligibility + scoring in isolation _(2026-05-21)_
 - **[367](docs/open-work/landed/367-phase-1-preservation-recipes-dried-fish-smoked-meat-preserved-organ-drying-rack-and-smoking-rack-stations-016-phase-1b.md)** — Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b) _(2026-05-21)_
 - **[433](docs/open-work/landed/433-431-stage-f-follow-on-colony-marker-snapshot-hoist-cross-system-dedupe.md)** — 431 Stage F follow-on — colony marker-snapshot hoist (cross-system dedupe) _(2026-05-20)_
 - **[431](docs/open-work/landed/431-hot-frame-catalog-per-tick-vs-event-driven-audit-of-top-10-cpu-consumers.md)** — Top-10 hot-frame remediation — passive_familiarity (64% CPU) + per-tick discipline event-driven sweep _(2026-05-20)_
