@@ -17,8 +17,8 @@ _Last generated: 2026-05-21._
 | In progress | 4 |
 | Ready | 118 |
 | Parked | 14 |
-| Blocked | 34 |
-| **Open total** | **170** |
+| Blocked | 35 |
+| **Open total** | **171** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -67,7 +67,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (34 ready, 6 blocked)
+### ai-substrate (34 ready, 7 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -470,7 +470,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · parked 2026-05-20 · added 2026-05-20_
 
-## Blocked (34)
+## Blocked (35)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -506,6 +506,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
 - **[422](docs/open-work/tickets/422-curio-cache-routing-deposit-prefix-on-curio-cache.md)** — Curio Cache routing — deposit-prefix on curio Cache — _[items-crafting] · blocked-by 016 · added 2026-05-19_
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · blocked-by 205 · added 2026-05-19_
+- **[439](docs/open-work/tickets/439-planner-zone-resolver-returns-no-reachable-target-for-dryingrack-smokingrack-surfaced-post-437.md)** — Planner zone resolver returns no reachable target for DryingRack / SmokingRack — surfaced post-437 — _[ai-substrate] · blocked-by 437 · added 2026-05-21_
 
 ## Landed archive (296)
 
