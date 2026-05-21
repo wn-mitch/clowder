@@ -1,7 +1,7 @@
 ---
 id: 433
 title: 431 Stage F follow-on — colony marker-snapshot hoist (cross-system dedupe)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 6427216c
+landed-on: 2026-05-20
 ---
 
 ## Why
@@ -54,3 +54,4 @@ Design phase: define `WorldSnapshots` shape, decide whether one Resource or seve
 ## Log
 
 - 2026-05-20: opened as the proper home for 431 Stage F's substrate intent after the 431 closeout analysis showed the narrow "marker-snapshot-only hoist" wasn't a meaningful win. The broader cross-system dedupe was always the right framing; 431 §Out of scope had referenced it as "ticket 432" but that id ended up assigned to the Stage C follow-on instead.
+- 2026-05-20: WorldSnapshots resource + colony-marker / food-fraction hoist. Audit + design doc at docs/systems/world-snapshots.md names the four cross-system duplications surveyed (colony markers, cat_positions, food_fraction, kitten_snapshot) and the caveat that gates each. First concrete hoist: colony markers + food_fraction read by evaluate_and_plan instead of inline colony_state_query + food.fraction(). Soak verdict 'concern' against the stale baseline (095-phase-1a-shadow); welfare +0.6%, fulfillment +8%, shelter -9%, schedule-edge perturbation from the new populate_world_snapshots sibling explains the drift (memory learning_bevy_schedule_edge_perturbation).

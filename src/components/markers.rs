@@ -417,8 +417,9 @@ impl HasHerbStashAccessible {
 /// FixedUpdate tick by the colony-marker chain
 /// (`buildings::update_colony_building_markers`,
 /// `magic::update_{herb_availability,ward_coverage,ward_siege}_markers`)
-/// and read by `goap::evaluate_and_plan` via `WorldStateQueries::colony_state_query`
-/// to populate `MarkerSnapshot`. Ticket 168.
+/// and cached into `WorldSnapshots::colony_markers` by
+/// `world_snapshots::populate_world_snapshots`; `goap::evaluate_and_plan`
+/// reads the cached bundle to populate `MarkerSnapshot`. Tickets 168, 433.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct ColonyState;
 

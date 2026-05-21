@@ -574,6 +574,10 @@ impl Plugin for SimulationPlugin {
         // Built incrementally on CatMoved by `update_near_pair_cache`; read
         // by `passive_familiarity` for the per-tick delta application.
         app.init_resource::<crate::resources::near_pair_cache::NearPairCache>();
+        // Ticket 433 — cross-system per-tick aggregates (colony markers +
+        // food snapshot). Populated by `populate_world_snapshots`; read by
+        // `evaluate_and_plan`. See `docs/systems/world-snapshots.md`.
+        app.init_resource::<crate::resources::world_snapshots::WorldSnapshots>();
         app.init_resource::<DseRegistry>();
         // Ticket 207 — InfluenceMapRegistry replaces the hand-bundled
         // `L1Maps` SystemParam in `trace_emit.rs`. Empty at build time;
@@ -1191,12 +1195,23 @@ impl Plugin for SimulationPlugin {
                 .after(systems::items::sync_food_stores)
                 .before(systems::goap::evaluate_and_plan),
         );
-        // Flush the singleton `.insert()/.remove()` writes so
-        // evaluate_and_plan's `Has<MarkerN>` reads see them within the
-        // same tick.
+        // Flush the singleton `.insert()/.remove()` writes so the
+        // `WorldSnapshots` populator + `evaluate_and_plan`'s
+        // `Has<MarkerN>` reads see them within the same tick. Chained
+        // with `populate_world_snapshots` so the snapshot reads the
+        // freshly-flushed marker state and downstream consumers
+        // (`evaluate_and_plan`) see the cached snapshot.
+        // Ticket 433 — `populate_world_snapshots` lives in the same
+        // chain block (rather than as an independent `.before` /
+        // `.after` constraint) so the topological order is explicit:
+        // ApplyDeferred → populate_world_snapshots → evaluate_and_plan.
         app.add_systems(
             FixedUpdate,
-            bevy::ecs::schedule::ApplyDeferred
+            (
+                bevy::ecs::schedule::ApplyDeferred,
+                systems::world_snapshots::populate_world_snapshots,
+            )
+                .chain()
                 .after(systems::magic::update_ward_siege_marker)
                 .before(systems::goap::evaluate_and_plan),
         );

@@ -196,38 +196,13 @@ pub struct WorldStateQueries<'w, 's> {
         ),
         Without<Dead>,
     >,
-    /// Ticket 168 — colony singleton readout for the colony-scoped
-    /// markers authored by `update_colony_building_markers` /
-    /// `update_herb_availability_markers` / `update_ward_coverage_markers`
-    /// / `update_ward_siege_marker`. Drains directly into
-    /// `MarkerSnapshot.set_colony(...)` so DSE eligibility filters and
-    /// the planner's `StatePredicate::HasMarker` resolve through the
-    /// snapshot surface (per `scoring.rs:88-95` MVP-shim doctrine).
-    /// Ticket 169 added the `HasConstructionSite` / `HasDamagedBuilding`
-    /// rows. Ticket 171 added `HasGarden` and retired the
-    /// `scan_colony_buildings` call that previously sourced it.
-    pub colony_state_query: Query<
-        'w,
-        's,
-        (
-            Has<markers::HasFunctionalKitchen>,
-            Has<markers::HasRawFoodInStores>,
-            Has<markers::HasStoredFood>,
-            Has<markers::ThornbriarAvailable>,
-            Has<markers::WardStrengthLow>,
-            Has<markers::WardsUnderSiege>,
-            Has<markers::HasConstructionSite>,
-            Has<markers::HasDamagedBuilding>,
-            Has<markers::HasGarden>,
-            Has<markers::ColonyStoresChronicallyFull>,
-            Has<markers::HasMidden>,
-            Has<markers::HasGroundCarcass>,
-            Has<markers::HasDependentCat>,
-            Has<markers::HasStoredThornbriar>,
-            Has<markers::ColonyThornbriarChronicallyLow>,
-        ),
-        With<markers::ColonyState>,
-    >,
+    // Ticket 433 retired `colony_state_query` here in favor of
+    // `PlanResources::world_snapshots.colony_markers`. The marker
+    // booleans are now cached once per tick by
+    // `populate_world_snapshots` and read from the resource; see
+    // `docs/systems/world-snapshots.md`. Removing the field also
+    // dropped a SystemParam slot, freeing future per-cat query
+    // additions inside `WorldStateQueries`.
     /// Ticket 109 (Phase A) — read-only Age lookup for the focal cat's
     /// `nearest_other` to feed `social_status_distress`'s `age_diff`
     /// arm. Disjoint from the per-cat iteration query because both
@@ -359,6 +334,14 @@ pub struct PlanResources<'w, 's> {
     /// `BinaryHeap` + `HashMap` capacities across cat-ticks (~20 MB/
     /// soak saved per the 427 survey).
     pub planner_scratch: bevy_ecs::prelude::Local<'s, crate::ai::planner::CatPlannerScratch>,
+    /// Ticket 433 — cross-system per-tick snapshot (colony markers +
+    /// food fraction + food_available boolean). Populated by
+    /// `populate_world_snapshots` after every marker-author system
+    /// runs; read here instead of `colony_state_query.single()` /
+    /// `food.fraction()` inline calls. See
+    /// `docs/systems/world-snapshots.md` for the substrate intent
+    /// and the planned follow-on hoists.
+    pub world_snapshots: Res<'w, crate::resources::world_snapshots::WorldSnapshots>,
 }
 
 /// Bundles magic resolver dependencies to keep resolve_goap_plans under 16 params.
@@ -1441,13 +1424,19 @@ pub fn evaluate_and_plan(
 ) {
     let sc = &res.constants.scoring;
     let d = &res.constants.disposition;
-    // Ticket 168 — six colony-scoped markers now authored on the
+    // Ticket 168 — six colony-scoped markers authored on the
     // `ColonyState` singleton by the colony-marker author chain
     // (buildings.rs::update_colony_building_markers,
     // magic.rs::update_{herb_availability,ward_coverage,ward_siege}_markers).
-    // Read them once here and feed them into `MarkerSnapshot` so the
-    // evaluator-side surface stays identical per scoring.rs:88-95 MVP-
-    // shim doctrine.
+    //
+    // Ticket 433 — read from `WorldSnapshots` instead of re-querying
+    // the singleton. The populator runs once per tick after every
+    // marker author + ApplyDeferred, so the cached bundle reflects the
+    // current tick's authored state. Substrate-equivalent to the prior
+    // inline `colony_state_query.single()` read but single source of
+    // truth — see `docs/systems/world-snapshots.md`.
+    let ws = &*res.world_snapshots;
+    let cm = ws.colony_markers;
     let (
         has_functional_kitchen,
         has_raw_food_in_stores,
@@ -1464,10 +1453,24 @@ pub fn evaluate_and_plan(
         has_dependent_cat,
         has_stored_thornbriar,
         colony_thornbriar_chronically_low,
-    ) = world_state.colony_state_query.single().expect(
-        "ColonyState singleton must exist (spawned by build_new_world / init_scenario_world_with)",
+    ) = (
+        cm.has_functional_kitchen,
+        cm.has_raw_food_in_stores,
+        ws.food_available,
+        cm.thornbriar_available,
+        cm.ward_strength_low,
+        cm.wards_under_siege,
+        cm.has_construction_site,
+        cm.has_damaged_building,
+        cm.has_garden,
+        cm.colony_stores_chronically_full,
+        cm.has_midden,
+        cm.has_ground_carcass,
+        cm.has_dependent_cat,
+        cm.has_stored_thornbriar,
+        cm.colony_thornbriar_chronically_low,
     );
-    let food_fraction = res.food.fraction();
+    let food_fraction = ws.food_fraction;
 
     // §4 marker snapshot. Populated once at system start from the
     // `ColonyState` singleton (colony-scoped markers, ticket 168) plus

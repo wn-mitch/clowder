@@ -127,3 +127,4 @@ pub mod visitors;
 pub mod weather;
 pub mod wildlife;
 pub mod wind;
+pub mod world_snapshots;

@@ -1,12 +1,12 @@
 ---
 id: 432
 title: 431 Stage C follow-on — rescoped per-cat route-cost field caching design
-status: ready
+status: parked
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-20
-parked: null
+parked: 2026-05-20
 blocked-by: []
 supersedes: []
 related-systems: []
@@ -54,3 +54,4 @@ Prefer the alternative — the planner-coupled approach inherits the per-replan 
 ## Log
 
 - 2026-05-20: opened as a 431 follow-on after 431 Stage C analysis surfaced the structural cache-hit-rate issue. The original Stage C design's cache hit rate at the planner-coupled call site is ~0% because the planner only fires on plan completion (i.e. after the cat moved). Rescope: decouple the flood from the planner cadence so the cache invalidation conditions (`CatMoved`, `MapTileChanged`) determine flood frequency instead of replan frequency.
+- 2026-05-20 (parked — gradient stability finding): first implementation attempt landed the `update_route_cost_fields` populator + `MapTileChanged` Message + `RouteCostFieldCache`/`RouteCostFieldFreshness` Components. `just check` + `just test` passed. `just soak-trace 42 Simba` ran clean (no debug-invariant panic) but `just verdict` returned **fail**: `welfare -25%`, `shelter -100%`, `fulfillment -96%`, `MatingOccurred = 0`, mythic-texture continuity = 0, plan-failure-rate regression on `TravelTo(RestingSpot)` (1477) / `TravelTo(Kitchen)` (705) / `TravelTo(Stores)` (543). Cats spent 52% on `Wander` (vs steady-state ~10–15%). **Diagnosis**: re-centering the field on every cat move breaks `step_along_field`'s gradient stability. Pre-432, the field's `origin` stayed pinned to the cat's REPLAN-time position; `cost_at(neighbor)` captured full-path cost through fox-scent / corruption corridors, so the secondary tiebreak (after chebyshev-to-destination) preferred overlay-cheap routes. Post-432, the populator rebuilds the field on `origin != current_pos` — origin becomes `current_pos` on every walk-step, and `cost_at(neighbor)` collapses to just immediate edge cost. The route_cost tiebreak loses its long-range overlay signal, cats walk into corruption / fox-scent corridors and time out on `TravelTo`. The 432 ticket's premise ("cache hit rate is meaningful when the cat hasn't moved") is true for resting cats but conflicts with the gradient-walk's assumption that the field anchors at the planning origin, not the moving cursor. Implementation parked behind: a redesign that either (a) keeps the field origin pinned across walk steps and only re-anchors at replan boundaries, or (b) reworks `step_along_field` to not depend on `cost_at(neighbor)` for long-range overlay-aware routing. Files touched in the parked attempt (preserved at jj change `vkslrtuz`, commit `f9e12c92`, NOT in ancestry of `@`): `src/messages/map_tile_changed.rs`, `src/resources/map.rs` (pending_tile_changes queue), `src/components/route_cost_field.rs` (OverlayRole + RouteCostFieldFreshness), `src/systems/route_cost.rs`, `src/plugins/simulation.rs` (Chain 4 sub-chain reorg). Saved as a reference implementation; a future ticket should pick option (a) — pin field origin to last replan, populator only fires on `Without<GoapPlan>` cats — which would dedupe the flood out of the planner per-cat loop without changing gradient inputs.

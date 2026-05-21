@@ -48,6 +48,7 @@ pub mod ward_coverage_map;
 pub mod ward_intent_map;
 pub mod weather;
 pub mod wind;
+pub mod world_snapshots;
 pub mod zodiac;
 
 pub use action_affordances::{
@@ -110,4 +111,5 @@ pub use unmet_demand::UnmetDemand;
 pub use ward_coverage_map::WardCoverageMap;
 pub use ward_intent_map::WardIntentMap;
 pub use weather::{Weather, WeatherState};
+pub use world_snapshots::{ColonyMarkerBundle, WorldSnapshots};
 pub use zodiac::ZodiacData;
