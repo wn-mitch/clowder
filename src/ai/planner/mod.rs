@@ -77,6 +77,21 @@ pub enum PlannerZone {
     /// and is consumed by `resolve_zone_position`'s `CorpseTarget`
     /// arm.
     CorpseTarget,
+    /// 367: position of the nearest idle Drying Rack. Resolves to the
+    /// nearest `Structure { kind: DryingRack }` with
+    /// `DryingRackState.loaded.is_none()`. Falls back to the nearest
+    /// drying-rack entity regardless of load state when no idle rack
+    /// exists, so the planner still finds *something* (the resolver
+    /// then re-checks load state and fails cleanly if the rack got
+    /// loaded between planning and execution).
+    DryingRack,
+    /// 367: position of the nearest Smoking Rack. Resolves to the
+    /// nearest `Structure { kind: SmokingRack }`. Used by both
+    /// `SmokeMeat` (which needs an idle rack to load) and
+    /// `TendSmokingRack` (which needs a loaded-and-off-cooldown rack).
+    /// The per-action precondition does the load / cooldown
+    /// discrimination — same zone for both.
+    SmokingRack,
 }
 
 /// What the cat is carrying.
@@ -336,6 +351,21 @@ pub enum GoapActionKind {
     /// the `Mourning` Component, ending the grief arc. Same caveats
     /// as `Vigil`.
     ReleaseGrief,
+    /// 367: load raw fish or raw organ (+ a herb for the organ
+    /// recipe) onto a Drying Rack. Single-tick action; effect is
+    /// `IncrementTrips` (matches Hunting/Cooking single-trip
+    /// completion shape). Drying then advances per-tick under Clear
+    /// weather via `systems::preservation`, independent of the cat.
+    DryFood,
+    /// 367: load raw meat + fuel onto a Smoking Rack. Single-tick
+    /// action; effect is `IncrementTrips`. Smoking progress advances
+    /// only on subsequent `TendSmokingRack` cycles.
+    SmokeMeat,
+    /// 367: perform one tend cycle on a loaded Smoking Rack. Advances
+    /// `SmokingRackState.progress` by `1.0 / tends_needed`, sets
+    /// `last_tended_at_tick`. Single-tick action; effect is
+    /// `IncrementTrips`.
+    TendSmokingRack,
 }
 
 // ---------------------------------------------------------------------------

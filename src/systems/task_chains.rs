@@ -44,7 +44,7 @@ pub fn resolve_task_chains(
             Option<&mut CropState>,
             &Position,
         ),
-        Without<TaskChain>,
+        crate::steps::building::BuildingsResolverFilter,
     >,
     mut stored_items: Query<&mut StoredItems>,
     map: Res<TileMap>,

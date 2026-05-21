@@ -108,7 +108,15 @@ fn assert_all_actions_covers_action(a: Action) {
         | Action::ReleaseGrief
         | Action::Wean
         | Action::Teach
-        | Action::Release => {}
+        | Action::Release
+        // 367: preservation Actions. Templates not authored yet —
+        // the audit arm matches them to keep this assertion
+        // exhaustive without forcing prose before the substrate
+        // settles. Templates land in a follow-on once seed-42 soaks
+        // show reliable firing.
+        | Action::DryFood
+        | Action::SmokeMeat
+        | Action::TendSmokingRack => {}
     }
 }
 

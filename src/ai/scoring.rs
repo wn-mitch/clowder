@@ -1377,6 +1377,12 @@ fn active_disposition_ordinal(
         Some(DispositionKind::Fleeing) => 22.0,
         // 035: Burying appends at ordinal 23.
         Some(DispositionKind::Burying) => 23.0,
+        // 367: preservation dispositions append at ordinals 24-26 —
+        // same append-only discipline; ordinal-equality tests and
+        // saved soaks stay valid.
+        Some(DispositionKind::DryingFood) => 24.0,
+        Some(DispositionKind::SmokingMeat) => 25.0,
+        Some(DispositionKind::TendingSmokingRack) => 26.0,
     }
 }
 

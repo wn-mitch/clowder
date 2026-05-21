@@ -132,6 +132,33 @@ pub enum Feature {
     /// A cat finished cooking a raw food item at a Kitchen, flipping its
     /// `cooked` flag. Eating the item later grants a hunger multiplier.
     FoodCooked,
+    /// 367: cat loaded a raw fish or raw organ onto a Drying Rack.
+    /// Positive intermediate — the eventual `FoodDried` Feature fires
+    /// when the per-tick preservation system completes the craft.
+    FoodLoadedOnDryingRack,
+    /// 367: cat loaded raw meat + fuel onto a Smoking Rack. Positive
+    /// intermediate — the eventual `MeatSmoked` Feature fires when a
+    /// tend cycle closes out the craft.
+    MeatLoadedOnSmokingRack,
+    /// 367: cat performed one tend cycle on a loaded Smoking Rack
+    /// (advanced progress by 1/N). Positive but intermediate — distinct
+    /// from `MeatSmoked` so the tend cadence shows up in traces
+    /// independent of completion rate.
+    SmokingRackTended,
+    /// 367: per-tick preservation system completed a drying craft and
+    /// spawned a `DriedFish` or `PreservedOrgan` `Item` entity at the
+    /// rack tile. Positive — the colony's winter buffer just grew by
+    /// one preserved item.
+    FoodDried,
+    /// 367: tend cycle completed a smoking craft and spawned a
+    /// `SmokedMeat` `Item` entity at the rack tile. Positive — same
+    /// shape as `FoodDried` but for the meat pipeline.
+    MeatSmoked,
+    /// 367: per-tick preservation system completed a Preserved Organ
+    /// craft. Positive sibling to `FoodDried` — separated so the trace
+    /// distinguishes fish-pipeline from organ-pipeline activity (the
+    /// organ recipe has a different input shape and rarer source).
+    OrganPreserved,
     KittenBorn,
     GestationAdvanced,
     KittenMatured,
@@ -634,6 +661,22 @@ impl Feature {
         Feature::HerbsDeposited,
         Feature::HerbsRetrieved,
         Feature::FoodCooked,
+        // 367: preservation Features. Five expected-to-fire on
+        // seed-42 (FoodLoadedOnDryingRack / MeatLoadedOnSmokingRack
+        // / SmokingRackTended / FoodDried / MeatSmoked);
+        // OrganPreserved is chain-rare (30% organ drop × herb
+        // availability × ~2-day cure) and stays expected=false.
+        // Without this enrollment the SystemActivation snapshot
+        // and never-fired canary don't iterate the new variants —
+        // a classic substrate-stub-class failure: writer present,
+        // category/display-name match arms updated, but the
+        // iteration source overlooked.
+        Feature::FoodLoadedOnDryingRack,
+        Feature::MeatLoadedOnSmokingRack,
+        Feature::SmokingRackTended,
+        Feature::FoodDried,
+        Feature::MeatSmoked,
+        Feature::OrganPreserved,
         Feature::KittenBorn,
         Feature::GestationAdvanced,
         Feature::KittenMatured,
@@ -810,6 +853,16 @@ impl Feature {
             Feature::HerbsDeposited => Positive,
             Feature::HerbsRetrieved => Positive,
             Feature::FoodCooked => Positive,
+            // 367: preservation pipeline. Loads + tends are positive
+            // intermediates (cat actually engaged a station); the three
+            // completion features are positive on the colony's winter
+            // buffer growing by one preserved item.
+            Feature::FoodLoadedOnDryingRack => Positive,
+            Feature::MeatLoadedOnSmokingRack => Positive,
+            Feature::SmokingRackTended => Positive,
+            Feature::FoodDried => Positive,
+            Feature::MeatSmoked => Positive,
+            Feature::OrganPreserved => Positive,
             Feature::KittenBorn => Positive,
             Feature::GestationAdvanced => Positive,
             Feature::KittenMatured => Positive,
@@ -1326,6 +1379,16 @@ impl Feature {
             Feature::SnakeAmbushed => false,
             Feature::SnakeRetreated => false,
             Feature::SnakeDied => false,
+            // 367: chain-rare completion. The organ pipeline is gated
+            // by: hunt success → 30% organ drop → cat picks up → loads
+            // drying rack → ~2 sim-day Clear-weather window. A 900s
+            // soak may not produce all four links, so the canary stays
+            // opt-out until balance verification shows reliable
+            // firing. `FoodDried` (fish pipeline, no organ-drop gate)
+            // and `MeatSmoked` (per-hunt mammal/bird drop, no extra
+            // herb requirement) both fall through to `_ => true` —
+            // those are the hypothesis-load-bearing completions.
+            Feature::OrganPreserved => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }
@@ -1388,6 +1451,13 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::HerbsDeposited => "HerbsDeposited",
         Feature::HerbsRetrieved => "HerbsRetrieved",
         Feature::FoodCooked => "FoodCooked",
+        // 367 preservation pipeline.
+        Feature::FoodLoadedOnDryingRack => "FoodLoadedOnDryingRack",
+        Feature::MeatLoadedOnSmokingRack => "MeatLoadedOnSmokingRack",
+        Feature::SmokingRackTended => "SmokingRackTended",
+        Feature::FoodDried => "FoodDried",
+        Feature::MeatSmoked => "MeatSmoked",
+        Feature::OrganPreserved => "OrganPreserved",
         Feature::KittenBorn => "KittenBorn",
         Feature::GestationAdvanced => "GestationAdvanced",
         Feature::KittenMatured => "KittenMatured",
@@ -1795,7 +1865,11 @@ mod tests {
         // for the herb-stash economy. Both ship `expected_to_fire_per_soak()
         // => false` in Commit 1; Commit 2's plan-template wiring promotes
         // them to `=> true`.
-        assert_eq!(positive, 78);
+        // Ticket 367 Commit 4: +6 Positive (FoodLoadedOnDryingRack,
+        // MeatLoadedOnSmokingRack, SmokingRackTended, FoodDried,
+        // MeatSmoked, OrganPreserved) for the preservation pipeline.
+        // Five expected=true; OrganPreserved expected=false (chain-rare).
+        assert_eq!(positive, 84);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -1891,9 +1965,10 @@ mod tests {
         // items-are-real migration.
         // Ticket 084 Commit 1: +2 Positive (HerbsDeposited, HerbsRetrieved)
         // for the herb-stash economy.
+        // Ticket 367 Commit 4: +6 Positive preservation Features.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            78
+            84
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

@@ -121,7 +121,14 @@ fn assert_pick_pool_covers_action(a: Action) {
         | Action::ReleaseGrief
         | Action::Wean
         | Action::Teach
-        | Action::Release => {}
+        | Action::Release
+        // 367: preservation Actions. Templates not authored yet —
+        // reuse the closest existing template per Action below so
+        // the smoke run still renders. Real prose follows once
+        // seed-42 soaks show reliable firing.
+        | Action::DryFood
+        | Action::SmokeMeat
+        | Action::TendSmokingRack => {}
     }
 }
 
@@ -199,6 +206,11 @@ fn main() {
             Action::GriefSit => "idle.ron",
             Action::ReleaseGrief => "mentor.ron",
             Action::Wean | Action::Teach | Action::Release => "mentor.ron",
+            // 367: preservation Actions. Reuse "cook.ron" — closest
+            // existing template by shape (single-step crafting at a
+            // station with hands-on involvement). Real templates
+            // follow once the prose tier for preservation lands.
+            Action::DryFood | Action::SmokeMeat | Action::TendSmokingRack => "cook.ron",
         };
 
         let tier = match action {

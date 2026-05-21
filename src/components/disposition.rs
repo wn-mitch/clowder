@@ -165,6 +165,25 @@ pub enum DispositionKind {
     /// entity at the same position; emits `EventKind::BurialFired`
     /// (continuity canary).
     Burying,
+    /// 367: load raw fish or raw organ onto a Drying Rack. Plan
+    /// template `[DryFood]` with `ZoneIs(DryingRack)` precondition
+    /// (mirrors `Cooking`'s `ZoneIs(Kitchen)` shape). Tier 2 — same
+    /// food-buffer infrastructure as Cooking. After loading, drying
+    /// progresses without the cat (per-tick under Clear weather), so
+    /// the cat completes the action in one tick.
+    DryingFood,
+    /// 367: load raw meat + fuel onto a Smoking Rack. Plan template
+    /// `[SmokeMeat]` with `ZoneIs(SmokingRack)`. Tier 2. Distinct from
+    /// `TendingSmokingRack` — loading creates the smoking session;
+    /// tending advances it.
+    SmokingMeat,
+    /// 367: perform one tend cycle on a loaded Smoking Rack. Plan
+    /// template `[TendSmokingRack]`. Tier 2. Per-rack cooldown enforced
+    /// at the marker layer (`HasLoadedSmokingRackOffCooldown`) — the
+    /// DSE doesn't fire again on the same rack until ~2 sim-hours
+    /// have elapsed, producing the design-doc "tend, walk away, come
+    /// back" rhythm without a multi-tick commitment Component.
+    TendingSmokingRack,
 }
 
 impl DispositionKind {
@@ -201,7 +220,13 @@ impl DispositionKind {
             | Self::Herbalism
             | Self::Witchcraft
             | Self::Cooking
-            | Self::Coordinating => 1,
+            | Self::Coordinating
+            // 367: preservation dispositions each complete after a
+            // single action — drying loads-and-walks-away, smoking
+            // load creates the session, tend advances one cycle.
+            | Self::DryingFood
+            | Self::SmokingMeat
+            | Self::TendingSmokingRack => 1,
             // 176: inventory-disposal dispositions complete after one
             // act. Trashing/Handing/PickingUp involve travel + a single
             // transfer; Discarding is just the in-place drop.
@@ -275,6 +300,14 @@ impl DispositionKind {
             | Action::MagicHarvest
             | Action::MagicCommune => Some(Self::Witchcraft),
             Action::Cook => Some(Self::Cooking),
+            // 367: preservation actions route directly to their
+            // single-action dispositions. Three peer dispositions
+            // because each has a distinct station + state machine
+            // (drying = sun-powered passive, smoking-load = consume-
+            // inputs, smoking-tend = advance-progress).
+            Action::DryFood => Some(Self::DryingFood),
+            Action::SmokeMeat => Some(Self::SmokingMeat),
+            Action::TendSmokingRack => Some(Self::TendingSmokingRack),
             Action::Coordinate => Some(Self::Coordinating),
             Action::Explore | Action::Wander => Some(Self::Exploring),
             Action::Mate => Some(Self::Mating),
@@ -359,6 +392,10 @@ impl DispositionKind {
                 Action::MagicCommune,
             ],
             Self::Cooking => &[Action::Cook],
+            // 367: preservation dispositions each own a single action.
+            Self::DryingFood => &[Action::DryFood],
+            Self::SmokingMeat => &[Action::SmokeMeat],
+            Self::TendingSmokingRack => &[Action::TendSmokingRack],
             Self::Coordinating => &[Action::Coordinate],
             Self::Exploring => &[Action::Explore, Action::Wander],
             Self::Mating => &[Action::Mate],
@@ -428,6 +465,10 @@ impl DispositionKind {
         Self::Fleeing,
         // 035: Burying appended at ordinal 23 (zero-indexed: 22).
         Self::Burying,
+        // 367: preservation dispositions appended at ordinals 24-26.
+        Self::DryingFood,
+        Self::SmokingMeat,
+        Self::TendingSmokingRack,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -456,6 +497,9 @@ impl DispositionKind {
             Self::PickingUp => "PickingUp",
             Self::Fleeing => "Fleeing",
             Self::Burying => "Burying",
+            Self::DryingFood => "DryingFood",
+            Self::SmokingMeat => "SmokingMeat",
+            Self::TendingSmokingRack => "TendingSmokingRack",
         }
     }
 
@@ -492,7 +536,14 @@ impl DispositionKind {
             // (now `Action::GroomSelf` riding `Resting` at tier 1) and
             // below the affiliative-coordination tier the Socializing
             // peer group anchors. Matches `groom_other_dse.maslow_tier()`.
-            Self::Guarding | Self::Grooming => 2,
+            // 367: preservation dispositions share tier 2 with
+            // Guarding/Grooming — forward-looking buffer-building, a
+            // step above Cooking's tier-1 acute colony-feeding floor.
+            Self::Guarding
+            | Self::Grooming
+            | Self::DryingFood
+            | Self::SmokingMeat
+            | Self::TendingSmokingRack => 2,
             Self::Socializing | Self::Caretaking | Self::Mating | Self::Mentoring => 3,
             // 035: Burying is Belonging (caring for the dead is a
             // community-belonging act). Same tier as the affiliative
@@ -535,6 +586,12 @@ impl DispositionKind {
             Self::PickingUp => "pick up a ground item",
             Self::Fleeing => "flee to safer ground",
             Self::Burying => "bury the fallen",
+            // 367: preservation infinitive verbs — used by the
+            // narrative writer ("sets out to ..."). Single-cat acts of
+            // food-craft infrastructure work.
+            Self::DryingFood => "lay food on the drying rack",
+            Self::SmokingMeat => "load the smoking rack",
+            Self::TendingSmokingRack => "tend the smoking rack",
         }
     }
 }
@@ -844,11 +901,29 @@ mod tests {
         // anxiety-interrupt-class migration).
         // 035: `Burying` appends at ordinal 23. Fleeing slides from
         // tail to ordinal-22; Burying becomes the new tail.
-        assert_eq!(DispositionKind::ALL.len(), 23);
+        // 367: preservation dispositions append at ordinals 24-26
+        // (DryingFood, SmokingMeat, TendingSmokingRack). Burying
+        // slides off the tail; TendingSmokingRack becomes the new tail.
+        assert_eq!(DispositionKind::ALL.len(), 26);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::Burying),
-            "Burying must remain at ordinal-23 (tail) position"
+            Some(&DispositionKind::TendingSmokingRack),
+            "TendingSmokingRack must remain at ordinal-26 (tail) position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[24],
+            DispositionKind::SmokingMeat,
+            "SmokingMeat must remain at ordinal-25 position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[23],
+            DispositionKind::DryingFood,
+            "DryingFood must remain at ordinal-24 position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[22],
+            DispositionKind::Burying,
+            "Burying must remain at ordinal-23 position"
         );
         assert_eq!(
             DispositionKind::ALL[21],

@@ -330,6 +330,49 @@ pub fn burying_actions() -> Vec<GoapActionDef> {
     }]
 }
 
+/// 367: plan template for loading a Drying Rack with raw fish / raw
+/// organ. Single-step `[DryFood]` with `ZoneIs(DryingRack)`
+/// precondition; A* prefixes the right TravelTo from `travel_actions`.
+/// The cat enters the rack zone carrying drying-eligible food in
+/// inventory; the resolver picks the specific recipe (DriedFish vs
+/// PreservedOrgan) from what's actually carried. `IncrementTrips`
+/// completes the single-trip Disposition.
+pub fn drying_food_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::DryFood,
+        cost: 2,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::DryingRack)],
+        effects: vec![StateEffect::IncrementTrips],
+    }]
+}
+
+/// 367: plan template for loading a Smoking Rack with raw meat + 1
+/// fuel. Single-step `[SmokeMeat]` with `ZoneIs(SmokingRack)`
+/// precondition. The load resolver consumes both items from
+/// inventory in the same tick. Subsequent tending happens via the
+/// `TendSmokingRack` Disposition.
+pub fn smoking_meat_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::SmokeMeat,
+        cost: 2,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SmokingRack)],
+        effects: vec![StateEffect::IncrementTrips],
+    }]
+}
+
+/// 367: plan template for one tend cycle on a loaded Smoking Rack.
+/// Single-step `[TendSmokingRack]`. Eligibility was already gated by
+/// the colony marker `HasLoadedSmokingRackOffCooldown`, so by the
+/// time A* runs we know at least one such rack exists.
+pub fn tend_smoking_rack_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::TendSmokingRack,
+        cost: 2,
+        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SmokingRack)],
+        effects: vec![StateEffect::IncrementTrips],
+    }]
+}
+
 /// 364: plan template for an HTN leaf primitive. The L2 frame-pin
 /// (#364 commit b) selects this builder when the cat's `HeldGoalStack`
 /// pins a `SubGoal::Primitive { action, .. }` — chosen in place of
@@ -1210,6 +1253,10 @@ pub fn actions_for_disposition(
         DispositionKind::PickingUp => picking_up_actions(),
         // 230: Fleeing plan template.
         DispositionKind::Fleeing => fleeing_actions(),
+        // 367: preservation plan templates.
+        DispositionKind::DryingFood => drying_food_actions(),
+        DispositionKind::SmokingMeat => smoking_meat_actions(),
+        DispositionKind::TendingSmokingRack => tend_smoking_rack_actions(),
     };
     actions.extend(domain_actions);
     actions

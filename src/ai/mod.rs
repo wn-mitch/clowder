@@ -182,6 +182,24 @@ pub enum Action {
     /// terminal sub-goal that retires the rearing arc). Until then no
     /// Live HTN method emits it.
     Release,
+    /// 367: load raw fish or raw organ (+ a herb for the organ recipe)
+    /// onto a Drying Rack. Single-step plan template `[DryFood]` with
+    /// a `ZoneIs(DryingRack)` precondition. Rides
+    /// `DispositionKind::DryingFood`. Drying chemistry then advances
+    /// per-tick under Clear weather via `systems::preservation`,
+    /// independent of the loading cat.
+    DryFood,
+    /// 367: load raw meat + fuel onto a Smoking Rack. Single-step plan
+    /// template `[SmokeMeat]` with a `ZoneIs(SmokingRack)` precondition.
+    /// Rides `DispositionKind::SmokingMeat`. Smoking progress advances
+    /// only on subsequent tend cycles (`TendSmokingRack`), not on its
+    /// own.
+    SmokeMeat,
+    /// 367: perform one tend cycle on a loaded Smoking Rack. Advances
+    /// `SmokingRackState.progress` by `1.0 / tends_needed`, sets
+    /// `last_tended_at_tick`. Single-step plan template
+    /// `[TendSmokingRack]`. Rides `DispositionKind::TendingSmokingRack`.
+    TendSmokingRack,
 }
 
 // ---------------------------------------------------------------------------

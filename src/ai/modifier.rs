@@ -254,6 +254,10 @@ const RELEASE_GRIEF: &str = "release_grief";
 const WEAN: &str = "wean";
 const TEACH: &str = "teach";
 const RELEASE: &str = "release";
+// 367 — Phase 1b preservation DSE ids.
+const DRY_FOOD: &str = "dry_food";
+const SMOKE_MEAT: &str = "smoke_meat";
+const TEND_SMOKING_RACK: &str = "tend_smoking_rack";
 
 // Disposition-failure cooldown scalar keys, one per failure-prone
 // DispositionKind. 1.0 = no recent failure (no damp);
@@ -640,6 +644,12 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         22 => Some(&[FLEE]),
         // 035: Burying → Bury. Single-action disposition.
         23 => Some(&[BURY]),
+        // 367: preservation dispositions append at ordinals 24-26.
+        // Each is a single-action disposition; lifts apply to the
+        // matching DSE alone while the cat is committed.
+        24 => Some(&[DRY_FOOD]),
+        25 => Some(&[SMOKE_MEAT]),
+        26 => Some(&[TEND_SMOKING_RACK]),
         _ => None,
     }
 }
@@ -820,6 +830,10 @@ pub const fn dse_id_for_action(action: crate::ai::Action) -> &'static str {
         Action::Wean => WEAN,
         Action::Teach => TEACH,
         Action::Release => RELEASE,
+        // 367 — preservation Actions.
+        Action::DryFood => DRY_FOOD,
+        Action::SmokeMeat => SMOKE_MEAT,
+        Action::TendSmokingRack => TEND_SMOKING_RACK,
     }
 }
 
@@ -4265,6 +4279,14 @@ mod tests {
                 Action::Wean => &[WEAN],
                 Action::Teach => &[TEACH],
                 Action::Release => &[RELEASE],
+                // 367: preservation Actions. Listed for exhaustivity.
+                // The Patience modifier never queries them (no Live
+                // parent disposition has them as constituent — each
+                // is its own `DispositionKind::DryFood` /
+                // `::SmokeMeat` / `::TendSmokingRack`).
+                Action::DryFood => &[DRY_FOOD],
+                Action::SmokeMeat => &[SMOKE_MEAT],
+                Action::TendSmokingRack => &[TEND_SMOKING_RACK],
             }
         }
 

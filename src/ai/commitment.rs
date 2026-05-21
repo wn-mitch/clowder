@@ -247,6 +247,13 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         // Pattern B. SingleMinded prevents a partner-bond wobble from
         // dropping the act mid-execution.
         DispositionKind::Burying => SingleMinded,
+        // 367: preservation dispositions are short, goal-shaped acts —
+        // load a rack or perform one tend cycle. SingleMinded prevents
+        // a mid-walk drift from leaving the rack half-loaded or the
+        // tend half-completed.
+        DispositionKind::DryingFood => SingleMinded,
+        DispositionKind::SmokingMeat => SingleMinded,
+        DispositionKind::TendingSmokingRack => SingleMinded,
     }
 }
 
@@ -795,6 +802,14 @@ mod tests {
         // `try_preempt_with_modifier_lurch` so the cat accumulates
         // hold ticks instead of thrashing.
         assert_eq!(strategy_for_disposition(Fleeing), SingleMinded);
+        // 367: preservation dispositions — SingleMinded mirrors the
+        // existing single-action chain-driven crafting dispositions
+        // (Building / Farming / Cooking). Cat sticks with the rack
+        // until the action completes; mid-trip distractions don't
+        // strand the load.
+        assert_eq!(strategy_for_disposition(DryingFood), SingleMinded);
+        assert_eq!(strategy_for_disposition(SmokingMeat), SingleMinded);
+        assert_eq!(strategy_for_disposition(TendingSmokingRack), SingleMinded);
 
         // Exhaustive-enum guard — if a new DispositionKind variant is
         // added without a row here, the `DispositionKind::ALL` constant
@@ -830,6 +845,11 @@ mod tests {
             Fleeing,
             // 035: Burying — Pattern B single-interaction (SingleMinded).
             Burying,
+            // 367: preservation dispositions — single-action chain-
+            // driven (mirrors Building / Cooking; SingleMinded).
+            DryingFood,
+            SmokingMeat,
+            TendingSmokingRack,
         ];
         assert_eq!(
             covered.len(),

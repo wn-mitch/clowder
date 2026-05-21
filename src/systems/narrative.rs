@@ -530,6 +530,37 @@ pub fn generate_narrative(
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Significant)
             }
+
+            // 367 — Phase 1b preservation narrative templates.
+            Action::DryFood => {
+                let options = [
+                    format!("{cat} arranges fish on the drying rack."),
+                    format!("{cat} lays out food to cure under the sun."),
+                    format!("{cat} sets a fresh catch on the drying frame."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::SmokeMeat => {
+                let options = [
+                    format!("{cat} loads meat and fuel onto the smoking rack."),
+                    format!("{cat} starts a fresh smoking session."),
+                    format!("{cat} sets the smoker working over a slow fire."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
+            Action::TendSmokingRack => {
+                let options = [
+                    format!("{cat} tends the smoking rack, adjusting the meat."),
+                    format!("{cat} checks the smoker and stokes the fire."),
+                    format!("{cat} works the smoking rack with quiet attention."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Micro)
+            }
         };
 
         log.push(tick, text, tier);

@@ -53,7 +53,7 @@ pub fn resolve_harvest(
             Option<&mut CropState>,
             &Position,
         ),
-        Without<crate::components::task_chain::TaskChain>,
+        crate::steps::building::BuildingsResolverFilter,
     >,
     stored_items: &mut Query<&mut StoredItems>,
     commands: &mut Commands,

@@ -1730,7 +1730,14 @@ pub fn disposition_to_chain(
             // chain path is dormant and we don't need a chain
             // builder for the single-action `[Bury]` template.
             // Returning None defers to the planner.
-            | DispositionKind::Burying => None,
+            | DispositionKind::Burying
+            // 367: preservation dispositions ship GOAP-only. The
+            // `[DryFood]` / `[SmokeMeat]` / `[TendSmokingRack]`
+            // single-step templates flow through the planner; this
+            // legacy chain-building path defers cleanly to it.
+            | DispositionKind::DryingFood
+            | DispositionKind::SmokingMeat
+            | DispositionKind::TendingSmokingRack => None,
         };
 
         if let Some((mut chain, action)) = chain {

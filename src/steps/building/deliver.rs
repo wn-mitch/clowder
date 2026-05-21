@@ -64,7 +64,7 @@ pub fn resolve_deliver(
             Option<&mut CropState>,
             &Position,
         ),
-        Without<crate::components::task_chain::TaskChain>,
+        crate::steps::building::BuildingsResolverFilter,
     >,
 ) -> StepOutcome<bool> {
     let Some(target) = target_entity else {
@@ -122,7 +122,7 @@ pub fn deliver_legacy_chain_adapter(
             Option<&mut CropState>,
             &Position,
         ),
-        Without<crate::components::task_chain::TaskChain>,
+        crate::steps::building::BuildingsResolverFilter,
     >,
 ) -> StepOutcome<bool> {
     let mut delivered_any = false;
@@ -176,7 +176,7 @@ mod tests {
             Option<&mut ConstructionSite>,
             Option<&mut CropState>,
             &Position,
-        ), Without<crate::components::task_chain::TaskChain>>();
+        ), crate::steps::building::BuildingsResolverFilter>();
         let mut buildings = q.query_mut(world);
         resolve_deliver(material, target, inventory, &mut buildings)
     }

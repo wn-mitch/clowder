@@ -90,7 +90,14 @@ pub fn goal_for_disposition(
         // (after `flee_hold_ticks` of low-cost + non-positive threat-
         // derivative hysteresis, enforced inside the resolver — no
         // new `StatePredicate` required).
-        | DispositionKind::Fleeing => GoalState {
+        | DispositionKind::Fleeing
+        // 367: preservation dispositions complete on a single trip
+        // (`[DryFood]` / `[SmokeMeat]` / `[TendSmokingRack]` each fire
+        // `IncrementTrips` in their resolver). Mirrors Cooking's
+        // single-trip shape.
+        | DispositionKind::DryingFood
+        | DispositionKind::SmokingMeat
+        | DispositionKind::TendingSmokingRack => GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(current_trips + 1)],
         },
     }

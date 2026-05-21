@@ -391,7 +391,16 @@ pub struct BuildingResolverParams<'w, 's> {
             Option<&'static mut CropState>,
             &'static Position,
         ),
-        Without<crate::components::task_chain::TaskChain>,
+        (
+            Without<crate::components::task_chain::TaskChain>,
+            // 367: keep `&mut Structure` here statically disjoint from
+            // the read-only `&Structure` in `drying_racks` /
+            // `smoking_racks` below. Preservation racks are the only
+            // archetypes carrying these state Components, so the
+            // negative filter is a clean partition.
+            Without<crate::components::building::DryingRackState>,
+            Without<crate::components::building::SmokingRackState>,
+        ),
     >,
     pub colony_score: Option<ResMut<'w, crate::resources::colony_score::ColonyScore>>,
     /// Ground build-material entities with positions and mutable Item
@@ -447,6 +456,36 @@ pub struct BuildingResolverParams<'w, 's> {
     /// `DepositHerbs` / `RetrieveHerbs(_)` dispatch arms in
     /// `dispatch_step_action`.
     pub stored_herbs: Query<'w, 's, &'static mut crate::components::building::StoredHerbs>,
+    /// 367 — mutable per-rack state for the preservation pipeline.
+    /// `Structure` is borrowed read-only here (disjoint from the
+    /// `&mut Structure` in `buildings` because we filter
+    /// `With<DryingRackState>` / `With<SmokingRackState>` — only
+    /// preservation racks carry those Components, and the `buildings`
+    /// query's mutation sites only touch Garden / Construction-site
+    /// arms which sit on different archetypes). Used by the three
+    /// preservation step resolvers
+    /// (`resolve_load_drying_rack` / `resolve_load_smoking_rack` /
+    /// `resolve_tend_smoking_rack`).
+    pub drying_racks: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Position,
+            &'static Structure,
+            &'static mut crate::components::building::DryingRackState,
+        ),
+    >,
+    pub smoking_racks: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Position,
+            &'static Structure,
+            &'static mut crate::components::building::SmokingRackState,
+        ),
+    >,
 }
 
 /// Bundles resources for resolve_goap_plans.
@@ -1677,6 +1716,24 @@ pub fn evaluate_and_plan(
         .map(|(_, _, p, _, _)| *p)
         .collect();
 
+    // 367: Pre-compute preservation-station positions for zone
+    // resolution. Same shape as `kitchen_positions` — completed
+    // buildings only. The load + cooldown discrimination happens at
+    // resolver-time; the zone resolver just answers "where is the
+    // nearest rack of this kind?".
+    let drying_rack_positions: Vec<Position> = world_state
+        .building_query
+        .iter()
+        .filter(|(_, s, _, site, _)| s.kind == StructureType::DryingRack && site.is_none())
+        .map(|(_, _, p, _, _)| *p)
+        .collect();
+    let smoking_rack_positions: Vec<Position> = world_state
+        .building_query
+        .iter()
+        .filter(|(_, s, _, site, _)| s.kind == StructureType::SmokingRack && site.is_none())
+        .map(|(_, _, p, _, _)| *p)
+        .collect();
+
     // 035: Pre-compute dead-cat positions for the `CorpseTarget`
     // zone in `build_zone_distances`. Disjoint from the other
     // position snapshots — the dead cats are filtered `With<Dead>`
@@ -2880,6 +2937,8 @@ pub fn evaluate_and_plan(
             &cat_positions,
             &material_pile_positions,
             &food_pile_positions,
+            &drying_rack_positions,
+            &smoking_rack_positions,
             &dead_cat_positions,
             entity,
             d,
@@ -3435,6 +3494,13 @@ struct StepSnapshots {
     /// 035: name lookup for dead cats so `EventKind::BurialFired`'s
     /// `deceased` field is a real name rather than `entity:N`.
     dead_cat_names: HashMap<Entity, String>,
+    /// 367: preservation-station positions for zone resolution.
+    /// Completed structures only (built sites — construction sites
+    /// are excluded). The load + cooldown discrimination happens at
+    /// resolver-time; the zone resolver answers "where is the nearest
+    /// rack of this kind?".
+    drying_rack_positions: Vec<Position>,
+    smoking_rack_positions: Vec<Position>,
 }
 
 /// Mutable accumulators written by `dispatch_step_action`, consumed by the
@@ -3714,6 +3780,20 @@ pub fn resolve_goap_plans(
         .collect();
     let kitchen_positions: Vec<Position> = kitchen_entities.iter().map(|(_, p)| *p).collect();
 
+    // 367: completed preservation-station positions for zone resolution.
+    // Mirrors the `kitchen_positions` shape — completed buildings only;
+    // load / cooldown discrimination lives at resolver-time.
+    let drying_rack_positions: Vec<Position> = building_snapshot
+        .iter()
+        .filter(|(_, kind, _, is_site, _)| *kind == StructureType::DryingRack && !*is_site)
+        .map(|(_, _, p, _, _)| *p)
+        .collect();
+    let smoking_rack_positions: Vec<Position> = building_snapshot
+        .iter()
+        .filter(|(_, kind, _, is_site, _)| *kind == StructureType::SmokingRack && !*is_site)
+        .map(|(_, _, p, _, _)| *p)
+        .collect();
+
     // Ticket 177: completed Middens — used by the `TrashItemAtMidden`
     // dispatch arm to resolve the target entity's `Position` without
     // widening `stores_query` to overlap `Structure`/`Position`.
@@ -3882,6 +3962,10 @@ pub fn resolve_goap_plans(
         material_pile_positions,
         food_pile_positions,
         planner_markers,
+        // 367 — preservation-station position snapshots threaded
+        // into the zone resolver.
+        drying_rack_positions,
+        smoking_rack_positions,
         workshop_bonus: if building_snapshot
             .iter()
             .any(|(_, kind, _, _, _)| *kind == StructureType::Workshop)
@@ -4278,6 +4362,8 @@ pub fn resolve_goap_plans(
                     &snaps.cat_positions,
                     &snaps.material_pile_positions,
                     &snaps.food_pile_positions,
+                    &snaps.drying_rack_positions,
+                    &snaps.smoking_rack_positions,
                     &snaps.dead_cat_positions,
                     cat_entity,
                     d,
@@ -4701,6 +4787,8 @@ pub fn resolve_goap_plans(
                     &snaps.cat_positions,
                     &snaps.material_pile_positions,
                     &snaps.food_pile_positions,
+                    &snaps.drying_rack_positions,
+                    &snaps.smoking_rack_positions,
                     &snaps.dead_cat_positions,
                     cat_entity,
                     d,
@@ -5469,6 +5557,8 @@ fn dispatch_step_action(
                 &snaps.cat_positions,
                 &snaps.material_pile_positions,
                 &snaps.food_pile_positions,
+                &snaps.drying_rack_positions,
+                &snaps.smoking_rack_positions,
                 &snaps.dead_cat_positions,
                 cat_entity,
                 d,
@@ -7705,6 +7795,70 @@ fn dispatch_step_action(
         GoapActionKind::Vigil => crate::steps::disposition::resolve_vigil().result,
         GoapActionKind::GriefSit => crate::steps::disposition::resolve_grief_sit().result,
         GoapActionKind::ReleaseGrief => crate::steps::disposition::resolve_release_grief().result,
+
+        // 367 — Phase 1b preservation dispatch.
+        GoapActionKind::DryFood => {
+            // Load resolver consults the cat's inventory + the
+            // nearest idle drying rack, drains the inputs, stamps
+            // the rack's state. The per-tick `systems::preservation`
+            // chain (Commit 5) then advances progress under Clear
+            // weather and spawns the output entity at completion.
+            // Proximity gate: 3 tiles — the cat is at the rack's
+            // tile (ZoneIs precondition) but the per-tile resolver
+            // accommodates the 2×2 footprint.
+            let outcome = crate::steps::disposition::resolve_load_drying_rack(
+                *pos,
+                inventory,
+                &mut building_params.drying_racks,
+                3,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::FoodLoadedOnDryingRack,
+            );
+            outcome.result
+        }
+        GoapActionKind::SmokeMeat => {
+            let outcome = crate::steps::disposition::resolve_load_smoking_rack(
+                *pos,
+                inventory,
+                &mut building_params.smoking_racks,
+                3,
+                &ec.constants.crafting,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::MeatLoadedOnSmokingRack,
+            );
+            outcome.result
+        }
+        GoapActionKind::TendSmokingRack => {
+            // The tend resolver returns
+            // `StepOutcome<Option<bool>>`: witness `None` = no tend
+            // (Fail), `Some(false)` = intermediate tend
+            // (progress < 1.0), `Some(true)` = completion tend that
+            // spawned the `SmokedMeat` `Item`. Every successful tend
+            // emits `SmokingRackTended`; completion tends ALSO emit
+            // `MeatSmoked`.
+            let outcome = crate::steps::disposition::resolve_tend_smoking_rack(
+                *pos,
+                ec.time.tick,
+                &mut building_params.smoking_racks,
+                3,
+                &ec.constants.crafting,
+                commands,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::SmokingRackTended,
+            );
+            if outcome.witness == Some(true) {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(crate::resources::system_activation::Feature::MeatSmoked);
+                }
+            }
+            outcome.result
+        }
     }
 }
 
@@ -8025,6 +8179,8 @@ fn resolve_travel_to(
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
     food_pile_positions: &[(Entity, Position, ItemKind)],
+    drying_rack_positions: &[Position],
+    smoking_rack_positions: &[Position],
     dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
@@ -8043,6 +8199,8 @@ fn resolve_travel_to(
             cat_positions,
             material_pile_positions,
             food_pile_positions,
+            drying_rack_positions,
+            smoking_rack_positions,
             dead_cat_positions,
             cat_entity,
             d,
@@ -9478,6 +9636,9 @@ fn resolve_zone_position(
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
     food_pile_positions: &[(Entity, Position, ItemKind)],
+    // 367: preservation-station positions for zone resolution.
+    drying_rack_positions: &[Position],
+    smoking_rack_positions: &[Position],
     // 035: Dead-and-not-Buried cat positions for the `CorpseTarget`
     // zone. Disjoint from `cat_positions` (which is `Without<Dead>`).
     dead_cat_positions: &[(Entity, Position)],
@@ -9550,6 +9711,21 @@ fn resolve_zone_position(
             .filter(|(other, _)| *other != cat_entity)
             .min_by_key(|(_, dp)| pos.manhattan_distance(dp))
             .map(|(_, p)| *p),
+        // 367: nearest preservation-station tile. Built-once-per-tick
+        // snapshots filter to completed structures only. Load /
+        // cooldown discrimination happens at resolver-time — the zone
+        // resolver answers "where is the nearest rack of this kind?"
+        // and the per-action resolver verifies idle / off-cooldown
+        // state when the cat actually arrives. If the rack got loaded
+        // mid-plan the resolver fails cleanly and the planner re-picks.
+        PlannerZone::DryingRack => drying_rack_positions
+            .iter()
+            .min_by_key(|dp| pos.manhattan_distance(dp))
+            .copied(),
+        PlannerZone::SmokingRack => smoking_rack_positions
+            .iter()
+            .min_by_key(|sp| pos.manhattan_distance(sp))
+            .copied(),
     }
 }
 
@@ -9774,6 +9950,8 @@ fn build_zone_distances(
     cat_positions: &[(Entity, Position)],
     material_pile_positions: &[(Entity, Position, ItemKind)],
     food_pile_positions: &[(Entity, Position, ItemKind)],
+    drying_rack_positions: &[Position],
+    smoking_rack_positions: &[Position],
     dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
@@ -9877,6 +10055,25 @@ fn build_zone_distances(
                 .filter(|(other, _)| *other != cat_entity)
                 .min_by_key(|(_, dp)| pos.manhattan_distance(dp))
                 .map(|(_, p)| *p),
+        ),
+        // 367: nearest preservation stations. Resolves to None when
+        // none is built — the plan template's `ZoneIs(...)` precondition
+        // then yields `GoalUnreachable`, the DSE marker gates upstream
+        // catch the same condition and the action doesn't score in
+        // the first place.
+        (
+            PlannerZone::DryingRack,
+            drying_rack_positions
+                .iter()
+                .min_by_key(|p| pos.manhattan_distance(p))
+                .copied(),
+        ),
+        (
+            PlannerZone::SmokingRack,
+            smoking_rack_positions
+                .iter()
+                .min_by_key(|p| pos.manhattan_distance(p))
+                .copied(),
         ),
     ];
 
@@ -10055,6 +10252,11 @@ mod tests {
             &[],
             &[],
             &[],
+            &[],
+            &[],
+            // 367: drying / smoking rack positions empty for the
+            // Wilds test path — this resolver fixture only exercises
+            // the Wilds zone arm.
             &[],
             &[],
             &[],

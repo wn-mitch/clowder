@@ -48,7 +48,7 @@ pub fn resolve_repair(
             Option<&mut CropState>,
             &Position,
         ),
-        Without<crate::components::task_chain::TaskChain>,
+        crate::steps::building::BuildingsResolverFilter,
     >,
     map: &TileMap,
     path_plan: &CatPathPlan<'_>,
