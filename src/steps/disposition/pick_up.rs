@@ -72,7 +72,13 @@ pub fn resolve_pick_up_from_ground(
         ));
     };
 
-    if !inventory.add_item_with_modifiers(item.kind, item.modifiers) {
+    // 367-4b: propagate the ground `Item.quality` into the inventory
+    // slot so downstream craft stations (preservation racks today;
+    // future cooking/weaving stations later) can compose
+    // input-quality with crafter-skill at the output-spawn site.
+    // Pre-4b callers that don't track per-instance quality continue to
+    // use `add_item_with_modifiers` (quality defaults to 1.0).
+    if !inventory.add_item_with_quality(item.kind, item.quality, item.modifiers) {
         return StepOutcome::unwitnessed(StepResult::Fail("pick_up: inventory full".to_string()));
     }
 

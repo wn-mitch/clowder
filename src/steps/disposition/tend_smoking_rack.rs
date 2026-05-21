@@ -111,7 +111,17 @@ pub fn resolve_tend_smoking_rack(
         let needed = state.tends_needed.max(1) as f32;
         state.progress = (state.progress + 1.0 / needed).min(1.0);
         if state.progress >= 1.0 {
-            output_spawn = Some((*rack_pos, load.source_quality, load.source_modifiers));
+            // 367-4b — compose source quality (the meat's per-instance
+            // quality at load time) with the loader's normalised
+            // crafter skill via the CraftingConstants formula. See
+            // `CraftingConstants::preservation_quality_input_weight`
+            // doc-comment for the rationale.
+            let output_quality = preservation_output_quality(
+                load.source_quality,
+                load.crafter_skill,
+                crafting,
+            );
+            output_spawn = Some((*rack_pos, output_quality, load.source_modifiers));
             // Reset the rack to idle on completion.
             state.loaded = None;
             state.fuel_loaded = false;
@@ -131,4 +141,95 @@ pub fn resolve_tend_smoking_rack(
     }
 
     StepOutcome::witnessed_with(StepResult::Advance, completed)
+}
+
+/// 367-4b — Factorio/RimWorld-style output quality formula.
+///
+/// Combines the input item's per-instance quality with the loader's
+/// normalised crafter skill into a `[0.0, 1.0]` output quality.
+/// Used by `resolve_tend_smoking_rack` at completion and by the
+/// per-tick `systems::preservation` drying system (Commit 5) at
+/// `progress >= 1.0`.
+///
+/// The formula is intentionally tunable — see
+/// `CraftingConstants::preservation_quality_input_weight` /
+/// `..._skill_weight` doc-comments for the trade-off space.
+///
+/// Quality is currently **decorative** (the eat path reads
+/// `ItemKind`, not `Item.quality`) — wiring quality into food value
+/// is a separate follow-on. The substrate landing here is what makes
+/// that follow-on a one-line change at `food_value()` rather than a
+/// full pipeline retrofit.
+pub fn preservation_output_quality(
+    source_quality: f32,
+    crafter_skill: f32,
+    crafting: &CraftingConstants,
+) -> f32 {
+    (source_quality * crafting.preservation_quality_input_weight
+        + crafter_skill * crafting.preservation_quality_skill_weight)
+        .clamp(0.0, 1.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_constants() -> CraftingConstants {
+        CraftingConstants {
+            preservation_quality_input_weight: 0.7,
+            preservation_quality_skill_weight: 0.3,
+            preservation_skill_baseline: 0.4,
+            ..CraftingConstants::default()
+        }
+    }
+
+    #[test]
+    fn perfect_input_perfect_skill_yields_perfect_output() {
+        let q = preservation_output_quality(1.0, 1.0, &test_constants());
+        assert!((q - 1.0).abs() < 1e-6, "got {q}");
+    }
+
+    #[test]
+    fn zero_input_zero_skill_yields_zero_output() {
+        let q = preservation_output_quality(0.0, 0.0, &test_constants());
+        assert!(q.abs() < 1e-6, "got {q}");
+    }
+
+    #[test]
+    fn default_skill_baseline_lifts_unskilled_crafters_off_floor() {
+        // Default-skill crafter: herbcraft 0.05, foraging 0.1 →
+        // normalised crafter_skill ≈ (0.025 + 0.03 + 0.4) = 0.455.
+        // Perfect input quality → output = 0.7 + 0.455*0.3 ≈ 0.8365.
+        let crafting = test_constants();
+        let crafter_skill = (0.05 * 0.5 + 0.1 * 0.3 + crafting.preservation_skill_baseline)
+            .clamp(0.0, 1.0);
+        let q = preservation_output_quality(1.0, crafter_skill, &crafting);
+        assert!(
+            q > 0.80 && q < 0.85,
+            "default-skill crafter on perfect input: got {q}, expected ~0.83",
+        );
+    }
+
+    #[test]
+    fn highly_skilled_crafter_recovers_mediocre_input() {
+        // Highly skilled crafter: herbcraft 1.5, foraging 1.0 →
+        // normalised = clamp(0.75 + 0.3 + 0.4) = clamp(1.45) = 1.0.
+        // Mediocre input 0.5 → output = 0.35 + 0.3 = 0.65.
+        let crafting = test_constants();
+        let crafter_skill = (1.5 * 0.5 + 1.0 * 0.3 + crafting.preservation_skill_baseline)
+            .clamp(0.0, 1.0);
+        let q = preservation_output_quality(0.5, crafter_skill, &crafting);
+        assert!(
+            q > 0.60 && q < 0.70,
+            "highly-skilled crafter on mediocre input: got {q}, expected ~0.65",
+        );
+    }
+
+    #[test]
+    fn output_is_always_clamped_to_unit_interval() {
+        let c = test_constants();
+        assert!((0.0..=1.0).contains(&preservation_output_quality(2.0, 2.0, &c)));
+        assert!((0.0..=1.0).contains(&preservation_output_quality(-1.0, -1.0, &c)));
+        assert!((0.0..=1.0).contains(&preservation_output_quality(1.0, -0.5, &c)));
+    }
 }

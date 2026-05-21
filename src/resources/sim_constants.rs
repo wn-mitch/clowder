@@ -6688,6 +6688,53 @@ pub struct CraftingConstants {
     /// effects live on resolvers keyed to item identity" pillar — this
     /// is an action-side effect, not a numeric field on the item.
     pub organ_mood_bonus: f32,
+
+    // ----- 367-4b: preservation output-quality formula -----
+    //
+    // Output quality at a preservation rack's completion site (drying
+    // system or tend resolver) is:
+    //
+    //     output = clamp01(
+    //         source_quality * preservation_quality_input_weight
+    //       + crafter_skill  * preservation_quality_skill_weight
+    //     )
+    //
+    // where `crafter_skill` is the loader's normalised skill:
+    //
+    //     crafter_skill = clamp01(
+    //         skills.herbcraft * 0.5
+    //       + skills.foraging  * 0.3
+    //       + preservation_skill_baseline
+    //     )
+    //
+    // Defaults (input 0.7 / skill 0.3 / baseline 0.4) give a default
+    // colony cat a `crafter_skill ≈ 0.46` and an output quality on a
+    // perfect-1.0 input of `~0.84`. Highly skilled cats craft near 1.0.
+    // **Decorative until consumption-side wiring lands**: `food_value`
+    // currently reads `ItemKind` only, so quality only surfaces in the
+    // narrative label / inspect panel. Wiring quality into food value
+    // (or mood) is a separate follow-on (cross-references ticket 016 +
+    // 429 for the items-are-real / Source-Transfer-Sink home).
+    /// Weight applied to the source item's `quality` when computing
+    /// preservation output quality. `0.7` means input quality
+    /// dominates; reducing this lifts the floor for unskilled crafters
+    /// (RimWorld-style skill-matters) and reducing it amplifies the
+    /// skill contribution.
+    pub preservation_quality_input_weight: f32,
+
+    /// Weight applied to the crafter's normalised skill when computing
+    /// preservation output quality. `0.3` means a maxed-skill crafter
+    /// adds 0.3 quality on top of the input contribution (capped at
+    /// 1.0). Symmetric pair with `preservation_quality_input_weight`.
+    pub preservation_quality_skill_weight: f32,
+
+    /// Additive baseline added to the loader's herbcraft+foraging
+    /// skills before clamp. `0.4` means a default-skill cat
+    /// (herbcraft 0.05, foraging 0.1) crafts at `~0.46` rather than
+    /// the catastrophic `~0.05` the raw skill values alone would
+    /// give. Tune down if novice cats should craft poorly; tune up
+    /// if novice cats should craft acceptably from day one.
+    pub preservation_skill_baseline: f32,
 }
 
 impl Default for CraftingConstants {
@@ -6709,6 +6756,11 @@ impl Default for CraftingConstants {
             // Small mood tick — enough to surface in mood traces, not
             // enough to push organ-eating above hunger-driven choices.
             organ_mood_bonus: 0.05,
+            // 367-4b — preservation quality formula. See struct
+            // doc-comments for the formula shape.
+            preservation_quality_input_weight: 0.7,
+            preservation_quality_skill_weight: 0.3,
+            preservation_skill_baseline: 0.4,
         }
     }
 }

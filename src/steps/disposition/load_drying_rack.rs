@@ -15,6 +15,8 @@ use crate::components::building::{DryingLoad, DryingRackState, DryingRecipe, Str
 use crate::components::items::{ItemKind, ItemModifiers};
 use crate::components::magic::Inventory;
 use crate::components::physical::Position;
+use crate::components::skills::Skills;
+use crate::resources::sim_constants::CraftingConstants;
 use crate::steps::{StepOutcome, StepResult};
 
 /// # GOAP step resolver: `LoadDryingRack`
@@ -57,6 +59,8 @@ use crate::steps::{StepOutcome, StepResult};
 pub fn resolve_load_drying_rack(
     cat_pos: Position,
     inventory: &mut Inventory,
+    skills: &Skills,
+    crafting: &CraftingConstants,
     racks: &mut Query<(Entity, &Position, &Structure, &mut DryingRackState)>,
     proximity: i32,
 ) -> StepOutcome<bool> {
@@ -116,6 +120,17 @@ pub fn resolve_load_drying_rack(
         }
     };
 
+    // 367-4b — capture the loader's normalised crafter skill. For
+    // drying, the loader IS the substrate-correct crafter: sun does
+    // the rest of the work without further cat involvement, so there's
+    // no per-tend candidate. Composes herbcraft (preservation-adjacent
+    // knowledge) and foraging (raw-food handling) under a baseline
+    // floor; see `CraftingConstants::preservation_skill_baseline`.
+    let crafter_skill = (skills.herbcraft * 0.5
+        + skills.foraging * 0.3
+        + crafting.preservation_skill_baseline)
+        .clamp(0.0, 1.0);
+
     // Apply the load via a mutable iteration over racks. We re-enter
     // the loop because the previous borrow has dropped.
     for (entity, _, _, mut state) in racks.iter_mut() {
@@ -123,6 +138,7 @@ pub fn resolve_load_drying_rack(
             state.loaded = Some(DryingLoad {
                 recipe,
                 source_quality,
+                crafter_skill,
                 source_modifiers,
             });
             state.progress = 0.0;
@@ -135,15 +151,14 @@ pub fn resolve_load_drying_rack(
 }
 
 /// Drain one instance of `kind` from the cat's inventory; returns
-/// the captured modifiers so the rack's load can ride them onto the
-/// output entity. Quality defaults to `1.0` because `ItemSlot`
-/// doesn't carry per-instance quality (inventory collapses it; see
-/// `src/components/magic.rs:309-312`). The output entity's quality
-/// is therefore stamped at craft completion time, not inherited.
+/// the captured quality + modifiers so the rack's load can ride them
+/// onto the output entity (367-4b: `ItemSlot` now carries
+/// per-instance `quality` propagated from the source `Item.quality`
+/// at pickup time).
 fn take_kind(inventory: &mut Inventory, kind: ItemKind) -> (f32, ItemModifiers) {
     if let Some(idx) = inventory.slots.iter().position(|s| s.kind == kind) {
         let slot = inventory.slots.swap_remove(idx);
-        (1.0, slot.modifiers)
+        (slot.quality, slot.modifiers)
     } else {
         (1.0, ItemModifiers::default())
     }

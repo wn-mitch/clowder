@@ -305,24 +305,71 @@ pub struct FlavorPlant {
 /// Ticket 231 collapsed the prior `enum ItemSlot { Herb, Item }` split,
 /// which created a representational asymmetry but no semantic difference
 /// (`Inventory::is_full()` was always variant-agnostic).
+///
+/// Ticket 367 Commit 4b added `quality`. Picked-up items propagate
+/// their source `Item.quality` through the slot (RimWorld/Factorio-
+/// style: input quality is the substrate for output quality at any
+/// downstream craft station). Pre-4b callers (hunt drops, remedy
+/// preparation, herb gather, etc.) default to `1.0` via
+/// `ItemSlot::new`. The `#[serde(default = "default_one_quality")]`
+/// attribute keeps pre-4b save-game JSON deserializable.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ItemSlot {
     pub kind: crate::components::items::ItemKind,
     pub modifiers: crate::components::items::ItemModifiers,
+    /// `[0.0, 1.0]`. Default `1.0` ("unknown / full quality") when
+    /// the upstream caller doesn't track per-instance quality. The
+    /// cat-picks-up-from-ground path (`resolve_pick_up`) captures
+    /// the source `Item.quality`; downstream crafting reads it via
+    /// the load resolver and combines it with crafter skill at the
+    /// output-spawn site (see `tend_smoking_rack.rs` and the
+    /// `preservation` system).
+    #[serde(default = "default_one_quality")]
+    pub quality: f32,
+}
+
+fn default_one_quality() -> f32 {
+    1.0
 }
 
 impl ItemSlot {
+    /// Construct a slot with default quality (`1.0`). Pre-367-4b
+    /// API surface — every existing caller (hunt drops, prepared
+    /// remedies, herb gather, magic) keeps working without explicit
+    /// quality plumbing. New callers that *do* track quality should
+    /// use `ItemSlot::with_quality` instead.
     pub fn new(
         kind: crate::components::items::ItemKind,
         modifiers: crate::components::items::ItemModifiers,
     ) -> Self {
-        Self { kind, modifiers }
+        Self {
+            kind,
+            modifiers,
+            quality: 1.0,
+        }
+    }
+
+    /// Construct a slot with explicit quality. Used by the
+    /// `resolve_pick_up` path (367-4b) to propagate the source
+    /// `Item.quality` into the inventory representation. Clamps to
+    /// `[0.0, 1.0]` matching the `Item::quality` invariant.
+    pub fn with_quality(
+        kind: crate::components::items::ItemKind,
+        quality: f32,
+        modifiers: crate::components::items::ItemModifiers,
+    ) -> Self {
+        Self {
+            kind,
+            modifiers,
+            quality: quality.clamp(0.0, 1.0),
+        }
     }
 
     pub fn herb(kind: HerbKind) -> Self {
         Self {
             kind: kind.to_item_kind(),
             modifiers: crate::components::items::ItemModifiers::default(),
+            quality: 1.0,
         }
     }
 }
@@ -483,7 +530,8 @@ impl Inventory {
         self.add_item_with_modifiers(kind, crate::components::items::ItemModifiers::default())
     }
 
-    /// Add an item with explicit modifiers. Returns false if inventory is full.
+    /// Add an item with explicit modifiers (default quality `1.0`).
+    /// Returns false if inventory is full.
     pub fn add_item_with_modifiers(
         &mut self,
         kind: crate::components::items::ItemKind,
@@ -493,6 +541,24 @@ impl Inventory {
             return false;
         }
         self.slots.push(ItemSlot::new(kind, modifiers));
+        true
+    }
+
+    /// 367-4b: add an item with full provenance (explicit quality +
+    /// modifiers). The cat-picks-up-from-ground path uses this so the
+    /// source `Item.quality` rides into inventory and onward into any
+    /// downstream craft station. Returns false if inventory is full.
+    pub fn add_item_with_quality(
+        &mut self,
+        kind: crate::components::items::ItemKind,
+        quality: f32,
+        modifiers: crate::components::items::ItemModifiers,
+    ) -> bool {
+        if self.is_full() {
+            return false;
+        }
+        self.slots
+            .push(ItemSlot::with_quality(kind, quality, modifiers));
         true
     }
 

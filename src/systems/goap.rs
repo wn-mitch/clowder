@@ -7809,6 +7809,8 @@ fn dispatch_step_action(
             let outcome = crate::steps::disposition::resolve_load_drying_rack(
                 *pos,
                 inventory,
+                skills,
+                &ec.constants.crafting,
                 &mut building_params.drying_racks,
                 3,
             );
@@ -7822,6 +7824,7 @@ fn dispatch_step_action(
             let outcome = crate::steps::disposition::resolve_load_smoking_rack(
                 *pos,
                 inventory,
+                skills,
                 &mut building_params.smoking_racks,
                 3,
                 &ec.constants.crafting,

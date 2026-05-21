@@ -13,6 +13,7 @@ use crate::components::building::{SmokingLoad, SmokingRackState, Structure};
 use crate::components::items::ItemKind;
 use crate::components::magic::Inventory;
 use crate::components::physical::Position;
+use crate::components::skills::Skills;
 use crate::resources::sim_constants::CraftingConstants;
 use crate::steps::{StepOutcome, StepResult};
 
@@ -52,6 +53,7 @@ use crate::steps::{StepOutcome, StepResult};
 pub fn resolve_load_smoking_rack(
     cat_pos: Position,
     inventory: &mut Inventory,
+    skills: &Skills,
     racks: &mut Query<(Entity, &Position, &Structure, &mut SmokingRackState)>,
     proximity: i32,
     crafting: &CraftingConstants,
@@ -107,12 +109,21 @@ pub fn resolve_load_smoking_rack(
         return StepOutcome::unwitnessed(StepResult::Fail("fuel vanished mid-load".into()));
     }
 
-    // Quality defaults to 1.0: `ItemSlot` doesn't carry per-instance
-    // quality (inventory collapses it; see `src/components/magic.rs:309-312`).
-    // The output entity is stamped at craft completion.
+    // 367-4b — `ItemSlot.quality` carries the source meat's per-
+    // instance quality from pickup. The output entity's final quality
+    // is computed at the closing tend cycle by combining this with
+    // `crafter_skill` via `CraftingConstants::preservation_quality_*`.
+    // The loader-as-crafter convention (rather than last-tender-as-
+    // crafter) keeps SmokingRackState's persisted skill scalar — see
+    // `SmokingLoad::crafter_skill` doc-comment for the trade-off.
+    let crafter_skill = (skills.herbcraft * 0.5
+        + skills.foraging * 0.3
+        + crafting.preservation_skill_baseline)
+        .clamp(0.0, 1.0);
     let load = SmokingLoad {
         source_kind: meat_slot.kind,
-        source_quality: 1.0,
+        source_quality: meat_slot.quality,
+        crafter_skill,
         source_modifiers: meat_slot.modifiers,
     };
 

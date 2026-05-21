@@ -563,10 +563,25 @@ pub enum DryingRecipe {
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DryingLoad {
     pub recipe: DryingRecipe,
-    /// Carries through to the output `Item::quality`.
+    /// Source item's quality at load time (RimWorld/Factorio-style
+    /// substrate for the output). Combined with `crafter_skill` via
+    /// `CraftingConstants::preservation_quality_*` at output-spawn
+    /// time to produce the final `Item::quality`.
     pub source_quality: f32,
+    /// 367-4b: loader's normalised crafter skill at load time. For
+    /// drying, the loader is the substrate-correct "crafter" — sun
+    /// does the rest of the work, no per-tend cat exists. Combined
+    /// with `source_quality` at output-spawn time. Default 0.4
+    /// (matches `CraftingConstants::preservation_skill_baseline`)
+    /// for serde back-compat on pre-4b save data.
+    #[serde(default = "default_crafter_skill")]
+    pub crafter_skill: f32,
     /// Corruption + `from_organ` ride through to the output's modifiers.
     pub source_modifiers: crate::components::items::ItemModifiers,
+}
+
+fn default_crafter_skill() -> f32 {
+    0.4
 }
 
 /// Per-Drying-Rack runtime state (ticket 367). Inserted on
@@ -594,7 +609,18 @@ pub struct SmokingLoad {
     /// four smoking recipes share `ItemKind::SmokedMeat` as their
     /// output.
     pub source_kind: crate::components::items::ItemKind,
+    /// Source meat's quality at load time. See `DryingLoad::source_quality`.
     pub source_quality: f32,
+    /// 367-4b: loader's normalised crafter skill at load time. Smoking
+    /// has a per-tend cat (the cooking happens in discrete visits) so
+    /// arguably the "last tender" is the substrate-correct crafter.
+    /// 4b ships the simpler convention — the loader's skill carries
+    /// through every tend — to avoid stamping skill on every visit.
+    /// If gameplay observation says the closing tender should matter
+    /// more, a follow-on can extend `SmokingRackState` with a
+    /// `tend_skills: Vec<f32>` and weight the closing tend higher.
+    #[serde(default = "default_crafter_skill")]
+    pub crafter_skill: f32,
     pub source_modifiers: crate::components::items::ItemModifiers,
 }
 
