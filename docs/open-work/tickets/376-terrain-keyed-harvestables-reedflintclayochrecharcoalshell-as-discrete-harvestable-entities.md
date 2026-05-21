@@ -47,9 +47,55 @@ The 016 crafting epic names **reed, flint, clay, pigment (ochre / charcoal), she
 
 **Design pillar:** "items are real" — flint occupies a tile, reeds grow in seasonal beds. Spatial routing of cat behavior toward known harvestable locations is the substrate; 378's demand pressure composes on top.
 
+## Lessons from 367 first-light (inherited from [016](016-crafting-items-recipes-stations.md))
+
+This ticket has a **DSE-side analog** of 367's `BuildPressure` lesson:
+the substrate works only if some DSE actually elects to harvest the
+new terrain materials. World-gen seeding them isn't enough — cats need
+a scoring path that pulls them toward reed-beds, flint outcrops, etc.
+
+- **DSE election is the analog of `BuildPressure`.** 367's lesson was
+  "the colony elects to build via `BuildPressure`; without an
+  accumulation channel, the structure is dormant." 376's analog: the
+  cat elects to harvest via a `Harvest` / `ForageHarvestable` DSE;
+  without a scoring path that *prefers* terrain-keyed harvestables
+  (or composes with 378's demand axis), the harvestables exist as
+  scenery but no cat ever walks to one. Two viable shapes:
+  - (a) Extend the existing `gather_herb` / `forage` DSE to score
+    terrain harvestables. Smaller diff; conflates herb and material
+    elections under one scoring shape. Risk: hidden coupling later.
+  - (b) Sibling `harvest_material` DSE keyed to `MaterialKind`. Larger
+    diff but cleaner orthogonality. Composes with 378 by reading
+    `material_pressure(kind)` directly.
+  Decision: defer to implementation but verify in first-light that
+  cats actually walk to + harvest at least one of each terrain type
+  on seed-42. If they don't, the DSE isn't electing — same dormancy
+  class as 367's "rack exists but never gets loaded" pre-fix.
+
+- **ItemKind enrollment.** Five new variants (Reed / Flint / Clay /
+  Ochre / Charcoal) plus wiring the existing `ColorfulShell` producer.
+  Audit the same hand-maintained iteration constants as 375
+  (`ItemKind` exhaustiveness test, `decay_rate()`, `is_food()`,
+  `category()`, `name()`). `decay_rate() == 0.0` on all five is
+  noted in scope — verify against existing non-decaying items
+  (`Wood`, `Stone` precedent).
+
+- **Producer-without-consumer is acceptable but visibility-flagged.**
+  Like 375, the terrain harvestables ship as a producer-only change;
+  consumers land in 369 (Flint / Reed), 370 (Shell), 371 (Clay /
+  Ochre / Charcoal), 372 (Clay / Ochre / Charcoal). First-light
+  verifies producer activation, not consumer flow.
+
+- **First-light soak before landing.** `just soak-trace 42 Simba` +
+  `just verdict logs/tuned-42/`. Hard gate: at least one harvest of
+  *each* terrain material on seed-42 / --duration 900. The scenario
+  test catches per-terrain spawn correctness; the soak catches
+  whether the DSE election path actually pulls cats to harvest.
+
 ## Verification
 - `just scenario terrain-harvest`: preset cats near each terrain type; assert harvest step picks the right Harvestable and spawns the right material.
 - World-gen sanity: `just headless --seed 42 --ticks 1000`; then `just q events events.jsonl HarvestableSpawned` to confirm reeds / flint / clay / ochre / charcoal / shells exist in expected counts on the right terrain.
+- **First-light gate (per [016](016-crafting-items-recipes-stations.md) lessons):** `just soak-trace 42 Simba` produces ≥1 harvest event per material kind. Until this gate clears, the DSE election is dormant and 369/370/371/372 stay structurally upstream-starved.
 - `just verdict logs/...` to confirm no continuity regression.
 
 ## Related work

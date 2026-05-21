@@ -161,6 +161,20 @@ pub struct BuildPressure {
     pub farming: f32,
     /// Wildlife breaching colony perimeter.
     pub defense: f32,
+    /// 367 Commit 8 — colony has raw food but no Drying Rack to
+    /// preserve fish/organs. Accumulates when raw food sits in
+    /// Stores and decays once a Drying Rack exists. The election
+    /// pillar matches the cooking/workshop pattern: signal-driven
+    /// build pressure, not directive-driven.
+    #[serde(default)]
+    pub drying_rack: f32,
+    /// 367 Commit 8 — colony has raw meat but no Smoking Rack to
+    /// preserve mammals/birds. Independent channel from
+    /// `drying_rack` (smoking needs fuel + tend cycles; drying just
+    /// needs sun) so the two structures can be elected
+    /// independently as the food economy demands.
+    #[serde(default)]
+    pub smoking_rack: f32,
 }
 
 impl BuildPressure {
@@ -180,6 +194,13 @@ impl BuildPressure {
             (self.cooking, StructureType::Kitchen),
             (self.farming, StructureType::Garden),
             (self.defense, StructureType::Watchtower),
+            // 367 Commit 8 — preservation infrastructure. Independent
+            // channels so the food economy can lift Drying Rack first
+            // (cheaper, sun-driven) and Smoking Rack second (needs
+            // fuel + tend cycles), or both, based on which raw foods
+            // are accumulating.
+            (self.drying_rack, StructureType::DryingRack),
+            (self.smoking_rack, StructureType::SmokingRack),
         ];
         channels
             .iter()

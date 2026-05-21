@@ -54,6 +54,64 @@ Load-bearing — drift re-triggers ranking (F→2, H→2, score → ~96). Quick 
 - Phase 5 not-DF guardrail: collective (multi-cat) or cumulative (multi-season), never individual-rare-strike. `the-calling.md` owns individual mood-strike craft.
 - Generalize `remedy_prep` and `ward_setting` into the unified catalog in Phase 1. No parallel code paths.
 
+## Lessons from 367 first-light (2026-05-21)
+
+Three substrate-stub-class gaps surfaced when 367 (Phase 1b preservation) ran
+its first soak. None were caught by `just check` or `cargo test --lib`;
+all surfaced as either silent canary false-negatives or as dormant-substrate
+"compiled and tested but never fires" outcomes. Every Phase ≥1b ticket
+inherits these:
+
+1. **Hand-maintained iteration lists are substrate, not metadata.** When
+   adding new enum variants (`Feature`, `ItemKind`, `DispositionKind`,
+   `Action`, etc.), enroll them in **every** hand-maintained iteration
+   constant, not just the exhaustive `match` arms. The compiler catches
+   missing match arms; it does **not** catch a `pub const ALL: &[Foo] = &[...]`
+   omission. The 367 case: 6 new `Feature` variants got writers,
+   `category()` arms, `feature_name()` arms, and `expected_to_fire_per_soak()`
+   arms — but the introducer missed `Feature::ALL` at
+   `src/resources/system_activation.rs:619`. The `SystemActivation` snapshot
+   emitter iterates `Feature::ALL`, so the new variants were excluded from
+   every per-tick activation record, **and** the never-fired canary's
+   `never_fired_expected_positives` returned `[]` as a false negative
+   (because the canary also iterates `ALL`). Same iteration-list class
+   exists for `DispositionKind::ALL` (`src/components/disposition.rs:443`),
+   `Feature::ALL`, and likely others.
+
+2. **Substrate-completeness ≠ election-completeness.** A new buildable
+   `StructureType` is *not* shippable when the construct.rs arm + state
+   Components + recipe registry entries + DSEs all land — it is shippable
+   when the colony **elects** to build it. The election layer is
+   `BuildPressure` (`src/components/coordination.rs:144-189`): one f32
+   channel per electable structure type, accumulated in
+   `assess_colony_needs` against a colony-state signal, decayed when the
+   signal is absent, reset on construction completion. 367 Commits 1-6
+   wired the full preservation substrate end-to-end and passed every
+   check; first-light revealed **zero racks ever constructed** because
+   `BuildPressure` had no `drying_rack` / `smoking_rack` channel. Fixed in
+   367 Commit 8. Applies wherever a ticket adds a new `StructureType`
+   variant (369 Tanning Frame is the immediate next case).
+
+3. **First-light soak is mandatory verification.** `just check` +
+   `cargo test --lib` verify mechanism; `just soak-trace` + `just verdict`
+   verify activation. The substrate-stub-catalog scripts
+   (`check_substrate_stubs.sh`, `check_marker_snapshot_wiring.sh`, etc.)
+   catch *some* substrate gaps but **not** hand-maintained iteration
+   lists and **not** election gaps. Per the
+   `feedback_dormant_substrate_activation_soak_first` memory: every
+   substrate-activation ticket runs ≥1 first-light soak before landing,
+   and the soak is the gate, not `just check`.
+
+A fourth lesson is **decorative-vs-load-bearing wiring** (367 Commit 4b
+plumbed `ItemSlot.quality` through `pick_up` → load resolvers → output
+items, but `food_value()` still reads `ItemKind` only — so quality
+propagates correctly but has zero behavioral effect). Substrate that
+*passes through* a value isn't *consuming* it; consumer-side wiring
+(read sites in `food_value`, `take_damage`, `noise_signature`, etc.) is
+a separate substrate step. 369 (material-property reads) is the canonical
+home for this discipline; cross-reference it from any future ticket
+that adds an item-borne property.
+
 ## Phase 5 gating
 
 Three conditions, all required:

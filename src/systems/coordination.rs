@@ -1109,6 +1109,36 @@ pub fn accumulate_build_pressure(
             pressure.defense *= BuildPressure::DECAY;
         }
 
+        // 367 Commit 8 — preservation pressure (DryingRack + SmokingRack).
+        //
+        // Drying rack: signal is "the colony has raw food sitting in
+        // stores while no Drying Rack exists." `raw_food_items`
+        // includes fish + mammal/bird carcasses + organs. Drying
+        // preserves fish + organs; the channel decays once a rack
+        // exists. Matches the workshop pattern: gate on a structural
+        // absence + a non-trivial economic signal.
+        //
+        // Smoking rack: independent channel — smoking needs fuel
+        // (Wood) and tend cycles, so the colony only invests when raw
+        // meat is accumulating. We gate the same `raw_food_items`
+        // signal (smoking is a meat pipeline; the cooking-cutoff has
+        // already established raw-food-in-stores as the economic
+        // signal). A future iteration can split this into "raw meat
+        // items" specifically if drying-vs-smoking elections need
+        // diverging thresholds.
+        let has_drying_rack = has_structure(StructureType::DryingRack);
+        let has_smoking_rack = has_structure(StructureType::SmokingRack);
+        if !has_drying_rack && raw_food_items >= cc.build_pressure_preservation_min_raw_food {
+            pressure.drying_rack += rate * cc.preservation_pressure_multiplier;
+        } else {
+            pressure.drying_rack *= BuildPressure::DECAY;
+        }
+        if !has_smoking_rack && raw_food_items >= cc.build_pressure_preservation_min_raw_food {
+            pressure.smoking_rack += rate * cc.preservation_pressure_multiplier;
+        } else {
+            pressure.smoking_rack *= BuildPressure::DECAY;
+        }
+
         // Check if any pressure exceeds the action threshold.
         if let Some(blueprint) = pressure.highest_actionable(threshold) {
             // Only issue if there isn't already a Build directive with a blueprint
@@ -1166,6 +1196,10 @@ pub fn accumulate_build_pressure(
                     }
                     StructureType::Garden => pressure.farming = 0.0,
                     StructureType::Watchtower => pressure.defense = 0.0,
+                    // 367 Commit 8 — preservation channels reset on
+                    // election to match cooking/workshop pattern.
+                    StructureType::DryingRack => pressure.drying_rack = 0.0,
+                    StructureType::SmokingRack => pressure.smoking_rack = 0.0,
                     _ => {}
                 }
             }

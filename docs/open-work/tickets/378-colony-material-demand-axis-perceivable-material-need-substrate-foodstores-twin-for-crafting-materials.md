@@ -58,6 +58,40 @@ This ticket lands as the **finishing move** on the input-substrate cluster (375 
 - "Richer perception, better strategy" — each material is an orthogonal demand axis. Composition at modifier layer.
 - "Substrate over hacks" — no hidden post-L2 score mutation; demand pressure is substrate visible in trace.
 
+## Lessons from 367 first-light (cross-reference)
+
+This ticket is the **harvest-side analog** of 367's `BuildPressure`
+construction-election lesson (367 Commit 8). 367 surfaced — under
+first-light empirical observation — that wiring a full substrate stack
+(StructureType + state Components + DSEs + recipes + resolvers + Features)
+*without* a colony-level election signal produces dormant code that
+compiles green but never fires. 367's fix was a new `BuildPressure`
+channel that accumulates against a colony-state signal and elects the
+structure via `highest_actionable`.
+
+378 is the same architectural shape on the harvest side: without
+`material_pressure(MaterialKind)` lifting Hunt / Harvest DSEs against
+colony stockpile state, the byproducts from 375 and the harvestables
+from 376 sit at zero production rate, the same way 367's racks sat at
+zero construction rate pre-Commit-8. Two takeaways for 378's
+implementation:
+
+- **The accumulation signal shape is the load-bearing decision.** 367
+  picked `raw_food_items >= threshold` as a coarse single-axis signal
+  for preservation pressure. 378's spec already calls out a four-axis
+  composition (stockpile, rate, recipe-pull, seasonal). The richer
+  axis count is correct (per "richer perception, better strategy"
+  pillar) but each axis individually needs the same care 367's
+  `BuildPressure` channels got — accumulation arm, decay path, reset
+  on consumption, tuning constants.
+
+- **First-light gate must verify activation per material kind, not in
+  aggregate.** 367's first-light failure was "*any* preservation
+  Feature firing" — too coarse. 378 should gate at "non-zero
+  production rate for *each* of the 14 tracked materials by end of
+  soak" (or a calibrated subset). Aggregate "harvest DSE fired"
+  passes false-negatively if all firings target one cheap material.
+
 ## Verification
 - `just scenario material-demand-pressure`: preset colony with empty reed stockpile + a cat with a Reed-Mat aspiration; assert Hunt DSE does NOT elevate over Harvest DSE pointing at a reed-bed (demand pull working). Inverse: empty bone stockpile + warrior's-kit aspiration → Hunt prefers rabbit over mouse when reading bone-demand.
 - `just soak-trace 42 Simba` + `just verdict`:

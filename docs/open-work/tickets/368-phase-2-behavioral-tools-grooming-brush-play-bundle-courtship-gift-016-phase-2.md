@@ -32,9 +32,47 @@ Land three Phase 2 behavioral-tool recipes — Grooming Brush, Play Bundle, Cour
 ## Approach
 See `docs/systems/crafting.md` Phase 2. Hypothesis: post-368, grooming / play / courtship action counts each rise ≥1× per soak on seed 42 (from currently-zero or near-zero baseline).
 
+## Lessons from 367 first-light (inherited from [016](016-crafting-items-recipes-stations.md))
+
+Two of the three 367 lessons apply directly. The third (`BuildPressure`
+election) **does not** — Phase 2 reuses the existing Workshop, no new
+`StructureType` variants land here.
+
+- **ItemKind enrollment.** Three new `ItemKind` variants
+  (Grooming Brush / Play Bundle / Courtship Gift) plus possible new
+  `Feature` variants (e.g. `GroomingBrushUsed`, `PlayBundleEngaged`,
+  `CourtshipGiftOffered` if those land as positive signals). Audit
+  every hand-maintained iteration constant:
+  - `ItemKind` exhaustiveness test (`src/components/items.rs:~825`,
+    currently `[ItemKind; N]` array literal).
+  - `Feature::ALL` at `src/resources/system_activation.rs:619` for
+    each new positive/neutral/negative Feature.
+  - `feature_name()` arm at `~1437` (string mapping for diagnostics).
+  - `category()` arm at `~811` (valence classification).
+  - `expected_to_fire_per_soak()` arm at `~1061` (canary enrollment).
+  Missing the `Feature::ALL` entry alone produces a false-negative
+  "never fired" canary (367's exact failure mode pre-Commit-4 amend).
+
+- **Decorative-vs-load-bearing wiring.** The three tools' effects live
+  on action resolvers keyed to item identity ("brush presence raises
+  grooming output," "play-bundle as a higher-satisfaction target,"
+  "gift presence factors fondness"). Verify the resolver actually
+  *reads* the modifier, not just the planner. 367 Commit 4b plumbed
+  `ItemSlot.quality` substrate-correctly but `food_value()` never
+  read it — the quality is propagated but gameplay-inert. Same trap:
+  if the brush exists in inventory but `groom_other` resolver doesn't
+  branch on its presence, the recipe lands as decoration.
+
+- **First-light soak before landing.** `just soak-trace 42 Simba` +
+  `just verdict logs/tuned-42/`. Confirm: (i) at least one of each
+  tool gets crafted in seed-42 / --duration 900; (ii) the
+  continuity-canary tally for grooming / play / courtship actually
+  rises when a tool is present (vs the dormancy baseline).
+
 ## Verification
 - `just hypothesize <spec.yaml>` runs the four-artifact treatment-vs-control on the three §5 continuity canaries.
 - `just verdict <run-dir>` shows grooming / play / courtship each fire ≥1×.
+- **First-light gate (per [016](016-crafting-items-recipes-stations.md) lessons):** at least one of each tool produced on seed-42 `--duration 900` AND continuity-canary deltas correlate with tool presence (not just tool *existence* in stores).
 
 ## Related work
 

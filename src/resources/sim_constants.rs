@@ -4161,6 +4161,26 @@ fn default_build_pressure_cooking_min_raw_food() -> usize {
     3
 }
 
+/// 367 Commit 8 — minimum raw food items in Stores before
+/// preservation-pressure (Drying Rack / Smoking Rack) starts
+/// accumulating. Lower than cooking (3) because preservation is
+/// most valuable when surplus exists — wait until the colony has
+/// genuine excess before building rack infrastructure. Tune up if
+/// preservation racks are over-elected at the expense of
+/// foundational infrastructure (Stores / Kitchen / Den).
+fn default_build_pressure_preservation_min_raw_food() -> usize {
+    5
+}
+
+/// 367 Commit 8 — multiplier on preservation pressure rate. Default
+/// 1.0 matches the Workshop/Defense pattern (no boost, no nerf);
+/// a future iteration can lift this if `just verdict` shows
+/// preservation racks are getting out-competed by other infrastructure
+/// channels.
+fn default_preservation_pressure_multiplier() -> f32 {
+    1.0
+}
+
 fn default_cook_directive_priority() -> f32 {
     0.4
 }
@@ -6003,6 +6023,15 @@ pub struct CoordinationConstants {
     /// justify a Kitchen.
     #[serde(default = "default_build_pressure_cooking_min_raw_food")]
     pub build_pressure_cooking_min_raw_food: usize,
+    /// 367 Commit 8 — minimum raw food items in Stores before
+    /// preservation pressure (Drying Rack / Smoking Rack) starts
+    /// accumulating. See `default_build_pressure_preservation_min_raw_food`.
+    #[serde(default = "default_build_pressure_preservation_min_raw_food")]
+    pub build_pressure_preservation_min_raw_food: usize,
+    /// 367 Commit 8 — multiplier on preservation-pressure accumulation
+    /// rate. Mirrors `cooking_pressure_multiplier`.
+    #[serde(default = "default_preservation_pressure_multiplier")]
+    pub preservation_pressure_multiplier: f32,
     /// Priority of a Cook directive when a Kitchen is functional and raw food
     /// is available. Kept below Hunt/Fight (~0.7+) so cooking doesn't crowd
     /// out survival directives.
@@ -6359,6 +6388,9 @@ impl Default for CoordinationConstants {
             build_pressure_farming_food_threshold: 0.3,
             build_pressure_workshop_min_cats: 4,
             build_pressure_cooking_min_raw_food: default_build_pressure_cooking_min_raw_food(),
+            build_pressure_preservation_min_raw_food:
+                default_build_pressure_preservation_min_raw_food(),
+            preservation_pressure_multiplier: default_preservation_pressure_multiplier(),
             cook_directive_priority: default_cook_directive_priority(),
             unmet_demand_amplifier: default_unmet_demand_amplifier(),
             wildlife_breach_range: 10,

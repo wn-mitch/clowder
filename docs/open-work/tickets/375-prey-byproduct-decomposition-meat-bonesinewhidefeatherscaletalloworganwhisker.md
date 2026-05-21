@@ -50,9 +50,51 @@ Today: every prey kill in `resolve_engage_prey` spawns exactly one raw-meat item
 
 **Inventory pressure note:** a rabbit kill now produces 4 items instead of 1. This creates emergent pressure toward Stores deposits + cat-cooperation hauling. Surface in verdict comparison.
 
+## Lessons from 367 first-light (inherited from [016](016-crafting-items-recipes-stations.md))
+
+This ticket is **producer-only** (engage_prey side); the
+`BuildPressure` election lesson doesn't apply (no new structure). The
+ItemKind enrollment lesson and the decorative-vs-load-bearing lesson
+both apply directly.
+
+- **ItemKind enrollment audit.** Seven new variants land here (Bone /
+  Sinew / Whisker / Hide / FishScale / Tallow / Organ — plus wiring
+  the existing `Feather` producer). Audit every hand-maintained
+  iteration constant:
+  - `ItemKind` exhaustiveness test in `src/components/items.rs:~825`
+    — the `[ItemKind; N]` literal needs its count bumped, otherwise
+    the test silently passes on the truncated array (367 Phase 1b
+    Commit 1 hit this — `[ItemKind; 33]` → `[ItemKind; 37]`).
+  - `decay_rate()`, `food_value()`, `is_food()`, `category()`,
+    `name()` match arms — all exhaustive, compiler catches misses.
+  - Per-byproduct: confirm `is_food() == false` on the 7 new
+    non-meat variants so existing `Eat` DSE / resolver paths don't
+    accidentally pull `Bone` or `FishScale` as food (the 367 case for
+    contrast: `is_food()` returns `true` for `DriedFish`, etc., and
+    the existing eat path consumed them seamlessly).
+
+- **No new Features expected** unless this ticket emits a
+  `ByproductSpawned`-style canary. If it does (likely useful for the
+  never-fired-canary): enroll the new variant(s) in
+  `Feature::ALL` at `src/resources/system_activation.rs:619` (per
+  367 Commit 4 amend; 5 arms total — `category()`, `feature_name()`,
+  `expected_to_fire_per_soak()`, `Feature::ALL`, plus the writer at
+  the producer site). Missing `Feature::ALL` is a silent
+  false-negative.
+
+- **Producer-without-consumer is a known dormancy class.** This
+  ticket *creates* byproducts but no resolver *consumes* them until
+  368 / 369 / 370 / 371 / 372 land. That's intentional per the
+  ticket's framing — but verify in first-light that the byproducts
+  actually accumulate in inventories / Stores / on the ground (i.e.
+  the producer fires). The substrate-without-consumer state is
+  acceptable; the substrate-without-producer state (367 first-light's
+  failure mode) is not.
+
 ## Verification
 - `just scenario prey-byproduct-spawn` (new scenario): preset one cat + one of each prey species at adjacent tiles; assert each kill spawns expected meat + byproducts.
 - `just soak-trace 42 Simba` + `just verdict logs/tuned-42`: confirm inventory-overflow → drop-to-ground hasn't broken haul-to-Stores continuity; survival gates hold (`Starvation == 0`, `ShadowFoxAmbush ≤ 10`).
+- **First-light gate (per [016](016-crafting-items-recipes-stations.md) lessons):** grep `events.jsonl` for non-zero counts of each new byproduct kind. The scenario test catches the per-species producer-table mapping; the soak catches whether seed-42 hunts actually fire in enough variety to populate every byproduct slot in a typical run.
 - `just frame-diff` baseline-vs-treatment: per-DSE drift should be small; this is a producer-only change with no L2 modifier wiring.
 
 ## Related work
