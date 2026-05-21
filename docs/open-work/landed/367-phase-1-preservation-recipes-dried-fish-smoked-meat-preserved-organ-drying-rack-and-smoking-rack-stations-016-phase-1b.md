@@ -1,7 +1,7 @@
 ---
 id: 367
 title: Phase 1 preservation recipes — Dried Fish, Smoked Meat, Preserved Organ; Drying Rack and Smoking Rack stations (016 Phase 1b)
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
@@ -52,3 +52,5 @@ See `docs/systems/crafting.md` Phase 1 table. Hypothesis: `deaths_by_cause.Starv
 - 2026-05-16: opened as 016 epic decomposition (Phase 1b; parent 016, blocked-by 365).
 - 2026-05-19: accuracy audit pass — blocked-by clear (365 landed 2026-05-14); status ready verified; docs/systems/crafting.md exists
 - 2026-05-21: substrate authored across 7 jj revisions (Commits 1-7). Stack: ItemKind variants + ItemCategory::PreservedFood + ItemModifiers.from_organ (Commit 1) → StructureType + state Components + construct wiring (Commit 2) → markers + goap.rs writers + DSE skeletons (Commit 3) → resolvers + Action / DispositionKind extensions + planner templates (Commit 4) → ItemSlot.quality propagation + skill-modulated preservation quality formula via `preservation_output_quality` (Commit 4b — Factorio/RimWorld-style, scope-confirmed mid-session) → DisciplineKind::Preservation + 6 `preserve.*` recipes + per-tick `systems::preservation::advance_preservation_drying` + CraftedItem provenance on output (Commit 5) → RawOrgan hunt drop wiring + organ mood bump on eat path (Commit 6) → hypothesis spec + balance doc skeleton + follow-on tickets 434 / 435 (Commit 7). All green on `just check` + 2376 lib tests post-Commit 6. Verification pending operator-driven `just soak-trace 42 Simba` + `just verdict logs/tuned-42/` per `feedback_dormant_substrate_activation_soak_first` (first-light is substrate-activation, not magnitude). Follow-on tickets 434 (terrain visual polish) + 435 (RecipeInput::AnyOf substrate). Quality propagation through `food_value()` deferred to a separate follow-on under ticket 429 — substrate is in place but decorative until consumption-side wiring lands.
+- 2026-05-21: post-Commit-7 soak (`logs/tuned-42-367ab32e`) confirmed dormant-substrate first-light defect — both racks construct (drying at tick 1204489 per narrative) but cats never load them. Layer-walk: BuildPressure substrate works (Commit 8 — added `pressure.drying_rack` + `pressure.smoking_rack` channels + accumulation + election arms). True structural defect lives in the plan template — `drying_food_actions` is single-step `[DryFood]` with `ZoneIs(DryingRack)` precondition only, but cats deposit raw food at Stores immediately on hunt-return so the narrow per-cat `HasDryableInInventory` eligibility marker is off whenever scoring runs. Structural-option menu per Bugfix discipline: split (chosen — new GoapActionKind::RetrieveDryable + multi-step plan template `[DropItem?, RetrieveDryable, DryFood]` mirroring `cooking_actions`'s shape from ticket 231) vs extend / rebind / retire. Commit 9 lands the split for drying only: new colony marker `HasDryableInStores` + per-cat composite `HasDryableAccessible` widens eligibility past inventory-only; new resolver `resolve_retrieve_dryable_from_stores` filters Stores to `RawFish`/`RawOrgan` (drying recipes can't accept mammal/bird raw meat). Smoking mirror deferred to Commit 10 (two-ingredient retrieve is structurally distinct — meat + fuel — warrants its own commit). All green on `just check` + 2376 lib tests; verification soak pending.
+- 2026-05-21: Commits 1-9 land; substrate complete + drying chain split-shape extension authored. Verification soak post-Commit-9 (logs/tuned-42-5598499f) confirms substrate built but DryFood action shows zero appearances in any cat's last_scores — eligibility filters every cat despite Commit 9's HasDryableAccessible composite. Follow-on tickets: 434 (terrain visual polish), 435 (RecipeInput::AnyOf substrate), 436 (drying-chain scenario microexperiment to triage the eligibility-filter root cause).
