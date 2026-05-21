@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: pending
+landed-at: 892eef9bd0db
 landed-on: 2026-05-21
 orchestration: substrate-sensitive
 ---
