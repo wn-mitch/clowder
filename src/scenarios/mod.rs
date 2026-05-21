@@ -63,6 +63,7 @@ pub mod picking_up_scavenging;
 pub mod preset;
 pub mod route_cost_decision;
 pub mod runner;
+pub mod smoking_chain_eligibility;
 pub mod surrounded_colony;
 pub mod ward_placement;
 pub mod wildlife_fight;
@@ -286,6 +287,11 @@ pub const ALL: &[&Scenario] = &[
     // failure can be classified as structural vs state-specific.
     &drying_chain_eligibility::SCENARIO_RESOLVER_COMPLETES,
     &drying_chain_eligibility::SCENARIO_RESOLVER_FAR_RACK,
+    // 443 — smoking-chain eligibility fixtures. Mirrors the 436 drying
+    // suite for the `HasSmokeableAccessible` composite-marker fix.
+    &smoking_chain_eligibility::SCENARIO_HOT_INVENTORY,
+    &smoking_chain_eligibility::SCENARIO_STORES_HAS_SMOKEABLE,
+    &smoking_chain_eligibility::SCENARIO_EMPTY_STORES,
 ];
 
 /// Look up a scenario by its `name` field.

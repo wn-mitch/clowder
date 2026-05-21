@@ -222,6 +222,12 @@ impl ItemKind {
         )
     }
 
+    /// True iff this item can serve as smoking fuel. Currently only
+    /// `Wood`; extended here so call sites don't hard-code the variant.
+    pub fn is_fuel(self) -> bool {
+        matches!(self, Self::Wood)
+    }
+
     /// True iff this item is a crafted remedy (consumed by
     /// `resolve_apply_remedy`). Mirrors `is_herb()` / `is_food()`.
     pub fn is_remedy(self) -> bool {

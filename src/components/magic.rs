@@ -482,8 +482,7 @@ impl Inventory {
     /// `has_any_material` — Stone is a build material but not a fuel.
     /// Reader: `HasFuelInInventory` writer.
     pub fn has_fuel(&self) -> bool {
-        use crate::components::items::ItemKind;
-        self.slots.iter().any(|s| s.kind == ItemKind::Wood)
+        self.slots.iter().any(|s| s.kind.is_fuel())
     }
 
     /// Whether the inventory holds a specific prepared remedy.

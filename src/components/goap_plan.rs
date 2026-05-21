@@ -413,7 +413,10 @@ impl GoapActionKind {
             // `RetrieveRawFood | Cook | DepositCookedFood => Cook`
             // pattern above).
             Self::RetrieveDryable | Self::DryFood => Action::DryFood,
-            Self::SmokeMeat => Action::SmokeMeat,
+            // 443: retrieve prefix step inherits the parent Action so
+            // `CurrentAction` stays stable through the multi-step plan
+            // (mirrors `RetrieveDryable => DryFood` above).
+            Self::RetrieveSmokeable | Self::SmokeMeat => Action::SmokeMeat,
             Self::TendSmokingRack => Action::TendSmokingRack,
         }
     }

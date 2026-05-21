@@ -66,6 +66,11 @@ pub struct ColonyMarkerBundle {
     /// `HasDryableAccessible` that gates `DryFoodDse` eligibility
     /// even when the cat's inventory is empty.
     pub has_dryable_in_stores: bool,
+    /// 443 — colony has ≥1 raw-meat item AND ≥1 fuel (Wood) in
+    /// `StoredItems`. Used to author the per-cat composite
+    /// `HasSmokeableAccessible` that gates `SmokeMeatDse` eligibility
+    /// even when the cat's inventory is empty.
+    pub has_smokeable_in_stores: bool,
 }
 
 #[derive(Resource, Debug, Default, Clone, Copy)]

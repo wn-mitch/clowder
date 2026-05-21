@@ -68,6 +68,8 @@ type ColonyStateMarkerTuple = (
         Has<markers::HasLoadedSmokingRackOffCooldown>,
         // 367 follow-on — colony-side dryable-in-stores predicate.
         Has<markers::HasDryableInStores>,
+        // 443 — colony-side smokeable-in-stores predicate.
+        Has<markers::HasSmokeableInStores>,
     ),
 );
 
@@ -97,6 +99,7 @@ fn read_colony_markers(
             has_functional_smoking_rack,
             has_loaded_smoking_rack_off_cooldown,
             has_dryable_in_stores,
+            has_smokeable_in_stores,
         ),
     ) = query
         .single()
@@ -121,6 +124,7 @@ fn read_colony_markers(
         has_functional_smoking_rack,
         has_loaded_smoking_rack_off_cooldown,
         has_dryable_in_stores,
+        has_smokeable_in_stores,
     }
 }
 

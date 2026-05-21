@@ -361,6 +361,15 @@ pub enum GoapActionKind {
     /// `drying_food_actions` plan template; an empty-inventory cat
     /// reaches the Drying Rack via `[RetrieveDryable, DryFood]`.
     RetrieveDryable,
+    /// 443: retrieve raw meat AND fuel from a `StoredItems` building into
+    /// the cat's `Inventory` in a single stores visit. Prefix step in the
+    /// `smoking_meat_actions` plan template. The resolver handles the
+    /// two-ingredient case: it skips any ingredient the cat already
+    /// carries and grabs the missing one(s) from stores. If the cat has
+    /// both, returns `unwitnessed(Advance)` so the chain moves on.
+    /// Sets `Carrying::RawFood` (search-state) to causally connect
+    /// the retrieve step to the `SmokeMeat` precondition `CarryingIs(RawFood)`.
+    RetrieveSmokeable,
     /// 367: load raw meat + fuel onto a Smoking Rack. Single-tick
     /// action; effect is `IncrementTrips`. Smoking progress advances
     /// only on subsequent `TendSmokingRack` cycles.

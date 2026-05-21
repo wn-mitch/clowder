@@ -590,6 +590,40 @@ impl HasDryableAccessible {
     pub const KEY: &str = "HasDryableAccessible";
 }
 
+/// 443: colony — ≥1 raw-meat item AND ≥1 fuel (Wood) item sit in any
+/// `StoredItems`. Reader: per-cat composite `HasSmokeableAccessible`
+/// in `goap::evaluate_and_plan`. Writer:
+/// `buildings::update_colony_building_markers`.
+///
+/// Distinct from `HasRawFoodInStores` (fires on all raw food) and
+/// `HasDryableInStores` (RawFish/RawOrgan only). Smoking requires
+/// both meat AND fuel present together; the marker encodes the
+/// conjunction so the per-cat composite can gate on a single
+/// colony-level boolean.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasSmokeableInStores;
+impl HasSmokeableInStores {
+    pub const KEY: &str = "HasSmokeableInStores";
+}
+
+/// 443: per-cat composite — the cat could conceivably elect `SmokeMeat`
+/// this tick. Fires when EITHER the cat already carries smokeable
+/// inventory (`HasSmokeableInInventory`) OR has a free slot AND the
+/// colony has smokeable meat + fuel in `StoredItems`
+/// (`HasFreeSlot && HasSmokeableInStores`). Reader: `SmokeMeatDse`
+/// eligibility filter. Writer: `goap::evaluate_and_plan` via
+/// `MarkerSnapshot::set_entity`.
+///
+/// Mirrors `HasDryableAccessible` for the two-ingredient smoking chain.
+/// `HasSmokeableInInventory` (both meat AND fuel) is still authored —
+/// resolvers read it to short-circuit retrieve steps when the cat
+/// already carries the needed items.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasSmokeableAccessible;
+impl HasSmokeableAccessible {
+    pub const KEY: &str = "HasSmokeableAccessible";
+}
+
 /// 367: colony — ≥1 loaded Smoking Rack exists in the colony AND its
 /// per-rack tend cooldown has elapsed (i.e. it's ready to be tended
 /// right now). Reader: `TendSmokingRackDse` eligibility filter. Writer:
@@ -1200,6 +1234,9 @@ mod tests {
         assert_marker_queryable(HasSmokeableInInventory);
         assert_marker_queryable(HasDryableInStores);
         assert_marker_queryable(HasDryableAccessible);
+        // 443 — smoking chain accessibility markers.
+        assert_marker_queryable(HasSmokeableInStores);
+        assert_marker_queryable(HasSmokeableAccessible);
     }
 
     #[test]

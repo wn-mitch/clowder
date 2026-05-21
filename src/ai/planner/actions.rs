@@ -416,18 +416,70 @@ pub fn drying_food_actions() -> Vec<GoapActionDef> {
     ]
 }
 
-/// 367: plan template for loading a Smoking Rack with raw meat + 1
-/// fuel. Single-step `[SmokeMeat]` with `ZoneIs(SmokingRack)`
-/// precondition. The load resolver consumes both items from
-/// inventory in the same tick. Subsequent tending happens via the
-/// `TendSmokingRack` Disposition.
+/// 443 follow-on: plan template for loading a Smoking Rack.
+///
+/// Upgraded from single-step `[SmokeMeat]` to a multi-step chain:
+///
+///   `[DropItem?, RetrieveSmokeable, SmokeMeat]`
+///
+/// - `RetrieveSmokeable` pulls raw meat AND fuel from Stores into the
+///   cat's `Inventory` in a single stores visit. The resolver handles
+///   the two-ingredient case: skips items the cat already carries,
+///   retrieves missing items. Sets `Carrying::RawFood` search-state
+///   to causally connect to `SmokeMeat`'s `CarryingIs(RawFood)`
+///   precondition, guaranteeing A* includes the retrieve step.
+/// - `SmokeMeat` requires `CarryingIs(Carrying::RawFood)` + `ZoneIs(SmokingRack)`.
+///   The runtime resolver consumes both items from inventory.
+/// - `DropItem` is the same inventory-clearance prefix as `drying_food_actions`.
+///
+/// Mirrors `drying_food_actions`'s shape; dual substrate-path /
+/// plan-path arms on `RetrieveSmokeable` cover cats with a live free
+/// slot and cats whose inventory was full at chain entry.
 pub fn smoking_meat_actions() -> Vec<GoapActionDef> {
-    vec![GoapActionDef {
-        kind: GoapActionKind::SmokeMeat,
-        cost: 2,
-        preconditions: vec![StatePredicate::ZoneIs(PlannerZone::SmokingRack)],
-        effects: vec![StateEffect::IncrementTrips],
-    }]
+    vec![
+        // Space-clearing prefix — mirrors drying_food_actions.
+        GoapActionDef {
+            kind: GoapActionKind::DropItem,
+            cost: 1,
+            preconditions: vec![],
+            effects: vec![
+                StateEffect::SetHasFreeSlotThisPlan(true),
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
+        // Substrate-path retrieve: cat has a live free slot.
+        GoapActionDef {
+            kind: GoapActionKind::RetrieveSmokeable,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::HasMarker(crate::components::markers::HasFreeSlot::KEY),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+        },
+        // Plan-path retrieve: after DropItem cleared the slot.
+        GoapActionDef {
+            kind: GoapActionKind::RetrieveSmokeable,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Stores),
+                StatePredicate::HasFreeSlotThisPlan(true),
+            ],
+            effects: vec![StateEffect::SetCarrying(Carrying::RawFood)],
+        },
+        GoapActionDef {
+            kind: GoapActionKind::SmokeMeat,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::SmokingRack),
+                StatePredicate::CarryingIs(Carrying::RawFood),
+            ],
+            effects: vec![
+                StateEffect::IncrementTrips,
+                StateEffect::SetCarrying(Carrying::Nothing),
+            ],
+        },
+    ]
 }
 
 /// 367: plan template for one tend cycle on a loaded Smoking Rack.

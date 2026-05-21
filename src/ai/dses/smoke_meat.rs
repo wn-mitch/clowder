@@ -77,7 +77,14 @@ impl SmokeMeatDse {
             eligibility: EligibilityFilter::new()
                 .require(markers::CanSmoke::KEY)
                 .require(markers::HasFunctionalSmokingRack::KEY)
-                .require(markers::HasSmokeableInInventory::KEY)
+                // 443: widened from `HasSmokeableInInventory` to
+                // `HasSmokeableAccessible` — fires when the cat
+                // already carries smokeable items OR has a free slot
+                // and the colony's stores hold raw meat + fuel.
+                // Without this, cats deposit at Stores on hunt-return
+                // and the DSE is permanently ineligible despite full
+                // stores.
+                .require(markers::HasSmokeableAccessible::KEY)
                 .forbid(markers::Incapacitated::KEY),
         }
     }
@@ -152,7 +159,7 @@ mod tests {
             vec![
                 markers::CanSmoke::KEY,
                 markers::HasFunctionalSmokingRack::KEY,
-                markers::HasSmokeableInInventory::KEY,
+                markers::HasSmokeableAccessible::KEY,
             ]
         );
         assert_eq!(

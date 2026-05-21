@@ -1487,6 +1487,7 @@ pub fn evaluate_and_plan(
         has_functional_smoking_rack,
         has_loaded_smoking_rack_off_cooldown,
         has_dryable_in_stores,
+        has_smokeable_in_stores,
     ) = (
         cm.has_functional_kitchen,
         cm.has_raw_food_in_stores,
@@ -1507,6 +1508,7 @@ pub fn evaluate_and_plan(
         cm.has_functional_smoking_rack,
         cm.has_loaded_smoking_rack_off_cooldown,
         cm.has_dryable_in_stores,
+        cm.has_smokeable_in_stores,
     );
     let food_fraction = ws.food_fraction;
 
@@ -1609,6 +1611,9 @@ pub fn evaluate_and_plan(
     // ColonyState component) because the eligibility filter resolves
     // markers via the snapshot.
     markers.set_colony(markers::HasDryableInStores::KEY, has_dryable_in_stores);
+    // 443 — colony has raw meat AND fuel in stores; read by the
+    // per-cat `HasSmokeableAccessible` composite below.
+    markers.set_colony(markers::HasSmokeableInStores::KEY, has_smokeable_in_stores);
     // 084 Commit 3: ColonyThornbriarChronicallyLow — chronicity latch
     // sampled at `chronicity_window_ticks` boundaries against the
     // colony-wide stash total. Reader (this commit): `FarmDse`'s
@@ -1930,6 +1935,21 @@ pub fn evaluate_and_plan(
                 markers::HasDryableAccessible::KEY,
                 entity,
                 has_dryable_accessible,
+            );
+            // 443 — `HasSmokeableAccessible` composite. Mirrors
+            // `HasDryableAccessible` for the two-ingredient smoking
+            // chain. A cat with smokeable inventory fires the left
+            // disjunct; a cat with a free slot and smokeable+fuel
+            // in stores fires the right disjunct. Either is enough
+            // to make `SmokeMeatDse` eligible — the plan template's
+            // `[RetrieveSmokeableMeat, RetrieveSmokeableFuel, SmokeMeat]`
+            // sequence handles the retrieve legs.
+            let has_smokeable_accessible =
+                has_smokeable || (has_free_slot && has_smokeable_in_stores);
+            markers.set_entity(
+                markers::HasSmokeableAccessible::KEY,
+                entity,
+                has_smokeable_accessible,
             );
         }
         // §4.2 State markers — InCombat / OnCorruptedTile /
@@ -7443,6 +7463,31 @@ fn dispatch_step_action(
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_retrieve_dryable_from_stores(
+                ticks,
+                plan.step_state[step_idx].target_entity,
+                inventory,
+                stores_query,
+                items_query,
+                commands,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::ItemRetrieved);
+            outcome.result
+        }
+
+        // 443 — `RetrieveSmokeable`: retrieves raw meat AND fuel from
+        // Stores into the cat's inventory in one stores visit. The
+        // resolver handles the two-ingredient case and no-ops for
+        // items the cat already carries. Same target-selection shape
+        // as `RetrieveDryable`.
+        GoapActionKind::RetrieveSmokeable => {
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .stores_entities
+                    .iter()
+                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .map(|(e, _)| *e);
+            }
+            let outcome = crate::steps::disposition::resolve_retrieve_smokeable_from_stores(
                 ticks,
                 plan.step_state[step_idx].target_entity,
                 inventory,

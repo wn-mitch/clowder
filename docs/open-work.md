@@ -38,11 +38,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · score 0.91_
-- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · score 0.90_
+- **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · score 0.92_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.90_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
 - **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
+- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · score 0.90_
 
 ## Epic progress (5)
 
@@ -310,7 +310,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
-### world-richness (6 open, 3 landed)
+### world-richness (6 open, 4 landed)
 
 - **[368](docs/open-work/tickets/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) — _[items-crafting] · added 2026-05-16_
 - **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
@@ -510,12 +510,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · blocked-by 205 · added 2026-05-19_
 - **[442](docs/open-work/tickets/442-split-resourcessim-constantsrs-into-a-sim-constants-submodule-per-substruct-family.md)** — Split resources/sim_constants.rs into a sim_constants/ submodule per substruct family — _[ai-substrate] · blocked-by 441 · added 2026-05-21_
 
-## Landed archive (298)
+## Landed archive (299)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (232)
+### 2026-05 (233)
 
+- **[443](docs/open-work/landed/443-smoking-chain-retrieve-step-hassmokeableaccessible-retrievesmokeable-resolvers-367-commit-10.md)** — Smoking chain retrieve step — HasSmokeableAccessible + RetrieveSmokeable resolvers (367 Commit 10) _(2026-05-21)_
 - **[439](docs/open-work/landed/439-planner-zone-resolver-returns-no-reachable-target-for-dryingrack-smokingrack-surfaced-post-437.md)** — Planner zone resolver returns no reachable target for DryingRack / SmokingRack — surfaced post-437 _(2026-05-21)_
 - **[438](docs/open-work/landed/438-retire-hand-written-dispatcher-in-score-actions-iterate-dseregistry-instead.md)** — Retire hand-written dispatcher in score_actions — iterate DseRegistry instead _(2026-05-21)_
 - **[437](docs/open-work/landed/437-dryfood-smokemeat-tendsmokingrack-dispatch-wiring-in-score-actions.md)** — DryFood / SmokeMeat / TendSmokingRack dispatch wiring in score_actions _(2026-05-21)_

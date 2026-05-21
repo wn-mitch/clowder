@@ -546,6 +546,28 @@ pub fn update_colony_building_markers(
             })
         })
     });
+    // 443 — `HasSmokeableInStores`: ≥1 raw-meat item AND ≥1 fuel item
+    // sit in any `StoredItems`. Conjunction check: both kinds must be
+    // present for the smoking chain to be viable — the rack resolver
+    // consumes one of each. Reader: per-cat composite
+    // `HasSmokeableAccessible` in `goap::evaluate_and_plan`.
+    let has_smokeable_in_stores = {
+        let has_meat = stored_items.iter().any(|stored| {
+            stored.items.iter().copied().any(|e| {
+                items
+                    .get(e)
+                    .is_ok_and(|it| !it.modifiers.cooked && it.kind.is_raw_meat())
+            })
+        });
+        let has_fuel = stored_items.iter().any(|stored| {
+            stored
+                .items
+                .iter()
+                .copied()
+                .any(|e| items.get(e).is_ok_and(|it| it.kind.is_fuel()))
+        });
+        has_meat && has_fuel
+    };
     let has_stored_food = !food.is_empty();
 
     // 176: chronicity tracking for `ColonyStoresChronicallyFull`. The
@@ -591,6 +613,11 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasDryableInStores);
     } else {
         em.remove::<crate::components::markers::HasDryableInStores>();
+    }
+    if has_smokeable_in_stores {
+        em.insert(crate::components::markers::HasSmokeableInStores);
+    } else {
+        em.remove::<crate::components::markers::HasSmokeableInStores>();
     }
     if has_stored_food {
         em.insert(crate::components::markers::HasStoredFood);
