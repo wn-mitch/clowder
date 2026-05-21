@@ -23,6 +23,10 @@ pub struct ColonyBuildingState {
     pub has_garden: bool,
     pub has_functional_kitchen: bool,
     pub has_midden: bool,
+    /// 367: ≥1 functional, idle Drying Rack.
+    pub has_functional_drying_rack: bool,
+    /// 367: ≥1 functional, idle Smoking Rack (not currently loaded).
+    pub has_functional_smoking_rack: bool,
 }
 
 /// Single-pass scan over the building query to derive all colony-scoped
@@ -38,6 +42,13 @@ pub fn scan_colony_buildings<'a>(
         has_garden: false,
         has_functional_kitchen: false,
         has_midden: false,
+        // 367: idle-rack predicate (loaded.is_none()) is layered on top
+        // of this functional-rack flag inside
+        // `update_colony_building_markers`, which has access to the
+        // per-rack state queries. Here we just answer "rack exists and
+        // is condition-functional."
+        has_functional_drying_rack: false,
+        has_functional_smoking_rack: false,
     };
     for (structure, site) in buildings {
         if site.is_some() {
@@ -54,6 +65,12 @@ pub fn scan_colony_buildings<'a>(
             }
             if structure.kind == StructureType::Midden {
                 state.has_midden = true;
+            }
+            if structure.kind == StructureType::DryingRack && structure.effectiveness() > 0.0 {
+                state.has_functional_drying_rack = true;
+            }
+            if structure.kind == StructureType::SmokingRack && structure.effectiveness() > 0.0 {
+                state.has_functional_smoking_rack = true;
             }
         }
     }
@@ -487,6 +504,12 @@ pub fn update_colony_building_markers(
     >,
     kittens: Query<(), (With<crate::components::markers::Kitten>, Without<Dead>)>,
     cats: Query<&crate::components::physical::Health, Without<Dead>>,
+    // 367: per-rack state for the idle / cooldown layered checks.
+    // Functional-rack flags in `scan_colony_buildings` come from
+    // `Structure::effectiveness()`; load and tend-cooldown are
+    // additional layers we apply here before flipping the markers.
+    drying_racks: Query<&crate::components::building::DryingRackState>,
+    smoking_racks: Query<&crate::components::building::SmokingRackState>,
     food: Res<FoodStores>,
     constants: Res<SimConstants>,
     activation: Option<Res<SystemActivation>>,
@@ -651,6 +674,55 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasDependentCat);
     } else {
         em.remove::<crate::components::markers::HasDependentCat>();
+    }
+
+    // 367: preservation-station markers. `scan_colony_buildings` already
+    // tells us whether a *functional* rack exists (condition above the
+    // damaged threshold); the load + cooldown checks here layer the
+    // idle and ready-to-tend predicates on top.
+    //
+    // `HasFunctionalDryingRack` fires only when ≥1 functional drying
+    // rack exists AND at least one of those racks is currently idle —
+    // i.e., its `DryingRackState.loaded` is `None`. A colony with
+    // racks-but-all-loaded gets the marker OFF, which keeps `DryFoodDse`
+    // from re-scoring a load action that can't find a target.
+    let has_idle_drying_rack = bldg_state.has_functional_drying_rack
+        && drying_racks.iter().any(|s| s.loaded.is_none());
+    if has_idle_drying_rack {
+        em.insert(crate::components::markers::HasFunctionalDryingRack);
+    } else {
+        em.remove::<crate::components::markers::HasFunctionalDryingRack>();
+    }
+
+    // Same shape for smoking racks — "functional and idle" gates the
+    // load action; the per-rack tend-cooldown gates the Tend DSE
+    // separately via `HasLoadedSmokingRackOffCooldown` below.
+    let has_idle_smoking_rack = bldg_state.has_functional_smoking_rack
+        && smoking_racks.iter().any(|s| s.loaded.is_none());
+    if has_idle_smoking_rack {
+        em.insert(crate::components::markers::HasFunctionalSmokingRack);
+    } else {
+        em.remove::<crate::components::markers::HasFunctionalSmokingRack>();
+    }
+
+    // Tend cooldown gate. `last_tended_at_tick == 0` is the "no tend
+    // yet this craft" sentinel — set by the load resolver so the very
+    // first tend after loading isn't blocked by the cooldown. Once any
+    // tend has fired, the cooldown gates the next visit on a per-rack
+    // basis (so different racks in different cooldown phases can
+    // interleave naturally).
+    let cooldown = constants.crafting.smoking_tend_cooldown_ticks;
+    let now = time.tick;
+    let has_loaded_smoking_off_cooldown = smoking_racks.iter().any(|s| {
+        s.loaded.is_some()
+            && s.progress < 1.0
+            && (s.last_tended_at_tick == 0
+                || now.saturating_sub(s.last_tended_at_tick) >= cooldown)
+    });
+    if has_loaded_smoking_off_cooldown {
+        em.insert(crate::components::markers::HasLoadedSmokingRackOffCooldown);
+    } else {
+        em.remove::<crate::components::markers::HasLoadedSmokingRackOffCooldown>();
     }
 }
 

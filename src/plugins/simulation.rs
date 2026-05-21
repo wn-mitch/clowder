@@ -25,6 +25,12 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry.target_taking_dses.push(dses::hunt_target_dse(scoring));
     registry.cat_dses.push(dses::forage_dse(scoring));
     registry.cat_dses.push(dses::cook_dse());
+    // 367 — Phase 1b preservation DSEs. DryFood loads the rack with
+    // raw fish / raw organ; SmokeMeat loads the rack with meat + fuel;
+    // TendSmokingRack advances per-rack progress one cycle at a time.
+    registry.cat_dses.push(dses::dry_food_dse());
+    registry.cat_dses.push(dses::smoke_meat_dse());
+    registry.cat_dses.push(dses::tend_smoking_rack_dse());
     registry.cat_dses.push(dses::flee_dse(scoring));
     registry.cat_dses.push(dses::fight_dse(scoring));
     // Ticket 104 — Hide/Freeze DSE. Ticket 170 lifted the Phase 1

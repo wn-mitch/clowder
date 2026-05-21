@@ -294,6 +294,26 @@ impl CanCook {
     pub const KEY: &str = "CanCook";
 }
 
+/// 367: per-cat capability — `Adult ∧ ¬Injured`, mirrors `CanCook`.
+/// Gates `DryFoodDse`. Colony-scoped station availability stays on the
+/// DSE eligibility filter so a "wants to dry but no rack" latent signal
+/// could later flow into BuildPressure (paralleling the
+/// `wants_cook_but_no_kitchen` pattern in `scoring.rs`).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct CanDry;
+impl CanDry {
+    pub const KEY: &str = "CanDry";
+}
+
+/// 367: per-cat capability — `Adult ∧ ¬Injured`, mirrors `CanCook`.
+/// Gates `SmokeMeatDse` (which loads a rack) and `TendSmokingRackDse`
+/// (which advances per-rack progress one tend at a time).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct CanSmoke;
+impl CanSmoke {
+    pub const KEY: &str = "CanSmoke";
+}
+
 // ---------------------------------------------------------------------------
 // Inventory markers (§4.3 Inventory — per-cat)
 // ---------------------------------------------------------------------------
@@ -348,6 +368,74 @@ impl HasLowWardReserve {
 pub struct HasFreeSlot;
 impl HasFreeSlot {
     pub const KEY: &str = "HasFreeSlot";
+}
+
+/// 367: per-cat — inventory contains at least one raw fish. Reader:
+/// `DryFoodDse` eligibility filter. Writer: `items::update_inventory_markers`.
+/// Distinct from `HasRawFoodInStores` (colony-scoped) — this is the
+/// "I'm carrying drying-eligible food right now" personal signal.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasRawFishInInventory;
+impl HasRawFishInInventory {
+    pub const KEY: &str = "HasRawFishInInventory";
+}
+
+/// 367: per-cat — inventory contains at least one raw organ. Reader:
+/// `DryFoodDse` eligibility filter (organ → Preserved Organ recipe).
+/// Writer: `items::update_inventory_markers`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasRawOrganInInventory;
+impl HasRawOrganInInventory {
+    pub const KEY: &str = "HasRawOrganInInventory";
+}
+
+/// 367: per-cat — inventory contains at least one raw meat
+/// (`ItemKind::is_raw_meat()` — mammals + birds; fish goes through
+/// drying). Reader: `SmokeMeatDse` eligibility filter. Writer:
+/// `items::update_inventory_markers`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasRawMeatInInventory;
+impl HasRawMeatInInventory {
+    pub const KEY: &str = "HasRawMeatInInventory";
+}
+
+/// 367: per-cat — inventory contains at least one fuel item (currently
+/// `ItemKind::Wood`). Reader: `SmokeMeatDse` eligibility filter (the
+/// load chain requires meat + fuel). Writer:
+/// `items::update_inventory_markers`. Separate marker from
+/// `HasMaterialsInInventory` because the semantic ("can I light a fire")
+/// is narrower than "carries any build material"; Stone is a material
+/// but not a fuel.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasFuelInInventory;
+impl HasFuelInInventory {
+    pub const KEY: &str = "HasFuelInInventory";
+}
+
+/// 367: per-cat — inventory contains *something* that can go onto a
+/// Drying Rack — either a Raw Fish (→ DriedFish recipe) or a Raw Organ
+/// (→ PreservedOrgan recipe, also needs a herb but the resolver-side
+/// pick handles that). Unified gate marker because `EligibilityFilter`
+/// only supports AND across required markers, and the DSE needs an
+/// OR-of-{fish, organ} signal. Sister marker to
+/// `HasRawFoodInStores` (which OR's across many food kinds at the
+/// colony layer for `CookDse`). Writer:
+/// `items::update_inventory_markers`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasDryableInInventory;
+impl HasDryableInInventory {
+    pub const KEY: &str = "HasDryableInInventory";
+}
+
+/// 367: per-cat — inventory satisfies the *full* Smoke Meat load
+/// requirement (meat AND fuel). Conjunction marker because the load
+/// resolver consumes both in one step; gating on just meat or just
+/// fuel would let the DSE fire and the load step fail at runtime.
+/// Writer: `items::update_inventory_markers`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasSmokeableInInventory;
+impl HasSmokeableInInventory {
+    pub const KEY: &str = "HasSmokeableInInventory";
 }
 
 /// 235: per-cat marker — the cat's inventory contains at least one
@@ -438,6 +526,46 @@ impl HasFunctionalKitchen {
 pub struct HasRawFoodInStores;
 impl HasRawFoodInStores {
     pub const KEY: &str = "HasRawFoodInStores";
+}
+
+/// 367: colony — ≥1 functional, idle Drying Rack exists in the colony.
+/// "Functional" = `Structure::effectiveness() > 0.0` (condition above
+/// the 0.2 floor); "idle" = `DryingRackState.loaded.is_none()`. Reader:
+/// `DryFoodDse` eligibility filter. Writer:
+/// `buildings::update_colony_building_markers`. When all racks are
+/// loaded, this drops to false and DryFood DSE shuts off — cats stop
+/// trying to load racks that are already drying something.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasFunctionalDryingRack;
+impl HasFunctionalDryingRack {
+    pub const KEY: &str = "HasFunctionalDryingRack";
+}
+
+/// 367: colony — ≥1 functional, idle Smoking Rack exists in the colony.
+/// Same shape as `HasFunctionalDryingRack`. Reader: `SmokeMeatDse`
+/// eligibility filter (the load chain). Writer:
+/// `buildings::update_colony_building_markers`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasFunctionalSmokingRack;
+impl HasFunctionalSmokingRack {
+    pub const KEY: &str = "HasFunctionalSmokingRack";
+}
+
+/// 367: colony — ≥1 loaded Smoking Rack exists in the colony AND its
+/// per-rack tend cooldown has elapsed (i.e. it's ready to be tended
+/// right now). Reader: `TendSmokingRackDse` eligibility filter. Writer:
+/// `buildings::update_colony_building_markers` (the writer evaluates
+/// `current_tick - rack.last_tended_at_tick >=
+/// crafting.smoking_tend_cooldown_ticks` per rack).
+///
+/// Distinct from "any loaded smoking rack" because we want the Tend DSE
+/// to score zero when every rack is on cooldown — that's the
+/// interleaving discipline (cats do something else for ~2 sim-hours
+/// between tends).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasLoadedSmokingRackOffCooldown;
+impl HasLoadedSmokingRackOffCooldown {
+    pub const KEY: &str = "HasLoadedSmokingRackOffCooldown";
 }
 
 /// Colony stores carry ≥1 food item (raw or cooked). Gates `Eat`.
@@ -1004,6 +1132,9 @@ mod tests {
         assert_marker_queryable(CanWard);
         assert_marker_queryable(CanWardFromSupply);
         assert_marker_queryable(CanCook);
+        // 367 — preservation capabilities.
+        assert_marker_queryable(CanDry);
+        assert_marker_queryable(CanSmoke);
     }
 
     #[test]
@@ -1018,6 +1149,16 @@ mod tests {
         assert_marker_queryable(HasStoredThornbriar);
         assert_marker_queryable(ColonyThornbriarChronicallyLow);
         assert_marker_queryable(MaterialsAvailable);
+        // 367 — preservation markers.
+        assert_marker_queryable(HasRawFishInInventory);
+        assert_marker_queryable(HasRawOrganInInventory);
+        assert_marker_queryable(HasRawMeatInInventory);
+        assert_marker_queryable(HasFuelInInventory);
+        assert_marker_queryable(HasFunctionalDryingRack);
+        assert_marker_queryable(HasFunctionalSmokingRack);
+        assert_marker_queryable(HasLoadedSmokingRackOffCooldown);
+        assert_marker_queryable(HasDryableInInventory);
+        assert_marker_queryable(HasSmokeableInInventory);
     }
 
     #[test]

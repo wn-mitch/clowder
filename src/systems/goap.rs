@@ -525,6 +525,27 @@ pub struct TargetMarkerQueries<'w, 's> {
         's,
         &'static crate::components::aspiration_emission::AspirationEmissions,
     >,
+    /// Ticket 367 — preservation per-cat markers. Bundled inside
+    /// `TargetMarkerQueries` so adding six new `Has<>` rows doesn't
+    /// push `evaluate_and_plan` past Bevy's 16-param limit, and so the
+    /// `per_cat_markers_q` tuple stays under the 15-arity `QueryData`
+    /// ceiling. `CanDry` / `CanSmoke` are capability markers (peers of
+    /// `CanCook`); the four `Has*InInventory` rows mirror the inventory
+    /// substrate the preservation DSEs read.
+    pub preservation_markers_q: Query<
+        'w,
+        's,
+        (
+            Has<markers::CanDry>,
+            Has<markers::CanSmoke>,
+            Has<markers::HasRawFishInInventory>,
+            Has<markers::HasRawOrganInInventory>,
+            Has<markers::HasRawMeatInInventory>,
+            Has<markers::HasFuelInInventory>,
+            Has<markers::HasDryableInInventory>,
+            Has<markers::HasSmokeableInInventory>,
+        ),
+    >,
 }
 
 #[allow(clippy::type_complexity)]
@@ -1453,6 +1474,9 @@ pub fn evaluate_and_plan(
         has_dependent_cat,
         has_stored_thornbriar,
         colony_thornbriar_chronically_low,
+        has_functional_drying_rack,
+        has_functional_smoking_rack,
+        has_loaded_smoking_rack_off_cooldown,
     ) = (
         cm.has_functional_kitchen,
         cm.has_raw_food_in_stores,
@@ -1469,6 +1493,9 @@ pub fn evaluate_and_plan(
         cm.has_dependent_cat,
         cm.has_stored_thornbriar,
         cm.colony_thornbriar_chronically_low,
+        cm.has_functional_drying_rack,
+        cm.has_functional_smoking_rack,
+        cm.has_loaded_smoking_rack_off_cooldown,
     );
     let food_fraction = ws.food_fraction;
 
@@ -1543,6 +1570,27 @@ pub fn evaluate_and_plan(
     // `update_colony_building_markers` from per-Stores `StoredHerbs`
     // aggregates.
     markers.set_colony(markers::HasStoredThornbriar::KEY, has_stored_thornbriar);
+
+    // 367: preservation-station colony markers. Failure to populate
+    // these into the snapshot would silently shut off `DryFoodDse` /
+    // `SmokeMeatDse` / `TendSmokingRackDse` eligibility — exactly the
+    // §209/084 class of bug that the third-clause discipline (and
+    // `check_marker_snapshot_wiring.sh`) exists to catch. Source of
+    // truth for each predicate is `update_colony_building_markers`;
+    // these lines mirror the cached bundle into the MarkerSnapshot the
+    // DSE eligibility filters actually consult.
+    markers.set_colony(
+        markers::HasFunctionalDryingRack::KEY,
+        has_functional_drying_rack,
+    );
+    markers.set_colony(
+        markers::HasFunctionalSmokingRack::KEY,
+        has_functional_smoking_rack,
+    );
+    markers.set_colony(
+        markers::HasLoadedSmokingRackOffCooldown::KEY,
+        has_loaded_smoking_rack_off_cooldown,
+    );
     // 084 Commit 3: ColonyThornbriarChronicallyLow — chronicity latch
     // sampled at `chronicity_window_ticks` boundaries against the
     // colony-wide stash total. Reader (this commit): `FarmDse`'s
@@ -1752,6 +1800,24 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::Elder::KEY, entity, e);
         }
         // §4 batch 1 + batch 2: per-cat markers read from authored ZSTs.
+        // 367: read preservation markers via the bundled sibling query
+        // inside `marker_qs`. Split off from `per_cat_markers_q` because
+        // adding eight rows pushed that tuple past Bevy's `QueryData`
+        // arity limit (15) and the parent system past the 16-param
+        // SystemParam budget. False defaults if the entity somehow
+        // isn't in the sibling query.
+        let (
+            can_dry,
+            can_smoke,
+            has_raw_fish,
+            has_raw_organ,
+            has_raw_meat,
+            has_fuel,
+            has_dryable,
+            has_smokeable,
+        ) = marker_qs.preservation_markers_q.get(entity).unwrap_or((
+            false, false, false, false, false, false, false, false,
+        ));
         if let Ok((
             injured,
             has_herbs,
@@ -1803,6 +1869,38 @@ pub fn evaluate_and_plan(
                 has_materials,
             );
             markers.set_entity(markers::HasCuriosInInventory::KEY, entity, has_curios);
+            // 367 — preservation per-cat markers. Missing any of these
+            // set_entity lines would silently mask the new DSE
+            // eligibility filters (third-clause discipline; precedent
+            // §209 / §084).
+            markers.set_entity(markers::CanDry::KEY, entity, can_dry);
+            markers.set_entity(markers::CanSmoke::KEY, entity, can_smoke);
+            markers.set_entity(
+                markers::HasRawFishInInventory::KEY,
+                entity,
+                has_raw_fish,
+            );
+            markers.set_entity(
+                markers::HasRawOrganInInventory::KEY,
+                entity,
+                has_raw_organ,
+            );
+            markers.set_entity(
+                markers::HasRawMeatInInventory::KEY,
+                entity,
+                has_raw_meat,
+            );
+            markers.set_entity(markers::HasFuelInInventory::KEY, entity, has_fuel);
+            markers.set_entity(
+                markers::HasDryableInInventory::KEY,
+                entity,
+                has_dryable,
+            );
+            markers.set_entity(
+                markers::HasSmokeableInInventory::KEY,
+                entity,
+                has_smokeable,
+            );
         }
         // §4.2 State markers — InCombat / OnCorruptedTile /
         // OnSpecialTerrain. Authored in Chain 2a alongside the other §4

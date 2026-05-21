@@ -30,7 +30,7 @@ use bevy_ecs::prelude::*;
 
 use crate::components::identity::Species;
 use crate::components::markers::{
-    Adult, CanCook, CanForage, CanHunt, CanWard, CanWardFromSupply, ColonyState,
+    Adult, CanCook, CanDry, CanForage, CanHunt, CanSmoke, CanWard, CanWardFromSupply, ColonyState,
     HasStoredThornbriar, HasWardHerbs, InCombat, Injured, Kitten, Young,
 };
 use crate::components::physical::{Dead, Position};
@@ -60,6 +60,8 @@ pub fn update_capability_markers(
             Has<CanWard>,
             Has<CanWardFromSupply>,
             Has<CanCook>,
+            Has<CanDry>,
+            Has<CanSmoke>,
         ),
         (With<Species>, Without<Dead>),
     >,
@@ -89,6 +91,8 @@ pub fn update_capability_markers(
         cur_ward,
         cur_ward_from_supply,
         cur_cook,
+        cur_dry,
+        cur_smoke,
     ) in cats.iter()
     {
         // CanHunt: (Adult ∨ Young) ∧ ¬InCombat ∧ forest nearby.
@@ -138,6 +142,17 @@ pub fn update_capability_markers(
         // CanCook: Adult ∧ ¬Injured (colony checks stay on CookDse)
         let want_cook = is_adult && !is_injured;
         toggle(&mut commands, entity, want_cook, cur_cook, CanCook);
+
+        // 367: CanDry / CanSmoke share CanCook's per-cat gate. Station
+        // availability + carried inventory stay on the per-DSE
+        // eligibility filter (matches the cook precedent — colony-side
+        // gates kept off the per-cat capability marker so absence of a
+        // station can later flow into BuildPressure rather than
+        // silently shutting the capability off).
+        let want_dry = is_adult && !is_injured;
+        toggle(&mut commands, entity, want_dry, cur_dry, CanDry);
+        let want_smoke = is_adult && !is_injured;
+        toggle(&mut commands, entity, want_smoke, cur_smoke, CanSmoke);
     }
 }
 
@@ -376,6 +391,8 @@ mod tests {
         assert!(!world.entity(cat).contains::<CanWard>());
         assert!(!world.entity(cat).contains::<CanWardFromSupply>());
         assert!(!world.entity(cat).contains::<CanCook>());
+        assert!(!world.entity(cat).contains::<CanDry>());
+        assert!(!world.entity(cat).contains::<CanSmoke>());
     }
 
     // -----------------------------------------------------------------------
@@ -587,6 +604,46 @@ mod tests {
         schedule.run(&mut world);
 
         assert!(!world.entity(cat).contains::<CanCook>());
+    }
+
+    // -----------------------------------------------------------------------
+    // CanDry / CanSmoke (ticket 367)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn adult_gets_can_dry_and_can_smoke() {
+        let (mut world, mut schedule) = setup();
+        let cat = spawn_cat(&mut world, 10, 10);
+        world.entity_mut(cat).insert(Adult);
+
+        schedule.run(&mut world);
+
+        assert!(world.entity(cat).contains::<CanDry>());
+        assert!(world.entity(cat).contains::<CanSmoke>());
+    }
+
+    #[test]
+    fn young_no_preservation_capabilities() {
+        let (mut world, mut schedule) = setup();
+        let cat = spawn_cat(&mut world, 10, 10);
+        world.entity_mut(cat).insert(Young);
+
+        schedule.run(&mut world);
+
+        assert!(!world.entity(cat).contains::<CanDry>());
+        assert!(!world.entity(cat).contains::<CanSmoke>());
+    }
+
+    #[test]
+    fn injured_no_preservation_capabilities() {
+        let (mut world, mut schedule) = setup();
+        let cat = spawn_cat(&mut world, 10, 10);
+        world.entity_mut(cat).insert((Adult, Injured));
+
+        schedule.run(&mut world);
+
+        assert!(!world.entity(cat).contains::<CanDry>());
+        assert!(!world.entity(cat).contains::<CanSmoke>());
     }
 
     // -----------------------------------------------------------------------

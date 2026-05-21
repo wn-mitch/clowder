@@ -6,8 +6,10 @@ use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::{item_display_name, Item};
 use crate::components::magic::{Inventory, ResourceKind};
 use crate::components::markers::{
-    HasCuriosInInventory, HasFreeSlot, HasHerbsInInventory, HasLowWardReserve,
-    HasMaterialsInInventory, HasRemedyHerbs, HasWardHerbs,
+    HasCuriosInInventory, HasDryableInInventory, HasFreeSlot, HasFuelInInventory,
+    HasHerbsInInventory, HasLowWardReserve, HasMaterialsInInventory, HasRawFishInInventory,
+    HasRawMeatInInventory, HasRawOrganInInventory, HasRemedyHerbs, HasSmokeableInInventory,
+    HasWardHerbs,
 };
 use crate::components::physical::Dead;
 use crate::resources::colony_reserves::ColonyReserves;
@@ -51,6 +53,13 @@ pub fn update_inventory_markers(
             Has<HasFreeSlot>,
             Has<HasMaterialsInInventory>,
             Has<HasCuriosInInventory>,
+            // 367: preservation inventory markers.
+            Has<HasRawFishInInventory>,
+            Has<HasRawOrganInInventory>,
+            Has<HasRawMeatInInventory>,
+            Has<HasFuelInInventory>,
+            Has<HasDryableInInventory>,
+            Has<HasSmokeableInInventory>,
         ),
         Without<Dead>,
     >,
@@ -64,6 +73,12 @@ pub fn update_inventory_markers(
         has_free_slot_marker,
         has_materials_marker,
         has_curios_marker,
+        has_raw_fish_marker,
+        has_raw_organ_marker,
+        has_raw_meat_marker,
+        has_fuel_marker,
+        has_dryable_marker,
+        has_smokeable_marker,
     ) in cats.iter()
     {
         let has_herbs = inventory.has_any_herb();
@@ -72,6 +87,19 @@ pub fn update_inventory_markers(
         let has_free_slot = !inventory.is_full();
         let has_materials = inventory.has_any_material();
         let has_curios = inventory.has_any_curio();
+        // 367 preservation inventory predicates.
+        let has_raw_fish = inventory.has_raw_fish();
+        let has_raw_organ = inventory.has_raw_organ();
+        let has_raw_meat = inventory.has_raw_meat();
+        let has_fuel = inventory.has_fuel();
+        // 367 unified DSE-gate markers — `EligibilityFilter` lacks an OR
+        // primitive, so the OR-of-{fish, organ} drying gate and the
+        // AND-of-{meat, fuel} smoking gate live on these conjunction /
+        // disjunction markers. Resolvers still read the more specific
+        // single-kind markers above when they need to pick a particular
+        // item to consume.
+        let has_dryable = has_raw_fish || has_raw_organ;
+        let has_smokeable = has_raw_meat && has_fuel;
 
         match (has_herbs, has_herbs_marker) {
             (true, false) => {
@@ -124,6 +152,63 @@ pub fn update_inventory_markers(
             }
             (false, true) => {
                 commands.entity(entity).remove::<HasCuriosInInventory>();
+            }
+            _ => {}
+        }
+        // 367 — preservation inventory markers. Same toggle shape as
+        // every sibling above; consolidating into a helper would be
+        // cleaner but matches the explicit precedent.
+        match (has_raw_fish, has_raw_fish_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasRawFishInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasRawFishInInventory>();
+            }
+            _ => {}
+        }
+        match (has_raw_organ, has_raw_organ_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasRawOrganInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasRawOrganInInventory>();
+            }
+            _ => {}
+        }
+        match (has_raw_meat, has_raw_meat_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasRawMeatInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasRawMeatInInventory>();
+            }
+            _ => {}
+        }
+        match (has_fuel, has_fuel_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasFuelInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasFuelInInventory>();
+            }
+            _ => {}
+        }
+        match (has_dryable, has_dryable_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasDryableInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasDryableInInventory>();
+            }
+            _ => {}
+        }
+        match (has_smokeable, has_smokeable_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasSmokeableInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasSmokeableInInventory>();
             }
             _ => {}
         }

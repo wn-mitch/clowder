@@ -91,6 +91,12 @@ pub struct SimConstants {
     /// follow-on 408 under the four-artifact methodology.
     #[serde(default)]
     pub parenting: ParentingActivityConstants,
+    /// Ticket 367 — Phase 1b preservation tunables. Drying/smoking
+    /// durations, smoking tend cadence, organ-drop rate from hunts,
+    /// and the per-eat mood bump for organ-derived food. `#[serde(default)]`
+    /// so pre-367 events.jsonl headers deserialize cleanly.
+    #[serde(default)]
+    pub crafting: CraftingConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -6629,6 +6635,80 @@ impl Default for ParentingActivityConstants {
             w_protection: 0.20,
             w_cultural: 0.15,
             w_autonomy: 0.15,
+        }
+    }
+}
+
+// ---------- CraftingConstants (ticket 367 — 016 Phase 1b) ----------
+
+/// Tunables for the food-preservation pipeline. Recipe durations come
+/// from `docs/systems/crafting.md` Phase 1 table; tend cadence and
+/// organ-drop probability are first-cut values that the 367 hypothesis
+/// soak will validate via `just verdict`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CraftingConstants {
+    /// Total ticks of Clear weather required for the
+    /// `preserve.dried_fish` recipe to complete. Per crafting.md:
+    /// "~3 days of Clear weather." At the default `SimConfig`
+    /// (ticks_per_day ≈ 5000 wall ticks), 3 days ≈ 15_000 ticks.
+    /// The drying system advances per-tick *only when*
+    /// `weather.current == Weather::Clear`; ticks under non-clear
+    /// weather don't count, so wall-clock completion can run longer.
+    pub drying_dried_fish_total_ticks: u64,
+
+    /// Total clear-weather ticks for `preserve.preserved_organ`. Per
+    /// crafting.md: "~2 days." Slightly faster than fish since organs
+    /// are smaller / cure with herb assistance.
+    pub drying_preserved_organ_total_ticks: u64,
+
+    /// Number of discrete tend visits a Smoking Rack needs before it
+    /// produces `SmokedMeat`. 3 = the design-doc default (~3-4 visits
+    /// over the ~1 day craft window). Stored on
+    /// `SmokingRackState::tends_needed` at load time so future recipes
+    /// could declare variant cadences.
+    pub smoking_tends_needed: u32,
+
+    /// Per-rack cooldown enforced between tend visits. The
+    /// `TendSmokingRackDse` eligibility gate's
+    /// `HasLoadedSmokingRackOffCooldown` marker fires only after this
+    /// many ticks have elapsed since the last tend on a given rack.
+    /// Forces interleaving — the cat must do something else for
+    /// ~2 sim-hours between tends, producing the "tend, walk away,
+    /// come back" rhythm the design doc calls for. At default
+    /// SimConfig (ticks_per_hour ≈ 208), ~2 hours ≈ 416 ticks.
+    pub smoking_tend_cooldown_ticks: u64,
+
+    /// Probability that a successful hunt drops a `RawOrgan` alongside
+    /// the carcass. Fish hunts bypass this roll (only mammals + birds
+    /// drop organs).
+    pub organ_drop_chance: f32,
+
+    /// Mood bump applied to a cat when it eats organ-derived food
+    /// (`RawOrgan` or `PreservedOrgan`). Per the "items are real,
+    /// effects live on resolvers keyed to item identity" pillar — this
+    /// is an action-side effect, not a numeric field on the item.
+    pub organ_mood_bonus: f32,
+}
+
+impl Default for CraftingConstants {
+    fn default() -> Self {
+        // Tick budgets are nominal and derived from the canonical
+        // SimConfig (ticks_per_day ≈ 5000). The drying system reads
+        // these directly; the resolver layer can convert via TimeScale
+        // if a future SimConfig scales them.
+        Self {
+            drying_dried_fish_total_ticks: 15_000,
+            drying_preserved_organ_total_ticks: 10_000,
+            smoking_tends_needed: 3,
+            smoking_tend_cooldown_ticks: 416,
+            // 30% per the user-selected scope (cf. plan §6 / hunt-drop
+            // wiring). High enough to surface organs reliably during a
+            // 15-min soak; low enough that they remain a "prize part of
+            // the kill" rather than the default carcass shape.
+            organ_drop_chance: 0.30,
+            // Small mood tick — enough to surface in mood traces, not
+            // enough to push organ-eating above hunger-driven choices.
+            organ_mood_bonus: 0.05,
         }
     }
 }

@@ -38,43 +38,63 @@ const WORLD_SNAPSHOT_INVARIANT_PERIOD_TICKS: u64 = 100;
 /// the cached snapshot and a fresh re-read indicates a scheduling drift
 /// rather than a populator-vs-author shape mismatch.
 #[allow(clippy::type_complexity)]
+// Nested tuple shape: Bevy's `QueryData` impl tops out at arity 15 per
+// level. After 367's three preservation markers landed, the flat shape
+// hit 18 entries — nested two-group form fits each level under the cap
+// and is otherwise a no-op (Bevy supports arbitrarily-nested tuple
+// destructuring in `Query::single()` / `get(...)`).
 type ColonyStateMarkerTuple = (
-    Has<markers::HasFunctionalKitchen>,
-    Has<markers::HasRawFoodInStores>,
-    Has<markers::HasStoredFood>,
-    Has<markers::ThornbriarAvailable>,
-    Has<markers::WardStrengthLow>,
-    Has<markers::WardsUnderSiege>,
-    Has<markers::HasConstructionSite>,
-    Has<markers::HasDamagedBuilding>,
-    Has<markers::HasGarden>,
-    Has<markers::ColonyStoresChronicallyFull>,
-    Has<markers::HasMidden>,
-    Has<markers::HasGroundCarcass>,
-    Has<markers::HasDependentCat>,
-    Has<markers::HasStoredThornbriar>,
-    Has<markers::ColonyThornbriarChronicallyLow>,
+    (
+        Has<markers::HasFunctionalKitchen>,
+        Has<markers::HasRawFoodInStores>,
+        Has<markers::HasStoredFood>,
+        Has<markers::ThornbriarAvailable>,
+        Has<markers::WardStrengthLow>,
+        Has<markers::WardsUnderSiege>,
+        Has<markers::HasConstructionSite>,
+        Has<markers::HasDamagedBuilding>,
+        Has<markers::HasGarden>,
+    ),
+    (
+        Has<markers::ColonyStoresChronicallyFull>,
+        Has<markers::HasMidden>,
+        Has<markers::HasGroundCarcass>,
+        Has<markers::HasDependentCat>,
+        Has<markers::HasStoredThornbriar>,
+        Has<markers::ColonyThornbriarChronicallyLow>,
+        // 367 — preservation station availability + tend cooldown.
+        Has<markers::HasFunctionalDryingRack>,
+        Has<markers::HasFunctionalSmokingRack>,
+        Has<markers::HasLoadedSmokingRackOffCooldown>,
+    ),
 );
 
 fn read_colony_markers(
     query: &Query<ColonyStateMarkerTuple, With<markers::ColonyState>>,
 ) -> ColonyMarkerBundle {
     let (
-        has_functional_kitchen,
-        has_raw_food_in_stores,
-        has_stored_food,
-        thornbriar_available,
-        ward_strength_low,
-        wards_under_siege,
-        has_construction_site,
-        has_damaged_building,
-        has_garden,
-        colony_stores_chronically_full,
-        has_midden,
-        has_ground_carcass,
-        has_dependent_cat,
-        has_stored_thornbriar,
-        colony_thornbriar_chronically_low,
+        (
+            has_functional_kitchen,
+            has_raw_food_in_stores,
+            has_stored_food,
+            thornbriar_available,
+            ward_strength_low,
+            wards_under_siege,
+            has_construction_site,
+            has_damaged_building,
+            has_garden,
+        ),
+        (
+            colony_stores_chronically_full,
+            has_midden,
+            has_ground_carcass,
+            has_dependent_cat,
+            has_stored_thornbriar,
+            colony_thornbriar_chronically_low,
+            has_functional_drying_rack,
+            has_functional_smoking_rack,
+            has_loaded_smoking_rack_off_cooldown,
+        ),
     ) = query
         .single()
         .expect("ColonyState singleton must exist for WorldSnapshots populator");
@@ -94,6 +114,9 @@ fn read_colony_markers(
         has_dependent_cat,
         has_stored_thornbriar,
         colony_thornbriar_chronically_low,
+        has_functional_drying_rack,
+        has_functional_smoking_rack,
+        has_loaded_smoking_rack_off_cooldown,
     }
 }
 

@@ -408,6 +408,37 @@ impl Inventory {
             .any(|s| s.kind.category() == ItemCategory::Curiosity)
     }
 
+    /// 367: whether the inventory contains at least one Raw Fish.
+    /// Reader: `HasRawFishInInventory` writer in
+    /// `items::update_inventory_markers`.
+    pub fn has_raw_fish(&self) -> bool {
+        use crate::components::items::ItemKind;
+        self.slots.iter().any(|s| s.kind == ItemKind::RawFish)
+    }
+
+    /// 367: whether the inventory contains at least one Raw Organ.
+    /// Reader: `HasRawOrganInInventory` writer.
+    pub fn has_raw_organ(&self) -> bool {
+        use crate::components::items::ItemKind;
+        self.slots.iter().any(|s| s.kind == ItemKind::RawOrgan)
+    }
+
+    /// 367: whether the inventory contains at least one Raw Meat
+    /// (mammals + birds — fish goes through drying, not smoking).
+    /// Reader: `HasRawMeatInInventory` writer.
+    pub fn has_raw_meat(&self) -> bool {
+        self.slots.iter().any(|s| s.kind.is_raw_meat())
+    }
+
+    /// 367: whether the inventory contains at least one Fuel item
+    /// (currently only `ItemKind::Wood`). Semantic-narrower sibling of
+    /// `has_any_material` — Stone is a build material but not a fuel.
+    /// Reader: `HasFuelInInventory` writer.
+    pub fn has_fuel(&self) -> bool {
+        use crate::components::items::ItemKind;
+        self.slots.iter().any(|s| s.kind == ItemKind::Wood)
+    }
+
     /// Whether the inventory holds a specific prepared remedy.
     /// Ticket 365 — Phase 1a real-items migration.
     pub fn has_remedy(&self, kind: RemedyKind) -> bool {

@@ -57,6 +57,10 @@ pub struct ColonyMarkerBundle {
     pub has_dependent_cat: bool,
     pub has_stored_thornbriar: bool,
     pub colony_thornbriar_chronically_low: bool,
+    /// 367 — preservation-station availability mirrors.
+    pub has_functional_drying_rack: bool,
+    pub has_functional_smoking_rack: bool,
+    pub has_loaded_smoking_rack_off_cooldown: bool,
 }
 
 #[derive(Resource, Debug, Default, Clone, Copy)]
