@@ -18,6 +18,7 @@ use bevy::prelude::*;
 use crate::components::building::{SmokingRackState, Structure};
 use crate::components::items::{Item, ItemKind, ItemLocation};
 use crate::components::physical::Position;
+use crate::components::recipe::{CraftedItem, RecipeId};
 use crate::resources::sim_constants::CraftingConstants;
 use crate::steps::{StepOutcome, StepResult};
 
@@ -96,7 +97,7 @@ pub fn resolve_tend_smoking_rack(
 
     // Apply the tend.
     let mut completed = false;
-    let mut output_spawn: Option<(Position, f32, crate::components::items::ItemModifiers)> = None;
+    let mut output_spawn: Option<CompletionSpawn> = None;
     for (entity, rack_pos, _, mut state) in racks.iter_mut() {
         if entity != rack_entity {
             continue;
@@ -121,7 +122,12 @@ pub fn resolve_tend_smoking_rack(
                 load.crafter_skill,
                 crafting,
             );
-            output_spawn = Some((*rack_pos, output_quality, load.source_modifiers));
+            output_spawn = Some(CompletionSpawn {
+                pos: *rack_pos,
+                quality: output_quality,
+                modifiers: load.source_modifiers,
+                recipe_id: recipe_id_for_source(load.source_kind),
+            });
             // Reset the rack to idle on completion.
             state.loaded = None;
             state.fuel_loaded = false;
@@ -133,14 +139,58 @@ pub fn resolve_tend_smoking_rack(
         break;
     }
 
-    if let Some((spawn_pos, quality, modifiers)) = output_spawn {
+    if let Some(spawn) = output_spawn {
         commands.spawn((
-            Item::with_modifiers(ItemKind::SmokedMeat, quality, ItemLocation::OnGround, modifiers),
-            spawn_pos,
+            Item::with_modifiers(
+                ItemKind::SmokedMeat,
+                spawn.quality,
+                ItemLocation::OnGround,
+                spawn.modifiers,
+            ),
+            spawn.pos,
+            CraftedItem {
+                recipe: spawn.recipe_id,
+                // No per-tender entity carried on the load yet — see
+                // `SmokingLoad::crafter_skill` doc-comment for the
+                // loader-as-crafter convention. A follow-on can
+                // persist the loader's Entity if narrative
+                // attribution wants it.
+                crafter: None,
+                crafted_at_tick: current_tick,
+            },
         ));
     }
 
     StepOutcome::witnessed_with(StepResult::Advance, completed)
+}
+
+/// Captured at completion time so the second pass (entity spawn +
+/// `CraftedItem` provenance attach) doesn't re-borrow `SmokingRackState`.
+struct CompletionSpawn {
+    pos: Position,
+    quality: f32,
+    modifiers: crate::components::items::ItemModifiers,
+    recipe_id: RecipeId,
+}
+
+/// Map a `SmokingLoad::source_kind` to the matching `preserve.smoked.*`
+/// recipe id. Hard-coded mirror of the 4 entries registered in
+/// `populate_recipe_registry`; falls back to a debug-shaped string
+/// for any defensively-passed non-smokeable kind (shouldn't happen
+/// in practice — load resolver gates `is_raw_meat`).
+fn recipe_id_for_source(kind: ItemKind) -> RecipeId {
+    match kind {
+        ItemKind::RawMouse => RecipeId("preserve.smoked.mouse"),
+        ItemKind::RawRat => RecipeId("preserve.smoked.rat"),
+        ItemKind::RawRabbit => RecipeId("preserve.smoked.rabbit"),
+        ItemKind::RawBird => RecipeId("preserve.smoked.bird"),
+        // Defensive: load resolver gates `is_raw_meat()`, so any
+        // unexpected kind here is a contract violation upstream.
+        // Carrying a placeholder rather than panicking keeps the run
+        // alive; a future contract assertion can promote this to a
+        // hard failure.
+        _ => RecipeId("preserve.smoked.unknown"),
+    }
 }
 
 /// 367-4b — Factorio/RimWorld-style output quality formula.

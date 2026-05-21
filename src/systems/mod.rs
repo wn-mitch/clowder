@@ -115,6 +115,7 @@ pub mod personality_events;
 pub mod personality_friction;
 pub mod plan_substrate;
 pub mod pregnancy;
+pub mod preservation;
 pub mod prey;
 pub mod sensing;
 pub mod snake_goap;

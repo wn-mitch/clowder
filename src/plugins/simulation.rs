@@ -298,8 +298,8 @@ pub fn register_influence_maps_at_startup(mut registry: ResMut<InfluenceMapRegis
 pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
     use crate::components::magic::{RemedyKind, WardKind};
     use crate::components::recipe::{
-        DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeInput, RecipeOutput,
-        StationRequirement,
+        DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeId, RecipeInput,
+        RecipeOutput, StationRequirement,
     };
     use crate::resources::sim_constants::MagicConstants;
 
@@ -400,6 +400,127 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         skill_gate: None,
     });
+
+    // 367 Commit 5 — preservation recipes (Phase 1b).
+    //
+    // Six entries cover the Phase 1b pipeline: two drying recipes
+    // (fish + organ) and four parallel smoking recipes (one per raw
+    // meat kind). Smoked recipes are parallel rather than an
+    // `AnyOf`-style consolidation because `RecipeInput` doesn't carry
+    // a multi-kind variant yet (flagged at `recipe.rs:31-34` as a
+    // follow-on need). The four-Recipe shape mirrors the existing
+    // one-Recipe-per-Ward/Remedy precedent.
+    //
+    // Registry duration is **metadata** — runtime advancement happens
+    // in `systems::preservation::advance_preservation_drying` (for
+    // drying) and in tend-cycle completion (for smoking). The
+    // resolvers read `CraftingConstants` directly, so this duration
+    // field exists for future tooling ("how long does this take?")
+    // not as a load-bearing budget. `Fixed` ticks are nominal at
+    // canonical `SimConfig`.
+    let crafting = crate::resources::sim_constants::CraftingConstants::default();
+    let drying_fish_ticks = crafting.drying_dried_fish_total_ticks;
+    let drying_organ_ticks = crafting.drying_preserved_organ_total_ticks;
+    // Nominal smoking duration: tends_needed (3) * tend_cooldown (~416)
+    // + tend-action ticks. Empirical bound at default constants is
+    // ~1500-2500 ticks wall-clock; ~5000 ticks ≈ one sim-day is the
+    // crafting.md target. Pick the design target as metadata so future
+    // tooling sees the intended wall-clock budget.
+    let smoking_ticks: u64 = 5_000;
+
+    registry.insert(Recipe {
+        id: RecipeId("preserve.dried_fish"),
+        discipline: DisciplineKind::Preservation,
+        inputs: vec![RecipeInput {
+            kind: crate::components::items::ItemKind::RawFish,
+            count: 1,
+        }],
+        station: StationRequirement::DryingRack,
+        duration: RecipeDuration::Fixed {
+            ticks: drying_fish_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: crate::components::items::ItemKind::DriedFish,
+            // Spawns at the rack's position. `WorldPosition` is the
+            // canonical destination for "spawn an `Item` entity on the
+            // ground at a recipe-chosen tile" — the destination
+            // machinery doesn't distinguish "at the crafter" from "at
+            // the station" today.
+            destination: ItemDestination::WorldPosition,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("preserve.preserved_organ"),
+        discipline: DisciplineKind::Preservation,
+        inputs: vec![
+            RecipeInput {
+                kind: crate::components::items::ItemKind::RawOrgan,
+                count: 1,
+            },
+            // Canonical herb input — `HerbHealingMoss` per the plan.
+            // The load resolver consumes "any herb" (see `take_any_herb`
+            // in `load_drying_rack.rs`) because `RecipeInput::AnyOf`
+            // doesn't exist yet; this entry documents the canonical
+            // intent until `AnyOf` lands.
+            RecipeInput {
+                kind: crate::components::items::ItemKind::HerbHealingMoss,
+                count: 1,
+            },
+        ],
+        station: StationRequirement::DryingRack,
+        duration: RecipeDuration::Fixed {
+            ticks: drying_organ_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: crate::components::items::ItemKind::PreservedOrgan,
+            destination: ItemDestination::WorldPosition,
+        },
+        skill_gate: None,
+    });
+
+    // Four parallel smoking recipes. All share `ItemKind::SmokedMeat`
+    // as output; the source meat's identity rides through
+    // `SmokingLoad::source_kind` for `CraftedItem` provenance. When
+    // `RecipeInput::AnyOf` lands these collapse to one Recipe.
+    for raw_meat_kind in [
+        crate::components::items::ItemKind::RawMouse,
+        crate::components::items::ItemKind::RawRat,
+        crate::components::items::ItemKind::RawRabbit,
+        crate::components::items::ItemKind::RawBird,
+    ] {
+        let recipe_slug: &'static str = match raw_meat_kind {
+            crate::components::items::ItemKind::RawMouse => "preserve.smoked.mouse",
+            crate::components::items::ItemKind::RawRat => "preserve.smoked.rat",
+            crate::components::items::ItemKind::RawRabbit => "preserve.smoked.rabbit",
+            crate::components::items::ItemKind::RawBird => "preserve.smoked.bird",
+            _ => unreachable!("smoked-meat recipe loop is enumerated above"),
+        };
+        registry.insert(Recipe {
+            id: RecipeId(recipe_slug),
+            discipline: DisciplineKind::Preservation,
+            inputs: vec![
+                RecipeInput {
+                    kind: raw_meat_kind,
+                    count: 1,
+                },
+                RecipeInput {
+                    kind: crate::components::items::ItemKind::Wood,
+                    count: 1,
+                },
+            ],
+            station: StationRequirement::SmokingRack,
+            duration: RecipeDuration::Fixed {
+                ticks: smoking_ticks,
+            },
+            output: RecipeOutput {
+                item_kind: crate::components::items::ItemKind::SmokedMeat,
+                destination: ItemDestination::WorldPosition,
+            },
+            skill_gate: None,
+        });
+    }
 }
 
 /// Startup system that populates [`RecipeRegistry`]. Independent
@@ -1101,6 +1222,15 @@ impl Plugin for SimulationPlugin {
                     systems::magic::apply_remedy_effects,
                     systems::buildings::process_gates,
                     systems::buildings::tidy_buildings,
+                    // 367 Commit 5 — drying-rack per-tick advancement.
+                    // Sits in Chain 3 next to building update systems
+                    // because the work it does ("if loaded under
+                    // Clear sky, advance progress; spawn output at
+                    // 100%") is structurally a structure-state-update
+                    // pass. The query is filtered to DryingRack
+                    // archetypes (typically 0-3 entities), so the
+                    // per-tick cost is bounded by colony rack count.
+                    systems::preservation::advance_preservation_drying,
                 )
                     .chain(),
                 // Chain 4: Social, combat, death, cleanup, narrative

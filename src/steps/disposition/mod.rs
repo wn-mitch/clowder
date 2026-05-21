@@ -78,7 +78,7 @@ pub use sleep::resolve_sleep;
 pub use socialize::resolve_socialize;
 pub use survey::resolve_survey;
 pub use teach::resolve_teach;
-pub use tend_smoking_rack::resolve_tend_smoking_rack;
+pub use tend_smoking_rack::{preservation_output_quality, resolve_tend_smoking_rack};
 pub use trash::{resolve_trash_at_midden, TrashOutcome};
 pub use vigil::resolve_vigil;
 pub use wean::resolve_wean;

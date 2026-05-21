@@ -106,6 +106,12 @@ pub enum DisciplineKind {
     Herbalism,
     Witchcraft,
     Cooking,
+    /// 367 Phase 1b — preservation. Drying Rack + Smoking Rack
+    /// pipelines. Maps 1-to-many onto the three new dispositions
+    /// (`DryingFood`, `SmokingMeat`, `TendingSmokingRack`) because
+    /// preservation is one discipline but three execution shapes
+    /// (load-and-leave drying, load-then-tend smoking, tend-cycles).
+    Preservation,
     // Future disciplines (Phase 2/3/4/5): FiberWeaving, BoneShellCraft,
     // HidePeltWork, PigmentMark, StonecraftCairn, AdornmentSetting.
 }
