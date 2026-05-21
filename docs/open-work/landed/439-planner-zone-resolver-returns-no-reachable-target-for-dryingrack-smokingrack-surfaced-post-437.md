@@ -1,7 +1,7 @@
 ---
 id: 439
 title: Planner zone resolver returns no reachable target for DryingRack / SmokingRack — surfaced post-437
-status: blocked
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: [437]
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
@@ -84,3 +84,4 @@ R3 (outer dispatcher gate) is the fast unblock if R1's spatial-anchor fix proves
 
 ## Log
 - 2026-05-21: opened from the post-437 verification soak (`logs/tuned-42-44a82ba0`). 437 fixed the dispatch (DSE now scored, elected, planned-for), exposing the next-layer defect: `TravelTo(DryingRack): no reachable zone target` × 1095 + `TravelTo(SmokingRack): no reachable zone target` × 719. Six layer-walk rows still need promotion; the position-scan + trace-inspection paths under `## Recommended direction` are the next-session entry points. Blocked-by 437 because the verification evidence depends on 437 being landed.
+- 2026-05-21: Fix: building_snapshot at goap.rs:3728 chains rack entries from drying_racks/smoking_racks queries (BuildingResolverParams.buildings filters them via Without<DryingRackState> for borrow disjointness). NearestDryingRack/NearestSmokingRack LandmarkAnchor variants retire the NearestKitchen Commit-4 placeholder in dry_food.rs/smoke_meat.rs/tend_smoking_rack.rs. Two scenario fixtures reproduce + verify. Post-fix soak (logs/tuned-42-45e5e256): FoodLoadedOnDryingRack + FoodDried fire; rack-zone failures 1814 → 0; never_fired 5 → 3 (smoking-side blocked on 367 Commit 10, out of scope).
