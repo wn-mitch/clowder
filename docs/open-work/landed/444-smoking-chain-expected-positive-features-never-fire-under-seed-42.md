@@ -1,8 +1,9 @@
 ---
 id: 444
 title: Smoking-chain expected-positive features never fire under seed-42
-status: ready
+status: done
 cluster: items-crafting
+orchestration: swarm-safe
 initiative: []
 added: 2026-05-21
 parked: null
@@ -10,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
@@ -59,3 +60,4 @@ Not yet decided. R3 is the smallest fix and the most honest about state; R4 is t
 
 ## Log
 - 2026-05-21: opened as 443 follow-on. Surfaced by the 290 landing soak at `logs/tuned-42-40397a72/`, but verified pre-existing at `logs/tuned-42-53a6bd27/` (same three never-fired positives at the 323 backfill commit, before 340 and 290).
+- 2026-05-21: Retire MeatLoadedOnSmokingRack / SmokingRackTended / MeatSmoked from expected_to_fire_per_soak() canary. 446 layer-walk verified the chain is structurally complete (DSE + dispatcher + registry + plan template + resolvers + marker writers all symmetric to drying) but the meat-AND-fuel conjunction inside HasSmokeableAccessible never resolves under healthy seed-42 — SmokeMeat never appears in any CatSnapshot last_scores. Regression coverage migrates to ticket 447's scenario preset.

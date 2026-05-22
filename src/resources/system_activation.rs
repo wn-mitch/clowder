@@ -1395,10 +1395,27 @@ impl Feature {
             // soak may not produce all four links, so the canary stays
             // opt-out until balance verification shows reliable
             // firing. `FoodDried` (fish pipeline, no organ-drop gate)
-            // and `MeatSmoked` (per-hunt mammal/bird drop, no extra
-            // herb requirement) both fall through to `_ => true` —
-            // those are the hypothesis-load-bearing completions.
+            // falls through to `_ => true` — that's the hypothesis-
+            // load-bearing completion that does fire in healthy soaks.
             Feature::OrganPreserved => false,
+            // 444 / 446: the smoking-side triple retires from the per-
+            // soak canary. 446's layer-walk verified the smoking chain
+            // is structurally complete (DSE, dispatcher, registry, plan
+            // template, resolvers, marker writers, item drops, canary
+            // classification all symmetric to drying), but behaviorally
+            // the meat-AND-fuel conjunction inside
+            // `HasSmokeableAccessible` never resolves under healthy
+            // seed-42: `SmokeMeat` never appears in any `last_scores`
+            // table across the run. Drying-side `HasDryableAccessible`
+            // is a fish-OR-organ disjunction which does resolve. Re-
+            // enroll when a future substrate arc splits the smoking
+            // conjunction into sequential retrievals (or adds a fuel-
+            // acquisition DSE). Regression coverage for the smoking
+            // pipeline migrates to a scenario harness preset under
+            // ticket 447 (`just scenario smoking_chain_complete`).
+            Feature::MeatLoadedOnSmokingRack => false,
+            Feature::SmokingRackTended => false,
+            Feature::MeatSmoked => false,
             // Every other feature is expected to fire per soak.
             _ => true,
         }

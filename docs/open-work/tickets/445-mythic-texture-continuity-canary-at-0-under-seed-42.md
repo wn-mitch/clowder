@@ -3,6 +3,7 @@ id: 445
 title: mythic-texture continuity canary at 0 under seed-42
 status: ready
 cluster: magic-mythic
+orchestration: swarm-safe
 initiative: []
 added: 2026-05-21
 parked: null
