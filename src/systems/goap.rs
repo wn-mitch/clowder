@@ -5648,6 +5648,8 @@ fn dispatch_step_action(
                 // phase-band bias. Dormant by default; reads only fire
                 // when the bias knob is non-zero.
                 &ec.action_affordances,
+                // 375: per-species guaranteed byproduct table.
+                &ec.constants.prey_byproducts,
             )
         }
 
@@ -8697,6 +8699,11 @@ fn resolve_engage_prey(
     // `±bias`. `pounce_range` is NOT biased — the leap is a physics
     // invariant the catch math relies on.
     affordances: &crate::resources::action_affordances::ActionAffordances,
+    // 375 — per-species guaranteed byproduct table. Each successful kill
+    // spawns the meat plus the species' fixed byproduct list. Independent
+    // of `crafting.organ_drop_chance` (367's probabilistic mammal+bird
+    // organ roll, which continues to fire on top).
+    prey_byproducts: &crate::resources::sim_constants::PreyByproductConstants,
 ) -> crate::steps::StepResult {
     use crate::components::magic::ItemSlot;
     use crate::components::prey::PreyAiState;
@@ -8917,6 +8924,39 @@ fn resolve_engage_prey(
                     act.record(crate::resources::system_activation::Feature::OverflowToGround);
                 }
             }
+
+            // 375 — byproduct spawn. Each guaranteed byproduct is its
+            // own physical entity / inventory slot (items-are-real); a
+            // single rabbit kill therefore yields 4 items (meat + hide
+            // + bone + sinew). Per-item inventory `is_full()` checks
+            // are independent — items 2/3/4 overflow individually if
+            // capacity fills mid-spawn. Modifiers (corruption) mirror
+            // the meat: the byproduct shares the carcass's spatial
+            // origin, so a corrupted catch yields corrupted byproducts.
+            // Byproducts are non-food (`is_food() == false`), so the
+            // self-eat branch is structurally inapplicable.
+            for &byp_kind in prey_byproducts.for_kind(prey_kind) {
+                if !inventory.is_full() {
+                    inventory.slots.push(ItemSlot::new(byp_kind, modifiers));
+                } else {
+                    commands.spawn((
+                        crate::components::items::Item::with_modifiers(
+                            byp_kind,
+                            1.0,
+                            crate::components::items::ItemLocation::OnGround,
+                            modifiers,
+                        ),
+                        prey_pos,
+                    ));
+                    if let Some(act) = narr.activation.as_deref_mut() {
+                        act.record(crate::resources::system_activation::Feature::OverflowToGround);
+                    }
+                }
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(crate::resources::system_activation::Feature::ByproductSpawned);
+                }
+            }
+
             skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
 
             prey_params.kill_writer.write(PreyKilled {

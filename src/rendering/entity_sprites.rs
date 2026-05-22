@@ -1066,12 +1066,12 @@ fn item_sprite_index(kind: ItemKind) -> usize {
         ItemKind::PreservedOrgan => 1, // meat cut
         // 375 — prey byproducts. Reuse closest-shaped sprites; dedicated
         // icons are a polish concern (mirrors the remedy / 367 comment).
-        ItemKind::Bone => 43,       // ROCK (bone-like)
-        ItemKind::Sinew => 11,      // GRASS (fibrous strand)
-        ItemKind::Whisker => 11,    // GRASS (thin filament)
-        ItemKind::Hide => 34,       // PLANK (flat sheet)
-        ItemKind::FishScale => 42,  // STONE (small flat fragments)
-        ItemKind::Tallow => 30,     // LARGEBROWNJAR (rendered fat in container)
+        ItemKind::Bone => 43,      // ROCK (bone-like)
+        ItemKind::Sinew => 11,     // GRASS (fibrous strand)
+        ItemKind::Whisker => 11,   // GRASS (thin filament)
+        ItemKind::Hide => 34,      // PLANK (flat sheet)
+        ItemKind::FishScale => 42, // STONE (small flat fragments)
+        ItemKind::Tallow => 30,    // LARGEBROWNJAR (rendered fat in container)
     }
 }
 
