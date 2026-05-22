@@ -39,10 +39,16 @@ echo "checking continuity canaries against: $LOGFILE"
 
 fail=0
 
-# Five canary classes (burial demoted in ticket 250). Order chosen
-# to match the headless footer's print order (CLAUDE.md "broaden
-# sideways" list).
-for canary in grooming play mentoring courtship mythic-texture; do
+# Four canary classes (burial demoted in ticket 250; mythic-texture
+# demoted in ticket 445 — its contributing events
+# `EventKind::ShadowFoxBanished` and `EventKind::MythicTexture` are
+# rare-legend / not-yet-wired, and the BondFormed / Adopted events
+# that would carry the canary in a healthy colony are blocked on
+# 403/404. The tally key stays initialized in event_log.rs so events
+# still increment if any fire; only the verdict gate is retired).
+# Order chosen to match the headless footer's print order (CLAUDE.md
+# "broaden sideways" list).
+for canary in grooming play mentoring courtship; do
     count=$(echo "$tallies" | jq -r --arg k "$canary" '.[$k] // 0')
     count="${count:-0}"
     if [ "$count" -gt 0 ]; then

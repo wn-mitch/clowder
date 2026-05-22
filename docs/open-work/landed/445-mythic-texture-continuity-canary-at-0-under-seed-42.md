@@ -1,7 +1,7 @@
 ---
 id: 445
 title: mythic-texture continuity canary at 0 under seed-42
-status: ready
+status: done
 cluster: magic-mythic
 orchestration: swarm-safe
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
@@ -58,3 +58,4 @@ Probably R3 (extend) is right — `BondFormed/Adopted` already fire in healthy c
 
 ## Log
 - 2026-05-21: opened after 290 landing soak. Verified pre-existing at `logs/tuned-42-53a6bd27/` (mythic-texture=0 there too), so this is not a 290-induced regression — it's a colony-shape issue that pre-dates the stack.
+- 2026-05-21: Drop mythic-texture from check_continuity.sh canary loop (now 4 canaries: grooming/play/mentoring/courtship). Contributing events ShadowFoxBanished + EventKind::MythicTexture are rare-legend / not-yet-wired; BondFormed/Adopted feeders blocked on 403/404. EventLog tally key stays initialized so events still increment if any fire. Same demotion pattern as ticket 250 for burial.

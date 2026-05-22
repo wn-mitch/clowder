@@ -15,10 +15,10 @@ _Last generated: 2026-05-21._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 120 |
+| Ready | 119 |
 | Parked | 14 |
 | Blocked | 34 |
-| **Open total** | **172** |
+| **Open total** | **171** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -38,11 +38,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · score 0.91_
-- **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · score 0.91_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.90_
+- **[375](docs/open-work/tickets/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker — _[items-crafting] · score 0.92_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[447](docs/open-work/tickets/447-smoking-chain-scenario-coverage-for-retired-per-soak-canary.md)** — smoking-chain scenario coverage for retired per-soak canary — _[items-crafting] · score 0.91_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
-- **[447](docs/open-work/tickets/447-smoking-chain-scenario-coverage-for-retired-per-soak-canary.md)** — smoking-chain scenario coverage for retired per-soak canary — _[items-crafting] · score 0.90_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
 
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (120)
+## Ready by cluster (119)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -198,13 +198,12 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
 
-### magic-mythic (5 ready, 4 blocked)
+### magic-mythic (4 ready, 4 blocked)
 
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
 - **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
 - **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
 - **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
-- **[445](docs/open-work/tickets/445-mythic-texture-continuity-canary-at-0-under-seed-42.md)** — mythic-texture continuity canary at 0 under seed-42 — _[magic-mythic] · added 2026-05-21_
 
 ### process-discipline (4 ready)
 
@@ -333,7 +332,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (120)
+## Ready (119)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -453,7 +452,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · added 2026-05-21_
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
-- **[445](docs/open-work/tickets/445-mythic-texture-continuity-canary-at-0-under-seed-42.md)** — mythic-texture continuity canary at 0 under seed-42 — _[magic-mythic] · added 2026-05-21_
 - **[447](docs/open-work/tickets/447-smoking-chain-scenario-coverage-for-retired-per-soak-canary.md)** — smoking-chain scenario coverage for retired per-soak canary — _[items-crafting] · added 2026-05-21_
 
 ## Parked (14)
@@ -510,13 +508,14 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · blocked-by 205 · added 2026-05-19_
 - **[442](docs/open-work/tickets/442-split-resourcessim-constantsrs-into-a-sim-constants-submodule-per-substruct-family.md)** — Split resources/sim_constants.rs into a sim_constants/ submodule per substruct family — _[ai-substrate] · blocked-by 441 · added 2026-05-21_
 
-## Landed archive (303)
+## Landed archive (304)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (237)
+### 2026-05 (238)
 
 - **[446](docs/open-work/landed/446-silent-canaries-meat-preservation-positives-sit-at-zero-while-drying-side-fires.md)** — Silent canaries — meat preservation positives sit at zero while drying side fires _(2026-05-21)_
+- **[445](docs/open-work/landed/445-mythic-texture-continuity-canary-at-0-under-seed-42.md)** — mythic-texture continuity canary at 0 under seed-42 _(2026-05-21)_
 - **[444](docs/open-work/landed/444-smoking-chain-expected-positive-features-never-fire-under-seed-42.md)** — Smoking-chain expected-positive features never fire under seed-42 _(2026-05-21)_
 - **[443](docs/open-work/landed/443-smoking-chain-retrieve-step-hassmokeableaccessible-retrievesmokeable-resolvers-367-commit-10.md)** — Smoking chain retrieve step — HasSmokeableAccessible + RetrieveSmokeable resolvers (367 Commit 10) _(2026-05-21)_
 - **[439](docs/open-work/landed/439-planner-zone-resolver-returns-no-reachable-target-for-dryingrack-smokingrack-surfaced-post-437.md)** — Planner zone resolver returns no reachable target for DryingRack / SmokingRack — surfaced post-437 _(2026-05-21)_
