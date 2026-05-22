@@ -125,6 +125,14 @@ pub struct ScenarioReport {
     /// chokepoint-isthmus scenario to assert the corridor-corked
     /// outcome at fixture-level corridor weight.
     pub final_ward_placements: Vec<(i32, i32)>,
+    /// Ticket 375 — histogram of every live `Item` entity by kind name
+    /// at end-of-run, covering inventory slots, ground items, and items
+    /// stored in buildings. Keyed by `ItemKind::name()` (e.g. "bone",
+    /// "hide", "rat") so consumers don't need the enum. Lets pipeline
+    /// scenarios assert per-species output mapping (e.g. a rabbit kill
+    /// produced ≥1 Hide and ≥1 Bone and ≥1 Sinew) without leaking the
+    /// `ItemKind` enum through `ScenarioReport`'s public surface.
+    pub final_item_kinds: std::collections::BTreeMap<String, usize>,
 }
 
 impl ScenarioReport {
@@ -219,6 +227,38 @@ pub fn run(
         }
     }
 
+    // Ticket 375 — per-ItemKind histogram covering inventory slots,
+    // ground items, and stored items. Keyed by `ItemKind::name()`
+    // (singular form via the existing `singular_name()` helper) so
+    // consumers don't need the enum and pluralization doesn't muddle
+    // assertion keys.
+    let final_item_kinds: std::collections::BTreeMap<String, usize> = {
+        use crate::components::items::Item;
+        use crate::components::magic::Inventory;
+        let mut histogram: std::collections::BTreeMap<String, usize> =
+            std::collections::BTreeMap::new();
+        let world = app.world_mut();
+        {
+            let mut q = world.query::<&Inventory>();
+            for inv in q.iter(world) {
+                for slot in &inv.slots {
+                    *histogram
+                        .entry(slot.kind.singular_name().to_string())
+                        .or_insert(0) += 1;
+                }
+            }
+        }
+        {
+            let mut q = world.query::<&Item>();
+            for item in q.iter(world) {
+                *histogram
+                    .entry(item.kind.singular_name().to_string())
+                    .or_insert(0) += 1;
+            }
+        }
+        histogram
+    };
+
     // Ticket 198 — SystemActivation snapshot for the substrate-fires gate.
     let feature_counts: std::collections::BTreeMap<String, u64> = {
         use crate::resources::system_activation::{feature_name, SystemActivation};
@@ -263,6 +303,7 @@ pub fn run(
         final_ground_item_count,
         feature_counts,
         final_ward_placements,
+        final_item_kinds,
     }
 }
 

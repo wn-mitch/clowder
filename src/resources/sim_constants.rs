@@ -7943,6 +7943,37 @@ mod tests {
         );
     }
 
+    /// 375: the per-species byproduct table is producer-only (no L2
+    /// consumer) and the canary only counts firings, not contents — a
+    /// typo in `PreyByproductConstants::default()` would slip past the
+    /// soak verdict. Pin each row here so the scenario / soak don't
+    /// need to be the sole guard.
+    #[test]
+    fn prey_byproducts_table_default_matches_spec() {
+        use crate::components::items::ItemKind;
+        let table = SimConstants::default().prey_byproducts;
+        assert_eq!(
+            table.for_kind(PreyKind::Mouse),
+            &[ItemKind::Bone, ItemKind::Sinew]
+        );
+        assert_eq!(
+            table.for_kind(PreyKind::Rat),
+            &[ItemKind::Bone, ItemKind::Sinew, ItemKind::Whisker]
+        );
+        assert_eq!(
+            table.for_kind(PreyKind::Rabbit),
+            &[ItemKind::Hide, ItemKind::Bone, ItemKind::Sinew]
+        );
+        assert_eq!(
+            table.for_kind(PreyKind::Fish),
+            &[ItemKind::FishScale, ItemKind::Tallow, ItemKind::RawOrgan]
+        );
+        assert_eq!(
+            table.for_kind(PreyKind::Bird),
+            &[ItemKind::Feather, ItemKind::Bone]
+        );
+    }
+
     #[test]
     fn env_override_silently_drops_unknown_fields() {
         // serde_json::from_value is lenient by default — unknown fields

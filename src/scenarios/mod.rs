@@ -61,6 +61,7 @@ pub mod parenting_joint_suppression;
 pub mod patrol_recalibration;
 pub mod picking_up_scavenging;
 pub mod preset;
+pub mod prey_byproduct_spawn;
 pub mod route_cost_decision;
 pub mod runner;
 pub mod smoking_chain_complete;
@@ -135,6 +136,15 @@ pub const ALL: &[&Scenario] = &[
     // 193 — election-side scenario for the rerouted PickingUp plan
     // template (PlannerZone::CarcassPile).
     &picking_up_scavenging::SCENARIO,
+    // 375 — per-species prey-byproduct table verification. Four
+    // species variants (Fish excluded — water-habitat requirement
+    // not met by the default test world; Fish row is covered by the
+    // `prey_byproducts_table_default_matches_spec` unit test and the
+    // seed-42 soak).
+    &prey_byproduct_spawn::SCENARIO_MOUSE,
+    &prey_byproduct_spawn::SCENARIO_RAT,
+    &prey_byproduct_spawn::SCENARIO_RABBIT,
+    &prey_byproduct_spawn::SCENARIO_BIRD,
     // 228 — bold-vs-timid route-cost suppression microexperiment.
     // Lifts hunt_route_cost_weight to 1.0 locally; canonical soak
     // constants ship at 0.0 (substrate-dormant).
