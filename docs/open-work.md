@@ -15,10 +15,10 @@ _Last generated: 2026-05-21._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 120 |
+| Ready | 121 |
 | Parked | 14 |
 | Blocked | 34 |
-| **Open total** | **172** |
+| **Open total** | **173** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (120)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -125,7 +125,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 
-### items-crafting (13 ready, 9 blocked)
+### items-crafting (14 ready, 9 blocked)
 
 - **[039](docs/open-work/tickets/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook — _[items-crafting] · added 2026-04-26_
 - **[041](docs/open-work/tickets/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling — _[items-crafting] · added 2026-04-26_
@@ -140,6 +140,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
 - **[444](docs/open-work/tickets/444-smoking-chain-expected-positive-features-never-fire-under-seed-42.md)** — Smoking-chain expected-positive features never fire under seed-42 — _[items-crafting] · added 2026-05-21_
+- **[446](docs/open-work/tickets/446-silent-canaries-meat-preservation-positives-sit-at-zero-while-drying-side-fires.md)** — Silent canaries — meat preservation positives sit at zero while drying side fires — _[items-crafting] · added 2026-05-21_
 
 ### belief-perception (11 ready, 4 blocked)
 
@@ -333,7 +334,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (120)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -455,6 +456,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
 - **[444](docs/open-work/tickets/444-smoking-chain-expected-positive-features-never-fire-under-seed-42.md)** — Smoking-chain expected-positive features never fire under seed-42 — _[items-crafting] · added 2026-05-21_
 - **[445](docs/open-work/tickets/445-mythic-texture-continuity-canary-at-0-under-seed-42.md)** — mythic-texture continuity canary at 0 under seed-42 — _[magic-mythic] · added 2026-05-21_
+- **[446](docs/open-work/tickets/446-silent-canaries-meat-preservation-positives-sit-at-zero-while-drying-side-fires.md)** — Silent canaries — meat preservation positives sit at zero while drying side fires — _[items-crafting] · added 2026-05-21_
 
 ## Parked (14)
 
