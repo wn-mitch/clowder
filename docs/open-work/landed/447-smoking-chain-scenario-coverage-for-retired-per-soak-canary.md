@@ -1,7 +1,7 @@
 ---
 id: 447
 title: smoking-chain scenario coverage for retired per-soak canary
-status: ready
+status: done
 cluster: items-crafting
 orchestration: swarm-safe
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-21
 ---
 
 ## Why
@@ -54,3 +54,4 @@ Pick the closest existing scenario (probably a cooking / drying preset under `sr
 
 ## Log
 - 2026-05-21: opened as 444's antipattern-migration follow-on. 444 retires the per-soak canary for the smoking triple; this ticket restores deterministic regression coverage in the scenario harness instead.
+- 2026-05-21: 2026-05-21: landed. New `just scenario smoking_chain_complete` preloads Adult cat with RawMouse + Wood adjacent to a functional idle SmokingRack; unit test pins seed=1 (probe in tests::diagnostic_probe_seeds_for_smoke_meat_election shows 39/49 seeds elect SmokeMeat at tick 0; seed 42 lands on Forage hence `expected_features: &[]`) and asserts all three Features (`MeatLoadedOnSmokingRack`, `SmokingRackTended`, `MeatSmoked`) fire within 2000 ticks. Regression sanity verified: temporarily commenting out `act.record(Feature::MeatSmoked)` at goap.rs:7891 fails the `done >= 1` assertion with the named-resolver diagnostic; restored before commit. Mirrors the drying-completes pattern (439) but asserts the full triple (smoking completes in 3 × 416 ≈ 1248 ticks vs drying's 15k → load-only).

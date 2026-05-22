@@ -63,6 +63,7 @@ pub mod picking_up_scavenging;
 pub mod preset;
 pub mod route_cost_decision;
 pub mod runner;
+pub mod smoking_chain_complete;
 pub mod smoking_chain_eligibility;
 pub mod surrounded_colony;
 pub mod ward_placement;
@@ -292,6 +293,13 @@ pub const ALL: &[&Scenario] = &[
     &smoking_chain_eligibility::SCENARIO_HOT_INVENTORY,
     &smoking_chain_eligibility::SCENARIO_STORES_HAS_SMOKEABLE,
     &smoking_chain_eligibility::SCENARIO_EMPTY_STORES,
+    // 447 — smoking-chain end-to-end completion. Replaces the
+    // per-soak never-fired-positives regression coverage that 444
+    // retired for the smoking triple (`MeatLoadedOnSmokingRack` /
+    // `SmokingRackTended` / `MeatSmoked`). Cat preloaded with meat +
+    // fuel adjacent to a functional idle SmokingRack; the unit test
+    // pins a seed where the full chain fires within ~2000 ticks.
+    &smoking_chain_complete::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.
