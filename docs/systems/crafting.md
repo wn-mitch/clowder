@@ -27,6 +27,23 @@ Cats do not smelt, forge, or cast. Metal enters the economy as:
 
 Metal is precious and storied — a cat knows where each piece came from. Found-metal enters recipes as a material input for Adornment & Setting and for construction fasteners; no discipline *produces* it. A tiara is cat-made adornment work; the wire in it came from somebody else's forge. Metal's scarcity and provenance is itself a story generator: a traded iron clasp from a badger-smith two generations back is already lore.
 
+### Inputs — producer → consumer mapping
+
+Cat-native materials enter the world through **producer substrates** (the systems that emit a physical `Item` entity) and feed **downstream sinks** (the recipes / phase-children that consume them). Each substrate is identity-keyed — recipes read `ItemKind` presence on the consumer side, not numeric modifier fields (items-are-real pillar).
+
+| Material | Producer | Downstream sinks (phase children) |
+|---|---|---|
+| **`Bone`** | `resolve_engage_prey` (Mouse / Rat / Rabbit / Bird per `prey_byproducts` table) | 369 Hide-Bracers, 372 Bone-Shell Craft (needles / combs / pierce-weapons) |
+| **`Sinew`** | `resolve_engage_prey` (Mouse / Rat / Rabbit) | 369 Hide-Bracers, 368 Fiber-Weaving (cordage / nets) |
+| **`Whisker`** | `resolve_engage_prey` (Rat) | 370 Adornment, 368 Fiber-Weaving (fine fiber) |
+| **`Hide`** | `resolve_engage_prey` (Rabbit) | 369 Hide-Pelt-Work, 370 Adornment |
+| **`FishScale`** | `resolve_engage_prey` (Fish) | 372 Bone-Shell Craft (light armor plate scales), 371 Pigment-Mark (iridescent pigment) |
+| **`Tallow`** | `resolve_engage_prey` (Fish) | 371 Pigment-Mark (binder), 369 Hide-Pelt-Work (curing fat) |
+| **`RawOrgan`** | `resolve_engage_prey` (Fish via `prey_byproducts`; also Mammals + Birds via 367 `crafting.organ_drop_chance` probabilistic roll) | 367 Drying Rack → `PreservedOrgan` |
+| **`Feather`** | `resolve_engage_prey` (Bird) — *previously dormant; producer wired by 375* | 368 Fiber-Weaving, 370 Adornment |
+
+The `prey_byproducts` table (ticket 375) is the **guaranteed** producer pathway — every successful kill emits its species' fixed list. The 367 `organ_drop_chance` continues to fire on top as a probabilistic mammal+bird drop; the two mechanisms are additive. Inventory pressure (a rabbit kill now yields 4 items — meat + Hide + Bone + Sinew) is the load-bearing emergent consequence; deposit / haul DSEs absorb the surplus.
+
 ## Crafting disciplines
 
 Disciplines are the named schools of cat craft, each mapping to one or more `aspirations.rs` mastery arcs (Phase 5 gating) and defining a family of stations and material inputs.
