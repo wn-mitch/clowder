@@ -258,6 +258,10 @@ const RELEASE: &str = "release";
 const DRY_FOOD: &str = "dry_food";
 const SMOKE_MEAT: &str = "smoke_meat";
 const TEND_SMOKING_RACK: &str = "tend_smoking_rack";
+// 450 — kitten beg-for-food DSE id. Single-action Begging
+// disposition; two sibling registrations (NewbornKitten +
+// EyesOpenKitten) share the same DseId.
+const BEG_FOR_FOOD: &str = "beg_for_food";
 
 // Disposition-failure cooldown scalar keys, one per failure-prone
 // DispositionKind. 1.0 = no recent failure (no damp);
@@ -650,6 +654,10 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         24 => Some(&[DRY_FOOD]),
         25 => Some(&[SMOKE_MEAT]),
         26 => Some(&[TEND_SMOKING_RACK]),
+        // 450: Begging → BegForFood. Single-action disposition;
+        // Patience / CommitmentTenure lifts apply to the BegForFood
+        // DSE alone while the cat is committed.
+        27 => Some(&[BEG_FOR_FOOD]),
         _ => None,
     }
 }
@@ -834,6 +842,8 @@ pub const fn dse_id_for_action(action: crate::ai::Action) -> &'static str {
         Action::DryFood => DRY_FOOD,
         Action::SmokeMeat => SMOKE_MEAT,
         Action::TendSmokingRack => TEND_SMOKING_RACK,
+        // 450 — kitten beg-for-food Action.
+        Action::BegForFood => BEG_FOR_FOOD,
     }
 }
 
@@ -4289,6 +4299,8 @@ mod tests {
                 Action::DryFood => &[DRY_FOOD],
                 Action::SmokeMeat => &[SMOKE_MEAT],
                 Action::TendSmokingRack => &[TEND_SMOKING_RACK],
+                // 450: BegForFood maps to the Begging disposition.
+                Action::BegForFood => &[BEG_FOR_FOOD],
             }
         }
 

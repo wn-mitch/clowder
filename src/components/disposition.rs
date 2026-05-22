@@ -184,6 +184,20 @@ pub enum DispositionKind {
     /// have elapsed, producing the design-doc "tend, walk away, come
     /// back" rhythm without a multi-tick commitment Component.
     TendingSmokingRack,
+    /// 450: kitten begs for food. Single-action plan template
+    /// `[BegForFood]` with no zone precondition (the kitten begs in
+    /// place) and no state effect — distinct from Eating because the
+    /// DSE emits an `Intention::Activity(Begging, UntilInterrupt)` per
+    /// §L2.10.5 rather than a goal-state achievement. The kitten's
+    /// hunger doesn't drop *because of* begging; it drops because a
+    /// parent witnesses the cry-map signal and feeds them via their
+    /// own Caretake plan. Single-trip completion (Pattern B); on each
+    /// re-election Begging wins again so long as the kitten remains
+    /// `NewbornKitten | EyesOpenKitten` AND lacks `HasFoodInInventory`.
+    /// Tier 1 — physiological adjacency: hunger drives the begging
+    /// activity, even though the activity itself doesn't satisfy
+    /// hunger (the parent does).
+    Begging,
 }
 
 impl DispositionKind {
@@ -227,6 +241,14 @@ impl DispositionKind {
             | Self::DryingFood
             | Self::SmokingMeat
             | Self::TendingSmokingRack => 1,
+            // 450: Begging is Pattern B (single-tick). Each tick the
+            // kitten begs once → `resolve_beg_for_food` stamps the
+            // cry-map → plan completes → re-election runs. If the
+            // kitten is still `(NewbornKitten | EyesOpenKitten) ∧
+            // ¬HasFoodInInventory ∧ hungry`, Begging wins again. The
+            // re-election rhythm IS the begging cadence; no commitment
+            // Component required.
+            Self::Begging => return 1,
             // 176: inventory-disposal dispositions complete after one
             // act. Trashing/Handing/PickingUp involve travel + a single
             // transfer; Discarding is just the in-place drop.
@@ -308,6 +330,13 @@ impl DispositionKind {
             Action::DryFood => Some(Self::DryingFood),
             Action::SmokeMeat => Some(Self::SmokingMeat),
             Action::TendSmokingRack => Some(Self::TendingSmokingRack),
+            // 450: BegForFood routes to its single-action Begging
+            // disposition. Begging is Activity-shaped (§L2.10.5) — the
+            // Disposition + plan template + resolver still wrap it so
+            // the L3 softmax / executor pipeline stays uniform, but the
+            // emitted Intention is `Activity(Begging, UntilInterrupt)`,
+            // not a `Goal`. See `DispositionKind::Begging` doc.
+            Action::BegForFood => Some(Self::Begging),
             Action::Coordinate => Some(Self::Coordinating),
             Action::Explore | Action::Wander => Some(Self::Exploring),
             Action::Mate => Some(Self::Mating),
@@ -396,6 +425,8 @@ impl DispositionKind {
             Self::DryingFood => &[Action::DryFood],
             Self::SmokingMeat => &[Action::SmokeMeat],
             Self::TendingSmokingRack => &[Action::TendSmokingRack],
+            // 450: Begging owns the single Action::BegForFood constituent.
+            Self::Begging => &[Action::BegForFood],
             Self::Coordinating => &[Action::Coordinate],
             Self::Exploring => &[Action::Explore, Action::Wander],
             Self::Mating => &[Action::Mate],
@@ -469,6 +500,11 @@ impl DispositionKind {
         Self::DryingFood,
         Self::SmokingMeat,
         Self::TendingSmokingRack,
+        // 450: Begging appended at ordinal-27 (zero-indexed: 26). Tail
+        // append preserves the upstream ordinal-stability invariant for
+        // saved soaks and `scoring::active_disposition_ordinal`
+        // ordinal-equality tests.
+        Self::Begging,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -500,6 +536,7 @@ impl DispositionKind {
             Self::DryingFood => "DryingFood",
             Self::SmokingMeat => "SmokingMeat",
             Self::TendingSmokingRack => "TendingSmokingRack",
+            Self::Begging => "Begging",
         }
     }
 
@@ -525,6 +562,13 @@ impl DispositionKind {
             | Self::Trashing
             | Self::Handing
             | Self::PickingUp
+            // 450: Begging is physiological-adjacent — driven by the
+            // kitten's hunger. The activity itself doesn't satiate
+            // hunger (a parent's Caretake does), but the *want* is
+            // hunger-driven; tier-1 lets Begging preempt social/
+            // exploratory dispositions in the same way Eating does
+            // for adults.
+            | Self::Begging
             // 230: Fleeing is acute survival — preempting higher tiers
             // is the whole point of `ThreatProximityAdrenalineFlee`
             // lifting Flee. (Pre-251 the now-retired
@@ -592,6 +636,7 @@ impl DispositionKind {
             Self::DryingFood => "lay food on the drying rack",
             Self::SmokingMeat => "load the smoking rack",
             Self::TendingSmokingRack => "tend the smoking rack",
+            Self::Begging => "beg for food",
         }
     }
 }
@@ -902,13 +947,20 @@ mod tests {
         // 035: `Burying` appends at ordinal 23. Fleeing slides from
         // tail to ordinal-22; Burying becomes the new tail.
         // 367: preservation dispositions append at ordinals 24-26
-        // (DryingFood, SmokingMeat, TendingSmokingRack). Burying
-        // slides off the tail; TendingSmokingRack becomes the new tail.
-        assert_eq!(DispositionKind::ALL.len(), 26);
+        // (DryingFood, SmokingMeat, TendingSmokingRack).
+        // 450: Begging appends at ordinal-27. TendingSmokingRack slides
+        // off the tail; Begging becomes the new tail. The 367 trio
+        // keeps its ordinal slots (24-26) for ordinal-stability.
+        assert_eq!(DispositionKind::ALL.len(), 27);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::TendingSmokingRack),
-            "TendingSmokingRack must remain at ordinal-26 (tail) position"
+            Some(&DispositionKind::Begging),
+            "Begging must remain at ordinal-27 (tail) position"
+        );
+        assert_eq!(
+            DispositionKind::ALL[25],
+            DispositionKind::TendingSmokingRack,
+            "TendingSmokingRack must remain at ordinal-26 position"
         );
         assert_eq!(
             DispositionKind::ALL[24],

@@ -116,7 +116,11 @@ fn assert_all_actions_covers_action(a: Action) {
         // show reliable firing.
         | Action::DryFood
         | Action::SmokeMeat
-        | Action::TendSmokingRack => {}
+        | Action::TendSmokingRack
+        // 450: kitten beg-for-food Action. The narrative fallback in
+        // `systems::narrative` already authors a Micro-tier line for
+        // this; no extra template surface here yet.
+        | Action::BegForFood => {}
     }
 }
 

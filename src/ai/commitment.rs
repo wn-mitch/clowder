@@ -254,6 +254,13 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         DispositionKind::DryingFood => SingleMinded,
         DispositionKind::SmokingMeat => SingleMinded,
         DispositionKind::TendingSmokingRack => SingleMinded,
+        // 450: Begging is Activity-shaped (§L2.10.5 `Activity(Begging,
+        // UntilInterrupt)`). OpenMinded per §L2.10.5's strategy-shape
+        // correlation: the activity's drop trigger IS the desire-drift
+        // condition (kitten gains `HasFoodInInventory` → Eat-side
+        // method outscores Begging; or kitten matures past Stage 2 →
+        // eligibility filter excludes). Sibling to Idle / Socializing.
+        DispositionKind::Begging => OpenMinded,
     }
 }
 
@@ -810,6 +817,9 @@ mod tests {
         assert_eq!(strategy_for_disposition(DryingFood), SingleMinded);
         assert_eq!(strategy_for_disposition(SmokingMeat), SingleMinded);
         assert_eq!(strategy_for_disposition(TendingSmokingRack), SingleMinded);
+        // 450: Begging — Activity-shaped (§L2.10.5 strategy-shape
+        // correlation: Activity + UntilInterrupt → OpenMinded).
+        assert_eq!(strategy_for_disposition(Begging), OpenMinded);
 
         // Exhaustive-enum guard — if a new DispositionKind variant is
         // added without a row here, the `DispositionKind::ALL` constant
@@ -850,6 +860,10 @@ mod tests {
             DryingFood,
             SmokingMeat,
             TendingSmokingRack,
+            // 450: Begging — Activity-shaped, OpenMinded (sibling of
+            // Socializing / Exploring under §L2.10.5's strategy-shape
+            // correlation).
+            Begging,
         ];
         assert_eq!(
             covered.len(),

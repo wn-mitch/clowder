@@ -200,6 +200,16 @@ pub enum Action {
     /// `last_tended_at_tick`. Single-step plan template
     /// `[TendSmokingRack]`. Rides `DispositionKind::TendingSmokingRack`.
     TendSmokingRack,
+    /// 450: kitten begs for food. Single-step plan template
+    /// `[BegForFood]` with no zone precondition and no state effect —
+    /// the action emits an `Intention::Activity(Begging, UntilInterrupt)`
+    /// (§L2.10.5), not a goal-state achievement. Rides
+    /// `DispositionKind::Begging`. Real-world effect lives in
+    /// `resolve_beg_for_food`: stamps the kitten cry-map at the
+    /// kitten's tile and emits `Feature::KittenBegged`. Parents read
+    /// the cry-map through the existing `IsParentOfHungryKitten`
+    /// substrate path; no autonomic dual-emission.
+    BegForFood,
 }
 
 // ---------------------------------------------------------------------------

@@ -7919,6 +7919,26 @@ fn dispatch_step_action(
             }
             outcome.result
         }
+        GoapActionKind::BegForFood => {
+            // 450: kitten beg cycle. The cry-map stamping + parent
+            // marker authoring happens in `growth::update_kitten_cry_map`
+            // keyed off the L3 election (`CurrentAction.action ==
+            // BegForFood`). This resolver's role is the canary signal:
+            // every cycle completion emits `Feature::KittenBegged` so
+            // the seed-42 footer catches a silently-dead Begging
+            // disposition.
+            let outcome = crate::steps::disposition::resolve_beg_for_food(
+                plan.step_state[step_idx].ticks_elapsed,
+                cat_entity,
+                *pos,
+                needs.hunger,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::KittenBegged,
+            );
+            outcome.result
+        }
     }
 }
 

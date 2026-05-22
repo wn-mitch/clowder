@@ -1411,6 +1411,9 @@ fn active_disposition_ordinal(
         Some(DispositionKind::DryingFood) => 24.0,
         Some(DispositionKind::SmokingMeat) => 25.0,
         Some(DispositionKind::TendingSmokingRack) => 26.0,
+        // 450: Begging appends at ordinal 27 — same append-only
+        // discipline as 150/154/158/155/176/230/035/367.
+        Some(DispositionKind::Begging) => 27.0,
     }
 }
 

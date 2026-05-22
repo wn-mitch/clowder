@@ -153,6 +153,13 @@ pub enum ActivityKind {
     /// 035: bury a deceased colony-mate. Bound to
     /// `DispositionKind::Burying` and `Action::Bury`.
     Bury,
+    /// 450: kitten cries out for food. Sibling-shape to
+    /// `Idle` / `Patrol` / `Socialize` per §L2.10.5 — the kitten's
+    /// hunger doesn't drop *because of* begging; it drops because a
+    /// parent witnesses the cry-map signal and feeds the kitten via
+    /// their own Caretake `Intention::Goal(kitten.hunger < threshold)`
+    /// plan. Bound to `DispositionKind::Begging` and `Action::BegForFood`.
+    Begging,
 }
 
 // ---------------------------------------------------------------------------

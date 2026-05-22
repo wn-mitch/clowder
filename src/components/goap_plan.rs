@@ -418,6 +418,9 @@ impl GoapActionKind {
             // (mirrors `RetrieveDryable => DryFood` above).
             Self::RetrieveSmokeable | Self::SmokeMeat => Action::SmokeMeat,
             Self::TendSmokingRack => Action::TendSmokingRack,
+            // 450: single-action begging step maps directly to the
+            // Begging Action label.
+            Self::BegForFood => Action::BegForFood,
         }
     }
 }

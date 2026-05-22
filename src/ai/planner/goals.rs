@@ -97,7 +97,17 @@ pub fn goal_for_disposition(
         // single-trip shape.
         | DispositionKind::DryingFood
         | DispositionKind::SmokingMeat
-        | DispositionKind::TendingSmokingRack => GoalState {
+        | DispositionKind::TendingSmokingRack
+        // 450: Begging is Activity-shaped (§L2.10.5 — the kitten's
+        // hunger doesn't drop *because of* begging; a parent's
+        // Caretake plan does). The Disposition wrapper completes on a
+        // single trip per cadence; on each re-election the
+        // `BegForFoodDse` wins again so long as the eligibility filter
+        // (`(NewbornKitten | EyesOpenKitten) ∧ ¬HasFoodInInventory`)
+        // still holds. Single-trip shape mirrors Cooking — but the
+        // begging cadence is the re-election rhythm, not a multi-step
+        // chain.
+        | DispositionKind::Begging => GoalState {
             predicates: vec![StatePredicate::TripsAtLeast(current_trips + 1)],
         },
     }

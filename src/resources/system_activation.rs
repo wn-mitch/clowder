@@ -624,6 +624,18 @@ pub enum Feature {
     /// => false` until dispatch follow-on lands.
     KittenReleased,
 
+    /// Ticket 450 — a Stage 1 or Stage 2 kitten completed one beg
+    /// cycle via `resolve_beg_for_food`. Positive; ships dormant
+    /// (`expected_to_fire_per_soak() => false`) because kittens are
+    /// filtered out of `evaluate_and_plan` / `evaluate_dispositions`
+    /// via `Without<KittenDependency>` (§Phase 5b — preserves the
+    /// FeedKitten +0.5 hunger restoration path). Until a kitten-side
+    /// scoring pipeline lifts that filter, kittens never elect
+    /// `BegForFood` at L3 and this canary cannot fire. The DSE /
+    /// resolver / dispatch arm land as ready-to-wire substrate in
+    /// 450; the follow-on ticket that unblocks kitten scoring
+    /// promotes this Feature back to `=> true`.
+    KittenBegged,
     /// Ticket 375 — `resolve_engage_prey` spawned a non-meat byproduct
     /// item (Bone, Sinew, Whisker, Hide, FishScale, Tallow, RawOrgan,
     /// or Feather) alongside the carcass. Positive — input substrate
@@ -841,6 +853,8 @@ impl Feature {
         // 375: producer-side canary for prey-byproduct decomposition.
         // expected_to_fire_per_soak() => true (every kill emits ≥1).
         Feature::ByproductSpawned,
+        // 450: kitten begs for food canary.
+        Feature::KittenBegged,
     ];
 
     /// The valence of this feature.
@@ -989,6 +1003,8 @@ impl Feature {
             Feature::KittenReleased => Positive,
             // 375: prey-byproduct producer canary.
             Feature::ByproductSpawned => Positive,
+            // 450: kitten begs for food.
+            Feature::KittenBegged => Positive,
 
             // 176: inventory-disposal completions are state-transition
             // signals — neither a colony win nor a loss, just "the cat
@@ -1371,6 +1387,13 @@ impl Feature {
             // seed-42 soak runs dozens of hunts. Zero count = silent
             // producer dormancy class (the canary's purpose).
             Feature::ByproductSpawned => true,
+            // 450: kitten begging canary. Dormant until a kitten-side
+            // scoring pipeline lifts the `Without<KittenDependency>`
+            // filter in `evaluate_and_plan` / `evaluate_dispositions`.
+            // The DSE / resolver / dispatch arm exist as ready-to-wire
+            // substrate; promote to `true` in the follow-on ticket
+            // that unblocks kitten L3 election.
+            Feature::KittenBegged => false,
             // Ticket 127 — JointIntention: drops are bursty (mirrors
             // `PairingDropped`); stage mismatch is healthy-sometimes-
             // zero. Both stay opt-out. Emitted / BiasApplied /
@@ -1625,6 +1648,8 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::KittenReleased => "KittenReleased",
         // 375: prey-byproduct producer canary.
         Feature::ByproductSpawned => "ByproductSpawned",
+        // 450: kitten begs for food canary.
+        Feature::KittenBegged => "KittenBegged",
     }
 }
 
@@ -1923,7 +1948,12 @@ mod tests {
         // Ticket 375: +1 Positive (ByproductSpawned) for the prey-byproduct
         // producer canary. expected_to_fire_per_soak() => true — every
         // successful hunt emits ≥1 byproduct via the prey_byproducts table.
-        assert_eq!(positive, 85);
+        // Ticket 450: +1 Positive (KittenBegged) for the kitten-begs-
+        // for-food canary signal. The Begging Activity Intention runs
+        // each tick a Stage 1 or Stage 2 kitten holds the Begging
+        // disposition; the resolver records the canary on every cycle
+        // completion (`expected_to_fire_per_soak() => true`).
+        assert_eq!(positive, 86);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -2024,7 +2054,7 @@ mod tests {
         // producer canary.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            85
+            86
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

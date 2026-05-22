@@ -326,6 +326,35 @@ pub fn burying_actions() -> Vec<GoapActionDef> {
     }]
 }
 
+/// 450: plan template for kitten begging. Single-action chain
+/// `[BegForFood]` with no zone precondition (the kitten begs in place)
+/// and no state effect (Activity Intention per §L2.10.5 — the
+/// kitten's hunger doesn't drop *because of* begging; it drops because
+/// a parent witnesses the cry-map signal and feeds them via their own
+/// Caretake `Intention::Goal(kitten.hunger < threshold)` chain).
+///
+/// Pattern-B single-trip on `target_completions = 1`: each tick the
+/// kitten begs once, the plan completes, the cat re-elects. If
+/// `(NewbornKitten | EyesOpenKitten) ∧ ¬HasFoodInInventory ∧ hungry`
+/// still holds, the `BegForFoodDse` wins L2 again on the next tick;
+/// the re-election rhythm IS the begging cadence. No commitment
+/// substrate Component is required — substrate-honest per the
+/// "Commitment is one mechanism, not two" pillar.
+pub fn begging_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::BegForFood,
+        cost: 1,
+        preconditions: vec![],
+        // Pattern-B single-trip completion: `IncrementTrips` lets the
+        // `TripsAtLeast(current_trips + 1)` goal predicate fire on the
+        // first `Advance`, so the disposition completes per beg cycle
+        // and the cat re-elects on the next tick. (Without
+        // `IncrementTrips` the planner would never reach its goal and
+        // would burn through `max_replans` trying to find one.)
+        effects: vec![StateEffect::IncrementTrips],
+    }]
+}
+
 /// 367: plan template for loading a Drying Rack with raw fish / raw
 /// organ.
 ///
@@ -1357,6 +1386,9 @@ pub fn actions_for_disposition(
         DispositionKind::DryingFood => drying_food_actions(),
         DispositionKind::SmokingMeat => smoking_meat_actions(),
         DispositionKind::TendingSmokingRack => tend_smoking_rack_actions(),
+        // 450: Begging plan template — single action, no preconditions,
+        // no state effect (Activity Intention, not Goal — §L2.10.5).
+        DispositionKind::Begging => begging_actions(),
     };
     actions.extend(domain_actions);
     actions

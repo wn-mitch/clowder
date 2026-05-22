@@ -1789,7 +1789,11 @@ pub fn disposition_to_chain(
             // legacy chain-building path defers cleanly to it.
             | DispositionKind::DryingFood
             | DispositionKind::SmokingMeat
-            | DispositionKind::TendingSmokingRack => None,
+            | DispositionKind::TendingSmokingRack
+            // 450: Begging ships GOAP-only. The `[BegForFood]`
+            // single-step template flows through the planner; this
+            // legacy chain-building path defers cleanly to it.
+            | DispositionKind::Begging => None,
         };
 
         if let Some((mut chain, action)) = chain {

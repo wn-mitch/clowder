@@ -1,3 +1,4 @@
+mod beg_for_food;
 mod bury;
 mod cook;
 // 322: dormant HTN-method sub-goal resolvers. Each returns
@@ -45,6 +46,7 @@ mod vigil;
 mod wean;
 mod wear_item;
 
+pub use beg_for_food::{resolve_beg_for_food, BegEmitted};
 pub use bury::{resolve_bury, BuryOutcome};
 pub use cook::resolve_cook;
 pub use craft::resolve_craft;

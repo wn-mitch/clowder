@@ -379,6 +379,15 @@ pub enum GoapActionKind {
     /// `last_tended_at_tick`. Single-tick action; effect is
     /// `IncrementTrips`.
     TendSmokingRack,
+    /// 450: kitten begs for food. Single-tick Activity action — no
+    /// preconditions, no state effect on `PlannerState`. The resolver
+    /// stamps the kitten cry-map at the kitten's tile and emits
+    /// `Feature::KittenBegged`. Real-world parental response flows
+    /// through the existing `IsParentOfHungryKitten` substrate path
+    /// (which already reads the cry-map). Pattern B single-trip on
+    /// `target_completions = 1`: re-election rhythm IS the begging
+    /// cadence.
+    BegForFood,
 }
 
 // ---------------------------------------------------------------------------

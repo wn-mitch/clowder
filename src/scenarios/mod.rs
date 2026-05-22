@@ -50,6 +50,7 @@ pub mod hunt_deposit_chain;
 pub mod intention_momentum_pickup_lock;
 pub mod inventory_full_no_pickup;
 pub mod kitten_cry;
+pub mod kittenhood_stages;
 pub mod lone_burial;
 pub mod mate_chain;
 pub mod parenting_caretake_kitten_absent;
@@ -310,6 +311,11 @@ pub const ALL: &[&Scenario] = &[
     // fuel adjacent to a functional idle SmokingRack; the unit test
     // pins a seed where the full chain fires within ~2000 ticks.
     &smoking_chain_complete::SCENARIO,
+    // 450 — three-stage kittenhood substrate triage. Preloads one cat
+    // at each Stage 1/2/3 sub-stage + an adult mother. Asserts
+    // `KittenBegged` fires within the 12-tick window and verifies the
+    // per-stage marker authoring via the module's unit tests.
+    &kittenhood_stages::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

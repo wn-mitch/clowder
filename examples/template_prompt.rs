@@ -128,7 +128,11 @@ fn assert_pick_pool_covers_action(a: Action) {
         // seed-42 soaks show reliable firing.
         | Action::DryFood
         | Action::SmokeMeat
-        | Action::TendSmokingRack => {}
+        | Action::TendSmokingRack
+        // 450: kitten beg-for-food Action. No dedicated template yet;
+        // the fallback narrative line in `systems::narrative` covers
+        // it.
+        | Action::BegForFood => {}
     }
 }
 
@@ -211,6 +215,10 @@ fn main() {
             // station with hands-on involvement). Real templates
             // follow once the prose tier for preservation lands.
             Action::DryFood | Action::SmokeMeat | Action::TendSmokingRack => "cook.ron",
+            // 450: kitten begging — reuse the closest existing template
+            // shape (Micro-tier hunger-driven vocalization). Real prose
+            // follows when the kitten-side narrative tier lands.
+            Action::BegForFood => "socialize.ron",
         };
 
         let tier = match action {

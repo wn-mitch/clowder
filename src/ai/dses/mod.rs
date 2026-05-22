@@ -56,6 +56,7 @@ pub fn cat_dse_constructors(scoring: &ScoringConstants) -> Vec<Box<dyn super::ds
 }
 
 pub mod apply_remedy_target;
+pub mod beg_for_food;
 pub mod build;
 pub mod build_target;
 pub mod bury;
@@ -118,6 +119,7 @@ pub mod trashing;
 pub mod wander;
 
 pub use apply_remedy_target::apply_remedy_target_dse;
+pub use beg_for_food::{beg_for_food_eyes_open_dse, beg_for_food_newborn_dse};
 pub use build::build_dse;
 pub use build_target::build_target_dse;
 pub use bury::bury_dse;

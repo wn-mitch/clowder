@@ -142,6 +142,22 @@ pub fn kitten_mood_aura(
 /// flip a movement tie-break at tick 1201300 of the seed-42 soak,
 /// cascading into a 6-cat fox-attrition extinction window.
 ///
+/// **Ticket 450 dormancy note.** The 450 spec called for flipping the
+/// data source from raw `Needs.hunger` to witnessed `Feature::KittenBegged`
+/// activations (or the `CurrentAction.action == BegForFood` election)
+/// so the cry-map routes through the substrate election rather than
+/// firing autonomically. The flip is parked: `evaluate_and_plan` and
+/// `evaluate_dispositions` both filter `Without<KittenDependency>`
+/// (§Phase 5b — kittens are dependents, not autonomous planners — and
+/// the FeedKitten +0.5 hunger restoration depends on the
+/// `kitten_needs` query staying `Without<GoapPlan>`). Until a kitten-
+/// side scoring pipeline lands (follow-on ticket from 450), kittens
+/// never elect `BegForFood` at L3, so substituting that predicate
+/// here would permanently silence the cry-map. The DSE / Disposition
+/// / resolver / Feature::KittenBegged registry entries land in 450
+/// as ready-to-wire substrate; this system keeps the autonomic
+/// stamping until the kitten-scoring follow-on activates the DSE.
+///
 /// **§4.3 ordering hazard.** When a kitten dies, the surviving
 /// parent's marker is removed within the same tick (the kitten's
 /// `KittenDependency` stops counting once `With<Dead>` filters it

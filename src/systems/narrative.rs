@@ -563,6 +563,19 @@ pub fn generate_narrative(
                 let idx = rng.rng.random_range(0..options.len());
                 (options[idx].clone(), NarrativeTier::Micro)
             }
+
+            // 450: kitten begs for food. Quiet animal vocalization —
+            // the dramatic act is the parent's response, not the cry
+            // itself; keep the line Micro-tier.
+            Action::BegForFood => {
+                let options = [
+                    format!("{cat} mews for food."),
+                    format!("{cat} cries out, hungry."),
+                    format!("{cat} pads in a small circle, mewing."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Micro)
+            }
         };
 
         log.push(tick, text, tier);
