@@ -97,6 +97,15 @@ pub struct SimConstants {
     /// so pre-367 events.jsonl headers deserialize cleanly.
     #[serde(default)]
     pub crafting: CraftingConstants,
+    /// Ticket 375 — per-species guaranteed prey-byproduct tables. Each
+    /// successful kill in `resolve_engage_prey` spawns the species' meat
+    /// plus this list (Bone, Sinew, Hide, Feather, FishScale, Tallow,
+    /// RawOrgan, Whisker). Independent of `crafting.organ_drop_chance`,
+    /// which is 367's probabilistic mammal+bird organ roll and continues
+    /// to fire on top of the guaranteed list. `#[serde(default)]` so
+    /// pre-375 archives deserialize cleanly.
+    #[serde(default)]
+    pub prey_byproducts: PreyByproductConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -6780,6 +6789,61 @@ impl Default for CraftingConstants {
             preservation_quality_input_weight: 0.7,
             preservation_quality_skill_weight: 0.3,
             preservation_skill_baseline: 0.4,
+        }
+    }
+}
+
+// ---------- PreyByproductConstants (ticket 375 — 016 input substrate) ----------
+
+/// Per-species guaranteed byproduct lists for `resolve_engage_prey`.
+///
+/// Each successful kill spawns the species' meat (from `PreyProfile::item_kind()`)
+/// plus the matching list from this table. Composition is additive: a Rat kill
+/// produces `RawRat` plus `[Bone, Sinew, Whisker]` plus — with `crafting.organ_drop_chance`
+/// probability — an optional `RawOrgan`. The 367 probabilistic organ drop continues
+/// to fire independently on top of this guaranteed list.
+///
+/// Downstream sinks (016 phase children):
+/// - `Bone` → 369 / 372 · `Sinew` → 369 / 368 · `Whisker` → 370 / 368
+/// - `Hide` → 369 / 370 · `FishScale` → 372 / 371 · `Tallow` → 371
+/// - `RawOrgan` → 367 (existing drying pipeline) · `Feather` → 368 / 370
+///
+/// Items-are-real: each entry is a spatial entity emitted by the hunt resolver,
+/// not a numeric modifier on the prey. Inventory pressure (4 items per rabbit
+/// instead of 1) is the load-bearing emergent consequence.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PreyByproductConstants {
+    pub mouse: Vec<crate::components::items::ItemKind>,
+    pub rat: Vec<crate::components::items::ItemKind>,
+    pub rabbit: Vec<crate::components::items::ItemKind>,
+    pub fish: Vec<crate::components::items::ItemKind>,
+    pub bird: Vec<crate::components::items::ItemKind>,
+}
+
+impl PreyByproductConstants {
+    /// Byproducts dropped by a kill of this species. Returns an empty slice
+    /// if the species somehow falls outside the table (defensive — every
+    /// `PreyKind` variant is wired below).
+    pub fn for_kind(&self, kind: PreyKind) -> &[crate::components::items::ItemKind] {
+        match kind {
+            PreyKind::Mouse => &self.mouse,
+            PreyKind::Rat => &self.rat,
+            PreyKind::Rabbit => &self.rabbit,
+            PreyKind::Fish => &self.fish,
+            PreyKind::Bird => &self.bird,
+        }
+    }
+}
+
+impl Default for PreyByproductConstants {
+    fn default() -> Self {
+        use crate::components::items::ItemKind;
+        Self {
+            mouse: vec![ItemKind::Bone, ItemKind::Sinew],
+            rat: vec![ItemKind::Bone, ItemKind::Sinew, ItemKind::Whisker],
+            rabbit: vec![ItemKind::Hide, ItemKind::Bone, ItemKind::Sinew],
+            fish: vec![ItemKind::FishScale, ItemKind::Tallow, ItemKind::RawOrgan],
+            bird: vec![ItemKind::Feather, ItemKind::Bone],
         }
     }
 }
