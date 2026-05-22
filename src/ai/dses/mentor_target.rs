@@ -153,8 +153,13 @@ pub fn mentor_target_dse() -> TargetTakingDse {
         required_stance: None,
         // Tickets 074 + 080 — gate dead/banished/incapacitated
         // candidates AND candidates already reserved by another
-        // cat. Combined filter applied at the IAUS scoring layer.
-        eligibility: crate::systems::plan_substrate::require_alive_and_unreserved_filter(),
+        // cat. 450 — additionally require `MentorableAge` on the
+        // mentee (`JuvenileKitten ∨ Young ∨ Adult`), so Stage 1 /
+        // Stage 2 kittens cannot be mentored even when nearby and
+        // unreserved. Combined filter applied at the IAUS scoring
+        // layer.
+        eligibility: crate::systems::plan_substrate::require_alive_and_unreserved_filter()
+            .require(crate::components::markers::MentorableAge::KEY),
     }
 }
 

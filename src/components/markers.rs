@@ -99,6 +99,66 @@ impl Elder {
 }
 
 // ---------------------------------------------------------------------------
+// LifeStage sub-markers — Kitten decomposition (ticket 450)
+// ---------------------------------------------------------------------------
+//
+// The monolithic `Kitten` stage (0–3 seasons) decomposes ethologically into
+// three sub-stages with progressive capabilities. The sub-marker plus
+// `Kitten` are co-resident on the same entity for the duration of each
+// sub-stage; the three sub-markers themselves are mutually exclusive.
+// Author: `growth.rs::update_life_stage_markers` from
+// `KittenDependency.maturity` at thresholds 0.33 / 0.67 / 1.0.
+
+/// Sub-stage 1: `Kitten ∧ maturity < 0.33` — newborn, motionless, eyes
+/// closed. Co-authored with `Incapacitated` so every existing
+/// `.forbid(Incapacitated::KEY)` filter (fetch / forage / hunt / mate /
+/// cook / ward / mentor-target / mentor) already excludes them without
+/// any per-DSE gate work. Reader: the HTN method `[BegForFood]`'s
+/// `ApplicableWhen::Kitten ∧ ¬HasFoodInInventory` plus the
+/// `MentorableAge` author (which excludes `NewbornKitten`).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct NewbornKitten;
+impl NewbornKitten {
+    pub const KEY: &str = "NewbornKitten";
+}
+
+/// Sub-stage 2: `Kitten ∧ 0.33 ≤ maturity < 0.67` — eyes open, mobile,
+/// can play / beg / sleep. `Incapacitated` is removed at the Stage 1 →
+/// Stage 2 transition. Still excluded from foraging / hunting / mating
+/// / mentoring by the `Kitten` marker on existing capability gates.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct EyesOpenKitten;
+impl EyesOpenKitten {
+    pub const KEY: &str = "EyesOpenKitten";
+}
+
+/// Sub-stage 3: `Kitten ∧ 0.67 ≤ maturity < 1.0` — juvenile, the
+/// "mentorable" phase. Co-authored with `MentorableAge`. `CanForage`
+/// gate widens to include this stage (juvenile kittens can forage
+/// alongside Young / Adult); `CanHunt` stays gated on Young/Adult
+/// (Stage 3 kittens learn hunting by mentoring, not by hunting solo).
+/// At maturity ≥ 1.0 the `KittenDependency` + `Kitten` markers retire
+/// (existing `tick_kitten_growth` semantics).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct JuvenileKitten;
+impl JuvenileKitten {
+    pub const KEY: &str = "JuvenileKitten";
+}
+
+/// Mentee-side eligibility gate: cat is old enough to absorb mentoring.
+/// `JuvenileKitten ∨ Young ∨ Adult`. Newborn / Eyes-open kittens cannot
+/// receive mentoring even though they're alive and present. Reader:
+/// `src/ai/dses/mentor_target.rs`'s `.require(MentorableAge::KEY)`.
+/// Author: `growth.rs::update_life_stage_markers` (co-authored with the
+/// life-stage markers themselves so the marker shape stays consistent
+/// across the same maturity read).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct MentorableAge;
+impl MentorableAge {
+    pub const KEY: &str = "MentorableAge";
+}
+
+// ---------------------------------------------------------------------------
 // State markers (§4.3 State)
 // ---------------------------------------------------------------------------
 
@@ -323,6 +383,25 @@ impl CanSmoke {
 pub struct HasHerbsInInventory;
 impl HasHerbsInInventory {
     pub const KEY: &str = "HasHerbsInInventory";
+}
+
+/// 450: per-cat — `inventory.has_food()` (any slot holds an item kind
+/// classified as food, raw or cooked). Authored by
+/// `items::update_inventory_markers`. Read by:
+/// - the HTN method `[BegForFood]`'s `ApplicableWhen::Kitten ∧
+///   ¬HasFoodInInventory` (a kitten with food doesn't beg);
+/// - 429 Phase 2's `EatFromOwnInventoryDse` eligibility filter
+///   (`.require(HasFoodInInventory::KEY).forbid(Incapacitated::KEY)`).
+///
+/// Distinct from the existing slot-kind markers (`HasRawFishInInventory`,
+/// `HasRawMeatInInventory`, …) which gate preservation-chain DSEs on
+/// specific raw inputs — this marker fires on *any* food, the way
+/// "cat carries something it could eat" is the right perceptual axis
+/// for the Eat-aspiration's method cascade and the eat-Sink DSE.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasFoodInInventory;
+impl HasFoodInInventory {
+    pub const KEY: &str = "HasFoodInInventory";
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -1179,6 +1258,11 @@ mod tests {
         assert_marker_queryable(Young);
         assert_marker_queryable(Adult);
         assert_marker_queryable(Elder);
+        // 450 — kitten sub-stages + mentorable gate.
+        assert_marker_queryable(NewbornKitten);
+        assert_marker_queryable(EyesOpenKitten);
+        assert_marker_queryable(JuvenileKitten);
+        assert_marker_queryable(MentorableAge);
     }
 
     #[test]
@@ -1213,6 +1297,8 @@ mod tests {
     #[test]
     fn inventory_markers_queryable() {
         assert_marker_queryable(HasHerbsInInventory);
+        // 450 — generic food-in-inventory marker for the Eat method cascade.
+        assert_marker_queryable(HasFoodInInventory);
         assert_marker_queryable(HasRemedyHerbs);
         assert_marker_queryable(HasWardHerbs);
         assert_marker_queryable(HasFunctionalKitchen);

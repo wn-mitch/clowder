@@ -60,6 +60,8 @@ pub fn update_inventory_markers(
             Has<HasFuelInInventory>,
             Has<HasDryableInInventory>,
             Has<HasSmokeableInInventory>,
+            // 450: generic food-in-inventory marker.
+            Has<crate::components::markers::HasFoodInInventory>,
         ),
         Without<Dead>,
     >,
@@ -79,6 +81,7 @@ pub fn update_inventory_markers(
         has_fuel_marker,
         has_dryable_marker,
         has_smokeable_marker,
+        has_food_marker,
     ) in cats.iter()
     {
         let has_herbs = inventory.has_any_herb();
@@ -92,6 +95,8 @@ pub fn update_inventory_markers(
         let has_raw_organ = inventory.has_raw_organ();
         let has_raw_meat = inventory.has_raw_meat();
         let has_fuel = inventory.has_fuel();
+        // 450: generic food-in-inventory predicate.
+        let has_food = inventory.has_food();
         // 367 unified DSE-gate markers — `EligibilityFilter` lacks an OR
         // primitive, so the OR-of-{fish, organ} drying gate and the
         // AND-of-{meat, fuel} smoking gate live on these conjunction /
@@ -209,6 +214,20 @@ pub fn update_inventory_markers(
             }
             (false, true) => {
                 commands.entity(entity).remove::<HasSmokeableInInventory>();
+            }
+            _ => {}
+        }
+        // 450: generic food-in-inventory marker.
+        match (has_food, has_food_marker) {
+            (true, false) => {
+                commands
+                    .entity(entity)
+                    .insert(crate::components::markers::HasFoodInInventory);
+            }
+            (false, true) => {
+                commands
+                    .entity(entity)
+                    .remove::<crate::components::markers::HasFoodInInventory>();
             }
             _ => {}
         }

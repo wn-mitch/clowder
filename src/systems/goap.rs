@@ -1405,6 +1405,11 @@ pub fn evaluate_and_plan(
         Has<markers::Young>,
         Has<markers::Adult>,
         Has<markers::Elder>,
+        // 450 kitten sub-stages + mentee-side gate.
+        Has<markers::NewbornKitten>,
+        Has<markers::EyesOpenKitten>,
+        Has<markers::JuvenileKitten>,
+        Has<markers::MentorableAge>,
     )>,
     per_cat_markers_q: Query<(
         Has<markers::Injured>,
@@ -1422,6 +1427,10 @@ pub fn evaluate_and_plan(
         // HasHerbsInInventory). Written by `items::update_inventory_markers`.
         Has<markers::HasMaterialsInInventory>,
         Has<markers::HasCuriosInInventory>,
+        // 450: generic food-in-inventory marker for the Eat method cascade
+        // ([BegForFood] requires `¬HasFoodInInventory`) and 429 Phase 2's
+        // `EatFromOwnInventoryDse` eligibility filter.
+        Has<markers::HasFoodInInventory>,
     )>,
     // §4.2 State markers — split into a separate query so the per-cat
     // tuple stays small and future State authors can extend here.
@@ -1836,11 +1845,19 @@ pub fn evaluate_and_plan(
         // identically to `ScoringContext.is_incapacitated` for any
         // DSE that later wires `.forbid("Incapacitated")` (§13.1).
         markers.set_entity(markers::Incapacitated::KEY, entity, is_incapacitated);
-        if let Ok((k, y, a, e)) = life_stage_q.get(entity) {
+        if let Ok((k, y, a, e, newborn, eyes_open, juvenile, mentorable)) = life_stage_q.get(entity)
+        {
             markers.set_entity(markers::Kitten::KEY, entity, k);
             markers.set_entity(markers::Young::KEY, entity, y);
             markers.set_entity(markers::Adult::KEY, entity, a);
             markers.set_entity(markers::Elder::KEY, entity, e);
+            // 450 sub-stage + mentorable populates. NewbornKitten /
+            // EyesOpenKitten / JuvenileKitten are mutually exclusive
+            // within `Kitten`; MentorableAge = `JuvenileKitten ∨ Young ∨ Adult`.
+            markers.set_entity(markers::NewbornKitten::KEY, entity, newborn);
+            markers.set_entity(markers::EyesOpenKitten::KEY, entity, eyes_open);
+            markers.set_entity(markers::JuvenileKitten::KEY, entity, juvenile);
+            markers.set_entity(markers::MentorableAge::KEY, entity, mentorable);
         }
         // §4 batch 1 + batch 2: per-cat markers read from authored ZSTs.
         // 367: read preservation markers via the bundled sibling query
@@ -1875,12 +1892,19 @@ pub fn evaluate_and_plan(
             can_cook,
             has_materials,
             has_curios,
+            has_food_in_inventory,
         )) = per_cat_markers_q.get(entity)
         {
             markers.set_entity(markers::Injured::KEY, entity, injured);
             markers.set_entity(markers::HasHerbsInInventory::KEY, entity, has_herbs);
             markers.set_entity(markers::HasRemedyHerbs::KEY, entity, has_remedy);
             markers.set_entity(markers::HasWardHerbs::KEY, entity, has_ward);
+            // 450 — generic food-in-inventory marker.
+            markers.set_entity(
+                markers::HasFoodInInventory::KEY,
+                entity,
+                has_food_in_inventory,
+            );
             markers.set_entity(
                 markers::IsCoordinatorWithDirectives::KEY,
                 entity,

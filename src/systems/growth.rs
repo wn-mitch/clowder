@@ -207,9 +207,29 @@ pub fn update_kitten_cry_map(
 /// living cat. The `Has<M>` booleans short-circuit: on steady-state ticks
 /// where no cat transitions, the system iterates but issues zero commands.
 ///
+/// Also (ticket 450) maintains the three **kitten sub-stage** markers —
+/// `NewbornKitten` / `EyesOpenKitten` / `JuvenileKitten` — when the cat
+/// is in the `Kitten` life-stage. Sub-stage bands key off
+/// `KittenDependency.maturity` against
+/// `SimConstants::kitten_rearing.weaned_threshold` (0.33) and
+/// `teach_done_threshold` (0.66): pre-wean = newborn (eyes closed,
+/// motionless), wean–teach = eyes open / mobile, post-teach = juvenile
+/// / mentorable. Reusing the Wean/Teach thresholds keeps the sub-stage
+/// boundaries aligned with the existing milestone-arc semantics.
+///
+/// Also authors the **`MentorableAge`** mentee-side gate marker
+/// (`JuvenileKitten ∨ Young ∨ Adult`) — Newborn / Eyes-open kittens
+/// cannot receive mentoring even though they're alive.
+///
 /// Runs in Chain 2, after `update_incapacitation` and before the scoring
 /// systems, so the `MarkerSnapshot` population in `evaluate_dispositions`
-/// and `evaluate_and_plan` sees the freshly-authored ZSTs.
+/// and `evaluate_and_plan` sees the freshly-authored ZSTs. The Stage 1
+/// Newborn-side `Incapacitated` author lives in
+/// `incapacitation.rs::update_incapacitation` (it ORs `Has<NewbornKitten>`
+/// into the pain-based predicate); life-stage authoring runs after
+/// incapacitation, so the next-tick read sees the freshly-inserted
+/// Newborn marker — 1-tick lag at the spawn boundary is acceptable
+/// (kitten-stage transitions are seasons apart, not ticks).
 #[allow(clippy::type_complexity)]
 pub fn update_life_stage_markers(
     mut commands: Commands,
@@ -217,17 +237,38 @@ pub fn update_life_stage_markers(
         (
             Entity,
             &Age,
+            Option<&KittenDependency>,
             Has<markers::Kitten>,
             Has<markers::Young>,
             Has<markers::Adult>,
             Has<markers::Elder>,
+            Has<markers::NewbornKitten>,
+            Has<markers::EyesOpenKitten>,
+            Has<markers::JuvenileKitten>,
+            Has<markers::MentorableAge>,
         ),
         Without<Dead>,
     >,
     time: Res<TimeState>,
     config: Res<SimConfig>,
+    constants: Res<SimConstants>,
 ) {
-    for (entity, age, has_k, has_y, has_a, has_e) in &cats {
+    let weaned = constants.kitten_rearing.weaned_threshold;
+    let teach_done = constants.kitten_rearing.teach_done_threshold;
+    for (
+        entity,
+        age,
+        dep,
+        has_k,
+        has_y,
+        has_a,
+        has_e,
+        has_newborn,
+        has_eyes_open,
+        has_juvenile,
+        has_mentorable,
+    ) in &cats
+    {
         let stage = age.stage(time.tick, config.ticks_per_season);
         match stage {
             LifeStage::Kitten if !has_k => {
@@ -258,8 +299,70 @@ pub fn update_life_stage_markers(
                     markers::Adult,
                 )>();
             }
-            _ => {} // already has the correct marker — no-op
+            _ => {} // already has the correct life-stage marker — no-op
         }
+
+        // 450 sub-stage authoring. Kitten + KittenDependency present →
+        // exactly one of {Newborn, EyesOpen, Juvenile}; else none.
+        let (want_newborn, want_eyes_open, want_juvenile) = match (stage, dep) {
+            (LifeStage::Kitten, Some(d)) if d.maturity < weaned => (true, false, false),
+            (LifeStage::Kitten, Some(d)) if d.maturity < teach_done => (false, true, false),
+            (LifeStage::Kitten, Some(_)) => (false, false, true),
+            // No KittenDependency or non-Kitten life-stage → all three off.
+            _ => (false, false, false),
+        };
+        toggle_marker(
+            &mut commands,
+            entity,
+            want_newborn,
+            has_newborn,
+            markers::NewbornKitten,
+        );
+        toggle_marker(
+            &mut commands,
+            entity,
+            want_eyes_open,
+            has_eyes_open,
+            markers::EyesOpenKitten,
+        );
+        toggle_marker(
+            &mut commands,
+            entity,
+            want_juvenile,
+            has_juvenile,
+            markers::JuvenileKitten,
+        );
+
+        // MentorableAge = JuvenileKitten ∨ Young ∨ Adult. Elders are
+        // not mentees today (they don't acquire new skills via mentoring).
+        let want_mentorable = want_juvenile || matches!(stage, LifeStage::Young | LifeStage::Adult);
+        toggle_marker(
+            &mut commands,
+            entity,
+            want_mentorable,
+            has_mentorable,
+            markers::MentorableAge,
+        );
+    }
+}
+
+/// Toggle a ZST marker only on state change — avoids redundant archetype
+/// moves on steady-state ticks. Sibling of `capabilities.rs::toggle`.
+fn toggle_marker<M: Component + Copy>(
+    commands: &mut Commands,
+    entity: Entity,
+    want: bool,
+    has: bool,
+    marker: M,
+) {
+    match (want, has) {
+        (true, false) => {
+            commands.entity(entity).insert(marker);
+        }
+        (false, true) => {
+            commands.entity(entity).remove::<M>();
+        }
+        _ => {}
     }
 }
 
@@ -369,8 +472,10 @@ pub fn update_parent_markers(
 mod tests {
     use super::*;
 
-    /// Build a minimal world with TimeState + SimConfig, returning the
-    /// world and a schedule containing only `update_life_stage_markers`.
+    /// Build a minimal world with TimeState + SimConfig + SimConstants
+    /// (450 added the constants read for the kitten sub-stage thresholds),
+    /// returning the world and a schedule containing only
+    /// `update_life_stage_markers`.
     fn setup() -> (World, Schedule) {
         let mut world = World::new();
         world.insert_resource(TimeState {
@@ -379,6 +484,7 @@ mod tests {
             ..Default::default()
         });
         world.insert_resource(SimConfig::default());
+        world.insert_resource(SimConstants::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(update_life_stage_markers);
         (world, schedule)

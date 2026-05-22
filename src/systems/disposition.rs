@@ -96,6 +96,14 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::Young>,
             Has<markers::Adult>,
             Has<markers::Elder>,
+            // 450 kitten sub-stages + mentee-side gate. Kept in sync with
+            // `goap.rs::evaluate_and_plan`'s `life_stage_q` so the
+            // legacy disposition-chain populator stays substrate-equivalent
+            // if it's ever re-scheduled.
+            Has<markers::NewbornKitten>,
+            Has<markers::EyesOpenKitten>,
+            Has<markers::JuvenileKitten>,
+            Has<markers::MentorableAge>,
         ),
     >,
     /// §4 batch 1 + batch 2: per-cat inventory, state, role, capability.
@@ -114,6 +122,8 @@ pub struct MarkerQueries<'w, 's> {
             Has<markers::CanWard>,
             Has<markers::CanWardFromSupply>,
             Has<markers::CanCook>,
+            // 450: generic food-in-inventory marker.
+            Has<markers::HasFoodInInventory>,
         ),
     >,
     /// §4.2 State markers — split into a separate query so the
@@ -662,11 +672,18 @@ pub fn evaluate_dispositions(
                 > constants.combat.pain_incapacitation_threshold;
         // §4.3 per-cat marker population — mirror of goap.rs.
         markers.set_entity(markers::Incapacitated::KEY, entity, is_incapacitated);
-        if let Ok((k, y, a, e)) = side_effects.marker_queries.life_stage.get(entity) {
+        if let Ok((k, y, a, e, newborn, eyes_open, juvenile, mentorable)) =
+            side_effects.marker_queries.life_stage.get(entity)
+        {
             markers.set_entity(markers::Kitten::KEY, entity, k);
             markers.set_entity(markers::Young::KEY, entity, y);
             markers.set_entity(markers::Adult::KEY, entity, a);
             markers.set_entity(markers::Elder::KEY, entity, e);
+            // 450 sub-stage + mentorable populates — mirror of goap.rs.
+            markers.set_entity(markers::NewbornKitten::KEY, entity, newborn);
+            markers.set_entity(markers::EyesOpenKitten::KEY, entity, eyes_open);
+            markers.set_entity(markers::JuvenileKitten::KEY, entity, juvenile);
+            markers.set_entity(markers::MentorableAge::KEY, entity, mentorable);
         }
         // §4 batch 1 + batch 2: per-cat markers read from authored ZSTs.
         if let Ok((
@@ -680,12 +697,19 @@ pub fn evaluate_dispositions(
             can_ward,
             can_ward_from_supply,
             can_cook,
+            has_food_in_inventory,
         )) = side_effects.marker_queries.per_cat.get(entity)
         {
             markers.set_entity(markers::Injured::KEY, entity, injured);
             markers.set_entity(markers::HasHerbsInInventory::KEY, entity, has_herbs);
             markers.set_entity(markers::HasRemedyHerbs::KEY, entity, has_remedy);
             markers.set_entity(markers::HasWardHerbs::KEY, entity, has_ward);
+            // 450 — generic food-in-inventory marker mirror.
+            markers.set_entity(
+                markers::HasFoodInInventory::KEY,
+                entity,
+                has_food_in_inventory,
+            );
             markers.set_entity(
                 markers::IsCoordinatorWithDirectives::KEY,
                 entity,

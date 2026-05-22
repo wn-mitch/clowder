@@ -31,44 +31,58 @@
 
 use bevy_ecs::prelude::*;
 
-use crate::components::markers::Incapacitated;
+use crate::components::markers::{Incapacitated, NewbornKitten};
 use crate::components::physical::Dead;
 
-/// Author the `Incapacitated` ZST on living cats with at least one
-/// unhealed `InjuryKind::Severe` injury; remove it otherwise.
+/// Author the `Incapacitated` ZST on living cats whose pain fraction
+/// crosses the configured threshold, OR who are newborn kittens
+/// (ticket 450 reuses `Incapacitated` for Stage 1 motionlessness so
+/// every existing `.forbid(Incapacitated)` filter excludes them
+/// without per-DSE work).
 ///
-/// **Predicate** — `health.injuries.iter().any(|inj| inj.kind ==
-/// InjuryKind::Severe && !inj.healed)`. Bit-for-bit mirror of the
-/// inline `is_incapacitated` computations in
-/// `goap.rs::evaluate_and_plan` and
-/// `disposition.rs::evaluate_dispositions`.
+/// **Predicate** — `(total_pain / max_pain) > threshold ∨ Has<NewbornKitten>`.
 ///
 /// **Ordering** — registered in Chain 2 (cat-needs / decision-prep)
 /// before the GOAP scoring pipeline runs, matching the per-tick
-/// timing of today's inline consumers. Injury writes (combat
-/// resolution, heal ticks) land in Chain 4 at end-of-tick, so the
-/// author observes the same end-of-previous-tick state that the
-/// inline predicate reads today.
+/// timing of today's inline consumers. The newborn-marker side reads
+/// the previous-tick state of `NewbornKitten` (authored by
+/// `growth.rs::update_life_stage_markers` which runs after this
+/// system in Chain 2). That introduces a 1-tick lag at the
+/// kitten-spawn boundary — acceptable because kitten-stage
+/// transitions are seasons apart, not ticks, and the planner has no
+/// observable behaviour-change in the missed tick (the cat also
+/// hasn't been authored Kitten yet).
 ///
 /// **Lifecycle** — only transitions insert/remove; idempotent when
 /// `is_incapacitated == has_marker`. `Dead` cats are filtered out so
 /// markers are not authored on corpses during the narrative
 /// grace-period window before `cleanup_dead`.
+#[allow(clippy::type_complexity)]
 pub fn update_incapacitation(
     mut commands: Commands,
-    cats: Query<(Entity, &crate::components::CatBodyModel, Has<Incapacitated>), Without<Dead>>,
+    cats: Query<
+        (
+            Entity,
+            &crate::components::CatBodyModel,
+            Has<Incapacitated>,
+            Has<NewbornKitten>,
+        ),
+        Without<Dead>,
+    >,
     constants: Res<crate::resources::sim_constants::SimConstants>,
 ) {
     // 095 Phase 1 Stage B — Incapacitated derives from anatomical pain
     // fraction (normalized total_pain / max_possible_pain) crossing the
-    // configured threshold. Replaces the legacy "any Severe unhealed
-    // injury" predicate.
+    // configured threshold. 450 — OR'd with NewbornKitten so Stage 1
+    // kittens (motionless / eyes-closed) inherit the same eligibility
+    // exclusions as severely-injured adults.
     let weights = &constants.combat.body_zone_pain_weights;
     let max_pain: f32 = weights.iter().sum();
     let threshold = constants.combat.pain_incapacitation_threshold;
-    for (entity, body_model, has_marker) in cats.iter() {
-        let is_incapacitated =
+    for (entity, body_model, has_marker, is_newborn) in cats.iter() {
+        let pain_incapacitated =
             max_pain > 0.0 && (body_model.total_pain(weights) / max_pain) > threshold;
+        let is_incapacitated = pain_incapacitated || is_newborn;
         match (is_incapacitated, has_marker) {
             (true, false) => {
                 commands.entity(entity).insert(Incapacitated);

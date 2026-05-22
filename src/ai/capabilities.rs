@@ -31,7 +31,7 @@ use bevy_ecs::prelude::*;
 use crate::components::identity::Species;
 use crate::components::markers::{
     Adult, CanCook, CanDry, CanForage, CanHunt, CanSmoke, CanWard, CanWardFromSupply, ColonyState,
-    HasStoredThornbriar, HasWardHerbs, InCombat, Injured, Kitten, Young,
+    HasStoredThornbriar, HasWardHerbs, InCombat, Injured, JuvenileKitten, Kitten, Young,
 };
 use crate::components::physical::{Dead, Position};
 use crate::resources::map::{Terrain, TileMap};
@@ -49,9 +49,11 @@ pub fn update_capability_markers(
         (
             Entity,
             &Position,
-            Has<Adult>,
-            Has<Young>,
-            Has<Kitten>,
+            // Life-stage + injury inputs. 450 added `Has<JuvenileKitten>`
+            // — Bevy's `QueryData` impl caps at 15 top-level fields, so
+            // we bundle the kitten-stage axes into a nested tuple. Same
+            // shape applies to the `cur_*` cluster below.
+            (Has<Adult>, Has<Young>, Has<Kitten>, Has<JuvenileKitten>),
             Has<Injured>,
             Has<InCombat>,
             Has<HasWardHerbs>,
@@ -80,9 +82,7 @@ pub fn update_capability_markers(
     for (
         entity,
         pos,
-        is_adult,
-        is_young,
-        is_kitten,
+        (is_adult, is_young, is_kitten, is_juvenile_kitten),
         is_injured,
         in_combat,
         has_ward_herbs,
@@ -113,8 +113,11 @@ pub fn update_capability_markers(
             });
         toggle(&mut commands, entity, want_hunt, cur_hunt, CanHunt);
 
-        // CanForage: ¬Kitten ∧ ¬Injured ∧ forageable terrain nearby
-        let want_forage = !is_kitten
+        // CanForage: (¬Kitten ∨ JuvenileKitten) ∧ ¬Injured ∧ forageable terrain.
+        // 450 — Stage 3 (Juvenile) kittens widen the gate alongside
+        // Young / Adult; Newborn / Eyes-open kittens stay excluded via
+        // the broader Kitten marker.
+        let want_forage = (!is_kitten || is_juvenile_kitten)
             && !is_injured
             && has_nearby_tile(pos, &map, d.forage_terrain_search_radius, |t| {
                 t.foraging_yield() > 0.0

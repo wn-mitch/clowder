@@ -455,6 +455,18 @@ impl Inventory {
             .any(|s| s.kind.category() == ItemCategory::Curiosity)
     }
 
+    /// 450: whether the inventory contains *any* food item (raw, cooked,
+    /// preserved). Reader: `HasFoodInInventory` writer in
+    /// `items::update_inventory_markers`. Consulted by the HTN method
+    /// `[BegForFood]`'s `ApplicableWhen` and (429 Phase 2) the
+    /// `EatFromOwnInventoryDse` eligibility filter. Distinct from the
+    /// narrower preservation-input markers (`has_raw_fish`,
+    /// `has_raw_meat`, …) which gate the drying/smoking chains on
+    /// specific raw inputs.
+    pub fn has_food(&self) -> bool {
+        self.slots.iter().any(|s| s.kind.is_food())
+    }
+
     /// 367: whether the inventory contains at least one Raw Fish.
     /// Reader: `HasRawFishInInventory` writer in
     /// `items::update_inventory_markers`.
