@@ -4,8 +4,10 @@
   import TemplateEditor from './pages/TemplateEditor.svelte'
   import LogsDashboard from './pages/LogsDashboard.svelte'
   import TraceDashboard from './pages/TraceDashboard.svelte'
+  import SpriteEditor from './pages/SpriteEditor.svelte'
+  import SpriteCatalog from './pages/SpriteCatalog.svelte'
 
-  const PAGES = ['templates', 'quiz', 'logs', 'trace'] as const
+  const PAGES = ['templates', 'quiz', 'logs', 'trace', 'sprites', 'catalog'] as const
   type Page = typeof PAGES[number]
 
   let page = $state<Page>(getPageFromHash())
@@ -36,6 +38,10 @@
     <LogsDashboard />
   {:else if page === 'trace'}
     <TraceDashboard />
+  {:else if page === 'sprites'}
+    <SpriteEditor />
+  {:else if page === 'catalog'}
+    <SpriteCatalog />
   {:else}
     <TemplateEditor />
   {/if}

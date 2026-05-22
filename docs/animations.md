@@ -1,7 +1,8 @@
 # Sprite Animation Reference
 
-Frame ranges for the two animation sheets used in Clowder. Open
-`tools/sprite_catalog.html` (Trees / Characters tabs) to inspect frames visually.
+Frame ranges for the two animation sheets used in Clowder. Open `just narrative-editor`
+and navigate to the [Catalog](#) page (`#/catalog`, Trees / Characters tabs) to inspect
+frames visually. The standalone `tools/sprite_catalog.html` was retired in ticket 449.
 
 ---
 

@@ -804,6 +804,21 @@ logs:
 trace:
     cd tools/narrative-editor && npm install --silent && npm run dev -- --open /#/trace
 
+# Open the sprite-bindings editor (#/sprites). Reads assets/sprites/bindings.toml
+# and renders the items/buildings/herbs/flavor_plants gallery. Click any entry
+# to repick its atlas index or texture path; Save POSTs back to the manifest
+# and Bevy hot-reload picks it up in the live window within ~1 second
+# (ticket 448 Phase 2, ticket 449 Phase 4).
+sprite-editor:
+    cd tools/narrative-editor && npm install --silent && npm run dev -- --open /#/sprites
+
+# Open the sprite atlas catalog (#/catalog). Read-only browser of the
+# Sprout Lands premium pack's four atlases (items, herbs, trees, chars)
+# with hover-highlight, named-cell outlines, and a side info panel.
+# Replaces the standalone tools/sprite_catalog.html retired in ticket 449.
+sprite-catalog:
+    cd tools/narrative-editor && npm install --silent && npm run dev -- --open /#/catalog
+
 # Build autotile atlases from Fan-tasy Tileset source images
 atlas-build:
     python3 tools/build_grass_atlas.py

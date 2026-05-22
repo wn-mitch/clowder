@@ -76,19 +76,13 @@ pub struct SpriteAssets {
     pub character_texture: Handle<Image>,
     pub character_layout: Handle<TextureAtlasLayout>,
 
-    /// Mushrooms, Flowers, Stones — 192x80, 16x16 frames (12 cols x 5 rows).
-    pub herbs_texture: Handle<Image>,
-    pub herbs_layout: Handle<TextureAtlasLayout>,
-
+    // 449 polish: items / herbs atlases moved to bindings.toml [atlases]
+    // (registered + loaded by sprite_bindings.rs). Removed here to avoid
+    // double-loading the same PNGs.
     /// Tree animation sprites — 576x192, 48x48 frames (12 cols x 4 rows).
     /// Row 0-1: saplings/small, Row 2: medium, Row 3: full-grown.
     pub trees_texture: Handle<Image>,
     pub trees_layout: Handle<TextureAtlasLayout>,
-
-    /// Items spritesheet — 128x240, 16x16 frames (8 cols x 15 rows).
-    /// Food, foraged goods, herbs-as-bottles, curiosities.
-    pub items_texture: Handle<Image>,
-    pub items_layout: Handle<TextureAtlasLayout>,
 
     /// Colony well — Fan-tasy Tileset hay well, 56x74.
     pub well_texture: Handle<Image>,
@@ -207,17 +201,9 @@ pub fn load_sprite_assets(
         None,
     ));
 
-    let herbs_texture = asset_server.load(
-        "sprites/Sprout Lands - Sprites - premium pack/Objects/Mushrooms, Flowers, Stones.png",
-    );
-    let herbs_layout = layouts.add(TextureAtlasLayout::from_grid(
-        UVec2::splat(16),
-        12,
-        5,
-        None,
-        None,
-    ));
-
+    // 449 polish: items + herbs atlas loads moved to bindings.toml +
+    // sprite_bindings.rs. Tree animation sprites stay here — they're not
+    // bound by enum variant, they're picked by world-gen via TreeSpritePool.
     let trees_texture = asset_server.load(
         "sprites/Sprout Lands - Sprites - premium pack/Objects/Tree animations/tree_sprites.png",
     );
@@ -225,16 +211,6 @@ pub fn load_sprite_assets(
         UVec2::splat(48),
         12,
         4,
-        None,
-        None,
-    ));
-
-    let items_texture = asset_server
-        .load("sprites/Sprout Lands - Sprites - premium pack/Objects/Items/items-spritesheet.png");
-    let items_layout = layouts.add(TextureAtlasLayout::from_grid(
-        UVec2::splat(16),
-        8,
-        15,
         None,
         None,
     ));
@@ -418,12 +394,8 @@ pub fn load_sprite_assets(
         white_pixel,
         character_texture,
         character_layout,
-        herbs_texture,
-        herbs_layout,
         trees_texture,
         trees_layout,
-        items_texture,
-        items_layout,
         well_texture,
         fox_texture,
         fox_layout,

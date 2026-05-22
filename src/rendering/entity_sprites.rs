@@ -1,21 +1,19 @@
 use std::collections::HashMap;
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::Text2d;
 
-use crate::components::building::{
-    ConstructionSite, CropState, GateState, Structure, StructureType,
-};
+use crate::components::building::{ConstructionSite, CropState, GateState, Structure};
 use crate::components::identity::{Appearance, Name, Species};
 use crate::components::items::{Item, ItemKind, ItemLocation};
-use crate::components::magic::{
-    FlavorKind, FlavorPlant, GrowthStage, Harvestable, Herb, HerbKind, Ward,
-};
+use crate::components::magic::{FlavorPlant, Harvestable, Herb, Ward};
 use crate::components::physical::{Dead, Position, PreviousPosition, RenderPosition};
 use crate::components::prey::{PreyAnimal, PreyConfig, PreyDen, PreyKind};
 use crate::components::wildlife::{FoxDen, WildAnimal};
 use crate::rendering::sprite_assets::SpriteAssets;
+use crate::rendering::sprite_bindings::SpriteBindings;
 use crate::rendering::tilemap_sync::{TILE_PX, TILE_SCALE};
 use crate::resources::map::TileMap;
 use crate::resources::time::{Season, SimConfig, TimeState};
@@ -126,12 +124,21 @@ pub fn compute_item_layout(mut commands: Commands, items: Query<(Entity, &Positi
     }
 }
 
+/// Rendering data sources bundled to keep `attach_entity_sprites` under
+/// the Bevy 16-param tuple limit (CLAUDE.md ECS rules). Add new sprite
+/// data resources here rather than as siblings of this SystemParam.
+#[derive(SystemParam)]
+pub struct RenderingData<'w> {
+    pub white_pixel: Res<'w, WhitePixel>,
+    pub sprite_assets: Res<'w, SpriteAssets>,
+    pub bindings: Res<'w, SpriteBindings>,
+}
+
 /// Attach sprites to entities that have Position but no EntitySpriteMarker.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn attach_entity_sprites(
     mut commands: Commands,
-    white_pixel: Res<WhitePixel>,
-    sprite_assets: Res<SpriteAssets>,
+    rendering: RenderingData,
     map: Res<TileMap>,
     cats: Query<
         (Entity, &Position, &Appearance, &Name),
@@ -194,11 +201,11 @@ pub fn attach_entity_sprites(
 
         commands.entity(entity).insert((
             Sprite {
-                image: sprite_assets.character_texture.clone(),
+                image: rendering.sprite_assets.character_texture.clone(),
                 color,
                 custom_size: Some(Vec2::splat(world_px)),
                 texture_atlas: Some(TextureAtlas {
-                    layout: sprite_assets.character_layout.clone(),
+                    layout: rendering.sprite_assets.character_layout.clone(),
                     index: 0, // front-facing idle
                 }),
                 ..Default::default()
@@ -215,7 +222,7 @@ pub fn attach_entity_sprites(
         let (x, y) = grid_to_world(pos, map_h, world_px);
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
+                image: rendering.white_pixel.0.clone(),
                 color: Color::srgba(0.4, 0.4, 0.4, 0.5),
                 custom_size: Some(Vec2::new(world_px * 0.5, world_px * 0.5)),
                 ..Default::default()
@@ -241,7 +248,7 @@ pub fn attach_entity_sprites(
             ))
             .id();
 
-        let (image, layout, size, frame_count) = wildlife_sprite(&sprite_assets, animal);
+        let (image, layout, size, frame_count) = wildlife_sprite(&rendering.sprite_assets, animal);
         let mut ecmds = commands.entity(entity);
         ecmds.insert((
             Sprite {
@@ -269,7 +276,7 @@ pub fn attach_entity_sprites(
         let (x, y) = grid_to_world(pos, map_h, world_px);
         let entity_hash = entity.to_bits();
         let (image, atlas, color, sprite_size, frame_count) =
-            prey_sprite(&sprite_assets, config.kind, world_px, entity_hash);
+            prey_sprite(&rendering.sprite_assets, config.kind, world_px, entity_hash);
         let label = commands
             .spawn((
                 Text2d::new(config.name),
@@ -335,7 +342,7 @@ pub fn attach_entity_sprites(
             .id();
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
+                image: rendering.white_pixel.0.clone(),
                 color: base_color,
                 custom_size: Some(size),
                 ..Default::default()
@@ -364,7 +371,7 @@ pub fn attach_entity_sprites(
             .id();
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
+                image: rendering.white_pixel.0.clone(),
                 color,
                 custom_size: Some(Vec2::splat(world_px * 0.6)),
                 ..Default::default()
@@ -393,7 +400,7 @@ pub fn attach_entity_sprites(
             .id();
         commands.entity(entity).insert((
             Sprite {
-                image: white_pixel.0.clone(),
+                image: rendering.white_pixel.0.clone(),
                 color,
                 custom_size: Some(Vec2::splat(world_px * 0.5)),
                 ..Default::default()
@@ -405,10 +412,11 @@ pub fn attach_entity_sprites(
         commands.entity(entity).add_children(&[label]);
     }
 
-    // Herbs — distinct flower/mushroom sprite per kind and growth stage.
+    // Herbs — bound to whichever atlas the manifest declares for each
+    // species. `herb_sprite()` resolves to (texture, layout, index).
     for (entity, pos, herb) in &herbs {
         let (x, y) = grid_to_world(pos, map_h, world_px);
-        let atlas_index = herb_sprite_index(herb.kind, herb.growth_stage);
+        let s = rendering.bindings.herb_sprite(herb.kind, herb.growth_stage);
         let color = if herb.twisted {
             Color::srgb(0.6, 0.15, 0.4) // corrupted: dark magenta tint
         } else {
@@ -416,12 +424,12 @@ pub fn attach_entity_sprites(
         };
         commands.entity(entity).insert((
             Sprite {
-                image: sprite_assets.herbs_texture.clone(),
+                image: s.texture,
                 color,
                 custom_size: Some(Vec2::splat(world_px * 0.5)),
                 texture_atlas: Some(TextureAtlas {
-                    layout: sprite_assets.herbs_layout.clone(),
-                    index: atlas_index,
+                    layout: s.layout,
+                    index: s.index,
                 }),
                 ..Default::default()
             },
@@ -431,18 +439,20 @@ pub fn attach_entity_sprites(
         ));
     }
 
-    // Flavor plants (non-harvestable) — same herbs atlas.
+    // Flavor plants (non-harvestable).
     for (entity, pos, plant) in &flavor_plants {
         let (x, y) = grid_to_world(pos, map_h, world_px);
-        let atlas_index = flavor_sprite_index(plant.kind, plant.growth_stage);
+        let s = rendering
+            .bindings
+            .flavor_sprite(plant.kind, plant.growth_stage);
         commands.entity(entity).insert((
             Sprite {
-                image: sprite_assets.herbs_texture.clone(),
+                image: s.texture,
                 color: Color::WHITE,
                 custom_size: Some(Vec2::splat(world_px * 0.5)),
                 texture_atlas: Some(TextureAtlas {
-                    layout: sprite_assets.herbs_layout.clone(),
-                    index: atlas_index,
+                    layout: s.layout,
+                    index: s.index,
                 }),
                 ..Default::default()
             },
@@ -466,7 +476,7 @@ pub fn attach_entity_sprites(
         let (x, y) = grid_to_world(pos, map_h, world_px);
         commands.entity(entity).insert((
             Sprite {
-                image: sprite_assets.ward_texture.clone(),
+                image: rendering.sprite_assets.ward_texture.clone(),
                 color: sprite_color,
                 custom_size: Some(Vec2::new(w, h)),
                 ..Default::default()
@@ -492,7 +502,7 @@ pub fn attach_entity_sprites(
         let aura = commands
             .spawn((
                 Sprite {
-                    image: sprite_assets.white_pixel.clone(),
+                    image: rendering.sprite_assets.white_pixel.clone(),
                     color: Color::srgba(aura_rgb.0, aura_rgb.1, aura_rgb.2, aura_alpha),
                     custom_size: Some(Vec2::new(diameter, diameter)),
                     ..Default::default()
@@ -504,18 +514,18 @@ pub fn attach_entity_sprites(
         commands.entity(entity).add_children(&[aura]);
     }
 
-    // Items — 16x16 sprites from the items spritesheet.
+    // Items — bound to whichever atlas the manifest declares per item.
     for (entity, pos, item) in &items {
         let (x, y) = grid_to_world(pos, map_h, world_px);
-        let atlas_index = item_sprite_index(item.kind);
+        let s = rendering.bindings.item_sprite(item.kind);
         commands.entity(entity).insert((
             Sprite {
-                image: sprite_assets.items_texture.clone(),
+                image: s.texture,
                 color: Color::WHITE,
                 custom_size: Some(Vec2::splat(world_px * 0.4)),
                 texture_atlas: Some(TextureAtlas {
-                    layout: sprite_assets.items_layout.clone(),
-                    index: atlas_index,
+                    layout: s.layout,
+                    index: s.index,
                 }),
                 ..Default::default()
             },
@@ -532,7 +542,7 @@ pub fn attach_entity_sprites(
         let h = w / 56.0 * 74.0;
         commands.entity(entity).insert((
             Sprite {
-                image: sprite_assets.well_texture.clone(),
+                image: rendering.sprite_assets.well_texture.clone(),
                 color: Color::WHITE,
                 custom_size: Some(Vec2::new(w, h)),
                 ..Default::default()
@@ -552,7 +562,7 @@ pub fn attach_entity_sprites(
 #[allow(clippy::type_complexity)]
 pub fn attach_building_sprites(
     mut commands: Commands,
-    sprite_assets: Res<SpriteAssets>,
+    bindings: Res<SpriteBindings>,
     map: Res<TileMap>,
     structures: Query<
         (Entity, &Position, &Structure, Option<&ConstructionSite>),
@@ -566,7 +576,7 @@ pub fn attach_building_sprites(
     let map_h = map.height as f32;
 
     for (entity, pos, structure, construction) in &structures {
-        let (image, size) = building_sprite(&sprite_assets, structure.kind, entity.to_bits());
+        let (image, size) = bindings.building_sprite(structure.kind, entity.to_bits(), world_px);
         let alpha = if construction.is_some() { 0.4 } else { 1.0 };
         let (x, y) = grid_to_world(pos, map_h, world_px);
 
@@ -581,96 +591,6 @@ pub fn attach_building_sprites(
             PreviousPosition { x: pos.x, y: pos.y },
             EntitySpriteMarker,
         ));
-    }
-}
-
-/// Select the texture handle and render size for a building type.
-fn building_sprite(
-    assets: &SpriteAssets,
-    kind: StructureType,
-    entity_hash: u64,
-) -> (Handle<Image>, Vec2) {
-    let world_px = TILE_PX * TILE_SCALE;
-    match kind {
-        // Den: 3 variants, 89x91 source, 2 tiles wide
-        StructureType::Den => {
-            let variant = (entity_hash as usize) % assets.den_textures.len();
-            let w = 2.0 * world_px;
-            let h = w / 89.0 * 91.0;
-            (assets.den_textures[variant].clone(), Vec2::new(w, h))
-        }
-        // Hearth: 128x128 source, 2 tiles wide
-        StructureType::Hearth => {
-            let w = 2.0 * world_px;
-            (assets.hearth_texture.clone(), Vec2::splat(w))
-        }
-        // Kitchen: reuses the workshop sprite until a dedicated asset exists.
-        StructureType::Kitchen => {
-            let w = world_px;
-            let h = w / 35.0 * 44.0;
-            (assets.workshop_texture.clone(), Vec2::new(w, h))
-        }
-        // Stores: 62x57 source, 2 tiles wide
-        StructureType::Stores => {
-            let w = 2.0 * world_px;
-            let h = w / 62.0 * 57.0;
-            (assets.stores_texture.clone(), Vec2::new(w, h))
-        }
-        // Workshop: 35x44 source, 1 tile wide
-        StructureType::Workshop => {
-            let w = world_px;
-            let h = w / 35.0 * 44.0;
-            (assets.workshop_texture.clone(), Vec2::new(w, h))
-        }
-        // Garden: 32x32 source, 0.7 tiles wide (basket prop)
-        StructureType::Garden => {
-            let w = 0.7 * world_px;
-            (assets.garden_textures[0].clone(), Vec2::splat(w))
-        }
-        // Watchtower: 68x149 source, 1.5 tiles wide
-        StructureType::Watchtower => {
-            let w = 1.5 * world_px;
-            let h = w / 68.0 * 149.0;
-            (assets.watchtower_texture.clone(), Vec2::new(w, h))
-        }
-        // WardPost: 24x59 source, 0.5 tiles wide
-        StructureType::WardPost => {
-            let w = 0.5 * world_px;
-            let h = w / 24.0 * 59.0;
-            (assets.wardpost_texture.clone(), Vec2::new(w, h))
-        }
-        // Wall: 16x48 source, 1 tile wide
-        StructureType::Wall => {
-            let w = world_px;
-            let h = w / 16.0 * 48.0;
-            (assets.wall_texture.clone(), Vec2::new(w, h))
-        }
-        // Gate: 80x96 source, 2 tiles wide
-        StructureType::Gate => {
-            let w = 2.0 * world_px;
-            let h = w / 80.0 * 96.0;
-            (assets.gate_texture.clone(), Vec2::new(w, h))
-        }
-        // 176: Midden visually reuses the Stores sprite (refuse pile
-        // looks "container-shaped"). A future visual-polish ticket
-        // can swap in a dedicated midden asset.
-        StructureType::Midden => {
-            let w = 2.0 * world_px;
-            let h = w / 62.0 * 57.0;
-            (assets.stores_texture.clone(), Vec2::new(w, h))
-        }
-        // 367: preservation stations reuse workshop / hearth sprites
-        // for stage-1 atomicity (Midden precedent). A follow-on visual
-        // polish ticket adds dedicated rack assets + autotile entries.
-        StructureType::DryingRack => {
-            let w = world_px;
-            let h = w / 35.0 * 44.0;
-            (assets.workshop_texture.clone(), Vec2::new(w, h))
-        }
-        StructureType::SmokingRack => {
-            let w = 2.0 * world_px;
-            (assets.hearth_texture.clone(), Vec2::splat(w))
-        }
     }
 }
 
@@ -708,7 +628,7 @@ pub fn update_crop_sprites(
 
 /// Swap building sprites between Seasons and Snow variants when winter starts/ends.
 pub fn swap_seasonal_building_sprites(
-    sprite_assets: Res<SpriteAssets>,
+    bindings: Res<SpriteBindings>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
     mut last_season: Local<Option<Season>>,
@@ -729,52 +649,15 @@ pub fn swap_seasonal_building_sprites(
         return;
     }
 
+    let world_px = TILE_PX * TILE_SCALE;
     for (entity, structure, mut sprite) in &mut buildings {
         let hash = entity.to_bits();
         let (image, _) = if entering_winter {
-            building_sprite_snow(&sprite_assets, structure.kind, hash)
+            bindings.building_sprite_winter(structure.kind, hash, world_px)
         } else {
-            building_sprite(&sprite_assets, structure.kind, hash)
+            bindings.building_sprite(structure.kind, hash, world_px)
         };
         sprite.image = image;
-    }
-}
-
-/// Select the snow variant texture for a building type (winter).
-fn building_sprite_snow(
-    assets: &SpriteAssets,
-    kind: StructureType,
-    entity_hash: u64,
-) -> (Handle<Image>, Vec2) {
-    let world_px = TILE_PX * TILE_SCALE;
-    match kind {
-        StructureType::Den => {
-            let variant = (entity_hash as usize) % assets.den_snow_textures.len();
-            let w = 2.0 * world_px;
-            let h = w / 89.0 * 91.0;
-            (assets.den_snow_textures[variant].clone(), Vec2::new(w, h))
-        }
-        StructureType::Hearth => {
-            let w = 2.0 * world_px;
-            (assets.hearth_snow_texture.clone(), Vec2::splat(w))
-        }
-        StructureType::Stores => {
-            let w = 2.0 * world_px;
-            let h = w / 62.0 * 57.0;
-            (assets.stores_snow_texture.clone(), Vec2::new(w, h))
-        }
-        StructureType::Watchtower => {
-            let w = 1.5 * world_px;
-            let h = w / 68.0 * 149.0;
-            (assets.watchtower_snow_texture.clone(), Vec2::new(w, h))
-        }
-        StructureType::WardPost => {
-            let w = 0.5 * world_px;
-            let h = w / 24.0 * 59.0;
-            (assets.wardpost_snow_texture.clone(), Vec2::new(w, h))
-        }
-        // Workshop, Garden, Wall, Gate have no snow variants — keep as-is.
-        _ => building_sprite(assets, kind, entity_hash),
     }
 }
 
@@ -924,154 +807,6 @@ fn fur_color_to_bevy(fur: &str) -> Color {
         "silver" => Color::srgb(0.75, 0.78, 0.8),
         "russet" => Color::srgb(0.7, 0.3, 0.15),
         _ => Color::srgb(0.7, 0.5, 0.3), // fallback brown
-    }
-}
-
-/// Map each herb kind + growth stage to a sprite index in the Mushrooms, Flowers, Stones atlas.
-/// Atlas: 12 cols × 5 rows, 16×16, row-major (index 0 = top-left).
-fn herb_sprite_index(kind: HerbKind, stage: GrowthStage) -> usize {
-    use GrowthStage::*;
-    match kind {
-        // Row 0: mushroom cluster (3 sprites, no Bud distinct from Bloom)
-        HerbKind::HealingMoss => match stage {
-            Sprout => 0,
-            Bud | Bloom => 1,
-            Blossom => 2,
-        },
-        // Row 0, cols 3–6: thornbriar stages
-        HerbKind::Thornbriar => match stage {
-            Sprout => 3,
-            Bud => 4,
-            Bloom => 5,
-            Blossom => 6,
-        },
-        // Row 4: moonpetal bud (58) / bloom (59) — previously wrong at index 24
-        HerbKind::Moonpetal => match stage {
-            Sprout | Bud | Bloom => 58,
-            Blossom => 59,
-        },
-        // Row 4: calmroot bloom (56) / blossom (57) — previously wrong at index 36
-        HerbKind::Calmroot => match stage {
-            Sprout | Bud | Bloom => 56,
-            Blossom => 57,
-        },
-        // Row 4: dreamroot full 4-stage progression — previously wrong at index 27
-        HerbKind::Dreamroot => match stage {
-            Sprout => 52,
-            Bud => 53,
-            Bloom => 54,
-            Blossom => 55,
-        },
-        // Row 2, cols 0–3: catnip sprout → bush
-        HerbKind::Catnip => match stage {
-            Sprout => 24,
-            Bud => 25,
-            Bloom => 26,
-            Blossom => 27,
-        },
-        // Row 3, cols 4–7: slumbershade
-        HerbKind::Slumbershade => match stage {
-            Sprout => 40,
-            Bud => 41,
-            Bloom => 42,
-            Blossom => 43,
-        },
-        // Row 4, cols 0–2: oracle orchid (3 sprites, skip Bud)
-        HerbKind::OracleOrchid => match stage {
-            Sprout | Bud => 48,
-            Bloom => 49,
-            Blossom => 50,
-        },
-    }
-}
-
-/// Map each flavor plant kind + growth stage to a sprite index in the Mushrooms, Flowers, Stones atlas.
-fn flavor_sprite_index(kind: FlavorKind, stage: GrowthStage) -> usize {
-    use GrowthStage::*;
-    match kind {
-        // Row 3, cols 0–3: sunflower shoot → blossom top
-        FlavorKind::Sunflower => match stage {
-            Sprout => 36,
-            Bud => 37,
-            Bloom => 38,
-            Blossom => 39,
-        },
-        // Row 3, col 8: rose (single sprite, all stages same)
-        FlavorKind::Rose => 44,
-        // Rocks — static sprites, stage irrelevant
-        FlavorKind::Pebble => 12,
-        FlavorKind::Rock => 13,
-        FlavorKind::Stone => 14,
-        FlavorKind::StoneChunk => 15,
-        FlavorKind::StoneFlat => 16,
-        FlavorKind::Boulder => 17,
-    }
-}
-
-/// Map each item kind to a sprite index in the items spritesheet atlas.
-/// The atlas is an 8-col x 15-row grid of 16x16 sprites, row-major.
-/// These picks are approximate — tune by running `just run` and eyeballing.
-fn item_sprite_index(kind: ItemKind) -> usize {
-    match kind {
-        // Raw prey — row 0 food sprites
-        ItemKind::RawMouse => 0,  // drumstick
-        ItemKind::RawRat => 1,    // meat cut
-        ItemKind::RawRabbit => 1, // meat cut
-        ItemKind::RawFish => 66,  // PEAR (closest fish shape in this pack)
-        ItemKind::RawBird => 0,   // drumstick (poultry)
-        // Foraged — actual produce sprites from the catalog
-        ItemKind::Berries => 82,    // STRAWBERRY
-        ItemKind::Nuts => 50,       // APPLE (round food, nut stand-in)
-        ItemKind::Roots => 81,      // TURNIP
-        ItemKind::WildOnion => 97,  // RADISH (bulb vegetable)
-        ItemKind::Mushroom => 7,    // mushroom
-        ItemKind::Moss => 5,        // leaf
-        ItemKind::DriedGrass => 11, // GRASS
-        ItemKind::Feather => 5,     // leaf shape
-        // Herbs as bottled items — bottles at cols 4-7: plain, special, large, large-special.
-        ItemKind::HerbHealingMoss => 20, // WHITEBOTTLE  (row 3, col 4)
-        ItemKind::HerbMoonpetal => 68,   // PINKBOTTLE   (row 9, col 4)
-        ItemKind::HerbCalmroot => 84,    // GREENBOTTLE  (row 11, col 4)
-        ItemKind::HerbThornbriar => 36,  // BROWNBOTTLE  (row 5, col 4)
-        ItemKind::HerbDreamroot => 52,   // PURPLEBOTTLE (row 7, col 4)
-        ItemKind::HerbCatnip => 69,      // PINKBOTTLESPECIAL   (row 9, col 5)
-        ItemKind::HerbSlumbershade => 37, // BROWNBOTTLESPECIAL  (row 5, col 5)
-        ItemKind::HerbOracleOrchid => 53, // PURPLEBOTTLESPECIAL (row 7, col 5)
-        // Curiosities
-        ItemKind::ShinyPebble => 42,   // STONE
-        ItemKind::GlassShard => 43,    // ROCK
-        ItemKind::ColorfulShell => 93, // PINKEGG (colorful rounded shape)
-        // Shadow materials
-        ItemKind::ShadowBone => 43, // ROCK (dark bone-like)
-        // Storage upgrades
-        ItemKind::Barrel => 30, // LARGEBROWNJAR
-        ItemKind::Crate => 35,  // STONEBRICK
-        ItemKind::Shelf => 34,  // PLANK
-        // Build materials
-        ItemKind::Wood => 34,  // PLANK
-        ItemKind::Stone => 35, // STONEBRICK
-        // 365 — crafted remedies. Reuse the herb-bottle column to
-        // signal "prepared from a herb"; sub-tier-tinted variants
-        // are a Phase 4 polish concern.
-        ItemKind::RemedyHealingPoultice => 20, // WHITEBOTTLE
-        ItemKind::RemedyEnergyTonic => 68,     // PINKBOTTLE
-        ItemKind::RemedyMoodTonic => 84,       // GREENBOTTLE
-        // 367 — raw organ + Phase 1b preservation outputs.
-        // Reuse the closest food-shaped sprites; dedicated icons
-        // are a Phase 4 polish concern (mirrors the remedy comment
-        // above).
-        ItemKind::RawOrgan => 1,       // meat cut
-        ItemKind::DriedFish => 66,     // PEAR (fish shape; signals fish-origin)
-        ItemKind::SmokedMeat => 1,     // meat cut
-        ItemKind::PreservedOrgan => 1, // meat cut
-        // 375 — prey byproducts. Reuse closest-shaped sprites; dedicated
-        // icons are a polish concern (mirrors the remedy / 367 comment).
-        ItemKind::Bone => 43,      // ROCK (bone-like)
-        ItemKind::Sinew => 11,     // GRASS (fibrous strand)
-        ItemKind::Whisker => 11,   // GRASS (thin filament)
-        ItemKind::Hide => 34,      // PLANK (flat sheet)
-        ItemKind::FishScale => 42, // STONE (small flat fragments)
-        ItemKind::Tallow => 30,    // LARGEBROWNJAR (rendered fat in container)
     }
 }
 

@@ -28,6 +28,7 @@ noise = "0.9"
 ron = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = "0.8"
 
 [lints.rust]
 # `deny` (not `forbid`) is mandatory for binary crates: cargo's test harness

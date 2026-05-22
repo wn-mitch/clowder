@@ -1,0 +1,459 @@
+[atlases.items]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/items-spritesheet.png"
+cols = 8
+rows = 15
+tile = 16
+note = "Premium items spritesheet — drumstick / meats / fruits / vegetables / bottles / jars / tools / packets / eggs / rocks"
+
+[atlases.items_dairy]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/milk-items.png"
+cols = 4
+rows = 11
+tile = 16
+note = "Premium dairy items — milk bottles, cheeses, butter, cream (44 sprites NOT in the main items atlas)"
+
+[atlases.items_all]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/All items.png"
+cols = 8
+rows = 15
+tile = 16
+note = "Premium 'All items' alternative layout — different organization than items-spritesheet.png"
+
+[atlases.herbs]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Mushrooms, Flowers, Stones.png"
+cols = 12
+rows = 5
+tile = 16
+note = "Premium flora atlas — mushrooms, flowers, herb growth stages, decorative stones"
+
+[atlases.furniture]
+texture = "sprites/Sprout Lands - Sprites - Basic pack/Objects/Basic Furniture.png"
+cols = 9
+rows = 6
+tile = 16
+note = "Basic-pack furniture — chairs, tables, beds, lamps (item-shaped props)"
+
+[atlases.chest]
+texture = "sprites/Sprout Lands - Sprites - Basic pack/Objects/Chest.png"
+cols = 15
+rows = 6
+tile = 16
+note = "Basic-pack chest animations — open/closed states, multiple colors"
+
+[atlases.basic_plants]
+texture = "sprites/Sprout Lands - Sprites - Basic pack/Objects/Basic Plants.png"
+cols = 6
+rows = 2
+tile = 16
+note = "Basic-pack flora — alternate plant sprites"
+
+[atlases.basic_grass_biom]
+texture = "sprites/Sprout Lands - Sprites - Basic pack/Objects/Basic_Grass_Biom_things.png"
+cols = 9
+rows = 5
+tile = 16
+note = "Basic-pack grass biome props — small ground objects"
+
+[atlases.trees]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Tree animations/tree_sprites.png"
+cols = 12
+rows = 4
+tile = 48
+note = "Tree animation sheet (48px tiles). Used by world-gen via TreeSpritePool, not bound per item — registered here so #/catalog can inspect frames."
+
+[atlases.chars]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Characters/Premium Charakter Spritesheet.png"
+cols = 8
+rows = 24
+tile = 48
+note = "Character animation sheet (48px tiles). Cats use this via SpriteAssets.character_texture; registered here for #/catalog inspection."
+
+[items.RawMouse]
+atlas = "items"
+index = 0
+note = "drumstick"
+
+[items.RawRat]
+atlas = "items"
+index = 1
+note = "meat cut"
+
+[items.RawRabbit]
+atlas = "items"
+index = 1
+note = "meat cut"
+
+[items.RawFish]
+atlas = "items"
+index = 66
+note = "PEAR (closest fish shape in this pack)"
+
+[items.RawBird]
+atlas = "items"
+index = 0
+note = "drumstick (poultry)"
+
+[items.Berries]
+atlas = "items"
+index = 82
+note = "STRAWBERRY"
+
+[items.Nuts]
+atlas = "items"
+index = 50
+note = "APPLE (round food, nut stand-in)"
+
+[items.Roots]
+atlas = "items"
+index = 81
+note = "TURNIP"
+
+[items.WildOnion]
+atlas = "items"
+index = 97
+note = "RADISH (bulb vegetable)"
+
+[items.Mushroom]
+atlas = "items"
+index = 7
+note = "mushroom"
+
+[items.Moss]
+atlas = "items"
+index = 57
+note = "leaf"
+
+[items.DriedGrass]
+atlas = "items"
+index = 11
+note = "GRASS"
+
+[items.Feather]
+atlas = "items"
+index = 65
+note = "leaf shape"
+
+[items.HerbHealingMoss]
+atlas = "items"
+index = 20
+note = "WHITEBOTTLE (row 3, col 4)"
+
+[items.HerbMoonpetal]
+atlas = "items"
+index = 68
+note = "PINKBOTTLE (row 9, col 4)"
+
+[items.HerbCalmroot]
+atlas = "items"
+index = 84
+note = "GREENBOTTLE (row 11, col 4)"
+
+[items.HerbThornbriar]
+atlas = "items"
+index = 36
+note = "BROWNBOTTLE (row 5, col 4)"
+
+[items.HerbDreamroot]
+atlas = "items"
+index = 52
+note = "PURPLEBOTTLE (row 7, col 4)"
+
+[items.HerbCatnip]
+atlas = "items"
+index = 69
+note = "PINKBOTTLESPECIAL (row 9, col 5)"
+
+[items.HerbSlumbershade]
+atlas = "items"
+index = 37
+note = "BROWNBOTTLESPECIAL (row 5, col 5)"
+
+[items.HerbOracleOrchid]
+atlas = "items"
+index = 53
+note = "PURPLEBOTTLESPECIAL (row 7, col 5)"
+
+[items.ShinyPebble]
+atlas = "items"
+index = 42
+note = "STONE"
+
+[items.GlassShard]
+atlas = "items"
+index = 43
+note = "ROCK"
+
+[items.ColorfulShell]
+atlas = "items"
+index = 93
+note = "PINKEGG (colorful rounded shape)"
+
+[items.ShadowBone]
+atlas = "items"
+index = 43
+note = "ROCK (dark bone-like)"
+
+[items.Barrel]
+atlas = "items"
+index = 30
+note = "LARGEBROWNJAR"
+
+[items.Crate]
+atlas = "items"
+index = 35
+note = "STONEBRICK"
+
+[items.Shelf]
+atlas = "items"
+index = 34
+note = "PLANK"
+
+[items.Wood]
+atlas = "items"
+index = 34
+note = "PLANK"
+
+[items.Stone]
+atlas = "items"
+index = 35
+note = "STONEBRICK"
+
+[items.RemedyHealingPoultice]
+atlas = "items"
+index = 20
+note = "WHITEBOTTLE"
+
+[items.RemedyEnergyTonic]
+atlas = "items"
+index = 68
+note = "PINKBOTTLE"
+
+[items.RemedyMoodTonic]
+atlas = "items"
+index = 84
+note = "GREENBOTTLE"
+
+[items.RawOrgan]
+atlas = "items"
+index = 1
+note = "meat cut"
+
+[items.DriedFish]
+atlas = "items"
+index = 66
+note = "PEAR (fish shape; signals fish-origin)"
+
+[items.SmokedMeat]
+atlas = "items"
+index = 1
+note = "meat cut"
+
+[items.PreservedOrgan]
+atlas = "items"
+index = 1
+note = "meat cut"
+
+[items.Bone]
+atlas = "items"
+index = 43
+note = "ROCK (bone-like)"
+
+[items.Sinew]
+atlas = "items"
+index = 11
+note = "GRASS (fibrous strand)"
+
+[items.Whisker]
+atlas = "items"
+index = 11
+note = "GRASS (thin filament)"
+
+[items.Hide]
+atlas = "items"
+index = 34
+note = "PLANK (flat sheet)"
+
+[items.FishScale]
+atlas = "items"
+index = 42
+note = "STONE (small flat fragments)"
+
+[items.Tallow]
+atlas = "items"
+index = 30
+note = "LARGEBROWNJAR (rendered fat in container)"
+
+[buildings.Den]
+textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_1.png", "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_2.png", "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_3.png" ]
+native_size = [ 89, 91 ]
+tiles_wide = 2
+
+[buildings.Hearth]
+textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_4_Red.png" ]
+native_size = [ 128, 128 ]
+tiles_wide = 2
+
+[buildings.Kitchen]
+textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
+native_size = [ 35, 44 ]
+tiles_wide = 1
+note = "reuses workshop sprite until a dedicated asset exists"
+
+[buildings.Stores]
+textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/MarketStand_1_Red.png" ]
+native_size = [ 62, 57 ]
+tiles_wide = 2
+
+[buildings.Workshop]
+textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
+native_size = [ 35, 44 ]
+tiles_wide = 1
+
+[buildings.Garden]
+textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props/Basket_Empty.png" ]
+native_size = [ 32, 32 ]
+tiles_wide = 0.7
+note = "Basket prop; CropState transitions to Basket_Cotton / Basket_Vegetables via update_crop_sprites and those handles remain in SpriteAssets.garden_textures."
+
+[buildings.Watchtower]
+textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/Watchtower_1_Hay_Red.png" ]
+native_size = [ 68, 149 ]
+tiles_wide = 1.5
+
+[buildings.WardPost]
+textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Props/Banner_Stick_1_Red.png" ]
+native_size = [ 24, 59 ]
+tiles_wide = 0.5
+
+[buildings.Wall]
+textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Fences and Walls/CityWall_Up_1.png" ]
+native_size = [ 16, 48 ]
+tiles_wide = 1
+
+[buildings.Gate]
+textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Fences and Walls/CityWall_Gate_1.png" ]
+native_size = [ 80, 96 ]
+tiles_wide = 2
+
+[buildings.Midden]
+textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/MarketStand_1_Red.png" ]
+native_size = [ 62, 57 ]
+tiles_wide = 2
+note = "176: visually reuses Stores sprite — refuse pile looks container-shaped"
+
+[buildings.DryingRack]
+textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
+native_size = [ 35, 44 ]
+tiles_wide = 1
+note = "367: reuses workshop sprite for stage-1 atomicity (Midden precedent)"
+
+[buildings.SmokingRack]
+textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_4_Red.png" ]
+native_size = [ 128, 128 ]
+tiles_wide = 2
+note = "367: reuses hearth sprite for stage-1 atomicity"
+
+[buildings_winter.Den]
+textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_1.png", "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_2.png", "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_3.png" ]
+native_size = [ 89, 91 ]
+tiles_wide = 2
+
+[buildings_winter.Hearth]
+textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_5_1_Red.png" ]
+native_size = [ 128, 128 ]
+tiles_wide = 2
+
+[buildings_winter.Stores]
+textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/MarketStand_1_Red.png" ]
+native_size = [ 62, 57 ]
+tiles_wide = 2
+
+[buildings_winter.Watchtower]
+textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/Watchtower_1_Snow_Red.png" ]
+native_size = [ 68, 149 ]
+tiles_wide = 1.5
+
+[buildings_winter.WardPost]
+textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Props/Banner_Stick_1_Red_Snow.png" ]
+native_size = [ 24, 59 ]
+tiles_wide = 0.5
+
+[herbs.HealingMoss]
+atlas = "herbs"
+indices_by_stage = [ 0, 1, 1, 2 ]
+note = "Row 0: mushroom cluster (3 sprites, Bud collapses to Bloom)"
+
+[herbs.Thornbriar]
+atlas = "herbs"
+indices_by_stage = [ 3, 4, 5, 6 ]
+note = "Row 0, cols 3-6: thornbriar stages"
+
+[herbs.Moonpetal]
+atlas = "herbs"
+indices_by_stage = [ 58, 58, 58, 59 ]
+note = "Row 4: bud (58) / bloom (59) — previously wrong at index 24"
+
+[herbs.Calmroot]
+atlas = "herbs"
+indices_by_stage = [ 56, 56, 56, 57 ]
+note = "Row 4: bloom (56) / blossom (57) — previously wrong at index 36"
+
+[herbs.Dreamroot]
+atlas = "herbs"
+indices_by_stage = [ 52, 53, 54, 55 ]
+note = "Row 4: full 4-stage progression — previously wrong at index 27"
+
+[herbs.Catnip]
+atlas = "herbs"
+indices_by_stage = [ 24, 25, 26, 27 ]
+note = "Row 2, cols 0-3: sprout → bush"
+
+[herbs.Slumbershade]
+atlas = "herbs"
+indices_by_stage = [ 40, 41, 42, 43 ]
+note = "Row 3, cols 4-7"
+
+[herbs.OracleOrchid]
+atlas = "herbs"
+indices_by_stage = [ 48, 48, 49, 50 ]
+note = "Row 4, cols 0-2: 3 sprites (Sprout + Bud collapse)"
+
+[flavor_plants.Sunflower]
+atlas = "herbs"
+indices_by_stage = [ 36, 37, 38, 39 ]
+note = "Row 3, cols 0-3: shoot → blossom top"
+
+[flavor_plants.Rose]
+atlas = "herbs"
+indices_by_stage = [ 44, 44, 44, 44 ]
+note = "Row 3, col 8: rose (single sprite, all stages same)"
+
+[flavor_plants.Pebble]
+atlas = "herbs"
+indices_by_stage = [ 12, 12, 12, 12 ]
+note = "static rock"
+
+[flavor_plants.Rock]
+atlas = "herbs"
+indices_by_stage = [ 13, 13, 13, 13 ]
+note = "static rock"
+
+[flavor_plants.Stone]
+atlas = "herbs"
+indices_by_stage = [ 14, 14, 14, 14 ]
+note = "static rock"
+
+[flavor_plants.StoneChunk]
+atlas = "herbs"
+indices_by_stage = [ 15, 15, 15, 15 ]
+note = "static rock"
+
+[flavor_plants.StoneFlat]
+atlas = "herbs"
+indices_by_stage = [ 16, 16, 16, 16 ]
+note = "static rock"
+
+[flavor_plants.Boulder]
+atlas = "herbs"
+indices_by_stage = [ 17, 17, 17, 17 ]
+note = "static rock"

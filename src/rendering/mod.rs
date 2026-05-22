@@ -6,6 +6,7 @@ pub mod entity_sprites;
 pub mod scent_signpost;
 pub mod sprite_animation;
 pub mod sprite_assets;
+pub mod sprite_bindings;
 pub mod terrain_sprites;
 pub mod tilemap_sync;
 pub mod ui;
@@ -22,11 +23,15 @@ impl Plugin for RenderingPlugin {
             .init_resource::<crate::resources::RenderTickProgress>()
             .init_resource::<scent_signpost::ScentSignpostsEnabled>()
             .init_resource::<action_overlay::ActionOverlayEnabled>()
+            .init_resource::<sprite_bindings::BindingsWatcher>()
             .add_systems(
                 Startup,
                 (
-                    // load_sprite_assets must run before create_tilemap (trees, corruption)
+                    // load_sprite_assets must run before create_tilemap (trees, corruption).
+                    // sprite_bindings loads first so the SpriteBindings resource is available
+                    // before any system that calls bindings.item_index / herb_index / flavor_index.
                     (
+                        sprite_bindings::load_sprite_bindings,
                         entity_sprites::create_white_pixel,
                         sprite_assets::load_sprite_assets,
                         sprite_assets::load_tree_sprite_pool,
@@ -77,7 +82,14 @@ impl Plugin for RenderingPlugin {
                     .chain()
                     .after(entity_sprites::attach_entity_sprites),
             )
-            .add_systems(Update, action_overlay::toggle_action_overlay);
+            .add_systems(Update, action_overlay::toggle_action_overlay)
+            // Phase 2 of ticket 448 — must run BEFORE the attach systems so
+            // marker stripping + resource swap take effect the same frame.
+            .add_systems(
+                Update,
+                sprite_bindings::watch_sprite_bindings
+                    .before(entity_sprites::attach_entity_sprites),
+            );
     }
 }
 

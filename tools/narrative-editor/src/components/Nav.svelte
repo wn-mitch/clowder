@@ -34,5 +34,17 @@
     >
       Focal trace
     </button>
+    <button
+      class="px-4 py-1.5 border-none bg-transparent text-muted text-sm rounded-md cursor-pointer transition-all duration-150 hover:text-txt hover:bg-surface-alt {currentPage === 'sprites' ? 'text-accent bg-bg' : ''}"
+      onclick={() => onNavigate('sprites')}
+    >
+      Sprites
+    </button>
+    <button
+      class="px-4 py-1.5 border-none bg-transparent text-muted text-sm rounded-md cursor-pointer transition-all duration-150 hover:text-txt hover:bg-surface-alt {currentPage === 'catalog' ? 'text-accent bg-bg' : ''}"
+      onclick={() => onNavigate('catalog')}
+    >
+      Catalog
+    </button>
   </div>
 </nav>

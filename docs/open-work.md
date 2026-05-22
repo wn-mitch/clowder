@@ -15,10 +15,10 @@ _Last generated: 2026-05-22._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 120 |
+| Ready | 121 |
 | Parked | 14 |
-| Blocked | 31 |
-| **Open total** | **169** |
+| Blocked | 32 |
+| **Open total** | **171** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (120)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -219,11 +219,12 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 
-### rendering (1 ready)
+### rendering (2 ready, 1 blocked)
 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
+- **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
-## Ready by initiative (81 tag-memberships across 9 initiatives)
+## Ready by initiative (82 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -299,6 +300,18 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 
+### world-richness (9 open, 5 landed)
+
+- **[368](docs/open-work/tickets/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) — _[items-crafting] · added 2026-05-16_
+- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
+- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
+- **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
+- **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
+- **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
+- **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
+- **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
+- **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
+
 ### welfare-fidelity (8 open, 4 landed)
 
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
@@ -309,17 +322,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
-
-### world-richness (8 open, 5 landed)
-
-- **[368](docs/open-work/tickets/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) — _[items-crafting] · added 2026-05-16_
-- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
-- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
-- **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
-- **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
-- **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
-- **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
-- **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
 
 ### worldgen-prehistory (5 open, 0 landed)
 
@@ -335,7 +337,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (120)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -457,6 +459,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · added 2026-05-21_
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
+- **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
 ## Parked (14)
 
@@ -475,7 +478,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · parked 2026-05-20 · added 2026-05-20_
 
-## Blocked (31)
+## Blocked (32)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -508,6 +511,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[422](docs/open-work/tickets/422-curio-cache-routing-deposit-prefix-on-curio-cache.md)** — Curio Cache routing — deposit-prefix on curio Cache — _[items-crafting] · blocked-by 016 · added 2026-05-19_
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · blocked-by 205 · added 2026-05-19_
 - **[442](docs/open-work/tickets/442-split-resourcessim-constantsrs-into-a-sim-constants-submodule-per-substruct-family.md)** — Split resources/sim_constants.rs into a sim_constants/ submodule per substruct family — _[ai-substrate] · blocked-by 441 · added 2026-05-21_
+- **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 
 ## Landed archive (306)
 
