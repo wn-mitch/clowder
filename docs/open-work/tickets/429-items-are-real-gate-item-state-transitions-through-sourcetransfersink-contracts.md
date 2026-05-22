@@ -1,13 +1,13 @@
 ---
 id: 429
 title: Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-20
 parked: null
-blocked-by: [450]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

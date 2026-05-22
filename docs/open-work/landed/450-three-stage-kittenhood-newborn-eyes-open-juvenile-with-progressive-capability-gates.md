@@ -1,7 +1,7 @@
 ---
 id: 450
 title: Three-stage kittenhood — Newborn / Eyes-open / Juvenile with progressive capability gates
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-22
 ---
 
 ## Why
@@ -97,3 +97,4 @@ Phase A (this ticket):
 - 2026-05-22: substrate foundation landed on main (commit yqvxnkrz / 1d05563c). Five new markers (NewbornKitten / EyesOpenKitten / JuvenileKitten / MentorableAge / HasFoodInInventory) + sub-stage authoring in `update_life_stage_markers` reusing `kitten_rearing.{weaned,teach_done}_threshold` + Incapacitated extension for newborns + Inventory::has_food() + CanForage flip + mentor_target MentorableAge gate + MarkerSnapshot wiring in goap.rs + disposition.rs. `just check` clean; substrate-stubs / marker-snapshot-wiring / method-registry / orchestration-frontmatter / score_actions_dispatch all green. Behavior change at this commit boundary: mentor-target restricted to MentorableAge candidates; soak verdict pending before BegForFood lands.
 - 2026-05-22: Scope §4 revised after re-reading `docs/systems/ai-substrate-refactor.md` §L2.10.4 (Caretake exemplar — DSE emits `Intention::Goal(state_predicate)`) and §L2.10.5 (Activity-vs-Goal Intention shapes). The original plan-file's "HTN method decomposes Eat" framing was vocabulary for what §L2.10.4/5 already specifies. Substrate-precise mechanism: Begging is an `Intention::Activity(Begging, UntilInterrupt)` DSE — sibling-shape to Idle / Patrol / Socialize per §L2.10.5 — not a method-registry entry (the registry routes aspiration-emitted goal labels per §7.M.1, not L2-DSE winners). End-state behavior matches Will's intent; the mechanism is grounded in existing doc literature rather than inventing a new HTN-as-L2-router substrate. Per Will's directive: "I prefer to adhere to pattern over adhoc."
 - 2026-05-22: BegForFood substrate landed dormant pending a kitten-scoring follow-on. Authored: `Action::BegForFood` (`src/ai/mod.rs`) + `DispositionKind::Begging` + `OpenMinded` strategy row + ordinal-27 in `scoring::active_disposition_ordinal` + `constituent_dses_for_ordinal` + `BEG_FOR_FOOD` modifier const + `dse_id_for_action` arm + `BegForFoodDse` with two sibling registrations (NewbornKitten / EyesOpenKitten, orders 3750/3760) + `ActivityKind::Begging` + `GoapActionKind::BegForFood` + `begging_actions()` template + `GoapPlan::to_action` arm + dispatch arm in `resolve_goap_plans` + `resolve_beg_for_food` (5-heading rustdoc) + `BegEmitted` witness + `Feature::KittenBegged` (Positive) + `kittenhood_stages` scenario with per-stage marker assertions + narrative fallback line + `examples/template_audit` + `examples/template_prompt` exhaustive arms + strategy-table + ordinal-table test coverage. **Discovery**: `evaluate_and_plan` and `evaluate_dispositions` both filter `Without<KittenDependency>` (§Phase 5b — kittens are dependents, not autonomous planners, AND the FeedKitten +0.5 hunger restoration depends on the `kitten_needs` query staying `Without<GoapPlan>`). Until a follow-on lifts that filter (or adds a kitten-side scoring evaluator), kittens never reach L3 election, so `BegForFood` is dormant in production. The cry-map flip from raw-hunger to witnessed-begging is parked — `update_kitten_cry_map` retains the autonomic hunger predicate (the alternative would permanently silence kitten cries since CurrentAction is never BegForFood today). `Feature::KittenBegged` ships `expected_to_fire_per_soak() => false` until the kitten-scoring follow-on activates the DSE. `just check` + full cargo test suite green at landing. Per the §4.3 "no dual emission" requirement, the cry-map autonomic path stays sole-source; the follow-on retires it when the DSE activates.
+- 2026-05-22: Substrate landed at 86d275db; mentoring continuity canary 375× on seed-42 soak (well above ≥1 gate); survival canary pass (no Starvation, no ShadowFox deaths). Cry-map flip + KittenBegged canary promotion parked behind 451 (kitten-scoring filter lift).
