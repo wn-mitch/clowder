@@ -623,6 +623,19 @@ pub enum Feature {
     /// the rearing-arc completion). `expected_to_fire_per_soak()
     /// => false` until dispatch follow-on lands.
     KittenReleased,
+
+    /// Ticket 375 — `resolve_engage_prey` spawned a non-meat byproduct
+    /// item (Bone, Sinew, Whisker, Hide, FishScale, Tallow, RawOrgan,
+    /// or Feather) alongside the carcass. Positive — input substrate
+    /// for the 016 crafting epic is alive; every successful kill
+    /// produces at least one byproduct via `prey_byproducts` table.
+    /// `expected_to_fire_per_soak() => true`: a healthy seed-42 soak
+    /// produces dozens of hunts across all five prey species, each
+    /// firing this canary at least twice. Zero count means the
+    /// `prey_byproducts` table reads stale, the loop is gated off,
+    /// or `resolve_engage_prey` itself isn't firing — the 367-class
+    /// silent-producer dormancy this canary exists to catch.
+    ByproductSpawned,
 }
 
 impl Feature {
@@ -825,6 +838,9 @@ impl Feature {
         Feature::KittenWeaned,
         Feature::SkillTaught,
         Feature::KittenReleased,
+        // 375: producer-side canary for prey-byproduct decomposition.
+        // expected_to_fire_per_soak() => true (every kill emits ≥1).
+        Feature::ByproductSpawned,
     ];
 
     /// The valence of this feature.
@@ -971,6 +987,8 @@ impl Feature {
             Feature::KittenWeaned => Positive,
             Feature::SkillTaught => Positive,
             Feature::KittenReleased => Positive,
+            // 375: prey-byproduct producer canary.
+            Feature::ByproductSpawned => Positive,
 
             // 176: inventory-disposal completions are state-transition
             // signals — neither a colony win nor a loss, just "the cat
@@ -1349,6 +1367,10 @@ impl Feature {
             Feature::KittenWeaned => false,
             Feature::SkillTaught => false,
             Feature::KittenReleased => false,
+            // 375: every successful hunt emits ≥1 byproduct; a healthy
+            // seed-42 soak runs dozens of hunts. Zero count = silent
+            // producer dormancy class (the canary's purpose).
+            Feature::ByproductSpawned => true,
             // Ticket 127 — JointIntention: drops are bursty (mirrors
             // `PairingDropped`); stage mismatch is healthy-sometimes-
             // zero. Both stay opt-out. Emitted / BiasApplied /
@@ -1601,6 +1623,8 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::KittenWeaned => "KittenWeaned",
         Feature::SkillTaught => "SkillTaught",
         Feature::KittenReleased => "KittenReleased",
+        // 375: prey-byproduct producer canary.
+        Feature::ByproductSpawned => "ByproductSpawned",
     }
 }
 
@@ -1896,7 +1920,10 @@ mod tests {
         // MeatLoadedOnSmokingRack, SmokingRackTended, FoodDried,
         // MeatSmoked, OrganPreserved) for the preservation pipeline.
         // Five expected=true; OrganPreserved expected=false (chain-rare).
-        assert_eq!(positive, 84);
+        // Ticket 375: +1 Positive (ByproductSpawned) for the prey-byproduct
+        // producer canary. expected_to_fire_per_soak() => true — every
+        // successful hunt emits ≥1 byproduct via the prey_byproducts table.
+        assert_eq!(positive, 85);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -1993,9 +2020,11 @@ mod tests {
         // Ticket 084 Commit 1: +2 Positive (HerbsDeposited, HerbsRetrieved)
         // for the herb-stash economy.
         // Ticket 367 Commit 4: +6 Positive preservation Features.
+        // Ticket 375: +1 Positive (ByproductSpawned) for prey-byproduct
+        // producer canary.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            84
+            85
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
