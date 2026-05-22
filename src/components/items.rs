@@ -67,6 +67,20 @@ pub enum ItemKind {
     // `preserve.preserved_organ` recipe at the Drying Rack.
     RawOrgan,
 
+    // --- Prey byproducts (ticket 375 — 016 input substrate). ---
+    // Non-food materials dropped alongside meat by `resolve_engage_prey`.
+    // Each prey species emits a fixed set (see SimConstants.prey_byproducts):
+    // Mouse + Rat → Bone, Sinew (Rat also Whisker); Rabbit → Hide, Bone, Sinew;
+    // Fish → FishScale, Tallow, RawOrgan; Bird → Feather (existing), Bone.
+    // Slow-decay organic (0.0005, alongside Feather/Moss/DriedGrass); never
+    // food. Downstream sinks: 016 Phase 2/3 crafting children (368–372).
+    Bone,
+    Sinew,
+    Whisker,
+    Hide,
+    FishScale,
+    Tallow,
+
     // --- Preserved food (ticket 367 — 016 Phase 1b). ---
     // Crafted, non-spoiling food items produced at the Drying Rack
     // and Smoking Rack. `decay_rate == 0.0` (the corruption stamped
@@ -99,7 +113,13 @@ impl ItemKind {
             | Self::Mushroom
             | Self::Moss
             | Self::DriedGrass
-            | Self::Feather => 0.0005,
+            | Self::Feather
+            | Self::Bone
+            | Self::Sinew
+            | Self::Whisker
+            | Self::Hide
+            | Self::FishScale
+            | Self::Tallow => 0.0005,
 
             Self::HerbHealingMoss
             | Self::HerbMoonpetal
@@ -277,6 +297,12 @@ impl ItemKind {
             Self::DriedFish => "dried fish",
             Self::SmokedMeat => "smoked meat",
             Self::PreservedOrgan => "preserved organ",
+            Self::Bone => "bone",
+            Self::Sinew => "sinew",
+            Self::Whisker => "whisker",
+            Self::Hide => "hide",
+            Self::FishScale => "fish scale",
+            Self::Tallow => "tallow",
         }
     }
 
@@ -338,7 +364,13 @@ impl ItemKind {
             | Self::Feather
             | Self::ShadowBone
             | Self::Wood
-            | Self::Stone => ItemCategory::Material,
+            | Self::Stone
+            | Self::Bone
+            | Self::Sinew
+            | Self::Whisker
+            | Self::Hide
+            | Self::FishScale
+            | Self::Tallow => ItemCategory::Material,
 
             // 365 — first Phase 1a entry in the Remedy category. Phase 1b
             // (preservation outputs) lands as the PreservedFood category;
@@ -641,8 +673,8 @@ mod tests {
 
     #[test]
     fn every_item_kind_has_a_category() {
-        // Exhaustive over the 37 variants — extend this list when ItemKind grows.
-        let all: [ItemKind; 37] = [
+        // Exhaustive over the 43 variants — extend this list when ItemKind grows.
+        let all: [ItemKind; 43] = [
             ItemKind::RawMouse,
             ItemKind::RawRat,
             ItemKind::RawRabbit,
@@ -680,6 +712,12 @@ mod tests {
             ItemKind::DriedFish,
             ItemKind::SmokedMeat,
             ItemKind::PreservedOrgan,
+            ItemKind::Bone,
+            ItemKind::Sinew,
+            ItemKind::Whisker,
+            ItemKind::Hide,
+            ItemKind::FishScale,
+            ItemKind::Tallow,
         ];
         // Trivially exhaustive (the match in category() is total) — this test
         // exists to make ItemKind growth fail loudly if a future variant gets
@@ -687,7 +725,7 @@ mod tests {
         for kind in all {
             let _ = kind.category();
         }
-        assert_eq!(all.len(), 37);
+        assert_eq!(all.len(), 43);
     }
 
     #[test]
@@ -826,6 +864,16 @@ mod tests {
         assert!(!ItemKind::Feather.is_food());
         assert!(!ItemKind::ShinyPebble.is_food());
         assert!(!ItemKind::HerbHealingMoss.is_food());
+
+        // 375: prey byproducts are crafting materials, not food. Eat-DSE
+        // and resolver paths gate on is_food(); a regression here would
+        // pull bones / hide / etc. into the food pool.
+        assert!(!ItemKind::Bone.is_food());
+        assert!(!ItemKind::Sinew.is_food());
+        assert!(!ItemKind::Whisker.is_food());
+        assert!(!ItemKind::Hide.is_food());
+        assert!(!ItemKind::FishScale.is_food());
+        assert!(!ItemKind::Tallow.is_food());
     }
 
     #[test]
