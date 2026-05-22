@@ -206,6 +206,10 @@ impl crate::ai::dse::CatDse for PatrolDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Patrol
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn patrol_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

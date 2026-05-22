@@ -215,6 +215,10 @@ impl crate::ai::dse::CatDse for FleeDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Flee
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::ALL
+    }
 }
 
 pub fn flee_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

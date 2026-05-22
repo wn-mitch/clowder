@@ -128,6 +128,14 @@ impl crate::ai::dse::CatDse for WanderDse {
         crate::ai::Action::Wander
     }
 
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // 451 verification soak: kittens electing Wander (score ~0.55)
+        // moved away from caretakers, missed FeedKitten coverage, starved.
+        // Lock to non-kittens; kittens stay near home via Idle / Sleep /
+        // BegForFood.
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
+
     fn always_emit_zero(&self) -> bool {
         true
     }

@@ -615,70 +615,30 @@ pub struct ExecutorContext<'w, 's> {
     /// target resolution through the registered DSEs, which retires
     /// the pre-4c `find_social_target` fondness-only helper.
     pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
-    /// §Phase 4c.4 kitten-feeding side effect: the main `cats` query
-    /// in `resolve_goap_plans` requires `&mut GoapPlan`, which
-    /// kittens don't have (see `src/systems/pregnancy.rs` — kittens
-    /// ship without a `GoapPlan` bundle). The deferred kitten-feeding
-    /// post-loop therefore must reach `&mut Needs` on kittens via a
-    /// disjoint query. `Without<GoapPlan>` proves disjointness from
-    /// the cats query for the borrow checker; `Without<Dead>`/
-    /// `Without<Structure>` mirror the cats query's base filters so
-    /// we don't accidentally grant +0.5 hunger to a dead cat or a
-    /// Structure. Previously, `cats.get_mut(kitten_entity)` silently
-    /// returned `Err(NoSuchEntity)` for every kitten — the
-    /// `KittenFed` activation would fire but the real-world hunger
-    /// credit was dropped, so every kitten that was "fed" still
-    /// starved (Pebblekit-34, Hazelkit-10, Reedkit-33 in the v3
-    /// soak; fourth silent-advance-class bug on this Caretake
-    /// pipeline in a week).
-    pub kitten_needs: bevy_ecs::prelude::Query<
-        'w,
-        's,
-        &'static mut crate::components::physical::Needs,
-        (Without<GoapPlan>, Without<Dead>, Without<Structure>),
-    >,
-    /// §428: kitten-recipient handoff drain target. Mirror of
-    /// `kitten_needs` — disjoint from the adult cats query (kittens
-    /// don't carry `GoapPlan`), so the post-loop `HandoffPending`
-    /// drain at `resolve_goap_plans` can grab `&mut Inventory` on a
-    /// kitten recipient without conflicting with the adult-side
-    /// iteration. Without this, kitten-recipient handoffs at
-    /// `goap.rs:4917` silently dropped because `cats.get_many_mut`
-    /// excludes kittens by the `With<GoapPlan>` requirement —
-    /// substrate over-filtering. Per the items-are-real pillar
-    /// (kittens are cats with limited behaviors; their `Inventory`
-    /// is a real slot), the transfer must physically land in the
-    /// kitten's Inventory. Hunger consumption from kitten's own
-    /// Inventory is a separate concern (autoconsume substrate not
-    /// in scope here).
-    pub kitten_inventory_q: bevy_ecs::prelude::Query<
-        'w,
-        's,
-        &'static mut Inventory,
-        (Without<GoapPlan>, Without<Dead>, Without<Structure>),
-    >,
-    /// §6.5.4 groom-other kinship lookup — read-only snapshot of
-    /// `(kitten_entity) → (mother, father)` pointers. Disjoint from
-    /// the mutable `cats` query by `With<KittenDependency>` (kittens
-    /// don't carry a `GoapPlan` so the cats query excludes them).
+    /// §6.5.4 kinship lookup — `(kitten_entity) → (mother, father)`
+    /// pointer table. Read-only, intentionally slim: drops `Position`
+    /// (read from the cats query / `cat_positions` snapshot instead).
+    /// Ticket 451 — disjointness from the mutable `cats` query is now
+    /// by component access (cats holds `&mut Position` / `&mut Needs` /
+    /// `&mut Inventory`; this query only touches `&KittenDependency` +
+    /// `Has<RearKittenReleased>`), not by the §Phase-5b `Without<GoapPlan>`
+    /// archetype filter — kittens now carry `GoapPlan` post-451 (they
+    /// participate in L2 scoring + dispatch) so the legacy filter would
+    /// empty the query.
     pub kitten_parentage: bevy_ecs::prelude::Query<
         'w,
         's,
         (
             Entity,
             &'static crate::components::KittenDependency,
-            &'static Position,
-            // 395: rear_kitten arc's one-shot Release marker. The
-            // `dependent_kitten_target` picker excludes already-released
-            // kittens so the second parent's concurrent frame doesn't
-            // re-witness `Feature::KittenReleased`.
+            // 395: rear_kitten arc's one-shot Release marker.
             Has<crate::components::markers::RearKittenReleased>,
         ),
-        // Disjoint from the cats query (which holds `&mut Position`):
-        // kittens never carry `GoapPlan` (evaluate_and_plan filters
-        // `Without<KittenDependency>`), so this `Without<GoapPlan>`
-        // gives Bevy the static disjointness proof.
-        (Without<Dead>, Without<GoapPlan>),
+        (
+            Without<Dead>,
+            Without<Structure>,
+            With<crate::components::KittenDependency>,
+        ),
     >,
     /// §11 focal-cat target. Present only when `--focal-cat` wired the
     /// resource in the headless runner; absent in every interactive
@@ -1379,16 +1339,15 @@ pub fn evaluate_and_plan(
         (
             Without<Dead>,
             Without<GoapPlan>,
-            // §Phase 5b — kittens are dependents, not autonomous planners.
-            // Before this filter, `evaluate_and_plan` inserted GoapPlan
-            // on kittens too; the `kitten_needs` post-loop query
-            // (`Without<GoapPlan>`) then silently excluded them, so
-            // adults' `+0.5` hunger restoration from FeedKitten never
-            // landed. Maplekit-83 starved on seed 42 despite 12
-            // successful feedings — the activation fired every time
-            // but the query returned NoSuchEntity on every restoration
-            // call.
-            Without<crate::components::KittenDependency>,
+            // Ticket 451 — the §Phase 5b `Without<KittenDependency>`
+            // filter retired. Kittens now enter L2 scoring; the
+            // per-DSE life-stage gate (`CatDse::life_stages`) restricts
+            // their pool to stage-appropriate DSEs (Eat / Sleep / Idle /
+            // Wander / Hide / Flee / Socialize / Groom / Explore plus
+            // the kitten-specific `BegForFood` siblings). The FeedKitten
+            // +0.5 hunger drain that §Phase 5b protected migrates to
+            // the unified cats query in `resolve_goap_plans` (kittens
+            // appear there post-451 because they have `GoapPlan`).
         ),
     >,
     world_state: WorldStateQueries,
@@ -4032,7 +3991,7 @@ pub fn resolve_goap_plans(
         kitten_parents: ec
             .kitten_parentage
             .iter()
-            .map(|(e, dep, _pos, _released)| (e, (dep.mother, dep.father)))
+            .map(|(e, dep, _released)| (e, (dep.mother, dep.father)))
             .collect(),
         // 035: dead-cat snapshot for burial target picking + post-loop
         // drain. The `cats` query is `Without<Dead>` so this is disjoint.
@@ -4042,10 +4001,12 @@ pub fn resolve_goap_plans(
             .iter()
             .map(|(e, _, name, _)| (e, name.0.clone()))
             .collect(),
-        // §428: populate kitten_snapshot from `ec.kitten_parentage`
-        // (entity / pos / parentage) + `ec.kitten_needs.get(entity)`
-        // (immutable hunger lookup). The HandoffItem goap-path resolver
-        // at line 7322 reads this snapshot to recover a recipient when
+        // §428 / 451: populate kitten_snapshot from `ec.kitten_parentage`
+        // (slim — entity / parentage / RearKittenReleased) + an
+        // immutable hunger + position lookup pulled from the unified
+        // cats query (kittens carry `GoapPlan` post-451). The HandoffItem
+        // goap-path resolver at line 7322 reads this snapshot to recover
+        // a recipient when
         // `target_entity` was cleared mid-plan by one of the eight
         // `disposition.rs` clear sites. The previous `Vec::new()` was a
         // substrate-stub class defect (same class as tickets 209 / 084):
@@ -4054,30 +4015,33 @@ pub fn resolve_goap_plans(
         // recipient on disposition (no dependent cat in colony)` 177k+
         // times per overnight soak.
         //
-        // The previous "&mut Needs conflict" justification was
-        // misdirected: `kitten_parentage` is `Without<GoapPlan>`,
-        // disjoint from the cats query that holds `&mut Needs` on
-        // adults; `kitten_needs.get()` returns immutable `&Needs` from
-        // the mut query, and its later `get_mut` drain runs sequentially
-        // after snapshot construction.
-        kitten_snapshot: ec
-            .kitten_parentage
-            .iter()
-            .map(|(entity, dep, pos, _released)| {
-                let hunger = ec
-                    .kitten_needs
-                    .get(entity)
-                    .map(|needs| needs.hunger)
-                    .unwrap_or(1.0);
-                crate::ai::caretake_targeting::KittenState {
-                    entity,
-                    pos: *pos,
-                    hunger,
-                    mother: dep.mother,
-                    father: dep.father,
-                }
-            })
-            .collect(),
+        // Ticket 451 — `kitten_needs` retired; pull immutable `&Needs`
+        // for the hunger snapshot via the cats query (kittens have
+        // `GoapPlan` post-451 so they appear there). Position similarly
+        // sourced from cats since the slim `kitten_parentage` no longer
+        // carries it.
+        kitten_snapshot: {
+            let kitten_hunger: std::collections::HashMap<Entity, (f32, Position)> = cats
+                .iter()
+                .map(|((e, _, _, pos, _, needs, _, _, _), _)| (e, (needs.hunger, *pos)))
+                .collect();
+            ec.kitten_parentage
+                .iter()
+                .map(|(entity, dep, _released)| {
+                    let (hunger, pos) = kitten_hunger
+                        .get(&entity)
+                        .copied()
+                        .unwrap_or((1.0, Position::new(0, 0)));
+                    crate::ai::caretake_targeting::KittenState {
+                        entity,
+                        pos,
+                        hunger,
+                        mother: dep.mother,
+                        father: dep.father,
+                    }
+                })
+                .collect()
+        },
         building_snapshot,
     };
 
@@ -5135,87 +5099,56 @@ pub fn resolve_goap_plans(
         }
     }
 
-    // Ticket 177 / §428: deferred handoffs. The dispatch arm pre-
-    // validated the actor side and queued the (actor, recipient) pair.
+    // Ticket 177 / §428 / 451: deferred handoffs. The dispatch arm
+    // pre-validated the actor side and queued the (actor, recipient)
+    // pair.
     //
-    // Two recipient branches:
-    //   1. Adult recipient — both inventories live on the `cats` query
-    //      (`With<GoapPlan>`); `cats.get_many_mut([actor, recipient])`
-    //      grabs both `&mut Inventory` borrows in one call.
-    //   2. Kitten recipient — kitten is `Without<GoapPlan>` and so
-    //      excluded from `cats`. Per the items-are-real / kittens-are-
-    //      cats pillars, the kitten's `Inventory` is a real slot and the
-    //      transfer must physically land. Use the disjoint
-    //      `ec.kitten_inventory_q` (mirror of `kitten_needs`) to grab
-    //      `&mut Inventory` on the kitten while holding `&mut Inventory`
-    //      on the adult from `cats.get_mut`. The two queries are
-    //      statically disjoint (`With<GoapPlan>` vs `Without<GoapPlan>`),
-    //      so Bevy permits the concurrent mut borrows.
+    // Ticket 451 unified kittens into the cats query (they carry
+    // `GoapPlan` post-451). Both adult and kitten recipients now live
+    // on `cats`; `cats.get_many_mut([actor, recipient])` grabs both
+    // `&mut Inventory` borrows in one call regardless of life stage.
+    // The kitten branch retained below as a fallback in case the
+    // actor-recipient pair fails the `get_many_mut` (e.g., one entity
+    // despawned between dispatch and drain).
     //
     // Pre-§428: the kitten branch silently dropped — the resolver at
     // goap.rs:7322 found a kitten recipient (post the same ticket's
     // R2b snapshot populate), pushed `HandoffPending`, and the drain
     // here Errd on `get_many_mut` because the kitten wasn't in `cats`.
-    // The food never moved, no Feature fired, and the adult was stuck
-    // in a no-op Handing loop (inventory_excess stayed high → Handing
-    // re-elected → same drop). Now both branches land the slot in the
-    // recipient's `Inventory`.
+    // 451 retires that asymmetry by including kittens in `cats`.
     //
     // Hunger consumption from the kitten's own Inventory is a separate
-    // substrate concern (not in scope for §428).
+    // substrate concern (not in scope here).
     for pending in std::mem::take(&mut accum.handoff_pending) {
         if pending.actor == pending.recipient {
             continue;
         }
-        if let Ok([mut actor_row, mut recipient_row]) =
+        let Ok([mut actor_row, mut recipient_row]) =
             cats.get_many_mut([pending.actor, pending.recipient])
-        {
-            let actor_inv: &mut Inventory = &mut actor_row.0 .6;
-            let recipient_inv: &mut Inventory = &mut recipient_row.0 .6;
-            let outcome = crate::steps::disposition::resolve_handoff(
-                actor_inv,
-                pending.recipient,
-                recipient_inv,
-            );
-            outcome.record_if_witnessed(
-                narr.activation.as_deref_mut(),
-                crate::resources::system_activation::Feature::ItemHandedOff,
-            );
-            continue;
-        }
-        // Adult lookup failed for the pair — try the kitten-recipient
-        // branch. Actor must still be an adult (only adults plan), so
-        // `cats.get_mut(actor)` must succeed; recipient sits in the
-        // disjoint kitten query.
-        let Ok(mut actor_row) = cats.get_mut(pending.actor) else {
-            continue;
-        };
-        let Ok(mut recipient_inv) = ec.kitten_inventory_q.get_mut(pending.recipient) else {
+        else {
+            // Either entity despawned between dispatch and drain.
             continue;
         };
         let actor_inv: &mut Inventory = &mut actor_row.0 .6;
-        let outcome = crate::steps::disposition::resolve_handoff(
-            actor_inv,
-            pending.recipient,
-            &mut recipient_inv,
-        );
+        let recipient_inv: &mut Inventory = &mut recipient_row.0 .6;
+        let outcome =
+            crate::steps::disposition::resolve_handoff(actor_inv, pending.recipient, recipient_inv);
         outcome.record_if_witnessed(
             narr.activation.as_deref_mut(),
             crate::resources::system_activation::Feature::ItemHandedOff,
         );
     }
 
-    // §Phase 4c.4: deferred kitten-feedings. +0.5 hunger per feed.
-    // Uses the disjoint `ec.kitten_needs` query because kittens don't
-    // have `GoapPlan` — the previous version routed through `cats`,
-    // which requires `&mut GoapPlan` and therefore excluded every
-    // kitten. `KittenFed` activations fired (the adult consumed food
-    // from inventory) but the kitten-side hunger credit was silently
-    // dropped. See `ExecutorContext::kitten_needs` doc for the full
-    // diagnosis.
+    // §Phase 4c.4 / ticket 451: deferred kitten-feedings. +0.5 hunger
+    // per feed. Ticket 451 unified kittens into the cats query (they
+    // carry `GoapPlan` post-451), so the +0.5 hunger drain reads
+    // `cats.get_mut` directly — no separate `kitten_needs` query
+    // anymore. The drain runs post-loop after the mutable iterator
+    // over cats has dropped.
     for kitten_entity in accum.kitten_feedings {
-        if let Ok(mut k_needs) = ec.kitten_needs.get_mut(kitten_entity) {
-            k_needs.hunger = (k_needs.hunger + 0.5).min(1.0);
+        if let Ok(mut row) = cats.get_mut(kitten_entity) {
+            let needs: &mut Needs = &mut row.0 .5;
+            needs.hunger = (needs.hunger + 0.5).min(1.0);
         }
     }
 
@@ -5260,7 +5193,7 @@ pub fn resolve_goap_plans(
             KittenRearingAdvance::Teach(e) => (e, "Teach"),
             KittenRearingAdvance::Release(e) => (e, "Release"),
         };
-        let Ok((_, dep, _pos, _released)) = ec.kitten_parentage.get(target) else {
+        let Ok((_, dep, _released)) = ec.kitten_parentage.get(target) else {
             // Kitten despawned between the per-cat loop and now (e.g.,
             // death cascade). Skip silently — the HTN frame will abandon
             // via backtrack hook (commit b) on the next plan boundary.
@@ -8003,10 +7936,9 @@ fn dispatch_htn_kitten_primitive(
         //     `MethodFailure`).
         // 395 extends 333/364's mother-only check to symmetric
         // mother-OR-father per the "both parents pitch in" decision.
-        let is_parent_of_any_dependent =
-            ec.kitten_parentage.iter().any(|(_, dep, _pos, _released)| {
-                dep.mother == Some(cat_entity) || dep.father == Some(cat_entity)
-            });
+        let is_parent_of_any_dependent = ec.kitten_parentage.iter().any(|(_, dep, _released)| {
+            dep.mother == Some(cat_entity) || dep.father == Some(cat_entity)
+        });
         if is_parent_of_any_dependent {
             return crate::steps::StepResult::Advance;
         }
@@ -8017,7 +7949,7 @@ fn dispatch_htn_kitten_primitive(
 
     // Read current KittenDependency state via the disjoint
     // `kitten_parentage` query.
-    let dep_state = ec.kitten_parentage.get(target).ok().map(|(_, d, _, _)| d);
+    let dep_state = ec.kitten_parentage.get(target).ok().map(|(_, d, _)| d);
 
     match action {
         crate::ai::Action::Wean => {
@@ -8070,31 +8002,37 @@ fn dispatch_htn_kitten_primitive(
 }
 
 /// 364 / 395: build the kitten snapshot consumed by
-/// `resolve_dependent_kitten_target`. Reads
-/// `ExecutorContext::kitten_parentage` directly (which carries Position
-/// alongside `KittenDependency` and the 395 `RearKittenReleased`
-/// marker); the `cat_positions` snapshot in `StepSnapshots` excludes
-/// kittens because they don't carry `GoapPlan`, so it can't be used
-/// here.
+/// `resolve_dependent_kitten_target`. Ticket 451 — `kitten_parentage`
+/// is now slim (no `Position`); the `cat_positions` snapshot in
+/// `StepSnapshots` covers kittens too because they carry `GoapPlan`
+/// post-451 and therefore appear in the cats query that builds it.
 #[allow(clippy::type_complexity)]
 fn build_dependent_kitten_snapshot(
     kitten_parentage: &Query<
         (
             Entity,
             &crate::components::KittenDependency,
-            &Position,
             Has<crate::components::markers::RearKittenReleased>,
         ),
-        (Without<Dead>, Without<GoapPlan>),
+        (
+            Without<Dead>,
+            Without<Structure>,
+            With<crate::components::KittenDependency>,
+        ),
     >,
-    _cat_positions: &[(Entity, Position)],
+    cat_positions: &[(Entity, Position)],
 ) -> Vec<crate::ai::dses::dependent_kitten_target::DependentKittenState> {
+    let pos_lookup: std::collections::HashMap<Entity, Position> =
+        cat_positions.iter().copied().collect();
     kitten_parentage
         .iter()
-        .map(|(entity, dep, pos, released)| {
+        .map(|(entity, dep, released)| {
             crate::ai::dses::dependent_kitten_target::DependentKittenState {
                 entity,
-                pos: *pos,
+                pos: pos_lookup
+                    .get(&entity)
+                    .copied()
+                    .unwrap_or(Position::new(0, 0)),
                 maturity: dep.maturity,
                 mother: dep.mother,
                 father: dep.father,

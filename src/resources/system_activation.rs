@@ -1387,12 +1387,18 @@ impl Feature {
             // seed-42 soak runs dozens of hunts. Zero count = silent
             // producer dormancy class (the canary's purpose).
             Feature::ByproductSpawned => true,
-            // 450: kitten begging canary. Dormant until a kitten-side
-            // scoring pipeline lifts the `Without<KittenDependency>`
-            // filter in `evaluate_and_plan` / `evaluate_dispositions`.
-            // The DSE / resolver / dispatch arm exist as ready-to-wire
-            // substrate; promote to `true` in the follow-on ticket
-            // that unblocks kitten L3 election.
+            // 450 + 451: kitten begging canary. Substrate lifted in 451
+            // (kittens enter L2 scoring via the life-stage gate, the
+            // BegForFood DSE has Newborn/EyesOpen/Incapacitated siblings,
+            // the resolver fires this Feature on cycle completion). But
+            // the seed-42 verification soak revealed BegForFood doesn't
+            // win L3 in practice: adults preempt kitten hunger via the
+            // direct-kitten-targeting Caretake path (`FeedKitten` fires
+            // 4355× in 85k ticks) and keep hunger above the begging
+            // threshold (hangry curve midpoint 0.5). Promoting the
+            // canary requires balance tuning (raise threshold, or steepen
+            // the hangry curve so kittens elect earlier) — parked for a
+            // follow-on ticket.
             Feature::KittenBegged => false,
             // Ticket 127 — JointIntention: drops are bursty (mirrors
             // `PairingDropped`); stage mismatch is healthy-sometimes-

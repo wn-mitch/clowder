@@ -158,9 +158,35 @@ pub fn tick_pregnancy(
                         // in `growth.rs::tick_kitten_growth` and `death.rs::check_death`.
                         markers::BornInSim,
                     ),
-                    // 095 Phase 1 — anatomical injury substrate. Kittens
-                    // spawn with a default (all-Healthy) `CatBodyModel`.
-                    crate::components::CatBodyModel::default(),
+                    (
+                        // 095 Phase 1 — anatomical injury substrate. Kittens
+                        // spawn with a default (all-Healthy) `CatBodyModel`.
+                        crate::components::CatBodyModel::default(),
+                        // Ticket 451 — `PendingUrgencies` is required (non-Option)
+                        // by `resolve_goap_plans`'s cats query AND by
+                        // `check_anxiety_interrupts` (both `With<GoapPlan>`).
+                        // Founder cats spawn with it via `spawn_cat_from_blueprint`
+                        // (`plugins/setup.rs:99`); the hand-rolled production
+                        // kitten spawn here previously omitted it, so a kitten
+                        // could install a `GoapPlan` (e.g. Begging) via
+                        // `evaluate_and_plan` (whose query does not require
+                        // urgencies) but then be silently filtered from the
+                        // dispatch loop forever — `CurrentAction.action` never
+                        // advanced past `Idle`, no resolver ran, hunger
+                        // monotonically collapsed to starvation. Scenario
+                        // kittens spawn through `spawn_cat_from_blueprint` and
+                        // pass; only this production path drifted from the
+                        // canonical component shape.
+                        crate::components::goap_plan::PendingUrgencies::default(),
+                        // Ticket 451 — `PrevSafetyDeficit` is `Option<&_>` in
+                        // the cats query so its absence doesn't block dispatch,
+                        // but lazy-inserting via `update_prev_safety_deficit`
+                        // wastes a tick of derivative resolution on every
+                        // newborn. Mirror `spawn_cat_from_blueprint` and seed
+                        // it here so the `ThreatProximityAdrenaline` derivative
+                        // sees a clean prior reading from the first tick.
+                        crate::components::PrevSafetyDeficit::default(),
+                    ),
                 ))
                 .id();
 

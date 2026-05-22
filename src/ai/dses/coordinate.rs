@@ -145,6 +145,10 @@ impl crate::ai::dse::CatDse for CoordinateDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Coordinate
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn coordinate_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

@@ -184,6 +184,10 @@ impl crate::ai::dse::CatDse for HerbcraftWardDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::HerbcraftSetWard
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn herbcraft_ward_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

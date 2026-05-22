@@ -420,6 +420,118 @@ pub trait Dse: Send + Sync + 'static {
 }
 
 // ---------------------------------------------------------------------------
+// LifeStageSet — per-DSE life-stage pool gate (ticket 451)
+// ---------------------------------------------------------------------------
+
+/// Granular life stage used by [`CatDse::life_stages`] to gate which DSEs
+/// reach a cat's L2 scoring pool. Distinct from [`crate::components::identity::LifeStage`]
+/// (which has 4 variants) because the Kitten band decomposes into three
+/// ethological sub-stages via [`crate::components::markers::NewbornKitten`] /
+/// [`EyesOpenKitten`](crate::components::markers::EyesOpenKitten) /
+/// [`JuvenileKitten`](crate::components::markers::JuvenileKitten) (ticket 450).
+/// Bit indices are stable — `LifeStageSet` stores `1 << stage as u8`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum CatLifeStage {
+    NewbornKitten = 0,
+    EyesOpenKitten = 1,
+    JuvenileKitten = 2,
+    Young = 3,
+    Adult = 4,
+    Elder = 5,
+}
+
+impl CatLifeStage {
+    pub const fn bit(self) -> u8 {
+        1u8 << (self as u8)
+    }
+}
+
+/// Bitset over [`CatLifeStage`] — the per-DSE declaration of which life
+/// stages a DSE is eligible to score for. Ticket 451 makes
+/// [`CatDse::life_stages`] trait-mandatory (no default); every cat-side
+/// DSE declares its pool at construction, and `evaluate_and_plan` filters
+/// the DSE registry by the per-cat life stage before iterating.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LifeStageSet(u8);
+
+impl LifeStageSet {
+    /// All six stages.
+    pub const ALL: Self = Self(0b0011_1111);
+
+    /// No stages — DSE is structurally inert. Reserved; not for production use.
+    pub const EMPTY: Self = Self(0);
+
+    /// Just one stage.
+    pub const fn just(stage: CatLifeStage) -> Self {
+        Self(stage.bit())
+    }
+
+    /// Union of stages from raw bits. Top two bits ignored.
+    pub const fn from_bits(bits: u8) -> Self {
+        Self(bits & Self::ALL.0)
+    }
+
+    pub const fn or(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    pub const fn with(self, stage: CatLifeStage) -> Self {
+        Self(self.0 | stage.bit())
+    }
+
+    pub const fn minus(self, other: Self) -> Self {
+        Self(self.0 & !other.0)
+    }
+
+    pub const fn without(self, stage: CatLifeStage) -> Self {
+        Self(self.0 & !stage.bit())
+    }
+
+    pub const fn contains(self, stage: CatLifeStage) -> bool {
+        self.0 & stage.bit() != 0
+    }
+
+    pub const fn bits(self) -> u8 {
+        self.0
+    }
+
+    /// `Young | Adult` — the classic "self-sufficient working-age cat" pool.
+    /// Hunt, Cook, Build, Ward, Mate, and most adult-side DSEs land here.
+    pub const fn adults_and_young() -> Self {
+        Self(CatLifeStage::Young.bit() | CatLifeStage::Adult.bit())
+    }
+
+    /// `Young | Adult | Elder` — adult-shaped DSEs that elders can still
+    /// elect (Eat, Socialize, Groom, Patrol). Most DSEs land here once
+    /// Stage 1/2 kittens are excluded.
+    pub const fn adults_young_elder() -> Self {
+        Self(CatLifeStage::Young.bit() | CatLifeStage::Adult.bit() | CatLifeStage::Elder.bit())
+    }
+
+    /// `JuvenileKitten | Young | Adult | Elder` — pool for DSEs that
+    /// Stage 3 kittens can elect but Stage 1/2 cannot. Matches the
+    /// `CanForage` gate widened in ticket 450.
+    pub const fn juvenile_and_up() -> Self {
+        Self(
+            CatLifeStage::JuvenileKitten.bit()
+                | CatLifeStage::Young.bit()
+                | CatLifeStage::Adult.bit()
+                | CatLifeStage::Elder.bit(),
+        )
+    }
+
+    /// `NewbornKitten | EyesOpenKitten | JuvenileKitten` — kitten-only pool.
+    pub const fn kittens_only() -> Self {
+        Self(
+            CatLifeStage::NewbornKitten.bit()
+                | CatLifeStage::EyesOpenKitten.bit()
+                | CatLifeStage::JuvenileKitten.bit(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CatDse sub-trait (ticket 438)
 // ---------------------------------------------------------------------------
 
@@ -443,6 +555,20 @@ pub trait CatDse: Dse {
     /// `src/ai/scoring.rs::score_actions` to build `(Action, score)`
     /// tuples without a hand-written switch.
     fn action(&self) -> crate::ai::Action;
+
+    /// Which [`CatLifeStage`]s this DSE may score for (ticket 451).
+    /// Trait-mandatory by construction — registering a `CatDse`
+    /// without naming its pool is a compile error, parallel to the
+    /// 438 enforcement of [`Self::action`]. Read once per cat in
+    /// `evaluate_and_plan`'s scoring loop; the DSE is skipped entirely
+    /// when the per-cat stage isn't in the set, so out-of-pool DSEs
+    /// never reach `score_actions`. Examples:
+    ///
+    /// - `BegForFoodDse::newborn()` → `LifeStageSet::just(NewbornKitten)`
+    /// - `EatDse` / `SleepDse` / `IdleDse` → `LifeStageSet::ALL`
+    /// - `ForageDse` → `LifeStageSet::juvenile_and_up()`
+    /// - `HuntDse` / `BuildDse` / etc. → `LifeStageSet::adults_and_young()`
+    fn life_stages(&self) -> LifeStageSet;
 
     /// Whether the DSE pushes its `(Action, score)` tuple into the
     /// L3 softmax pool even when its score is exactly 0.0. Default

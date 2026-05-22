@@ -407,11 +407,10 @@ pub fn evaluate_dispositions(
         (
             Without<Dead>,
             Without<Disposition>,
-            // §Phase 5b — kittens are dependents, not planners. Mirror
-            // the filter in `goap.rs::evaluate_and_plan` so the
-            // disposition-chain path (if ever re-enabled) doesn't
-            // regress the feed-kitten fix.
-            Without<crate::components::KittenDependency>,
+            // Ticket 451 — §Phase 5b `Without<KittenDependency>` retired.
+            // Mirror of the same lift in `goap.rs::evaluate_and_plan`;
+            // the per-DSE life-stage gate (`CatDse::life_stages`) now
+            // restricts kittens to stage-appropriate DSEs.
         ),
     >,
     all_positions: Query<(Entity, &Position, Option<&PreyAnimal>), Without<Dead>>,

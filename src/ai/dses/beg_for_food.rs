@@ -11,19 +11,28 @@
 //! eligibility filter excludes), so it pairs with `OpenMinded`
 //! commitment per §L2.10.5's strategy-shape correlation.
 //!
-//! ## Two sibling registrations (no OR combinator per §4.7.3)
+//! ## Three sibling registrations (no OR combinator per §4.7.3)
 //!
-//! Both registrations construct the same scoring shape and emit the
-//! same Activity Intention; they differ only in their
-//! `EligibilityFilter` require-marker (`NewbornKitten::KEY` vs
-//! `EyesOpenKitten::KEY`). Both `.forbid(HasFoodInInventory::KEY)` so
-//! a kitten that already carries food doesn't beg — the Eat-side
-//! method (429 Phase 2) outscores instead.
+//! Begging's true gating axis isn't life stage — it's the capability
+//! to self-provision food. Newborn and Eyes-open kittens can't, and
+//! Incapacitated cats of any age can't either. Per §4.7.3 doctrine
+//! (no OR combinator in `EligibilityFilter`), this is three sibling
+//! registrations with mutually-exclusive coverage (life-stage gate ∧
+//! marker eligibility — ticket 451):
 //!
-//! Stage 3 (`JuvenileKitten`) kittens are explicitly NOT eligible to
-//! beg — by the time a kitten can forage, mentoring is the right
-//! channel for learning provisioning. Two sibling DSEs (not three)
-//! encode this.
+//! - **Stage 1** `BegForFoodDse::newborn()`:
+//!   `life_stages = just(NewbornKitten)`, `.require(NewbornKitten).forbid(HasFoodInInventory)`.
+//! - **Stage 2** `BegForFoodDse::eyes_open()`:
+//!   `life_stages = just(EyesOpenKitten)`, `.require(EyesOpenKitten).forbid(HasFoodInInventory)`.
+//! - **Incapacitated non-kitten** `BegForFoodDse::incapacitated()`:
+//!   `life_stages = ALL.minus(Newborn | EyesOpen)`,
+//!   `.require(Incapacitated).forbid(HasFoodInInventory)`.
+//!
+//! Stage 3 (`JuvenileKitten`) kittens are NOT eligible via the
+//! kitten-shaped siblings — by the time a kitten can forage, mentoring
+//! is the right channel for learning provisioning. A Juvenile that
+//! becomes Incapacitated would beg via the third sibling (Incapacitated
+//! marker + life-stage filter permits Juvenile).
 //!
 //! ## Scoring shape
 //!
@@ -51,8 +60,8 @@ use crate::ai::composition::Composition;
 use crate::ai::considerations::{Consideration, ScalarConsideration};
 use crate::ai::curves::hangry;
 use crate::ai::dse::{
-    ActivityKind, CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, Intention,
-    Termination,
+    ActivityKind, CatLifeStage, CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx,
+    Intention, LifeStageSet, Termination,
 };
 use crate::components::markers;
 
@@ -68,28 +77,49 @@ pub struct BegForFoodDse {
     considerations: Vec<Consideration>,
     composition: Composition,
     eligibility: EligibilityFilter,
+    life_stages: LifeStageSet,
 }
 
 impl BegForFoodDse {
     /// Stage 1 sibling — `NewbornKitten` ∧ ¬`HasFoodInInventory`.
     pub fn newborn() -> Self {
-        Self::with_eligibility(
+        Self::build(
             EligibilityFilter::new()
                 .require(markers::NewbornKitten::KEY)
                 .forbid(markers::HasFoodInInventory::KEY),
+            LifeStageSet::just(CatLifeStage::NewbornKitten),
         )
     }
 
     /// Stage 2 sibling — `EyesOpenKitten` ∧ ¬`HasFoodInInventory`.
     pub fn eyes_open() -> Self {
-        Self::with_eligibility(
+        Self::build(
             EligibilityFilter::new()
                 .require(markers::EyesOpenKitten::KEY)
                 .forbid(markers::HasFoodInInventory::KEY),
+            LifeStageSet::just(CatLifeStage::EyesOpenKitten),
         )
     }
 
-    fn with_eligibility(eligibility: EligibilityFilter) -> Self {
+    /// Incapacitated non-kitten sibling (ticket 451) — `Incapacitated` ∧
+    /// ¬`HasFoodInInventory`, life-stage filter excludes Newborn and
+    /// EyesOpen kittens (they have their own siblings; Newborns carry
+    /// `Incapacitated` for the 450 substrate reuse, but the kitten-shaped
+    /// sibling handles them). Covers Juvenile / Young / Adult / Elder
+    /// cats who are too injured to self-provision and need a peer to
+    /// bring food.
+    pub fn incapacitated() -> Self {
+        Self::build(
+            EligibilityFilter::new()
+                .require(markers::Incapacitated::KEY)
+                .forbid(markers::HasFoodInInventory::KEY),
+            LifeStageSet::ALL
+                .without(CatLifeStage::NewbornKitten)
+                .without(CatLifeStage::EyesOpenKitten),
+        )
+    }
+
+    fn build(eligibility: EligibilityFilter, life_stages: LifeStageSet) -> Self {
         Self {
             id: DseId("beg_for_food"),
             considerations: vec![Consideration::Scalar(ScalarConsideration::new(
@@ -98,6 +128,7 @@ impl BegForFoodDse {
             ))],
             composition: Composition::weighted_sum(vec![1.0]),
             eligibility,
+            life_stages,
         }
     }
 }
@@ -144,6 +175,10 @@ impl crate::ai::dse::CatDse for BegForFoodDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::BegForFood
     }
+
+    fn life_stages(&self) -> LifeStageSet {
+        self.life_stages
+    }
 }
 
 /// Stage 1 constructor (used by the registry). Public so headless / scenario
@@ -155,6 +190,11 @@ pub fn beg_for_food_newborn_dse() -> Box<dyn crate::ai::dse::CatDse> {
 /// Stage 2 constructor.
 pub fn beg_for_food_eyes_open_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(BegForFoodDse::eyes_open())
+}
+
+/// Incapacitated non-kitten constructor (ticket 451).
+pub fn beg_for_food_incapacitated_dse() -> Box<dyn crate::ai::dse::CatDse> {
+    Box::new(BegForFoodDse::incapacitated())
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +217,13 @@ static BEG_FOR_FOOD_EYES_OPEN_REGISTRATION: crate::ai::dses::CatDseRegistration 
     crate::ai::dses::CatDseRegistration {
         order: 3760,
         construct: |_| beg_for_food_eyes_open_dse(),
+    };
+
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static BEG_FOR_FOOD_INCAPACITATED_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        order: 3770,
+        construct: |_| beg_for_food_incapacitated_dse(),
     };
 
 // ---------------------------------------------------------------------------
@@ -263,5 +310,57 @@ mod tests {
             BegForFoodDse::eyes_open().action(),
             crate::ai::Action::BegForFood
         );
+        assert_eq!(
+            BegForFoodDse::incapacitated().action(),
+            crate::ai::Action::BegForFood
+        );
+    }
+
+    #[test]
+    fn incapacitated_sibling_requires_incapacitated_marker() {
+        let dse = BegForFoodDse::incapacitated();
+        assert_eq!(
+            dse.eligibility().required,
+            vec![markers::Incapacitated::KEY]
+        );
+        assert_eq!(
+            dse.eligibility().forbidden,
+            vec![markers::HasFoodInInventory::KEY]
+        );
+    }
+
+    #[test]
+    fn per_sibling_life_stages_are_mutually_exclusive() {
+        use crate::ai::dse::CatDse;
+        let newborn = BegForFoodDse::newborn();
+        let eyes_open = BegForFoodDse::eyes_open();
+        let incapacitated = BegForFoodDse::incapacitated();
+
+        // Kitten siblings each gate to exactly one life stage.
+        assert!(newborn.life_stages().contains(CatLifeStage::NewbornKitten));
+        assert!(!newborn.life_stages().contains(CatLifeStage::EyesOpenKitten));
+        assert!(!newborn.life_stages().contains(CatLifeStage::Adult));
+
+        assert!(eyes_open
+            .life_stages()
+            .contains(CatLifeStage::EyesOpenKitten));
+        assert!(!eyes_open
+            .life_stages()
+            .contains(CatLifeStage::NewbornKitten));
+
+        // Incapacitated sibling reaches every stage EXCEPT the two kitten-
+        // specific siblings' targets.
+        assert!(!incapacitated
+            .life_stages()
+            .contains(CatLifeStage::NewbornKitten));
+        assert!(!incapacitated
+            .life_stages()
+            .contains(CatLifeStage::EyesOpenKitten));
+        assert!(incapacitated
+            .life_stages()
+            .contains(CatLifeStage::JuvenileKitten));
+        assert!(incapacitated.life_stages().contains(CatLifeStage::Young));
+        assert!(incapacitated.life_stages().contains(CatLifeStage::Adult));
+        assert!(incapacitated.life_stages().contains(CatLifeStage::Elder));
     }
 }

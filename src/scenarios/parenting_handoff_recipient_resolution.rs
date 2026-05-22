@@ -226,14 +226,15 @@ mod tests {
     /// is co-located in the same tile, hunger = 0.05.
     ///
     /// Three substrate links must all hold for this to pass:
-    ///   1. R2b populate (`goap.rs:3819`) — `kitten_snapshot` is built
-    ///      from `ec.kitten_parentage` + `ec.kitten_needs`, so the
-    ///      resolver at `goap.rs:7322` finds Crumb.
-    ///   2. Drain rebind (`goap.rs:4917`) — the kitten-recipient branch
-    ///      uses `ec.kitten_inventory_q` (disjoint `Without<GoapPlan>`)
-    ///      to grab `&mut Inventory` on Crumb; pre-fix the drain
-    ///      silently dropped because `cats.get_many_mut` excluded
-    ///      kittens.
+    ///   1. R2b populate — `kitten_snapshot` is built from
+    ///      `ec.kitten_parentage` (slim) + an immutable hunger lookup
+    ///      pulled from the unified cats query (post-451), so the
+    ///      resolver finds Crumb.
+    ///   2. Drain rebind — the kitten-recipient branch uses
+    ///      `cats.get_many_mut([actor, recipient])` (post-451 the cats
+    ///      query includes kittens because they carry `GoapPlan`); pre-
+    ///      §428 the drain silently dropped because `cats.get_many_mut`
+    ///      excluded kittens.
     ///   3. Existing `eat_from_inventory` (`systems/needs.rs:301`) —
     ///      runs over ALL cats including kittens, consumes food from
     ///      Inventory when hungry, boosts `Needs.hunger`. Already in

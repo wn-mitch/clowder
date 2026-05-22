@@ -155,6 +155,10 @@ impl crate::ai::dse::CatDse for CookDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Cook
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn cook_dse() -> Box<dyn crate::ai::dse::CatDse> {

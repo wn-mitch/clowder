@@ -93,6 +93,10 @@ impl crate::ai::dse::CatDse for GroomSelfDse {
         crate::ai::Action::GroomSelf
     }
 
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::ALL
+    }
+
     fn always_emit_zero(&self) -> bool {
         true
     }

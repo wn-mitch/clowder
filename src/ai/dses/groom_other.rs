@@ -149,6 +149,10 @@ impl crate::ai::dse::CatDse for GroomOtherDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::GroomOther
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::ALL
+    }
 }
 
 pub fn groom_other_dse() -> Box<dyn crate::ai::dse::CatDse> {

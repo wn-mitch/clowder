@@ -196,6 +196,10 @@ impl crate::ai::dse::CatDse for SocializeDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Socialize
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::ALL
+    }
 }
 
 pub fn socialize_dse() -> Box<dyn crate::ai::dse::CatDse> {

@@ -226,6 +226,10 @@ impl crate::ai::dse::CatDse for HideDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Hide
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::ALL
+    }
 }
 
 /// Build the Hide DSE for registration. Called once at plugin load.

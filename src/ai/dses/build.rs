@@ -151,6 +151,10 @@ impl crate::ai::dse::CatDse for BuildDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Build
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn build_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

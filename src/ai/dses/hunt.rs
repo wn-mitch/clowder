@@ -185,6 +185,11 @@ impl crate::ai::dse::CatDse for HuntDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Hunt
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // Matches CanHunt = Adult ∨ Young (capabilities.rs).
+        crate::ai::dse::LifeStageSet::adults_and_young()
+    }
 }
 
 pub fn hunt_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

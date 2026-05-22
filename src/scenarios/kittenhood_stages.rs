@@ -54,19 +54,18 @@ use super::Scenario;
 pub static SCENARIO: Scenario = Scenario {
     name: "kittenhood_stages",
     default_focal: "Crumb",
-    // 4 ticks is enough for the marker-authoring + Incapacitated
-    // co-author to settle. The Begging-Feature canary is parked until
-    // a follow-on ticket lifts the `Without<KittenDependency>` filter
-    // in `evaluate_and_plan` / `evaluate_dispositions`; until then
-    // kittens never elect at L3 and `KittenBegged` is dormant. The
-    // per-stage marker assertions in `mod tests` carry the structural
-    // verification for 450.
-    default_ticks: 4,
+    // 12 ticks lets the 5-tick BegForFood cycle complete in the
+    // scenario (per-stage kittens with hunger 0.15 reliably elect
+    // BegForFood — verified in `mod tests`). The cycle DOES fire here;
+    // the canary `KittenBegged` is parked at production-soak level
+    // because adults preempt begging in steady-state colonies. See
+    // `Feature::KittenBegged`'s `expected_to_fire_per_soak` comment.
+    default_ticks: 12,
     setup,
-    // `KittenBegged` parked behind the kitten-scoring follow-on (see
-    // module rustdoc + `Feature::KittenBegged` doc-comment). The
-    // marker-authoring tests in `mod tests` substitute for the
-    // canary's structural coverage in the interim.
+    // 451 — scenario-level structural verification still rides on the
+    // per-stage marker assertions in `mod tests`. Soak-level canary
+    // promotion is parked behind balance tuning that gives kittens a
+    // window to elect BegForFood before adults preempt with FeedKitten.
     expected_features: &[],
 };
 

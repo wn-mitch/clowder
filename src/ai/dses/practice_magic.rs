@@ -111,6 +111,10 @@ impl crate::ai::dse::CatDse for ScryDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::MagicScry
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn scry_dse() -> Box<dyn crate::ai::dse::CatDse> {
@@ -211,6 +215,10 @@ impl crate::ai::dse::CatDse for DurableWardDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::MagicDurableWard
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn durable_ward_dse() -> Box<dyn crate::ai::dse::CatDse> {
@@ -302,6 +310,10 @@ impl Dse for CleanseDse {
 impl crate::ai::dse::CatDse for CleanseDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::MagicCleanse
+    }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
     }
 }
 
@@ -401,6 +413,10 @@ impl crate::ai::dse::CatDse for ColonyCleanseDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::MagicColonyCleanse
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn colony_cleanse_dse() -> Box<dyn crate::ai::dse::CatDse> {
@@ -474,6 +490,10 @@ impl crate::ai::dse::CatDse for HarvestDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::MagicHarvest
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn harvest_dse() -> Box<dyn crate::ai::dse::CatDse> {
@@ -545,6 +565,10 @@ impl Dse for CommuneDse {
 impl crate::ai::dse::CatDse for CommuneDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::MagicCommune
+    }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
     }
 }
 

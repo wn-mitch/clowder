@@ -167,6 +167,11 @@ impl crate::ai::dse::CatDse for ForageDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Forage
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // Matches CanForage's 450 flip: JuvenileKitten ∨ Young ∨ Adult ∨ Elder.
+        crate::ai::dse::LifeStageSet::juvenile_and_up()
+    }
 }
 
 pub fn forage_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

@@ -135,6 +135,39 @@ impl MarkerSnapshot {
     }
 }
 
+/// Read the cat's granular [`CatLifeStage`] from the marker snapshot.
+/// Returns `None` if no life-stage marker is set (transient case before
+/// `growth::update_life_stage_markers` runs on a freshly spawned cat;
+/// the caller skips DSE scoring entirely rather than emit a surprising
+/// default).
+///
+/// Checked in the kitten-decomposition order so the more-specific
+/// sub-stage markers (Newborn / EyesOpen / Juvenile) win over the
+/// umbrella `Kitten` marker when both are present (the 450 substrate
+/// co-authors them).
+pub fn current_cat_life_stage(
+    markers: &MarkerSnapshot,
+    entity: Entity,
+) -> Option<crate::ai::dse::CatLifeStage> {
+    use crate::ai::dse::CatLifeStage;
+    use crate::components::markers as m;
+    if markers.has(m::NewbornKitten::KEY, entity) {
+        Some(CatLifeStage::NewbornKitten)
+    } else if markers.has(m::EyesOpenKitten::KEY, entity) {
+        Some(CatLifeStage::EyesOpenKitten)
+    } else if markers.has(m::JuvenileKitten::KEY, entity) {
+        Some(CatLifeStage::JuvenileKitten)
+    } else if markers.has(m::Young::KEY, entity) {
+        Some(CatLifeStage::Young)
+    } else if markers.has(m::Adult::KEY, entity) {
+        Some(CatLifeStage::Adult)
+    } else if markers.has(m::Elder::KEY, entity) {
+        Some(CatLifeStage::Elder)
+    } else {
+        None
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Jitter
 // ---------------------------------------------------------------------------
@@ -1789,8 +1822,27 @@ pub fn score_actions(
     let pre_gates = pre_dispatch_gates();
     let post_hooks = post_eval_hooks();
 
+    // Ticket 451 — per-cat life stage, read once per scoring pass from
+    // the §4.3 markers. The 450 sub-stage markers (Newborn / EyesOpen /
+    // Juvenile) sit alongside the legacy `Kitten` umbrella; the granular
+    // 6-stage view drives DSE-pool filtering. None for cats that haven't
+    // yet been classified (rare: pre-author or post-despawn races) — we
+    // skip the DSE pool entirely in that case rather than emit a
+    // surprising default action.
+    let cat_stage = current_cat_life_stage(inputs.markers, inputs.cat);
+
     for dse in &inputs.dse_registry.cat_dses {
         let id = dse.id();
+        // Ticket 451 — DSE-pool gate: skip DSEs whose declared
+        // `life_stages()` doesn't include this cat's stage. Replaces the
+        // §Phase 5b `Without<KittenDependency>` filter on the cats query
+        // with substrate-honest per-DSE declarations (see
+        // `CatDse::life_stages` doc).
+        match cat_stage {
+            Some(stage) if !dse.life_stages().contains(stage) => continue,
+            None => continue,
+            _ => {}
+        }
         // Outer gate: composite / threshold / side-effect-bearing
         // predicates that can't (or shouldn't) move into the DSE's
         // EligibilityFilter live here. Most cat DSEs have no entry;
@@ -2881,6 +2933,15 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::colony_cleanse_dse());
             r.cat_dses.push(crate::ai::dses::harvest_dse());
             r.cat_dses.push(crate::ai::dses::commune_dse());
+            // Ticket 450 + 451 — BegForFood three siblings (Newborn /
+            // EyesOpen / Incapacitated). The life-stage gate ensures
+            // they only score for cats whose stage matches.
+            r.cat_dses
+                .push(crate::ai::dses::beg_for_food::beg_for_food_newborn_dse());
+            r.cat_dses
+                .push(crate::ai::dses::beg_for_food::beg_for_food_eyes_open_dse());
+            r.cat_dses
+                .push(crate::ai::dses::beg_for_food::beg_for_food_incapacitated_dse());
             r
         })
     }
@@ -2922,6 +2983,11 @@ mod tests {
             s.set_entity(markers::CanWard::KEY, cat, true);
             s.set_entity(markers::CanWardFromSupply::KEY, cat, true);
             s.set_entity(markers::CanCook::KEY, cat, true);
+            // Ticket 451 — life-stage filter requires a stage marker.
+            // Default test cat is an Adult so every adult-shaped DSE
+            // reaches the scoring loop. Tests that exercise per-stage
+            // behavior override `markers` on the returned `EvalInputs`.
+            s.set_entity(markers::Adult::KEY, cat, true);
             s
         })
     }
@@ -4198,6 +4264,8 @@ mod tests {
         markers.set_colony(markers::WardStrengthLow::KEY, true);
         let cat_entity = Entity::from_raw_u32(1).unwrap();
         markers.set_entity(markers::Incapacitated::KEY, cat_entity, true);
+        // Ticket 451 — life-stage filter requires a stage marker.
+        markers.set_entity(markers::Adult::KEY, cat_entity, true);
 
         let base = test_eval_inputs();
         let inputs = EvalInputs {
@@ -4255,6 +4323,61 @@ mod tests {
             get(Action::Flee),
             jitter_range
         );
+    }
+
+    /// Ticket 451 — a hungry Newborn kitten with `KittenDependency` +
+    /// `Incapacitated` (the 450 substrate co-author for Stage 1) must
+    /// reach L2 scoring (i.e. NOT be filtered by §Phase 5b) and elect
+    /// `BegForFood` at L3. This is the structural verification that
+    /// the trio of changes — life-stage gate, lifted
+    /// `Without<KittenDependency>`, retired kitten-side queries —
+    /// activates the dormant 450 substrate.
+    #[test]
+    fn hungry_newborn_kitten_elects_beg_for_food() {
+        let sc = default_scoring();
+        let mut needs = Needs::default();
+        needs.hunger = 0.1; // very hungry — `hangry()` curve spikes
+        needs.energy = 0.8;
+
+        let personality = default_personality();
+        let mut rng = seeded_rng(451);
+
+        let mut c = ctx(&needs, &personality, &sc);
+        c.is_incapacitated = true; // Newborn co-authors `Incapacitated`
+
+        let mut markers = MarkerSnapshot::new();
+        let kitten = Entity::from_raw_u32(1).unwrap();
+        // Stage 1 marker set + Incapacitated co-author (450 substrate).
+        markers.set_entity(crate::components::markers::NewbornKitten::KEY, kitten, true);
+        markers.set_entity(crate::components::markers::Incapacitated::KEY, kitten, true);
+        // BegForFood eligibility forbids `HasFoodInInventory` — leave unset.
+        // No colony markers — kitten doesn't elect adult-shaped DSEs anyway,
+        // and the life-stage gate filters out all but the `LifeStageSet::ALL`
+        // / `kittens_only` / `NewbornKitten`-specific pool.
+
+        let base = test_eval_inputs();
+        let inputs = EvalInputs {
+            cat: kitten,
+            markers: &markers,
+            ..base
+        };
+        let scores = score_actions(&c, &inputs, &mut rng).scores;
+        let best = select_best_action(&scores);
+
+        assert_eq!(
+            best,
+            Action::BegForFood,
+            "hungry NewbornKitten should elect BegForFood; scores: {scores:?}"
+        );
+
+        // The Hunt / Build / Cook DSEs (adult-only pool) must not even
+        // appear in the score list — the life-stage gate skips them.
+        for adult_action in [Action::Hunt, Action::Build, Action::Cook, Action::Forage] {
+            assert!(
+                !scores.iter().any(|(a, _)| *a == adult_action),
+                "adult-only DSE {adult_action:?} leaked into kitten score pool: {scores:?}"
+            );
+        }
     }
 
     // --- Herbcraft / PracticeMagic scoring tests ---
@@ -5033,6 +5156,8 @@ mod tests {
         snap.set_entity(markers::CanForage::KEY, cat, true);
         // CanWard intentionally absent — cat has no ward herbs.
         snap.set_entity(markers::CanCook::KEY, cat, true);
+        // Ticket 451 — life-stage filter requires a stage marker.
+        snap.set_entity(markers::Adult::KEY, cat, true);
         let inputs = EvalInputs {
             cat,
             position: Position::new(0, 0),

@@ -109,6 +109,12 @@ impl crate::ai::dse::CatDse for MateDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Mate
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // Fertility is removed at the Adult→Elder boundary
+        // (§7.M.7.1). Elders structurally cannot mate.
+        crate::ai::dse::LifeStageSet::adults_and_young()
+    }
 }
 
 pub fn mate_dse() -> Box<dyn crate::ai::dse::CatDse> {

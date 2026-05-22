@@ -965,6 +965,10 @@ mod tests {
         fn action(&self) -> crate::ai::Action {
             crate::ai::Action::Idle
         }
+
+        fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+            crate::ai::dse::LifeStageSet::ALL
+        }
     }
 
     fn test_dse(id: &'static str, scalar_name: &'static str) -> TestDse {

@@ -147,6 +147,12 @@ impl crate::ai::dse::CatDse for ExploreDse {
         crate::ai::Action::Explore
     }
 
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // 451 — kittens electing Explore would travel to unexplored
+        // frontiers, away from caretakers. Lock to non-kittens.
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
+
     fn always_emit_zero(&self) -> bool {
         true
     }

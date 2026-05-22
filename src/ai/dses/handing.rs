@@ -89,6 +89,12 @@ impl crate::ai::dse::CatDse for HandingDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Handoff
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // Adults hand off food to kittens; kittens are recipients (drain
+        // side), not actors. Restrict to the working pool.
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn handing_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

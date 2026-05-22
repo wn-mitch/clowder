@@ -167,6 +167,22 @@ impl crate::ai::dse::CatDse for EatDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Eat
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // Eat's only plan template is `TravelTo(Stores) → EatAtStores`,
+        // which Stage 1/2 kittens can't execute (they're Incapacitated /
+        // not yet ambulant). 451 verification soak observed two kittens
+        // (Sparkkit-85, Flintkit-86) elect Eat at score 0.81, plan
+        // TravelTo(Stores), and starve to death because the plan never
+        // completes. Lock Eat to adults_young_elder until ticket 429
+        // lands the inventory-eating path (HasFoodInInventory-gated
+        // eat-from-inventory sibling); at that point Eat splits into
+        // kitten-eligible inventory-eating + adult-only stores-eating
+        // siblings. Until then, kittens fall through to BegForFood at
+        // L3 (autonomic cry-map signal picks them up via the FeedKitten
+        // path).
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 /// Goal predicate: hunger has risen above the satiation threshold (the

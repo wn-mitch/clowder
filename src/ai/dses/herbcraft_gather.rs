@@ -130,6 +130,10 @@ impl crate::ai::dse::CatDse for HerbcraftGatherDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::HerbcraftGather
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn herbcraft_gather_dse() -> Box<dyn crate::ai::dse::CatDse> {

@@ -121,6 +121,12 @@ impl crate::ai::dse::CatDse for MentorDse {
     fn action(&self) -> crate::ai::Action {
         crate::ai::Action::Mentor
     }
+
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // Elders carry hard-won mastery and should be teaching;
+        // mentee-side gate (MentorableAge, 450) excludes Stage 1/2 kittens.
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
 }
 
 pub fn mentor_dse(scoring: &ScoringConstants) -> Box<dyn crate::ai::dse::CatDse> {

@@ -161,6 +161,12 @@ impl crate::ai::dse::CatDse for CaretakeDse {
         crate::ai::Action::Caretake
     }
 
+    fn life_stages(&self) -> crate::ai::dse::LifeStageSet {
+        // Caretake responds to kitten / incapacitated cries; elders can
+        // still care for kittens and downed kin.
+        crate::ai::dse::LifeStageSet::adults_young_elder()
+    }
+
     fn always_emit_zero(&self) -> bool {
         true
     }
