@@ -1,13 +1,13 @@
 ---
 id: 429
 title: Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts
-status: ready
+status: blocked
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-20
 parked: null
-blocked-by: []
+blocked-by: [450]
 supersedes: []
 related-systems: []
 related-balance: []
@@ -59,3 +59,4 @@ Three-phase landing:
 ## Log
 
 - 2026-05-20: opened as a §428 follow-on. User framing: "every item has Sources, Transfers, and Sinks. An item can only shift between locations or forms when it hits one of these gates. Ideally this creates coding contracts in rust as well." Surfaced when reviewing `eat_from_inventory`'s registration during §428's drain-fix verification — the function is registered in SimulationPlugin schedule and works correctly, but is a pre-substrate-era reflex that bypasses the items-are-real contract.
+- 2026-05-22: blocked-by [450] (three-stage kittenhood). Phase 2's eat-from-own-inventory DSE composes against the sub-stage markers + `HasFoodInInventory` marker authored in 450; the `[EatFromInventory]` HTN method composes alongside 450's new `[BegForFood]` method as parallel decompositions of the shared Eat aspiration. Scope here also expanded to promote seven proto-Sources/proto-Sinks surfaced during plan-phase audit (`src/systems/disposition.rs:3201/3753/4202` den-raid carcass / hunt-engage / forage-engage; `src/systems/goap.rs:8381/8965/9002/9451` carry-cleanup fallbacks) into named gate resolvers with witnesses + Feature emission. User framing: "these are really just the proto sources and should be converted as such."
