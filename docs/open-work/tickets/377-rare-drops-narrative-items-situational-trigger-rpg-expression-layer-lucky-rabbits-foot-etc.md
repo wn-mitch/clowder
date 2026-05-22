@@ -1,13 +1,13 @@
 ---
 id: 377
 title: rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.)
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-16
 parked: null
-blocked-by: [375]
+blocked-by: []
 supersedes: []
 related-systems: [crafting.md, the-calling.md, naming.md]
 related-balance: []

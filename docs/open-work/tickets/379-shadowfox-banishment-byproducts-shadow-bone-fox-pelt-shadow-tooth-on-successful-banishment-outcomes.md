@@ -1,13 +1,13 @@
 ---
 id: 379
 title: ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-16
 parked: null
-blocked-by: [375]
+blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []

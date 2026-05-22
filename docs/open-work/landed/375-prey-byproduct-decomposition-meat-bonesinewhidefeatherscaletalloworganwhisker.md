@@ -1,7 +1,7 @@
 ---
 id: 375
 title: prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-22
 ---
 
 ## Why
@@ -110,3 +110,4 @@ both apply directly.
 ## Log
 - 2026-05-16: opened. Plan: `~/.claude/plans/i-d-like-to-do-bright-coral.md`. First of the four tickets in the input-substrate cluster (375 / 376 / 377 / 378) plus three follow-ons (379 / 380 / 381).
 - 2026-05-19: accuracy audit pass — blocked-by empty and status ready; docs/systems/crafting.md exists; referenced ItemKind and byproduct logic are aspirational (not yet in code)
+- 2026-05-22: soak logs/tuned-42-5baec8f5 (commit 5baec8f5): verdict=concern (drift vs old 095 baseline; survival+continuity gates pass). ByproductSpawned canary fired 971× and never_fired_expected_positives=[]; OverflowToGround 1027× as predicted by inventory-pressure risk note. Per-species table verified by prey_byproduct_spawn scenarios (Mouse/Rat/Rabbit/Bird) + prey_byproducts_table_default_matches_spec unit test (covers Fish row not reachable by all-Grass scenario world).
