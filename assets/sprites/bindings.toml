@@ -54,6 +54,41 @@ rows = 5
 tile = 16
 note = "Basic-pack grass biome props — small ground objects"
 
+[atlases.tools_n_materials]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/tools-n-meterial-items.png"
+cols = 4
+rows = 3
+tile = 16
+note = "Premium tools + materials sheet (12 cells) — axes/swords/scythes/pickaxes (row 0), small tools incl. brushes (row 1), logs/stones/bundles (row 2). Source for ticket 368 Phase 2 crafting items."
+
+[atlases.grass_ground]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/grass-n-ground-tile-items.png"
+cols = 6
+rows = 2
+tile = 16
+note = "Premium grass + ground tufts — small organic ground props; source for fibrous / wisp identities (Fiber, Bristle, etc)."
+
+[atlases.fruit_berries]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/fruit-n-berries-items.png"
+cols = 4
+rows = 2
+tile = 16
+note = "Premium fruit + berries — 8 cells; gift-like rounded edibles."
+
+[atlases.solaria_icons]
+texture = "sprites/Solaria Crafting/Solaria Crafting 03a/Shadows/Icons/Crafting Materials Icons.png"
+cols = 42
+rows = 42
+tile = 16
+note = "World of Solaria crafting-materials icons (shadowed variant) — 1764 cells. Top 20 rows are clean 14+2 stride; lower rows merge into larger objects. Guide image in the same directory labels every row (Dye/Thread/Cloth/String/Pelt/Feather/Clay/Button/Wool/Yarn/Cowhide/Needle/Log/Branch/Plank/Stick/Beam/Nails/Paper/Moss/Leaf/Sand/Glass/Horn/Battery/TreeSap/Rope/PinGlue/Bone/Stone/StoneBrick/Coal/Charcoal/Flint/Crystal/BoneMeal)."
+
+[atlases.solaria_objects]
+texture = "sprites/Solaria Crafting/Solaria Crafting 03a/Shadows/Objects/Crafting Materials Objects.png"
+cols = 44
+rows = 40
+tile = 16
+note = "World of Solaria crafting-materials objects (shadowed variant) — 1760 cells. Metal ores/bars/sheets, buckets, hoe/shovel/watering-can/pickaxe/axe/bug-net/hammer, plus stations (Charcoal Kiln, Furnace, Crystalarium, Lightning Rod, Solar Panel, Recycler, Bone Mill, Rock Crusher)."
+
 [atlases.trees]
 texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Tree animations/tree_sprites.png"
 cols = 12
@@ -283,141 +318,141 @@ atlas = "items"
 index = 30
 note = "LARGEBROWNJAR (rendered fat in container)"
 
-# Ticket 368 — 016 Phase 2 inputs + behavioral tools. Placeholder
-# sprite indices reusing existing tiles; art pass can rebind once
-# dedicated assets land.
+# Ticket 368 — 016 Phase 2 inputs + behavioral tools. All bound to
+# cells in the registered Premium item atlases above. Repick visually
+# in #/sprites once the art pass settles each identity.
 [items.Twig]
-atlas = "items"
-index = 100
-note = "placeholder — branch/stick-like tile"
+atlas = "solaria_icons"
+index = 800
+note = "Solaria Stick row, col 2 (row 19 × 42 + 2) — labelled \"Stick\" in the Solaria guide"
 
 [items.Bristle]
-atlas = "items"
-index = 101
-note = "placeholder — fur/whisker-like tile"
+atlas = "solaria_icons"
+index = 254
+note = "Solaria Pelt row, col 2 (row 6 × 42 + 2) — labelled \"Pelt\" in the Solaria guide"
 
 [items.Fiber]
-atlas = "items"
-index = 102
-note = "placeholder — thread/grass-like tile"
+atlas = "solaria_icons"
+index = 128
+note = "Solaria String row, col 2 (row 3 × 42 + 2) — labelled \"String\" in the Solaria guide"
 
 [items.Flower]
-atlas = "items"
-index = 103
-note = "placeholder — flower/blossom tile"
+atlas = "herbs"
+index = 24
+note = "flower row of Mushrooms/Flowers/Stones (herbs atlas row 2 col 0)"
 
 [items.PolishedStone]
-atlas = "items"
-index = 104
-note = "placeholder — refined stone tile"
+atlas = "tools_n_materials"
+index = 9
+note = "stone tile (tools_n_materials row 2 col 1) — refined/shaped stone"
 
 [items.GroomingBrush]
-atlas = "items"
-index = 105
-note = "placeholder — brush/tool tile"
+atlas = "tools_n_materials"
+index = 5
+note = "small-tool tile (tools_n_materials row 1 col 1) — brush/comb identity"
 
 [items.PlayBundle]
-atlas = "items"
-index = 106
-note = "placeholder — bundle/toy tile"
+atlas = "tools_n_materials"
+index = 11
+note = "bundle tile (tools_n_materials row 2 col 3) — bound-stack identity"
 
 [items.CourtshipGift]
-atlas = "items"
-index = 107
-note = "placeholder — gift/curio tile"
+atlas = "fruit_berries"
+index = 0
+note = "fruit (fruit_berries row 0 col 0) — gift-curio identity"
 
 [buildings.Den]
-textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_1.png", "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_2.png", "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_3.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_1.png", "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_2.png", "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_3.png" ]
 native_size = [ 89, 91 ]
 tiles_wide = 2
 
 [buildings.Hearth]
-textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_4_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_4_Red.png" ]
 native_size = [ 128, 128 ]
 tiles_wide = 2
 
 [buildings.Kitchen]
-textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
+textures = [ "sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
 native_size = [ 35, 44 ]
 tiles_wide = 1
 note = "reuses workshop sprite until a dedicated asset exists"
 
 [buildings.Stores]
-textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/MarketStand_1_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/MarketStand_1_Red.png" ]
 native_size = [ 62, 57 ]
 tiles_wide = 2
 
 [buildings.Workshop]
-textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
+textures = [ "sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
 native_size = [ 35, 44 ]
 tiles_wide = 1
 
 [buildings.Garden]
-textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props/Basket_Empty.png" ]
+textures = [ "sprites/The Fan-tasy Tileset (Premium)/Art/Props/Basket_Empty.png" ]
 native_size = [ 32, 32 ]
 tiles_wide = 0.7
 note = "Basket prop; CropState transitions to Basket_Cotton / Basket_Vegetables via update_crop_sprites and those handles remain in SpriteAssets.garden_textures."
 
 [buildings.Watchtower]
-textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/Watchtower_1_Hay_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/Watchtower_1_Hay_Red.png" ]
 native_size = [ 68, 149 ]
 tiles_wide = 1.5
 
 [buildings.WardPost]
-textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Props/Banner_Stick_1_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Props/Banner_Stick_1_Red.png" ]
 native_size = [ 24, 59 ]
 tiles_wide = 0.5
 
 [buildings.Wall]
-textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Fences and Walls/CityWall_Up_1.png" ]
+textures = [ "sprites/The Fan-tasy Tileset (Premium)/Art/Fences and Walls/CityWall_Up_1.png" ]
 native_size = [ 16, 48 ]
 tiles_wide = 1
 
 [buildings.Gate]
-textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Fences and Walls/CityWall_Gate_1.png" ]
+textures = [ "sprites/The Fan-tasy Tileset (Premium)/Art/Fences and Walls/CityWall_Gate_1.png" ]
 native_size = [ 80, 96 ]
 tiles_wide = 2
 
 [buildings.Midden]
-textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/MarketStand_1_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/MarketStand_1_Red.png" ]
 native_size = [ 62, 57 ]
 tiles_wide = 2
 note = "176: visually reuses Stores sprite — refuse pile looks container-shaped"
 
 [buildings.DryingRack]
-textures = [ "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
+textures = [ "sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
 native_size = [ 35, 44 ]
 tiles_wide = 1
 note = "367: reuses workshop sprite for stage-1 atomicity (Midden precedent)"
 
 [buildings.SmokingRack]
-textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_4_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_4_Red.png" ]
 native_size = [ 128, 128 ]
 tiles_wide = 2
 note = "367: reuses hearth sprite for stage-1 atomicity"
 
 [buildings_winter.Den]
-textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_1.png", "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_2.png", "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_3.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_1.png", "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_2.png", "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_3.png" ]
 native_size = [ 89, 91 ]
 tiles_wide = 2
 
 [buildings_winter.Hearth]
-textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_5_1_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_5_1_Red.png" ]
 native_size = [ 128, 128 ]
 tiles_wide = 2
 
 [buildings_winter.Stores]
-textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/MarketStand_1_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/MarketStand_1_Red.png" ]
 native_size = [ 62, 57 ]
 tiles_wide = 2
 
 [buildings_winter.Watchtower]
-textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/Watchtower_1_Snow_Red.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/Watchtower_1_Snow_Red.png" ]
 native_size = [ 68, 149 ]
 tiles_wide = 1.5
 
 [buildings_winter.WardPost]
-textures = [ "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art/Props/Banner_Stick_1_Red_Snow.png" ]
+textures = [ "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Props/Banner_Stick_1_Red_Snow.png" ]
 native_size = [ 24, 59 ]
 tiles_wide = 0.5
 

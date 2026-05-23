@@ -3296,6 +3296,15 @@ pub struct DispositionConstants {
     pub forage_yield_scale: f32,
     pub forage_skill_growth: f32,
     pub forage_timeout_ticks: u64,
+    /// Ticket 368 — chance of also dropping a Phase 2 crafting input
+    /// (Twig on forest tiles; Fiber or Flower on Grass) alongside the
+    /// foraged food, as a separate `OnGround` `Item` entity. Preserves
+    /// food throughput on successful forages while adding ingredient
+    /// supply for the Grooming Brush / Play Bundle / Courtship Gift
+    /// recipes. 0.30 is the first-light value; tune via sweep if
+    /// ingredient throughput is too sparse or too dense relative to
+    /// the recipe demand.
+    pub forage_ingredient_drop_chance: f32,
     pub deposit_quality_base: f32,
     pub deposit_quality_skill_scale: f32,
     pub eat_at_stores_duration: u64,
@@ -4957,6 +4966,7 @@ impl Default for DispositionConstants {
             forage_yield_scale: 0.35,
             forage_skill_growth: 0.0008,
             forage_timeout_ticks: 40,
+            forage_ingredient_drop_chance: 0.30,
             deposit_quality_base: 0.3,
             deposit_quality_skill_scale: 0.4,
             eat_at_stores_duration: 50,
@@ -6807,6 +6817,7 @@ impl Default for CraftingConstants {
 /// - `Bone` → 369 / 372 · `Sinew` → 369 / 368 · `Whisker` → 370 / 368
 /// - `Hide` → 369 / 370 · `FishScale` → 372 / 371 · `Tallow` → 371
 /// - `RawOrgan` → 367 (existing drying pipeline) · `Feather` → 368 / 370
+/// - `Bristle` → 368 (Grooming Brush; mammal-only — Mouse/Rat/Rabbit)
 ///
 /// Items-are-real: each entry is a spatial entity emitted by the hunt resolver,
 /// not a numeric modifier on the prey. Inventory pressure (4 items per rabbit
@@ -6839,9 +6850,22 @@ impl Default for PreyByproductConstants {
     fn default() -> Self {
         use crate::components::items::ItemKind;
         Self {
-            mouse: vec![ItemKind::Bone, ItemKind::Sinew],
-            rat: vec![ItemKind::Bone, ItemKind::Sinew, ItemKind::Whisker],
-            rabbit: vec![ItemKind::Hide, ItemKind::Bone, ItemKind::Sinew],
+            // 368: Mammals shed Bristle (the prey-shedding ingredient
+            // for Grooming Brush). Appended to existing per-species
+            // vectors to preserve byproduct iteration order from 375.
+            mouse: vec![ItemKind::Bone, ItemKind::Sinew, ItemKind::Bristle],
+            rat: vec![
+                ItemKind::Bone,
+                ItemKind::Sinew,
+                ItemKind::Whisker,
+                ItemKind::Bristle,
+            ],
+            rabbit: vec![
+                ItemKind::Hide,
+                ItemKind::Bone,
+                ItemKind::Sinew,
+                ItemKind::Bristle,
+            ],
             fish: vec![ItemKind::FishScale, ItemKind::Tallow, ItemKind::RawOrgan],
             bird: vec![ItemKind::Feather, ItemKind::Bone],
         }
@@ -7952,17 +7976,29 @@ mod tests {
     fn prey_byproducts_table_default_matches_spec() {
         use crate::components::items::ItemKind;
         let table = SimConstants::default().prey_byproducts;
+        // 368: Bristle appended to mammal byproduct lists (Grooming
+        // Brush input). Fish + Bird unchanged.
         assert_eq!(
             table.for_kind(PreyKind::Mouse),
-            &[ItemKind::Bone, ItemKind::Sinew]
+            &[ItemKind::Bone, ItemKind::Sinew, ItemKind::Bristle]
         );
         assert_eq!(
             table.for_kind(PreyKind::Rat),
-            &[ItemKind::Bone, ItemKind::Sinew, ItemKind::Whisker]
+            &[
+                ItemKind::Bone,
+                ItemKind::Sinew,
+                ItemKind::Whisker,
+                ItemKind::Bristle,
+            ]
         );
         assert_eq!(
             table.for_kind(PreyKind::Rabbit),
-            &[ItemKind::Hide, ItemKind::Bone, ItemKind::Sinew]
+            &[
+                ItemKind::Hide,
+                ItemKind::Bone,
+                ItemKind::Sinew,
+                ItemKind::Bristle,
+            ]
         );
         assert_eq!(
             table.for_kind(PreyKind::Fish),

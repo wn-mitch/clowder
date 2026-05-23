@@ -8,10 +8,27 @@
   // Phase 4 (ticket 449): click-to-repick + write-back via POST.
   // ---------------------------------------------------------------------
 
-  interface ItemBinding {
+  // Items bind either to an atlas grid cell (the original Sprout Lands
+  // form — `atlas + index`) or to a single PNG file on disk (the
+  // Fan-tasy props form — `texture`). Discriminated by which keys are
+  // present in the TOML table; matches the untagged Rust enum in
+  // src/rendering/sprite_bindings.rs::ItemBinding.
+  interface AtlasItemBinding {
     atlas: string
     index: number
     note?: string
+  }
+  interface TextureItemBinding {
+    texture: string
+    note?: string
+  }
+  type ItemBinding = AtlasItemBinding | TextureItemBinding
+
+  function isAtlasItem(b: ItemBinding): b is AtlasItemBinding {
+    return 'atlas' in b && 'index' in b
+  }
+  function isTextureItem(b: ItemBinding): b is TextureItemBinding {
+    return 'texture' in b
   }
   interface PlantBinding {
     atlas: string
@@ -131,7 +148,11 @@
   function repickIndex(newIdx: number) {
     if (!bindings || !selection) return
     if (selection.kind === 'item') {
-      bindings.items[selection.key].index = newIdx
+      const b = bindings.items[selection.key]
+      // Texture-form items have no index to repick; the side panel
+      // shows the PNG picker instead, so this path is unreachable
+      // for them in normal use.
+      if (isAtlasItem(b)) b.index = newIdx
     } else if (selection.kind === 'herb') {
       bindings.herbs[selection.key].indices_by_stage[selection.stage] = newIdx
     } else if (selection.kind === 'flavor') {
@@ -148,9 +169,18 @@
    */
   function switchAtlas(newAtlas: string) {
     if (!bindings || !selection) return
+    // Items can opt out of atlas form entirely via the synthetic
+    // `[single PNG]` option — converts the binding to texture form.
+    if (newAtlas === TEXTURE_FORM_SENTINEL && selection.kind === 'item') {
+      convertItemBindingForm(true)
+      return
+    }
     if (!bindings.atlases[newAtlas]) return
     if (selection.kind === 'item') {
       const b = bindings.items[selection.key]
+      // Texture-form items have no atlas to switch; ignore in this
+      // path (the side panel doesn't surface this control for them).
+      if (!isAtlasItem(b)) return
       if (b.atlas === newAtlas) return
       b.atlas = newAtlas
       b.index = 0
@@ -178,9 +208,63 @@
     dirty = true
   }
 
+  /**
+   * Repoint a texture-form item at a different PNG path. Mirrors
+   * `repickBuildingTexture` — the side panel shows the same PNG
+   * picker UI for texture items as it does for building variants.
+   */
+  function repickItemTexture(path: string) {
+    if (!bindings || !selection || selection.kind !== 'item') return
+    const b = bindings.items[selection.key]
+    if (!isTextureItem(b)) return
+    b.texture = path
+    dirty = true
+  }
+
+  /**
+   * Sentinel value in the atlas <select> that doesn't correspond to a
+   * registered grid atlas — picking it converts an atlas-form item
+   * binding into a single-PNG texture binding (Fan-tasy props or any
+   * other standalone sprite). Atlas keys are user-defined but can't
+   * shadow this because the leading bracket is invalid in TOML keys.
+   */
+  const TEXTURE_FORM_SENTINEL = '[single PNG]'
+
+  /**
+   * Convert an atlas-form item binding to texture form (or vice versa).
+   * Called from the side-panel atlas dropdown when the user picks the
+   * `[single PNG]` sentinel, or from the "switch to atlas" button on
+   * the texture-form side panel. Picks a sensible default for the new
+   * form's required fields; the user finalises in the picker that
+   * appears next.
+   */
+  function convertItemBindingForm(toTexture: boolean) {
+    if (!bindings || !selection || selection.kind !== 'item') return
+    const current = bindings.items[selection.key]
+    const note = current.note
+    if (toTexture && isAtlasItem(current)) {
+      bindings.items[selection.key] = { texture: '', ...(note ? { note } : {}) }
+      loadPngList()
+    } else if (!toTexture && isTextureItem(current)) {
+      // Default to the `items` atlas (the original Sprout Lands sheet)
+      // at index 0. The user picks a real cell from the grid next.
+      bindings.items[selection.key] = {
+        atlas: 'items',
+        index: 0,
+        ...(note ? { note } : {}),
+      }
+    } else {
+      return
+    }
+    dirty = true
+  }
+
   function currentSelectionAtlas(): string | null {
     if (!selection || !bindings) return null
-    if (selection.kind === 'item') return bindings.items[selection.key]?.atlas ?? null
+    if (selection.kind === 'item') {
+      const b = bindings.items[selection.key]
+      return b && isAtlasItem(b) ? b.atlas : null
+    }
     if (selection.kind === 'herb') return bindings.herbs[selection.key]?.atlas ?? null
     if (selection.kind === 'flavor') return bindings.flavor_plants[selection.key]?.atlas ?? null
     return null
@@ -188,7 +272,10 @@
 
   function currentSelectionIndex(): number | null {
     if (!selection || !bindings) return null
-    if (selection.kind === 'item') return bindings.items[selection.key]?.index ?? null
+    if (selection.kind === 'item') {
+      const b = bindings.items[selection.key]
+      return b && isAtlasItem(b) ? b.index : null
+    }
     if (selection.kind === 'herb')
       return bindings.herbs[selection.key]?.indices_by_stage[selection.stage] ?? null
     if (selection.kind === 'flavor')
@@ -306,6 +393,7 @@
     const out: Record<number, string> = {}
     if (atlas === 'items') {
       for (const [k, b] of Object.entries(bindings.items)) {
+        if (!isAtlasItem(b)) continue
         if (out[b.index]) out[b.index] += `, ${k}`
         else out[b.index] = k
       }
@@ -391,19 +479,40 @@
       {#if !bindings}
         <p class="text-muted">Loading…</p>
       {:else if category === 'items'}
-        <p class="text-xs text-muted mb-2">{itemEntries.length} items · atlas: items (8×15 of 16px)</p>
+        <p class="text-xs text-muted mb-2">
+          {itemEntries.length} items — atlas-bound use named sheets (e.g. items 8×15), texture-bound point at single PNGs (Fan-tasy props)
+        </p>
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
           {#each itemEntries as [name, binding]}
             {@const isSelected = selection?.kind === 'item' && selection.key === name}
             <button
               type="button"
               class="flex items-center gap-3 p-2 border rounded text-left cursor-pointer transition-colors {isSelected ? 'border-accent bg-accent/10' : 'border-border bg-surface hover:bg-surface-alt'}"
-              onclick={() => (selection = { kind: 'item', key: name })}
+              onclick={() => {
+                selection = { kind: 'item', key: name }
+                if (isTextureItem(binding)) loadPngList()
+              }}
             >
-              <div style={atlasCellStyle(binding.atlas, binding.index, 48)}></div>
+              {#if isAtlasItem(binding)}
+                <div style={atlasCellStyle(binding.atlas, binding.index, 48)}></div>
+              {:else}
+                <img
+                  src={`/assets/${encodeURI(binding.texture)}`}
+                  alt=""
+                  class="w-12 h-12 object-contain bg-bg-deep"
+                  style="image-rendering: pixelated;"
+                  loading="lazy"
+                />
+              {/if}
               <div class="flex flex-col min-w-0">
                 <span class="text-sm text-txt truncate" title={name}>{name}</span>
-                <span class="text-xs text-muted">#{binding.index}</span>
+                {#if isAtlasItem(binding)}
+                  <span class="text-xs text-muted">{binding.atlas} · #{binding.index}</span>
+                {:else}
+                  <span class="text-xs text-muted truncate" title={binding.texture}>
+                    {binding.texture.split('/').pop()}
+                  </span>
+                {/if}
                 {#if binding.note}
                   <span class="text-[10px] text-muted truncate" title={binding.note}>{binding.note}</span>
                 {/if}
@@ -554,7 +663,74 @@
           </button>
         </div>
 
-        {#if selection.kind === 'item' || selection.kind === 'herb' || selection.kind === 'flavor'}
+        {#if selection.kind === 'item' && isTextureItem(bindings.items[selection.key])}
+          <!-- Texture-form item: PNG-path picker (mirrors building UI). -->
+          {@const itemB = bindings.items[selection.key] as TextureItemBinding}
+          <div class="flex items-center gap-2 mb-2 text-[11px]">
+            <span class="text-muted">form: single PNG (texture)</span>
+            <button
+              class="ml-auto px-2 py-1 text-[11px] border border-border rounded bg-surface text-txt hover:bg-surface-alt"
+              onclick={() => convertItemBindingForm(false)}
+              title="Convert this item to an atlas-grid binding"
+            >
+              ⇄ switch to atlas grid
+            </button>
+          </div>
+          <div class="flex items-center gap-3 mb-2">
+            {#if itemB.texture}
+              <img
+                src={`/assets/${encodeURI(itemB.texture)}`}
+                alt=""
+                class="w-24 h-24 object-contain bg-bg-deep"
+                style="image-rendering: pixelated;"
+                loading="lazy"
+              />
+            {:else}
+              <div class="w-24 h-24 bg-bg-deep border border-dashed border-border flex items-center justify-center text-[10px] text-muted">
+                pick a PNG →
+              </div>
+            {/if}
+            <div class="flex flex-col min-w-0">
+              <span class="text-[11px] text-muted">current:</span>
+              <code class="text-[10px] text-txt break-all">{itemB.texture || '(none — pick below)'}</code>
+            </div>
+          </div>
+          <input
+            type="text"
+            class="w-full mb-2 px-2 py-1 text-xs bg-bg-deep border border-border rounded text-txt"
+            placeholder="filter PNG paths (e.g. 'LotusFlower', 'Cattail', 'Basket')"
+            bind:value={pngFilter}
+          />
+          <div class="max-h-[400px] overflow-y-auto border border-border rounded">
+            {#if pngList.length === 0}
+              <p class="text-xs text-muted p-2">loading PNG list…</p>
+            {:else}
+              {#each filteredPngs as path}
+                {@const isCurrent = path === itemB.texture}
+                <button
+                  type="button"
+                  class="flex items-center gap-2 w-full p-1 text-left border-b border-border last:border-b-0 hover:bg-surface-alt {isCurrent ? 'bg-accent/10' : ''}"
+                  onclick={() => repickItemTexture(path)}
+                >
+                  <img
+                    src={`/assets/${encodeURI(path)}`}
+                    alt=""
+                    class="w-10 h-10 object-contain bg-bg-deep"
+                    style="image-rendering: pixelated;"
+                    loading="lazy"
+                  />
+                  <code class="text-[10px] text-txt break-all flex-1">{path}</code>
+                  {#if isCurrent}
+                    <span class="text-[10px] text-accent">current</span>
+                  {/if}
+                </button>
+              {/each}
+              {#if filteredPngs.length === 0}
+                <p class="text-xs text-muted p-2">no matches</p>
+              {/if}
+            {/if}
+          </div>
+        {:else if selection.kind === 'item' || selection.kind === 'herb' || selection.kind === 'flavor'}
           {@const atlas = currentSelectionAtlas()}
           {@const meta = atlas ? bindings.atlases[atlas] : null}
           {@const idx = currentSelectionIndex()}
@@ -568,6 +744,10 @@
               {#each Object.entries(bindings.atlases) as [name, info]}
                 <option value={name}>{name} · {info.cols}×{info.rows}</option>
               {/each}
+              {#if selection.kind === 'item'}
+                <option disabled>──────────</option>
+                <option value={TEXTURE_FORM_SENTINEL}>{TEXTURE_FORM_SENTINEL} (Fan-tasy / standalone PNG)</option>
+              {/if}
             </select>
           </div>
           {#if meta?.note}

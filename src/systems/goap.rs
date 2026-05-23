@@ -9401,6 +9401,49 @@ fn resolve_forage_item(
             }
             skills.foraging += skills.growth_rate() * d.forage_skill_growth;
 
+            // 368 — Phase 2 ingredient drop. Terrain-conditioned
+            // secondary spawn alongside the foraged food: woody tiles
+            // shed Twigs; Grass tiles offer Fiber or Flower. Drops as
+            // an `OnGround` `Item` entity at the cat's current tile,
+            // keeping food inventory pressure unchanged. A subsequent
+            // cat can plan `Action::PickUp` to gather it for the
+            // Workshop behavioral-tool recipes.
+            //
+            // RNG-frugal ordering: roll the drop-chance first; only
+            // consume the Fiber/Flower selection RNG on Grass tiles
+            // where a drop actually lands. Minimises seed-42
+            // perturbation vs the pre-368 baseline.
+            let ingredient_terrain_eligible = matches!(
+                tile.terrain,
+                Terrain::DenseForest | Terrain::LightForest | Terrain::Grass
+            );
+            if ingredient_terrain_eligible
+                && rng.rng.random::<f32>() < d.forage_ingredient_drop_chance
+            {
+                let ing = match tile.terrain {
+                    Terrain::DenseForest | Terrain::LightForest => ItemKind::Twig,
+                    Terrain::Grass => {
+                        if rng.rng.random::<bool>() {
+                            ItemKind::Fiber
+                        } else {
+                            ItemKind::Flower
+                        }
+                    }
+                    _ => unreachable!("guarded by ingredient_terrain_eligible above"),
+                };
+                let ing_modifiers =
+                    crate::components::items::ItemModifiers::with_corruption(forage_corruption);
+                commands.spawn((
+                    crate::components::items::Item::with_modifiers(
+                        ing,
+                        1.0,
+                        crate::components::items::ItemLocation::OnGround,
+                        ing_modifiers,
+                    ),
+                    *pos,
+                ));
+            }
+
             let item_name = if consumed_in_place {
                 if forage_corruption > 0.3 {
                     format!("eats a corrupted {} on the spot", item_kind.name())

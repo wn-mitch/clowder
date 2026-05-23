@@ -514,19 +514,28 @@ pub fn attach_entity_sprites(
         commands.entity(entity).add_children(&[aura]);
     }
 
-    // Items — bound to whichever atlas the manifest declares per item.
+    // Items — bound to whichever atlas the manifest declares per item,
+    // OR to a single-file texture path (Fan-tasy props). The renderer
+    // branches on the binding form: atlas items carry a `TextureAtlas`
+    // component, texture items render the full PNG with no atlas.
     for (entity, pos, item) in &items {
         let (x, y) = grid_to_world(pos, map_h, world_px);
-        let s = rendering.bindings.item_sprite(item.kind);
-        commands.entity(entity).insert((
-            Sprite {
-                image: s.texture,
-                color: Color::WHITE,
-                custom_size: Some(Vec2::splat(world_px * 0.4)),
-                texture_atlas: Some(TextureAtlas {
+        let (image, atlas) = match rendering.bindings.item_sprite(item.kind) {
+            crate::rendering::sprite_bindings::ItemSprite::Atlas(s) => (
+                s.texture,
+                Some(TextureAtlas {
                     layout: s.layout,
                     index: s.index,
                 }),
+            ),
+            crate::rendering::sprite_bindings::ItemSprite::Texture(handle) => (handle, None),
+        };
+        commands.entity(entity).insert((
+            Sprite {
+                image,
+                color: Color::WHITE,
+                custom_size: Some(Vec2::splat(world_px * 0.4)),
+                texture_atlas: atlas,
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 15.0),

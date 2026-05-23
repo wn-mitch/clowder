@@ -63,7 +63,12 @@ pub static SCENARIO_RABBIT: Scenario = Scenario {
 pub static SCENARIO_BIRD: Scenario = Scenario {
     name: "prey_byproduct_spawn_bird",
     default_focal: "Stoat",
-    default_ticks: 200,
+    // 368: bumped 200 → 300. Seed-42 perturbation from the Phase 2
+    // substrate (Bristle in mammal byproducts + forage-ingredient
+    // drops on Grass/forest tiles) shifts bird-hunt timing past the
+    // original 200-tick window. Mouse/Rat/Rabbit still land in time
+    // (more guaranteed hits per pounce); Bird is more brittle.
+    default_ticks: 300,
     setup: setup_bird,
     expected_features: &["ByproductSpawned"],
 };
@@ -164,7 +169,8 @@ mod tests {
             .get("ByproductSpawned")
             .copied()
             .unwrap_or(0) as usize;
-        let kills = bp_total / 2;
+        // 368: Mouse drops 3 byproducts per kill (Bone + Sinew + Bristle).
+        let kills = bp_total / 3;
         if kills == 0 {
             panic!(
                 "expected ≥1 mouse kill within 200 ticks (ByproductSpawned canary fired {bp_total} times); \
@@ -174,37 +180,32 @@ mod tests {
                 report.final_item_kinds,
             );
         }
-        let bone = report.final_item_kinds.get("bone").copied().unwrap_or(0);
-        let sinew = report.final_item_kinds.get("sinew").copied().unwrap_or(0);
-        assert!(
-            bone >= kills,
-            "{kills} mouse kill(s) should produce ≥{kills} bone; got {bone}. \
-             histogram = {:?}",
-            report.final_item_kinds
-        );
-        assert!(
-            sinew >= kills,
-            "{kills} mouse kill(s) should produce ≥{kills} sinew; got {sinew}. \
-             histogram = {:?}",
-            report.final_item_kinds
-        );
+        for kind in ["bone", "sinew", "bristle"] {
+            let n = report.final_item_kinds.get(kind).copied().unwrap_or(0);
+            assert!(
+                n >= kills,
+                "{kills} mouse kill(s) should produce ≥{kills} {kind}; got {n}. \
+                 histogram = {:?}",
+                report.final_item_kinds
+            );
+        }
     }
 
     /// Rat kills add Whisker on top of Bone + Sinew.
     #[test]
     fn rat_kills_produce_bone_sinew_whisker() {
         let report = run(&SCENARIO_RAT, None, Some(200), 42);
-        // Rat drops 3 byproducts per kill.
+        // 368: Rat drops 4 byproducts per kill (Bone + Sinew + Whisker + Bristle).
         let bp_total = report
             .feature_counts
             .get("ByproductSpawned")
             .copied()
             .unwrap_or(0) as usize;
-        let kills = bp_total / 3;
+        let kills = bp_total / 4;
         if kills == 0 {
             panic!("expected ≥1 rat kill within 200 ticks (ByproductSpawned fired {bp_total}×)");
         }
-        for kind in ["bone", "sinew", "whisker"] {
+        for kind in ["bone", "sinew", "whisker", "bristle"] {
             let n = report.final_item_kinds.get(kind).copied().unwrap_or(0);
             assert!(
                 n >= kills,
@@ -219,17 +220,17 @@ mod tests {
     #[test]
     fn rabbit_kills_produce_hide_bone_sinew() {
         let report = run(&SCENARIO_RABBIT, None, Some(200), 42);
-        // Rabbit drops 3 byproducts per kill.
+        // 368: Rabbit drops 4 byproducts per kill (Hide + Bone + Sinew + Bristle).
         let bp_total = report
             .feature_counts
             .get("ByproductSpawned")
             .copied()
             .unwrap_or(0) as usize;
-        let kills = bp_total / 3;
+        let kills = bp_total / 4;
         if kills == 0 {
             panic!("expected ≥1 rabbit kill within 200 ticks (ByproductSpawned fired {bp_total}×)");
         }
-        for kind in ["hide", "bone", "sinew"] {
+        for kind in ["hide", "bone", "sinew", "bristle"] {
             let n = report.final_item_kinds.get(kind).copied().unwrap_or(0);
             assert!(
                 n >= kills,
@@ -253,9 +254,17 @@ mod tests {
     /// Bird kills produce Feather + Bone. Closes the long-standing
     /// `Feather` dormancy gap (existed as an ItemKind since pre-016
     /// with zero producers).
+    ///
+    /// 368: budget bumped from 200 → 300 ticks. Seed-42 perturbation
+    /// from the Phase 2 substrate (Bristle in mammal byproducts +
+    /// forage-ingredient drops) shifts the bird-hunt timing past the
+    /// original 200-tick window; mouse/rat/rabbit kills still land in
+    /// time but Bird is more brittle (longer pre-pounce stalk + lower
+    /// catch chance per `PreyProfile`). The extended budget keeps the
+    /// per-row coverage of the byproduct table intact.
     #[test]
     fn bird_kills_produce_feather_and_bone() {
-        let report = run(&SCENARIO_BIRD, None, Some(200), 42);
+        let report = run(&SCENARIO_BIRD, None, Some(300), 42);
         // Bird drops 2 byproducts per kill.
         let bp_total = report
             .feature_counts

@@ -64,12 +64,50 @@ pub struct AtlasSprite {
     pub index: usize,
 }
 
+/// An item's sprite binding. Either points at a grid cell in a
+/// registered atlas (the original ticket-448 form) or at a single
+/// PNG file on disk (the Fan-tasy / Sprout Lands single-file props
+/// added under this branch). Serde discriminates by which keys are
+/// present in the TOML table — `atlas` + `index` → `Atlas`,
+/// `texture` → `Texture`.
 #[derive(Debug, Clone, Deserialize)]
-pub struct ItemBinding {
+#[serde(untagged)]
+pub enum ItemBinding {
+    Atlas(AtlasItemBinding),
+    Texture(TextureItemBinding),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AtlasItemBinding {
     pub atlas: String,
     pub index: usize,
     #[serde(default)]
     pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TextureItemBinding {
+    pub texture: String,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+impl ItemBinding {
+    pub fn note(&self) -> Option<&str> {
+        match self {
+            Self::Atlas(b) => b.note.as_deref(),
+            Self::Texture(b) => b.note.as_deref(),
+        }
+    }
+}
+
+/// Resolved item sprite — what `attach_entity_sprites` needs to build a
+/// Bevy `Sprite`. Atlas items carry a `TextureAtlas` (layout + index);
+/// texture items render the whole PNG without an atlas.
+#[derive(Debug, Clone)]
+pub enum ItemSprite {
+    Atlas(AtlasSprite),
+    Texture(Handle<Image>),
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -137,19 +175,36 @@ pub struct SpriteBindings {
 }
 
 impl SpriteBindings {
-    /// Look up the full atlas-sprite triple (texture + layout + index)
-    /// for an item. Panics with the variant name if the binding is missing
-    /// or its declared atlas isn't registered — silent fallback to
-    /// sprite zero is the exact failure mode that produced the three
-    /// "previously wrong" comments in the legacy match statements
+    /// Look up the renderable sprite for an item. Returns `ItemSprite`
+    /// because items may bind to either an atlas grid cell or a
+    /// single-file texture (Fan-tasy props). Panics with the variant
+    /// name if the binding is missing — silent fallback to sprite zero
+    /// is the exact failure mode that produced the three "previously
+    /// wrong" comments in the legacy match statements
     /// (Moonpetal/Calmroot/Dreamroot).
-    pub fn item_sprite(&self, kind: ItemKind) -> AtlasSprite {
+    pub fn item_sprite(&self, kind: ItemKind) -> ItemSprite {
         let key = format!("{kind:?}");
         let binding = self
             .items
             .get(&key)
             .unwrap_or_else(|| panic!("sprite binding missing for item: {key}"));
-        self.resolve_atlas_sprite(&binding.atlas, binding.index, &format!("item {key}"))
+        match binding {
+            ItemBinding::Atlas(b) => ItemSprite::Atlas(self.resolve_atlas_sprite(
+                &b.atlas,
+                b.index,
+                &format!("item {key}"),
+            )),
+            ItemBinding::Texture(b) => {
+                let handle = self
+                    .handles
+                    .get(&b.texture)
+                    .unwrap_or_else(|| {
+                        panic!("texture not preloaded for item {key}: {}", b.texture)
+                    })
+                    .clone();
+                ItemSprite::Texture(handle)
+            }
+        }
     }
 
     pub fn herb_sprite(&self, kind: HerbKind, stage: GrowthStage) -> AtlasSprite {
@@ -195,12 +250,31 @@ impl SpriteBindings {
     //    without depending on Bevy asset handles. Production rendering
     //    code uses `*_sprite()` above. --
 
+    /// Test-only presence check: confirms an item has SOME binding (atlas
+    /// or texture). Atlas-only spot checks live in
+    /// `bindings_match_legacy_match_statements` and use `item_atlas_index`.
     #[cfg(test)]
-    pub fn item_index(&self, kind: ItemKind) -> usize {
-        self.items
-            .get(&format!("{kind:?}"))
-            .map(|b| b.index)
-            .unwrap_or_else(|| panic!("sprite binding missing for item: {kind:?}"))
+    pub fn assert_item_has_binding(&self, kind: ItemKind) {
+        let key = format!("{kind:?}");
+        assert!(
+            self.items.contains_key(&key),
+            "sprite binding missing for item: {key}"
+        );
+    }
+
+    /// Test-only: pull the atlas index for an atlas-form item. Panics if
+    /// the binding is missing or is the texture form (callers should
+    /// only invoke for items they know are atlas-bound).
+    #[cfg(test)]
+    pub fn item_atlas_index(&self, kind: ItemKind) -> usize {
+        let key = format!("{kind:?}");
+        match self.items.get(&key) {
+            Some(ItemBinding::Atlas(b)) => b.index,
+            Some(ItemBinding::Texture(_)) => {
+                panic!("item {key} uses a texture binding, not an atlas index")
+            }
+            None => panic!("sprite binding missing for item: {key}"),
+        }
     }
 
     #[cfg(test)]
@@ -352,6 +426,8 @@ fn assemble_bindings(
         .collect();
 
     // Buildings — pre-load every variant texture, keyed by path.
+    // Texture-form items (single-file Fan-tasy props) share the same
+    // handle cache: their `texture` path is loaded once at startup.
     let mut handles: HashMap<String, Handle<Image>> = HashMap::new();
     for binding in file
         .buildings
@@ -362,6 +438,13 @@ fn assemble_bindings(
             handles
                 .entry(path.clone())
                 .or_insert_with(|| asset_server.load(path));
+        }
+    }
+    for binding in file.items.values() {
+        if let ItemBinding::Texture(b) = binding {
+            handles
+                .entry(b.texture.clone())
+                .or_insert_with(|| asset_server.load(&b.texture));
         }
     }
 
@@ -761,7 +844,7 @@ mod tests {
     fn every_item_kind_has_a_binding() {
         let bindings = load_bindings_for_test();
         for kind in ALL_ITEM_KINDS {
-            let _ = bindings.item_index(*kind);
+            bindings.assert_item_has_binding(*kind);
         }
     }
 
@@ -792,10 +875,10 @@ mod tests {
         // fails, the manifest has drifted from the legacy bindings and
         // the visual change should be intentional + verified.
         let bindings = load_bindings_for_test();
-        assert_eq!(bindings.item_index(ItemKind::RawMouse), 0);
-        assert_eq!(bindings.item_index(ItemKind::Berries), 82);
-        assert_eq!(bindings.item_index(ItemKind::HerbCatnip), 69);
-        assert_eq!(bindings.item_index(ItemKind::Tallow), 30);
+        assert_eq!(bindings.item_atlas_index(ItemKind::RawMouse), 0);
+        assert_eq!(bindings.item_atlas_index(ItemKind::Berries), 82);
+        assert_eq!(bindings.item_atlas_index(ItemKind::HerbCatnip), 69);
+        assert_eq!(bindings.item_atlas_index(ItemKind::Tallow), 30);
 
         assert_eq!(
             bindings.herb_index(HerbKind::Moonpetal, GrowthStage::Blossom),
@@ -828,11 +911,13 @@ mod tests {
         let file = load_bindings_file_from_disk();
         let declared: std::collections::HashSet<&String> = file.atlases.keys().collect();
         for (key, b) in &file.items {
-            assert!(
-                declared.contains(&b.atlas),
-                "item {key} references undeclared atlas '{}'",
-                b.atlas
-            );
+            if let ItemBinding::Atlas(atlas_b) = b {
+                assert!(
+                    declared.contains(&atlas_b.atlas),
+                    "item {key} references undeclared atlas '{}'",
+                    atlas_b.atlas
+                );
+            }
         }
         for (key, b) in &file.herbs {
             assert!(
