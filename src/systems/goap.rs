@@ -5873,6 +5873,18 @@ fn dispatch_step_action(
                     );
                 }
             }
+            // 368: Phase 2 — PlayBundle presence on the actor scales
+            // social fondness gain. Target-side check is a follow-on
+            // (would require querying the target's `Inventory`); the
+            // actor-side check is sufficient for first-light canary
+            // emission. Caller emits `Feature::PlayBundleEngaged` on
+            // a witnessed Advance when the multiplier was > 1.0.
+            let bundle_multiplier =
+                if inventory.has_item(crate::components::items::ItemKind::PlayBundle) {
+                    ec.constants.crafting.play_bundle_social_multiplier
+                } else {
+                    1.0
+                };
             let outcome = crate::steps::disposition::resolve_socialize(
                 ticks,
                 cat_entity,
@@ -5888,8 +5900,14 @@ fn dispatch_step_action(
                 d,
                 &ec.constants.fulfillment,
                 pairing_bias,
+                bundle_multiplier,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::Socialized);
+            if bundle_multiplier > 1.0 && outcome.witness {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::PlayBundleEngaged);
+                }
+            }
             if matches!(outcome.result, crate::steps::StepResult::Advance) {
                 magic_params
                     .pushback_writer
@@ -5995,6 +6013,15 @@ fn dispatch_step_action(
                     );
                 }
             }
+            // 368: Phase 2 — GroomingBrush presence scales the
+            // fondness delta. Caller emits `Feature::GroomingBrushUsed`
+            // on a witnessed Advance when the multiplier was > 1.0.
+            let brush_multiplier =
+                if inventory.has_item(crate::components::items::ItemKind::GroomingBrush) {
+                    ec.constants.crafting.groom_brush_fondness_multiplier
+                } else {
+                    1.0
+                };
             let outcome = crate::steps::disposition::resolve_groom_other(
                 ticks,
                 cat_entity,
@@ -6010,8 +6037,15 @@ fn dispatch_step_action(
                 d,
                 &ec.constants.fulfillment,
                 pairing_bias,
+                brush_multiplier,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::GroomedOther);
+            if brush_multiplier > 1.0 && matches!(outcome.result, crate::steps::StepResult::Advance)
+            {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::GroomingBrushUsed);
+                }
+            }
             if let Some(r) = outcome.witness {
                 // 258 — observable side-effect for the belief substrate.
                 // `belief_integrator` updates witnesses' affiliation_history
@@ -6456,6 +6490,16 @@ fn dispatch_step_action(
             }
             let target = plan.step_state[step_idx].target_entity;
             let target_gender = target.and_then(|t| snaps.gender.get(&t).copied());
+            // 368: Phase 2 — CourtshipGift presence on the courting
+            // cat scales the romantic delta. Caller emits
+            // `Feature::CourtshipGiftOffered` on a witnessed Advance
+            // when the multiplier was > 1.0.
+            let gift_multiplier =
+                if inventory.has_item(crate::components::items::ItemKind::CourtshipGift) {
+                    ec.constants.crafting.courtship_gift_romantic_multiplier
+                } else {
+                    1.0
+                };
             let outcome = crate::steps::disposition::resolve_mate_with(
                 ticks,
                 cat_entity,
@@ -6464,9 +6508,18 @@ fn dispatch_step_action(
                 target_gender,
                 needs,
                 relationships,
+                gift_multiplier,
             );
             // MatingOccurred fires only when a pregnancy was produced.
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MatingOccurred);
+            if gift_multiplier > 1.0
+                && matches!(outcome.result, crate::steps::StepResult::Advance)
+                && target.is_some()
+            {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::CourtshipGiftOffered);
+                }
+            }
             // §Phase 5a: CourtshipInteraction — the resolver's
             // witness type can't distinguish "no target" from
             // "target, no gestation" (Tom×Tom), so the caller

@@ -43,12 +43,16 @@ use crate::steps::{StepOutcome, StepResult};
 /// the `record_if_witnessed` helper pattern (§Phase 5a), since
 /// the resolver's witness type can't distinguish "no target"
 /// from "target but no gestation" without a richer payload.
+/// Ticket 368 — caller separately emits
+/// `Feature::CourtshipGiftOffered` when `gift_multiplier > 1.0`
+/// (the courting cat carries an `ItemKind::CourtshipGift`).
 ///
 /// §7.M.7.4 gender rule: if both partners can gestate
 /// (Queen×Queen, Queen×Nonbinary, Nonbinary×Nonbinary), the
 /// initiator wins the tie; if exactly one can, that one is the
 /// gestator regardless of initiator; if neither can, witness is
 /// `None`.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_mate_with(
     ticks: u64,
     cat_entity: Entity,
@@ -57,6 +61,14 @@ pub fn resolve_mate_with(
     target_gender: Option<Gender>,
     needs: &mut Needs,
     relationships: &mut Relationships,
+    // Ticket 368 — romantic-delta multiplier when the courting cat
+    // carries an `ItemKind::CourtshipGift` (016 Phase 2). `1.0` for
+    // the no-gift case;
+    // `crafting.courtship_gift_romantic_multiplier` (default 2.0)
+    // when present. Per the "items are real" pillar the effect
+    // lives on the action resolver keyed to item identity. Caller
+    // emits `Feature::CourtshipGiftOffered` when > 1.0.
+    gift_multiplier: f32,
 ) -> StepOutcome<Option<(Entity, u8)>> {
     if ticks < 10 {
         return StepOutcome::unwitnessed(StepResult::Continue);
@@ -77,7 +89,7 @@ pub fn resolve_mate_with(
     // need to clear, otherwise the initiator re-scores Mate forever.
     needs.mating = 1.0;
     needs.social = (needs.social + 0.15).min(1.0);
-    relationships.modify_romantic(cat_entity, partner, 0.1);
+    relationships.modify_romantic(cat_entity, partner, 0.1 * gift_multiplier);
 
     let pregnancy = gestator.map(|g| {
         let mut litter_size: u8 = 1;
@@ -120,6 +132,7 @@ mod tests {
             Some(Gender::Tom),
             &mut needs,
             &mut rel,
+            1.0, // gift_multiplier — no gift in test
         );
         assert_eq!(outcome.witness.map(|(e, _)| e), Some(initiator));
     }
@@ -138,6 +151,7 @@ mod tests {
             Some(Gender::Queen),
             &mut needs,
             &mut rel,
+            1.0, // gift_multiplier — no gift in test
         );
         assert_eq!(outcome.witness.map(|(e, _)| e), Some(partner));
     }
@@ -156,6 +170,7 @@ mod tests {
             Some(Gender::Nonbinary),
             &mut needs,
             &mut rel,
+            1.0, // gift_multiplier — no gift in test
         );
         assert_eq!(outcome.witness.map(|(e, _)| e), Some(initiator));
     }
@@ -174,6 +189,7 @@ mod tests {
             Some(Gender::Tom),
             &mut needs,
             &mut rel,
+            1.0, // gift_multiplier — no gift in test
         );
         assert!(matches!(outcome.result, StepResult::Advance));
         assert!(outcome.witness.is_none());
@@ -195,6 +211,7 @@ mod tests {
             Some(Gender::Tom),
             &mut needs,
             &mut rel,
+            1.0, // gift_multiplier — no gift in test
         );
         assert!(matches!(outcome.result, StepResult::Continue));
         assert!(outcome.witness.is_none());
@@ -215,6 +232,7 @@ mod tests {
             Some(Gender::Tom),
             &mut needs,
             &mut rel,
+            1.0, // gift_multiplier — no gift in test
         );
         assert_eq!(outcome.witness.map(|(_, n)| n), Some(2));
     }

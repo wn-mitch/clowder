@@ -59,7 +59,10 @@ pub struct GroomOutcome {
 /// caller separately emits
 /// `Feature::JointBiasApplied { practice: Courtship }` when
 /// `pairing_bias > 1.0` (i.e. the resolver target is the actor's
-/// `JointIntention { practice: Courtship, .. }.partner`).
+/// `JointIntention { practice: Courtship, .. }.partner`). Ticket
+/// 368 — caller separately emits `Feature::GroomingBrushUsed`
+/// when `brush_multiplier > 1.0` (the actor's inventory carries a
+/// `ItemKind::GroomingBrush`).
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_groom_other(
     ticks: u64,
@@ -81,6 +84,14 @@ pub fn resolve_groom_other(
     // case. Caller emits `Feature::JointBiasApplied { Courtship }`
     // when > 1.0.
     pairing_bias: f32,
+    // Ticket 368 — fondness multiplier when the actor carries a
+    // `ItemKind::GroomingBrush` (016 Phase 2). `1.0` for the no-tool
+    // case; `crafting.groom_brush_fondness_multiplier` (default 1.5)
+    // when the brush is present. Per the "items are real" pillar
+    // the effect lives on the action resolver keyed to item
+    // identity, not on a modifier field on the item type. Caller
+    // emits `Feature::GroomingBrushUsed` when > 1.0.
+    brush_multiplier: f32,
 ) -> StepOutcome<Option<GroomOutcome>> {
     if let Some(target) = target_entity {
         let target_grooming = grooming_snapshot.get(&target).copied().unwrap_or(0.8);
@@ -91,7 +102,7 @@ pub fn resolve_groom_other(
         relationships.modify_fondness(
             cat_entity,
             target,
-            d.groom_other_fondness_per_tick * fondness_mod * pairing_bias,
+            d.groom_other_fondness_per_tick * fondness_mod * pairing_bias * brush_multiplier,
         );
         relationships.modify_familiarity(
             cat_entity,
@@ -188,6 +199,7 @@ mod tests {
             &disp,
             &fc,
             1.0,
+            1.0, // brush_multiplier — no brush in test
         );
 
         assert!(matches!(outcome.result, StepResult::Advance));
@@ -224,6 +236,7 @@ mod tests {
             &disp,
             &fc,
             1.0,
+            1.0, // brush_multiplier — no brush in test
         );
 
         assert!(
@@ -259,6 +272,7 @@ mod tests {
             &disp,
             &fc,
             1.0,
+            1.0, // brush_multiplier — no brush in test
         );
 
         let groom = outcome

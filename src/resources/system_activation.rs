@@ -648,6 +648,25 @@ pub enum Feature {
     /// or `resolve_engage_prey` itself isn't firing — the 367-class
     /// silent-producer dormancy this canary exists to catch.
     ByproductSpawned,
+
+    /// Ticket 368 — `resolve_groom_other` ran with the actor's
+    /// `Inventory` containing a `GroomingBrush`. Positive — the
+    /// 016 Phase 2 behavioral-tool substrate is exercising the
+    /// grooming canary. Ships dormant (`expected_to_fire_per_soak()
+    /// => false`) until the Workshop-craft pipeline follow-on
+    /// lands and brushes actually circulate in seed-42; until then
+    /// no cat carries a brush in a healthy soak and this canary
+    /// cannot fire. The resolver branch + emission ARE wired so
+    /// the test scenarios that hand-place a brush exercise it.
+    GroomingBrushUsed,
+    /// Ticket 368 — `resolve_socialize` ran with either participant's
+    /// `Inventory` containing a `PlayBundle`. Positive — paired
+    /// with `GroomingBrushUsed`. Ships dormant for the same reason.
+    PlayBundleEngaged,
+    /// Ticket 368 — `resolve_mate_with` ran with the courting cat's
+    /// `Inventory` containing a `CourtshipGift`. Positive — paired
+    /// with `GroomingBrushUsed`. Ships dormant for the same reason.
+    CourtshipGiftOffered,
 }
 
 impl Feature {
@@ -855,6 +874,12 @@ impl Feature {
         Feature::ByproductSpawned,
         // 450: kitten begs for food canary.
         Feature::KittenBegged,
+        // 368: Phase 2 behavioral-tool canaries. Ship dormant (see
+        // each variant's doc-comment) until the Workshop-craft
+        // pipeline follow-on lands and tools circulate in seed-42.
+        Feature::GroomingBrushUsed,
+        Feature::PlayBundleEngaged,
+        Feature::CourtshipGiftOffered,
     ];
 
     /// The valence of this feature.
@@ -1003,6 +1028,10 @@ impl Feature {
             Feature::KittenReleased => Positive,
             // 375: prey-byproduct producer canary.
             Feature::ByproductSpawned => Positive,
+            // 368: Phase 2 behavioral-tool canaries.
+            Feature::GroomingBrushUsed => Positive,
+            Feature::PlayBundleEngaged => Positive,
+            Feature::CourtshipGiftOffered => Positive,
             // 450: kitten begs for food.
             Feature::KittenBegged => Positive,
 
@@ -1387,6 +1416,17 @@ impl Feature {
             // seed-42 soak runs dozens of hunts. Zero count = silent
             // producer dormancy class (the canary's purpose).
             Feature::ByproductSpawned => true,
+            // 368: behavioral-tool canaries ship dormant. The
+            // Workshop-craft pipeline follow-on flips these to
+            // `true` once cats craft + circulate the tools in
+            // seed-42. Until then, no cat carries a brush / bundle
+            // / gift in a healthy soak, so the canary's never-fired
+            // tripwire would fail spuriously. The resolver branches
+            // and emission sites ARE wired so scenario tests that
+            // hand-place a tool exercise the canary.
+            Feature::GroomingBrushUsed => false,
+            Feature::PlayBundleEngaged => false,
+            Feature::CourtshipGiftOffered => false,
             // 450 + 451: kitten begging canary. Substrate lifted in 451
             // (kittens enter L2 scoring via the life-stage gate, the
             // BegForFood DSE has Newborn/EyesOpen/Incapacitated siblings,
@@ -1713,6 +1753,10 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::KittenReleased => "KittenReleased",
         // 375: prey-byproduct producer canary.
         Feature::ByproductSpawned => "ByproductSpawned",
+        // 368: Phase 2 behavioral-tool canaries.
+        Feature::GroomingBrushUsed => "GroomingBrushUsed",
+        Feature::PlayBundleEngaged => "PlayBundleEngaged",
+        Feature::CourtshipGiftOffered => "CourtshipGiftOffered",
         // 450: kitten begs for food canary.
         Feature::KittenBegged => "KittenBegged",
     }
@@ -1922,7 +1966,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 152;
+        const EXPECTED_VARIANT_COUNT: usize = 155;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2047,7 +2091,11 @@ mod tests {
         // each tick a Stage 1 or Stage 2 kitten holds the Begging
         // disposition; the resolver records the canary on every cycle
         // completion (`expected_to_fire_per_soak() => true`).
-        assert_eq!(positive, 86);
+        // Ticket 368: +3 Positive (GroomingBrushUsed, PlayBundleEngaged,
+        // CourtshipGiftOffered) for the Phase 2 behavioral-tool
+        // canaries. All ship dormant (`=> false`) until the Workshop-
+        // craft pipeline follow-on circulates the tools in seed-42.
+        assert_eq!(positive, 89);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -2146,9 +2194,11 @@ mod tests {
         // Ticket 367 Commit 4: +6 Positive preservation Features.
         // Ticket 375: +1 Positive (ByproductSpawned) for prey-byproduct
         // producer canary.
+        // Ticket 368: +3 Positive (GroomingBrushUsed, PlayBundleEngaged,
+        // CourtshipGiftOffered) for Phase 2 behavioral-tool canaries.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            86
+            89
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

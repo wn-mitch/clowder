@@ -4381,6 +4381,14 @@ fn dispatch_chain_step(
                     );
                 }
             }
+            // 368: Phase 2 — PlayBundle on actor scales social
+            // fondness; emits `Feature::PlayBundleEngaged` when > 1.0.
+            let bundle_multiplier =
+                if inventory.has_item(crate::components::items::ItemKind::PlayBundle) {
+                    constants.crafting.play_bundle_social_multiplier
+                } else {
+                    1.0
+                };
             let outcome = crate::steps::disposition::resolve_socialize(
                 ticks,
                 cat_entity,
@@ -4396,8 +4404,14 @@ fn dispatch_chain_step(
                 d,
                 &constants.fulfillment,
                 pairing_bias,
+                bundle_multiplier,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::Socialized);
+            if bundle_multiplier > 1.0 && outcome.witness {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::PlayBundleEngaged);
+                }
+            }
             apply_step_result(outcome.result, chain, current);
         }
 
@@ -4434,6 +4448,15 @@ fn dispatch_chain_step(
                     );
                 }
             }
+            // 368: Phase 2 — GroomingBrush presence scales the
+            // fondness delta. Caller emits `Feature::GroomingBrushUsed`
+            // on a witnessed Advance when the multiplier was > 1.0.
+            let brush_multiplier =
+                if inventory.has_item(crate::components::items::ItemKind::GroomingBrush) {
+                    constants.crafting.groom_brush_fondness_multiplier
+                } else {
+                    1.0
+                };
             let outcome = crate::steps::disposition::resolve_groom_other(
                 ticks,
                 cat_entity,
@@ -4449,8 +4472,15 @@ fn dispatch_chain_step(
                 d,
                 &constants.fulfillment,
                 pairing_bias,
+                brush_multiplier,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::GroomedOther);
+            if brush_multiplier > 1.0 && matches!(outcome.result, crate::steps::StepResult::Advance)
+            {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::GroomingBrushUsed);
+                }
+            }
             if let Some(r) = outcome.witness {
                 accum.grooming_restorations.push(r);
             }
@@ -4626,6 +4656,14 @@ fn dispatch_chain_step(
             let step = chain.current_mut().unwrap();
             let target = step.target_entity;
             let target_gender = target.and_then(|t| snaps.gender.get(&t).copied());
+            // 368: Phase 2 — CourtshipGift on courting cat scales the
+            // romantic delta; emits `Feature::CourtshipGiftOffered`.
+            let gift_multiplier =
+                if inventory.has_item(crate::components::items::ItemKind::CourtshipGift) {
+                    constants.crafting.courtship_gift_romantic_multiplier
+                } else {
+                    1.0
+                };
             let outcome = crate::steps::disposition::resolve_mate_with(
                 ticks,
                 cat_entity,
@@ -4634,8 +4672,17 @@ fn dispatch_chain_step(
                 target_gender,
                 needs,
                 relationships,
+                gift_multiplier,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MatingOccurred);
+            if gift_multiplier > 1.0
+                && matches!(outcome.result, crate::steps::StepResult::Advance)
+                && target.is_some()
+            {
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(Feature::CourtshipGiftOffered);
+                }
+            }
             // §Phase 5a: CourtshipInteraction for Tom×Tom or any
             // target-present, no-pregnancy Advance.
             if matches!(outcome.result, crate::steps::StepResult::Advance)

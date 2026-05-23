@@ -89,6 +89,48 @@ rows = 40
 tile = 16
 note = "World of Solaria crafting-materials objects (shadowed variant) — 1760 cells. Metal ores/bars/sheets, buckets, hoe/shovel/watering-can/pickaxe/axe/bug-net/hammer, plus stations (Charcoal Kiln, Furnace, Crystalarium, Lightning Rod, Solar Panel, Recycler, Bone Mill, Rock Crusher)."
 
+[atlases.solaria_icons_no_shadow]
+texture = "sprites/Solaria Crafting/Solaria Crafting 03a/No Shadows/Icons/Crafting Materials Icons.png"
+cols = 42
+rows = 42
+tile = 16
+note = "World of Solaria crafting-materials icons (no-shadow variant) — same layout as solaria_icons, lighter style for cleaner pixel art."
+
+[atlases.solaria_objects_no_shadow]
+texture = "sprites/Solaria Crafting/Solaria Crafting 03a/No Shadows/Objects/Crafting Materials Objects.png"
+cols = 44
+rows = 40
+tile = 16
+note = "World of Solaria crafting-materials objects (no-shadow variant) — same layout as solaria_objects."
+
+[atlases.items_eggs]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/egg-items.png"
+cols = 5
+rows = 1
+tile = 16
+note = "Premium egg items — 5 colored eggs in a single row."
+
+[atlases.items_farming_plants]
+texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Items/farming-Plants-items.png"
+cols = 2
+rows = 15
+tile = 16
+note = "Premium farming-plants items — 30 cells of crops (potatoes, carrots, tomatoes, etc. at growth stages)."
+
+[atlases.fantasy_rocks]
+texture = "sprites/The Fan-tasy Tileset (Premium)/Art/Rocks/Atlas/Atlas_Rocks.png"
+cols = 63
+rows = 48
+tile = 16
+note = "Fan-tasy rocks atlas (Premium) — 1008×768 = 3024 cells. Rocks/stones in many shapes and sizes; source for refined-stone identities (PolishedStone, ShinyPebble) and rocky textures."
+
+[atlases.fantasy_rocks_snow]
+texture = "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Rocks/Atlas/Rocks_Snow.png"
+cols = 63
+rows = 48
+tile = 16
+note = "Fan-tasy rocks atlas (Snow Adventures) — same layout as fantasy_rocks with snow-dusted variants."
+
 [atlases.trees]
 texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Tree animations/tree_sprites.png"
 cols = 12
@@ -164,8 +206,8 @@ index = 11
 note = "GRASS"
 
 [items.Feather]
-atlas = "items"
-index = 65
+atlas = "solaria_icons"
+index = 528
 note = "leaf shape"
 
 [items.HerbHealingMoss]
@@ -214,8 +256,8 @@ index = 42
 note = "STONE"
 
 [items.GlassShard]
-atlas = "items"
-index = 43
+atlas = "solaria_icons"
+index = 363
 note = "ROCK"
 
 [items.ColorfulShell]
@@ -224,8 +266,8 @@ index = 93
 note = "PINKEGG (colorful rounded shape)"
 
 [items.ShadowBone]
-atlas = "items"
-index = 43
+atlas = "solaria_icons"
+index = 531
 note = "ROCK (dark bone-like)"
 
 [items.Barrel]
@@ -244,8 +286,8 @@ index = 34
 note = "PLANK"
 
 [items.Wood]
-atlas = "items"
-index = 34
+atlas = "solaria_objects"
+index = 27
 note = "PLANK"
 
 [items.Stone]
@@ -284,8 +326,8 @@ index = 1
 note = "meat cut"
 
 [items.PreservedOrgan]
-atlas = "items"
-index = 1
+atlas = "solaria_icons"
+index = 0
 note = "meat cut"
 
 [items.Bone]
@@ -309,8 +351,8 @@ index = 34
 note = "PLANK (flat sheet)"
 
 [items.FishScale]
-atlas = "items"
-index = 42
+atlas = "solaria_objects"
+index = 431
 note = "STONE (small flat fragments)"
 
 [items.Tallow]
@@ -318,22 +360,19 @@ atlas = "items"
 index = 30
 note = "LARGEBROWNJAR (rendered fat in container)"
 
-# Ticket 368 — 016 Phase 2 inputs + behavioral tools. All bound to
-# cells in the registered Premium item atlases above. Repick visually
-# in #/sprites once the art pass settles each identity.
 [items.Twig]
 atlas = "solaria_icons"
-index = 800
+index = 31
 note = "Solaria Stick row, col 2 (row 19 × 42 + 2) — labelled \"Stick\" in the Solaria guide"
 
 [items.Bristle]
 atlas = "solaria_icons"
-index = 254
+index = 276
 note = "Solaria Pelt row, col 2 (row 6 × 42 + 2) — labelled \"Pelt\" in the Solaria guide"
 
 [items.Fiber]
 atlas = "solaria_icons"
-index = 128
+index = 66
 note = "Solaria String row, col 2 (row 3 × 42 + 2) — labelled \"String\" in the Solaria guide"
 
 [items.Flower]
@@ -342,13 +381,13 @@ index = 24
 note = "flower row of Mushrooms/Flowers/Stones (herbs atlas row 2 col 0)"
 
 [items.PolishedStone]
-atlas = "tools_n_materials"
-index = 9
+atlas = "solaria_icons"
+index = 405
 note = "stone tile (tools_n_materials row 2 col 1) — refined/shaped stone"
 
 [items.GroomingBrush]
-atlas = "tools_n_materials"
-index = 5
+atlas = "solaria_objects"
+index = 622
 note = "small-tool tile (tools_n_materials row 1 col 1) — brush/comb identity"
 
 [items.PlayBundle]
