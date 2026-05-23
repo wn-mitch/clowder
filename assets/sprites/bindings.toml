@@ -158,13 +158,13 @@ index = 0
 note = "drumstick"
 
 [items.RawRat]
-atlas = "items"
-index = 1
+atlas = "food"
+index = 44
 note = "meat cut"
 
 [items.RawRabbit]
-atlas = "items"
-index = 1
+atlas = "food"
+index = 50
 note = "meat cut"
 
 [items.RawFish]
@@ -173,8 +173,8 @@ index = 66
 note = "PEAR (closest fish shape in this pack)"
 
 [items.RawBird]
-atlas = "items"
-index = 0
+atlas = "food"
+index = 25
 note = "drumstick (poultry)"
 
 [items.Berries]
@@ -183,8 +183,8 @@ index = 82
 note = "STRAWBERRY"
 
 [items.Nuts]
-atlas = "items"
-index = 50
+atlas = "food"
+index = 30
 note = "APPLE (round food, nut stand-in)"
 
 [items.Roots]
@@ -318,23 +318,23 @@ index = 84
 note = "GREENBOTTLE"
 
 [items.RawOrgan]
-atlas = "items"
-index = 1
+atlas = "food"
+index = 45
 note = "meat cut"
 
 [items.DriedFish]
-atlas = "items"
-index = 66
+atlas = "food"
+index = 23
 note = "PEAR (fish shape; signals fish-origin)"
 
 [items.SmokedMeat]
-atlas = "items"
-index = 1
+atlas = "food"
+index = 41
 note = "meat cut"
 
 [items.PreservedOrgan]
-atlas = "solaria_icons"
-index = 0
+atlas = "food"
+index = 45
 note = "meat cut"
 
 [items.Bone]
@@ -343,8 +343,8 @@ index = 43
 note = "ROCK (bone-like)"
 
 [items.Sinew]
-atlas = "items"
-index = 11
+atlas = "solaria_icons"
+index = 1072
 note = "GRASS (fibrous strand)"
 
 [items.Whisker]

@@ -3301,9 +3301,12 @@ pub struct DispositionConstants {
     /// foraged food, as a separate `OnGround` `Item` entity. Preserves
     /// food throughput on successful forages while adding ingredient
     /// supply for the Grooming Brush / Play Bundle / Courtship Gift
-    /// recipes. 0.30 is the first-light value; tune via sweep if
-    /// ingredient throughput is too sparse or too dense relative to
-    /// the recipe demand.
+    /// recipes. `0.10` is the first-light value (tuned down from an
+    /// initial 0.30 after seed-42 wall-clock verification showed the
+    /// MatingOccurred canary never-fired due to ~28% fewer ticks per
+    /// second from the extra entity churn). Tune via sweep once the
+    /// Workshop-craft pipeline (ticket 457) lands and recipes actually
+    /// consume the ingredients.
     pub forage_ingredient_drop_chance: f32,
     pub deposit_quality_base: f32,
     pub deposit_quality_skill_scale: f32,
@@ -4966,7 +4969,7 @@ impl Default for DispositionConstants {
             forage_yield_scale: 0.35,
             forage_skill_growth: 0.0008,
             forage_timeout_ticks: 40,
-            forage_ingredient_drop_chance: 0.30,
+            forage_ingredient_drop_chance: 0.10,
             deposit_quality_base: 0.3,
             deposit_quality_skill_scale: 0.4,
             eat_at_stores_duration: 50,
