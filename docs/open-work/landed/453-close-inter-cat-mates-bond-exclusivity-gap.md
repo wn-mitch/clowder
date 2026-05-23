@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: pending
+landed-at: 4630cf9aa266
 landed-on: 2026-05-23
 orchestration: substrate-sensitive
 ---
