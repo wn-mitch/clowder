@@ -196,6 +196,17 @@ pub fn resolve_mate_target(
         if !matches!(bond, BondType::Partners | BondType::Mates) {
             continue;
         }
+        // Ticket 453: skip candidates already Mates-bonded to a third
+        // party. The actor-side check is unnecessary here — the
+        // Partners|Mates filter above already restricts the candidate
+        // set to the actor's bonded partner when the actor itself is
+        // Mates-locked.
+        let other_mated_elsewhere = relationships
+            .iter_for(*other)
+            .any(|(third, third_rel)| third != cat && third_rel.bond == Some(BondType::Mates));
+        if other_mated_elsewhere {
+            continue;
+        }
         scratch.entities.push(*other);
         scratch.positions.push(*other_pos);
     }
@@ -504,5 +515,80 @@ mod tests {
             Intention::Activity { kind, .. } => assert_eq!(kind, ActivityKind::Pairing),
             _ => panic!("expected Activity intention"),
         }
+    }
+
+    #[test]
+    fn resolver_skips_candidate_mated_elsewhere() {
+        // Ticket 453 — candidate-side exclusivity gate. Cat A is
+        // Partners with B; B is Mates with C. The resolver must skip
+        // B as a target so A doesn't poach a Mates-locked partner.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(mate_target_dse());
+        let cat_a = Entity::from_raw_u32(1).unwrap();
+        let cat_b = Entity::from_raw_u32(2).unwrap();
+        let cat_c = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        // A↔B Partners (would otherwise pass the resolver filter).
+        let ab = relationships.get_or_insert(cat_a, cat_b);
+        ab.fondness = 0.8;
+        ab.romantic = 0.8;
+        ab.bond = Some(BondType::Partners);
+        // B↔C Mates — B is exclusively bonded elsewhere.
+        let bc = relationships.get_or_insert(cat_b, cat_c);
+        bc.fondness = 0.9;
+        bc.romantic = 0.9;
+        bc.bond = Some(BondType::Mates);
+
+        let cat_positions = vec![(cat_b, Position::new(1, 0))];
+        let out = resolve_mate_target(
+            &registry,
+            cat_a,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            0,
+            None,
+            None,
+            8000,
+            None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert!(
+            out.is_none(),
+            "B is Mates-bonded with C; must not be selected as A's target; got {out:?}"
+        );
+    }
+
+    #[test]
+    fn resolver_keeps_actors_own_mate_when_already_bonded() {
+        // Ticket 453 — actor-side check: A is Mates with B. B is *not*
+        // mated elsewhere. The existing Partners|Mates filter naturally
+        // selects B (the actor's own mate), and the new third-party gate
+        // doesn't fire because B's only Mates bond is with A itself.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(mate_target_dse());
+        let cat_a = Entity::from_raw_u32(1).unwrap();
+        let cat_b = Entity::from_raw_u32(2).unwrap();
+        let mut relationships = Relationships::default();
+        let ab = relationships.get_or_insert(cat_a, cat_b);
+        ab.fondness = 0.8;
+        ab.romantic = 0.8;
+        ab.bond = Some(BondType::Mates);
+
+        let cat_positions = vec![(cat_b, Position::new(1, 0))];
+        let out = resolve_mate_target(
+            &registry,
+            cat_a,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            0,
+            None,
+            None,
+            8000,
+            None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(out, Some(cat_b));
     }
 }

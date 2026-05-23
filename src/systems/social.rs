@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use bevy_ecs::prelude::*;
 
@@ -324,6 +324,65 @@ struct CourtshipFitness {
     orientation: Orientation,
 }
 
+/// Collect existing `BondType::Mates` partners per cat from the relationship
+/// graph. Both directions of each Mates pair contribute: the pair (a, b)
+/// adds `b` to `by_cat[a]` and `a` to `by_cat[b]`.
+///
+/// Ticket 453: feeds the exclusivity invariant in [`check_bonds`] — a cat
+/// with more than one Mates partner needs all but its canonical partner
+/// demoted.
+fn mates_partners_by_cat(relationships: &Relationships) -> BTreeMap<Entity, Vec<Entity>> {
+    let mut by_cat: BTreeMap<Entity, Vec<Entity>> = BTreeMap::new();
+    for ((a, b), rel) in relationships.iter() {
+        if rel.bond == Some(BondType::Mates) {
+            by_cat.entry(a).or_default().push(b);
+            by_cat.entry(b).or_default().push(a);
+        }
+    }
+    by_cat
+}
+
+/// From a per-cat Mates-partner map, identify the pair keys that must be
+/// demoted to satisfy the "at most one Mates per cat" invariant.
+/// Deterministic by `Entity::index()` ascending — matches the canonical
+/// ordering [`Relationships`] already uses in `normalize_key`.
+///
+/// A cat's *canonical* Mates partner is the partner with the lowest
+/// `Entity::index()`. A pair (a, b) survives iff a's canonical is b AND
+/// b's canonical is a; any other Mates pair is demoted. This breaks
+/// triangular polyamory deterministically: in {A-B, A-C, B-C}, the
+/// indices order one pair as canonical for both ends, and the other two
+/// drop to Partners.
+fn collect_excess_mates_to_demote(
+    by_cat: &BTreeMap<Entity, Vec<Entity>>,
+) -> BTreeSet<(Entity, Entity)> {
+    let canonical: BTreeMap<Entity, Entity> = by_cat
+        .iter()
+        .filter_map(|(cat, partners)| {
+            partners
+                .iter()
+                .min_by_key(|e| e.index())
+                .map(|p| (*cat, *p))
+        })
+        .collect();
+    let mut to_demote = BTreeSet::new();
+    for (cat, partners) in by_cat {
+        let mine = canonical.get(cat).copied();
+        for other in partners {
+            let theirs = canonical.get(other).copied();
+            if mine != Some(*other) || theirs != Some(*cat) {
+                let pair = if cat.index() <= other.index() {
+                    (*cat, *other)
+                } else {
+                    (*other, *cat)
+                };
+                to_demote.insert(pair);
+            }
+        }
+    }
+    to_demote
+}
+
 /// Periodically check all relationships and upgrade bonds when thresholds are
 /// met. Emits Tier::Significant narrative on bond formation.
 ///
@@ -331,6 +390,16 @@ struct CourtshipFitness {
 /// adult cats whose fondness and familiarity have crossed the courtship
 /// gates. Without this, romantic stays at 0.0 forever — the MateWith step is
 /// the only other writer, and it requires a Partners bond to reach.
+///
+/// **Mates exclusivity** (ticket 453): at most one `BondType::Mates` bond
+/// per cat is enforced as a current-substrate-shape invariant. A pre-loop
+/// migration pass demotes excess pre-existing Mates bonds to Partners
+/// deterministically (lowest `Entity::index()` wins). In the main pair
+/// loop, a Mates promotion is capped at Partners when either side already
+/// holds a Mates bond elsewhere. This is a promotion-time invariant,
+/// *not* a semantic property of `BondType::Mates` — future romantic-depth
+/// work (infidelity, polyamory, jealousy) flips the gate without
+/// redefining the bond type.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn check_bonds(
     time: Res<TimeState>,
@@ -372,6 +441,29 @@ pub fn check_bonds(
                 },
             )
         })
+        .collect();
+
+    // Ticket 453 — migration: demote any cat's excess Mates bonds to
+    // Partners. Idempotent once the invariant holds (`to_demote` is empty
+    // when every cat has ≤1 Mates partner).
+    {
+        let by_cat = mates_partners_by_cat(&relationships);
+        let to_demote = collect_excess_mates_to_demote(&by_cat);
+        for (a, b) in to_demote {
+            if let Some(rel) = relationships.get_mut(a, b) {
+                rel.bond = Some(BondType::Partners);
+            }
+        }
+    }
+
+    // Ticket 453 — set of cats currently holding a Mates bond. Kept in
+    // sync below: any new Mates promotion inserts both sides; the
+    // pre-loop migration has already collapsed pre-existing polyamory
+    // so this set is invariant-correct on entry.
+    let mut mates_holders: BTreeSet<Entity> = relationships
+        .iter()
+        .filter(|(_, rel)| rel.bond == Some(BondType::Mates))
+        .flat_map(|((a, b), _)| [a, b])
         .collect();
 
     for ((a, b), rel) in relationships.pairs_iter_mut() {
@@ -421,7 +513,7 @@ pub fn check_bonds(
             }
         }
 
-        let new_bond = if romantic_eligible
+        let proposed_new_bond = if romantic_eligible
             && rel.romantic > c.mates_romantic_threshold
             && rel.fondness > c.mates_fondness_threshold
             && rel.familiarity > c.mates_familiarity_threshold
@@ -441,9 +533,26 @@ pub fn check_bonds(
             None
         };
 
+        // Ticket 453: exclusivity cap. A pair already at Mates is allowed
+        // to stay there (old_bond == Some(Mates)). A new Mates promotion
+        // is capped at Partners when either side already holds a Mates
+        // bond elsewhere.
+        let new_bond = if proposed_new_bond == Some(BondType::Mates)
+            && old_bond != Some(BondType::Mates)
+            && (mates_holders.contains(&a) || mates_holders.contains(&b))
+        {
+            Some(BondType::Partners)
+        } else {
+            proposed_new_bond
+        };
+
         // Only upgrade bonds, never downgrade.
         if new_bond > old_bond {
             rel.bond = new_bond;
+            if new_bond == Some(BondType::Mates) {
+                mates_holders.insert(a);
+                mates_holders.insert(b);
+            }
             activation.record(Feature::BondFormed);
             if let Some(ref mut score) = colony_score {
                 score.bonds_formed += 1;
@@ -472,6 +581,14 @@ pub fn check_bonds(
             }
         }
     }
+
+    debug_assert!(
+        {
+            let post = mates_partners_by_cat(&relationships);
+            post.values().all(|partners| partners.len() <= 1)
+        },
+        "check_bonds invariant (ticket 453): every cat must hold at most 1 Mates bond"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1272,6 +1389,191 @@ mod tests {
                 .get::<crate::components::markers::BefriendedAlly>(fox_a)
                 .is_none(),
             "fox_a's max familiarity (0.4) is below threshold; should not carry marker"
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // Ticket 453 — Mates-exclusivity invariant helpers (pure-function
+    // unit tests against `mates_partners_by_cat` /
+    // `collect_excess_mates_to_demote`).
+    // ---------------------------------------------------------------------
+
+    fn make_pair_at_mates(rels: &mut Relationships, a: Entity, b: Entity) {
+        let rel = rels.get_or_insert(a, b);
+        rel.bond = Some(BondType::Mates);
+        rel.romantic = 0.9;
+        rel.fondness = 0.9;
+        rel.familiarity = 0.9;
+    }
+
+    #[test]
+    fn mates_partners_by_cat_counts_both_directions() {
+        let mut world = World::new();
+        let a = world.spawn_empty().id();
+        let b = world.spawn_empty().id();
+        let mut rels = Relationships::default();
+        make_pair_at_mates(&mut rels, a, b);
+
+        let by_cat = mates_partners_by_cat(&rels);
+        assert_eq!(by_cat.get(&a).map(|v| v.as_slice()), Some(&[b][..]));
+        assert_eq!(by_cat.get(&b).map(|v| v.as_slice()), Some(&[a][..]));
+    }
+
+    #[test]
+    fn collect_excess_mates_demotes_one_side_of_v_shape() {
+        // V-shape: A has Mates(B) and Mates(C). B and C only mate A.
+        // A's canonical partner is the lower-index of {B, C}; say B.
+        // Then (A, B) survives, (A, C) demoted.
+        let mut world = World::new();
+        let a = world.spawn_empty().id();
+        let b = world.spawn_empty().id();
+        let c = world.spawn_empty().id();
+        assert!(b.index() < c.index(), "test relies on spawn order");
+
+        let mut rels = Relationships::default();
+        make_pair_at_mates(&mut rels, a, b);
+        make_pair_at_mates(&mut rels, a, c);
+
+        let by_cat = mates_partners_by_cat(&rels);
+        let to_demote = collect_excess_mates_to_demote(&by_cat);
+
+        let pair_ab = if a.index() <= b.index() {
+            (a, b)
+        } else {
+            (b, a)
+        };
+        let pair_ac = if a.index() <= c.index() {
+            (a, c)
+        } else {
+            (c, a)
+        };
+        assert!(!to_demote.contains(&pair_ab), "canonical pair must survive");
+        assert!(
+            to_demote.contains(&pair_ac),
+            "non-canonical pair must demote"
+        );
+    }
+
+    #[test]
+    fn collect_excess_mates_breaks_triangle_to_one_pair() {
+        // Triangle: A-B, A-C, B-C all at Mates. Each cat has 2 Mates
+        // partners. Canonical partner is the lowest-index neighbor;
+        // only one pair has matching canonicals on both ends.
+        let mut world = World::new();
+        let a = world.spawn_empty().id();
+        let b = world.spawn_empty().id();
+        let c = world.spawn_empty().id();
+
+        let mut rels = Relationships::default();
+        make_pair_at_mates(&mut rels, a, b);
+        make_pair_at_mates(&mut rels, a, c);
+        make_pair_at_mates(&mut rels, b, c);
+
+        let by_cat = mates_partners_by_cat(&rels);
+        let to_demote = collect_excess_mates_to_demote(&by_cat);
+        assert_eq!(
+            to_demote.len(),
+            2,
+            "triangle collapses to one surviving Mates pair; got {to_demote:?}"
+        );
+
+        // Apply the demotions and verify the invariant.
+        for (x, y) in &to_demote {
+            rels.get_mut(*x, *y).unwrap().bond = Some(BondType::Partners);
+        }
+        let after = mates_partners_by_cat(&rels);
+        assert!(
+            after.values().all(|partners| partners.len() <= 1),
+            "post-demote invariant: every cat ≤ 1 Mates partner; got {after:?}"
+        );
+    }
+
+    #[test]
+    fn check_bonds_refuses_second_mates_promotion() {
+        // A already Mates with B. A↔C primed above Mates thresholds —
+        // pre-453 would promote to Mates on the next check_bonds tick.
+        // The exclusivity gate caps the new bond at Partners.
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        let a = spawn_adult(&mut world, "Fern", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+        let c = spawn_adult(&mut world, "Tamsin", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        let ab = rels.get_or_insert(a, b);
+        ab.bond = Some(BondType::Mates);
+        ab.fondness = 0.9;
+        ab.familiarity = 0.9;
+        ab.romantic = 0.9;
+        let ac = rels.get_or_insert(a, c);
+        ac.fondness = 0.9;
+        ac.familiarity = 0.9;
+        ac.romantic = 0.9;
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let rels = world.resource::<Relationships>();
+        assert_eq!(
+            rels.get(a, b).unwrap().bond,
+            Some(BondType::Mates),
+            "the existing Mates pair stays at Mates"
+        );
+        assert_eq!(
+            rels.get(a, c).unwrap().bond,
+            Some(BondType::Partners),
+            "second Mates promotion capped at Partners by the exclusivity gate"
+        );
+    }
+
+    #[test]
+    fn check_bonds_demotes_pre_existing_polyamory_to_one_partner() {
+        // Pre-seed an invalid state: A-Mates(B) AND A-Mates(C). One tick
+        // of check_bonds migrates the colony to the invariant by
+        // demoting the non-canonical pair to Partners.
+        let adult_tick = 50 + 20_000 * 12;
+        let (mut world, mut schedule) = bond_test_world(adult_tick);
+        let a = spawn_adult(&mut world, "Fern", Gender::Queen, Orientation::Straight);
+        let b = spawn_adult(&mut world, "Reed", Gender::Tom, Orientation::Straight);
+        let c = spawn_adult(&mut world, "Tamsin", Gender::Tom, Orientation::Straight);
+
+        let mut rels = Relationships::default();
+        make_pair_at_mates(&mut rels, a, b);
+        make_pair_at_mates(&mut rels, a, c);
+        world.insert_resource(rels);
+
+        schedule.run(&mut world);
+
+        let rels = world.resource::<Relationships>();
+        let a_mates: Vec<_> = rels
+            .iter_for(a)
+            .filter(|(_, rel)| rel.bond == Some(BondType::Mates))
+            .collect();
+        assert_eq!(
+            a_mates.len(),
+            1,
+            "A must end with exactly 1 Mates bond after migration; got {a_mates:?}"
+        );
+    }
+
+    #[test]
+    fn collect_excess_mates_is_noop_when_invariant_holds() {
+        // Two disjoint Mates pairs — no demotions needed.
+        let mut world = World::new();
+        let a = world.spawn_empty().id();
+        let b = world.spawn_empty().id();
+        let c = world.spawn_empty().id();
+        let d = world.spawn_empty().id();
+
+        let mut rels = Relationships::default();
+        make_pair_at_mates(&mut rels, a, b);
+        make_pair_at_mates(&mut rels, c, d);
+
+        let by_cat = mates_partners_by_cat(&rels);
+        let to_demote = collect_excess_mates_to_demote(&by_cat);
+        assert!(
+            to_demote.is_empty(),
+            "no demotions when each cat already has ≤1 Mates partner"
         );
     }
 }

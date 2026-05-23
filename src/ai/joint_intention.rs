@@ -387,6 +387,16 @@ fn pick_courtship_partner(
     relationships: &Relationships,
     practice_constants: &CourtshipPracticeConstants,
 ) -> Option<Entity> {
+    // Ticket 453: Mates-exclusivity perception gate. A cat already in a
+    // `BondType::Mates` bond does not emit new Courtship JointIntentions
+    // toward third parties under the current substrate shape.
+    if relationships
+        .iter_for(self_entity)
+        .any(|(_, rel)| rel.bond == Some(BondType::Mates))
+    {
+        return None;
+    }
+
     let range = practice_constants.candidate_range;
     let weights = (
         practice_constants.quality_fondness_weight,
@@ -423,6 +433,13 @@ fn pick_courtship_partner(
         };
         let bond_score = bond_tier_score(rel.bond);
         if bond_score == 0.0 {
+            continue;
+        }
+        // Ticket 453: skip candidates already Mates-bonded to a third
+        // party. (Self-Mates already excluded by the early return above.)
+        if relationships.iter_for(*other).any(|(third, third_rel)| {
+            third != self_entity && third_rel.bond == Some(BondType::Mates)
+        }) {
             continue;
         }
         let fondness = rel.fondness.max(0.0);
@@ -792,6 +809,131 @@ mod tests {
                 .unwrap_or(0)
                 >= 1,
             "JointIntentionDropped fires on the cascade"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // Ticket 453 — Mates-exclusivity perception gates on
+    // `pick_courtship_partner`. The matchmaker refuses to emit a
+    // Courtship intention when the actor is already Mates-bonded, and
+    // skips candidates already Mates-bonded with a third party.
+    // -----------------------------------------------------------------
+
+    fn default_eligible_fitness(gender: Gender) -> MatingFitness {
+        MatingFitness {
+            stage: LifeStage::Adult,
+            gender,
+            orientation: Orientation::Straight,
+            mood_valence: 0.5,
+            hunger: 0.9,
+            energy: 0.9,
+            is_pregnant: false,
+            fertility_phase: if matches!(gender, Gender::Tom) {
+                None
+            } else {
+                Some(FertilityPhase::Estrus)
+            },
+            body_condition: 1.0,
+        }
+    }
+
+    #[test]
+    fn pick_courtship_partner_returns_none_when_self_already_mated() {
+        let mut world = World::new();
+        let a = world.spawn_empty().id();
+        let b = world.spawn_empty().id();
+        let c = world.spawn_empty().id();
+
+        let mut fitness: HashMap<Entity, MatingFitness> = HashMap::new();
+        fitness.insert(a, default_eligible_fitness(Gender::Queen));
+        fitness.insert(b, default_eligible_fitness(Gender::Tom));
+        fitness.insert(c, default_eligible_fitness(Gender::Tom));
+
+        let mut rels = Relationships::default();
+        // A is already Mates with B — exclusivity precondition.
+        let ab = rels.get_or_insert(a, b);
+        ab.bond = Some(BondType::Mates);
+        ab.fondness = 0.8;
+        ab.romantic = 0.8;
+        // A and C also share a strong courtship-bonded relationship that
+        // would otherwise qualify C as a target.
+        let ac = rels.get_or_insert(a, c);
+        ac.bond = Some(BondType::Partners);
+        ac.fondness = 0.8;
+        ac.romantic = 0.8;
+
+        let positions = vec![
+            (a, Position::new(0, 0)),
+            (b, Position::new(1, 0)),
+            (c, Position::new(2, 0)),
+        ];
+        let constants = SimConstants::default();
+        let picked = pick_courtship_partner(
+            a,
+            &Position::new(0, 0),
+            default_eligible_fitness(Gender::Queen),
+            &positions,
+            &fitness,
+            &rels,
+            &constants.practices.courtship,
+        );
+        assert!(
+            picked.is_none(),
+            "actor already Mates-bonded must not emit new courtship; got {picked:?}"
+        );
+    }
+
+    #[test]
+    fn pick_courtship_partner_skips_candidates_mated_elsewhere() {
+        let mut world = World::new();
+        let a = world.spawn_empty().id();
+        let b = world.spawn_empty().id();
+        let c = world.spawn_empty().id();
+        let d = world.spawn_empty().id();
+
+        let mut fitness: HashMap<Entity, MatingFitness> = HashMap::new();
+        fitness.insert(a, default_eligible_fitness(Gender::Queen));
+        fitness.insert(b, default_eligible_fitness(Gender::Tom));
+        fitness.insert(c, default_eligible_fitness(Gender::Tom));
+        fitness.insert(d, default_eligible_fitness(Gender::Queen));
+
+        let mut rels = Relationships::default();
+        // A's nearby targets: B and C, both with Partners bonds —
+        // ordinarily both would be eligible. But C is Mates-bonded
+        // with D elsewhere, so C should be skipped.
+        let ab = rels.get_or_insert(a, b);
+        ab.bond = Some(BondType::Partners);
+        ab.fondness = 0.8;
+        ab.romantic = 0.8;
+        let ac = rels.get_or_insert(a, c);
+        ac.bond = Some(BondType::Partners);
+        ac.fondness = 0.9; // higher quality — would win without the gate
+        ac.romantic = 0.9;
+        let cd = rels.get_or_insert(c, d);
+        cd.bond = Some(BondType::Mates);
+        cd.fondness = 0.9;
+        cd.romantic = 0.9;
+
+        let positions = vec![
+            (a, Position::new(0, 0)),
+            (b, Position::new(1, 0)),
+            (c, Position::new(1, 1)),
+            (d, Position::new(5, 5)),
+        ];
+        let constants = SimConstants::default();
+        let picked = pick_courtship_partner(
+            a,
+            &Position::new(0, 0),
+            default_eligible_fitness(Gender::Queen),
+            &positions,
+            &fitness,
+            &rels,
+            &constants.practices.courtship,
+        );
+        assert_eq!(
+            picked,
+            Some(b),
+            "Mates-bonded candidate C must be filtered out, leaving B; got {picked:?}"
         );
     }
 }
