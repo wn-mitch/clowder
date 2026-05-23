@@ -6773,6 +6773,52 @@ pub struct CraftingConstants {
     /// give. Tune down if novice cats should craft poorly; tune up
     /// if novice cats should craft acceptably from day one.
     pub preservation_skill_baseline: f32,
+
+    // ----- 368 Phase 2 — behavioral-tool recipe durations -----
+    //
+    // Tick budgets are nominal at the canonical SimConfig
+    // (ticks_per_day ≈ 5000). The Workshop-craft pipeline (DSE +
+    // plan template + executor wiring) lands in a follow-on ticket;
+    // these fields are registry metadata used by the Recipe.duration
+    // field so future tooling can answer "how long does this take?"
+    /// Stone → PolishedStone polish duration. Quick surface-shaping
+    /// at a Workshop — half a sim-day at canonical SimConfig.
+    pub polish_polished_stone_ticks: u64,
+    /// (Twig + Bristle) → GroomingBrush. One sim-day.
+    pub craft_grooming_brush_ticks: u64,
+    /// (Fiber + Feather) → PlayBundle. Half a sim-day; play bundles
+    /// are simpler than a full tool.
+    pub craft_play_bundle_ticks: u64,
+    /// (One of PolishedStone / Feather / Flower) → CourtshipGift.
+    /// Quick — the courting cat picks an existing material and
+    /// presents it as expressive prop, no major shaping.
+    pub craft_courtship_gift_ticks: u64,
+
+    // ----- 368 Phase 2 — behavioral-tool resolver multipliers -----
+    //
+    // The three new ItemKinds (GroomingBrush / PlayBundle /
+    // CourtshipGift) modify their corresponding action resolvers'
+    // outcome magnitudes via these multipliers. Read in commit 5
+    // (groom_other / socialize / mate_with) when the actor's
+    // inventory carries the tool. Per the "items are real" pillar,
+    // the multiplier lives on the resolver branch, not as a
+    // modifier field on the item type.
+    /// Multiplier applied to `groom_other` fondness delta when the
+    /// actor carries a `GroomingBrush`. `1.5` = 50% richer mutual
+    /// grooming when a brush is used. Tune via sweep once the
+    /// Workshop-craft pipeline lands and brushes actually circulate
+    /// in seed-42.
+    pub groom_brush_fondness_multiplier: f32,
+    /// Multiplier applied to social fondness gain when either
+    /// participant in a Socializing pairing carries a `PlayBundle`.
+    /// Kittens benefit more in narrative (`play_social` already
+    /// templates differently for the `life_stage == Kitten` arm);
+    /// the multiplier scales the underlying delta uniformly.
+    pub play_bundle_social_multiplier: f32,
+    /// Multiplier applied to the romantic-delta in `mate_with` when
+    /// the courting cat carries a `CourtshipGift`. `2.0` = double
+    /// fondness gain on the gift-bearing pairing tick.
+    pub courtship_gift_romantic_multiplier: f32,
 }
 
 impl Default for CraftingConstants {
@@ -6799,6 +6845,19 @@ impl Default for CraftingConstants {
             preservation_quality_input_weight: 0.7,
             preservation_quality_skill_weight: 0.3,
             preservation_skill_baseline: 0.4,
+            // 368 Phase 2 — recipe durations (registry metadata; runtime
+            // wiring lands with the Workshop-craft DSE follow-on).
+            polish_polished_stone_ticks: 2_500,
+            craft_grooming_brush_ticks: 5_000,
+            craft_play_bundle_ticks: 2_500,
+            craft_courtship_gift_ticks: 1_000,
+            // 368 Phase 2 — behavioral-tool resolver multipliers
+            // (first-light values; tune via sweep when the
+            // Workshop-craft pipeline lands and the tools circulate
+            // in seed-42).
+            groom_brush_fondness_multiplier: 1.5,
+            play_bundle_social_multiplier: 1.5,
+            courtship_gift_romantic_multiplier: 2.0,
         }
     }
 }

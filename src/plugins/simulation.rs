@@ -486,6 +486,127 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             skill_gate: None,
         });
     }
+
+    // 368 Phase 2 — behavioral-tool recipes (016 Phase 2).
+    //
+    // Six entries cover the Phase 2 Workshop pipeline: one polish
+    // sub-recipe (Stone → PolishedStone), one Grooming Brush, one
+    // Play Bundle, and three parallel Courtship Gift recipes
+    // (PolishedStone / Feather / Flower → CourtshipGift). The three
+    // gift recipes mirror the four smoking recipes' shape:
+    // `RecipeInput::AnyOf` doesn't exist yet, so one Recipe per
+    // input. When `AnyOf` lands the three gifts collapse to one.
+    //
+    // **Substrate completeness note**: these recipes register in the
+    // registry but the Workshop-craft executor (DSE + plan template +
+    // resolver) is not wired in 368. Cats won't autonomously craft
+    // these tools in seed-42 until the follow-on ticket lands the
+    // Workshop crafting pipeline. The three resolver branches in
+    // groom_other / socialize / mate_with (commit 5) DO read the
+    // tools' identity when the items are present in inventory —
+    // honest at the action-execution layer, decoration at the
+    // crafting-elect layer until the follow-on.
+    registry.insert(Recipe {
+        id: RecipeId("polish.polished_stone"),
+        discipline: DisciplineKind::StonecraftCairn,
+        inputs: vec![RecipeInput {
+            kind: crate::components::items::ItemKind::Stone,
+            count: 1,
+        }],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.polish_polished_stone_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: crate::components::items::ItemKind::PolishedStone,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("behavioral.grooming_brush"),
+        discipline: DisciplineKind::BoneShellCraft,
+        inputs: vec![
+            RecipeInput {
+                kind: crate::components::items::ItemKind::Twig,
+                count: 1,
+            },
+            RecipeInput {
+                kind: crate::components::items::ItemKind::Bristle,
+                count: 1,
+            },
+        ],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_grooming_brush_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: crate::components::items::ItemKind::GroomingBrush,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("behavioral.play_bundle"),
+        discipline: DisciplineKind::FiberWeaving,
+        inputs: vec![
+            RecipeInput {
+                kind: crate::components::items::ItemKind::Fiber,
+                count: 1,
+            },
+            RecipeInput {
+                kind: crate::components::items::ItemKind::Feather,
+                count: 1,
+            },
+        ],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_play_bundle_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: crate::components::items::ItemKind::PlayBundle,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    // Three parallel Courtship Gift recipes (one per acceptable input
+    // material). Output is always `ItemKind::CourtshipGift`; the
+    // narrative tier differentiates by `CraftedItem.recipe`.
+    for (gift_slug, input_kind) in [
+        (
+            "behavioral.courtship_gift.polished_stone",
+            crate::components::items::ItemKind::PolishedStone,
+        ),
+        (
+            "behavioral.courtship_gift.feather",
+            crate::components::items::ItemKind::Feather,
+        ),
+        (
+            "behavioral.courtship_gift.flower",
+            crate::components::items::ItemKind::Flower,
+        ),
+    ] {
+        registry.insert(Recipe {
+            id: RecipeId(gift_slug),
+            discipline: DisciplineKind::AdornmentSetting,
+            inputs: vec![RecipeInput {
+                kind: input_kind,
+                count: 1,
+            }],
+            station: StationRequirement::Workshop,
+            duration: RecipeDuration::Fixed {
+                ticks: crafting.craft_courtship_gift_ticks,
+            },
+            output: RecipeOutput {
+                item_kind: crate::components::items::ItemKind::CourtshipGift,
+                destination: ItemDestination::Inventory,
+            },
+            skill_gate: None,
+        });
+    }
 }
 
 /// Startup system that populates [`RecipeRegistry`]. Independent

@@ -117,8 +117,20 @@ pub enum DisciplineKind {
     /// preservation is one discipline but three execution shapes
     /// (load-and-leave drying, load-then-tend smoking, tend-cycles).
     Preservation,
-    // Future disciplines (Phase 2/3/4/5): FiberWeaving, BoneShellCraft,
-    // HidePeltWork, PigmentMark, StonecraftCairn, AdornmentSetting.
+    /// 368 Phase 2 — fiber weaving. Play Bundle recipe (Fiber +
+    /// Feather → PlayBundle @ Workshop).
+    FiberWeaving,
+    /// 368 Phase 2 — bone / shell / bristle craft. Grooming Brush
+    /// recipe (Twig + Bristle → GroomingBrush @ Workshop).
+    BoneShellCraft,
+    /// 368 Phase 2 — stonecraft / cairn-shaping. The polish
+    /// sub-recipe (Stone → PolishedStone @ Workshop) lands here;
+    /// later phases (Shrine-Cairn etc.) extend the same axis.
+    StonecraftCairn,
+    /// 368 Phase 2 — gift-as-adornment. Courtship Gift recipes
+    /// (PolishedStone / Feather / Flower → CourtshipGift @ Workshop).
+    AdornmentSetting,
+    // Future disciplines (Phase 3/4/5): HidePeltWork, PigmentMark.
 }
 
 /// What a recipe produces. Always a real item — the crafting
