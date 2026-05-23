@@ -15,10 +15,10 @@ _Last generated: 2026-05-23._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 122 |
+| Ready | 121 |
 | Parked | 14 |
 | Blocked | 32 |
-| **Open total** | **172** |
+| **Open total** | **171** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -38,11 +38,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
-- **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · score 0.91_
-- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
+- **[326](docs/open-work/tickets/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.91_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
 
@@ -63,11 +63,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (122)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (36 ready, 6 blocked)
+### ai-substrate (35 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -104,7 +104,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[426](docs/open-work/tickets/426-update-mate-eligibility-markers-event-driven-haseligiblemate-via-matingeligibilitychanged-message.md)** — update_mate_eligibility_markers event-driven HasEligibleMate via MatingEligibilityChanged Message — _[ai-substrate] · added 2026-05-19_
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · added 2026-05-21_
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
-- **[452](docs/open-work/tickets/452-kitten-spawn-uses-spawn-cat-from-blueprint-to-match-founder-cat-component-shape.md)** — Kitten spawn uses spawn_cat_from_blueprint to match founder-cat component shape — _[ai-substrate] · added 2026-05-23_
 
 ### social-coordination (17 ready, 4 blocked)
 
@@ -225,7 +224,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
-## Ready by initiative (83 tag-memberships across 10 initiatives)
+## Ready by initiative (82 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -338,11 +337,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-### parenting-substrate (1 open, 1 landed)
-
-- **[452](docs/open-work/tickets/452-kitten-spawn-uses-spawn-cat-from-blueprint-to-match-founder-cat-component-shape.md)** — Kitten spawn uses spawn_cat_from_blueprint to match founder-cat component shape — _[ai-substrate] · added 2026-05-23_
-
-## Ready (122)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
@@ -465,7 +460,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · added 2026-05-21_
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
-- **[452](docs/open-work/tickets/452-kitten-spawn-uses-spawn-cat-from-blueprint-to-match-founder-cat-component-shape.md)** — Kitten spawn uses spawn_cat_from_blueprint to match founder-cat component shape — _[ai-substrate] · added 2026-05-23_
 
 ## Parked (14)
 
@@ -519,12 +513,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[442](docs/open-work/tickets/442-split-resourcessim-constantsrs-into-a-sim-constants-submodule-per-substruct-family.md)** — Split resources/sim_constants.rs into a sim_constants/ submodule per substruct family — _[ai-substrate] · blocked-by 441 · added 2026-05-21_
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 
-## Landed archive (308)
+## Landed archive (309)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (242)
+### 2026-05 (243)
 
+- **[452](docs/open-work/landed/452-kitten-spawn-uses-spawn-cat-from-blueprint-to-match-founder-cat-component-shape.md)** — Kitten spawn uses spawn_cat_from_blueprint to match founder-cat component shape _(2026-05-23)_
 - **[451](docs/open-work/landed/451-lift-withoutkittendependency-filter-so-kittens-elect-begging-at-l3.md)** — Lift Without<KittenDependency> filter so kittens elect Begging at L3 _(2026-05-23)_
 - **[450](docs/open-work/landed/450-three-stage-kittenhood-newborn-eyes-open-juvenile-with-progressive-capability-gates.md)** — Three-stage kittenhood — Newborn / Eyes-open / Juvenile with progressive capability gates _(2026-05-22)_
 - **[375](docs/open-work/landed/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker _(2026-05-22)_

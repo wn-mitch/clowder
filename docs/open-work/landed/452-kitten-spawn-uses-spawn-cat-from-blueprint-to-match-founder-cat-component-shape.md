@@ -1,7 +1,7 @@
 ---
 id: 452
 title: Kitten spawn uses spawn_cat_from_blueprint to match founder-cat component shape
-status: in-progress
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: [parenting-substrate]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: be5093d5
+landed-on: 2026-05-23
 ---
 
 ## Why
@@ -58,3 +58,4 @@ Implementation order: (a) build `CatBlueprint` inside the births loop, (b) route
 ## Log
 
 - 2026-05-23: opened as follow-on to [451]'s landing. 451 patched `PendingUrgencies` + `PrevSafetyDeficit` narrowly inline in `pregnancy.rs`; this ticket carries the structural fix (route through `spawn_cat_from_blueprint`) so future founder-bundle additions land on production kittens automatically.
+- 2026-05-23: feat substrate: cat_bundle helper + target_grooming_deficit axis + Fulfillment::newborn; seed-42 soak survival+continuity pass, KittenBegged=717 GroomedOther=709312
