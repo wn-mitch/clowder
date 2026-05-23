@@ -1814,7 +1814,11 @@ pub fn disposition_to_chain(
             // 450: Begging ships GOAP-only. The `[BegForFood]`
             // single-step template flows through the planner; this
             // legacy chain-building path defers cleanly to it.
-            | DispositionKind::Begging => None,
+            | DispositionKind::Begging
+            // 457: Crafting ships GOAP-only — single-step
+            // `[CraftAtWorkshop]` template flows through the planner;
+            // this legacy chain-building path defers cleanly.
+            | DispositionKind::Crafting => None,
         };
 
         if let Some((mut chain, action)) = chain {

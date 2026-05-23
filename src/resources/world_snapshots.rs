@@ -71,6 +71,10 @@ pub struct ColonyMarkerBundle {
     /// `HasSmokeableAccessible` that gates `SmokeMeatDse` eligibility
     /// even when the cat's inventory is empty.
     pub has_smokeable_in_stores: bool,
+    /// 457 — ≥1 functional Workshop exists in the colony. Read by
+    /// `evaluate_and_plan` to gate the per-cat `CraftAtWorkshopDse`
+    /// eligibility filter via `MarkerSnapshot::has(...)`.
+    pub has_functional_workshop: bool,
 }
 
 #[derive(Resource, Debug, Default, Clone, Copy)]

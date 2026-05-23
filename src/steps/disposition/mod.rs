@@ -6,6 +6,7 @@ mod cook;
 // They exist so the enum-cascade compile-checks stay total and so the
 // 5-heading step-contract lint has a real source to scan.
 mod craft;
+mod craft_at_workshop;
 mod deliver_directive;
 mod deposit_at_stores;
 mod deposit_herbs_to_stores;
@@ -50,6 +51,7 @@ pub use beg_for_food::{resolve_beg_for_food, BegEmitted};
 pub use bury::{resolve_bury, BuryOutcome};
 pub use cook::resolve_cook;
 pub use craft::resolve_craft;
+pub use craft_at_workshop::resolve_craft_at_workshop;
 pub use deliver_directive::resolve_deliver_directive;
 pub use deposit_at_stores::resolve_deposit_at_stores;
 pub use deposit_herbs_to_stores::resolve_deposit_herbs_to_stores;

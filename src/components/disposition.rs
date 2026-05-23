@@ -184,6 +184,19 @@ pub enum DispositionKind {
     /// have elapsed, producing the design-doc "tend, walk away, come
     /// back" rhythm without a multi-tick commitment Component.
     TendingSmokingRack,
+    /// 457: cat crafts a 368 Phase 2 behavioral tool at a Workshop.
+    /// Plan template `[DropItem?, RetrieveCraftInput*, CraftAtWorkshop]`
+    /// with `ZoneIs(Workshop)` precondition on the terminal step.
+    /// Generalised over all six Phase 2 recipes (polish + brush +
+    /// bundle + 3 gifts) — the DSE elects "any craftable accessible"
+    /// via `HasCraftableAccessible`; `resolve_craft_at_workshop`
+    /// picks the specific RecipeId from the satisfied set at execute
+    /// time (lexicographic order). Maslow tier 4 — esteem / craft,
+    /// alongside Herbalism / Witchcraft / Building / Farming. Distinct
+    /// from the 367 preservation dispositions (tier 2 — colony-feeding
+    /// buffer-building) because behavioral tools enhance social-tier
+    /// outcomes, not physiological-tier survival.
+    Crafting,
     /// 450: kitten begs for food. Single-action plan template
     /// `[BegForFood]` with no zone precondition (the kitten begs in
     /// place) and no state effect — distinct from Eating because the
@@ -240,7 +253,11 @@ impl DispositionKind {
             // load creates the session, tend advances one cycle.
             | Self::DryingFood
             | Self::SmokingMeat
-            | Self::TendingSmokingRack => 1,
+            | Self::TendingSmokingRack
+            // 457: Crafting completes after one Workshop session
+            // (single-trip Pattern B); the resolver consumes one
+            // recipe's inputs in one tick.
+            | Self::Crafting => 1,
             // 450: Begging is Pattern B (single-tick). Each tick the
             // kitten begs once → `resolve_beg_for_food` stamps the
             // cry-map → plan completes → re-election runs. If the
@@ -330,6 +347,12 @@ impl DispositionKind {
             Action::DryFood => Some(Self::DryingFood),
             Action::SmokeMeat => Some(Self::SmokingMeat),
             Action::TendSmokingRack => Some(Self::TendingSmokingRack),
+            // 457: Craft (previously dormant for #334) promotes to live
+            // here as the Workshop-craft pipeline's L3 sub-action.
+            // Generalised over all `StationRequirement::Workshop`
+            // recipes; the resolver picks the specific RecipeId at
+            // execute time.
+            Action::Craft => Some(Self::Crafting),
             // 450: BegForFood routes to its single-action Begging
             // disposition. Begging is Activity-shaped (§L2.10.5) — the
             // Disposition + plan template + resolver still wrap it so
@@ -362,7 +385,7 @@ impl DispositionKind {
             // the no-op fallback. Both stay headless until evidence
             // justifies promoting them.
             //
-            // 322: HTN-method sub-goal Primitives (WearItem / Craft /
+            // 322: HTN-method sub-goal Primitives (WearItem /
             // PetitionCoordinator / Vigil / GriefSit / Wean / Teach /
             // Release) also return None. They're never L3-selectable —
             // a Live HTN method emits them as method sub-goal leaves,
@@ -370,10 +393,15 @@ impl DispositionKind {
             // Their wiring tickets (#332/#333/#334) flip the
             // corresponding PendingSubstrate method to Live; the
             // Actions stay outside DispositionKind selection regardless.
+            //
+            // 457: `Action::Craft` exits this list — promoted to a
+            // live L3 selectable via the Workshop-craft pipeline. The
+            // dormant comment for #334 (StealthCloak) on the Action
+            // variant now points to "first live user, more recipes to
+            // come" rather than "deferred until #334."
             Action::Idle
             | Action::Hide
             | Action::WearItem
-            | Action::Craft
             | Action::PetitionCoordinator
             | Action::Vigil
             | Action::GriefSit
@@ -425,6 +453,11 @@ impl DispositionKind {
             Self::DryingFood => &[Action::DryFood],
             Self::SmokingMeat => &[Action::SmokeMeat],
             Self::TendingSmokingRack => &[Action::TendSmokingRack],
+            // 457: Crafting owns the single Action::Craft constituent.
+            // Generalised over the six Phase 2 recipes — recipe choice
+            // happens at execute time inside `resolve_craft_at_workshop`,
+            // not at the L3 softmax layer.
+            Self::Crafting => &[Action::Craft],
             // 450: Begging owns the single Action::BegForFood constituent.
             Self::Begging => &[Action::BegForFood],
             Self::Coordinating => &[Action::Coordinate],
@@ -505,6 +538,10 @@ impl DispositionKind {
         // saved soaks and `scoring::active_disposition_ordinal`
         // ordinal-equality tests.
         Self::Begging,
+        // 457: Crafting appended at ordinal-28 (zero-indexed: 27). Same
+        // ordinal-stability invariant — saved soaks pre-457 don't carry
+        // Crafting and the ordinal-equality scorer skips it.
+        Self::Crafting,
     ];
 
     /// Human-readable label for the inspect panel.
@@ -537,6 +574,7 @@ impl DispositionKind {
             Self::SmokingMeat => "SmokingMeat",
             Self::TendingSmokingRack => "TendingSmokingRack",
             Self::Begging => "Begging",
+            Self::Crafting => "Crafting",
         }
     }
 
@@ -595,11 +633,15 @@ impl DispositionKind {
             Self::Burying => 3,
             // 155: Herbalism / Witchcraft inherit Crafting's tier 4
             // (esteem / craft).
+            // 457: Crafting (new, generalised over Workshop recipes)
+            // sits at tier 4 alongside Herbalism / Witchcraft / Building
+            // / Farming — esteem/craft work, not survival.
             Self::Herbalism
             | Self::Witchcraft
             | Self::Coordinating
             | Self::Building
-            | Self::Farming => 4,
+            | Self::Farming
+            | Self::Crafting => 4,
             Self::Exploring => 5,
         }
     }
@@ -637,6 +679,7 @@ impl DispositionKind {
             Self::SmokingMeat => "load the smoking rack",
             Self::TendingSmokingRack => "tend the smoking rack",
             Self::Begging => "beg for food",
+            Self::Crafting => "craft at the workshop",
         }
     }
 }
@@ -951,11 +994,13 @@ mod tests {
         // 450: Begging appends at ordinal-27. TendingSmokingRack slides
         // off the tail; Begging becomes the new tail. The 367 trio
         // keeps its ordinal slots (24-26) for ordinal-stability.
-        assert_eq!(DispositionKind::ALL.len(), 27);
+        // 457: Crafting appends at ordinal-28. Begging slides from
+        // tail to ordinal-27; Crafting becomes the new tail.
+        assert_eq!(DispositionKind::ALL.len(), 28);
         assert_eq!(
             DispositionKind::ALL.last(),
-            Some(&DispositionKind::Begging),
-            "Begging must remain at ordinal-27 (tail) position"
+            Some(&DispositionKind::Crafting),
+            "Crafting must remain at ordinal-28 (tail) position"
         );
         assert_eq!(
             DispositionKind::ALL[25],

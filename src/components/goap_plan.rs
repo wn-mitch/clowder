@@ -338,6 +338,10 @@ impl GoapActionKind {
                 // `Action::Flee` so any stray TravelTo leg under a
                 // `Fleeing` plan reports the umbrella label.
                 DispositionKind::Fleeing => Action::Flee,
+                // 457: Crafting's chain is `[TravelTo(Workshop),
+                // CraftAtWorkshop]`. The travel leg reports
+                // `Action::Craft` so `CurrentAction` stays stable.
+                DispositionKind::Crafting => Action::Craft,
                 _ => Action::Wander,
             },
             Self::SearchPrey | Self::EngagePrey | Self::DepositPrey => Action::Hunt,
@@ -421,6 +425,11 @@ impl GoapActionKind {
             // 450: single-action begging step maps directly to the
             // Begging Action label.
             Self::BegForFood => Action::BegForFood,
+            // 457: Workshop-craft step maps directly to Action::Craft
+            // (the L3 umbrella for generalised Workshop crafting). The
+            // resolver picks the specific recipe at execute time, but
+            // the plan-step label stays uniform.
+            Self::CraftAtWorkshop => Action::Craft,
         }
     }
 }

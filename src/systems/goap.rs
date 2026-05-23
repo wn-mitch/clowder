@@ -569,6 +569,18 @@ pub struct TargetMarkerQueries<'w, 's> {
             Has<markers::HasFuelInInventory>,
             Has<markers::HasDryableInInventory>,
             Has<markers::HasSmokeableInInventory>,
+            // 457: Workshop-craft input marker (`Twig` / `Bristle` /
+            // `Fiber` / `Flower` / `Stone` / `Feather` / `PolishedStone`
+            // in inventory). Bundled here alongside the preservation
+            // inventory rows since the authoring system
+            // (`items::update_inventory_markers`) is the same.
+            Has<markers::HasCraftInputInInventory>,
+            // 457: Workshop-craft per-cat capability (`Adult ∧ ¬Injured`).
+            // Bundled here alongside `CanDry` / `CanSmoke` since the
+            // authoring system (`capabilities::update_capability_markers`)
+            // is the same — keeps the parent `per_cat_markers_q` tuple
+            // under the 15-arity ceiling.
+            Has<markers::CanCraft>,
         ),
     >,
 }
@@ -582,6 +594,10 @@ pub struct ExecutorContext<'w, 's> {
     pub time_scale: Res<'w, crate::resources::time::TimeScale>,
     pub constants: Res<'w, SimConstants>,
     pub event_log: Option<ResMut<'w, EventLog>>,
+    /// 457: recipe catalog for the Workshop-craft dispatch
+    /// (`GoapActionKind::CraftAtWorkshop`). Populated once at startup
+    /// by `populate_recipe_registry` and consumed read-only here.
+    pub recipes: Res<'w, crate::resources::recipe_registry::RecipeRegistry>,
     /// Ticket 364 — read-only `MethodRegistry` for the HTN advance hook's
     /// gate (matches the held frame's leaf primitive action against the
     /// completed plan's chosen action, so only HTN-leaf plan completions
@@ -1458,6 +1474,7 @@ pub fn evaluate_and_plan(
         has_loaded_smoking_rack_off_cooldown,
         has_dryable_in_stores,
         has_smokeable_in_stores,
+        has_functional_workshop,
     ) = (
         cm.has_functional_kitchen,
         cm.has_raw_food_in_stores,
@@ -1479,6 +1496,7 @@ pub fn evaluate_and_plan(
         cm.has_loaded_smoking_rack_off_cooldown,
         cm.has_dryable_in_stores,
         cm.has_smokeable_in_stores,
+        cm.has_functional_workshop,
     );
     let food_fraction = ws.food_fraction;
 
@@ -1584,6 +1602,11 @@ pub fn evaluate_and_plan(
     // 443 — colony has raw meat AND fuel in stores; read by the
     // per-cat `HasSmokeableAccessible` composite below.
     markers.set_colony(markers::HasSmokeableInStores::KEY, has_smokeable_in_stores);
+    // 457 — Workshop availability. Reader: `CraftAtWorkshopDse`
+    // eligibility filter via `MarkerSnapshot.has(...)`. Wired here
+    // (not only as a ColonyState component) per the third-clause
+    // discipline (§209 / §084).
+    markers.set_colony(markers::HasFunctionalWorkshop::KEY, has_functional_workshop);
     // 084 Commit 3: ColonyThornbriarChronicallyLow — chronicity latch
     // sampled at `chronicity_window_ticks` boundaries against the
     // colony-wide stash total. Reader (this commit): `FarmDse`'s
@@ -1685,6 +1708,16 @@ pub fn evaluate_and_plan(
         .building_query
         .iter()
         .filter(|(_, s, _, site, _)| s.kind == StructureType::SmokingRack && site.is_none())
+        .map(|(_, _, p, _, _)| *p)
+        .collect();
+    // 457: Pre-compute Workshop positions for `PlannerZone::Workshop`
+    // zone resolution. Same shape as `kitchen_positions` /
+    // `drying_rack_positions` — completed buildings only. Recipe and
+    // input checks happen at resolver-time.
+    let workshop_positions: Vec<Position> = world_state
+        .building_query
+        .iter()
+        .filter(|(_, s, _, site, _)| s.kind == StructureType::Workshop && site.is_none())
         .map(|(_, _, p, _, _)| *p)
         .collect();
 
@@ -1834,10 +1867,11 @@ pub fn evaluate_and_plan(
             has_fuel,
             has_dryable,
             has_smokeable,
-        ) = marker_qs
-            .preservation_markers_q
-            .get(entity)
-            .unwrap_or((false, false, false, false, false, false, false, false));
+            has_craft_input,
+            can_craft,
+        ) = marker_qs.preservation_markers_q.get(entity).unwrap_or((
+            false, false, false, false, false, false, false, false, false, false,
+        ));
         if let Ok((
             injured,
             has_herbs,
@@ -1935,6 +1969,16 @@ pub fn evaluate_and_plan(
                 markers::HasSmokeableAccessible::KEY,
                 entity,
                 has_smokeable_accessible,
+            );
+            // 457 — Workshop-craft per-cat markers. CanCraft mirrors
+            // CanCook/CanDry/CanSmoke (Adult ∧ ¬Injured);
+            // HasCraftInputInInventory fires when inventory contains
+            // any Phase 2 recipe input.
+            markers.set_entity(markers::CanCraft::KEY, entity, can_craft);
+            markers.set_entity(
+                markers::HasCraftInputInInventory::KEY,
+                entity,
+                has_craft_input,
             );
         }
         // §4.2 State markers — InCombat / OnCorruptedTile /
@@ -2906,6 +2950,7 @@ pub fn evaluate_and_plan(
             &food_pile_positions,
             &drying_rack_positions,
             &smoking_rack_positions,
+            &workshop_positions,
             &dead_cat_positions,
             entity,
             d,
@@ -3453,6 +3498,8 @@ struct StepSnapshots {
     /// rack of this kind?".
     drying_rack_positions: Vec<Position>,
     smoking_rack_positions: Vec<Position>,
+    /// 457: Workshop positions for zone resolution.
+    workshop_positions: Vec<Position>,
 }
 
 /// Mutable accumulators written by `dispatch_step_action`, consumed by the
@@ -3780,6 +3827,12 @@ pub fn resolve_goap_plans(
         .filter(|(_, kind, _, is_site, _)| *kind == StructureType::SmokingRack && !*is_site)
         .map(|(_, _, p, _, _)| *p)
         .collect();
+    // 457: Workshop positions for `PlannerZone::Workshop` zone resolution.
+    let workshop_positions: Vec<Position> = building_snapshot
+        .iter()
+        .filter(|(_, kind, _, is_site, _)| *kind == StructureType::Workshop && !*is_site)
+        .map(|(_, _, p, _, _)| *p)
+        .collect();
 
     // Ticket 177: completed Middens — used by the `TrashItemAtMidden`
     // dispatch arm to resolve the target entity's `Position` without
@@ -3951,6 +4004,8 @@ pub fn resolve_goap_plans(
         // into the zone resolver.
         drying_rack_positions,
         smoking_rack_positions,
+        // 457 — Workshop positions threaded into the zone resolver.
+        workshop_positions,
         workshop_bonus: if building_snapshot
             .iter()
             .any(|(_, kind, _, _, _)| *kind == StructureType::Workshop)
@@ -4373,6 +4428,7 @@ pub fn resolve_goap_plans(
                     &snaps.food_pile_positions,
                     &snaps.drying_rack_positions,
                     &snaps.smoking_rack_positions,
+                    &snaps.workshop_positions,
                     &snaps.dead_cat_positions,
                     cat_entity,
                     d,
@@ -4804,6 +4860,7 @@ pub fn resolve_goap_plans(
                     &snaps.food_pile_positions,
                     &snaps.drying_rack_positions,
                     &snaps.smoking_rack_positions,
+                    &snaps.workshop_positions,
                     &snaps.dead_cat_positions,
                     cat_entity,
                     d,
@@ -5538,6 +5595,7 @@ fn dispatch_step_action(
                 &snaps.food_pile_positions,
                 &snaps.drying_rack_positions,
                 &snaps.smoking_rack_positions,
+                &snaps.workshop_positions,
                 &snaps.dead_cat_positions,
                 cat_entity,
                 d,
@@ -7952,6 +8010,25 @@ fn dispatch_step_action(
             );
             outcome.result
         }
+        // 457: Workshop-craft dispatch. Resolver scans the recipe
+        // registry for `StationRequirement::Workshop` recipes in
+        // lexicographic order and picks the first satisfied recipe
+        // from `inventory`. Inputs consumed, output added to inventory
+        // (Phase 2 outputs are all `ItemDestination::Inventory`).
+        GoapActionKind::CraftAtWorkshop => {
+            let outcome = crate::steps::disposition::resolve_craft_at_workshop(
+                *pos,
+                inventory,
+                &ec.recipes,
+                &snaps.workshop_positions,
+                3,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::ItemCrafted,
+            );
+            outcome.result
+        }
     }
 }
 
@@ -8267,6 +8344,7 @@ fn resolve_travel_to(
     food_pile_positions: &[(Entity, Position, ItemKind)],
     drying_rack_positions: &[Position],
     smoking_rack_positions: &[Position],
+    workshop_positions: &[Position],
     dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
@@ -8287,6 +8365,7 @@ fn resolve_travel_to(
             food_pile_positions,
             drying_rack_positions,
             smoking_rack_positions,
+            workshop_positions,
             dead_cat_positions,
             cat_entity,
             d,
@@ -9805,6 +9884,8 @@ fn resolve_zone_position(
     // 367: preservation-station positions for zone resolution.
     drying_rack_positions: &[Position],
     smoking_rack_positions: &[Position],
+    // 457: Workshop positions for `PlannerZone::Workshop` zone resolution.
+    workshop_positions: &[Position],
     // 035: Dead-and-not-Buried cat positions for the `CorpseTarget`
     // zone. Disjoint from `cat_positions` (which is `Without<Dead>`).
     dead_cat_positions: &[(Entity, Position)],
@@ -9891,6 +9972,12 @@ fn resolve_zone_position(
         PlannerZone::SmokingRack => smoking_rack_positions
             .iter()
             .min_by_key(|sp| pos.manhattan_distance(sp))
+            .copied(),
+        // 457: nearest Workshop. Same shape as DryingRack/SmokingRack;
+        // recipe selection happens at resolver-time, not zone-resolve-time.
+        PlannerZone::Workshop => workshop_positions
+            .iter()
+            .min_by_key(|wp| pos.manhattan_distance(wp))
             .copied(),
     }
 }
@@ -10114,6 +10201,7 @@ fn build_zone_distances(
     food_pile_positions: &[(Entity, Position, ItemKind)],
     drying_rack_positions: &[Position],
     smoking_rack_positions: &[Position],
+    workshop_positions: &[Position],
     dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
@@ -10233,6 +10321,16 @@ fn build_zone_distances(
         (
             PlannerZone::SmokingRack,
             smoking_rack_positions
+                .iter()
+                .min_by_key(|p| pos.manhattan_distance(p))
+                .copied(),
+        ),
+        // 457: nearest Workshop. Same Resolves-to-None semantics as the
+        // 367 preservation racks — eligibility gates upstream prevent
+        // the Crafting plan from forming when no Workshop is built.
+        (
+            PlannerZone::Workshop,
+            workshop_positions
                 .iter()
                 .min_by_key(|p| pos.manhattan_distance(p))
                 .copied(),
@@ -10420,6 +10518,8 @@ mod tests {
             // Wilds test path — this resolver fixture only exercises
             // the Wilds zone arm.
             &[],
+            &[],
+            // 457: workshop_positions empty (same rationale).
             &[],
             &[],
             entity,

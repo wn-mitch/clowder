@@ -143,10 +143,23 @@ pub enum Action {
     /// Live HTN method emits it; the placeholder resolver returns
     /// `StepResult::Fail` so accidental dispatch is observable.
     WearItem,
-    /// 322 / 334 — dormant stub for `acquire_stealth_via_self_craft`.
-    /// `Action::Craft` will be wired in #334 alongside the StealthCloak
-    /// recipe + crafting substrate. Until then no Live HTN method emits
-    /// it; the placeholder resolver returns `StepResult::Fail`.
+    /// 457: live L3 action — generalised Workshop crafting. Rides
+    /// `DispositionKind::Crafting`. Plan template
+    /// `[DropItem?, RetrieveCraftInput*, CraftAtWorkshop]` with
+    /// `ZoneIs(Workshop)` precondition on the terminal step. The
+    /// resolver picks the specific RecipeId at execute time
+    /// (lexicographic order over satisfied recipes), so a single
+    /// Action variant covers the six 368 Phase 2 recipes (polish +
+    /// brush + bundle + 3 gifts) plus any future
+    /// `StationRequirement::Workshop` recipes added downstream.
+    ///
+    /// 322 / 334 historical context — `Action::Craft` was opened as a
+    /// dormant stub for the StealthCloak HTN method
+    /// (`acquire_stealth_via_self_craft`). 457 is the first live
+    /// user; #334 inherits the same Action variant when its
+    /// stealth-cloak recipe ships, gated by an HTN method emitting
+    /// `Goal { state: "stealth_cloak_crafted" }` alongside the
+    /// generic Workshop-craft DSE.
     Craft,
     /// 322 / 334 — dormant stub for `acquire_stealth_via_commission`.
     /// `Action::PetitionCoordinator` will be wired in #334 (the

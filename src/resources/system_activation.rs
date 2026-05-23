@@ -667,6 +667,15 @@ pub enum Feature {
     /// `Inventory` containing a `CourtshipGift`. Positive — paired
     /// with `GroomingBrushUsed`. Ships dormant for the same reason.
     CourtshipGiftOffered,
+    /// Ticket 457 — `resolve_craft_at_workshop` consumed one Workshop
+    /// recipe's full input set and produced an output `Item`. Positive,
+    /// `expected_to_fire_per_soak() => true` — the elect-side first-
+    /// light gate for the 368 Phase 2 behavioral-tool substrate. If
+    /// seed-42 produces zero `ItemCrafted` events, the Workshop-craft
+    /// pipeline is structurally broken (DSE not scoring, plan not
+    /// forming, marker not authored, or resolver not dispatched) and
+    /// the wiring needs fixing before ship.
+    ItemCrafted,
 }
 
 impl Feature {
@@ -880,6 +889,8 @@ impl Feature {
         Feature::GroomingBrushUsed,
         Feature::PlayBundleEngaged,
         Feature::CourtshipGiftOffered,
+        // 457: Workshop-craft first-light canary.
+        Feature::ItemCrafted,
     ];
 
     /// The valence of this feature.
@@ -1032,6 +1043,8 @@ impl Feature {
             Feature::GroomingBrushUsed => Positive,
             Feature::PlayBundleEngaged => Positive,
             Feature::CourtshipGiftOffered => Positive,
+            // 457: Workshop-craft elect-side first-light canary.
+            Feature::ItemCrafted => Positive,
             // 450: kitten begs for food.
             Feature::KittenBegged => Positive,
 
@@ -1427,6 +1440,12 @@ impl Feature {
             Feature::GroomingBrushUsed => false,
             Feature::PlayBundleEngaged => false,
             Feature::CourtshipGiftOffered => false,
+            // 457: Workshop-craft first-light canary. expected = true
+            // — the elect-side pipeline must fire ≥1 craft in seed-42
+            // to satisfy the 368 substrate first-light gate. Zero
+            // crafts = wiring broken (DSE not scoring, marker not
+            // authored, plan not forming, or resolver not dispatched).
+            Feature::ItemCrafted => true,
             // 450 + 451: kitten begging canary. Substrate lifted in 451
             // (kittens enter L2 scoring via the life-stage gate, the
             // BegForFood DSE has Newborn/EyesOpen/Incapacitated siblings,
@@ -1757,6 +1776,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::GroomingBrushUsed => "GroomingBrushUsed",
         Feature::PlayBundleEngaged => "PlayBundleEngaged",
         Feature::CourtshipGiftOffered => "CourtshipGiftOffered",
+        Feature::ItemCrafted => "ItemCrafted",
         // 450: kitten begs for food canary.
         Feature::KittenBegged => "KittenBegged",
     }
@@ -1966,7 +1986,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 155;
+        const EXPECTED_VARIANT_COUNT: usize = 156;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2095,7 +2115,11 @@ mod tests {
         // CourtshipGiftOffered) for the Phase 2 behavioral-tool
         // canaries. All ship dormant (`=> false`) until the Workshop-
         // craft pipeline follow-on circulates the tools in seed-42.
-        assert_eq!(positive, 89);
+        // Ticket 457: +1 Positive (ItemCrafted) for the Workshop-craft
+        // first-light canary. Ships expected=true — the elect-side
+        // pipeline must fire ≥1 craft in seed-42 to satisfy the 368
+        // substrate first-light gate.
+        assert_eq!(positive, 90);
         assert_eq!(negative, 23);
         assert_eq!(neutral, 43);
     }
@@ -2196,9 +2220,11 @@ mod tests {
         // producer canary.
         // Ticket 368: +3 Positive (GroomingBrushUsed, PlayBundleEngaged,
         // CourtshipGiftOffered) for Phase 2 behavioral-tool canaries.
+        // Ticket 457: +1 Positive (ItemCrafted) for Workshop-craft
+        // first-light canary.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            89
+            90
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

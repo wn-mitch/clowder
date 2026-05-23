@@ -374,6 +374,18 @@ impl CanSmoke {
     pub const KEY: &str = "CanSmoke";
 }
 
+/// 457: per-cat capability — `Adult ∧ ¬Injured`, mirrors `CanCook` /
+/// `CanDry` / `CanSmoke`. Gates `CraftAtWorkshopDse` (the elect-side
+/// pipeline that lets cats autonomously craft the 368 Phase 2 behavioral
+/// tools — Grooming Brush, Play Bundle, Courtship Gift — and the
+/// Polished Stone intermediate). Colony-scoped Workshop availability
+/// stays on the DSE eligibility filter via `HasFunctionalWorkshop`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct CanCraft;
+impl CanCraft {
+    pub const KEY: &str = "CanCraft";
+}
+
 // ---------------------------------------------------------------------------
 // Inventory markers (§4.3 Inventory — per-cat)
 // ---------------------------------------------------------------------------
@@ -630,6 +642,19 @@ impl HasFunctionalSmokingRack {
     pub const KEY: &str = "HasFunctionalSmokingRack";
 }
 
+/// 457: colony — ≥1 functional Workshop structure exists in the colony.
+/// "Functional" = `Structure::effectiveness() > 0.0` (condition above
+/// the damaged floor). Reader: `CraftAtWorkshopDse` eligibility filter.
+/// Writer: `buildings::update_colony_building_markers`. Unlike the
+/// preservation racks, Workshops don't carry a per-station load state —
+/// any functional Workshop can host any of the six Phase 2 recipes, so
+/// the marker is presence-only (no "idle" predicate layered on top).
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasFunctionalWorkshop;
+impl HasFunctionalWorkshop {
+    pub const KEY: &str = "HasFunctionalWorkshop";
+}
+
 /// 367 follow-on: colony — ≥1 RawFish or RawOrgan item sits in any
 /// `StoredItems` aggregate. Reader: composite per-cat marker
 /// `HasDryableAccessible` populated in `goap::evaluate_and_plan`; the
@@ -701,6 +726,34 @@ impl HasSmokeableInStores {
 pub struct HasSmokeableAccessible;
 impl HasSmokeableAccessible {
     pub const KEY: &str = "HasSmokeableAccessible";
+}
+
+/// 457: per-cat — the cat carries ≥1 Phase 2 Workshop-recipe input
+/// (Twig / Bristle / Fiber / Flower / Stone / Feather / PolishedStone).
+/// Authored by `items::update_inventory_markers` mirroring the existing
+/// `HasRawFishInInventory` / `HasFuelInInventory` rows. Reader:
+/// `CraftAtWorkshopDse` eligibility filter.
+///
+/// Recipe-agnostic by design — any single Workshop input present in
+/// inventory satisfies the marker; the resolver picks the specific
+/// recipe at execute time. Mirrors the 367 inventory-marker shape
+/// (`HasDryableInInventory` fires on any RawFish OR RawOrgan; the
+/// drying resolver picks the specific raw input). A cat with Twig but
+/// no Bristle still fires the marker — the L3 may elect Crafting, the
+/// resolver finds no full recipe satisfied, returns Fail, and the cat
+/// re-plans (substrate-honest: the per-recipe scoring lives at recipe-
+/// variety, deferred per ticket scope).
+///
+/// Stores-side retrieve is intentionally NOT in scope for first-light.
+/// Cats gather inputs via hunt (Bristle from `PreyByproductConstants`)
+/// plus forage (`resolve_forage` drops Twig / Fiber / Flower at
+/// `forage_ingredient_drop_chance = 0.10`) and craft when inputs are
+/// already in hand. The plan template is single-step
+/// `[CraftAtWorkshop]`, no `RetrieveCraftInput` leg.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasCraftInputInInventory;
+impl HasCraftInputInInventory {
+    pub const KEY: &str = "HasCraftInputInInventory";
 }
 
 /// 367: colony — ≥1 loaded Smoking Rack exists in the colony AND its
@@ -1292,6 +1345,8 @@ mod tests {
         // 367 — preservation capabilities.
         assert_marker_queryable(CanDry);
         assert_marker_queryable(CanSmoke);
+        // 457 — Workshop-craft capability.
+        assert_marker_queryable(CanCraft);
     }
 
     #[test]
@@ -1323,6 +1378,9 @@ mod tests {
         // 443 — smoking chain accessibility markers.
         assert_marker_queryable(HasSmokeableInStores);
         assert_marker_queryable(HasSmokeableAccessible);
+        // 457 — Workshop-craft station + input markers.
+        assert_marker_queryable(HasFunctionalWorkshop);
+        assert_marker_queryable(HasCraftInputInInventory);
     }
 
     #[test]

@@ -98,6 +98,9 @@ pub fn goal_for_disposition(
         | DispositionKind::DryingFood
         | DispositionKind::SmokingMeat
         | DispositionKind::TendingSmokingRack
+        // 457: Crafting completes on a single `CraftAtWorkshop` trip —
+        // resolver consumes one recipe's inputs and spawns the output.
+        | DispositionKind::Crafting
         // 450: Begging is Activity-shaped (§L2.10.5 — the kitten's
         // hunger doesn't drop *because of* begging; a parent's
         // Caretake plan does). The Disposition wrapper completes on a

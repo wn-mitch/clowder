@@ -1,7 +1,7 @@
 ---
 id: 457
 title: Workshop-craft DSE + plan template for 016 Phase 2 behavioral tools
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-23
 ---
 
 ## Why
@@ -64,3 +64,4 @@ The DSE scores a `(RecipeId, Workshop)` tuple — first ranked recipe wins. Init
 
 ## Log
 - 2026-05-23: opened as 368 follow-on. 368 ships the substrate (recipes + items + producers + resolver branches + canary variants); 457 wires the elect-side pipeline so cats craft and use the tools autonomously in seed-42.
+- 2026-05-23: First-light: ItemCrafted=11 / never_fired_expected_positives=[] in seed-42 64363-tick soak. Three tool-use canaries (GroomingBrushUsed/PlayBundleEngaged/CourtshipGiftOffered) deferred — first-satisfied recipe order biased crafts toward courtship gifts; mating-canary=0 means gifts unused. Recipe-variety + mating-blocker follow-ons separate.

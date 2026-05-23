@@ -246,6 +246,12 @@ const BURY: &str = "bury";
 // authoring sites when they flip the corresponding PendingSubstrate
 // method to Live.
 const WEAR_ITEM: &str = "wear_item";
+// 322 / #334: dormant DseId for the StealthCloak HTN-leaf wiring.
+// 457 promoted `Action::Craft` to a live L3 action via
+// `CRAFT_AT_WORKSHOP`; this constant retains its identity for the
+// future #334 stealth-cloak DSE registration. Suppressed dead-code
+// lint until #334 wires the second consumer.
+#[allow(dead_code)]
 const CRAFT: &str = "craft";
 const PETITION_COORDINATOR: &str = "petition_coordinator";
 const VIGIL: &str = "vigil";
@@ -262,6 +268,11 @@ const TEND_SMOKING_RACK: &str = "tend_smoking_rack";
 // disposition; two sibling registrations (NewbornKitten +
 // EyesOpenKitten) share the same DseId.
 const BEG_FOR_FOOD: &str = "beg_for_food";
+// 457 — Workshop-craft DSE id. Generalised over the six 368 Phase 2
+// recipes; the resolver picks the specific recipe at execute time.
+// Distinct from `CRAFT` (the 322 / #334 dormant id for the StealthCloak
+// HTN-leaf wiring): same Action variant, distinct DseId.
+const CRAFT_AT_WORKSHOP: &str = "craft_at_workshop";
 
 // Disposition-failure cooldown scalar keys, one per failure-prone
 // DispositionKind. 1.0 = no recent failure (no damp);
@@ -658,6 +669,10 @@ fn constituent_dses_for_ordinal(ordinal: f32) -> Option<&'static [&'static str]>
         // Patience / CommitmentTenure lifts apply to the BegForFood
         // DSE alone while the cat is committed.
         27 => Some(&[BEG_FOR_FOOD]),
+        // 457: Crafting → CraftAtWorkshop. Single-action disposition
+        // (the resolver picks the specific recipe at execute time, but
+        // L3 sees a single Action::Craft + DseId).
+        28 => Some(&[CRAFT_AT_WORKSHOP]),
         _ => None,
     }
 }
@@ -830,7 +845,10 @@ pub const fn dse_id_for_action(action: crate::ai::Action) -> &'static str {
         // these — they're never selectable via L3 — but the match must
         // stay exhaustive. Wired in #332/#333/#334.
         Action::WearItem => WEAR_ITEM,
-        Action::Craft => CRAFT,
+        // 457: Action::Craft now decodes to the live `craft_at_workshop`
+        // DSE id. The 322 / #334 dormant `CRAFT` constant remains for
+        // documentation continuity and the future StealthCloak DSE.
+        Action::Craft => CRAFT_AT_WORKSHOP,
         Action::PetitionCoordinator => PETITION_COORDINATOR,
         Action::Vigil => VIGIL,
         Action::GriefSit => GRIEF_SIT,
@@ -4283,7 +4301,14 @@ mod tests {
                 // queries them (no Live DSE has them as constituent).
                 // Wired in #332/#333/#334.
                 Action::WearItem => &[WEAR_ITEM],
-                Action::Craft => &[CRAFT],
+                // 457: Action::Craft now resolves to the live
+                // CRAFT_AT_WORKSHOP DseId (generalised Workshop crafting).
+                // The 322 / #334 dormant `CRAFT` id remains as a
+                // placeholder constant for the StealthCloak HTN-leaf
+                // wiring; when #334 ships its dedicated stealth-cloak
+                // DSE alongside CraftAtWorkshopDse this slice gets a
+                // second entry.
+                Action::Craft => &[CRAFT_AT_WORKSHOP],
                 Action::PetitionCoordinator => &[PETITION_COORDINATOR],
                 Action::Vigil => &[VIGIL],
                 Action::GriefSit => &[GRIEF_SIT],

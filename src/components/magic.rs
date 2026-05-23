@@ -497,6 +497,30 @@ impl Inventory {
         self.slots.iter().any(|s| s.kind.is_fuel())
     }
 
+    /// 457: whether the inventory contains at least one Phase 2 Workshop
+    /// recipe input — `Twig`, `Bristle`, `Fiber`, `Flower`, `Stone`,
+    /// `Feather`, or `PolishedStone`. Reader:
+    /// `HasCraftInputInInventory` writer in
+    /// `items::update_inventory_markers`. Recipe-agnostic: the marker
+    /// fires when ANY craft input is present, and `resolve_craft_at_workshop`
+    /// picks the specific Workshop recipe whose full input set is
+    /// satisfied at execute time.
+    pub fn has_craft_input(&self) -> bool {
+        use crate::components::items::ItemKind;
+        self.slots.iter().any(|s| {
+            matches!(
+                s.kind,
+                ItemKind::Twig
+                    | ItemKind::Bristle
+                    | ItemKind::Fiber
+                    | ItemKind::Flower
+                    | ItemKind::Stone
+                    | ItemKind::Feather
+                    | ItemKind::PolishedStone,
+            )
+        })
+    }
+
     /// Whether the inventory holds a specific prepared remedy.
     /// Ticket 365 — Phase 1a real-items migration.
     pub fn has_remedy(&self, kind: RemedyKind) -> bool {

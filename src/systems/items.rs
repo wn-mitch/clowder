@@ -6,10 +6,10 @@ use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::{item_display_name, Item};
 use crate::components::magic::{Inventory, ResourceKind};
 use crate::components::markers::{
-    HasCuriosInInventory, HasDryableInInventory, HasFreeSlot, HasFuelInInventory,
-    HasHerbsInInventory, HasLowWardReserve, HasMaterialsInInventory, HasRawFishInInventory,
-    HasRawMeatInInventory, HasRawOrganInInventory, HasRemedyHerbs, HasSmokeableInInventory,
-    HasWardHerbs,
+    HasCraftInputInInventory, HasCuriosInInventory, HasDryableInInventory, HasFreeSlot,
+    HasFuelInInventory, HasHerbsInInventory, HasLowWardReserve, HasMaterialsInInventory,
+    HasRawFishInInventory, HasRawMeatInInventory, HasRawOrganInInventory, HasRemedyHerbs,
+    HasSmokeableInInventory, HasWardHerbs,
 };
 use crate::components::physical::Dead;
 use crate::resources::colony_reserves::ColonyReserves;
@@ -53,15 +53,22 @@ pub fn update_inventory_markers(
             Has<HasFreeSlot>,
             Has<HasMaterialsInInventory>,
             Has<HasCuriosInInventory>,
-            // 367: preservation inventory markers.
-            Has<HasRawFishInInventory>,
-            Has<HasRawOrganInInventory>,
-            Has<HasRawMeatInInventory>,
-            Has<HasFuelInInventory>,
-            Has<HasDryableInInventory>,
-            Has<HasSmokeableInInventory>,
+            // 367: preservation inventory markers — bundled into a nested
+            // tuple so the parent query stays under Bevy's 15-arity
+            // `QueryData` ceiling (457 added `HasCraftInputInInventory`
+            // and pushed the flat shape over).
+            (
+                Has<HasRawFishInInventory>,
+                Has<HasRawOrganInInventory>,
+                Has<HasRawMeatInInventory>,
+                Has<HasFuelInInventory>,
+                Has<HasDryableInInventory>,
+                Has<HasSmokeableInInventory>,
+            ),
             // 450: generic food-in-inventory marker.
             Has<crate::components::markers::HasFoodInInventory>,
+            // 457: Workshop-craft input marker.
+            Has<HasCraftInputInInventory>,
         ),
         Without<Dead>,
     >,
@@ -75,13 +82,16 @@ pub fn update_inventory_markers(
         has_free_slot_marker,
         has_materials_marker,
         has_curios_marker,
-        has_raw_fish_marker,
-        has_raw_organ_marker,
-        has_raw_meat_marker,
-        has_fuel_marker,
-        has_dryable_marker,
-        has_smokeable_marker,
+        (
+            has_raw_fish_marker,
+            has_raw_organ_marker,
+            has_raw_meat_marker,
+            has_fuel_marker,
+            has_dryable_marker,
+            has_smokeable_marker,
+        ),
         has_food_marker,
+        has_craft_input_marker,
     ) in cats.iter()
     {
         let has_herbs = inventory.has_any_herb();
@@ -105,6 +115,11 @@ pub fn update_inventory_markers(
         // item to consume.
         let has_dryable = has_raw_fish || has_raw_organ;
         let has_smokeable = has_raw_meat && has_fuel;
+        // 457: Workshop-craft input presence — fires when inventory
+        // contains any Phase 2 recipe input (Twig / Bristle / Fiber /
+        // Flower / Stone / Feather / PolishedStone). Recipe-agnostic;
+        // the resolver picks the specific recipe at execute time.
+        let has_craft_input = inventory.has_craft_input();
 
         match (has_herbs, has_herbs_marker) {
             (true, false) => {
@@ -214,6 +229,16 @@ pub fn update_inventory_markers(
             }
             (false, true) => {
                 commands.entity(entity).remove::<HasSmokeableInInventory>();
+            }
+            _ => {}
+        }
+        // 457: Workshop-craft input marker toggle.
+        match (has_craft_input, has_craft_input_marker) {
+            (true, false) => {
+                commands.entity(entity).insert(HasCraftInputInInventory);
+            }
+            (false, true) => {
+                commands.entity(entity).remove::<HasCraftInputInInventory>();
             }
             _ => {}
         }

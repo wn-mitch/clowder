@@ -92,6 +92,12 @@ pub enum PlannerZone {
     /// The per-action precondition does the load / cooldown
     /// discrimination — same zone for both.
     SmokingRack,
+    /// 457: position of the nearest Workshop. Resolves to the nearest
+    /// `Structure { kind: Workshop }`. Used by `CraftAtWorkshop`
+    /// (generalised over the six 368 Phase 2 recipes — the resolver
+    /// picks the specific recipe by inventory + recipe registry at
+    /// execute time).
+    Workshop,
 }
 
 /// What the cat is carrying.
@@ -379,6 +385,16 @@ pub enum GoapActionKind {
     /// `last_tended_at_tick`. Single-tick action; effect is
     /// `IncrementTrips`.
     TendSmokingRack,
+    /// 457: craft a 368 Phase 2 behavioral tool at a Workshop. Single-
+    /// tick action; effect is `IncrementTrips`. The resolver
+    /// (`resolve_craft_at_workshop`) scans the recipe registry for
+    /// `StationRequirement::Workshop` recipes, picks the first one
+    /// (lexicographic by `RecipeId`) whose inputs are all in the
+    /// actor's `Inventory`, consumes them, spawns the output `Item`
+    /// per `Recipe.output.destination`, and emits
+    /// `Feature::ItemCrafted`. Plan-level precondition is
+    /// `ZoneIs(Workshop) ∧ HasMarker(HasCraftInputInInventory)`.
+    CraftAtWorkshop,
     /// 450: kitten begs for food. Single-tick Activity action — no
     /// preconditions, no state effect on `PlannerState`. The resolver
     /// stamps the kitten cry-map at the kitten's tile and emits

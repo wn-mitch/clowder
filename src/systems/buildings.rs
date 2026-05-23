@@ -27,6 +27,10 @@ pub struct ColonyBuildingState {
     pub has_functional_drying_rack: bool,
     /// 367: ≥1 functional, idle Smoking Rack (not currently loaded).
     pub has_functional_smoking_rack: bool,
+    /// 457: ≥1 functional Workshop. Unlike the preservation racks,
+    /// Workshops don't carry per-station load state — any functional
+    /// Workshop can host any Phase 2 recipe, so this is presence-only.
+    pub has_functional_workshop: bool,
 }
 
 /// Single-pass scan over the building query to derive all colony-scoped
@@ -49,6 +53,7 @@ pub fn scan_colony_buildings<'a>(
         // is condition-functional."
         has_functional_drying_rack: false,
         has_functional_smoking_rack: false,
+        has_functional_workshop: false,
     };
     for (structure, site) in buildings {
         if site.is_some() {
@@ -71,6 +76,9 @@ pub fn scan_colony_buildings<'a>(
             }
             if structure.kind == StructureType::SmokingRack && structure.effectiveness() > 0.0 {
                 state.has_functional_smoking_rack = true;
+            }
+            if structure.kind == StructureType::Workshop && structure.effectiveness() > 0.0 {
+                state.has_functional_workshop = true;
             }
         }
     }
@@ -754,6 +762,15 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasFunctionalSmokingRack);
     } else {
         em.remove::<crate::components::markers::HasFunctionalSmokingRack>();
+    }
+
+    // 457: Workshop availability. Presence-only (no idle predicate) —
+    // a Workshop can host any number of concurrent craft plans; the
+    // resolver handles consumption + spawning per-recipe.
+    if bldg_state.has_functional_workshop {
+        em.insert(crate::components::markers::HasFunctionalWorkshop);
+    } else {
+        em.remove::<crate::components::markers::HasFunctionalWorkshop>();
     }
 
     // Tend cooldown gate. `last_tended_at_tick == 0` is the "no tend

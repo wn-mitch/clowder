@@ -524,6 +524,33 @@ pub fn tend_smoking_rack_actions() -> Vec<GoapActionDef> {
     }]
 }
 
+/// 457: plan template for crafting a 368 Phase 2 behavioral tool at a
+/// Workshop. Single-step `[CraftAtWorkshop]`. Eligibility was already
+/// gated by the cat-side `HasCraftInputInInventory` marker (cat carries
+/// ≥1 Phase 2 input) + colony-side `HasFunctionalWorkshop`, so by the
+/// time A* runs we know there's at least one Workshop and the cat has
+/// some input. The resolver scans the recipe registry for any
+/// `StationRequirement::Workshop` recipe whose full input set is in
+/// inventory and crafts it; partial-input cats see the resolver Fail
+/// without witnessing, prompting a re-plan.
+///
+/// No retrieve step in the template — first-light gathers inputs via
+/// the existing hunt-byproduct + forage-drop paths, then crafts when
+/// the cat returns to the Workshop. A stores-side retrieve leg
+/// (mirroring `drying_food_actions` / `smoking_meat_actions`) is a
+/// follow-on if cats deposit inputs at Stores before crafting.
+pub fn crafting_actions() -> Vec<GoapActionDef> {
+    vec![GoapActionDef {
+        kind: GoapActionKind::CraftAtWorkshop,
+        cost: 2,
+        preconditions: vec![
+            StatePredicate::ZoneIs(PlannerZone::Workshop),
+            StatePredicate::HasMarker(crate::components::markers::HasCraftInputInInventory::KEY),
+        ],
+        effects: vec![StateEffect::IncrementTrips],
+    }]
+}
+
 /// 364: plan template for an HTN leaf primitive. The L2 frame-pin
 /// (#364 commit b) selects this builder when the cat's `HeldGoalStack`
 /// pins a `SubGoal::Primitive { action, .. }` — chosen in place of
@@ -1389,6 +1416,9 @@ pub fn actions_for_disposition(
         // 450: Begging plan template — single action, no preconditions,
         // no state effect (Activity Intention, not Goal — §L2.10.5).
         DispositionKind::Begging => begging_actions(),
+        // 457: Workshop-craft plan template — single `CraftAtWorkshop`
+        // step over `ZoneIs(Workshop) ∧ HasCraftInputInInventory`.
+        DispositionKind::Crafting => crafting_actions(),
     };
     actions.extend(domain_actions);
     actions

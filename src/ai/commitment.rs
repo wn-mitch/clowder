@@ -254,6 +254,11 @@ pub fn strategy_for_disposition(kind: DispositionKind) -> CommitmentStrategy {
         DispositionKind::DryingFood => SingleMinded,
         DispositionKind::SmokingMeat => SingleMinded,
         DispositionKind::TendingSmokingRack => SingleMinded,
+        // 457: Workshop crafting is a short, goal-shaped act — walk to
+        // the Workshop and consume one recipe's inputs. SingleMinded
+        // prevents mood drift from dropping the trip before the cat
+        // arrives at the Workshop.
+        DispositionKind::Crafting => SingleMinded,
         // 450: Begging is Activity-shaped (§L2.10.5 `Activity(Begging,
         // UntilInterrupt)`). OpenMinded per §L2.10.5's strategy-shape
         // correlation: the activity's drop trigger IS the desire-drift
@@ -864,6 +869,9 @@ mod tests {
             // Socializing / Exploring under §L2.10.5's strategy-shape
             // correlation).
             Begging,
+            // 457: Crafting — short goal-shaped Workshop trip
+            // (SingleMinded, mirrors preservation siblings).
+            Crafting,
         ];
         assert_eq!(
             covered.len(),

@@ -30,8 +30,9 @@ use bevy_ecs::prelude::*;
 
 use crate::components::identity::Species;
 use crate::components::markers::{
-    Adult, CanCook, CanDry, CanForage, CanHunt, CanSmoke, CanWard, CanWardFromSupply, ColonyState,
-    HasStoredThornbriar, HasWardHerbs, InCombat, Injured, JuvenileKitten, Kitten, Young,
+    Adult, CanCook, CanCraft, CanDry, CanForage, CanHunt, CanSmoke, CanWard, CanWardFromSupply,
+    ColonyState, HasStoredThornbriar, HasWardHerbs, InCombat, Injured, JuvenileKitten, Kitten,
+    Young,
 };
 use crate::components::physical::{Dead, Position};
 use crate::resources::map::{Terrain, TileMap};
@@ -64,6 +65,9 @@ pub fn update_capability_markers(
             Has<CanCook>,
             Has<CanDry>,
             Has<CanSmoke>,
+            // 457 — Workshop-craft per-cat capability. Same `Adult ∧
+            // ¬Injured` gate as CanCook / CanDry / CanSmoke.
+            Has<CanCraft>,
         ),
         (With<Species>, Without<Dead>),
     >,
@@ -93,6 +97,7 @@ pub fn update_capability_markers(
         cur_cook,
         cur_dry,
         cur_smoke,
+        cur_craft,
     ) in cats.iter()
     {
         // CanHunt: (Adult ∨ Young) ∧ ¬InCombat ∧ forest nearby.
@@ -155,6 +160,12 @@ pub fn update_capability_markers(
         toggle(&mut commands, entity, want_dry, cur_dry, CanDry);
         let want_smoke = is_adult && !is_injured;
         toggle(&mut commands, entity, want_smoke, cur_smoke, CanSmoke);
+
+        // 457: CanCraft shares the same per-cat gate. Colony-side
+        // Workshop availability stays on `CraftAtWorkshopDse`'s
+        // eligibility filter via `HasFunctionalWorkshop`.
+        let want_craft = is_adult && !is_injured;
+        toggle(&mut commands, entity, want_craft, cur_craft, CanCraft);
     }
 }
 
@@ -395,6 +406,7 @@ mod tests {
         assert!(!world.entity(cat).contains::<CanCook>());
         assert!(!world.entity(cat).contains::<CanDry>());
         assert!(!world.entity(cat).contains::<CanSmoke>());
+        assert!(!world.entity(cat).contains::<CanCraft>());
     }
 
     // -----------------------------------------------------------------------
