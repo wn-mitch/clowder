@@ -131,6 +131,13 @@ rows = 48
 tile = 16
 note = "Fan-tasy rocks atlas (Snow Adventures) — same layout as fantasy_rocks with snow-dusted variants."
 
+[atlases.food]
+texture = "sprites/Food.png"
+cols = 8
+rows = 8
+tile = 16
+note = "Food icons atlas — 64 cells, 16px tiles. Cooked meals / breads / pies / drinks / wedges / fruits — the prepared-food counterpart to the raw fruit_berries and items sheets."
+
 [atlases.trees]
 texture = "sprites/Sprout Lands - Sprites - premium pack/Objects/Tree animations/tree_sprites.png"
 cols = 12
