@@ -1467,8 +1467,67 @@ impl Feature {
             Feature::MeatLoadedOnSmokingRack => false,
             Feature::SmokingRackTended => false,
             Feature::MeatSmoked => false,
-            // Every other feature is expected to fire per soak.
-            _ => true,
+
+            // -------------------------------------------------------------
+            // Healthy-trunk Features: a canonical seed-42 soak fires each
+            // at least once. Ticket 368 retired the prior `_ => true`
+            // catch-all so new Feature variants must be classified
+            // explicitly — the default-true was the silent-canary surface
+            // a never-fired regression hid behind (the precedent the
+            // `## Conventions` "Silent-canary surfaces are forbidden"
+            // entry references).
+            // -------------------------------------------------------------
+            Feature::CorruptionSpread => true,
+            Feature::CorruptionTileEffect => true,
+            Feature::WardDecay => true,
+            Feature::HerbSeasonalCheck => true,
+            Feature::CombatResolved => true,
+            Feature::FateAssigned => true,
+            Feature::AspirationSelected => true,
+            Feature::BondFormed => true,
+            Feature::CoordinatorElected => true,
+            Feature::DirectiveIssued => true,
+            Feature::DirectiveDelivered => true,
+            Feature::ConstructionSiteSpawned => true,
+            Feature::BuildingConstructed => true,
+            Feature::MoodContagion => true,
+            Feature::PersonalityFriction => true,
+            Feature::AnxietyInterrupt => true,
+            Feature::ModifierPreemption => true,
+            Feature::PreyBred => true,
+            Feature::PreyDenAbandoned => true,
+            Feature::DenRaided => true,
+            Feature::WildlifeSpawned => true,
+            Feature::DeathStarvation => true,
+            Feature::DeathInjury => true,
+            Feature::KnowledgePromoted => true,
+            Feature::KnowledgeForgotten => true,
+            Feature::DepositRejected => true,
+            Feature::FoodCooked => true,
+            Feature::FoodLoadedOnDryingRack => true,
+            Feature::FoodDried => true,
+            Feature::MatingOccurred => true,
+            Feature::FoxHuntedPrey => true,
+            Feature::FoxStandoff => true,
+            Feature::FoxScentMarked => true,
+            Feature::FoxAvoidedCat => true,
+            Feature::GatherHerbCompleted => true,
+            Feature::FoodEaten => true,
+            Feature::Socialized => true,
+            Feature::GroomedOther => true,
+            Feature::MentoredCat => true,
+            Feature::CourtshipInteraction => true,
+            Feature::CommitmentDropTriggered => true,
+            Feature::CommitmentDropBlind => true,
+            Feature::CommitmentDropSingleMinded => true,
+            Feature::CommitmentDropOpenMinded => true,
+            Feature::CommitmentDropReplanCap => true,
+            Feature::HuntAttempted => true,
+            Feature::IntentionAdopted => true,
+            Feature::IntentionFulfilled => true,
+            Feature::JointIntentionEmitted { .. } => true,
+            Feature::JointBiasApplied { .. } => true,
+            Feature::JointStageAdvanced { .. } => true,
         }
     }
 }
@@ -1848,6 +1907,35 @@ mod tests {
         for feature in Feature::ALL {
             let _ = feature.category();
         }
+    }
+
+    /// Ticket 368 — silent-canary surfaces are forbidden (CLAUDE.md
+    /// `## Conventions`). The 367 pre-Commit-4 amend bug was a Feature
+    /// variant added to the enum but omitted from `Feature::ALL`; the
+    /// never-fired canary then silently skipped the new variant. The
+    /// exhaustive matches in `feature_name` / `category` /
+    /// `expected_to_fire_per_soak` already break compile when a variant
+    /// is added without classification. This test closes the last
+    /// surface: a hand-maintained sentinel count + duplicate check so
+    /// the developer who adds a variant must also add it to ALL and
+    /// bump `EXPECTED_VARIANT_COUNT` below.
+    #[test]
+    fn feature_all_is_exhaustive_and_unique() {
+        use std::collections::HashSet;
+        const EXPECTED_VARIANT_COUNT: usize = 152;
+        let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
+        assert_eq!(
+            distinct.len(),
+            Feature::ALL.len(),
+            "Feature::ALL contains duplicate variants — drop the duplicate.",
+        );
+        assert_eq!(
+            Feature::ALL.len(),
+            EXPECTED_VARIANT_COUNT,
+            "Feature::ALL count drift. Adding/removing a Feature variant requires \
+             updating Feature::ALL and bumping EXPECTED_VARIANT_COUNT in this test. \
+             See CLAUDE.md `## Conventions` — 'Silent-canary surfaces are forbidden'.",
+        );
     }
 
     #[test]
