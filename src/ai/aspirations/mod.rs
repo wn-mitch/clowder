@@ -231,6 +231,14 @@ pub struct AspirationChain {
     /// per pair (no symmetry requirement); the runtime walks both
     /// directions in [`can_adopt`].
     pub incompatible_with: &'static [(&'static str, ConflictClass)],
+    /// Spec §7.7.1 per-arc expected valence baseline. The emotional
+    /// tone a cat pursuing this chain is expected to feel on average.
+    /// Read by ticket 055's mood drift-threshold detector: sustained
+    /// `Mood::valence` below this target for ≥ N seasons signals
+    /// arc misalignment and fires §7.7.d reconsideration. Range
+    /// `[-1.0, 1.0]`. Author-time best guesses; balance tuning is
+    /// follow-on work to ticket 055.
+    pub expected_valence_target: f32,
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +271,23 @@ pub const ALL_CHAINS: &[&AspirationChain] = &[
     &mastery::PIGMENT_MASTERY,
     &mastery::CAIRN_MASTERY,
 ];
+
+// ---------------------------------------------------------------------------
+// §7.7.1 expected-valence reader (ticket 344)
+// ---------------------------------------------------------------------------
+
+/// Resolve the per-arc `expected_valence_target` for a chain by name.
+/// Ticket 055's mood drift-threshold detector calls this to compare a
+/// cat's sustained `Mood::valence` against the active arc's expected
+/// emotional baseline. Returns `None` if `chain_name` is not registered.
+pub fn expected_valence_for(
+    chain_name: &str,
+    registry: &crate::resources::aspiration_registry::AspirationRegistry,
+) -> Option<f32> {
+    registry
+        .chain_by_name(chain_name)
+        .map(|c| c.expected_valence_target)
+}
 
 // ---------------------------------------------------------------------------
 // §7.7.1 adoption gate
@@ -443,6 +468,43 @@ mod compatibility_tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn expected_valence_targets_are_in_unit_range() {
+        // Ticket 344 — every chain's expected_valence_target must sit
+        // in [-1.0, 1.0]; out-of-range values would corrupt 055's
+        // sustained-mood comparator.
+        for c in ALL_CHAINS {
+            assert!(
+                (-1.0..=1.0).contains(&c.expected_valence_target),
+                "chain '{}' expected_valence_target {} out of [-1.0, 1.0]",
+                c.name,
+                c.expected_valence_target,
+            );
+        }
+    }
+
+    #[test]
+    fn expected_valence_for_resolves_every_chain() {
+        // Ticket 344 — the free-fn reader must resolve for every name
+        // in the registry, so 055 doesn't silently fall through to
+        // `None` for any active arc.
+        let r = registry();
+        for c in ALL_CHAINS {
+            assert_eq!(
+                expected_valence_for(c.name, &r),
+                Some(c.expected_valence_target),
+                "expected_valence_for failed to resolve '{}'",
+                c.name,
+            );
+        }
+    }
+
+    #[test]
+    fn expected_valence_for_unknown_chain_returns_none() {
+        let r = registry();
+        assert_eq!(expected_valence_for("Not A Chain", &r), None);
     }
 
     #[test]

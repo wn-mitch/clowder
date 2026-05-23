@@ -1,7 +1,7 @@
 ---
 id: 344
 title: §7.7.1 aspiration arc per-chain expected_valence_target field
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-23
 ---
 
 ## Why
@@ -94,3 +94,4 @@ system can fetch without coupling to chain-const knowledge.
   antipattern-migration discipline). 055's `blocked-by` flipped from
   `[056]` to `[344]` in the same commit.
 - 2026-05-19: accuracy audit pass — no blockers in blocked-by (correct), referenced file exists (ai-substrate-refactor.md), Rust symbols verified (AspirationChain, AspirationRegistry).
+- 2026-05-23: Authored expected_valence_target on all 20 chains (15 primary + 5 Phase 5 mastery — ticket scope text says 14 but registry grew with 366); reader expected_valence_for(name, &registry) surfaced; 3 unit tests (range, resolution, unknown→None); unblocks 055.

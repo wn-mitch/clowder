@@ -63,6 +63,7 @@ pub const VOICE_OF_THE_COLONY: AspirationChain = AspirationChain {
     // Pair with BEYOND_THE_BORDER authored on that side (one-direction
     // authoring per §7.7.1; reverse-walk in `can_adopt` handles it).
     incompatible_with: &[],
+    expected_valence_target: 0.05,
 };
 
 pub const THE_UNIFIER: AspirationChain = AspirationChain {
@@ -99,4 +100,5 @@ pub const THE_UNIFIER: AspirationChain = AspirationChain {
     ],
     completion_narrative: "{name} is The Unifier. The colony is one because {subject} made it so.",
     incompatible_with: &[],
+    expected_valence_target: 0.10,
 };

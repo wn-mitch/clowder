@@ -122,4 +122,5 @@ pub const RAISE_OFFSPRING_ASPIRATION: AspirationChain = AspirationChain {
     // against `ReproduceAspiration` and the lifetime-celibacy arcs
     // is follow-on.
     incompatible_with: &[],
+    expected_valence_target: 0.40,
 };

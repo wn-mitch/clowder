@@ -118,6 +118,7 @@ pub const WEAVING_MASTERY: AspirationChain = AspirationChain {
     completion_narrative:
         "{name} is the Paragon Weaver. There is nothing fiber can do that {subject} cannot teach it.",
     incompatible_with: &[],
+    expected_valence_target: 0.20,
 };
 
 pub const BONE_SHAPING_MASTERY: AspirationChain = AspirationChain {
@@ -193,6 +194,7 @@ pub const BONE_SHAPING_MASTERY: AspirationChain = AspirationChain {
     completion_narrative:
         "{name} is the Paragon Bone-Shaper. The dead give up their last form for {object}.",
     incompatible_with: &[],
+    expected_valence_target: 0.20,
 };
 
 pub const HIDEWORK_MASTERY: AspirationChain = AspirationChain {
@@ -267,6 +269,7 @@ pub const HIDEWORK_MASTERY: AspirationChain = AspirationChain {
     completion_narrative:
         "{name} is the Paragon Hideworker. Every cured hide in the colony bears {possessive} mark.",
     incompatible_with: &[],
+    expected_valence_target: 0.20,
 };
 
 pub const PIGMENT_MASTERY: AspirationChain = AspirationChain {
@@ -343,6 +346,7 @@ pub const PIGMENT_MASTERY: AspirationChain = AspirationChain {
     completion_narrative:
         "{name} is the Paragon Pigmenter. The colony's seasons leave their mark through {possessive} paws.",
     incompatible_with: &[],
+    expected_valence_target: 0.25,
 };
 
 pub const CAIRN_MASTERY: AspirationChain = AspirationChain {
@@ -419,4 +423,5 @@ pub const CAIRN_MASTERY: AspirationChain = AspirationChain {
     completion_narrative:
         "{name} is the Paragon Cairn-Wright. The colony's bones are the stones {subject} has set.",
     incompatible_with: &[],
+    expected_valence_target: 0.25,
 };

@@ -72,6 +72,7 @@ pub const MAPMAKER: AspirationChain = AspirationChain {
     completion_narrative:
         "{name} is the Mapmaker. The world is larger because {subject} walked it.",
     incompatible_with: &[],
+    expected_valence_target: 0.20,
 };
 
 pub const BEYOND_THE_BORDER: AspirationChain = AspirationChain {
@@ -120,4 +121,5 @@ pub const BEYOND_THE_BORDER: AspirationChain = AspirationChain {
     // incoherent (solitary-wanderer vs colony-coordinator, spec
     // verbatim).
     incompatible_with: &[("Voice of the Colony", ConflictClass::HardIdentity)],
+    expected_valence_target: 0.15,
 };

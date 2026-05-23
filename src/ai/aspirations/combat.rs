@@ -111,6 +111,7 @@ pub const WARRIORS_PATH: AspirationChain = AspirationChain {
     // remedy-pressing. Simultaneous active state is coherence-
     // incoherent (warrior-path vs pacifist-mentor, spec verbatim).
     incompatible_with: &[("Healer's Calling", ConflictClass::HardLogical)],
+    expected_valence_target: -0.10,
 };
 
 pub const SHADOW_FIGHTER: AspirationChain = AspirationChain {
@@ -150,4 +151,5 @@ pub const SHADOW_FIGHTER: AspirationChain = AspirationChain {
     ],
     completion_narrative: "They call {name} the Shadow Fighter. The borders have never been safer.",
     incompatible_with: &[],
+    expected_valence_target: -0.20,
 };
