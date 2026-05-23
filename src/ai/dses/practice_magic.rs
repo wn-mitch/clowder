@@ -7,10 +7,11 @@
 //! additive contributions are now produced at the axis level through
 //! Logistic curves per §2.3's "Retired constants" subsection.
 //!
-//! All six share the PracticeMagic eligibility contract:
-//! `magic_affinity > magic_affinity_threshold && magic_skill >
-//! magic_skill_threshold` — handled by the outer gate in
-//! `score_actions` until §4 markers port in Phase 3d.
+//! Ticket 004 retired the legacy `magic_affinity / magic_skill > threshold`
+//! outer gate. Each DSE's `CompensatedProduct` shape suppresses low-skill
+//! scores via the multiplicative `magic_skill` axis; the misfire system
+//! at `src/systems/magic.rs::check_misfire` prices unskilled execution
+//! at action time.
 
 use bevy::prelude::*;
 
@@ -162,12 +163,10 @@ impl DurableWardDse {
             ],
             composition: Composition::compensated_product(vec![1.0, 1.0, 1.0, 1.0]),
             // §4 marker eligibility (Phase 4b.5): DurableWard only
-            // scores when colony ward strength is low. Retires the
-            // `ctx.ward_strength_low` conjunct from the outer gate at
-            // `scoring.rs:775-780`. The
-            // `magic_skill > magic_durable_ward_skill_threshold`
-            // conjunct stays inline — magic_skill is a §4.5 scalar,
-            // not a marker.
+            // scores when colony ward strength is low. Ticket 004
+            // retired the `magic_skill > magic_durable_ward_skill_threshold`
+            // conjunct — magic_skill is already a multiplicative CP axis
+            // that suppresses low-skill scores.
             // §13.1: `.forbid(markers::Incapacitated::KEY)` blocks downed cats.
             eligibility: EligibilityFilter::new()
                 .require(markers::WardStrengthLow::KEY)

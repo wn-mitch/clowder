@@ -1,7 +1,7 @@
 ---
 id: 004
 title: Magic hard-gated at scoring
-status: ready
+status: done
 cluster: magic-mythic
 orchestration: substrate-sensitive
 initiative: [mythic-texture]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [project-vision.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-23
 ---
 
 ## Current state
@@ -44,3 +44,4 @@ Also touches `src/systems/disposition.rs:1675–1676, 1717–1718, 1748`
 ## Log
 
 - 2026-05-19: accuracy audit pass — line numbers in `src/ai/scoring.rs` have shifted (now ~1854-1855 for magic gate) but cited gating behavior still accurate; no edit needed
+- 2026-05-23: 2026-05-23: landed. Verdict concern (survival pass · continuity pass · 2.2× duration drift attributed to pre-existing joint_intention hot path — see 459). Predicted ecological shift confirmed: wards_placed_total +1050%/10kt — over-shoot tracked in 460. Soft-considerations follow-on in 458.

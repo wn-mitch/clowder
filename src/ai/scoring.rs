@@ -1923,15 +1923,6 @@ pub struct PostEvalSink<'a> {
     pub wants_cook_but_no_kitchen: &'a mut bool,
 }
 
-/// Shared §155 PracticeMagic outer-gate predicate — `magic_affinity >
-/// threshold AND magic_skill > threshold`. Hoisted to a free fn so
-/// each `PreDispatchGate` closure stays capture-free (the `fn`-pointer
-/// alias only accepts non-capturing closures).
-fn magic_outer(ctx: &ScoringContext) -> bool {
-    ctx.magic_affinity > ctx.scoring.magic_affinity_threshold
-        && ctx.magic_skill > ctx.scoring.magic_skill_threshold
-}
-
 /// Lazy-initialized `DseId → PreDispatchGate` table. `BTreeMap` rather
 /// than `HashMap` so iteration order is deterministic (matters when a
 /// future caller walks the table; lookups by key are unaffected).
@@ -1985,27 +1976,16 @@ fn pre_dispatch_gates() -> &'static BTreeMap<DseId, PreDispatchGate> {
         t.insert(DseId("herbcraft_prepare"), |ctx, _| {
             ctx.has_remedy_herbs && ctx.colony_injury_count > 0
         });
-        // PracticeMagic — shared outer gate on innate affinity + trained
-        // skill (`magic_outer`); sub-DSEs add their own inner conditions
-        // (corruption / carcass / special-terrain / skill-threshold).
-        // Outer condition hoisted to a free fn at module scope so each
-        // closure stays capture-free (PreDispatchGate is an `fn` pointer).
-        t.insert(DseId("magic_scry"), |ctx, _| magic_outer(ctx));
-        t.insert(DseId("magic_durable_ward"), |ctx, _| {
-            magic_outer(ctx) && ctx.magic_skill > ctx.scoring.magic_durable_ward_skill_threshold
-        });
-        t.insert(DseId("magic_cleanse"), |ctx, _| {
-            magic_outer(ctx)
-                && ctx.on_corrupted_tile
-                && ctx.tile_corruption > ctx.scoring.magic_cleanse_corruption_threshold
-        });
-        t.insert(DseId("magic_colony_cleanse"), |ctx, _| magic_outer(ctx));
-        t.insert(DseId("magic_harvest"), |ctx, _| {
-            magic_outer(ctx) && ctx.carcass_nearby
-        });
-        t.insert(DseId("magic_commune"), |ctx, _| {
-            magic_outer(ctx) && ctx.on_special_terrain
-        });
+        // PracticeMagic — ticket 004 retired the `magic_outer` affinity +
+        // skill binary gate. Each magic DSE's `CompensatedProduct` shape
+        // already suppresses low-skill scores via the `magic_skill`
+        // multiplicative axis; the misfire system at
+        // `src/systems/magic.rs::check_misfire` prices unskilled execution.
+        // Inner spatial/marker conditions live on the per-DSE eligibility
+        // filter (e.g., DurableWard requires `WardStrengthLow`) or in the
+        // consideration axes themselves (Cleanse / ColonyCleanse / Harvest
+        // / Commune use spatial anchors or context scalars that go to
+        // zero off-position).
         // Cook: hunger threshold gate. The §4.5 scalar precondition
         // means a starving cat doesn't wander off to the Kitchen
         // instead of eating. The post-eval hook below writes the
@@ -2873,20 +2853,6 @@ mod tests {
             apply_carry_affinity(10.0, "build", Carrying::BuildMaterials, 1.0),
             10.0
         );
-    }
-
-    /// 155: helper for tests that need to ask "did any of the six
-    /// Witchcraft sub-actions score?".
-    fn is_magic_subaction(a: Action) -> bool {
-        matches!(
-            a,
-            Action::MagicScry
-                | Action::MagicDurableWard
-                | Action::MagicCleanse
-                | Action::MagicColonyCleanse
-                | Action::MagicHarvest
-                | Action::MagicCommune
-        )
     }
 
     // --- Shared DseRegistry + ModifierPipeline for tests ---
@@ -4439,31 +4405,34 @@ mod tests {
     }
 
     #[test]
-    fn practice_magic_requires_prereqs() {
+    fn practice_magic_reachable_for_low_affinity_cats() {
+        // Ticket 004 retired the `magic_affinity / magic_skill > threshold`
+        // binary outer gate. A low-affinity cat with positive magic_skill
+        // now sees Scry in the L2 pool — the substrate-honest replacement
+        // for the legacy hard gate. The misfire system at
+        // `src/systems/magic.rs::check_misfire` prices unskilled execution
+        // at action time. The companion test
+        // `magical_cat_on_corrupted_tile_scores_practice_magic` covers
+        // the inverse direction (favorable context promotes the score).
         let sc = default_scoring();
         let needs = Needs::default();
         let personality = default_personality();
         let mut rng = seeded_rng(52);
 
-        // Below prereqs: affinity 0.2 < 0.3 threshold
         let mut c = ctx(&needs, &personality, &sc);
         c.magic_affinity = 0.2;
         c.magic_skill = 0.3;
 
         let scores = score_actions(&c, &test_eval_inputs(), &mut rng).scores;
-        // 155: PracticeMagic fanned to 6 sub-actions; below the
-        // affinity gate, none of them should appear.
-        let any_magic = scores.iter().any(|(a, _)| is_magic_subaction(*a));
-        assert!(!any_magic, "below affinity threshold → no Magic sub-action");
-
-        // Below prereqs: skill 0.1 < 0.2 threshold
-        let mut c2 = ctx(&needs, &personality, &sc);
-        c2.magic_affinity = 0.5;
-        c2.magic_skill = 0.1;
-
-        let scores2 = score_actions(&c2, &test_eval_inputs(), &mut rng).scores;
-        let any_magic2 = scores2.iter().any(|(a, _)| is_magic_subaction(*a));
-        assert!(!any_magic2, "below skill threshold → no Magic sub-action");
+        let scry = scores.iter().find(|(a, _)| *a == Action::MagicScry);
+        assert!(
+            scry.is_some(),
+            "Scry should be reachable for a low-affinity cat with positive magic_skill"
+        );
+        assert!(
+            scry.unwrap().1 > 0.0,
+            "Scry score should be positive when magic_skill > 0"
+        );
     }
 
     #[test]

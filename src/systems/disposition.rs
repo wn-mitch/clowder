@@ -1306,7 +1306,6 @@ pub fn disposition_to_chain(
             &Position,
             &Memory,
             &Skills,
-            &MagicAffinity,
             &Inventory,
             &Health,
             &mut Disposition,
@@ -1447,7 +1446,6 @@ pub fn disposition_to_chain(
         pos,
         memory,
         skills,
-        magic_aff,
         inventory,
         health,
         disposition,
@@ -1730,7 +1728,6 @@ pub fn disposition_to_chain(
                     personality,
                     needs,
                     skills,
-                    magic_aff,
                     inventory,
                     &herb_query,
                     &building_query,
@@ -2422,7 +2419,6 @@ fn build_crafting_chain(
     _personality: &Personality,
     _needs: &Needs,
     skills: &Skills,
-    magic_aff: &MagicAffinity,
     inventory: &Inventory,
     herb_query: &Query<(Entity, &Herb, &Position), With<Harvestable>>,
     building_query: &Query<(
@@ -2483,7 +2479,6 @@ fn build_crafting_chain(
         chosen_action,
         pos,
         skills,
-        magic_aff,
         inventory,
         herb_query,
         building_query,
@@ -2515,7 +2510,6 @@ fn build_crafting_chain(
             mode,
             pos,
             skills,
-            magic_aff,
             inventory,
             herb_query,
             building_query,
@@ -2544,7 +2538,6 @@ fn try_crafting_sub_mode(
     mode: Action,
     pos: &Position,
     skills: &Skills,
-    magic_aff: &MagicAffinity,
     inventory: &Inventory,
     herb_query: &Query<(Entity, &Herb, &Position), With<Harvestable>>,
     building_query: &Query<(
@@ -2654,12 +2647,6 @@ fn try_crafting_sub_mode(
             if (!is_durable && !inventory.has_ward_herb()) || !ward_strength_low {
                 return None;
             }
-            if is_durable
-                && (magic_aff.0 <= d.crafting_magic_affinity_threshold
-                    || skills.magic <= d.crafting_magic_skill_threshold)
-            {
-                return None;
-            }
 
             // Fallback to map-center anchor on the rare path where
             // `ward_strength_low` was false at computation time but the
@@ -2690,12 +2677,6 @@ fn try_crafting_sub_mode(
         }
 
         Action::MagicScry | Action::MagicCommune => {
-            if magic_aff.0 <= d.crafting_magic_affinity_threshold
-                || skills.magic <= d.crafting_magic_skill_threshold
-            {
-                return None;
-            }
-
             let on_special = if map.in_bounds(pos.x, pos.y) {
                 matches!(
                     map.get(pos.x, pos.y).terrain,
@@ -2721,9 +2702,6 @@ fn try_crafting_sub_mode(
         }
 
         Action::MagicCleanse | Action::MagicColonyCleanse => {
-            if magic_aff.0 <= d.crafting_magic_affinity_threshold {
-                return None;
-            }
             let chain = TaskChain::new(
                 vec![TaskStep::new(StepKind::CleanseCorruption).with_position(*pos)],
                 FailurePolicy::AbortChain,
@@ -4857,7 +4835,7 @@ mod tests {
     #[test]
     fn chain_respects_prepare_hint() {
         use crate::components::magic::{GrowthStage, Harvestable, Herb, HerbKind, Inventory, Ward};
-        use crate::components::skills::{MagicAffinity, Skills};
+        use crate::components::skills::Skills;
         use crate::resources::map::{Terrain, TileMap};
         use rand_chacha::rand_core::SeedableRng;
         use rand_chacha::ChaCha8Rng;
@@ -4905,7 +4883,6 @@ mod tests {
         let needs = Needs::default();
         let mut skills = Skills::default();
         skills.herbcraft = 0.5; // above threshold
-        let magic_aff = MagicAffinity(0.0);
         let mut inventory = Inventory { slots: Vec::new() };
         inventory.add_herb(HerbKind::HealingMoss); // remedy herb
 
@@ -4937,7 +4914,6 @@ mod tests {
             &personality,
             &needs,
             &skills,
-            &magic_aff,
             &inventory,
             &herb_query,
             &building_query,

@@ -15,10 +15,10 @@ _Last generated: 2026-05-23._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 121 |
+| Ready | 123 |
 | Parked | 14 |
 | Blocked | 32 |
-| **Open total** | **171** |
+| **Open total** | **173** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (121)
+## Ready by cluster (123)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -104,7 +104,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · added 2026-05-21_
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
 
-### social-coordination (17 ready, 4 blocked)
+### social-coordination (18 ready, 4 blocked)
 
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
 - **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[social-coordination] · added 2026-05-07_
@@ -123,6 +123,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[404](docs/open-work/tickets/404-adopted-parental-adoption-orphan-integration-399-follow-on-mythic-texture.md)** — Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
+- **[459](docs/open-work/tickets/459-retire-author-joint-intentions-per-tick-hot-path.md)** — Retire author_joint_intentions per-tick hot path — _[social-coordination] · added 2026-05-23_
 
 ### items-crafting (13 ready, 6 blocked)
 
@@ -197,6 +198,14 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
 
+### magic-mythic (5 ready, 4 blocked)
+
+- **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
+- **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
+- **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
+- **[458](docs/open-work/tickets/458-practicemagic-soft-affinity-skill-considerations.md)** — PracticeMagic soft affinity / skill considerations — _[magic-mythic] · added 2026-05-23_
+- **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
+
 ### process-discipline (5 ready)
 
 - **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
@@ -204,13 +213,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
 - **[455](docs/open-work/tickets/455-prune-landed-ticket-entries-from-substrate-stubsallowlist-and-add-ci-guard.md)** — Prune landed-ticket entries from substrate_stubs.allowlist and add CI guard — _[process-discipline] · added 2026-05-23_
-
-### magic-mythic (4 ready, 4 blocked)
-
-- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
-- **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
-- **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
-- **[240](docs/open-work/tickets/240-anti-corruption-from-graves-balance-pass-tune-grave-aura-strength-and-radius.md)** — Anti-corruption-from-graves balance pass — tune grave_aura strength and radius — _[magic-mythic] · added 2026-05-08_
 
 ### tooling-diagnostics-ui (4 ready)
 
@@ -224,7 +226,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
-## Ready by initiative (80 tag-memberships across 9 initiatives)
+## Ready by initiative (81 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -246,9 +248,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
 
-### mythic-texture (12 open, 1 landed)
+### mythic-texture (13 open, 2 landed)
 
-- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
 - **[236](docs/open-work/tickets/236-body-preparation-tiers-dragshroudmummify-gated-by-tech-markers.md)** — Body preparation tiers — drag/shroud/mummify gated by tech markers — _[life-cycle] · added 2026-05-08_
@@ -260,6 +261,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[404](docs/open-work/tickets/404-adopted-parental-adoption-orphan-integration-399-follow-on-mythic-texture.md)** — Adopted parental adoption (orphan integration; 399 follow-on; mythic-texture) — _[social-coordination] · added 2026-05-17_
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
+- **[458](docs/open-work/tickets/458-practicemagic-soft-affinity-skill-considerations.md)** — PracticeMagic soft affinity / skill considerations — _[magic-mythic] · added 2026-05-23_
+- **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
 
 ### full-sensory-perception (11 open, 5 landed)
 
@@ -335,10 +338,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (121)
+## Ready (123)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
-- **[004](docs/open-work/tickets/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring — _[magic-mythic] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
@@ -458,6 +460,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 - **[455](docs/open-work/tickets/455-prune-landed-ticket-entries-from-substrate-stubsallowlist-and-add-ci-guard.md)** — Prune landed-ticket entries from substrate_stubs.allowlist and add CI guard — _[process-discipline] · added 2026-05-23_
 - **[456](docs/open-work/tickets/456-goap-plan-construction-integration-test-for-commitment-strategy-goal-priority.md)** — GOAP plan-construction integration test for commitment-strategy goal priority — _[tooling-diagnostics-ui] · added 2026-05-23_
+- **[458](docs/open-work/tickets/458-practicemagic-soft-affinity-skill-considerations.md)** — PracticeMagic soft affinity / skill considerations — _[magic-mythic] · added 2026-05-23_
+- **[459](docs/open-work/tickets/459-retire-author-joint-intentions-per-tick-hot-path.md)** — Retire author_joint_intentions per-tick hot path — _[social-coordination] · added 2026-05-23_
+- **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
 
 ## Parked (14)
 
@@ -511,11 +516,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 
-## Landed archive (314)
+## Landed archive (315)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (248)
+### 2026-05 (249)
 
 - **[457](docs/open-work/landed/457-workshop-craft-dse-plan-template-for-016-phase-2-behavioral-tools.md)** — Workshop-craft DSE + plan template for 016 Phase 2 behavioral tools _(2026-05-23)_
 - **[453](docs/open-work/landed/453-close-inter-cat-mates-bond-exclusivity-gap.md)** — Close inter-cat Mates-bond exclusivity gap _(2026-05-23)_
@@ -524,6 +529,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[368](docs/open-work/landed/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) _(2026-05-23)_
 - **[344](docs/open-work/landed/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field _(2026-05-23)_
 - **[326](docs/open-work/landed/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables _(2026-05-23)_
+- **[004](docs/open-work/landed/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring _(2026-05-23)_
 - **[450](docs/open-work/landed/450-three-stage-kittenhood-newborn-eyes-open-juvenile-with-progressive-capability-gates.md)** — Three-stage kittenhood — Newborn / Eyes-open / Juvenile with progressive capability gates _(2026-05-22)_
 - **[375](docs/open-work/landed/375-prey-byproduct-decomposition-meat-bonesinewhidefeatherscaletalloworganwhisker.md)** — prey-byproduct decomposition: meat + bone/sinew/hide/feather/scale/tallow/organ/whisker _(2026-05-22)_
 - **[447](docs/open-work/landed/447-smoking-chain-scenario-coverage-for-retired-per-soak-canary.md)** — smoking-chain scenario coverage for retired per-soak canary _(2026-05-21)_

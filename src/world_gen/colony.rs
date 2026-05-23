@@ -243,11 +243,16 @@ pub(crate) fn roll_orientation(rng: &mut impl Rng) -> Orientation {
 
 /// 60% get 0.0–0.2, 30% get 0.3–0.6, 10% get 0.7–1.0.
 ///
-/// Rebalanced to raise the fraction of cats capable of crossing the
-/// `magic_affinity_threshold` (0.3) for PracticeMagic — the prior 80/15/5
-/// distribution produced ~1 magic-capable cat per 8-cat colony, which killed
-/// the durable-ward path entirely (0/85 DurableWards placed in the baseline
-/// 15-minute deep-soak).
+/// Distribution intent: most cats are mundane (low affinity), a substantial
+/// minority are magically attuned (mid range), a rare few are gifted (high).
+/// Ticket 004 retired the affinity binary gate — magic-DSE scoring now
+/// suppresses low-affinity / low-skill scores via the per-DSE CP shape, and
+/// the misfire system at `src/systems/magic.rs::check_misfire` prices
+/// unskilled execution. The prior rebalance from 80/15/5 → 60/30/10 was
+/// motivated by the long-retired binary gate that produced ~1 magic-capable
+/// cat per 8-cat colony; the current substrate shape would not require the
+/// rebalance, but the 60/30/10 distribution still encodes the design intent
+/// of "magical aptitude is a meaningful minority trait."
 pub(crate) fn roll_magic_affinity(rng: &mut impl Rng) -> f32 {
     match rng.random_range(0..20u32) {
         0..=11 => rng.random_range(0.0_f32..=0.2),
