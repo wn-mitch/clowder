@@ -668,6 +668,19 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     registry.push(crate::ai::methods::fight::fight_method());
     registry.push(crate::ai::methods::flee::flee_method());
 
+    // 326: Tier-1 Live methods — combine-and-test slice for the Social
+    // chain. `socialize_method` catches `socialize` (Primary emit on
+    // every HEART_OF_THE_COLONY milestone); `groom_other_method` catches
+    // `groom_other` (Primary emit on every THE_BELOVED milestone). Both
+    // carry `applicable_when: Live(always_true)` and one primitive sub-
+    // goal each (Action::Socialize + TargetHint::SocialPartner;
+    // Action::GroomOther + TargetHint::GroomingTarget). Mentor wrappers
+    // and bespoke applicability predicates (`has_eligible_apprentice`,
+    // `has_friend_or_better_bond`, …) are deferred to a follow-on
+    // balance pass per sibling 330 / 331 discipline.
+    registry.push(crate::ai::methods::socialize::socialize_method());
+    registry.push(crate::ai::methods::groom_other::groom_other_method());
+
     // 398 Phase 1a: Live single-primitive `caretake_kitten` method.
     // Catches the `caretake_kitten` label that
     // `RAISE_OFFSPRING_ASPIRATION`'s dormant emit row will fire once

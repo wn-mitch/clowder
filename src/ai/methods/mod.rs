@@ -86,6 +86,18 @@ pub enum TargetHint {
     /// maturity for the wean/teach/release stage gate). Used by
     /// `rear_kitten`'s three primitive sub-goals.
     DependentKitten,
+    /// 326 — primitive sub-goal binds to the cat's social-partner
+    /// picker (Socialize-DSE's existing target resolution in
+    /// `src/ai/dses/socialize_target.rs`: a proximate cat scored by
+    /// bond / familiarity / affiliation). Used by `socialize_method`
+    /// as HEART_OF_THE_COLONY's primary emit target.
+    SocialPartner,
+    /// 326 — primitive sub-goal binds to the cat's grooming-target
+    /// picker (GroomOther-DSE's existing target resolution in
+    /// `src/ai/dses/groom_other_target.rs`: a proximate partner / kin /
+    /// affiliated cat with grooming need). Used by `groom_other_method`
+    /// as THE_BELOVED's primary emit target.
+    GroomingTarget,
 }
 
 // ---------------------------------------------------------------------------
@@ -441,6 +453,13 @@ pub mod courtship;
 // `SubGoal::Goal(GoalState { label: "mating_event_completed" })`
 // recursion seam — see module doc.
 pub mod mating;
+// 326: Live HTN method modules — combine-and-test slice for the Social
+// chain. `socialize_method` catches `socialize` (Primary emit on every
+// HEART_OF_THE_COLONY milestone); `groom_other_method` catches
+// `groom_other` (Primary emit on every THE_BELOVED milestone). Tier-1
+// Live primitives mirroring `build_method`'s 330 shape.
+pub mod groom_other;
+pub mod socialize;
 
 // Tests live in `tests.rs` so the bash lint can exclude that path
 // while scanning `src/ai/methods/` for production `Method` literals.

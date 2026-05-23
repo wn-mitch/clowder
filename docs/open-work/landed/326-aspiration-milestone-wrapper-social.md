@@ -1,7 +1,7 @@
 ---
 id: 326
 title: Social aspiration_milestone_wrapper + emits tables
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: [smarter-cats]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [htn-methods.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-23
 ---
 
 ## Why
@@ -99,3 +99,4 @@ emits: &[
 - 2026-05-14: opened as 128 epic child #8 (Batch B Tier 1,
   paired with #325 for shape diversity).
 - 2026-05-19: accuracy audit pass — no blockers, referenced files exist, Rust symbols verified (Milestone, Emit).
+- 2026-05-23: Tier-1 Live HTN methods socialize_method + groom_other_method wrap Action::Socialize / Action::GroomOther with TargetHint::SocialPartner / GroomingTarget; HEART_OF_THE_COLONY + THE_BELOVED milestones emit single Primary always_true rows per sibling 330/331 combine-and-test discipline. Verified via soak-trace 42 Simba: Heart-of-the-Colony cats (Nettle, Bramble) carry socialize_method in goal_stack with source=aspiration:Heart of the Colony.
