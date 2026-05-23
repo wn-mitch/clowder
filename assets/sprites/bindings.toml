@@ -283,6 +283,49 @@ atlas = "items"
 index = 30
 note = "LARGEBROWNJAR (rendered fat in container)"
 
+# Ticket 368 — 016 Phase 2 inputs + behavioral tools. Placeholder
+# sprite indices reusing existing tiles; art pass can rebind once
+# dedicated assets land.
+[items.Twig]
+atlas = "items"
+index = 100
+note = "placeholder — branch/stick-like tile"
+
+[items.Bristle]
+atlas = "items"
+index = 101
+note = "placeholder — fur/whisker-like tile"
+
+[items.Fiber]
+atlas = "items"
+index = 102
+note = "placeholder — thread/grass-like tile"
+
+[items.Flower]
+atlas = "items"
+index = 103
+note = "placeholder — flower/blossom tile"
+
+[items.PolishedStone]
+atlas = "items"
+index = 104
+note = "placeholder — refined stone tile"
+
+[items.GroomingBrush]
+atlas = "items"
+index = 105
+note = "placeholder — brush/tool tile"
+
+[items.PlayBundle]
+atlas = "items"
+index = 106
+note = "placeholder — bundle/toy tile"
+
+[items.CourtshipGift]
+atlas = "items"
+index = 107
+note = "placeholder — gift/curio tile"
+
 [buildings.Den]
 textures = [ "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_1.png", "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_2.png", "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_3.png" ]
 native_size = [ 89, 91 ]

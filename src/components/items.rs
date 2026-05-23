@@ -91,6 +91,32 @@ pub enum ItemKind {
     DriedFish,
     SmokedMeat,
     PreservedOrgan,
+
+    // --- Crafting input substrate (ticket 368 — 016 Phase 2). ---
+    // Inputs that feed the Phase 2 behavioral-tool recipes
+    // (Grooming Brush / Play Bundle / Courtship Gift). Twig / Fiber /
+    // Flower come from forage producers; Bristle is shed by prey on
+    // death (extends `prey_byproducts`); PolishedStone is the output
+    // of a Workshop sub-recipe (Stone → PolishedStone).
+    // Slow-decay organic (0.0005, matches Feather / Bone / etc.) for
+    // the four foraged/shed inputs; PolishedStone is inorganic (0.0).
+    Twig,
+    Bristle,
+    Fiber,
+    Flower,
+    PolishedStone,
+
+    // --- Crafted behavioral tools (ticket 368 — 016 Phase 2). ---
+    // Tools whose effect lives on the corresponding action resolver
+    // (groom_other / socialize / mate_with) keyed to item identity,
+    // per `docs/systems/crafting.md` §Design constraints. Durable
+    // (0.0 decay) — crafted at the Workshop, carried in inventory,
+    // read by the resolver as a presence check; the effect is on the
+    // action's outcome magnitude (fondness delta multiplier), never
+    // a stat-stick modifier on the item itself.
+    GroomingBrush,
+    PlayBundle,
+    CourtshipGift,
 }
 
 impl ItemKind {
@@ -119,7 +145,13 @@ impl ItemKind {
             | Self::Whisker
             | Self::Hide
             | Self::FishScale
-            | Self::Tallow => 0.0005,
+            | Self::Tallow
+            // 368: Phase 2 crafting inputs decay at the same slow rate
+            // as the other foraged/shed organic materials.
+            | Self::Twig
+            | Self::Fiber
+            | Self::Flower
+            | Self::Bristle => 0.0005,
 
             Self::HerbHealingMoss
             | Self::HerbMoonpetal
@@ -152,6 +184,15 @@ impl ItemKind {
             // tainted catch dries into a tainted dried fish; only the
             // condition-decay clock is frozen.
             Self::DriedFish | Self::SmokedMeat | Self::PreservedOrgan => 0.0,
+
+            // 368: PolishedStone is inorganic (matches Stone). The
+            // three behavioral tools are durable crafted objects —
+            // their organic content (fiber, feather) decays in raw
+            // form but is structurally bound in the finished tool.
+            Self::PolishedStone
+            | Self::GroomingBrush
+            | Self::PlayBundle
+            | Self::CourtshipGift => 0.0,
         }
     }
 
@@ -303,6 +344,15 @@ impl ItemKind {
             Self::Hide => "hide",
             Self::FishScale => "fish scale",
             Self::Tallow => "tallow",
+            // 368 Phase 2 inputs + behavioral tools.
+            Self::Twig => "twig",
+            Self::Bristle => "bristle",
+            Self::Fiber => "fiber",
+            Self::Flower => "flower",
+            Self::PolishedStone => "polished stone",
+            Self::GroomingBrush => "grooming brush",
+            Self::PlayBundle => "play bundle",
+            Self::CourtshipGift => "courtship gift",
         }
     }
 
@@ -370,7 +420,13 @@ impl ItemKind {
             | Self::Whisker
             | Self::Hide
             | Self::FishScale
-            | Self::Tallow => ItemCategory::Material,
+            | Self::Tallow
+            // 368 Phase 2 crafting inputs — raw and refined materials.
+            | Self::Twig
+            | Self::Bristle
+            | Self::Fiber
+            | Self::Flower
+            | Self::PolishedStone => ItemCategory::Material,
 
             // 365 — first Phase 1a entry in the Remedy category. Phase 1b
             // (preservation outputs) lands as the PreservedFood category;
@@ -383,6 +439,12 @@ impl ItemKind {
             Self::DriedFish | Self::SmokedMeat | Self::PreservedOrgan => {
                 ItemCategory::PreservedFood
             }
+
+            // 368 — Phase 2 behavioral tools (Grooming Brush /
+            // Play Bundle / Courtship Gift). First Tool entry in
+            // the 016 category list; Phase 3 (Wearable) and Phase 4
+            // (Decoration) extend the same axis.
+            Self::GroomingBrush | Self::PlayBundle | Self::CourtshipGift => ItemCategory::Tool,
         }
     }
 
@@ -448,6 +510,11 @@ pub enum ItemCategory {
     /// Meat, Preserved Organ. Sorts alongside raw food in the UI
     /// rollup — both are "food" from a cat's planning perspective.
     PreservedFood,
+    /// Crafted behavioral tools produced at the Workshop (ticket
+    /// 368 — 016 Phase 2). Grooming Brush, Play Bundle, Courtship
+    /// Gift. Their effect lives on the corresponding action
+    /// resolver, not on a modifier field on the item type.
+    Tool,
 }
 
 impl ItemCategory {
@@ -462,6 +529,7 @@ impl ItemCategory {
             Self::StorageUpgrade => "Storage upgrades",
             Self::Curiosity => "Curiosities",
             Self::Remedy => "Remedies",
+            Self::Tool => "Tools",
         }
     }
 
@@ -478,6 +546,10 @@ impl ItemCategory {
             Self::Material => 4,
             Self::StorageUpgrade => 5,
             Self::Curiosity => 6,
+            // 368: Tools sort after curiosities — distinct functional
+            // class, lowest planning priority of the displayable
+            // categories.
+            Self::Tool => 7,
         }
     }
 }
@@ -833,6 +905,19 @@ mod tests {
         assert_eq!(ItemKind::Wood.category(), ItemCategory::Material);
         assert_eq!(ItemKind::Barrel.category(), ItemCategory::StorageUpgrade);
         assert_eq!(ItemKind::ShinyPebble.category(), ItemCategory::Curiosity);
+        // 368: Phase 2 inputs are materials; behavioral tools are Tools.
+        assert_eq!(ItemKind::Twig.category(), ItemCategory::Material);
+        assert_eq!(ItemKind::Bristle.category(), ItemCategory::Material);
+        assert_eq!(ItemKind::Fiber.category(), ItemCategory::Material);
+        assert_eq!(ItemKind::Flower.category(), ItemCategory::Material);
+        assert_eq!(ItemKind::PolishedStone.category(), ItemCategory::Material);
+        assert_eq!(ItemKind::GroomingBrush.category(), ItemCategory::Tool);
+        assert_eq!(ItemKind::PlayBundle.category(), ItemCategory::Tool);
+        assert_eq!(ItemKind::CourtshipGift.category(), ItemCategory::Tool);
+        // Behavioral tools are not food / herb / remedy.
+        assert!(!ItemKind::GroomingBrush.is_food());
+        assert!(!ItemKind::PlayBundle.is_food());
+        assert!(!ItemKind::CourtshipGift.is_food());
     }
 
     #[test]

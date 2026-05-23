@@ -543,6 +543,15 @@ mod tests {
         ItemKind::Hide,
         ItemKind::FishScale,
         ItemKind::Tallow,
+        // 368 — Phase 2 crafting inputs + behavioral tools.
+        ItemKind::Twig,
+        ItemKind::Bristle,
+        ItemKind::Fiber,
+        ItemKind::Flower,
+        ItemKind::PolishedStone,
+        ItemKind::GroomingBrush,
+        ItemKind::PlayBundle,
+        ItemKind::CourtshipGift,
     ];
 
     const ALL_HERB_KINDS: &[HerbKind] = &[
@@ -625,7 +634,16 @@ mod tests {
             | ItemKind::Whisker
             | ItemKind::Hide
             | ItemKind::FishScale
-            | ItemKind::Tallow => {}
+            | ItemKind::Tallow
+            // 368 — Phase 2 crafting inputs + behavioral tools.
+            | ItemKind::Twig
+            | ItemKind::Bristle
+            | ItemKind::Fiber
+            | ItemKind::Flower
+            | ItemKind::PolishedStone
+            | ItemKind::GroomingBrush
+            | ItemKind::PlayBundle
+            | ItemKind::CourtshipGift => {}
         }
     }
 
