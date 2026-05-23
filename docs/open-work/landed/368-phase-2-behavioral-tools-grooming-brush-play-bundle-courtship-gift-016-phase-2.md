@@ -1,7 +1,7 @@
 ---
 id: 368
 title: Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2)
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: ce8e2bc2
+landed-on: 2026-05-23
 ---
 
 ## Why
@@ -93,3 +93,4 @@ election) **does not** — Phase 2 reuses the existing Workshop, no new
   - Commit 3 (`feat: 368 commit 3`): Bristle byproduct on Mouse / Rat / Rabbit; Twig (forest) / Fiber / Flower (Grass) forage drops at 30% drop-chance via new `CraftingConstants::forage_ingredient_drop_chance`.
   - Commit 4 (`feat: 368 commit 4`): six new Workshop recipes (polish + brush + bundle + three parallel CourtshipGift variants) + four new `DisciplineKind`s + recipe-duration constants + resolver multipliers.
   - Commit 5 (`feat: 368 commit 5`): resolver branches on `groom_other` / `socialize` / `mate_with` read tool identity from inventory; three Feature canaries emitted at caller on witnessed Advance when multiplier > 1.0.
+- 2026-05-23: 2026-05-23: soak verified (logs/tuned-42-89611e15) — survival canary pass, continuity canary pass, verdict concern (drift vs stale baseline 095-phase-1a-shadow promoted 2026-05-16, not 368-specific; aggregate score +8% — colony healthier). Tuned forage_ingredient_drop_chance 0.30→0.10 to keep MatingOccurred canary in-band; full first-light gate (cats craft tools + circulating-tool canaries fire ≥1) lifts when ticket 457 lands the Workshop-craft pipeline.
