@@ -1314,7 +1314,19 @@ pub fn disposition_to_chain(
         ),
         (With<Disposition>, Without<Dead>, Without<TaskChain>),
     >,
-    cat_positions: Query<(Entity, &Position, &Needs), Without<Dead>>,
+    cat_positions: Query<
+        (
+            Entity,
+            &Position,
+            &Needs,
+            // Ticket 452 — `Option<&GroomingCondition>` so save-loaded
+            // cats lacking the component (pre-452 saves) score the
+            // grooming-deficit axis as 0.0 deficit rather than being
+            // excluded from the candidate pool.
+            Option<&crate::components::grooming::GroomingCondition>,
+        ),
+        Without<Dead>,
+    >,
     wildlife: Query<(Entity, &Position), With<WildAnimal>>,
     building_query: Query<(
         Entity,
@@ -1346,13 +1358,21 @@ pub fn disposition_to_chain(
     let d = &constants.disposition;
     // Pre-collect cat position pairs for social target selection.
     let cat_pos_list: Vec<(Entity, Position)> =
-        cat_positions.iter().map(|(e, p, _)| (e, *p)).collect();
+        cat_positions.iter().map(|(e, p, _, _)| (e, *p)).collect();
     // Snapshot per-cat `needs.temperature` for the §6.5.4 Groom-other
     // target-taking DSE. Keyed by entity so the resolver's closure
     // captures one HashMap<Entity, f32> rather than a whole query.
     let cat_temperature_map: std::collections::HashMap<Entity, f32> = cat_positions
         .iter()
-        .map(|(e, _, n)| (e, n.temperature))
+        .map(|(e, _, n, _)| (e, n.temperature))
+        .collect();
+    // Ticket 452 — per-cat `GroomingCondition.0` snapshot for the
+    // `target_grooming_deficit` axis on `GroomOtherTargetDse`. Cats
+    // lacking the component (save-loaded pre-452) score 0.0 deficit
+    // via the resolver's `.unwrap_or(0.0)` fallthrough.
+    let cat_grooming_map: std::collections::HashMap<Entity, f32> = cat_positions
+        .iter()
+        .filter_map(|(e, _, _, g)| g.map(|gc| (e, gc.0)))
         .collect();
     // Snapshot kitten → (mother, father) parent pointers for the
     // §6.5.4 kinship axis. Bidirectional kinship is computed on the
@@ -1554,6 +1574,7 @@ pub fn disposition_to_chain(
         // `find_social_target` (fondness-only) could not see.
         let temperature_lookup =
             |e: Entity| -> Option<f32> { cat_temperature_map.get(&e).copied() };
+        let grooming_lookup = |e: Entity| -> Option<f32> { cat_grooming_map.get(&e).copied() };
         let is_kin = |a: Entity, b: Entity| -> bool {
             let a_parents = kitten_parents_map.get(&a);
             let b_parents = kitten_parents_map.get(&b);
@@ -1566,6 +1587,7 @@ pub fn disposition_to_chain(
             *pos,
             &cat_pos_list,
             &temperature_lookup,
+            &grooming_lookup,
             &is_kin,
             &res.relationships,
             res.time.tick,

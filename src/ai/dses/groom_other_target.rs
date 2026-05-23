@@ -29,12 +29,28 @@
 //! 0.85 → 1-0.85 = 0.15 and inverting gives the same numerical curve
 //! as the legacy form. Behavior-neutral by construction.
 //!
-//! | # | Consideration       | Source                   | Curve                                  | Weight |
-//! |---|---------------------|--------------------------|----------------------------------------|--------|
-//! | 1 | distance            | `Spatial(target)`        | `Composite{Logistic(15, 0.15), Invert}`| 0.30   |
-//! | 2 | fondness            | `target_fondness`        | `Linear(1, 0)`                         | 0.30   |
-//! | 3 | target-need-warmth  | `target_warmth_deficit`  | `Quadratic(exp=2)`                     | 0.30   |
-//! | 4 | kinship             | `target_kinship`         | `Piecewise` (kin=1.0 / else=0.5)       | 0.10   |
+//! | # | Consideration         | Source                     | Curve                                  | Weight |
+//! |---|-----------------------|----------------------------|----------------------------------------|--------|
+//! | 1 | distance              | `Spatial(target)`          | `Composite{Logistic(15, 0.15), Invert}`| 0.24   |
+//! | 2 | fondness              | `target_fondness`          | `Linear(1, 0)`                         | 0.24   |
+//! | 3 | target-need-warmth    | `target_warmth_deficit`    | `Quadratic(exp=2)`                     | 0.12   |
+//! | 4 | target-need-grooming  | `target_grooming_deficit`  | `Quadratic(exp=2)`                     | 0.12   |
+//! | 5 | kinship               | `target_kinship`           | `Piecewise` (kin=1.0 / else=0.5)       | 0.08   |
+//! | 6 | recent-failure cool   | `target_recent_failure`    | `cooldown_curve()`                     | 0.20   |
+//!
+//! **Ticket 452 — target-need-grooming axis.** Decomposes target
+//! selection so coat condition is a first-class signal alongside
+//! temperature. Newborns spawn with `GroomingCondition(0.15)` to encode
+//! the birth-membrane coat state (`pregnancy.rs::NEWBORN_GROOMING`); the
+//! quadratic curve amplifies severe deficit so a dirty newborn
+//! (deficit ≈ 0.85, curve ≈ 0.72) lifts maternal grooming sharply over
+//! a clean adult (deficit ≈ 0.20, curve ≈ 0.04). The 0.12 weight gives
+//! parity with `target_warmth_deficit` — both target-need axes have
+//! the same shape and same magnitude. Halving the legacy 0.24 warmth
+//! weight to seat the new axis keeps the legacy-tied test
+//! `warmth_deficit_convexity_amplifies_severe_need` decisive (0.65 ×
+//! 0.12 = 0.078 score gap on warmth, still the tiebreaker when other
+//! axes are tied).
 //!
 //! **Distance curve interpretation.** The spec cell reads
 //! `Logistic(steepness=15, midpoint=1), range=1–2`; reified onto the
@@ -83,6 +99,7 @@ use crate::systems::plan_substrate::{
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_WARMTH_DEFICIT_INPUT: &str = "target_warmth_deficit";
+pub const TARGET_GROOMING_DEFICIT_INPUT: &str = "target_grooming_deficit";
 pub const TARGET_KINSHIP_INPUT: &str = "target_kinship";
 
 /// Candidate-pool range in Manhattan tiles. Matches `SOCIALIZE_TARGET_RANGE`
@@ -101,6 +118,16 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
     // quadruples the contribution. Mirrors Caretake's `kitten-hunger`
     // axis shape (§6.5.6) for consistency across outreach DSEs.
     let warmth_curve = Curve::Quadratic {
+        exponent: 2.0,
+        divisor: 1.0,
+        shift: 0.0,
+    };
+    // Ticket 452 — grooming deficit shares the warmth-deficit curve
+    // shape. Both are target-need axes: convex amplification means
+    // outreach scales with severity, not linear proximity. A newborn
+    // dirty-coat (deficit ≈ 0.85, curve ≈ 0.72) towers over an adult
+    // mid-day mat (deficit ≈ 0.30, curve ≈ 0.09).
+    let grooming_curve = Curve::Quadratic {
         exponent: 2.0,
         divisor: 1.0,
         shift: 0.0,
@@ -143,6 +170,14 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
                 TARGET_WARMTH_DEFICIT_INPUT,
                 warmth_curve,
             )),
+            // Ticket 452 — `target_grooming_deficit`. Decomposes target
+            // selection so coat condition is a first-class signal.
+            // Newborn `GroomingCondition(0.15)` (set in pregnancy.rs's
+            // `NEWBORN_GROOMING`) amplifies maternal-grooming lift.
+            Consideration::Scalar(ScalarConsideration::new(
+                TARGET_GROOMING_DEFICIT_INPUT,
+                grooming_curve,
+            )),
             Consideration::Scalar(ScalarConsideration::new(
                 TARGET_KINSHIP_INPUT,
                 kinship_curve,
@@ -158,14 +193,18 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
         // non-kin-but-beloved target via the 0.5 kinship signal
         // passing through multiplicative gating — the spec intent is
         // a small additive bias, not a gate.
-        // Original four weights (0.30/0.30/0.30/0.10) renormalized
-        // ×(4/5) to make room for the cooldown axis at 1/5.
+        // Ticket 452 redistribution: legacy `warmth_deficit` weight
+        // 0.24 halved to 0.12 to seat `grooming_deficit` at 0.12 with
+        // matching shape — both are target-need axes with equal
+        // weight. Other weights unchanged (×4/5 of original four-axis
+        // 0.30/0.30/0.30/0.10 ratios, with cooldown at 1/5).
         composition: Composition::weighted_sum(vec![
-            0.30 * 4.0 / 5.0,
-            0.30 * 4.0 / 5.0,
-            0.30 * 4.0 / 5.0,
-            0.10 * 4.0 / 5.0,
-            1.0 / 5.0,
+            0.30 * 4.0 / 5.0,       // nearness     = 0.24
+            0.30 * 4.0 / 5.0,       // fondness     = 0.24
+            0.30 * 4.0 / 5.0 / 2.0, // warmth_deficit   = 0.12
+            0.30 * 4.0 / 5.0 / 2.0, // grooming_deficit = 0.12
+            0.10 * 4.0 / 5.0,       // kinship      = 0.08
+            1.0 / 5.0,              // recent_failure = 0.20
         ]),
         aggregation: TargetAggregation::Best,
         intention: groom_other_intention,
@@ -197,10 +236,15 @@ fn groom_other_intention(_target: Entity) -> Intention {
 /// [`groom_other_target_dse`]. Returns `None` iff no eligible candidate
 /// exists in range.
 ///
-/// The resolver needs two lookups that only the caller can provide:
+/// The resolver needs three lookups that only the caller can provide:
 /// - `temperature_lookup(target)` — target's `needs.temperature` in
 ///   `[0, 1]`. Returns `None` if the entity has no `Needs` (dead / non-
 ///   cat) — the resolver treats the target as skipped.
+/// - `grooming_lookup(target)` — target's `GroomingCondition.0` in
+///   `[0, 1]`. Returns `None` if the entity has no `GroomingCondition`
+///   (test paths / save-loaded pre-component cats) — the axis
+///   contributes 0.0 deficit for that target, preserving pre-452
+///   behavior for callers without a grooming snapshot.
 /// - `is_kin(self, target)` — bidirectional parent-child check via
 ///   `KittenDependency.mother / .father`. Returns `true` iff either
 ///   entity is the other's recorded parent. Cheap O(1) HashMap lookup
@@ -212,6 +256,7 @@ pub fn resolve_groom_other_target(
     cat_pos: Position,
     cat_positions: &[(Entity, Position)],
     temperature_lookup: &dyn Fn(Entity) -> Option<f32>,
+    grooming_lookup: &dyn Fn(Entity) -> Option<f32>,
     is_kin: &dyn Fn(Entity, Entity) -> bool,
     relationships: &Relationships,
     tick: u64,
@@ -269,6 +314,9 @@ pub fn resolve_groom_other_target(
             TARGET_WARMTH_DEFICIT_INPUT => temperatures
                 .get(&target)
                 .map(|t| (1.0 - t).clamp(0.0, 1.0))
+                .unwrap_or(0.0),
+            TARGET_GROOMING_DEFICIT_INPUT => grooming_lookup(target)
+                .map(|g| (1.0 - g).clamp(0.0, 1.0))
                 .unwrap_or(0.0),
             TARGET_KINSHIP_INPUT if is_kin(cat, target) => 1.0,
             TARGET_RECENT_FAILURE_INPUT => {
@@ -350,11 +398,12 @@ mod tests {
     }
 
     #[test]
-    fn groom_other_target_has_five_axes() {
-        // Ticket 073 — four legacy axes + the cooldown axis = five.
+    fn groom_other_target_has_six_axes() {
+        // Ticket 073 added the cooldown axis (4 → 5); ticket 452 added
+        // `target_grooming_deficit` (5 → 6).
         assert_eq!(
             groom_other_target_dse().per_target_considerations().len(),
-            5
+            6
         );
     }
 
@@ -396,6 +445,7 @@ mod tests {
             Position::new(0, 0),
             &[],
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -424,6 +474,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -451,6 +502,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -482,6 +534,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -527,6 +580,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -562,6 +616,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -603,6 +658,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -639,6 +695,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -689,6 +746,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,
@@ -699,6 +757,113 @@ mod tests {
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(freezing));
+    }
+
+    #[test]
+    fn dirty_newborn_amplifies_groom_other_target_score() {
+        // Ticket 452 — `target_grooming_deficit` axis. Two candidates
+        // tied on fondness (0.5), temperature (deficit 0.5 → curve 0.25),
+        // distance (1 tile, Manhattan), kinship (non-kin), cooldown
+        // (no recent failure). They differ only in `GroomingCondition`:
+        // dirty = 0.15 (deficit 0.85, curve ≈ 0.72), clean = 0.95
+        // (deficit 0.05, curve ≈ 0.0025). With grooming-axis weight
+        // 0.12, the gap is (0.72 − 0.0025) × 0.12 ≈ 0.086 score —
+        // decisive when all other axes tie. The dirty cat wins.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(groom_other_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let dirty = Entity::from_raw_u32(2).unwrap();
+        let clean = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, dirty).fondness = 0.5;
+        relationships.get_or_insert(cat, clean).fondness = 0.5;
+
+        let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };
+        let grooming_lookup = move |e: Entity| -> Option<f32> {
+            if e == dirty {
+                Some(0.15) // newborn-membrane coat
+            } else if e == clean {
+                Some(0.95) // freshly-groomed adult
+            } else {
+                None
+            }
+        };
+        let is_kin = |_: Entity, _: Entity| -> bool { false };
+
+        let cat_positions = vec![(dirty, Position::new(1, 0)), (clean, Position::new(0, 1))];
+        let out = resolve_groom_other_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &temperature_lookup,
+            &grooming_lookup,
+            &is_kin,
+            &relationships,
+            0,
+            None,
+            None,
+            8000,
+            None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(out, Some(dirty));
+    }
+
+    #[test]
+    fn groom_other_target_score_continuous_at_default_grooming() {
+        // Ticket 452 regression guard — the grooming axis must not
+        // introduce a discontinuity at the default `0.8`. Two candidates
+        // identical on every other axis, one with grooming None (lazy-
+        // inserted absence → 0.0 deficit via resolver fallthrough), one
+        // with grooming 0.8 (founder default → 0.2 deficit → curve
+        // 0.04). With weight 0.12 the gap is 0.04 × 0.12 ≈ 0.005 —
+        // small enough that other ties dominate, but non-zero so the
+        // axis fires.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(groom_other_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let with_groom = Entity::from_raw_u32(2).unwrap();
+        let absent_groom = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, with_groom).fondness = 0.5;
+        relationships.get_or_insert(cat, absent_groom).fondness = 0.5;
+
+        let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };
+        let grooming_lookup = move |e: Entity| -> Option<f32> {
+            if e == with_groom {
+                Some(0.8) // founder default
+            } else {
+                None // absent → resolver treats as 0.0 deficit
+            }
+        };
+        let is_kin = |_: Entity, _: Entity| -> bool { false };
+
+        let cat_positions = vec![
+            (with_groom, Position::new(1, 0)),
+            (absent_groom, Position::new(0, 1)),
+        ];
+        // The with-groom cat has a tiny grooming-deficit contribution
+        // (0.04 × 0.12 ≈ 0.005); the absent-groom cat contributes 0.0
+        // on this axis. So with-groom should win by a small margin
+        // when nothing else discriminates.
+        let out = resolve_groom_other_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &temperature_lookup,
+            &grooming_lookup,
+            &is_kin,
+            &relationships,
+            0,
+            None,
+            None,
+            8000,
+            None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(out, Some(with_groom));
     }
 
     #[test]
@@ -731,6 +896,7 @@ mod tests {
             Position::new(0, 0),
             &cat_positions,
             &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
             &is_kin,
             &relationships,
             0,

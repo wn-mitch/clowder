@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 
 use bevy::prelude::Resource;
+use bevy_ecs::bundle::Bundle;
 use bevy_ecs::entity::Entity;
 use bevy_ecs::world::World;
 
 use crate::components::fulfillment::Fulfillment;
+use crate::components::grooming::GroomingCondition;
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Age, Name, Species};
 use crate::components::magic::Inventory;
@@ -54,11 +56,109 @@ impl WorldSetup {
     }
 }
 
+/// Ticket 452 — canonical component bundle for a cat entity. Returning
+/// `impl Bundle` lets both `World`-mode callers (founder spawn via
+/// `spawn_cat_from_blueprint`) and `Commands`-mode callers (the
+/// `tick_pregnancy` births loop in `src/systems/pregnancy.rs`) compose
+/// it via `world.spawn(bundle)` or `commands.spawn(bundle)`. Kitten-only
+/// markers (`KittenDependency`, `BornInSim`) are post-inserted by the
+/// caller after spawning the canonical bundle.
+///
+/// `health` and `grooming` are parameters (not defaults inside the
+/// bundle) so the kitten path can express its per-spawn divergence at
+/// the call site: production kittens spawn with nutrition-scaled
+/// `Health` (`0.7 + avg_nutrition * 0.3`) and a low `GroomingCondition`
+/// reflecting the birth-membrane coat state. Founder callers pass
+/// `Health::default()` / `GroomingCondition::default()`.
+pub fn cat_bundle(
+    blueprint: CatBlueprint,
+    position: Position,
+    needs: Needs,
+    fulfillment: Fulfillment,
+    health: Health,
+    grooming: GroomingCondition,
+) -> impl Bundle {
+    (
+        (
+            Name(blueprint.name),
+            Species,
+            Age {
+                born_tick: blueprint.born_tick,
+            },
+            blueprint.gender,
+            blueprint.orientation,
+            blueprint.personality,
+            blueprint.appearance,
+            position,
+            health,
+            needs,
+            fulfillment,
+            Mood::default(),
+            Memory::default(),
+        ),
+        (
+            blueprint.zodiac_sign,
+            blueprint.skills,
+            MagicAffinity(blueprint.magic_affinity),
+            Corruption(0.0),
+            Training::default(),
+            crate::ai::CurrentAction::default(),
+            Inventory::default(),
+            crate::components::disposition::ActionHistory::default(),
+            HuntingPriors::default(),
+            grooming,
+            crate::components::goap_plan::PendingUrgencies::default(),
+            crate::components::SensorySpecies::Cat,
+            crate::components::SensorySignature::CAT,
+            // Ticket 073 — per-cat recently-failed target memory.
+            // Bundle insertion ensures `resolve_goap_plans`'s
+            // `Option<&mut RecentTargetFailures>` resolves to
+            // `Some` for live-spawned cats. Save-loaded cats
+            // (pre-073 saves) get the lazy-insert path on first
+            // failure.
+            crate::components::RecentTargetFailures::default(),
+            // Ticket 108 — per-cat snapshot of last tick's
+            // `safety_deficit` for the `ThreatProximityAdrenaline`
+            // derivative. Default 0.0 matches a freshly-spawned cat
+            // at full safety. Save-loaded cats fall through the
+            // lazy-insert path in `update_prev_safety_deficit`.
+            crate::components::PrevSafetyDeficit::default(),
+        ),
+        // 258 — C3 subjective belief substrate. Four per-cat mental-
+        // model Components seeded empty; `belief_integrator`
+        // populates them on first `WitnessableEvent` for a given
+        // subject (or first `Implant`-evidence first-encounter for
+        // predators).
+        (
+            crate::components::CatBeliefs::default(),
+            crate::components::LocationBeliefs::default(),
+            crate::components::PredatorBeliefs::default(),
+            crate::components::ContextBeliefs::default(),
+            // 308 — per-cat subjective belief about colony-wide
+            // reserve stockpile counts (thornbriar / remedy-herb).
+            // Authored by belief_integrator from three new
+            // WitnessableEvent variants; dormant at land (consumer
+            // is ticket 309).
+            crate::components::beliefs::ColonyReservesBelief::default(),
+            // 095 Phase 1 — anatomical injury substrate. Shadow
+            // co-resident with Health during Stage A; sole source of
+            // truth after Stage B cutover.
+            crate::components::CatBodyModel::default(),
+        ),
+    )
+}
+
 /// Ticket 162 — single source of truth for the founder spawn bundle. Both
 /// `build_new_world` (production colony spawn) and `crate::scenarios::env`
 /// (microexperiment harness) call this so a missing component on either
 /// path is impossible. Drift control is enforced by an integration test
 /// (see `tests/scenarios.rs::cat_preset_matches_founder_bundle`).
+///
+/// Ticket 452 — thin wrapper over `cat_bundle`; founder spawns use
+/// `Health::default()` and `GroomingCondition::default()`. Production
+/// kittens (`pregnancy.rs::tick_pregnancy`) call `cat_bundle` directly
+/// via `Commands` to express their per-spawn `Health` and low
+/// `GroomingCondition`.
 pub fn spawn_cat_from_blueprint(
     world: &mut World,
     blueprint: CatBlueprint,
@@ -67,73 +167,13 @@ pub fn spawn_cat_from_blueprint(
     fulfillment: Fulfillment,
 ) -> Entity {
     world
-        .spawn((
-            (
-                Name(blueprint.name),
-                Species,
-                Age {
-                    born_tick: blueprint.born_tick,
-                },
-                blueprint.gender,
-                blueprint.orientation,
-                blueprint.personality,
-                blueprint.appearance,
-                position,
-                Health::default(),
-                needs,
-                fulfillment,
-                Mood::default(),
-                Memory::default(),
-            ),
-            (
-                blueprint.zodiac_sign,
-                blueprint.skills,
-                MagicAffinity(blueprint.magic_affinity),
-                Corruption(0.0),
-                Training::default(),
-                crate::ai::CurrentAction::default(),
-                Inventory::default(),
-                crate::components::disposition::ActionHistory::default(),
-                HuntingPriors::default(),
-                crate::components::grooming::GroomingCondition::default(),
-                crate::components::goap_plan::PendingUrgencies::default(),
-                crate::components::SensorySpecies::Cat,
-                crate::components::SensorySignature::CAT,
-                // Ticket 073 — per-cat recently-failed target memory.
-                // Bundle insertion ensures `resolve_goap_plans`'s
-                // `Option<&mut RecentTargetFailures>` resolves to
-                // `Some` for live-spawned cats. Save-loaded cats
-                // (pre-073 saves) get the lazy-insert path on first
-                // failure.
-                crate::components::RecentTargetFailures::default(),
-                // Ticket 108 — per-cat snapshot of last tick's
-                // `safety_deficit` for the `ThreatProximityAdrenaline`
-                // derivative. Default 0.0 matches a freshly-spawned cat
-                // at full safety. Save-loaded cats fall through the
-                // lazy-insert path in `update_prev_safety_deficit`.
-                crate::components::PrevSafetyDeficit::default(),
-            ),
-            // 258 — C3 subjective belief substrate. Four per-cat mental-
-            // model Components seeded empty; `belief_integrator`
-            // populates them on first `WitnessableEvent` for a given
-            // subject (or first `Implant`-evidence first-encounter for
-            // predators).
-            (
-                crate::components::CatBeliefs::default(),
-                crate::components::LocationBeliefs::default(),
-                crate::components::PredatorBeliefs::default(),
-                crate::components::ContextBeliefs::default(),
-                // 308 — per-cat subjective belief about colony-wide
-                // reserve stockpile counts (thornbriar / remedy-herb).
-                // Authored by belief_integrator from three new
-                // WitnessableEvent variants; dormant at land (consumer
-                // is ticket 309).
-                crate::components::beliefs::ColonyReservesBelief::default(),
-                // 095 Phase 1 — anatomical injury substrate. Shadow
-                // co-resident with Health during Stage A; sole source of
-                // truth after Stage B cutover.
-                crate::components::CatBodyModel::default(),
-            ),
+        .spawn(cat_bundle(
+            blueprint,
+            position,
+            needs,
+            fulfillment,
+            Health::default(),
+            GroomingCondition::default(),
         ))
         .id()
 }

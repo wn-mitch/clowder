@@ -64,6 +64,22 @@ impl Fulfillment {
     pub fn social_warmth_deficit(&self) -> f32 {
         (1.0 - self.social_warmth).clamp(0.0, 1.0)
     }
+
+    /// Ticket 452 — newborn-kitten spawn value. Encodes "newborn arrives
+    /// in a maximally-bonded post-gestation state": social_warmth high
+    /// because gestation is the most maternally-saturated window of a
+    /// cat's life (in utero, then nursing-from-birth, mother grooming).
+    /// body_condition full-for-stage. The bank decays over the early
+    /// weeks if maternal contact drops — the welfare problem is *loss*
+    /// of maternal presence, not absence at birth. Distinct from
+    /// `GroomingCondition` (which spawns low — newborn coat is dirty
+    /// with birth membrane and requires maternal cleaning).
+    pub fn newborn() -> Self {
+        Self {
+            social_warmth: 0.9,
+            body_condition: 1.0,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +133,13 @@ mod tests {
     fn staggered_single_cat_uses_default() {
         let f = Fulfillment::staggered(0, 1);
         assert!((f.social_warmth - 0.6).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn newborn_has_high_social_warmth_and_full_body_condition() {
+        let f = Fulfillment::newborn();
+        assert!((f.social_warmth - 0.9).abs() < f32::EPSILON);
+        assert!((f.body_condition - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

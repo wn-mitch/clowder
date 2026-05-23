@@ -1,8 +1,9 @@
 ---
 id: 452
 title: Kitten spawn uses spawn_cat_from_blueprint to match founder-cat component shape
-status: ready
+status: in-progress
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [parenting-substrate]
 added: 2026-05-23
 parked: null

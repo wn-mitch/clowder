@@ -3428,6 +3428,13 @@ struct StepSnapshots {
     injured_cat_positions: Vec<(Entity, Position)>,
     cat_skills: HashMap<Entity, Skills>,
     cat_temperature: HashMap<Entity, f32>,
+    /// Ticket 452 — per-cat `GroomingCondition.0` snapshot for the
+    /// `target_grooming_deficit` axis on `GroomOtherTargetDse`. Built
+    /// from the sibling `grooming_q` system param so the outer
+    /// mutable `cats` iteration stays disjoint. Cats lacking the
+    /// component (save-loaded pre-452) score 0.0 deficit via the
+    /// resolver's `.unwrap_or(0.0)` fallthrough.
+    cat_grooming: HashMap<Entity, f32>,
     kitten_parents: HashMap<Entity, (Option<Entity>, Option<Entity>)>,
     kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState>,
     building_snapshot: Vec<(Entity, StructureType, Position, bool, bool)>,
@@ -3982,6 +3989,23 @@ pub fn resolve_goap_plans(
         cat_temperature: cats
             .iter()
             .map(|((e, _, _, _, _, needs, _, _, _), _)| (e, needs.temperature))
+            .collect(),
+        // Ticket 452 — per-cat `GroomingCondition.0` snapshot for the
+        // `target_grooming_deficit` axis on `GroomOtherTargetDse`.
+        // Pulled from the same `cats.iter()` pass that produces
+        // `cat_temperature`; `GroomingCondition` lives in the cats
+        // query's second inner tuple at position 4 (see the query
+        // def at the top of `resolve_goap_plans`). Cats lacking the
+        // component (save-loaded pre-component) are filtered out;
+        // the resolver's `.unwrap_or(0.0)` fallthrough treats their
+        // absence as 0.0 deficit.
+        cat_grooming: cats
+            .iter()
+            .filter_map(
+                |((e, _, _, _, _, _, _, _, _), (_, _, _, gc, _, _, _, _, _, _, _, _, _, _))| {
+                    gc.map(|g| (e, g.0))
+                },
+            )
             .collect(),
         // §6.5.4 kinship lookup — `(kitten_entity) → (mother, father)`.
         // Bidirectional `is_kin` is computed per-call by the resolver
@@ -5888,6 +5912,8 @@ fn dispatch_step_action(
             if plan.step_state[step_idx].target_entity.is_none() {
                 let temperature_lookup =
                     |e: Entity| -> Option<f32> { snaps.cat_temperature.get(&e).copied() };
+                let grooming_lookup =
+                    |e: Entity| -> Option<f32> { snaps.cat_grooming.get(&e).copied() };
                 let is_kin = |a: Entity, b: Entity| -> bool {
                     let a_parents = snaps.kitten_parents.get(&a);
                     let b_parents = snaps.kitten_parents.get(&b);
@@ -5912,6 +5938,7 @@ fn dispatch_step_action(
                         *pos,
                         &snaps.cat_positions,
                         &temperature_lookup,
+                        &grooming_lookup,
                         &is_kin,
                         relationships,
                         ec.time.tick,
