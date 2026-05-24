@@ -129,10 +129,7 @@ impl Dse for FoxAvoidingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "cats_out_of_range",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("cats_out_of_range", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

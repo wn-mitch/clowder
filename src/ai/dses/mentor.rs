@@ -103,10 +103,7 @@ impl Dse for MentorDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "mentored_apprentice",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("mentored_apprentice", |_, _| false),
             strategy: CommitmentStrategy::OpenMinded,
         }
     }

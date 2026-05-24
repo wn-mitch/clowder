@@ -74,10 +74,7 @@ impl Dse for SnakeForagingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "snake_fed_by_foraging",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("snake_fed_by_foraging", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

@@ -141,10 +141,7 @@ impl Dse for FoxPatrollingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "fox_territory_marked",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("fox_territory_marked", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

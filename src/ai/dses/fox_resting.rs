@@ -132,10 +132,7 @@ impl Dse for FoxRestingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "fox_rested_at_den",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("fox_rested_at_den", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

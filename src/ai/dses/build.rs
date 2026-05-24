@@ -136,10 +136,7 @@ impl Dse for BuildDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "built_or_repaired",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("built_or_repaired", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

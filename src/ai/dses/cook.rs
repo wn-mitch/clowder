@@ -140,10 +140,7 @@ impl Dse for CookDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "food_cooked_at_kitchen",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("food_cooked_at_kitchen", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

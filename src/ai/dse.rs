@@ -30,6 +30,7 @@ use bevy_ecs::prelude::*;
 
 use super::composition::Composition;
 use super::considerations::{Consideration, MarkerKey};
+use crate::components::items::ItemKind;
 
 // ---------------------------------------------------------------------------
 // DseId
@@ -94,34 +95,91 @@ impl CommitmentStrategy {
 // GoalState
 // ---------------------------------------------------------------------------
 
+/// The shape of a goal Intention's target state. Either a freeform
+/// predicate carrying its own label and `achieved` fn, or a typed
+/// `HaveItem(ItemKind)` arm with a uniform inventory-contains
+/// achievement predicate (and a derived `"have_<item>"` label).
+///
+/// 462 widens the prior flat-struct shape into this sum type so 463's
+/// `CraftItemAspiration` chain can emit `Goal(GoalKind::HaveItem(_))`
+/// Intentions that the templated HTN method (`have_item_via_recipe`)
+/// can decompose by reading the recipe registry. The `Predicate` arm
+/// preserves the pre-462 shape for every existing call site.
+#[derive(Clone, Copy)]
+pub enum GoalKind {
+    /// Freeform predicate. Equivalent to the pre-462 `GoalState`
+    /// shape: a short-form `label` for logs / narrative and a
+    /// `fn(&World, Entity) -> bool` checked by §7.2's
+    /// reconsideration gate.
+    Predicate {
+        label: &'static str,
+        achieved: fn(&World, Entity) -> bool,
+    },
+    /// Item-aspiration goal: the cat wants to have one of `ItemKind`
+    /// in its inventory. The label is derived (`"have_<item>"`); the
+    /// achievement predicate checks the cat's `Inventory` for a slot
+    /// carrying the kind. Dormant in 462; emitted by 463+.
+    HaveItem(ItemKind),
+}
+
+impl std::fmt::Debug for GoalKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Predicate { label, .. } => f
+                .debug_struct("Predicate")
+                .field("label", label)
+                .finish_non_exhaustive(),
+            Self::HaveItem(item) => f.debug_tuple("HaveItem").field(item).finish(),
+        }
+    }
+}
+
 /// A goal Intention's target state. Carries both a log-able label
 /// (for trace emission / narrative binding) and a predicate the
 /// commitment layer calls to check `achievement_believed` (§7.2).
 ///
-/// Phase 3a commits the type shape; predicate bodies are authored
-/// per-DSE in Phase 3b+.
+/// Construct via `GoalState::predicate(label, achieved)` or
+/// `GoalState::have_item(item)`; read via `state.label()` and
+/// `state.achieved(world, entity)`.
+#[derive(Debug, Clone, Copy)]
 pub struct GoalState {
-    /// Short-form label for logs and narrative emission. Matches the
-    /// spec's parenthetical gloss, e.g. `"hunger_below_threshold"`.
-    pub label: &'static str,
-    /// Returns `true` when the goal is satisfied for `cat` in the
-    /// current world state. Called from §7.2's reconsideration gate.
-    pub achieved: fn(&World, Entity) -> bool,
+    pub kind: GoalKind,
 }
 
-impl std::fmt::Debug for GoalState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GoalState")
-            .field("label", &self.label)
-            .finish_non_exhaustive()
-    }
-}
-
-impl Clone for GoalState {
-    fn clone(&self) -> Self {
+impl GoalState {
+    /// Construct a freeform-predicate goal (pre-462 shape).
+    pub const fn predicate(label: &'static str, achieved: fn(&World, Entity) -> bool) -> Self {
         Self {
-            label: self.label,
-            achieved: self.achieved,
+            kind: GoalKind::Predicate { label, achieved },
+        }
+    }
+
+    /// Construct an item-aspiration goal (462 substrate; emitted by 463+).
+    pub const fn have_item(item: ItemKind) -> Self {
+        Self {
+            kind: GoalKind::HaveItem(item),
+        }
+    }
+
+    /// Short-form label for logs / narrative emission. For
+    /// `Predicate`, returns the authored label; for `HaveItem`,
+    /// derives `"have_<item>"` via `ItemKind::goal_label`.
+    pub fn label(&self) -> &'static str {
+        match &self.kind {
+            GoalKind::Predicate { label, .. } => label,
+            GoalKind::HaveItem(item) => item.goal_label(),
+        }
+    }
+
+    /// True iff the goal is satisfied for `entity` in `world`. For
+    /// `Predicate`, dispatches to the authored fn; for `HaveItem`,
+    /// checks the cat's `Inventory` for a slot carrying `item`.
+    pub fn achieved(&self, world: &World, entity: Entity) -> bool {
+        match &self.kind {
+            GoalKind::Predicate { achieved, .. } => achieved(world, entity),
+            GoalKind::HaveItem(item) => world
+                .get::<crate::components::magic::Inventory>(entity)
+                .is_some_and(|inv| inv.slots.iter().any(|s| s.kind == *item)),
         }
     }
 }
@@ -600,10 +658,7 @@ mod tests {
 
     #[test]
     fn intention_goal_strategy() {
-        let goal = GoalState {
-            label: "hunger_below_threshold",
-            achieved: always_false,
-        };
+        let goal = GoalState::predicate("hunger_below_threshold", always_false);
         let i = Intention::Goal {
             state: goal,
             strategy: CommitmentStrategy::SingleMinded,

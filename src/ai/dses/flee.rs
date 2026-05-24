@@ -200,10 +200,7 @@ impl Dse for FleeDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "fled_to_safety",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("fled_to_safety", |_, _| false),
             strategy: CommitmentStrategy::Blind,
         }
     }

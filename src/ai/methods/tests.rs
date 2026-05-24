@@ -100,7 +100,7 @@ fn courtship_method_has_four_sub_goals_one_per_practice_stage() {
         .iter()
         .map(|sg| match sg {
             SubGoal::Primitive { label, .. } => *label,
-            SubGoal::Goal(g) => g.label,
+            SubGoal::Goal(g) => g.label(),
         })
         .collect();
     assert_eq!(
@@ -132,7 +132,7 @@ fn mate_with_goal_has_three_primitives_in_chain_order() {
         .iter()
         .map(|sg| match sg {
             SubGoal::Primitive { label, .. } => *label,
-            SubGoal::Goal(g) => g.label,
+            SubGoal::Goal(g) => g.label(),
         })
         .collect();
     assert_eq!(
@@ -157,7 +157,7 @@ fn courtship_recursion_seam_finds_mate_with_goal_via_registry() {
         );
     };
     let spec = registry
-        .lookup_spec_dormant_filtered(seam.label)
+        .lookup_spec_dormant_filtered(seam.label())
         .expect("mate_with_goal must register Live for label mating_event_completed");
     assert_eq!(spec.id, MethodId("mate_with_goal"));
     assert_eq!(spec.sub_goals.len(), 3);

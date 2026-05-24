@@ -191,10 +191,7 @@ impl Dse for PatrolDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "territory_patrolled",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("territory_patrolled", |_, _| false),
             strategy: CommitmentStrategy::Blind,
         }
     }

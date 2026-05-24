@@ -77,10 +77,7 @@ impl Dse for TrashingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "trashed_surplus_at_midden",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("trashed_surplus_at_midden", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

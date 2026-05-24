@@ -151,10 +151,7 @@ impl Dse for EatDse {
 
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "hunger_below_threshold",
-                achieved: eat_goal_achieved,
-            },
+            state: GoalState::predicate("hunger_below_threshold", eat_goal_achieved),
             strategy: CommitmentStrategy::Blind,
         }
     }

@@ -77,10 +77,7 @@ impl Dse for GroomSelfDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "groomed_self",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("groomed_self", |_, _| false),
             strategy: CommitmentStrategy::Blind,
         }
     }

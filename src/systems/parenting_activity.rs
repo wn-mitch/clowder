@@ -635,10 +635,7 @@ mod tests {
         // caretake_resolution.target at the L2 author site).
         let held = HeldIntention {
             intention: crate::ai::dse::Intention::Goal {
-                state: crate::ai::dse::GoalState {
-                    label: "kitten_fed",
-                    achieved: |_, _| false,
-                },
+                state: crate::ai::dse::GoalState::predicate("kitten_fed", |_, _| false),
                 strategy: crate::ai::dse::CommitmentStrategy::SingleMinded,
             },
             held_action: Action::Caretake,
@@ -723,10 +720,7 @@ mod tests {
         // Litter 1: A1 + A2 → K1. A1 holds Caretake on K1.
         let held_a1 = HeldIntention {
             intention: crate::ai::dse::Intention::Goal {
-                state: crate::ai::dse::GoalState {
-                    label: "kitten_fed",
-                    achieved: |_, _| false,
-                },
+                state: crate::ai::dse::GoalState::predicate("kitten_fed", |_, _| false),
                 strategy: crate::ai::dse::CommitmentStrategy::SingleMinded,
             },
             held_action: Action::Caretake,

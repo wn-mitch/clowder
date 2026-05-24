@@ -155,10 +155,7 @@ impl Dse for DryFoodDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "food_loaded_on_drying_rack",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("food_loaded_on_drying_rack", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

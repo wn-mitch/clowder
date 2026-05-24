@@ -247,10 +247,7 @@ fn hunt_candidate_query_doc(_cat: Entity) -> &'static str {
 
 fn hunt_intention(_target: Entity) -> Intention {
     Intention::Goal {
-        state: GoalState {
-            label: "prey_caught",
-            achieved: |_, _| false,
-        },
+        state: GoalState::predicate("prey_caught", |_, _| false),
         strategy: CommitmentStrategy::SingleMinded,
     }
 }
@@ -602,7 +599,7 @@ mod tests {
         let intention = (dse.intention)(target);
         match intention {
             Intention::Goal { state, strategy } => {
-                assert_eq!(state.label, "prey_caught");
+                assert_eq!(state.label(), "prey_caught");
                 assert_eq!(strategy, CommitmentStrategy::SingleMinded);
             }
             other => panic!("expected Goal intention, got {other:?}"),

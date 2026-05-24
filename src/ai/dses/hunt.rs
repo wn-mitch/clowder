@@ -170,10 +170,7 @@ impl Dse for HuntDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "prey_caught",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("prey_caught", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

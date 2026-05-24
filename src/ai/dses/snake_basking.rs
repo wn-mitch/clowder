@@ -69,10 +69,7 @@ impl Dse for SnakeBaskingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "snake_warmed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("snake_warmed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

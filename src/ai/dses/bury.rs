@@ -100,10 +100,7 @@ impl Dse for BuryDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "burial_performed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("burial_performed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

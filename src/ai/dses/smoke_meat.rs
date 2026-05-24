@@ -114,10 +114,7 @@ impl Dse for SmokeMeatDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "meat_loaded_on_smoking_rack",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("meat_loaded_on_smoking_rack", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

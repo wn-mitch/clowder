@@ -119,10 +119,7 @@ impl Dse for PickingUpDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "picked_up_ground_item",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("picked_up_ground_item", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

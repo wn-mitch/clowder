@@ -122,10 +122,7 @@ impl Dse for FoxDispersingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "dispersed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("dispersed", |_, _| false),
             strategy: CommitmentStrategy::Blind,
         }
     }

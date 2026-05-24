@@ -228,6 +228,78 @@ impl ItemKind {
         }
     }
 
+    /// Short-form label used by `GoalState::have_item(self).label()`
+    /// for trace / narrative emission and HTN method-registry lookup.
+    /// Format: `"have_<snake_item_name>"`.
+    ///
+    /// Exhaustive `match` so adding a new `ItemKind` variant is a
+    /// compile error until labeled — per the project's
+    /// "compile-time contracts over runtime checks" discipline
+    /// (CLAUDE.md). 462 substrate; emitted by 463+.
+    pub const fn goal_label(self) -> &'static str {
+        match self {
+            Self::RawMouse => "have_raw_mouse",
+            Self::RawRat => "have_raw_rat",
+            Self::RawRabbit => "have_raw_rabbit",
+            Self::RawFish => "have_raw_fish",
+            Self::RawBird => "have_raw_bird",
+            Self::Berries => "have_berries",
+            Self::Nuts => "have_nuts",
+            Self::Roots => "have_roots",
+            Self::WildOnion => "have_wild_onion",
+            Self::Mushroom => "have_mushroom",
+            Self::Moss => "have_moss",
+            Self::DriedGrass => "have_dried_grass",
+            Self::Feather => "have_feather",
+            Self::HerbHealingMoss => "have_herb_healing_moss",
+            Self::HerbMoonpetal => "have_herb_moonpetal",
+            Self::HerbCalmroot => "have_herb_calmroot",
+            Self::HerbThornbriar => "have_herb_thornbriar",
+            Self::HerbDreamroot => "have_herb_dreamroot",
+            Self::HerbCatnip => "have_herb_catnip",
+            Self::HerbSlumbershade => "have_herb_slumbershade",
+            Self::HerbOracleOrchid => "have_herb_oracle_orchid",
+            Self::ShinyPebble => "have_shiny_pebble",
+            Self::GlassShard => "have_glass_shard",
+            Self::ColorfulShell => "have_colorful_shell",
+            Self::ShadowBone => "have_shadow_bone",
+            Self::Barrel => "have_barrel",
+            Self::Crate => "have_crate",
+            Self::Shelf => "have_shelf",
+            Self::Wood => "have_wood",
+            Self::Stone => "have_stone",
+            Self::RemedyHealingPoultice => "have_remedy_healing_poultice",
+            Self::RemedyEnergyTonic => "have_remedy_energy_tonic",
+            Self::RemedyMoodTonic => "have_remedy_mood_tonic",
+            Self::RawOrgan => "have_raw_organ",
+            Self::Bone => "have_bone",
+            Self::Sinew => "have_sinew",
+            Self::Whisker => "have_whisker",
+            Self::Hide => "have_hide",
+            Self::FishScale => "have_fish_scale",
+            Self::Tallow => "have_tallow",
+            Self::DriedFish => "have_dried_fish",
+            Self::SmokedMeat => "have_smoked_meat",
+            Self::PreservedOrgan => "have_preserved_organ",
+            Self::Twig => "have_twig",
+            Self::Bristle => "have_bristle",
+            Self::Fiber => "have_fiber",
+            Self::Flower => "have_flower",
+            Self::PolishedStone => "have_polished_stone",
+            Self::GroomingBrush => "have_grooming_brush",
+            Self::PlayBundle => "have_play_bundle",
+            Self::CourtshipGift => "have_courtship_gift",
+            Self::BoneTipSpear => "have_bone_tip_spear",
+            Self::BoneStiletto => "have_bone_stiletto",
+            Self::FlintBlade => "have_flint_blade",
+            Self::HideBracers => "have_hide_bracers",
+            Self::HidePlatedWrap => "have_hide_plated_wrap",
+            Self::Sling => "have_sling",
+            Self::WovenReedCloak => "have_woven_reed_cloak",
+            Self::ToothNotchedClub => "have_tooth_notched_club",
+        }
+    }
+
     /// Bridge to the construction `Material` enum. Returns `Some(_)` for the
     /// item kinds that can be delivered to a `ConstructionSite`. Used by
     /// `resolve_pickup_material` and `resolve_deliver` to identify carried

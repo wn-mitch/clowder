@@ -97,10 +97,7 @@ impl Dse for ScryDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "scried",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("scried", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }
@@ -199,10 +196,7 @@ impl Dse for DurableWardDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "durable_ward_placed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("durable_ward_placed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }
@@ -295,10 +289,7 @@ impl Dse for CleanseDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "tile_cleansed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("tile_cleansed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }
@@ -397,10 +388,7 @@ impl Dse for ColonyCleanseDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "colony_cleansed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("colony_cleansed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }
@@ -474,10 +462,7 @@ impl Dse for HarvestDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "carcass_harvested",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("carcass_harvested", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }
@@ -550,10 +535,7 @@ impl Dse for CommuneDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "communed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("communed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

@@ -215,10 +215,7 @@ impl Dse for SleepDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "energy_restored",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("energy_restored", |_, _| false),
             strategy: CommitmentStrategy::Blind,
         }
     }

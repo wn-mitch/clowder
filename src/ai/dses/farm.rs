@@ -151,10 +151,7 @@ impl Dse for FarmDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "farmed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("farmed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

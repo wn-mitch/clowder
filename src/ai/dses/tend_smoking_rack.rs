@@ -121,10 +121,7 @@ impl Dse for TendSmokingRackDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "smoking_rack_tended",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("smoking_rack_tended", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

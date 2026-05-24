@@ -3184,15 +3184,15 @@ pub fn evaluate_and_plan(
             {
                 Some(row) => {
                     let goal = crate::ai::dse::Intention::Goal {
-                        state: crate::ai::dse::GoalState {
-                            label: row.label,
+                        state: crate::ai::dse::GoalState::predicate(
+                            row.label,
                             // §Future deferred: auto-derived
                             // `achieved` predicate. Until then,
                             // fulfillment fires via 320's
                             // frame-pop on leaf completion, not
                             // via this predicate.
-                            achieved: |_world, _entity| false,
-                        },
+                            |_world, _entity| false,
+                        ),
                         strategy: row.strategy,
                     };
                     let source =
@@ -3277,13 +3277,13 @@ pub fn evaluate_and_plan(
                     .get(entity)
                     .ok()
                     .and_then(|s| s.top())
-                    .map(|frame| frame.goal_label == state.label)
+                    .map(|frame| frame.goal_label == state.label())
                     .unwrap_or(false);
                 if preserve_existing {
                     // Keep the advance hook's stack as-is.
                 } else {
                     let mut stack = crate::components::HeldGoalStack::empty();
-                    let mut next_label: Option<&'static str> = Some(state.label);
+                    let mut next_label: Option<&'static str> = Some(state.label());
                     let mut depth_exceeded = false;
                     while let Some(label) = next_label {
                         let Some(spec) = res.method_registry.lookup_spec_dormant_filtered(label)
@@ -3317,7 +3317,7 @@ pub fn evaluate_and_plan(
                         // terminate the walk — the primitive is held via
                         // `HeldIntention`.
                         next_label = match spec.sub_goals.first() {
-                            Some(crate::ai::methods::SubGoal::Goal(g)) => Some(g.label),
+                            Some(crate::ai::methods::SubGoal::Goal(g)) => Some(g.label()),
                             _ => None,
                         };
                     }

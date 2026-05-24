@@ -115,10 +115,7 @@ impl Dse for HerbcraftGatherDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "herbs_in_inventory",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("herbs_in_inventory", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

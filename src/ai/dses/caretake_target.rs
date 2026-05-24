@@ -174,10 +174,7 @@ fn caretake_candidate_query_doc(_cat: Entity) -> &'static str {
 
 fn caretake_intention(_target: Entity) -> Intention {
     Intention::Goal {
-        state: GoalState {
-            label: "kitten_fed",
-            achieved: |_, _| false,
-        },
+        state: GoalState::predicate("kitten_fed", |_, _| false),
         strategy: CommitmentStrategy::SingleMinded,
     }
 }
@@ -474,7 +471,7 @@ mod tests {
         let intention = (dse.intention)(target);
         match intention {
             Intention::Goal { state, strategy } => {
-                assert_eq!(state.label, "kitten_fed");
+                assert_eq!(state.label(), "kitten_fed");
                 assert_eq!(strategy, CommitmentStrategy::SingleMinded);
             }
             other => panic!("expected Goal intention, got {other:?}"),

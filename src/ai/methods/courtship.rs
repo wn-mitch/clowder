@@ -94,51 +94,49 @@ pub fn has_active_courtship(world: &World, entity: Entity) -> bool {
 /// Construct the `courtship_method` literal. Called by
 /// `populate_method_registry` in `src/plugins/simulation.rs`.
 pub fn courtship_method() -> Method {
+    const SUB_GOALS: &[SubGoal] = &[
+        SubGoal::Primitive {
+            label: "approach_partner",
+            action: Action::Socialize,
+            target_hint: TargetHint::Partner,
+        },
+        SubGoal::Primitive {
+            label: "allogroom_partner",
+            action: Action::GroomOther,
+            target_hint: TargetHint::Partner,
+        },
+        // #340 recursion seam — the third sub-goal decomposes
+        // into `mate_with_goal` via the method registry. When the
+        // L2 evaluator advances `courtship_method` to
+        // `sub_goal_index == 2`, it pushes a new `GoalFrame` for
+        // `mate_with_goal` onto the cat's `HeldGoalStack`,
+        // producing the two-deep frame stack that is the 128
+        // worked-example payoff. Depth-cap (8) is trivially
+        // satisfied (depth 2). The `achieved` predicate stays
+        // `false` so completion flows through the natural
+        // `sub_goal_index` advancement path; the
+        // `failure_strategy: Abandon` on `mate_with_goal` handles
+        // partner-loss / eligibility-loss as method abandonment
+        // rather than premature achievement.
+        SubGoal::Goal(GoalState::predicate("mating_event_completed", |_, _| false)),
+        // Bonded-stage held action: continued partner-presence.
+        // No dedicated `Bond` / `Pair` Action exists; the Bonded
+        // stage's "post-conception or post-Mates-bond settled
+        // state" (per `PracticeStage::CourtshipBonded` doc)
+        // manifests as ongoing Socialize-with-partner today —
+        // matching the PairingActivity-during-pregnancy behavior
+        // 127 subsumes 1:1.
+        SubGoal::Primitive {
+            label: "consolidate_bonded",
+            action: Action::Socialize,
+            target_hint: TargetHint::Partner,
+        },
+    ];
     Method {
         id: MethodId("courtship_method"),
         goal_label: "courtship_completed",
         applicable_when: ApplicableWhen::Live(has_active_courtship),
-        sub_goals: &[
-            SubGoal::Primitive {
-                label: "approach_partner",
-                action: Action::Socialize,
-                target_hint: TargetHint::Partner,
-            },
-            SubGoal::Primitive {
-                label: "allogroom_partner",
-                action: Action::GroomOther,
-                target_hint: TargetHint::Partner,
-            },
-            // #340 recursion seam — the third sub-goal decomposes
-            // into `mate_with_goal` via the method registry. When the
-            // L2 evaluator advances `courtship_method` to
-            // `sub_goal_index == 2`, it pushes a new `GoalFrame` for
-            // `mate_with_goal` onto the cat's `HeldGoalStack`,
-            // producing the two-deep frame stack that is the 128
-            // worked-example payoff. Depth-cap (8) is trivially
-            // satisfied (depth 2). The `achieved` predicate stays
-            // `false` so completion flows through the natural
-            // `sub_goal_index` advancement path; the
-            // `failure_strategy: Abandon` on `mate_with_goal` handles
-            // partner-loss / eligibility-loss as method abandonment
-            // rather than premature achievement.
-            SubGoal::Goal(GoalState {
-                label: "mating_event_completed",
-                achieved: |_, _| false,
-            }),
-            // Bonded-stage held action: continued partner-presence.
-            // No dedicated `Bond` / `Pair` Action exists; the Bonded
-            // stage's "post-conception or post-Mates-bond settled
-            // state" (per `PracticeStage::CourtshipBonded` doc)
-            // manifests as ongoing Socialize-with-partner today —
-            // matching the PairingActivity-during-pregnancy behavior
-            // 127 subsumes 1:1.
-            SubGoal::Primitive {
-                label: "consolidate_bonded",
-                action: Action::Socialize,
-                target_hint: TargetHint::Partner,
-            },
-        ],
+        sub_goals: SUB_GOALS,
         // Abandon: no sibling Courtship methods today, and a
         // `JointDropBranch` trigger (partner Dead, BondLost, cascade,
         // …) propagates as practice-abandon, not method-backtrack.

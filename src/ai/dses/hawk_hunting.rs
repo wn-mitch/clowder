@@ -72,10 +72,7 @@ impl Dse for HawkHuntingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "hawk_fed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("hawk_fed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

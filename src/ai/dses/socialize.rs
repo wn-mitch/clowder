@@ -181,10 +181,7 @@ impl Dse for SocializeDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "socialized",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("socialized", |_, _| false),
             strategy: CommitmentStrategy::OpenMinded,
         }
     }

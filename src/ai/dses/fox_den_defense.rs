@@ -122,10 +122,7 @@ impl Dse for FoxDenDefenseDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "den_defended",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("den_defended", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

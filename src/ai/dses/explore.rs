@@ -131,10 +131,7 @@ impl Dse for ExploreDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "area_explored",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("area_explored", |_, _| false),
             strategy: CommitmentStrategy::OpenMinded,
         }
     }

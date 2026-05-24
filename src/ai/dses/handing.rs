@@ -74,10 +74,7 @@ impl Dse for HandingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "handed_off_surplus",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("handed_off_surplus", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

@@ -205,15 +205,15 @@ impl Dse for HideDse {
 
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "freeze_concluded",
+            state: GoalState::predicate(
+                "freeze_concluded",
                 // Mirror's Flee's `|_, _| false` shape — the freeze
                 // counter ticks down via `resolve_hide`'s witnessed
                 // step output rather than a world-state predicate.
                 // Phase 2/3 wires the actual achievement check
                 // (e.g. `safety > threshold` after threat departs).
-                achieved: |_, _| false,
-            },
+                |_, _| false,
+            ),
             strategy: CommitmentStrategy::Blind,
         }
     }

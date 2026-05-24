@@ -114,10 +114,7 @@ impl Dse for FightDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "threat_defeated",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("threat_defeated", |_, _| false),
             strategy: CommitmentStrategy::Blind,
         }
     }

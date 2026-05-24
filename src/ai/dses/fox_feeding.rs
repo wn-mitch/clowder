@@ -110,10 +110,7 @@ impl Dse for FoxFeedingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "cubs_fed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("cubs_fed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

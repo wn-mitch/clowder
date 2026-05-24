@@ -144,10 +144,7 @@ impl Dse for CaretakeDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "kitten_fed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("kitten_fed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

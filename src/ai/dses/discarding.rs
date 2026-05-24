@@ -73,10 +73,7 @@ impl Dse for DiscardingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "discarded_surplus_item",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("discarded_surplus_item", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

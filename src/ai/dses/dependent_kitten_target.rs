@@ -140,30 +140,21 @@ fn dependent_kitten_intention_for(action: Action) -> fn(Entity) -> Intention {
 
 fn wean_intention(_target: Entity) -> Intention {
     Intention::Goal {
-        state: GoalState {
-            label: "wean_kitten",
-            achieved: |_, _| false,
-        },
+        state: GoalState::predicate("wean_kitten", |_, _| false),
         strategy: CommitmentStrategy::SingleMinded,
     }
 }
 
 fn teach_intention(_target: Entity) -> Intention {
     Intention::Goal {
-        state: GoalState {
-            label: "teach_kitten",
-            achieved: |_, _| false,
-        },
+        state: GoalState::predicate("teach_kitten", |_, _| false),
         strategy: CommitmentStrategy::SingleMinded,
     }
 }
 
 fn release_intention(_target: Entity) -> Intention {
     Intention::Goal {
-        state: GoalState {
-            label: "release_kitten",
-            achieved: |_, _| false,
-        },
+        state: GoalState::predicate("release_kitten", |_, _| false),
         strategy: CommitmentStrategy::SingleMinded,
     }
 }

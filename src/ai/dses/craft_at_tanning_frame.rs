@@ -98,10 +98,7 @@ impl Dse for CraftAtTanningFrameDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "crafted_at_tanning_frame",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("crafted_at_tanning_frame", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

@@ -171,10 +171,7 @@ fn build_candidate_query_doc(_cat: Entity) -> &'static str {
 
 fn build_intention(_target: Entity) -> Intention {
     Intention::Goal {
-        state: GoalState {
-            label: "site_completed",
-            achieved: |_, _| false,
-        },
+        state: GoalState::predicate("site_completed", |_, _| false),
         strategy: CommitmentStrategy::SingleMinded,
     }
 }
@@ -366,7 +363,7 @@ mod tests {
         let intention = (dse.intention)(target);
         match intention {
             Intention::Goal { state, strategy } => {
-                assert_eq!(state.label, "site_completed");
+                assert_eq!(state.label(), "site_completed");
                 assert_eq!(strategy, CommitmentStrategy::SingleMinded);
             }
             other => panic!("expected Goal intention, got {other:?}"),

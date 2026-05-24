@@ -146,10 +146,7 @@ fn apply_remedy_candidate_query_doc(_cat: Entity) -> &'static str {
 
 fn apply_remedy_intention(_target: Entity) -> Intention {
     Intention::Goal {
-        state: GoalState {
-            label: "injury_healed",
-            achieved: |_, _| false,
-        },
+        state: GoalState::predicate("injury_healed", |_, _| false),
         strategy: CommitmentStrategy::SingleMinded,
     }
 }
@@ -311,7 +308,7 @@ mod tests {
         let intention = (dse.intention)(target);
         match intention {
             Intention::Goal { state, strategy } => {
-                assert_eq!(state.label, "injury_healed");
+                assert_eq!(state.label(), "injury_healed");
                 assert_eq!(strategy, CommitmentStrategy::SingleMinded);
             }
             other => panic!("expected Goal intention, got {other:?}"),

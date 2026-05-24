@@ -169,10 +169,7 @@ impl Dse for HerbcraftWardDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "ward_placed",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("ward_placed", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }

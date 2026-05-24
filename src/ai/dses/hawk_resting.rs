@@ -82,10 +82,7 @@ impl Dse for HawkRestingDse {
     }
     fn emit(&self, _: f32, _: &EvalCtx) -> Intention {
         Intention::Goal {
-            state: GoalState {
-                label: "hawk_rested",
-                achieved: |_, _| false,
-            },
+            state: GoalState::predicate("hawk_rested", |_, _| false),
             strategy: CommitmentStrategy::SingleMinded,
         }
     }
