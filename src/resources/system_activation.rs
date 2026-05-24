@@ -1278,23 +1278,27 @@ impl Feature {
             //
             // - MaterialsDelivered / MaterialPickedUp: ticket 038 wired
             //   the full Pickup → Carry → Deliver pipeline (planner +
-            //   step resolvers + executor dispatch) but parked the
+            //   step resolvers + executor dispatch) and gated the
             //   founding wagon-dismantling spawn behind the
-            //   CLOWDER_FOUNDING_HAUL env var while balance work
-            //   resolves an early-game starvation regression. With the
-            //   spawn parked, no cat encounters a build-material pile,
-            //   so neither Feature fires. When the spawn is activated
-            //   (post-tuning), promote both back to `true`.
+            //   CLOWDER_FOUNDING_HAUL env var. The founding-spawn
+            //   activation work (originally ticket 041) is retired as
+            //   obviated — the early-game starvation regression that
+            //   blocked it no longer reproduces, and no other producer
+            //   of build-material piles exists in the current world-gen,
+            //   so both Features stay demoted by default. Open a fresh
+            //   ticket if/when a build-material producer ships.
             //
-            // The four "trunk" Features `FoodCooked`, `MatingOccurred`,
+            // The three "trunk" Features `MatingOccurred`,
             // `GroomedOther`, `MentoredCat` deliberately stay in the
             // expected set even though they fire at zero in current
             // soaks — the canary flagging them RED is accurate and
             // tracks load-bearing tickets:
-            // - FoodCooked   → ticket 036 (no kitchen built)
             // - GroomedOther → ticket 037 (silent-advance via GroomingFired)
             // - MentoredCat  → known mastery-decay dynamic
             // - MatingOccurred → ticket 027 (mating cadence cascade)
+            //
+            // `FoodCooked` was a fourth trunk Feature (tickets 036 + 039)
+            // and is now firing; canary green.
             //
             // Cascade-exempt: each entry below is silent strictly
             // because its trunk Feature is silent. Listing them as
@@ -1306,9 +1310,11 @@ impl Feature {
             // them as independent canaries.
             // - GestationAdvanced / KittenBorn / KittenFed: cascade
             //   from MatingOccurred (ticket 027).
-            // - ItemRetrieved: cascade from FoodCooked (ticket 036) —
-            //   nothing in stores worth retrieving until cooking
-            //   produces output.
+            // - ItemRetrieved: cascade from FoodCooked. FoodCooked
+            //   (036 + 039) is now green, so this cascade-exempt
+            //   demotion may be promotable on the next sweep — left
+            //   `false` here pending a fresh soak that confirms
+            //   ItemRetrieved fires reliably.
             Feature::PreyDenFounded => false,
             Feature::KittenMatured => false,
             Feature::ThreatEngaged => false,

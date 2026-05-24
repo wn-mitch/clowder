@@ -1,7 +1,7 @@
 ---
 id: 041
 title: Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-23
 ---
 
 ## Why
@@ -71,3 +71,4 @@ Iterative balance tuning per CLAUDE.md methodology — hypothesis / prediction /
 - 2026-04-26: Ticket opened. Infrastructure landed in 038; spawn parked behind env var pending balance work.
 - 2026-04-26: Diagnostic dive on the spawn-on starvation regression isolated a pre-existing Flee-lock bug (cats stuck in `Action::Flee` for 5000+ ticks because the threat-preempt path didn't remove `GoapPlan`, so `evaluate_and_plan` couldn't re-evaluate). Flee-lock fix landed in 038. With it, iter4 spawn-on soak shows the founding flow firing as designed (`MaterialPickedUp = MaterialsDelivered = 4`) and large continuity-tally surges (`courtship 0→1254`, `mythic-texture 22→43`, `grooming 19→599`, `play 109→1840`, plus `BondFormed` and `CourtshipInteraction` newly firing) — needs characterization to determine whether magnitudes are realistic or over-firing. Iter4 still shows 3 starvation deaths at days 122/167 to be investigated separately.
 - 2026-05-19: accuracy audit pass — no changes needed (ready, no blocked-by, related-systems and linkages current)
+- 2026-05-23: 2026-05-23: retired as obviated. The early-game starvation regression that motivated the founding-haul balance work no longer reproduces, and no other build-material producer exists in current world-gen — Materials* Features stay demoted by default. CLOWDER_FOUNDING_HAUL gate stays in place as opt-in. system_activation.rs block comment updated to drop the 041 pointer in the same commit.

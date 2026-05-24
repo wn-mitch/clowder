@@ -1,7 +1,7 @@
 ---
 id: 039
 title: FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-23
 ---
 
 ## Why
@@ -62,3 +62,4 @@ Pre-036 baseline soak at `logs/tuned-42-a879f43-pre-cook-fix/` (FoodCooked = 0; 
 ## Log
 
 - 2026-05-19: accuracy audit pass — no changes needed (ready, no blocked-by, related-systems and linkages current)
+- 2026-05-23: 2026-05-23: retired. Latest seed-42 soak (logs/tuned-42-cf6f36f5) shows never_fired_expected_positives = [] with Feature::FoodCooked still classified expected. Canary green; whatever fix landed downstream of 036 carried FoodCooked across the line.
