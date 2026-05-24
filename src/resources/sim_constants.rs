@@ -3289,15 +3289,17 @@ pub struct DispositionConstants {
     /// per unit of `PreyState.alertness`. A nervous rabbit
     /// (`alertness ≈ 1.0`) pushes a typical patient stalker out by
     /// `alertness_push` extra tiles before the stalk transition fires.
-    /// Default `3.0` — alertness can roughly double the stalk distance
-    /// for a high-patience cat without dwarfing personality.
+    /// Default `1.5` (ticket 464 halved the ticket-100 default of `3.0`:
+    /// the original lift saturated the `[5, 9]` clamp ceiling for
+    /// high-tremor prey, dropping colony hunt success 19.7% → 13.3%).
     #[serde(default = "default_alertness_push")]
     pub alertness_push: f32,
     /// Ticket 100 — additive lift applied to `effective_stalk_distance`
     /// per unit of normalized prey tremor sensitivity
     /// (`prey_tremor_sensitivity` returns `base_range / 12.0`; Rabbit at
-    /// max emits 1.0, Bird at 2/12 ≈ 0.17). Default `2.0` — high-tremor
-    /// prey expand the stalker's required cushion proportionally.
+    /// max emits 1.0, Bird at 2/12 ≈ 0.17). Default `1.0` (ticket 464
+    /// halved the ticket-100 default of `2.0`: high-tremor prey were
+    /// stalked from too far out, quadrupling `lost_during_stalk`).
     #[serde(default = "default_species_push")]
     pub species_push: f32,
     /// Ticket 100 — multiplier on the patient cat's reading of the
@@ -4765,11 +4767,11 @@ fn default_scent_detect_threshold() -> f32 {
 }
 
 fn default_alertness_push() -> f32 {
-    3.0
+    1.5
 }
 
 fn default_species_push() -> f32 {
-    2.0
+    1.0
 }
 
 fn default_tremor_push() -> f32 {

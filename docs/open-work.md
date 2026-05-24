@@ -38,11 +38,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
 - **[462](docs/open-work/tickets/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md)** — HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs) — _[items-crafting] · score 0.91_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
-- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.90_
+- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
+- **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
 
@@ -185,7 +185,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
-- **[464](docs/open-work/tickets/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) — _[wildlife] · added 2026-05-24_
+- **[465](docs/open-work/tickets/465-cat-approach-pathing-failure-at-stalk-range.md)** — Cat approach pathing failure at stalk range — _[wildlife] · added 2026-05-24_
 
 ### buildings-zones (5 ready, 2 blocked)
 
@@ -287,7 +287,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
-### predator-prey-dynamics (9 open, 7 landed)
+### predator-prey-dynamics (9 open, 8 landed)
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 - **[265](docs/open-work/tickets/265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md)** — Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox) — _[wildlife] · added 2026-05-10_
@@ -297,7 +297,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · added 2026-05-13_
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
-- **[464](docs/open-work/tickets/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) — _[wildlife] · added 2026-05-24_
+- **[465](docs/open-work/tickets/465-cat-approach-pathing-failure-at-stalk-range.md)** — Cat approach pathing failure at stalk range — _[wildlife] · added 2026-05-24_
 
 ### welfare-fidelity (8 open, 4 landed)
 
@@ -455,7 +455,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[459](docs/open-work/tickets/459-retire-author-joint-intentions-per-tick-hot-path.md)** — Retire author_joint_intentions per-tick hot path — _[social-coordination] · added 2026-05-23_
 - **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
 - **[462](docs/open-work/tickets/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md)** — HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs) — _[items-crafting] · added 2026-05-24_
-- **[464](docs/open-work/tickets/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) — _[wildlife] · added 2026-05-24_
+- **[465](docs/open-work/tickets/465-cat-approach-pathing-failure-at-stalk-range.md)** — Cat approach pathing failure at stalk range — _[wildlife] · added 2026-05-24_
 
 ## Parked (14)
 
@@ -510,12 +510,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[463](docs/open-work/tickets/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick — _[items-crafting] · blocked-by 462 · added 2026-05-24_
 
-## Landed archive (321)
+## Landed archive (322)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (255)
+### 2026-05 (256)
 
+- **[464](docs/open-work/landed/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) _(2026-05-24)_
 - **[461](docs/open-work/landed/461-phase-2b-warriors-kit-tanningframe-buildpressure-tuning-369-follow-on.md)** — Phase 2b warrior's-kit TanningFrame BuildPressure threshold tuning (369 follow-on; election-completeness moves to 462/463) _(2026-05-24)_
 - **[369](docs/open-work/landed/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) _(2026-05-24)_
 - **[100](docs/open-work/landed/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach _(2026-05-24)_

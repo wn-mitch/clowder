@@ -220,15 +220,24 @@ mod tests {
     #[test]
     fn rabbit_kills_produce_hide_bone_sinew() {
         let report = run(&SCENARIO_RABBIT, None, Some(200), 42);
-        // 368: Rabbit drops 4 byproducts per kill (Hide + Bone + Sinew + Bristle).
-        let bp_total = report
-            .feature_counts
-            .get("ByproductSpawned")
-            .copied()
-            .unwrap_or(0) as usize;
-        let kills = bp_total / 4;
+        // Derive *rabbit-specific* kill count from the meat histogram —
+        // hunger=0.55 is calibrated above `production_self_eat_threshold`
+        // to keep meat in inventory (see module docstring). Using the
+        // global ByproductSpawned canary instead would conflate stray
+        // ambient kills (rats from wildlife dens) with rabbit kills and
+        // wrongly demand a hide per stray rat (ticket 464).
+        let kills = report.final_item_kinds.get("rabbit").copied().unwrap_or(0);
         if kills == 0 {
-            panic!("expected ≥1 rabbit kill within 200 ticks (ByproductSpawned fired {bp_total}×)");
+            let bp_total = report
+                .feature_counts
+                .get("ByproductSpawned")
+                .copied()
+                .unwrap_or(0) as usize;
+            panic!(
+                "expected ≥1 rabbit kill within 200 ticks (rabbit meat histogram empty; \
+                 global ByproductSpawned fired {bp_total}×; histogram = {:?})",
+                report.final_item_kinds,
+            );
         }
         for kind in ["hide", "bone", "sinew", "bristle"] {
             let n = report.final_item_kinds.get(kind).copied().unwrap_or(0);
@@ -241,11 +250,17 @@ mod tests {
         }
         // Whisker is on the Rat row, not the Rabbit row — assert it
         // doesn't bleed in. Catches a typo where the lookup keyed off
-        // the wrong PreyKind variant.
+        // the wrong PreyKind variant. Ambient wildlife dens can spawn
+        // stray rats into this scenario; if the cat kills one, a single
+        // legitimate whisker may appear. Bound the assertion to
+        // "whisker count ≤ rat-meat count" so any whisker without a
+        // corresponding rat is a real rabbit→rat lookup defect (ticket 464).
         let whisker = report.final_item_kinds.get("whisker").copied().unwrap_or(0);
-        assert_eq!(
-            whisker, 0,
-            "rabbit kills must not produce whisker (Rat-row item); got {whisker}. \
+        let rat_kills = report.final_item_kinds.get("rat").copied().unwrap_or(0);
+        assert!(
+            whisker <= rat_kills,
+            "rabbit kills must not produce whisker (Rat-row item); \
+             got whisker={whisker} but only {rat_kills} stray rat kill(s). \
              histogram = {:?}",
             report.final_item_kinds
         );

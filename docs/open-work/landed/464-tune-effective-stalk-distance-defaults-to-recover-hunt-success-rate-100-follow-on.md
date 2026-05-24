@@ -1,7 +1,7 @@
 ---
 id: 464
 title: Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on)
-status: ready
+status: done
 cluster: wildlife
 orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [sensory.md, ai-substrate-refactor.md]
 related-balance: [100-tremor-action-multiplier.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-24
 ---
 
 ## Why
@@ -167,3 +167,4 @@ parameter tweaks on top of R1.
   success rate −32% colony-wide (19.7% → 13.3%); Rabbit −15.5 pp,
   Rat −25.4 pp. R1 (halve species_push + alertness_push) recommended;
   R5 held as escalation path if R1 underdelivers.
+- 2026-05-24: soak `logs/tuned-42-cfc6f4fa` (header carries my tuned constants; `commit_hash` field reads the parent due to build.rs/jj `git rev-parse HEAD` interaction). Colony-wide hunt success 13.3% → 18.47% (target ≥17.7% ✓), Rat 14.1% → 45.4% (target ≥35.6% ✓, exceeds baseline 39.5%). Rabbit stalled at 17.05% (target ≥29.7% missed) — failure mode is "stuck during approach" 97.8% of Rabbit losses, the A*-pathing weakness §Out of scope named. Opened 465 for the pathing follow-on. `just frame-diff` confirms Hunt not in top-15 movers — recovery is resolver-side via effective_stalk_distance arithmetic, not L2 score shape. Hard gates pass (0 deaths, all 4 continuity canaries fire). Welfare +13.9%, seasons survived +50%, run lasted 19% longer. lost_during_stalk recovered 301 → 108 (~3× toward baseline 74).
