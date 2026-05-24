@@ -1,7 +1,7 @@
 ---
 id: 055
 title: §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-23
 ---
 
 ## Why
@@ -75,3 +75,4 @@ per-arc expected-valence targets.
   split the per-arc `expected_valence_target` work into ticket 344
   (the actual dependency this ticket needs).
 - 2026-05-19: accuracy audit pass — blocked-by [344] confirmed in tickets/; no changes needed
+- 2026-05-23: First-light soak logs/tuned-42-1799e798 — survival+continuity pass, verdict=concern (pre-existing wards drift, ticket 460). AspirationDriftAbandoned cadence = 0 on canonical seed; layer wired and silent on a well-aligned colony (correct first-light behavior).

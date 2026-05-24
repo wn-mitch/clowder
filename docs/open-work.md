@@ -15,10 +15,10 @@ _Last generated: 2026-05-23._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 121 |
+| Ready | 120 |
 | Parked | 14 |
 | Blocked | 32 |
-| **Open total** | **171** |
+| **Open total** | **170** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -51,7 +51,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
 | **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 8 | 4 | 4 (0 / 1 / 3 / 0) | `▰▰▰▰▰▱▱▱▱▱` 50% |
-| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 5 | 28 (1 / 20 / 5 / 2) | `▰▰▱▱▱▱▱▱▱▱` 15% |
+| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 6 | 27 (1 / 19 / 5 / 2) | `▰▰▱▱▱▱▱▱▱▱` 18% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 | **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 26 | 19 | 7 (0 / 4 / 1 / 2) | `▰▰▰▰▰▰▰▱▱▱` 73% |
@@ -63,15 +63,14 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (121)
+## Ready by cluster (120)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (34 ready, 6 blocked)
+### ai-substrate (33 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
-- **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _[ai-substrate] · added 2026-04-27_
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · added 2026-05-02_
 - **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · blocked-by 135 · added 2026-05-02_
@@ -336,14 +335,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (121)
+## Ready (120)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
-- **[055](docs/open-work/tickets/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger — _[ai-substrate] · added 2026-04-27_
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _[buildings-zones] · added 2026-04-27_
 - **[100](docs/open-work/tickets/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach — _[wildlife] · added 2026-05-01_
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · blocked-by 100 · added 2026-05-01_
@@ -512,11 +510,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 
-## Landed archive (317)
+## Landed archive (318)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (251)
+### 2026-05 (252)
 
 - **[457](docs/open-work/landed/457-workshop-craft-dse-plan-template-for-016-phase-2-behavioral-tools.md)** — Workshop-craft DSE + plan template for 016 Phase 2 behavioral tools _(2026-05-23)_
 - **[453](docs/open-work/landed/453-close-inter-cat-mates-bond-exclusivity-gap.md)** — Close inter-cat Mates-bond exclusivity gap _(2026-05-23)_
@@ -525,6 +523,7 @@ Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 - **[368](docs/open-work/landed/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md)** — Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift (016 Phase 2) _(2026-05-23)_
 - **[344](docs/open-work/landed/344-771-aspiration-arc-per-chain-expected-valence-target-field.md)** — §7.7.1 aspiration arc per-chain expected_valence_target field _(2026-05-23)_
 - **[326](docs/open-work/landed/326-aspiration-milestone-wrapper-social.md)** — Social aspiration_milestone_wrapper + emits tables _(2026-05-23)_
+- **[055](docs/open-work/landed/055-mood-drift-threshold-detection.md)** — §7.7.d mood drift-threshold detection — sustain-duration + arc-misalignment trigger _(2026-05-23)_
 - **[041](docs/open-work/landed/041-founding-haul-balance-tuning.md)** — Founding wagon-dismantling haul — balance the early-game cost so cats don't starve while hauling _(2026-05-23)_
 - **[039](docs/open-work/landed/039-foodcooked-still-silent-post-036.md)** — FoodCooked still silent after 036 — Cook chain execution failure downstream of CraftingHint::Cook _(2026-05-23)_
 - **[004](docs/open-work/landed/004-magic-hard-gated-at-scoring.md)** — Magic hard-gated at scoring _(2026-05-23)_
