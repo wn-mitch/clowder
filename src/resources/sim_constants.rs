@@ -97,6 +97,12 @@ pub struct SimConstants {
     /// so pre-367 events.jsonl headers deserialize cleanly.
     #[serde(default)]
     pub crafting: CraftingConstants,
+    /// Ticket 100 — tremor influence-map tunables. Action-keyed
+    /// emission multipliers + deposit / decay / detection-threshold
+    /// scalars. `#[serde(default)]` so pre-100 archive headers
+    /// deserialize cleanly.
+    #[serde(default)]
+    pub tremor: TremorConstants,
     /// Ticket 375 — per-species guaranteed prey-byproduct tables. Each
     /// successful kill in `resolve_engage_prey` spawns the species' meat
     /// plus this list (Bone, Sinew, Hide, Feather, FishScale, Tallow,
@@ -2344,6 +2350,17 @@ pub struct ScoringConstants {
     /// activated. Ships dormant at 0.0.
     #[serde(default = "default_hunt_best_predation_weight")]
     pub hunt_best_predation_weight: f32,
+    /// 100 — orthogonal `prey_alertness_tolerance` axis weight on the
+    /// HuntTarget DSE. Input is `boldness × alertness`. The signal
+    /// peaks when a bold cat eyes nervous prey — exactly the "I'm
+    /// bold *and* you're alert" case the existing single-axis
+    /// `prey_calm` penalty can't represent. WeightedSum composition:
+    /// when non-zero, the other axes (and any 263 affordance axis)
+    /// renormalize so the sum stays at 1.0. Ships live at 0.15 — a
+    /// meaningful bias toward bold-cat acceptance of nervous prey
+    /// without dominating the yield + pursuit-cost signal.
+    #[serde(default = "default_hunt_alertness_tolerance_weight")]
+    pub hunt_alertness_tolerance_weight: f32,
     /// 263: bias magnitude on the Hunt resolver's `stalk_start` band
     /// threshold inside `resolve_engage_prey`. At bias `0.0` (default,
     /// dormant) the threshold is unchanged from the distance-keyed
@@ -3004,6 +3021,7 @@ impl Default for ScoringConstants {
             hide_perceived_intent_clarity_weight: default_hide_perceived_intent_clarity_weight(),
             patrol_threat_recency_weight: default_patrol_threat_recency_weight(),
             hunt_best_predation_weight: default_hunt_best_predation_weight(),
+            hunt_alertness_tolerance_weight: default_hunt_alertness_tolerance_weight(),
             hunt_stalk_chase_affordance_bias: default_hunt_stalk_chase_affordance_bias(),
             ward_ambush_anchor_weight: default_ward_ambush_anchor_weight(),
             ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
@@ -3267,6 +3285,37 @@ pub struct DispositionConstants {
     pub hunt_catch_skill_growth: f32,
     pub stalk_start_buffer: i32,
     pub stalk_start_minimum: i32,
+    /// Ticket 100 — additive lift applied to `effective_stalk_distance`
+    /// per unit of `PreyState.alertness`. A nervous rabbit
+    /// (`alertness ≈ 1.0`) pushes a typical patient stalker out by
+    /// `alertness_push` extra tiles before the stalk transition fires.
+    /// Default `3.0` — alertness can roughly double the stalk distance
+    /// for a high-patience cat without dwarfing personality.
+    #[serde(default = "default_alertness_push")]
+    pub alertness_push: f32,
+    /// Ticket 100 — additive lift applied to `effective_stalk_distance`
+    /// per unit of normalized prey tremor sensitivity
+    /// (`prey_tremor_sensitivity` returns `base_range / 12.0`; Rabbit at
+    /// max emits 1.0, Bird at 2/12 ≈ 0.17). Default `2.0` — high-tremor
+    /// prey expand the stalker's required cushion proportionally.
+    #[serde(default = "default_species_push")]
+    pub species_push: f32,
+    /// Ticket 100 — multiplier on the patient cat's reading of the
+    /// `TremorMap` at the prey's tile. Effective contribution is
+    /// `patience × tremor_push × tremor_map.get(prey_pos)`. Bold cats
+    /// (`patience ≈ 0`) ignore the ambient read by construction.
+    /// Default `4.0` — a 0.5 reading at full patience adds 2 tiles of
+    /// caution; a 1.0 reading at full patience adds 4.
+    #[serde(default = "default_tremor_push")]
+    pub tremor_push: f32,
+    /// Ticket 100 — multiplier on the patient cat's reading of the
+    /// per-species prey scent at the prey's tile (settled prey accrue
+    /// scent at their loiter spot). Effective contribution is
+    /// `patience × scent_settle_push × scent.get(prey_pos)` and is
+    /// *subtracted* from `effective_stalk_distance` — settled prey
+    /// invite the patient cat to close. Default `3.0`.
+    #[serde(default = "default_scent_settle_push")]
+    pub scent_settle_push: f32,
     pub anxiety_spook_threshold: f32,
     pub anxiety_spook_chance: f32,
     pub chase_limit_bold: u64,
@@ -4581,6 +4630,14 @@ fn default_hunt_best_predation_weight() -> f32 {
     0.0
 }
 
+/// 100 — HuntTarget DSE 5th-axis `prey_alertness_tolerance` weight.
+/// Ships live at 0.15 — modest bias toward bold cats accepting alert
+/// prey. Tuning belongs to follow-on per the four-artifact
+/// methodology if drift > ±10% on Hunt success.
+fn default_hunt_alertness_tolerance_weight() -> f32 {
+    0.15
+}
+
 /// 263: Hunt resolver `stalk_start` band-threshold bias magnitude.
 /// Ships dormant at 0.0; activation in a follow-on (recommended
 /// 0.25 → ±25% width swing under maximum affordance asymmetry).
@@ -4692,6 +4749,22 @@ fn default_scent_search_radius() -> i32 {
 
 fn default_scent_detect_threshold() -> f32 {
     0.05
+}
+
+fn default_alertness_push() -> f32 {
+    3.0
+}
+
+fn default_species_push() -> f32 {
+    2.0
+}
+
+fn default_tremor_push() -> f32 {
+    4.0
+}
+
+fn default_scent_settle_push() -> f32 {
+    3.0
 }
 
 fn default_sleep_dawn_bonus() -> f32 {
@@ -4955,6 +5028,11 @@ impl Default for DispositionConstants {
             hunt_catch_skill_growth: 0.01,
             stalk_start_buffer: 2,
             stalk_start_minimum: 5,
+            // 100: effective_stalk_distance lifts.
+            alertness_push: default_alertness_push(),
+            species_push: default_species_push(),
+            tremor_push: default_tremor_push(),
+            scent_settle_push: default_scent_settle_push(),
             anxiety_spook_threshold: 0.7,
             anxiety_spook_chance: 0.02,
             chase_limit_bold: 200,
@@ -7236,6 +7314,79 @@ impl Default for SensoryConstants {
                 tremor: Channel::new(2.0, 0.5, Falloff::Cliff),
                 scent_directional: true,
             },
+        }
+    }
+}
+
+// ---------- TremorConstants (ticket 100) ----------
+
+/// `TremorMap` tunables — action-keyed emission multipliers + deposit /
+/// decay / detection-threshold scalars. The map is the §5.6 tremor
+/// channel's influence-map substrate.
+///
+/// Action multipliers ladder from `idle` (motionless) to `pounce`
+/// (explosive spring). The convention preserved by the test
+/// `action_tremor_mul_ordered_by_loudness` is
+/// `idle ≤ stalk ≤ walk ≤ fight ≤ run ≤ pounce`; a tuning pass that
+/// breaks the ordering must update the test or the design.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TremorConstants {
+    /// Multiplier on `sensory_signature.tremor_baseline` when the cat
+    /// is mid-stalk. ≈0.2 — stalking suppresses vibration by design;
+    /// that's the action's whole behavioral function.
+    pub action_tremor_stalk: f32,
+    /// Multiplier for stationary / quiescent actions (Sleep, Idle,
+    /// Hide, GroomSelf, Vigil, GriefSit). 0.0 — no emitter motion.
+    pub action_tremor_idle: f32,
+    /// Multiplier for normal-pace movement and most mundane actions.
+    /// 1.0 — the baseline.
+    pub action_tremor_walk: f32,
+    /// Multiplier for sustained high-speed motion (Flee, chase-phase
+    /// Hunt). ≈1.8 — running cats announce themselves through the
+    /// ground.
+    pub action_tremor_run: f32,
+    /// Multiplier for combat. ≈1.5 — high but below run, because the
+    /// thrash is chaotic-localized rather than ground-coupled-stride.
+    pub action_tremor_fight: f32,
+    /// Multiplier for the strike. ≈2.0 — explosive spring is peak
+    /// emission. The pounce range is by construction inside the
+    /// terminal grab window, so the spike is "too late" feedback by
+    /// design.
+    pub action_tremor_pounce: f32,
+    /// Per-tick scale applied to every deposit; tunes the absolute
+    /// intensity of the map without disturbing the action-ratio
+    /// ladder. Default 1.0.
+    pub deposit_per_tick: f32,
+    /// Per-tick decay subtracted from every bucket. ≈0.4 empties a
+    /// full bucket in 1-3 ticks — fast enough that "this tile is hot
+    /// right now" stays meaningful and slow enough that a few-tick
+    /// burst (e.g. a running cat crossing) leaves a perceivable trail.
+    pub decay_per_tick: f32,
+    /// Minimum `TremorMap::peak_nearby` reading required for
+    /// `try_detect_cat` to transition the prey to `PreyAiState::Alert`
+    /// on vibration alone. ≈0.25 — well above noise, below the peak
+    /// reading produced by a single walking cat in an adjacent bucket.
+    pub detect_threshold: f32,
+    /// Manhattan radius around prey for the `peak_nearby` sample.
+    /// Larger values make prey more sensitive to distant footfall but
+    /// flatten the spatial gradient. Default 6 tiles — roughly two
+    /// bucket-radii at the canonical bucket_size=3.
+    pub detect_radius: i32,
+}
+
+impl Default for TremorConstants {
+    fn default() -> Self {
+        Self {
+            action_tremor_stalk: 0.2,
+            action_tremor_idle: 0.0,
+            action_tremor_walk: 1.0,
+            action_tremor_run: 1.8,
+            action_tremor_fight: 1.5,
+            action_tremor_pounce: 2.0,
+            deposit_per_tick: 1.0,
+            decay_per_tick: 0.4,
+            detect_threshold: 0.25,
+            detect_radius: 6,
         }
     }
 }

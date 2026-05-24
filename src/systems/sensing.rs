@@ -518,43 +518,66 @@ pub fn observer_smells_at(
 /// Probabilistic prey-cat detection proximity factor.
 ///
 /// Phase 4 migration helper for `src/systems/prey.rs::try_detect_cat`.
-/// Returns a proximity confidence in [0, 1] routed through `detect()`
-/// with the prey's sight channel (Linear falloff). Callers multiply the
-/// returned value by alertness and vigilance factors and roll against
-/// the product — the probabilistic Bernoulli gate stays outside the
-/// sensory model.
+/// Returns a proximity confidence in [0, 1] routed through `detect()`.
 ///
-/// **Algebraic equivalence:** under identity multipliers, returns
-/// exactly `1 - dist/(alert_radius+1)` for `dist ∈ [1, alert_radius]`,
-/// matching the pre-migration `proximity` formula. Returns 0 for
-/// `dist == 0` or `dist > alert_radius` so the caller's Bernoulli roll
-/// consumes no RNG on unreachable cats (preserving upstream RNG order).
+/// **Ticket 100 — sight ∨ tremor.** Returns `sight.max(tremor)` rather
+/// than sight alone. A stalking cat (passing `cat_action_tremor_mul ≈
+/// 0.2`) suppresses its tremor signature and stays "feet" of sight
+/// range; a running cat (`≈ 1.8`) carries through tremor inside the
+/// prey's tremor channel range. The Bernoulli gate stays outside this
+/// function — callers multiply by alertness + vigilance, then roll.
+///
+/// `cat_action_tremor_mul` is sourced from
+/// `crate::resources::action_tremor_mul(action, &constants.tremor)`.
+/// Callers that don't know the cat's action (test helpers, etc.) pass
+/// `1.0` to recover the pre-100 baseline (walking cat).
 pub fn prey_cat_proximity(
     prey_pos: Position,
     prey_kind: crate::components::prey::PreyKind,
     prey_profile: &SensoryProfile,
     cat_pos: Position,
     alert_radius: i32,
+    cat_action_tremor_mul: f32,
 ) -> f32 {
     let dist = prey_pos.manhattan_distance(&cat_pos);
-    if dist > alert_radius || dist == 0 {
+    if dist == 0 {
         return 0.0;
     }
-    detect(
-        ObserverCtx {
-            position: prey_pos,
-            species: SensorySpecies::Prey(prey_kind),
-            profile: prey_profile,
-            modifier: None,
-        },
-        TargetCtx {
-            position: cat_pos,
-            signature: SensorySignature::CAT,
-            current_action_tremor_mul: 1.0,
-        },
-        EnvCtx::identity().with_max_range(alert_radius as f32 + 1.0),
-    )
-    .sight
+    let target_ctx = TargetCtx {
+        position: cat_pos,
+        signature: SensorySignature::CAT,
+        current_action_tremor_mul: cat_action_tremor_mul,
+    };
+    let observer_ctx = ObserverCtx {
+        position: prey_pos,
+        species: SensorySpecies::Prey(prey_kind),
+        profile: prey_profile,
+        modifier: None,
+    };
+    // Sight stays gated on alert_radius (the legacy semantic the
+    // pre-100 callers depend on). Cliff vs Linear falloff on the
+    // species' sight channel is preserved.
+    let sight_result = if dist <= alert_radius {
+        detect(
+            observer_ctx,
+            target_ctx,
+            EnvCtx::identity().with_max_range(alert_radius as f32 + 1.0),
+        )
+        .sight
+    } else {
+        0.0
+    };
+    // Tremor uses the species' natural tremor channel range — NOT
+    // alert_radius. That's the point of ticket 100: a high-tremor
+    // species (Rabbit, base_range=12) can sense ground vibration well
+    // beyond its visual alert_radius (6). A motionless cat
+    // (`mul == 0.0`) emits no tremor regardless of range.
+    let tremor_result = if cat_action_tremor_mul > 0.0 {
+        detect(observer_ctx, target_ctx, EnvCtx::identity()).tremor
+    } else {
+        0.0
+    };
+    sight_result.max(tremor_result)
 }
 
 /// Does this cat *see* a wildlife threat at `threat_pos`?
@@ -1052,6 +1075,62 @@ pub fn update_hide_eligible_markers(
 }
 
 // ---------------------------------------------------------------------------
+// tremor_tick — TremorMap writer (ticket 100)
+// ---------------------------------------------------------------------------
+
+/// Live cats deposit substrate vibration onto `TremorMap` each tick;
+/// the whole grid decays globally first. The deposit per cat is
+/// `signature.tremor_baseline × action_tremor_mul(action) ×
+/// deposit_per_tick` — a stalking cat (`action_tremor_mul ≈ 0.2`)
+/// barely registers; a running or pouncing cat (`≈ 1.8 / 2.0`) lights
+/// up its tile.
+///
+/// Scope is intentionally cats-only — prey vibration is uniform under
+/// any normal behavior (no Action gating) and looping it back into the
+/// map would alert prey to their own emission. Wildlife (foxes / hawks
+/// / snakes) emit through their natural movement systems but don't
+/// participate in this writer at v1; bringing them in is a follow-on
+/// once a parallel `WildlifeCurrentAction` shape exists.
+#[allow(clippy::type_complexity)]
+pub fn tremor_tick(
+    cats: Query<
+        (&Position, &SensorySignature, &crate::ai::CurrentAction),
+        (With<crate::components::identity::Species>, Without<Dead>),
+    >,
+    mut tremor_map: ResMut<crate::resources::TremorMap>,
+    constants: Res<crate::resources::sim_constants::SimConstants>,
+) {
+    // Decay first — yesterday's tracks fade before today's stamps land.
+    // Matches prey_scent_tick / fox_scent_tick ordering.
+    tremor_map.decay_all(constants.tremor.decay_per_tick);
+    for (pos, sig, current) in cats.iter() {
+        let mul = crate::resources::action_tremor_mul(current.action, &constants.tremor);
+        let amount = sig.tremor_baseline * mul * constants.tremor.deposit_per_tick;
+        if amount > 0.0 {
+            tremor_map.deposit(pos.x, pos.y, amount);
+        }
+    }
+}
+
+/// Normalized per-species tremor-sensitivity scalar in `[0.0, 1.0]`.
+/// Returns `base_range / 12.0` (Rabbit's max). Used by
+/// `resolve_engage_prey` to weight the `species_push` term in
+/// `effective_stalk_distance`: high-tremor prey (Rabbit=1.0, Rat≈0.58,
+/// Mouse=0.5, Fish=0.5, Bird≈0.17) expand the stalker's required
+/// cushion.
+pub fn prey_tremor_sensitivity(
+    kind: crate::components::prey::PreyKind,
+    sensory: &crate::resources::sim_constants::SensoryConstants,
+) -> f32 {
+    const RABBIT_MAX: f32 = 12.0;
+    let base_range = sensory
+        .profile_for(SensorySpecies::Prey(kind))
+        .tremor
+        .base_range;
+    (base_range / RABBIT_MAX).clamp(0.0, 1.0)
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1204,6 +1283,70 @@ mod tests {
         };
         let result = detect(observer, target, EnvCtx::identity());
         assert_eq!(result.tremor, 0.0);
+    }
+
+    #[test]
+    fn prey_cat_proximity_sees_running_cat_via_tremor_beyond_sight() {
+        // Ticket 100 — load-bearing assertion. Rabbit's sight is 6
+        // tiles (alert_radius from sim_constants), tremor channel
+        // reaches 12. A *running* cat at dist=11 (beyond sight,
+        // inside tremor) still produces a positive proximity reading.
+        // Pre-100 the same call returned 0.0 (sight-only).
+        let profile = rabbit_profile();
+        let prey_pos = Position::new(0, 0);
+        let cat_pos = Position::new(11, 0); // beyond sight (Cliff at 6+alert_window), inside tremor (12)
+        let alert_radius = 6; // rabbit's natural sight-based alert_radius
+        let running_mul = 1.8;
+        let p = prey_cat_proximity(
+            prey_pos,
+            PreyKind::Rabbit,
+            &profile,
+            cat_pos,
+            alert_radius,
+            running_mul,
+        );
+        assert!(
+            p > 0.0,
+            "running cat at tremor range (beyond sight) should yield positive proximity (got {p})"
+        );
+    }
+
+    #[test]
+    fn prey_cat_proximity_misses_motionless_cat_at_tremor_range() {
+        // Ticket 100 — flip side. Same geometry, `mul = 0.0` → tremor
+        // signature is zero → confidence is zero → max(0, 0) = 0.
+        // This is the structural bound: the stalking mechanic gains
+        // teeth because the multiplier collapses the emission.
+        let profile = rabbit_profile();
+        let prey_pos = Position::new(0, 0);
+        let cat_pos = Position::new(11, 0);
+        let alert_radius = 6;
+        let stalk_mul = 0.0;
+        let p = prey_cat_proximity(
+            prey_pos,
+            PreyKind::Rabbit,
+            &profile,
+            cat_pos,
+            alert_radius,
+            stalk_mul,
+        );
+        assert_eq!(
+            p, 0.0,
+            "motionless cat beyond sight should yield zero proximity"
+        );
+    }
+
+    #[test]
+    fn prey_tremor_sensitivity_normalizes_against_rabbit() {
+        use crate::resources::sim_constants::SensoryConstants;
+        let sensory = SensoryConstants::default();
+        let rabbit = prey_tremor_sensitivity(PreyKind::Rabbit, &sensory);
+        let bird = prey_tremor_sensitivity(PreyKind::Bird, &sensory);
+        let mouse = prey_tremor_sensitivity(PreyKind::Mouse, &sensory);
+        assert!((rabbit - 1.0).abs() < f32::EPSILON, "rabbit pinned to 1.0");
+        assert!(rabbit > mouse, "rabbit > mouse");
+        assert!(mouse > bird, "mouse > bird");
+        assert!((0.0..=1.0).contains(&bird));
     }
 
     #[test]
@@ -1475,8 +1618,19 @@ mod tests {
                         } else {
                             1.0 - (dist as f32 / (alert_radius as f32 + 1.0))
                         };
-                        let new_proximity =
-                            prey_cat_proximity(prey_pos, *kind, profile, cat_pos, alert_radius);
+                        // 100: pass `0.0` for cat_action_tremor_mul so
+                        // the tremor channel contributes nothing — this
+                        // test is the *sight-channel* migration
+                        // equivalence proof; the tremor branch lands
+                        // with its own coverage below.
+                        let new_proximity = prey_cat_proximity(
+                            prey_pos,
+                            *kind,
+                            profile,
+                            cat_pos,
+                            alert_radius,
+                            0.0,
+                        );
                         let diff = (old_proximity - new_proximity).abs();
                         assert!(
                             diff < 1e-6,

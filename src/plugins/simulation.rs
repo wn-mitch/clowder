@@ -147,7 +147,8 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
         CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, ColonyDistrictMap,
         ConstructionSiteMap, CoverAvailabilityMap, ExplorationMap, FoodLocationMap,
         FoxApproachCorridorMap, FoxScentMap, GardenLocationMap, GraveAuraMap, HerbLocationMap,
-        KittenCryMap, PreyScentMaps, RecentAmbushMap, TileMap, WardCoverageMap, WardIntentMap,
+        KittenCryMap, PreyScentMaps, RecentAmbushMap, TileMap, TremorMap, WardCoverageMap,
+        WardIntentMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -170,6 +171,12 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
         });
     }
     registry.register::<CarcassScentMap>();
+    // 100: aggregate substrate-vibration field. Faction::Neutral —
+    // prey cannot discriminate cat vibration from fox vibration; the
+    // map encodes "is anyone moving nearby?" not "who?". Written by
+    // `tremor_tick`; read by `try_detect_cat` and the EngagePrey
+    // approach phase's ambient opportunity-quality reads.
+    registry.register::<TremorMap>();
     // Ticket 423: cover-availability map. Tile-resolution boolean
     // (within sprint_radius of any `Terrain::is_low_cover()` tile).
     // Consumer: `update_hide_eligible_markers`; trace emitter walks
@@ -1254,7 +1261,19 @@ impl Plugin for SimulationPlugin {
                     systems::prey::prey_population,
                     systems::prey::prey_hunger,
                     systems::prey::prey_ai,
-                    systems::prey::prey_scent_tick,
+                    // Substrate-vibration + scent influence-map writers.
+                    // Sub-chain to stay under Bevy's 20-tuple limit on
+                    // the outer chain. 100: `tremor_tick` runs after
+                    // `prey_ai` (which reads it) so the read sees
+                    // last-tick deposits — preserves the cause-and-
+                    // effect ordering "the cat moved, prey alerts next
+                    // tick" rather than "prey alerts during the same
+                    // tick the cat first stepped."
+                    (
+                        systems::prey::prey_scent_tick,
+                        systems::sensing::tremor_tick,
+                    )
+                        .chain(),
                     systems::prey::prey_den_lifecycle,
                     systems::wildlife::detect_threats,
                     // Building-side sub-chain: passive effects, decay,

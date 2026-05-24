@@ -313,7 +313,13 @@ impl DispositionKind {
         match action {
             Action::Eat => Some(Self::Eating),
             Action::Sleep => Some(Self::Resting),
-            Action::Hunt => Some(Self::Hunting),
+            // 100: Stalk and Pounce are EngagePrey-resolver phase
+            // sub-actions of Hunt — set by `resolve_engage_prey` when
+            // StepPhase transitions to Stalking/Pouncing, never
+            // L3-selected. They share the Hunting disposition so the
+            // disposition-side commitment & momentum bookkeeping stays
+            // consistent across the phase change.
+            Action::Hunt | Action::Stalk | Action::Pounce => Some(Self::Hunting),
             Action::Forage => Some(Self::Foraging),
             Action::Patrol | Action::Fight => Some(Self::Guarding),
             // 154: Mentor splits out of Socializing — see DispositionKind
@@ -426,6 +432,12 @@ impl DispositionKind {
         match self {
             Self::Resting => &[Action::Sleep, Action::GroomSelf],
             Self::Eating => &[Action::Eat],
+            // 100: `constituent_actions` lists L3-selectable Actions
+            // only. Stalk/Pounce are EngagePrey-resolver phase tokens
+            // set mid-step by `resolve_engage_prey`, never independently
+            // L3-selected; they don't appear here. `from_action` still
+            // maps Stalk/Pounce → `Hunting` so mid-step commitment +
+            // momentum bookkeeping resolves correctly.
             Self::Hunting => &[Action::Hunt],
             Self::Foraging => &[Action::Forage],
             Self::Guarding => &[Action::Patrol, Action::Fight],

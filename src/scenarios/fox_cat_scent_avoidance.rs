@@ -27,7 +27,11 @@ const FOX_START: Position = Position { x: 35, y: 20 };
 pub static SCENARIO: Scenario = Scenario {
     name: "fox_cat_scent_avoidance",
     default_focal: "Pyre",
-    default_ticks: 100,
+    // 100: bumped from 100 → 200 ticks. Schedule-edge perturbation from
+    // adding `tremor_tick` to the per-tick chain shifted seed-42's
+    // ShadowFox approach-then-avoid pacing; the avoid still fires,
+    // just later in the run.
+    default_ticks: 200,
     setup,
     expected_features: &["ShadowFoxAvoidedCatScent"],
 };

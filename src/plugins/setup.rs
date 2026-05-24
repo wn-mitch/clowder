@@ -498,6 +498,12 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // semantics for current consumers.
     world.insert_resource(crate::resources::PreyScentMaps::default_maps());
 
+    // Insert tremor influence-map (ticket 100). Same 120×90 / bucket=3
+    // shape as PreyScentMap; fast-decay (≈ 1-3 ticks for a full bucket
+    // per `TremorConstants::decay_per_tick`) so the map reflects
+    // current-tick motion, not residue.
+    world.insert_resource(crate::resources::TremorMap::default_map());
+
     // Insert carcass scent map resource (ticket 048 — Phase 2C
     // §5.6.3 row #6).
     world.insert_resource(crate::resources::CarcassScentMap::default());

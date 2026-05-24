@@ -74,6 +74,10 @@ fn assert_pick_pool_covers_action(a: Action) {
         Action::Eat
         | Action::Sleep
         | Action::Hunt
+        // 100: Stalk / Pounce are EngagePrey-resolver phase tokens.
+        // No dedicated template — Hunt narrative covers them.
+        | Action::Stalk
+        | Action::Pounce
         | Action::Forage
         | Action::Wander
         | Action::Idle
@@ -155,7 +159,8 @@ fn main() {
         let ron_file = match action {
             Action::Eat => "eat.ron",
             Action::Sleep => "sleep.ron",
-            Action::Hunt => "hunt.ron",
+            // 100: Stalk / Pounce share Hunt's narrative template.
+            Action::Hunt | Action::Stalk | Action::Pounce => "hunt.ron",
             Action::Forage => "forage.ron",
             Action::Wander => "wander.ron",
             Action::Idle => "idle.ron",

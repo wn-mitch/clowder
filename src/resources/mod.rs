@@ -43,6 +43,7 @@ pub mod thornbriar_pressure;
 pub mod time;
 pub mod time_units;
 pub mod trace_log;
+pub mod tremor_map;
 pub mod unmet_demand;
 pub mod ward_coverage_map;
 pub mod ward_intent_map;
@@ -106,6 +107,7 @@ pub use trace_log::{
     CapturedDse, FocalScoreCapture, FocalScoreCaptureInner, FocalTraceTarget, TraceEntry, TraceLog,
     TraceRecord,
 };
+pub use tremor_map::{action_tremor_mul, TremorMap};
 pub use unmet_demand::UnmetDemand;
 pub use ward_coverage_map::WardCoverageMap;
 pub use ward_intent_map::WardIntentMap;

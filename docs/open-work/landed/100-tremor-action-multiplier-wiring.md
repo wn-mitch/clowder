@@ -1,7 +1,7 @@
 ---
 id: 100
 title: Tremor map, Action::Stalk, and personality-driven hunt approach
-status: ready
+status: done
 cluster: wildlife
 orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics, environmental-simulation]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [sensory.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-24
 ---
 
 ## Why
@@ -274,3 +274,4 @@ tradition logic — purely from the axis weights and the ecology.
   weights, not explicit stalk-or-charge branches. Blocked on 062 for
   the per-species scent opportunity-quality read (item 11).
 - 2026-05-19: accuracy audit pass — ready status correct; TremorMap symbol exists in src/resources/; scope items detailed and comprehensive.
+- 2026-05-24: soak verdict=concern (hard gates pass); see docs/balance/100-tremor-action-multiplier.md

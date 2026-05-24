@@ -564,6 +564,30 @@ pub fn generate_narrative(
                 (options[idx].clone(), NarrativeTier::Micro)
             }
 
+            // 100: EngagePrey-resolver phase actions. Stalk is the
+            // patient close — Micro-tier ambient texture so it doesn't
+            // overwhelm the actual kill narrative. Pounce is the strike
+            // — Action-tier because the moment is the dramatic beat.
+            Action::Stalk => {
+                let options = [
+                    format!("{cat} flattens to the grass and creeps closer."),
+                    format!("{cat} moves silent through the undergrowth."),
+                    format!("{cat} freezes mid-step, watching."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Micro)
+            }
+
+            Action::Pounce => {
+                let options = [
+                    format!("{cat} springs from cover."),
+                    format!("{cat} explodes from the stalk into a leap."),
+                    format!("{cat} strikes."),
+                ];
+                let idx = rng.rng.random_range(0..options.len());
+                (options[idx].clone(), NarrativeTier::Action)
+            }
+
             // 450: kitten begs for food. Quiet animal vocalization —
             // the dramatic act is the parent's response, not the cry
             // itself; keep the line Micro-tier.

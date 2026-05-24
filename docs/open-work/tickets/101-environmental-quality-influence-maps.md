@@ -7,7 +7,7 @@ orchestration: substrate-sensitive
 initiative: [environmental-simulation]
 added: 2026-05-01
 parked: null
-blocked-by: [100]
+blocked-by: []
 supersedes: []
 related-systems: [environmental-quality.md]
 related-balance: []

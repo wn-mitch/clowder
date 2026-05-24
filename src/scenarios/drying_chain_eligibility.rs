@@ -604,15 +604,18 @@ mod tests {
     /// If it doesn't fire, the bug is structural and we drill into
     /// `goap.rs:8266`'s upstream.
     /// Seed selected via `diagnostic_probe_seeds_for_dryfood_election`
-    /// — DryFood deterministically wins the softmax draw at tick 0 here
-    /// (per the diagnostic, seeds 1/4/5/7/8/10–14/16–19/21/22/25/26/31/
-    /// 33/36/38–41/43/45/47–49 all elect DryFood at tick 0; seed 42
-    /// happens to land on Forage's ~27% bucket). Seed-1 anchors the
-    /// resolver-completion assertion; the underlying L3 pool is
-    /// well-defined across seeds (see diagnostic — DryFood scores
-    /// highest in L2 in all 49 probes), the seed merely picks which
-    /// softmax bucket the stochastic draw lands in.
-    const RESOLVER_FIXTURE_SEED: u64 = 1;
+    /// — DryFood deterministically wins the softmax draw at tick 0 here.
+    /// Pre-100 used seed 1; ticket 100 added `tremor_tick` to the
+    /// per-tick chain and inserted Stalk/Pounce into the Action enum,
+    /// which perturbed the seed-1 softmax-RNG state (precedent:
+    /// `learning_bevy_schedule_edge_perturbation`) and pushed the
+    /// far-rack 90-tick window onto a Forage/Wander track. Re-probed
+    /// for the post-100 schedule: seeds 21/22/25/26/31/38–41/43/47–49
+    /// elect DryFood at tick 0 AND complete the far-rack load within
+    /// budget. Seed 21 is the first in that intersection; the L3 pool
+    /// is well-defined across all probes (DryFood scores highest in
+    /// L2), the seed merely picks which softmax bucket lands.
+    const RESOLVER_FIXTURE_SEED: u64 = 21;
 
     #[test]
     fn resolver_completes_load_step_on_adjacent_rack() {

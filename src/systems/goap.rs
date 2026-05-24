@@ -73,6 +73,12 @@ pub struct PreyHuntParams<'w, 's> {
     /// `resolve_disposition_chains` is at Bevy's 16-param ceiling —
     /// bundling here avoids a SystemParam refactor at the use sites.
     pub fox_scent_map: Res<'w, crate::resources::FoxScentMap>,
+    /// Ticket 100 — aggregate substrate-vibration field. Read by
+    /// `resolve_engage_prey` to (a) modulate `effective_stalk_distance`
+    /// with the prey's ambient tremor reading and (b) drive the
+    /// patient-cat opportunity-quality assessment before committing to
+    /// the approach.
+    pub tremor_map: Res<'w, crate::resources::TremorMap>,
 }
 
 #[derive(bevy_ecs::system::SystemParam)]
@@ -5723,6 +5729,12 @@ fn dispatch_step_action(
                 &ec.action_affordances,
                 // 375: per-species guaranteed byproduct table.
                 &ec.constants.prey_byproducts,
+                // 100: ambient opportunity-quality reads + Stalk/Pounce
+                // stamping. The cat's `CurrentAction` is mutated on
+                // phase entry so `tremor_tick` (next tick) reads the
+                // correct emission multiplier.
+                &ec.constants.sensory,
+                current,
             )
         }
 
@@ -8696,6 +8708,8 @@ fn resolve_search_prey(
             dse_registry,
             _cat_entity,
             *pos,
+            // 100: cat boldness powers the prey_alertness_tolerance axis.
+            personality.boldness,
             &visible,
             relations,
             stance_overlays,
@@ -8899,6 +8913,13 @@ fn resolve_engage_prey(
     // of `crafting.organ_drop_chance` (367's probabilistic mammal+bird
     // organ roll, which continues to fire on top).
     prey_byproducts: &crate::resources::sim_constants::PreyByproductConstants,
+    // 100 — per-species tremor `base_range` lookup for the
+    // `effective_stalk_distance` species_push term.
+    sensory: &crate::resources::sim_constants::SensoryConstants,
+    // 100 — cat's CurrentAction. The resolver stamps `Action::Stalk`
+    // on stalk-phase entry and `Action::Pounce` on pounce-phase entry
+    // so `tremor_tick` reads the right multiplier next tick.
+    current_action: &mut CurrentAction,
 ) -> crate::steps::StepResult {
     use crate::components::magic::ItemSlot;
     use crate::components::prey::PreyAiState;
@@ -8998,8 +9019,33 @@ fn resolve_engage_prey(
         return crate::steps::StepResult::Fail("prey teleported".into());
     }
 
-    let stalk_start_base =
-        (prey_cfg.alert_radius + d.stalk_start_buffer).max(d.stalk_start_minimum);
+    // 100 — per-cat effective stalk distance. Replaces the constant
+    // `(alert_radius + stalk_start_buffer).max(stalk_start_minimum)`
+    // with a continuous personality-modulated computation. The legacy
+    // base (`stalk_start_minimum + stalk_start_buffer`) is recovered
+    // when patience=1, alertness=0, species_sens=0 and ambient reads
+    // are zero. Bold cats (patience≈0) collapse to a near-minimum stalk
+    // distance; patient cats expand it. Ambient reads only contribute
+    // at non-trivial patience (the `× patience` scaling), so bold cats
+    // skip the read by construction.
+    let species_sens = crate::systems::sensing::prey_tremor_sensitivity(prey_kind, sensory);
+    let tremor_at_prey = prey_params.tremor_map.get(prey_pos.x, prey_pos.y);
+    let scent_settle = prey_params
+        .prey_scent_maps
+        .for_kind(prey_kind)
+        .get(prey_pos.x, prey_pos.y);
+    let raw_stalk_distance = (d.stalk_start_minimum as f32)
+        + (d.stalk_start_buffer as f32) * personality.patience
+        + d.alertness_push * prey_state.alertness
+        + d.species_push * species_sens
+        + personality.patience * d.tremor_push * tremor_at_prey
+        - personality.patience * d.scent_settle_push * scent_settle;
+    // Clamp to `[min, min + 2 × buffer]` so a clean settled-prey read
+    // can't collapse the stalk distance below the personality-neutral
+    // base, and a perfect-storm reading can't more-than-double it.
+    let stalk_low = d.stalk_start_minimum as f32;
+    let stalk_high = stalk_low + 2.0 * (d.stalk_start_buffer as f32);
+    let stalk_start_base = raw_stalk_distance.clamp(stalk_low, stalk_high).round() as i32;
     // 263: affordance-biased stalk-start. Bias is dormant by default;
     // at non-zero `hunt_stalk_chase_affordance_bias`, high stalk
     // affordance widens the stalk band (cat begins stalking from
@@ -9037,6 +9083,11 @@ fn resolve_engage_prey(
 
     if dist <= pounce_range {
         // === POUNCE ===
+        // 100: stamp Action::Pounce so this tick's `tremor_tick`
+        // deposit uses the peak (≈2.0×) multiplier. The pounce range
+        // is by construction inside the terminal grab window, so the
+        // tremor spike is "too late" feedback — that's the design.
+        current_action.action = Action::Pounce;
         let awareness_base = match prey_awareness {
             PreyAiState::Idle | PreyAiState::Grazing { .. } => d.pounce_awareness_idle,
             PreyAiState::Alert { .. } => d.pounce_awareness_alert,
@@ -9372,6 +9423,12 @@ fn resolve_engage_prey(
             }
         } else {
             // === STALK ===
+            // 100: stamp Action::Stalk so this tick's `tremor_tick`
+            // deposit uses the stalk (≈0.2×) multiplier. The load-
+            // bearing bit: a stalking cat barely registers on the
+            // tremor map, so prey can't alert on the cat's motion
+            // alone — only sight at close range remains.
+            current_action.action = Action::Stalk;
             let mut moved = false;
             if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
                 *pos = next;

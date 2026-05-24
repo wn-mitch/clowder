@@ -39,6 +39,21 @@ pub enum Action {
     Eat,
     Sleep,
     Hunt,
+    /// 100: predation approach action — the cat moves slowly toward
+    /// detected prey while suppressing its own tremor signature. Set by
+    /// `resolve_engage_prey` when `StepPhase::Stalking` is entered;
+    /// before that the same plan step runs under `Action::Hunt`. The
+    /// difference is load-bearing for `tremor_tick` (`action_tremor_mul`
+    /// returns ≈0.2 for Stalk vs 1.0 for Hunt-as-walk), which is what
+    /// makes the rabbit's tremor-mediated alertness ecologically live.
+    Stalk,
+    /// 100: predation strike action — explosive spring from stalk
+    /// distance onto the prey tile. Set by `resolve_engage_prey` when
+    /// `StepPhase::Pouncing` is entered. `action_tremor_mul` returns
+    /// ≈2.0 (peak deposit) — the prey gets a tremor spike, but by then
+    /// it's too late: pounce range is by construction inside the
+    /// terminal grab window.
+    Pounce,
     Forage,
     Wander,
     Idle,

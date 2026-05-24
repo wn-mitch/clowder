@@ -61,6 +61,11 @@ fn assert_all_actions_covers_action(a: Action) {
         Action::Eat
         | Action::Sleep
         | Action::Hunt
+        // 100: Stalk / Pounce are EngagePrey-resolver phase tokens
+        // sharing the Hunt narrative template path — no dedicated
+        // template authored.
+        | Action::Stalk
+        | Action::Pounce
         | Action::Forage
         | Action::Wander
         | Action::Idle

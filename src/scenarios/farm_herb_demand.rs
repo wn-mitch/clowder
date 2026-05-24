@@ -73,7 +73,13 @@ use super::Scenario;
 pub static SCENARIO: Scenario = Scenario {
     name: "farm_herb_demand",
     default_focal: "Bracken",
-    default_ticks: 80,
+    // 100: bumped from 80 → 300 ticks. The post-100 schedule (tremor_tick
+    // joins the per-tick chain) perturbed seed-42 softmax draws enough
+    // that the original 80-tick budget no longer reaches CropHarvested
+    // (CropTended fires reliably at 160; harvest needs more headroom).
+    // The mechanism still works on every seed probed; the fixture just
+    // needs more headroom.
+    default_ticks: 300,
     setup,
     expected_features: &["CropTended", "CropHarvested"],
 };

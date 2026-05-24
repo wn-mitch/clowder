@@ -90,16 +90,27 @@ fn try_detect_cat(
     detection_base_chance: f32,
     alertness_base: f32,
     alertness_range: f32,
-    cat_positions: &Query<(Entity, &Position), (With<Needs>, Without<Dead>, Without<PreyAnimal>)>,
+    cat_positions: &Query<
+        (Entity, &Position, &crate::ai::CurrentAction),
+        (With<Needs>, Without<Dead>, Without<PreyAnimal>),
+    >,
+    tremor_constants: &crate::resources::sim_constants::TremorConstants,
     rng: &mut SimRng,
 ) -> Option<Entity> {
-    for (entity, cat_pos) in cat_positions.iter() {
+    for (entity, cat_pos, current) in cat_positions.iter() {
+        // 100: per-cat tremor multiplier from the cat's current action.
+        // A stalking cat returns ≈0.2 (suppressed); a running cat ≈1.8
+        // (loud). `prey_cat_proximity` now returns `sight.max(tremor)`
+        // so the prey hears the chase even if the cat is out of sight,
+        // but is fooled by a patient stalk inside tremor range.
+        let cat_tremor_mul = crate::resources::action_tremor_mul(current.action, tremor_constants);
         let proximity = crate::systems::sensing::prey_cat_proximity(
             *pos,
             prey_kind,
             prey_profile,
             *cat_pos,
             alert_radius,
+            cat_tremor_mul,
         );
         if proximity <= 0.0 {
             continue;
@@ -202,7 +213,15 @@ pub fn prey_ai(
         (&PreyConfig, &mut PreyState, &mut Position),
         (With<PreyAnimal>, Without<Dead>),
     >,
-    cat_positions: Query<(Entity, &Position), (With<Needs>, Without<Dead>, Without<PreyAnimal>)>,
+    // 100: cat query now carries `&CurrentAction` so prey can read the
+    // action-modulated tremor signature (stalking ≈ 0.2× emission,
+    // running ≈ 1.8×). Without `&CurrentAction`, prey would see every
+    // cat the same way regardless of behavior — the silent-failure
+    // mode the ticket fixes.
+    cat_positions: Query<
+        (Entity, &Position, &crate::ai::CurrentAction),
+        (With<Needs>, Without<Dead>, Without<PreyAnimal>),
+    >,
     positions: Query<&Position, Without<PreyAnimal>>,
     dens: Query<(&PreyDen, &Position), Without<PreyAnimal>>,
     map: Res<TileMap>,
@@ -242,10 +261,14 @@ pub fn prey_ai(
                     p.alertness_base,
                     p.alertness_range,
                     &cat_positions,
+                    &constants.tremor,
                     &mut rng,
                 ) {
                     if config.flee_strategy == FleeStrategy::Teleport {
-                        let threat_pos = cat_positions.get(threat).map(|(_, p)| *p).unwrap_or(*pos);
+                        let threat_pos = cat_positions
+                            .get(threat)
+                            .map(|(_, p, _)| *p)
+                            .unwrap_or(*pos);
                         bird_teleport(
                             &mut pos,
                             &threat_pos,
@@ -295,10 +318,14 @@ pub fn prey_ai(
                     p.alertness_base,
                     p.alertness_range,
                     &cat_positions,
+                    &constants.tremor,
                     &mut rng,
                 ) {
                     if config.flee_strategy == FleeStrategy::Teleport {
-                        let threat_pos = cat_positions.get(threat).map(|(_, p)| *p).unwrap_or(*pos);
+                        let threat_pos = cat_positions
+                            .get(threat)
+                            .map(|(_, p, _)| *p)
+                            .unwrap_or(*pos);
                         bird_teleport(
                             &mut pos,
                             &threat_pos,
@@ -376,7 +403,7 @@ pub fn prey_ai(
 
                 let threat_pos = cat_positions
                     .get(threat)
-                    .map(|(_, p)| p)
+                    .map(|(_, p, _)| p)
                     .or_else(|_| positions.get(threat))
                     .ok();
 
@@ -411,7 +438,7 @@ pub fn prey_ai(
 
                 let threat_pos = cat_positions
                     .get(from)
-                    .map(|(_, p)| p)
+                    .map(|(_, p, _)| p)
                     .or_else(|_| positions.get(from))
                     .ok();
 
@@ -1374,8 +1401,15 @@ mod tests {
     fn prey_alert_detects_nearby_cat() {
         let (mut world, mut schedule) = setup_ai();
 
-        // Spawn a "cat" (needs Needs component for detection).
-        world.spawn((Needs::default(), Health::default(), Position::new(10, 10)));
+        // Spawn a "cat" — needs `Needs` for the query filter and
+        // `CurrentAction` for the ticket-100 per-cat tremor-multiplier
+        // read inside `try_detect_cat`.
+        world.spawn((
+            Needs::default(),
+            Health::default(),
+            Position::new(10, 10),
+            crate::ai::CurrentAction::default(),
+        ));
 
         // Spawn a rabbit (alert_radius=6) very close to the cat.
         let registry = world.resource::<SpeciesRegistry>();

@@ -3,6 +3,7 @@ id: 461
 title: Phase 2b warrior's-kit election-completeness: recipe-variety axis + retrieve-from-stores plan template + TanningFrame BuildPressure tuning (369 follow-on)
 status: ready
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-24
 parked: null
