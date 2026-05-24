@@ -1,7 +1,7 @@
 ---
 id: 461
 title: Phase 2b warrior's-kit TanningFrame BuildPressure threshold tuning (369 follow-on; election-completeness moves to 462/463)
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 213a10ec
+landed-on: 2026-05-24
 ---
 
 ## Why

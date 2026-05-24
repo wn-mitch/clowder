@@ -1,13 +1,13 @@
 ---
 id: 462
 title: HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs)
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-24
 parked: null
-blocked-by: [461]
+blocked-by: []
 supersedes: []
 related-systems: [crafting.md, ai-substrate-refactor.md]
 related-balance: []
