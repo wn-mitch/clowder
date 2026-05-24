@@ -4184,6 +4184,23 @@ fn default_preservation_pressure_multiplier() -> f32 {
     1.0
 }
 
+/// 369 — minimum count of `ItemKind::Hide` items in Stores before
+/// the Tanning Frame BuildPressure channel begins accumulating.
+/// Mirrors `build_pressure_preservation_min_raw_food`. Default 5 —
+/// roughly one prey kill's worth of hide; tune up if Tanning Frames
+/// are over-elected at the expense of foundational infrastructure.
+fn default_build_pressure_tanning_min_hides() -> usize {
+    5
+}
+
+/// 369 — multiplier on tanning pressure accumulation rate. Default
+/// 1.0 matches the preservation channel's default; iteration can
+/// lift if first-light shows tanning frames lagging behind hide
+/// accumulation.
+fn default_tanning_pressure_multiplier() -> f32 {
+    1.0
+}
+
 fn default_cook_directive_priority() -> f32 {
     0.4
 }
@@ -6031,6 +6048,16 @@ pub struct CoordinationConstants {
     /// rate. Mirrors `cooking_pressure_multiplier`.
     #[serde(default = "default_preservation_pressure_multiplier")]
     pub preservation_pressure_multiplier: f32,
+    /// 369 — minimum hide items in Stores before tanning-pressure
+    /// (TanningFrame BuildPressure channel) starts accumulating.
+    /// Mirrors `build_pressure_preservation_min_raw_food`. See
+    /// `default_build_pressure_tanning_min_hides`.
+    #[serde(default = "default_build_pressure_tanning_min_hides")]
+    pub build_pressure_tanning_min_hides: usize,
+    /// 369 — multiplier on tanning-pressure accumulation rate.
+    /// Mirrors `preservation_pressure_multiplier`.
+    #[serde(default = "default_tanning_pressure_multiplier")]
+    pub tanning_pressure_multiplier: f32,
     /// Priority of a Cook directive when a Kitchen is functional and raw food
     /// is available. Kept below Hunt/Fight (~0.7+) so cooking doesn't crowd
     /// out survival directives.
@@ -6390,6 +6417,8 @@ impl Default for CoordinationConstants {
             build_pressure_preservation_min_raw_food:
                 default_build_pressure_preservation_min_raw_food(),
             preservation_pressure_multiplier: default_preservation_pressure_multiplier(),
+            build_pressure_tanning_min_hides: default_build_pressure_tanning_min_hides(),
+            tanning_pressure_multiplier: default_tanning_pressure_multiplier(),
             cook_directive_priority: default_cook_directive_priority(),
             unmet_demand_amplifier: default_unmet_demand_amplifier(),
             wildlife_breach_range: 10,
@@ -6811,6 +6840,34 @@ pub struct CraftingConstants {
     /// presents it as expressive prop, no major shaping.
     pub craft_courtship_gift_ticks: u64,
 
+    // ----- 369 Phase 2b — warrior's-kit recipe durations -----
+    //
+    // 8 new recipes. Tick budgets calibrated to roughly mirror the
+    // 368 Phase 2 family — simpler items (stiletto, club) take ~half
+    // a sim-day, complex items (spear, plated wrap) take a full day.
+    // First-light values; tune via sweep once production stabilises.
+    /// Bone + Twig + Sinew → BoneTipSpear. Full sim-day — shaft
+    /// preparation + bone-tip lashing.
+    pub craft_bone_tip_spear_ticks: u64,
+    /// Bone → BoneStiletto. Quick — single-piece bone-shaping.
+    pub craft_bone_stiletto_ticks: u64,
+    /// Stone → FlintBlade. Open-ground knapping — slightly faster
+    /// than workshop-bound shaping.
+    pub craft_flint_blade_ticks: u64,
+    /// Hide + Sinew → HideBracers. Tanning-frame work — a stretched
+    /// hide cures while the cat trims and ties.
+    pub craft_hide_bracers_ticks: u64,
+    /// Hide + Sinew → HidePlatedWrap. Heavier coverage; longest
+    /// Phase 2b craft.
+    pub craft_hide_plated_wrap_ticks: u64,
+    /// Fiber + Hide → Sling. Cradle weaving — half a sim-day.
+    pub craft_sling_ticks: u64,
+    /// Fiber → WovenReedCloak. Full sim-day; reed-mat weaving.
+    pub craft_woven_reed_cloak_ticks: u64,
+    /// Twig + Whisker → ToothNotchedClub. Quick — shaft + notch
+    /// shaping.
+    pub craft_tooth_notched_club_ticks: u64,
+
     // ----- 368 Phase 2 — behavioral-tool resolver multipliers -----
     //
     // The three new ItemKinds (GroomingBrush / PlayBundle /
@@ -6868,6 +6925,15 @@ impl Default for CraftingConstants {
             craft_grooming_brush_ticks: 5_000,
             craft_play_bundle_ticks: 2_500,
             craft_courtship_gift_ticks: 1_000,
+            // 369 Phase 2b — warrior's-kit durations.
+            craft_bone_tip_spear_ticks: 5_000,
+            craft_bone_stiletto_ticks: 1_500,
+            craft_flint_blade_ticks: 2_000,
+            craft_hide_bracers_ticks: 4_000,
+            craft_hide_plated_wrap_ticks: 7_500,
+            craft_sling_ticks: 2_500,
+            craft_woven_reed_cloak_ticks: 5_000,
+            craft_tooth_notched_club_ticks: 1_500,
             // 368 Phase 2 — behavioral-tool resolver multipliers
             // (first-light values; tune via sweep when the
             // Workshop-craft pipeline lands and the tools circulate

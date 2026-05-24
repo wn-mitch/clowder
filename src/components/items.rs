@@ -117,6 +117,24 @@ pub enum ItemKind {
     GroomingBrush,
     PlayBundle,
     CourtshipGift,
+
+    // --- Phase 2b warrior's kit (ticket 369 — 016 Phase 2b). ---
+    // Material-property substrate read by hunt-strike / combat /
+    // ranged-attack / movement-detection / noise resolvers. Each
+    // variant maps via `equip_material()` / `weapon_class()` /
+    // `armor_class()` / `noise_class()` / `durability_tier()` (all
+    // exhaustive `match` on ItemKind). Durable (0.0 decay) — the
+    // mechanical degradation channel for these is the Fragile
+    // snap-on-failed-strike branch, not the per-tick decay clock.
+    // Subsumes ticket 334 (stealth cloak == Woven Reed Cloak).
+    BoneTipSpear,
+    BoneStiletto,
+    FlintBlade,
+    HideBracers,
+    HidePlatedWrap,
+    Sling,
+    WovenReedCloak,
+    ToothNotchedClub,
 }
 
 impl ItemKind {
@@ -193,6 +211,20 @@ impl ItemKind {
             | Self::GroomingBrush
             | Self::PlayBundle
             | Self::CourtshipGift => 0.0,
+
+            // 369: Phase 2b warrior's-kit items are durable crafted
+            // objects. Their organic content (bone, sinew, hide,
+            // fiber) is structurally bound; degradation routes
+            // through the Fragile snap-on-failed-strike branch in
+            // the hunt-strike resolver, not per-tick decay.
+            Self::BoneTipSpear
+            | Self::BoneStiletto
+            | Self::FlintBlade
+            | Self::HideBracers
+            | Self::HidePlatedWrap
+            | Self::Sling
+            | Self::WovenReedCloak
+            | Self::ToothNotchedClub => 0.0,
         }
     }
 
@@ -353,6 +385,15 @@ impl ItemKind {
             Self::GroomingBrush => "grooming brush",
             Self::PlayBundle => "play bundle",
             Self::CourtshipGift => "courtship gift",
+            // 369 Phase 2b warrior's kit.
+            Self::BoneTipSpear => "bone-tip spear",
+            Self::BoneStiletto => "bone stiletto",
+            Self::FlintBlade => "flint blade",
+            Self::HideBracers => "hide bracers",
+            Self::HidePlatedWrap => "hide-plated wrap",
+            Self::Sling => "sling",
+            Self::WovenReedCloak => "woven reed cloak",
+            Self::ToothNotchedClub => "tooth-notched club",
         }
     }
 
@@ -445,6 +486,21 @@ impl ItemKind {
             // the 016 category list; Phase 3 (Wearable) and Phase 4
             // (Decoration) extend the same axis.
             Self::GroomingBrush | Self::PlayBundle | Self::CourtshipGift => ItemCategory::Tool,
+
+            // 369 — Phase 2b warrior's kit. Distinct category from
+            // Tool because the resolver-read shape is different:
+            // weapons/armor compose via `weapon_class()` /
+            // `armor_class()` / `noise_class()` in hunt-strike /
+            // combat / detection resolvers, not via the fondness-
+            // multiplier hook that the behavioral tools use.
+            Self::BoneTipSpear
+            | Self::BoneStiletto
+            | Self::FlintBlade
+            | Self::HideBracers
+            | Self::HidePlatedWrap
+            | Self::Sling
+            | Self::WovenReedCloak
+            | Self::ToothNotchedClub => ItemCategory::CombatGear,
         }
     }
 
@@ -515,6 +571,12 @@ pub enum ItemCategory {
     /// Gift. Their effect lives on the corresponding action
     /// resolver, not on a modifier field on the item type.
     Tool,
+    /// Phase 2b warrior's kit (ticket 369): weapons + armor +
+    /// stealth garments whose material properties are read by
+    /// hunt-strike / combat / detection / noise resolvers. Distinct
+    /// from `Tool` (which composes via action-magnitude multipliers
+    /// rather than property-keyed resolver reads).
+    CombatGear,
 }
 
 impl ItemCategory {
@@ -530,6 +592,7 @@ impl ItemCategory {
             Self::Curiosity => "Curiosities",
             Self::Remedy => "Remedies",
             Self::Tool => "Tools",
+            Self::CombatGear => "Combat gear",
         }
     }
 
@@ -550,6 +613,9 @@ impl ItemCategory {
             // class, lowest planning priority of the displayable
             // categories.
             Self::Tool => 7,
+            // 369: Combat gear sorts last — equipped state is
+            // long-lived and players rarely scan it for action.
+            Self::CombatGear => 8,
         }
     }
 }
@@ -745,8 +811,8 @@ mod tests {
 
     #[test]
     fn every_item_kind_has_a_category() {
-        // Exhaustive over the 43 variants — extend this list when ItemKind grows.
-        let all: [ItemKind; 43] = [
+        // Exhaustive over the 59 variants — extend this list when ItemKind grows.
+        let all: [ItemKind; 59] = [
             ItemKind::RawMouse,
             ItemKind::RawRat,
             ItemKind::RawRabbit,
@@ -790,6 +856,24 @@ mod tests {
             ItemKind::Hide,
             ItemKind::FishScale,
             ItemKind::Tallow,
+            // 368 Phase 2 inputs + behavioral tools.
+            ItemKind::Twig,
+            ItemKind::Bristle,
+            ItemKind::Fiber,
+            ItemKind::Flower,
+            ItemKind::PolishedStone,
+            ItemKind::GroomingBrush,
+            ItemKind::PlayBundle,
+            ItemKind::CourtshipGift,
+            // 369 Phase 2b warrior's kit.
+            ItemKind::BoneTipSpear,
+            ItemKind::BoneStiletto,
+            ItemKind::FlintBlade,
+            ItemKind::HideBracers,
+            ItemKind::HidePlatedWrap,
+            ItemKind::Sling,
+            ItemKind::WovenReedCloak,
+            ItemKind::ToothNotchedClub,
         ];
         // Trivially exhaustive (the match in category() is total) — this test
         // exists to make ItemKind growth fail loudly if a future variant gets
@@ -797,7 +881,7 @@ mod tests {
         for kind in all {
             let _ = kind.category();
         }
-        assert_eq!(all.len(), 43);
+        assert_eq!(all.len(), 59);
     }
 
     #[test]

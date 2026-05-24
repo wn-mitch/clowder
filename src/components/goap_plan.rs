@@ -430,6 +430,11 @@ impl GoapActionKind {
             // resolver picks the specific recipe at execute time, but
             // the plan-step label stays uniform.
             Self::CraftAtWorkshop => Action::Craft,
+            // 369: TanningFrame-craft step shares the Craft umbrella
+            // with Workshop crafting. Both DSEs emit Action::Craft and
+            // DispositionKind::Crafting; the GoapActionKind discriminates
+            // the station at plan-execute time.
+            Self::CraftAtTanningFrame => Action::Craft,
         }
     }
 }

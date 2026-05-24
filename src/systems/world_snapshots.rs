@@ -72,6 +72,8 @@ type ColonyStateMarkerTuple = (
         Has<markers::HasSmokeableInStores>,
         // 457 — Workshop availability.
         Has<markers::HasFunctionalWorkshop>,
+        // 369 — Tanning Frame availability.
+        Has<markers::HasFunctionalTanningFrame>,
     ),
 );
 
@@ -103,6 +105,7 @@ fn read_colony_markers(
             has_dryable_in_stores,
             has_smokeable_in_stores,
             has_functional_workshop,
+            has_functional_tanning_frame,
         ),
     ) = query
         .single()
@@ -129,6 +132,7 @@ fn read_colony_markers(
         has_dryable_in_stores,
         has_smokeable_in_stores,
         has_functional_workshop,
+        has_functional_tanning_frame,
     }
 }
 

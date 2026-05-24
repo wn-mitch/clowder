@@ -8,7 +8,7 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-05-23._
+_Last generated: 2026-05-24._
 
 ## Summary
 
@@ -38,11 +38,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
+- **[461](docs/open-work/tickets/461-phase-2b-warriors-kit-election-completeness-recipe-variety-axis-retrieve-from-stores-plan-template-tanningframe-buildpressure-tuning-369-follow-on.md)** — Phase 2b warrior's-kit election-completeness: recipe-variety axis + retrieve-from-stores plan template + TanningFrame BuildPressure tuning (369 follow-on) — _[items-crafting] · score 0.92_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.91_
-- **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · score 0.90_
+- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.91_
+- **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · score 0.90_
 
 ## Epic progress (5)
 
@@ -50,7 +50,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 8 | 4 | 4 (0 / 1 / 3 / 0) | `▰▰▰▰▰▱▱▱▱▱` 50% |
+| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 8 | 5 | 3 (0 / 0 / 3 / 0) | `▰▰▰▰▰▰▱▱▱▱` 62% |
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 6 | 27 (1 / 19 / 5 / 2) | `▰▰▱▱▱▱▱▱▱▱` 18% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
@@ -143,7 +143,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _[items-crafting] · added 2026-05-06_
 - **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[items-crafting] · added 2026-05-06_
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
-- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
 - **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
 - **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
@@ -151,6 +150,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[421](docs/open-work/tickets/421-central-material-pile-smart-material-deposit-routing.md)** — Central material pile + smart material-deposit routing — _[items-crafting] · added 2026-05-19_
 - **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
+- **[461](docs/open-work/tickets/461-phase-2b-warriors-kit-election-completeness-recipe-variety-axis-retrieve-from-stores-plan-template-tanningframe-buildpressure-tuning-369-follow-on.md)** — Phase 2b warrior's-kit election-completeness: recipe-variety axis + retrieve-from-stores plan template + TanningFrame BuildPressure tuning (369 follow-on) — _[items-crafting] · added 2026-05-24_
 
 ### life-cycle (10 ready, 1 blocked)
 
@@ -310,9 +310,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
-### world-richness (8 open, 7 landed)
+### world-richness (8 open, 8 landed)
 
-- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
 - **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
 - **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
@@ -320,6 +319,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
+- **[461](docs/open-work/tickets/461-phase-2b-warriors-kit-election-completeness-recipe-variety-axis-retrieve-from-stores-plan-template-tanningframe-buildpressure-tuning-369-follow-on.md)** — Phase 2b warrior's-kit election-completeness: recipe-variety axis + retrieve-from-stores plan template + TanningFrame BuildPressure tuning (369 follow-on) — _[items-crafting] · added 2026-05-24_
 
 ### worldgen-prehistory (5 open, 0 landed)
 
@@ -418,7 +418,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[369](docs/open-work/tickets/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) — _[items-crafting] · added 2026-05-16_
 - **[373](docs/open-work/tickets/373-denworkshop-food-retrieval-broaden-eat-substrate-beyond-stores-only.md)** — Den/Workshop food retrieval — broaden eat substrate beyond Stores-only — _[ai-substrate] · added 2026-05-16_
 - **[374](docs/open-work/tickets/374-shelter-as-housing-security-belief-per-cat-home-den-facet-replace-per-tick-spatial-shelter-rollup.md)** — Shelter as housing-security belief — per-cat home-den facet, replace per-tick spatial shelter rollup — _[ai-substrate] · added 2026-05-16_
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
@@ -457,6 +456,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[458](docs/open-work/tickets/458-practicemagic-soft-affinity-skill-considerations.md)** — PracticeMagic soft affinity / skill considerations — _[magic-mythic] · added 2026-05-23_
 - **[459](docs/open-work/tickets/459-retire-author-joint-intentions-per-tick-hot-path.md)** — Retire author_joint_intentions per-tick hot path — _[social-coordination] · added 2026-05-23_
 - **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
+- **[461](docs/open-work/tickets/461-phase-2b-warriors-kit-election-completeness-recipe-variety-axis-retrieve-from-stores-plan-template-tanningframe-buildpressure-tuning-369-follow-on.md)** — Phase 2b warrior's-kit election-completeness: recipe-variety axis + retrieve-from-stores plan template + TanningFrame BuildPressure tuning (369 follow-on) — _[items-crafting] · added 2026-05-24_
 
 ## Parked (14)
 
@@ -510,12 +510,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 
-## Landed archive (318)
+## Landed archive (319)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (252)
+### 2026-05 (253)
 
+- **[369](docs/open-work/landed/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) _(2026-05-24)_
 - **[457](docs/open-work/landed/457-workshop-craft-dse-plan-template-for-016-phase-2-behavioral-tools.md)** — Workshop-craft DSE + plan template for 016 Phase 2 behavioral tools _(2026-05-23)_
 - **[453](docs/open-work/landed/453-close-inter-cat-mates-bond-exclusivity-gap.md)** — Close inter-cat Mates-bond exclusivity gap _(2026-05-23)_
 - **[452](docs/open-work/landed/452-kitten-spawn-uses-spawn-cat-from-blueprint-to-match-founder-cat-component-shape.md)** — Kitten spawn uses spawn_cat_from_blueprint to match founder-cat component shape _(2026-05-23)_

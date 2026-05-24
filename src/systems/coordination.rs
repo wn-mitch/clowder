@@ -968,6 +968,27 @@ pub fn accumulate_build_pressure(
         })
         .sum::<usize>();
 
+    // 369: hide items in Stores — the build-pressure signal for the
+    // Tanning Frame channel. Same shape as `raw_food_items` (count
+    // by item kind across all Stores aggregates). Hide accumulates
+    // from prey kills via the 375 byproducts pipeline; without a
+    // TanningFrame the hide piles up unused.
+    let hide_items_in_stores = stored_items_query
+        .iter()
+        .filter(|(s, _)| s.kind == StructureType::Stores)
+        .map(|(_, si)| {
+            si.items
+                .iter()
+                .copied()
+                .filter(|&e| {
+                    items_query
+                        .get(e)
+                        .is_ok_and(|it| it.kind == crate::components::items::ItemKind::Hide)
+                })
+                .count()
+        })
+        .sum::<usize>();
+
     let skilled_crafters = cats.iter().count(); // simplified: count living cats as proxy
                                                 // Wildlife inside colony area (within ~wildlife_breach_range tiles of any building).
     let wildlife_breach = wildlife.iter().any(|wpos| {
@@ -1136,6 +1157,18 @@ pub fn accumulate_build_pressure(
             pressure.smoking_rack *= BuildPressure::DECAY;
         }
 
+        // 369 — Tanning Frame pressure. Signal: hide items in
+        // Stores ≥ threshold AND no TanningFrame exists yet. Same
+        // shape as preservation arms; tunable via
+        // `SimConstants.crafting.build_pressure_tanning_min_hides`
+        // and `.tanning_pressure_multiplier`.
+        let has_tanning_frame = has_structure(StructureType::TanningFrame);
+        if !has_tanning_frame && hide_items_in_stores >= cc.build_pressure_tanning_min_hides {
+            pressure.tanning_frame += rate * cc.tanning_pressure_multiplier;
+        } else {
+            pressure.tanning_frame *= BuildPressure::DECAY;
+        }
+
         // Check if any pressure exceeds the action threshold.
         if let Some(blueprint) = pressure.highest_actionable(threshold) {
             // Only issue if there isn't already a Build directive with a blueprint
@@ -1197,6 +1230,8 @@ pub fn accumulate_build_pressure(
                     // election to match cooking/workshop pattern.
                     StructureType::DryingRack => pressure.drying_rack = 0.0,
                     StructureType::SmokingRack => pressure.smoking_rack = 0.0,
+                    // 369 — tanning frame channel resets on election.
+                    StructureType::TanningFrame => pressure.tanning_frame = 0.0,
                     _ => {}
                 }
             }
@@ -1222,6 +1257,7 @@ fn structure_display_name(kind: StructureType) -> &'static str {
         StructureType::Midden => "midden",
         StructureType::DryingRack => "drying rack",
         StructureType::SmokingRack => "smoking rack",
+        StructureType::TanningFrame => "tanning frame",
     }
 }
 
@@ -1484,8 +1520,10 @@ fn kind_affinity(kind: StructureType, c: &SimConstants) -> KindAffinity {
         // food-craft adjacents that share the placement profile of the
         // Kitchen / Workshop / Stores cluster (want proximity to food
         // stockpile, want same-kind clustering so a colony can run
-        // multiple racks side-by-side).
-        Stores | Kitchen | Workshop | DryingRack | SmokingRack => (
+        // multiple racks side-by-side). 369: Tanning Frame inherits
+        // the same craft-cluster placement profile (the cat needs to
+        // shuttle hides between Stores and the frame).
+        Stores | Kitchen | Workshop | DryingRack | SmokingRack | TanningFrame => (
             -1.0,
             1.0,
             s.building_placement_food_proximity_weight,

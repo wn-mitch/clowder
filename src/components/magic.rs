@@ -498,25 +498,33 @@ impl Inventory {
     }
 
     /// 457: whether the inventory contains at least one Phase 2 Workshop
-    /// recipe input — `Twig`, `Bristle`, `Fiber`, `Flower`, `Stone`,
-    /// `Feather`, or `PolishedStone`. Reader:
+    /// recipe input — Phase 2 (368): `Twig`, `Bristle`, `Fiber`,
+    /// `Flower`, `Stone`, `Feather`, `PolishedStone`; Phase 2b (369):
+    /// `Bone`, `Sinew`, `Whisker`, `Hide`. Reader:
     /// `HasCraftInputInInventory` writer in
     /// `items::update_inventory_markers`. Recipe-agnostic: the marker
-    /// fires when ANY craft input is present, and `resolve_craft_at_workshop`
-    /// picks the specific Workshop recipe whose full input set is
-    /// satisfied at execute time.
+    /// fires when ANY craft input is present, and the resolver
+    /// (`resolve_craft_at_workshop` or `resolve_craft_at_tanning_frame`)
+    /// picks the specific recipe whose full input set is satisfied at
+    /// execute time.
     pub fn has_craft_input(&self) -> bool {
         use crate::components::items::ItemKind;
         self.slots.iter().any(|s| {
             matches!(
                 s.kind,
+                // 368 Phase 2 inputs.
                 ItemKind::Twig
                     | ItemKind::Bristle
                     | ItemKind::Fiber
                     | ItemKind::Flower
                     | ItemKind::Stone
                     | ItemKind::Feather
-                    | ItemKind::PolishedStone,
+                    | ItemKind::PolishedStone
+                    // 369 Phase 2b inputs (prey byproducts).
+                    | ItemKind::Bone
+                    | ItemKind::Sinew
+                    | ItemKind::Whisker
+                    | ItemKind::Hide,
             )
         })
     }

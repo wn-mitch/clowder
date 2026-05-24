@@ -175,6 +175,13 @@ pub struct BuildPressure {
     /// independently as the food economy demands.
     #[serde(default)]
     pub smoking_rack: f32,
+    /// 369 — colony has hide accumulating in Stores but no Tanning
+    /// Frame to convert it into armor. Same shape as `drying_rack` /
+    /// `smoking_rack` channels (signal-driven accumulation, decays
+    /// when the structure exists). Tunable threshold lives at
+    /// `SimConstants.crafting.build_pressure_tanning_min_hides`.
+    #[serde(default)]
+    pub tanning_frame: f32,
 }
 
 impl BuildPressure {
@@ -201,6 +208,10 @@ impl BuildPressure {
             // are accumulating.
             (self.drying_rack, StructureType::DryingRack),
             (self.smoking_rack, StructureType::SmokingRack),
+            // 369 — hide-tanning infrastructure. Independent channel
+            // from preservation racks; lifts when hides accumulate in
+            // Stores without a TanningFrame to convert them.
+            (self.tanning_frame, StructureType::TanningFrame),
         ];
         channels
             .iter()

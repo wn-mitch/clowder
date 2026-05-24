@@ -31,6 +31,10 @@ pub struct ColonyBuildingState {
     /// Workshops don't carry per-station load state — any functional
     /// Workshop can host any Phase 2 recipe, so this is presence-only.
     pub has_functional_workshop: bool,
+    /// 369: ≥1 functional Tanning Frame. Same presence-only shape as
+    /// Workshop — TanningFrame hosts single-pass Phase 2b hide
+    /// recipes with no per-rack load state.
+    pub has_functional_tanning_frame: bool,
 }
 
 /// Single-pass scan over the building query to derive all colony-scoped
@@ -54,6 +58,7 @@ pub fn scan_colony_buildings<'a>(
         has_functional_drying_rack: false,
         has_functional_smoking_rack: false,
         has_functional_workshop: false,
+        has_functional_tanning_frame: false,
     };
     for (structure, site) in buildings {
         if site.is_some() {
@@ -79,6 +84,9 @@ pub fn scan_colony_buildings<'a>(
             }
             if structure.kind == StructureType::Workshop && structure.effectiveness() > 0.0 {
                 state.has_functional_workshop = true;
+            }
+            if structure.kind == StructureType::TanningFrame && structure.effectiveness() > 0.0 {
+                state.has_functional_tanning_frame = true;
             }
         }
     }
@@ -771,6 +779,15 @@ pub fn update_colony_building_markers(
         em.insert(crate::components::markers::HasFunctionalWorkshop);
     } else {
         em.remove::<crate::components::markers::HasFunctionalWorkshop>();
+    }
+
+    // 369: TanningFrame availability. Same presence-only shape as
+    // Workshop — single-pass hide-craft recipes with no per-station
+    // load state.
+    if bldg_state.has_functional_tanning_frame {
+        em.insert(crate::components::markers::HasFunctionalTanningFrame);
+    } else {
+        em.remove::<crate::components::markers::HasFunctionalTanningFrame>();
     }
 
     // Tend cooldown gate. `last_tended_at_tick == 0` is the "no tend

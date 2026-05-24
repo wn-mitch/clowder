@@ -53,18 +53,46 @@ pub fn resolve_craft_at_workshop(
     workshop_positions: &[Position],
     proximity: i32,
 ) -> StepOutcome<Option<RecipeId>> {
-    let near_workshop = workshop_positions
+    resolve_craft_at_station(
+        cat_pos,
+        inventory,
+        recipes,
+        workshop_positions,
+        StationRequirement::Workshop,
+        "workshop",
+        proximity,
+    )
+}
+
+/// 369: shared station-craft resolver. Same shape as
+/// `resolve_craft_at_workshop` was pre-369 — proximity check,
+/// lex-order recipe pick, input drain, output add — parameterised by
+/// the station whose recipes we're picking. Used by both
+/// `resolve_craft_at_workshop` (Workshop station) and
+/// `resolve_craft_at_tanning_frame` (TanningFrame station). The
+/// `station_label` is for the failure-mode `Fail("no <label> in
+/// range")` string; the `station_filter` discriminates the recipe set.
+pub(crate) fn resolve_craft_at_station(
+    cat_pos: Position,
+    inventory: &mut Inventory,
+    recipes: &RecipeRegistry,
+    station_positions: &[Position],
+    station_filter: StationRequirement,
+    station_label: &'static str,
+    proximity: i32,
+) -> StepOutcome<Option<RecipeId>> {
+    let near_station = station_positions
         .iter()
-        .any(|wp| cat_pos.manhattan_distance(wp) <= proximity);
-    if !near_workshop {
-        return StepOutcome::unwitnessed(StepResult::Fail("no workshop in range".into()));
+        .any(|sp| cat_pos.manhattan_distance(sp) <= proximity);
+    if !near_station {
+        return StepOutcome::unwitnessed(StepResult::Fail(format!("no {station_label} in range")));
     }
 
-    let chosen = pick_satisfied_recipe(recipes, inventory);
+    let chosen = pick_satisfied_recipe(recipes, inventory, station_filter);
     let Some(recipe_id) = chosen else {
-        return StepOutcome::unwitnessed(StepResult::Fail(
-            "no Workshop recipe fully satisfied by inventory".into(),
-        ));
+        return StepOutcome::unwitnessed(StepResult::Fail(format!(
+            "no {station_label} recipe fully satisfied by inventory"
+        )));
     };
 
     let recipe = recipes
@@ -92,10 +120,10 @@ pub fn resolve_craft_at_workshop(
             }
         }
         ItemDestination::EquippedSlot | ItemDestination::WorldPosition => {
-            return StepOutcome::unwitnessed(StepResult::Fail(
-                "Workshop recipe output destination not yet supported (Phase 2 is Inventory-only)"
-                    .into(),
-            ));
+            return StepOutcome::unwitnessed(StepResult::Fail(format!(
+                "{station_label} recipe output destination not yet supported \
+                 (Phase 2/2b are Inventory-only)"
+            )));
         }
     }
 
@@ -103,16 +131,18 @@ pub fn resolve_craft_at_workshop(
 }
 
 /// Walk the recipe registry in deterministic order (lexicographic by
-/// RecipeId) and return the first Workshop recipe whose inputs are
-/// all in inventory at sufficient counts. Returns `None` when no
-/// recipe is satisfied. Deterministic ordering matters for seed-42
-/// reproducibility — the registry's `HashMap` doesn't give us that, so
-/// we sort here.
-fn pick_satisfied_recipe(recipes: &RecipeRegistry, inventory: &Inventory) -> Option<RecipeId> {
-    let mut candidates: Vec<&crate::components::recipe::Recipe> = recipes
-        .iter()
-        .filter(|r| r.station == StationRequirement::Workshop)
-        .collect();
+/// RecipeId) and return the first recipe matching `station` whose
+/// inputs are all in inventory at sufficient counts. Returns `None`
+/// when no recipe is satisfied. Deterministic ordering matters for
+/// seed-42 reproducibility — the registry's `HashMap` doesn't give us
+/// that, so we sort here.
+fn pick_satisfied_recipe(
+    recipes: &RecipeRegistry,
+    inventory: &Inventory,
+    station: StationRequirement,
+) -> Option<RecipeId> {
+    let mut candidates: Vec<&crate::components::recipe::Recipe> =
+        recipes.iter().filter(|r| r.station == station).collect();
     candidates.sort_by_key(|r| r.id.0);
     for recipe in candidates {
         if recipe_inputs_satisfied(recipe, inventory) {

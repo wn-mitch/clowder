@@ -1,7 +1,7 @@
 ---
 id: 369
 title: Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b)
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-24
 ---
 
 ## Why
@@ -95,3 +95,15 @@ green but never fires.
 ## Log
 - 2026-05-16: opened as 016 epic decomposition (Phase 2b; parent 016, blocked-by 365).
 - 2026-05-19: accuracy audit pass — blocked-by clear (365 landed 2026-05-14); status ready verified; related-work 334/379/377/378 exist in tickets
+- 2026-05-24: **landed as substrate-completeness; election-completeness paired with follow-on.** Mirrors 367's Commit-1-through-6 / Commit-8 split (parent epic 016, §"Lessons from 367 first-light"). What landed:
+  - **ItemKind**: 8 new variants (BoneTipSpear / BoneStiletto / FlintBlade / HideBracers / HidePlatedWrap / Sling / WovenReedCloak / ToothNotchedClub) + `ItemCategory::CombatGear`. Coverage test extended 43 → 59 (also closed the pre-existing 368 gap that left 8 variants unenrolled).
+  - **Equipment substrate** (`src/components/equipment.rs`): `EquipMaterial` / `WeaponClass` / `ArmorClass` / `NoiseClass` / `DurabilityTier` enums + five exhaustive-match classifiers on `ItemKind`. Compile-time-contracts pillar: a new metal weapon in 370 must explicitly declare its material/class/durability or the build fails.
+  - **StructureType**: `TanningFrame` variant + `material_cost` (Wood×4) + `default_size` (2×2) + terrain reuse. `HasFunctionalTanningFrame` marker (writer in `buildings.rs::scan_colony_buildings` + `update_colony_building_markers`; snapshot wired through `ColonyMarkerBundle` + `MarkerSnapshot::set_colony`).
+  - **DisciplineKind**: `HidePeltWork` (was documented "Future Phase 3/4/5" — promoted) and generic `Stonecraft` (paired with existing `StonecraftCairn`).
+  - **Recipes**: 8 registry entries + tick-budget constants on `CraftingConstants`. `flint_blade` lands as Workshop-station (open-ground knapping deferred to a `CraftInPlaceDse` follow-on).
+  - **Sibling DSE**: `CraftAtTanningFrameDse` (mirror of `CraftAtWorkshopDse`, §L2.10.10 pattern) + `GoapActionKind::CraftAtTanningFrame` + `resolve_craft_at_tanning_frame` (delegating to a shared `resolve_craft_at_station` helper) + extended `crafting_actions()` plan template with both station GoapActionDefs + dispatch arm. `PlannerZone::TanningFrame` + `tanning_frame_positions` snapshot threaded through `build_zone_distances` / `resolve_zone_position` / `resolve_travel_to`.
+  - **BuildPressure**: `tanning_frame` channel + accumulation arm (signal: `hide_items_in_stores >= cc.build_pressure_tanning_min_hides`) + construction-completion reset. Constants: `build_pressure_tanning_min_hides: usize = 5`, `tanning_pressure_multiplier: f32 = 1.0`.
+  - **HasCraftInputInInventory**: extended to include 369 Phase 2b prey-byproduct inputs (Bone / Sinew / Whisker / Hide alongside the existing 368 Phase 2 inputs).
+  - **334 subsumed**: Woven Reed Cloak == stealth cloak; the WearItem resolver path 334 named depends on slot-inventory (017), so the consumer wiring (movement-detection read of cloak) ships with the resolver-reads follow-on. 334 retired in this commit's landing.
+- 2026-05-24: **first-light gate did not clear.** `just soak-trace 42 Simba 900` → `just verdict logs/tuned-42-994d52ee`: starvation 0, ShadowFox 0 deaths, continuity canaries (grooming 1001 / play 1 / mentoring 246 / courtship 634) all alive, but `colony_score.structures_built -27.3%` and `colony_score.fulfillment +29.7%` produced a `survival: fail` verdict. Zero kit items produced; zero Tanning Frames built. Root cause matches 367's lesson #2: substrate-complete ≠ election-complete. Three structural blockers, none of which 369 can fix without scope explosion: (i) prey-byproducts deposit to Stores faster than cats walk to a Workshop, so the `HasCraftInputInInventory` window is too narrow despite the marker being extended; (ii) recipe-pick is lex-order first-satisfied with no per-cat per-context scoring (the §L2.10.10 "deferred refinement" comment in `craft_at_workshop.rs:8-9`), so even Bone-bearing cats craft a GroomingBrush before a BoneStiletto; (iii) `hide_items_in_stores >= 5` threshold isn't met in 900-tick first-light. Paired follow-on `369-followon-recipe-variety-axis` opens at landing to absorb all three. The 367 inheritance lesson is exact: this is the substrate-completeness ticket; the election-completeness ticket is its blocker-flipped successor.
+- 2026-05-24: pre-existing surface noise observed during `just check` — epic-060 roster drift (per `feedback_epic_dashboard_needs_queryable_state.md` memory; not 369's responsibility); trashing-stub allowlist line shifted (640 ← 619 due to `crafting_actions()` expanding for `CraftAtTanningFrame`; allowlist entry updated in same commit).

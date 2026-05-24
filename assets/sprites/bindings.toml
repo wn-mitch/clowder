@@ -407,6 +407,50 @@ atlas = "fruit_berries"
 index = 0
 note = "fruit (fruit_berries row 0 col 0) — gift-curio identity"
 
+# 369 Phase 2b warrior's kit — placeholder bindings reusing the
+# Phase 2 tool atlas. Visual polish (distinct spear / blade / cloak
+# sprites) is a follow-on; substrate-first means the items render
+# as a recognisable-but-generic tool icon at first-light.
+[items.BoneTipSpear]
+atlas = "solaria_objects"
+index = 622
+note = "placeholder — 369 substrate-first; rebind for visual polish"
+
+[items.BoneStiletto]
+atlas = "solaria_objects"
+index = 622
+note = "placeholder — 369 substrate-first; rebind for visual polish"
+
+[items.FlintBlade]
+atlas = "solaria_objects"
+index = 622
+note = "placeholder — 369 substrate-first; rebind for visual polish"
+
+[items.HideBracers]
+atlas = "solaria_objects"
+index = 622
+note = "placeholder — 369 substrate-first; rebind for visual polish"
+
+[items.HidePlatedWrap]
+atlas = "solaria_objects"
+index = 622
+note = "placeholder — 369 substrate-first; rebind for visual polish"
+
+[items.Sling]
+atlas = "solaria_objects"
+index = 622
+note = "placeholder — 369 substrate-first; rebind for visual polish"
+
+[items.WovenReedCloak]
+atlas = "solaria_objects"
+index = 622
+note = "placeholder — 369 substrate-first; rebind for visual polish"
+
+[items.ToothNotchedClub]
+atlas = "solaria_objects"
+index = 622
+note = "placeholder — 369 substrate-first; rebind for visual polish"
+
 [buildings.Den]
 textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_1.png", "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_2.png", "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_3.png" ]
 native_size = [ 89, 91 ]
@@ -476,6 +520,12 @@ textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Building
 native_size = [ 128, 128 ]
 tiles_wide = 2
 note = "367: reuses hearth sprite for stage-1 atomicity"
+
+[buildings.TanningFrame]
+textures = [ "sprites/The Fan-tasy Tileset (Premium)/Art/Props/ToolsStand_1.png" ]
+native_size = [ 35, 44 ]
+tiles_wide = 1
+note = "369: reuses DryingRack sprite for stage-1 atomicity — visual polish is a follow-on"
 
 [buildings_winter.Den]
 textures = [ "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_1.png", "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_2.png", "sprites/The Fan-tasy Tileset - Snow Adventures/Art/Buildings/House_Snow_1_3.png" ]

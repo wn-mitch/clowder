@@ -1475,6 +1475,7 @@ pub fn evaluate_and_plan(
         has_dryable_in_stores,
         has_smokeable_in_stores,
         has_functional_workshop,
+        has_functional_tanning_frame,
     ) = (
         cm.has_functional_kitchen,
         cm.has_raw_food_in_stores,
@@ -1497,6 +1498,7 @@ pub fn evaluate_and_plan(
         cm.has_dryable_in_stores,
         cm.has_smokeable_in_stores,
         cm.has_functional_workshop,
+        cm.has_functional_tanning_frame,
     );
     let food_fraction = ws.food_fraction;
 
@@ -1607,6 +1609,12 @@ pub fn evaluate_and_plan(
     // (not only as a ColonyState component) per the third-clause
     // discipline (§209 / §084).
     markers.set_colony(markers::HasFunctionalWorkshop::KEY, has_functional_workshop);
+    // 369 — TanningFrame availability. Same shape + discipline as
+    // Workshop. Reader: `CraftAtTanningFrameDse` eligibility filter.
+    markers.set_colony(
+        markers::HasFunctionalTanningFrame::KEY,
+        has_functional_tanning_frame,
+    );
     // 084 Commit 3: ColonyThornbriarChronicallyLow — chronicity latch
     // sampled at `chronicity_window_ticks` boundaries against the
     // colony-wide stash total. Reader (this commit): `FarmDse`'s
@@ -1718,6 +1726,15 @@ pub fn evaluate_and_plan(
         .building_query
         .iter()
         .filter(|(_, s, _, site, _)| s.kind == StructureType::Workshop && site.is_none())
+        .map(|(_, _, p, _, _)| *p)
+        .collect();
+    // 369: Pre-compute TanningFrame positions for
+    // `PlannerZone::TanningFrame` zone resolution. Same shape as
+    // `workshop_positions`.
+    let tanning_frame_positions: Vec<Position> = world_state
+        .building_query
+        .iter()
+        .filter(|(_, s, _, site, _)| s.kind == StructureType::TanningFrame && site.is_none())
         .map(|(_, _, p, _, _)| *p)
         .collect();
 
@@ -2951,6 +2968,7 @@ pub fn evaluate_and_plan(
             &drying_rack_positions,
             &smoking_rack_positions,
             &workshop_positions,
+            &tanning_frame_positions,
             &dead_cat_positions,
             entity,
             d,
@@ -3500,6 +3518,11 @@ struct StepSnapshots {
     smoking_rack_positions: Vec<Position>,
     /// 457: Workshop positions for zone resolution.
     workshop_positions: Vec<Position>,
+    /// 369: TanningFrame positions for zone resolution. Same shape
+    /// as `workshop_positions` — built once per tick from the
+    /// building snapshot, drives `PlannerZone::TanningFrame` zone
+    /// lookups for `CraftAtTanningFrame` plan execution.
+    tanning_frame_positions: Vec<Position>,
 }
 
 /// Mutable accumulators written by `dispatch_step_action`, consumed by the
@@ -3833,6 +3856,12 @@ pub fn resolve_goap_plans(
         .filter(|(_, kind, _, is_site, _)| *kind == StructureType::Workshop && !*is_site)
         .map(|(_, _, p, _, _)| *p)
         .collect();
+    // 369: TanningFrame positions for `PlannerZone::TanningFrame`.
+    let tanning_frame_positions: Vec<Position> = building_snapshot
+        .iter()
+        .filter(|(_, kind, _, is_site, _)| *kind == StructureType::TanningFrame && !*is_site)
+        .map(|(_, _, p, _, _)| *p)
+        .collect();
 
     // Ticket 177: completed Middens — used by the `TrashItemAtMidden`
     // dispatch arm to resolve the target entity's `Position` without
@@ -4006,6 +4035,8 @@ pub fn resolve_goap_plans(
         smoking_rack_positions,
         // 457 — Workshop positions threaded into the zone resolver.
         workshop_positions,
+        // 369 — TanningFrame positions threaded into the zone resolver.
+        tanning_frame_positions,
         workshop_bonus: if building_snapshot
             .iter()
             .any(|(_, kind, _, _, _)| *kind == StructureType::Workshop)
@@ -4429,6 +4460,7 @@ pub fn resolve_goap_plans(
                     &snaps.drying_rack_positions,
                     &snaps.smoking_rack_positions,
                     &snaps.workshop_positions,
+                    &snaps.tanning_frame_positions,
                     &snaps.dead_cat_positions,
                     cat_entity,
                     d,
@@ -4861,6 +4893,7 @@ pub fn resolve_goap_plans(
                     &snaps.drying_rack_positions,
                     &snaps.smoking_rack_positions,
                     &snaps.workshop_positions,
+                    &snaps.tanning_frame_positions,
                     &snaps.dead_cat_positions,
                     cat_entity,
                     d,
@@ -5596,6 +5629,7 @@ fn dispatch_step_action(
                 &snaps.drying_rack_positions,
                 &snaps.smoking_rack_positions,
                 &snaps.workshop_positions,
+                &snaps.tanning_frame_positions,
                 &snaps.dead_cat_positions,
                 cat_entity,
                 d,
@@ -8029,6 +8063,24 @@ fn dispatch_step_action(
             );
             outcome.result
         }
+        // 369: Tanning-frame-craft dispatch. Sibling to the Workshop
+        // arm — same shape but filters on `StationRequirement::TanningFrame`
+        // recipes. Shares `Feature::ItemCrafted` (the canary is per-
+        // craft, not per-station).
+        GoapActionKind::CraftAtTanningFrame => {
+            let outcome = crate::steps::disposition::resolve_craft_at_tanning_frame(
+                *pos,
+                inventory,
+                &ec.recipes,
+                &snaps.tanning_frame_positions,
+                3,
+            );
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::ItemCrafted,
+            );
+            outcome.result
+        }
     }
 }
 
@@ -8345,6 +8397,7 @@ fn resolve_travel_to(
     drying_rack_positions: &[Position],
     smoking_rack_positions: &[Position],
     workshop_positions: &[Position],
+    tanning_frame_positions: &[Position],
     dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
@@ -8366,6 +8419,7 @@ fn resolve_travel_to(
             drying_rack_positions,
             smoking_rack_positions,
             workshop_positions,
+            tanning_frame_positions,
             dead_cat_positions,
             cat_entity,
             d,
@@ -9886,6 +9940,8 @@ fn resolve_zone_position(
     smoking_rack_positions: &[Position],
     // 457: Workshop positions for `PlannerZone::Workshop` zone resolution.
     workshop_positions: &[Position],
+    // 369: TanningFrame positions for `PlannerZone::TanningFrame`.
+    tanning_frame_positions: &[Position],
     // 035: Dead-and-not-Buried cat positions for the `CorpseTarget`
     // zone. Disjoint from `cat_positions` (which is `Without<Dead>`).
     dead_cat_positions: &[(Entity, Position)],
@@ -9978,6 +10034,13 @@ fn resolve_zone_position(
         PlannerZone::Workshop => workshop_positions
             .iter()
             .min_by_key(|wp| pos.manhattan_distance(wp))
+            .copied(),
+        // 369: nearest TanningFrame. Same shape as Workshop — recipe
+        // selection (HideBracers vs HidePlatedWrap) happens at
+        // resolver-time, not zone-resolve-time.
+        PlannerZone::TanningFrame => tanning_frame_positions
+            .iter()
+            .min_by_key(|tp| pos.manhattan_distance(tp))
             .copied(),
     }
 }
@@ -10202,6 +10265,7 @@ fn build_zone_distances(
     drying_rack_positions: &[Position],
     smoking_rack_positions: &[Position],
     workshop_positions: &[Position],
+    tanning_frame_positions: &[Position],
     dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
@@ -10331,6 +10395,14 @@ fn build_zone_distances(
         (
             PlannerZone::Workshop,
             workshop_positions
+                .iter()
+                .min_by_key(|p| pos.manhattan_distance(p))
+                .copied(),
+        ),
+        // 369: nearest TanningFrame. Same semantics as Workshop.
+        (
+            PlannerZone::TanningFrame,
+            tanning_frame_positions
                 .iter()
                 .min_by_key(|p| pos.manhattan_distance(p))
                 .copied(),
@@ -10520,6 +10592,8 @@ mod tests {
             &[],
             &[],
             // 457: workshop_positions empty (same rationale).
+            &[],
+            // 369: tanning_frame_positions empty (same rationale).
             &[],
             &[],
             entity,

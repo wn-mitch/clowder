@@ -540,15 +540,36 @@ pub fn tend_smoking_rack_actions() -> Vec<GoapActionDef> {
 /// (mirroring `drying_food_actions` / `smoking_meat_actions`) is a
 /// follow-on if cats deposit inputs at Stores before crafting.
 pub fn crafting_actions() -> Vec<GoapActionDef> {
-    vec![GoapActionDef {
-        kind: GoapActionKind::CraftAtWorkshop,
-        cost: 2,
-        preconditions: vec![
-            StatePredicate::ZoneIs(PlannerZone::Workshop),
-            StatePredicate::HasMarker(crate::components::markers::HasCraftInputInInventory::KEY),
-        ],
-        effects: vec![StateEffect::IncrementTrips],
-    }]
+    vec![
+        GoapActionDef {
+            kind: GoapActionKind::CraftAtWorkshop,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::Workshop),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasCraftInputInInventory::KEY,
+                ),
+            ],
+            effects: vec![StateEffect::IncrementTrips],
+        },
+        // 369: TanningFrame sibling — same plan-template shape as the
+        // Workshop entry; A* picks based on the cat's zone-reachability
+        // and the recipe's input-set satisfaction. Per the §L2.10.10
+        // sibling-DSE pattern: two craft DSEs share `Action::Craft` and
+        // `DispositionKind::Crafting`, the template lists both station
+        // options, and the resolver discriminates by `StationRequirement`.
+        GoapActionDef {
+            kind: GoapActionKind::CraftAtTanningFrame,
+            cost: 2,
+            preconditions: vec![
+                StatePredicate::ZoneIs(PlannerZone::TanningFrame),
+                StatePredicate::HasMarker(
+                    crate::components::markers::HasCraftInputInInventory::KEY,
+                ),
+            ],
+            effects: vec![StateEffect::IncrementTrips],
+        },
+    ]
 }
 
 /// 364: plan template for an HTN leaf primitive. The L2 frame-pin

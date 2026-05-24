@@ -130,7 +130,17 @@ pub enum DisciplineKind {
     /// 368 Phase 2 — gift-as-adornment. Courtship Gift recipes
     /// (PolishedStone / Feather / Flower → CourtshipGift @ Workshop).
     AdornmentSetting,
-    // Future disciplines (Phase 3/4/5): HidePeltWork, PigmentMark.
+    /// 369 Phase 2b — knapping & flint-shaping. Flint Blade (Stone →
+    /// FlintBlade, no station) — Phase 2b's only no-station recipe.
+    /// Distinct from `StonecraftCairn` (which is workshop-bound polish
+    /// + future cairn builds); flint knapping happens in open ground.
+    Stonecraft,
+    /// 369 Phase 2b — hide tanning & curing. Hide Bracers / Hide-
+    /// Plated Wrap (Hide + Sinew → armor @ TanningFrame). Maps 1-to-
+    /// many onto the future wear-related dispositions once 017 lands
+    /// slot-inventory.
+    HidePeltWork,
+    // Future disciplines (Phase 3/4/5): PigmentMark.
 }
 
 /// What a recipe produces. Always a real item — the crafting

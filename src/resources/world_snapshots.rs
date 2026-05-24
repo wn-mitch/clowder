@@ -75,6 +75,12 @@ pub struct ColonyMarkerBundle {
     /// `evaluate_and_plan` to gate the per-cat `CraftAtWorkshopDse`
     /// eligibility filter via `MarkerSnapshot::has(...)`.
     pub has_functional_workshop: bool,
+    /// 369 — ≥1 functional Tanning Frame exists in the colony. Read
+    /// by `evaluate_and_plan` to gate the per-cat
+    /// `CraftAtTanningFrameDse` eligibility filter via
+    /// `MarkerSnapshot::has(...)`. Same shape as
+    /// `has_functional_workshop`.
+    pub has_functional_tanning_frame: bool,
 }
 
 #[derive(Resource, Debug, Default, Clone, Copy)]

@@ -607,6 +607,203 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             skill_gate: None,
         });
     }
+
+    // 369 Phase 2b — warrior's-kit recipes.
+    //
+    // Eight items split across four disciplines + three station
+    // requirements (Workshop / TanningFrame / None). Inputs draw from
+    // existing prey-byproducts (Bone, Sinew, Whisker, Hide) and
+    // foraged stocks (Twig, Fiber, Stone) — no new input ItemKinds.
+    // Recipe-id prefix `warriors_kit.` keeps the lex-order block
+    // cohesive in the registry sort that drives recipe selection.
+    use crate::components::items::ItemKind;
+
+    registry.insert(Recipe {
+        id: RecipeId("warriors_kit.bone_tip_spear"),
+        discipline: DisciplineKind::BoneShellCraft,
+        inputs: vec![
+            RecipeInput {
+                kind: ItemKind::Bone,
+                count: 1,
+            },
+            RecipeInput {
+                kind: ItemKind::Twig,
+                count: 1,
+            },
+            RecipeInput {
+                kind: ItemKind::Sinew,
+                count: 1,
+            },
+        ],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_bone_tip_spear_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: ItemKind::BoneTipSpear,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("warriors_kit.bone_stiletto"),
+        discipline: DisciplineKind::BoneShellCraft,
+        inputs: vec![RecipeInput {
+            kind: ItemKind::Bone,
+            count: 1,
+        }],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_bone_stiletto_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: ItemKind::BoneStiletto,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    // Flint Blade — workshop-bench knapping for 369. crafting.md's
+    // Phase 2b table calls for `open ground; no station`, but the
+    // substrate to resolve a `StationRequirement::None` recipe (a
+    // `CraftInPlaceDse` with no station-proximity gate) doesn't
+    // exist yet — it would be a third sibling alongside the Workshop
+    // / TanningFrame pair, and the design compromise (knap at the
+    // workshop bench) is recoverable via a follow-on ticket. Per
+    // 016's "follow-on tickets are non-optional" discipline, the
+    // CraftInPlace substrate gets opened at landing.
+    registry.insert(Recipe {
+        id: RecipeId("warriors_kit.flint_blade"),
+        discipline: DisciplineKind::Stonecraft,
+        inputs: vec![RecipeInput {
+            kind: ItemKind::Stone,
+            count: 1,
+        }],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_flint_blade_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: ItemKind::FlintBlade,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("warriors_kit.hide_bracers"),
+        discipline: DisciplineKind::HidePeltWork,
+        inputs: vec![
+            RecipeInput {
+                kind: ItemKind::Hide,
+                count: 2,
+            },
+            RecipeInput {
+                kind: ItemKind::Sinew,
+                count: 1,
+            },
+        ],
+        station: StationRequirement::TanningFrame,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_hide_bracers_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: ItemKind::HideBracers,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("warriors_kit.hide_plated_wrap"),
+        discipline: DisciplineKind::HidePeltWork,
+        inputs: vec![
+            RecipeInput {
+                kind: ItemKind::Hide,
+                count: 4,
+            },
+            RecipeInput {
+                kind: ItemKind::Sinew,
+                count: 2,
+            },
+        ],
+        station: StationRequirement::TanningFrame,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_hide_plated_wrap_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: ItemKind::HidePlatedWrap,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("warriors_kit.sling"),
+        discipline: DisciplineKind::FiberWeaving,
+        inputs: vec![
+            RecipeInput {
+                kind: ItemKind::Fiber,
+                count: 2,
+            },
+            RecipeInput {
+                kind: ItemKind::Hide,
+                count: 1,
+            },
+        ],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_sling_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: ItemKind::Sling,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("warriors_kit.woven_reed_cloak"),
+        discipline: DisciplineKind::FiberWeaving,
+        inputs: vec![RecipeInput {
+            kind: ItemKind::Fiber,
+            count: 4,
+        }],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_woven_reed_cloak_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: ItemKind::WovenReedCloak,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
+
+    registry.insert(Recipe {
+        id: RecipeId("warriors_kit.tooth_notched_club"),
+        discipline: DisciplineKind::BoneShellCraft,
+        inputs: vec![
+            RecipeInput {
+                kind: ItemKind::Twig,
+                count: 1,
+            },
+            RecipeInput {
+                kind: ItemKind::Whisker,
+                count: 1,
+            },
+        ],
+        station: StationRequirement::Workshop,
+        duration: RecipeDuration::Fixed {
+            ticks: crafting.craft_tooth_notched_club_ticks,
+        },
+        output: RecipeOutput {
+            item_kind: ItemKind::ToothNotchedClub,
+            destination: ItemDestination::Inventory,
+        },
+        skill_gate: None,
+    });
 }
 
 /// Startup system that populates [`RecipeRegistry`]. Independent

@@ -51,6 +51,15 @@ pub enum StructureType {
     /// other actions. State lives on a sibling `SmokingRackState`
     /// Component.
     SmokingRack,
+    /// 369: tanning frame for cured-hide work. Hosts the Hide
+    /// Bracers / Hide-Plated Wrap recipes (016 Phase 2b). Single-pass
+    /// craft (no per-rack progress state) — the recipe duration is a
+    /// `RecipeDuration::AtStationFaster` like the Workshop entries,
+    /// resolved by `resolve_craft_at_tanning_frame` (mirror of
+    /// `resolve_craft_at_workshop`). Construction is light wood +
+    /// stake-driven hide stretching; cheaper than the Smoking Rack
+    /// because there's no flame containment.
+    TanningFrame,
 }
 
 impl StructureType {
@@ -86,6 +95,13 @@ impl StructureType {
             // Pricier than the drying rack to match the multi-cycle
             // labor cost of tending it.
             Self::SmokingRack => vec![(Material::Stone, 3), (Material::Wood, 4)],
+            // 369: Tanning Frame is a light wood frame with stake-
+            // driven hide stretching. No flame containment, so
+            // cheaper than the Smoking Rack; slightly heavier than
+            // the Drying Rack because the stakes need to be ground-
+            // anchored. The sinew lashing the hides to the frame is
+            // implicit (cat labor, not a delivered material).
+            Self::TanningFrame => vec![(Material::Wood, 4)],
         }
     }
 
@@ -101,7 +117,9 @@ impl StructureType {
             Self::Midden => (2, 2),
             // 367: both preservation stations occupy a 2×2 footprint —
             // a rack frame and a workspace tile alongside it.
-            Self::DryingRack | Self::SmokingRack => (2, 2),
+            // 369: Tanning Frame uses the same 2×2 footprint pattern —
+            // the frame + working tile for the cat stretching hide.
+            Self::DryingRack | Self::SmokingRack | Self::TanningFrame => (2, 2),
         }
     }
 
@@ -133,6 +151,11 @@ impl StructureType {
             // Smoking Rack reads as a hearth (manages combustion).
             Self::DryingRack => Terrain::Workshop,
             Self::SmokingRack => Terrain::Hearth,
+            // 369: Tanning Frame reuses Workshop terrain visually
+            // (same open-frame structure idiom as Drying Rack); a
+            // dedicated Terrain variant + autotile pass is a
+            // visual-polish follow-on, not a substrate concern.
+            Self::TanningFrame => Terrain::Workshop,
         }
     }
 

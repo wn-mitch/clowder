@@ -655,6 +655,18 @@ impl HasFunctionalWorkshop {
     pub const KEY: &str = "HasFunctionalWorkshop";
 }
 
+/// 369: colony — ≥1 functional Tanning Frame exists in the colony.
+/// Same presence-only shape as `HasFunctionalWorkshop` — Tanning
+/// Frames host single-pass Phase 2b hide-craft recipes (HideBracers /
+/// HidePlatedWrap) with no per-rack load state. Reader:
+/// `CraftAtTanningFrameDse` eligibility filter. Writer:
+/// `buildings::update_colony_building_markers`.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasFunctionalTanningFrame;
+impl HasFunctionalTanningFrame {
+    pub const KEY: &str = "HasFunctionalTanningFrame";
+}
+
 /// 367 follow-on: colony — ≥1 RawFish or RawOrgan item sits in any
 /// `StoredItems` aggregate. Reader: composite per-cat marker
 /// `HasDryableAccessible` populated in `goap::evaluate_and_plan`; the

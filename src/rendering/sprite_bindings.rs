@@ -635,6 +635,15 @@ mod tests {
         ItemKind::GroomingBrush,
         ItemKind::PlayBundle,
         ItemKind::CourtshipGift,
+        // 369 — Phase 2b warrior's kit.
+        ItemKind::BoneTipSpear,
+        ItemKind::BoneStiletto,
+        ItemKind::FlintBlade,
+        ItemKind::HideBracers,
+        ItemKind::HidePlatedWrap,
+        ItemKind::Sling,
+        ItemKind::WovenReedCloak,
+        ItemKind::ToothNotchedClub,
     ];
 
     const ALL_HERB_KINDS: &[HerbKind] = &[
@@ -726,7 +735,16 @@ mod tests {
             | ItemKind::PolishedStone
             | ItemKind::GroomingBrush
             | ItemKind::PlayBundle
-            | ItemKind::CourtshipGift => {}
+            | ItemKind::CourtshipGift
+            // 369 — Phase 2b warrior's kit.
+            | ItemKind::BoneTipSpear
+            | ItemKind::BoneStiletto
+            | ItemKind::FlintBlade
+            | ItemKind::HideBracers
+            | ItemKind::HidePlatedWrap
+            | ItemKind::Sling
+            | ItemKind::WovenReedCloak
+            | ItemKind::ToothNotchedClub => {}
         }
     }
 
@@ -772,6 +790,8 @@ mod tests {
         StructureType::Midden,
         StructureType::DryingRack,
         StructureType::SmokingRack,
+        // 369 Phase 2b.
+        StructureType::TanningFrame,
     ];
 
     #[allow(dead_code)]
@@ -789,7 +809,8 @@ mod tests {
             | StructureType::Gate
             | StructureType::Midden
             | StructureType::DryingRack
-            | StructureType::SmokingRack => {}
+            | StructureType::SmokingRack
+            | StructureType::TanningFrame => {}
         }
     }
 

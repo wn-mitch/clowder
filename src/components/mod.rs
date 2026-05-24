@@ -5,6 +5,7 @@ pub mod body_zones;
 pub mod building;
 pub mod coordination;
 pub mod disposition;
+pub mod equipment;
 pub mod fate;
 pub mod fertility;
 pub mod fox_goap_plan;

@@ -98,6 +98,13 @@ pub enum PlannerZone {
     /// picks the specific recipe by inventory + recipe registry at
     /// execute time).
     Workshop,
+    /// 369: position of the nearest Tanning Frame. Resolves to the
+    /// nearest `Structure { kind: TanningFrame }`. Used by
+    /// `CraftAtTanningFrame` (generalised over the two Phase 2b
+    /// hide recipes — HideBracers + HidePlatedWrap; the resolver
+    /// picks the specific recipe by inventory + recipe registry at
+    /// execute time).
+    TanningFrame,
 }
 
 /// What the cat is carrying.
@@ -395,6 +402,15 @@ pub enum GoapActionKind {
     /// `Feature::ItemCrafted`. Plan-level precondition is
     /// `ZoneIs(Workshop) ∧ HasMarker(HasCraftInputInInventory)`.
     CraftAtWorkshop,
+    /// 369: craft a Phase 2b hide-armor item at a Tanning Frame.
+    /// Sibling to `CraftAtWorkshop` — same single-tick shape and
+    /// effect (`IncrementTrips`) — but the resolver scans recipes
+    /// with `StationRequirement::TanningFrame` and the plan-level
+    /// precondition is `ZoneIs(TanningFrame) ∧
+    /// HasMarker(HasCraftInputInInventory)`. Two recipes live here
+    /// (HideBracers, HidePlatedWrap); resolver picks lex-order first
+    /// satisfied.
+    CraftAtTanningFrame,
     /// 450: kitten begs for food. Single-tick Activity action — no
     /// preconditions, no state effect on `PlannerState`. The resolver
     /// stamps the kitten cry-map at the kitten's tile and emits
