@@ -460,6 +460,17 @@ pub mod mating;
 // Live primitives mirroring `build_method`'s 330 shape.
 pub mod groom_other;
 pub mod socialize;
+// 462: HaveItem decomposition substrate — standalone helper that
+// turns a `GoalKind::HaveItem(item)` into the per-recipe GOAP plan
+// `[RetrieveCraftInputs(id), TravelTo(zone), CraftAt<station>]`.
+// Dormant on disk: no caller invokes `decompose_goal_have_item` in
+// 462; 463 wires it into the goal-advance hook (or the
+// `Action::Craft` plan-template builder) alongside the
+// `CraftItemAspiration` emitter that produces the HaveItem
+// Intentions. The module ships no `Method` literal so the
+// `scripts/check_method_registry.sh` bidirectional lint doesn't
+// fire here.
+pub mod have_item;
 
 // Tests live in `tests.rs` so the bash lint can exclude that path
 // while scanning `src/ai/methods/` for production `Method` literals.

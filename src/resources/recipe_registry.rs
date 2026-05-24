@@ -40,6 +40,18 @@ impl RecipeRegistry {
         self.recipes.get(&id)
     }
 
+    /// 462: find the recipe whose output is `item`. Used by the
+    /// `decompose_goal_have_item` HTN substrate helper to turn a
+    /// `GoalKind::HaveItem(item)` Intention into a craft plan.
+    ///
+    /// Linear scan over registered recipes (≤50 today). If multiple
+    /// recipes share an output kind (none today; flagged for revisit
+    /// if a future Phase ≥2 recipe lands a second producer), this
+    /// returns the first-registered match.
+    pub fn recipe_producing(&self, item: crate::components::items::ItemKind) -> Option<&Recipe> {
+        self.iter().find(|r| r.output.item_kind == item)
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &Recipe> {
         self.recipes.values()
     }
