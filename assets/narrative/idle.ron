@@ -143,4 +143,9 @@
         mood: Some(Miserable),
         needs: [(axis: Social, level: Critical)],
     ),
+    (
+        text: "{name} carries a bone from one end of the hall to the other, lays it down, and yawns.",
+        tier: Micro,
+        action: Some(Idle),
+    ),
 ]
