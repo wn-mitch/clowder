@@ -15,10 +15,10 @@ _Last generated: 2026-05-24._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 119 |
+| Ready | 120 |
 | Parked | 14 |
 | Blocked | 34 |
-| **Open total** | **171** |
+| **Open total** | **172** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (119)
+## Ready by cluster (120)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -176,7 +176,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[289](docs/open-work/tickets/289-engagethreat-retry-cooldown-after-morale-break-suppress-immediate-guarding-re-election-under-active-fight-directive.md)** — EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive — _[combat-threat] · added 2026-05-11_
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 
-### wildlife (7 ready, 1 blocked)
+### wildlife (8 ready, 1 blocked)
 
 - **[265](docs/open-work/tickets/265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md)** — Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox) — _[wildlife] · added 2026-05-10_
 - **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
@@ -185,6 +185,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
+- **[464](docs/open-work/tickets/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) — _[wildlife] · added 2026-05-24_
 
 ### buildings-zones (5 ready, 2 blocked)
 
@@ -222,7 +223,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
-## Ready by initiative (79 tag-memberships across 9 initiatives)
+## Ready by initiative (80 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -286,7 +287,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
-### predator-prey-dynamics (8 open, 7 landed)
+### predator-prey-dynamics (9 open, 7 landed)
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 - **[265](docs/open-work/tickets/265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md)** — Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox) — _[wildlife] · added 2026-05-10_
@@ -296,6 +297,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · added 2026-05-13_
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
+- **[464](docs/open-work/tickets/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) — _[wildlife] · added 2026-05-24_
 
 ### welfare-fidelity (8 open, 4 landed)
 
@@ -332,7 +334,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[101](docs/open-work/tickets/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure — _[belief-perception] · added 2026-05-01_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (119)
+## Ready (120)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -453,6 +455,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[459](docs/open-work/tickets/459-retire-author-joint-intentions-per-tick-hot-path.md)** — Retire author_joint_intentions per-tick hot path — _[social-coordination] · added 2026-05-23_
 - **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
 - **[461](docs/open-work/tickets/461-phase-2b-warriors-kit-tanningframe-buildpressure-tuning-369-follow-on.md)** — Phase 2b warrior's-kit TanningFrame BuildPressure threshold tuning (369 follow-on; election-completeness moves to 462/463) — _[items-crafting] · added 2026-05-24_
+- **[464](docs/open-work/tickets/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) — _[wildlife] · added 2026-05-24_
 
 ## Parked (14)
 
