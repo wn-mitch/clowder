@@ -1,7 +1,7 @@
 ---
 id: 462
 title: HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs)
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [crafting.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-24
 ---
 
 ## Why
@@ -70,3 +70,4 @@ Substrate-only landing, three commits:
 ## Log
 
 - 2026-05-24: opened as 461's substrate-widening follow-on (blocked-by 461). Rationale and decision history in 461's 2026-05-24 ## Log entry.
+- 2026-05-24: Three-commit substrate landing — GoalKind sum type + GoapActionKind::RetrieveCraftInputs(RecipeId) + decompose_goal_have_item helper. Ships dormant per the 462/463 split; 463 lifts the weight.

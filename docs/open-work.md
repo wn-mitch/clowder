@@ -17,8 +17,8 @@ _Last generated: 2026-05-24._
 | In progress | 4 |
 | Ready | 120 |
 | Parked | 14 |
-| Blocked | 33 |
-| **Open total** | **171** |
+| Blocked | 32 |
+| **Open total** | **170** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -38,11 +38,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
+- **[463](docs/open-work/tickets/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — "CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick" — _[items-crafting] · score 0.94_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[462](docs/open-work/tickets/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md)** — HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs) — _[items-crafting] · score 0.91_
-- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.90_
-- **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · score 0.90_
+- **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
 
@@ -138,7 +138,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 
-### items-crafting (11 ready, 7 blocked)
+### items-crafting (11 ready, 6 blocked)
 
 - **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _[items-crafting] · added 2026-05-06_
 - **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[items-crafting] · added 2026-05-06_
@@ -150,7 +150,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[421](docs/open-work/tickets/421-central-material-pile-smart-material-deposit-routing.md)** — Central material pile + smart material-deposit routing — _[items-crafting] · added 2026-05-19_
 - **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
-- **[462](docs/open-work/tickets/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md)** — HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs) — _[items-crafting] · added 2026-05-24_
+- **[463](docs/open-work/tickets/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick — _[items-crafting] · added 2026-05-24_
 
 ### life-cycle (10 ready, 1 blocked)
 
@@ -310,7 +310,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
-### world-richness (8 open, 9 landed)
+### world-richness (8 open, 10 landed)
 
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
 - **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
@@ -319,7 +319,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
-- **[462](docs/open-work/tickets/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md)** — HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs) — _[items-crafting] · added 2026-05-24_
+- **[463](docs/open-work/tickets/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick — _[items-crafting] · added 2026-05-24_
 
 ### worldgen-prehistory (5 open, 0 landed)
 
@@ -454,7 +454,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[458](docs/open-work/tickets/458-practicemagic-soft-affinity-skill-considerations.md)** — PracticeMagic soft affinity / skill considerations — _[magic-mythic] · added 2026-05-23_
 - **[459](docs/open-work/tickets/459-retire-author-joint-intentions-per-tick-hot-path.md)** — Retire author_joint_intentions per-tick hot path — _[social-coordination] · added 2026-05-23_
 - **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
-- **[462](docs/open-work/tickets/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md)** — HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs) — _[items-crafting] · added 2026-05-24_
+- **[463](docs/open-work/tickets/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick — _[items-crafting] · added 2026-05-24_
 - **[465](docs/open-work/tickets/465-cat-approach-pathing-failure-at-stalk-range.md)** — Cat approach pathing failure at stalk range — _[wildlife] · added 2026-05-24_
 
 ## Parked (14)
@@ -474,7 +474,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[381](docs/open-work/tickets/381-trader-substrate-foundation-visitor-cats-tradable-goods-exchange-unlocks-metal-scrap-acquisition.md)** — trader-substrate foundation: visitor cats + tradable-goods exchange (unlocks metal-scrap acquisition) — _[world-systems] · parked 2026-05-16 · added 2026-05-16_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · parked 2026-05-20 · added 2026-05-20_
 
-## Blocked (33)
+## Blocked (32)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -508,15 +508,15 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[442](docs/open-work/tickets/442-split-resourcessim-constantsrs-into-a-sim-constants-submodule-per-substruct-family.md)** — Split resources/sim_constants.rs into a sim_constants/ submodule per substruct family — _[ai-substrate] · blocked-by 441 · added 2026-05-21_
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
-- **[463](docs/open-work/tickets/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick — _[items-crafting] · blocked-by 462 · added 2026-05-24_
 
-## Landed archive (322)
+## Landed archive (323)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (256)
+### 2026-05 (257)
 
 - **[464](docs/open-work/landed/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) _(2026-05-24)_
+- **[462](docs/open-work/landed/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md)** — HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs) _(2026-05-24)_
 - **[461](docs/open-work/landed/461-phase-2b-warriors-kit-tanningframe-buildpressure-tuning-369-follow-on.md)** — Phase 2b warrior's-kit TanningFrame BuildPressure threshold tuning (369 follow-on; election-completeness moves to 462/463) _(2026-05-24)_
 - **[369](docs/open-work/landed/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md)** — Phase 2b warrior's kit — 8 items, Tanning Frame station, material-property substrate for hunt/combat/noise resolvers (016 Phase 2b) _(2026-05-24)_
 - **[100](docs/open-work/landed/100-tremor-action-multiplier-wiring.md)** — Tremor map, Action::Stalk, and personality-driven hunt approach _(2026-05-24)_

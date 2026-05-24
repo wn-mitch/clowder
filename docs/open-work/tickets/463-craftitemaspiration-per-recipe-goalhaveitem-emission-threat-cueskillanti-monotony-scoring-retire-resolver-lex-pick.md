@@ -1,13 +1,13 @@
 ---
 id: 463
 title: "CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick"
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-24
 parked: null
-blocked-by: [462]
+blocked-by: []
 supersedes: []
 related-systems: [crafting.md, ai-substrate-refactor.md]
 related-balance: []
