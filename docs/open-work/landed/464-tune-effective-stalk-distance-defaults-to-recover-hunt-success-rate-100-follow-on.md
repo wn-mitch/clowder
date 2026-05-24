@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [sensory.md, ai-substrate-refactor.md]
 related-balance: [100-tremor-action-multiplier.md]
-landed-at: pending
+landed-at: d28db80c8663
 landed-on: 2026-05-24
 ---
 
