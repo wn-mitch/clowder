@@ -435,6 +435,10 @@ impl GoapActionKind {
             // DispositionKind::Crafting; the GoapActionKind discriminates
             // the station at plan-execute time.
             Self::CraftAtTanningFrame => Action::Craft,
+            // 462: retrieve-craft-inputs step inherits the parent Craft
+            // Action so `CurrentAction` stays stable through the multi-
+            // step plan (mirrors `RetrieveSmokeable => SmokeMeat`).
+            Self::RetrieveCraftInputs(_) => Action::Craft,
         }
     }
 }

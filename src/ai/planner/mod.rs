@@ -411,6 +411,18 @@ pub enum GoapActionKind {
     /// (HideBracers, HidePlatedWrap); resolver picks lex-order first
     /// satisfied.
     CraftAtTanningFrame,
+    /// 462: retrieve every `RecipeInput { kind, count }` of the named
+    /// recipe from a `StoredItems` building into the cat's
+    /// `Inventory`. Carries `RecipeId` rather than the input set
+    /// directly so the enum stays `Copy + Hash + Eq` (load-bearing
+    /// for A*'s state-graph hashing); the resolver looks up
+    /// `recipe.inputs` from the `RecipeRegistry` resource at runtime.
+    /// Prefix step in the templated `have_item_via_recipe` plan
+    /// (built by `Action::Craft`'s template when the cat holds an
+    /// `Intention::Goal(HaveItem(_))`). Dormant in 462 — the plan
+    /// template is widened by Commit 3, but no DSE emits the
+    /// `HaveItem` Intention until 463.
+    RetrieveCraftInputs(crate::components::recipe::RecipeId),
     /// 450: kitten begs for food. Single-tick Activity action — no
     /// preconditions, no state effect on `PlannerState`. The resolver
     /// stamps the kitten cry-map at the kitten's tile and emits

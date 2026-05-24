@@ -21,8 +21,25 @@ use crate::components::items::ItemKind;
 /// Stable identifier for a recipe. Stringly-typed so registry
 /// entries are greppable across module boundaries; the registry
 /// keys on this for `O(1)` lookup.
+///
+/// 462 adds `Deserialize` via the manual impl below so
+/// `GoapActionKind::RetrieveCraftInputs(RecipeId)` can ride the
+/// enum's `serde::Deserialize` derive. The impl leaks the input
+/// string into a `&'static str` — acceptable because RecipeId
+/// values are bounded by the recipe-registry size (~10-50) and
+/// deserialization is rare (logdb / save-load / debug paths).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 pub struct RecipeId(pub &'static str);
+
+impl<'de> serde::Deserialize<'de> for RecipeId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(RecipeId(Box::leak(s.into_boxed_str())))
+    }
+}
 
 /// What a recipe needs as input.
 ///

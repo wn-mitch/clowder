@@ -7606,6 +7606,38 @@ fn dispatch_step_action(
             outcome.result
         }
 
+        // 462 — `RetrieveCraftInputs(recipe_id)`: parameterized
+        // retrieve over arbitrary recipe input sets. The resolver
+        // looks up `recipe.inputs` from `RecipeRegistry` at runtime
+        // and pulls each `RecipeInput { kind, count }` from the
+        // nearest Stores. Same target-selection shape as
+        // `RetrieveSmokeable`/`RetrieveDryable`. Dormant in 462:
+        // no plan template emits this variant; Commit 3 widens
+        // `Action::Craft`'s template to emit it when the cat holds
+        // an `Intention::Goal(HaveItem(_))`, and 463 emits the
+        // `HaveItem` Intention from `CraftItemAspiration`.
+        GoapActionKind::RetrieveCraftInputs(recipe_id) => {
+            if plan.step_state[step_idx].target_entity.is_none() {
+                plan.step_state[step_idx].target_entity = snaps
+                    .stores_entities
+                    .iter()
+                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .map(|(e, _)| *e);
+            }
+            let outcome = crate::steps::disposition::resolve_retrieve_craft_inputs(
+                recipe_id,
+                &ec.recipes,
+                ticks,
+                plan.step_state[step_idx].target_entity,
+                inventory,
+                stores_query,
+                items_query,
+                commands,
+            );
+            outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::ItemRetrieved);
+            outcome.result
+        }
+
         GoapActionKind::Cook => {
             let outcome =
                 crate::steps::disposition::resolve_cook(ticks, inventory, d, &ec.time_scale);
