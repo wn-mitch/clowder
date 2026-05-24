@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [project-vision.md]
 related-balance: []
-landed-at: pending
+landed-at: 769b71e11f96
 landed-on: 2026-05-23
 ---
 
