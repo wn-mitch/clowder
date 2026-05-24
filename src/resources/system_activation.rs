@@ -62,6 +62,11 @@ pub enum Feature {
     AspirationSelected,
     AspirationCompleted,
     AspirationAbandoned,
+    /// Ticket 055 / §7.7.d — drift-threshold abandonment. Distinct
+    /// from `AspirationAbandoned` (stagnation + low personality
+    /// alignment) so canaries / trace can attribute drops to mood
+    /// drift vs. personality drift independently.
+    AspirationDriftAbandoned,
     BondFormed,
     CoordinatorElected,
     DirectiveIssued,
@@ -696,6 +701,7 @@ impl Feature {
         Feature::AspirationSelected,
         Feature::AspirationCompleted,
         Feature::AspirationAbandoned,
+        Feature::AspirationDriftAbandoned,
         Feature::BondFormed,
         Feature::CoordinatorElected,
         Feature::DirectiveIssued,
@@ -1081,6 +1087,7 @@ impl Feature {
             Feature::AnxietyInterrupt => Negative,
             Feature::ModifierPreemption => Negative,
             Feature::AspirationAbandoned => Negative,
+            Feature::AspirationDriftAbandoned => Negative,
             Feature::DenRaided => Negative,
             Feature::PreyDenAbandoned => Negative,
             Feature::DepositRejected => Negative,
@@ -1209,6 +1216,7 @@ impl Feature {
             Feature::DeathOldAge => false,
             Feature::AspirationCompleted => false,
             Feature::AspirationAbandoned => false,
+            Feature::AspirationDriftAbandoned => false,
             // Fox-ecology ambient signals that depend on world state
             // (a fox may or may not spawn / be in range in 15 min).
             Feature::FoxStoreRaided => false,
@@ -1623,6 +1631,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::AspirationSelected => "AspirationSelected",
         Feature::AspirationCompleted => "AspirationCompleted",
         Feature::AspirationAbandoned => "AspirationAbandoned",
+        Feature::AspirationDriftAbandoned => "AspirationDriftAbandoned",
         Feature::BondFormed => "BondFormed",
         Feature::CoordinatorElected => "CoordinatorElected",
         Feature::DirectiveIssued => "DirectiveIssued",
@@ -1992,7 +2001,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 156;
+        const EXPECTED_VARIANT_COUNT: usize = 157;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2125,8 +2134,13 @@ mod tests {
         // first-light canary. Ships expected=true — the elect-side
         // pipeline must fire ≥1 craft in seed-42 to satisfy the 368
         // substrate first-light gate.
+        // Ticket 055: +1 Negative (AspirationDriftAbandoned) for the
+        // §7.7.d mood drift-threshold detection layer. Ships
+        // `expected_to_fire_per_soak == false` (mirror of
+        // `AspirationAbandoned`) until first-light soak cadence
+        // confirms the canary expectation.
         assert_eq!(positive, 90);
-        assert_eq!(negative, 23);
+        assert_eq!(negative, 24);
         assert_eq!(neutral, 43);
     }
 
@@ -2228,13 +2242,15 @@ mod tests {
         // CourtshipGiftOffered) for Phase 2 behavioral-tool canaries.
         // Ticket 457: +1 Positive (ItemCrafted) for Workshop-craft
         // first-light canary.
+        // Ticket 055: +1 Negative (AspirationDriftAbandoned) for §7.7.d
+        // mood drift-threshold detection.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
             90
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
-            23
+            24
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),

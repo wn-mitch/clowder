@@ -358,6 +358,7 @@ mod compatibility_tests {
             progress: 0,
             adopted_tick: 0,
             last_progress_tick: 0,
+            misaligned_since_tick: None,
         }]
     }
 

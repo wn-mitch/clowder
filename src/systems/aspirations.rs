@@ -9,7 +9,7 @@ use crate::components::aspirations::{
 };
 use crate::components::identity::{Age, LifeStage, Name, Species};
 use crate::components::markers;
-use crate::components::mental::{Memory, MemoryType, MoodModifier, MoodSource};
+use crate::components::mental::{Memory, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
 use crate::components::skills::{Skills, Training};
@@ -309,6 +309,7 @@ pub fn select_aspirations(
                     progress: 0,
                     adopted_tick: time.tick,
                     last_progress_tick: time.tick,
+                    misaligned_since_tick: None,
                 }],
                 completed: Vec::new(),
             };
@@ -442,6 +443,7 @@ pub fn check_second_aspiration_slot(
                 progress: 0,
                 adopted_tick: time.tick,
                 last_progress_tick: time.tick,
+                misaligned_since_tick: None,
             });
 
             log.push(
@@ -460,30 +462,53 @@ pub fn check_second_aspiration_slot(
 // check_aspiration_abandonment system
 // ---------------------------------------------------------------------------
 
-/// Abandons aspirations when a cat has made no progress for 2000 ticks and
-/// their personality alignment for that domain has drifted below 0.3.
+/// Abandons aspirations via two orthogonal triggers:
+///
+/// - **Stagnation** — no progress for 2000 ticks AND personality
+///   alignment for the domain has drifted below 0.3 (trait-vs-arc
+///   signal).
+/// - **Mood drift** (§7.7.d, ticket 055) — `Mood::valence` has sat
+///   outside the arc's `expected_valence_target` hysteresis band for
+///   `drift_sustain_duration` (mood-vs-arc signal).
+///
+/// Both triggers drop via `aspirations.active.remove(i)`; subsequent
+/// re-adoption happens organically through `select_aspirations`
+/// (pillar #4 — one commitment mechanism).
+///
+/// The two checks live in one system (rather than two systems racing
+/// on the same Vec) for two reasons: (1) pillar discipline — one walk
+/// per aspiration; (2) Bevy schedule-edge determinism — a second
+/// sibling system would perturb seed-42 parallelism (precedent ticket
+/// 061 / memory `learning_bevy_schedule_edge_perturbation`).
 pub fn check_aspiration_abandonment(
-    mut query: Query<(&Name, &Personality, &mut Aspirations), Without<Dead>>,
+    mut query: Query<(&Name, &Personality, &Mood, &mut Aspirations), Without<Dead>>,
     time: Res<TimeState>,
+    constants: Res<SimConstants>,
+    registry: Res<AspirationRegistry>,
+    time_scale: Res<TimeScale>,
     mut log: ResMut<NarrativeLog>,
     mut activation: ResMut<SystemActivation>,
 ) {
     const STAGNATION_TICKS: u64 = 2000;
     const MIN_ALIGNMENT: f32 = 0.3;
+    let drift = &constants.aspirations;
+    let drift_sustain_ticks = drift.drift_sustain_duration.ticks(&time_scale);
 
-    for (name, personality, mut aspirations) in &mut query {
+    for (name, personality, mood, mut aspirations) in &mut query {
         let mut to_remove = Vec::new();
-        for (i, asp) in aspirations.active.iter().enumerate() {
+        for (i, asp) in aspirations.active.iter_mut().enumerate() {
             // Ticket 398 — Kinship aspirations are event-driven (adopt
             // on first kitten, drop when no more dependents per
-            // `adopt_kinship_aspiration`). The progress-stagnation
-            // abandonment path doesn't apply: ActionCount(9999) is
-            // unreachable by design, and low-compassion mothers would
-            // otherwise cycle adopt → abandon every 2000 ticks for the
-            // duration of their kittens' dependency.
+            // `adopt_kinship_aspiration`). Both stagnation and drift
+            // paths are exempt: ActionCount(9999) is unreachable by
+            // design, and low-compassion mothers would otherwise cycle
+            // adopt → abandon for the duration of their kittens'
+            // dependency.
             if asp.domain == AspirationDomain::Kinship {
                 continue;
             }
+
+            // Stagnation check.
             let stagnant = time.tick.saturating_sub(asp.last_progress_tick) >= STAGNATION_TICKS;
             let low_alignment = domain_personality_axis(asp.domain, personality) < MIN_ALIGNMENT;
             if stagnant && low_alignment {
@@ -497,6 +522,39 @@ pub fn check_aspiration_abandonment(
                     ),
                     NarrativeTier::Action,
                 );
+                continue;
+            }
+
+            // §7.7.d mood drift-threshold check. Two-band hysteresis on
+            // valence vs the arc's `expected_valence_target`; drops
+            // when the misaligned interval reaches `drift_sustain_duration`.
+            let Some(target) =
+                crate::ai::aspirations::expected_valence_for(&asp.chain_name, &registry)
+            else {
+                continue;
+            };
+            let below_enter = mood.valence < target - drift.drift_enter_margin;
+            let above_exit = mood.valence > target - drift.drift_exit_margin;
+            match asp.misaligned_since_tick {
+                None if below_enter => {
+                    asp.misaligned_since_tick = Some(time.tick);
+                }
+                Some(_) if above_exit => {
+                    asp.misaligned_since_tick = None;
+                }
+                Some(since) if time.tick.saturating_sub(since) >= drift_sustain_ticks => {
+                    to_remove.push(i);
+                    activation.record(Feature::AspirationDriftAbandoned);
+                    log.push(
+                        time.tick,
+                        format!(
+                            "The fire dims. {}'s heart no longer follows the path of {:?}.",
+                            name.0, asp.domain,
+                        ),
+                        NarrativeTier::Action,
+                    );
+                }
+                _ => {}
             }
         }
 
@@ -945,6 +1003,7 @@ pub fn adopt_kinship_aspiration(
                     progress: 0,
                     adopted_tick: time.tick,
                     last_progress_tick: time.tick,
+                    misaligned_since_tick: None,
                 });
                 log.push(
                     time.tick,
@@ -1353,5 +1412,265 @@ mod tests {
         assert!(world
             .entity(mentor)
             .contains::<markers::HasMentoringTarget>());
+    }
+
+    // -----------------------------------------------------------------------
+    // §7.7.d mood drift-threshold detection (ticket 055)
+    // -----------------------------------------------------------------------
+
+    fn setup_drift_world() -> (World, Schedule) {
+        use crate::resources::SimConstants;
+        let mut world = World::new();
+        world.insert_resource(SimConstants::default());
+        let cfg = SimConfig::default();
+        world.insert_resource(TimeScale::from_config(&cfg, 16.6667));
+        world.insert_resource(cfg);
+        world.insert_resource(TimeState::default());
+        world.insert_resource(NarrativeLog::default());
+        world.insert_resource(SystemActivation::default());
+        world.insert_resource(AspirationRegistry::build_static());
+        let mut schedule = Schedule::default();
+        schedule.add_systems(check_aspiration_abandonment);
+        (world, schedule)
+    }
+
+    /// Default-mid personality used for the drift tests so the
+    /// stagnation arm of `check_aspiration_abandonment` never fires
+    /// (every axis at 0.5 keeps `domain_personality_axis >= 0.3`).
+    fn drift_personality() -> Personality {
+        Personality {
+            boldness: 0.5,
+            sociability: 0.5,
+            curiosity: 0.5,
+            diligence: 0.5,
+            warmth: 0.5,
+            spirituality: 0.5,
+            ambition: 0.5,
+            patience: 0.5,
+            anxiety: 0.5,
+            optimism: 0.5,
+            temper: 0.5,
+            stubbornness: 0.5,
+            playfulness: 0.5,
+            loyalty: 0.5,
+            tradition: 0.5,
+            compassion: 0.5,
+            pride: 0.5,
+            independence: 0.5,
+        }
+    }
+
+    fn spawn_drift_cat(
+        world: &mut World,
+        chain_name: &str,
+        domain: AspirationDomain,
+        valence: f32,
+    ) -> Entity {
+        // Use a non-zero `last_progress_tick` matching the test's
+        // initial `time.tick` so the sibling stagnation check is
+        // satisfied — its `time.tick - last_progress_tick >= 2000`
+        // gate is what would otherwise trigger spuriously when the
+        // drift test advances `tick`.
+        world
+            .spawn((
+                Name("Test".to_string()),
+                drift_personality(),
+                Mood {
+                    valence,
+                    modifiers: std::collections::VecDeque::new(),
+                },
+                Aspirations {
+                    active: vec![ActiveAspiration {
+                        chain_name: chain_name.to_string(),
+                        domain,
+                        current_milestone: 0,
+                        progress: 0,
+                        adopted_tick: 0,
+                        last_progress_tick: 0,
+                        misaligned_since_tick: None,
+                    }],
+                    completed: Vec::new(),
+                },
+            ))
+            .id()
+    }
+
+    /// Hysteresis: a brief dip below the entry band that recovers above
+    /// the exit band must clear `misaligned_since_tick` without firing.
+    #[test]
+    fn mood_drift_short_dip_clears_state() {
+        let (mut world, mut schedule) = setup_drift_world();
+        // MASTER_OF_THE_HUNT target 0.30; enter < 0.30 - 0.25 = 0.05.
+        let cat = spawn_drift_cat(
+            &mut world,
+            "Master of the Hunt",
+            AspirationDomain::Hunting,
+            -0.10, // well below enter band
+        );
+
+        schedule.run(&mut world);
+        assert_eq!(
+            world.get::<Aspirations>(cat).unwrap().active[0].misaligned_since_tick,
+            Some(0),
+            "below-enter valence should mark misaligned_since_tick"
+        );
+
+        // Recover above the exit band (target - exit_margin = 0.20).
+        world.get_mut::<Mood>(cat).unwrap().valence = 0.30;
+        schedule.run(&mut world);
+        assert_eq!(
+            world.get::<Aspirations>(cat).unwrap().active[0].misaligned_since_tick,
+            None,
+            "above-exit valence should clear misaligned_since_tick"
+        );
+        assert_eq!(
+            world.get::<Aspirations>(cat).unwrap().active.len(),
+            1,
+            "no abandonment on a transient dip"
+        );
+        assert_eq!(
+            world
+                .resource::<SystemActivation>()
+                .counts
+                .get(&Feature::AspirationDriftAbandoned)
+                .copied()
+                .unwrap_or(0),
+            0
+        );
+    }
+
+    /// Sustain: misalignment held for `drift_sustain_duration` drops the
+    /// arc, records the Feature, and pushes a narrative log entry.
+    #[test]
+    fn mood_drift_sustained_dip_triggers_abandonment() {
+        let (mut world, mut schedule) = setup_drift_world();
+        let sustain = world
+            .resource::<crate::resources::SimConstants>()
+            .aspirations
+            .drift_sustain_duration
+            .ticks(world.resource::<TimeScale>());
+        let cat = spawn_drift_cat(
+            &mut world,
+            "Master of the Hunt",
+            AspirationDomain::Hunting,
+            -0.50, // far below enter band
+        );
+
+        // First tick: enter misaligned state.
+        schedule.run(&mut world);
+        assert!(world.get::<Aspirations>(cat).unwrap().active[0]
+            .misaligned_since_tick
+            .is_some());
+
+        // Advance `tick` past sustain and run one more time.
+        world.resource_mut::<TimeState>().tick = sustain + 1;
+        let initial_log_len = world.resource::<NarrativeLog>().entries.len();
+        schedule.run(&mut world);
+
+        assert!(
+            world.get::<Aspirations>(cat).unwrap().active.is_empty(),
+            "arc should drop after sustained drift"
+        );
+        assert_eq!(
+            world
+                .resource::<SystemActivation>()
+                .counts
+                .get(&Feature::AspirationDriftAbandoned)
+                .copied()
+                .unwrap_or(0),
+            1
+        );
+        assert!(
+            world.resource::<NarrativeLog>().entries.len() > initial_log_len,
+            "narrative log should record the drift abandonment"
+        );
+    }
+
+    /// Arc-relative gating: low absolute valence that still sits within
+    /// the arc's negative-target band must NOT trigger. Pure mood-vs-arc
+    /// signal, not absolute-low-valence signal.
+    #[test]
+    fn mood_drift_aligned_with_negative_arc_does_not_trigger() {
+        let (mut world, mut schedule) = setup_drift_world();
+        let sustain = world
+            .resource::<crate::resources::SimConstants>()
+            .aspirations
+            .drift_sustain_duration
+            .ticks(world.resource::<TimeScale>());
+        // WARRIORS_PATH target -0.10; enter band < -0.10 - 0.25 = -0.35.
+        // Valence -0.05 is BELOW Mood::default() 0.2 (looks "low" naively)
+        // but ABOVE the entry threshold for this arc.
+        let cat = spawn_drift_cat(
+            &mut world,
+            "Warrior's Path",
+            AspirationDomain::Combat,
+            -0.05,
+        );
+
+        // Advance well past sustain duration.
+        for tick in 0..=(sustain + 1) {
+            world.resource_mut::<TimeState>().tick = tick;
+            schedule.run(&mut world);
+        }
+
+        assert_eq!(
+            world.get::<Aspirations>(cat).unwrap().active.len(),
+            1,
+            "aligned arc should not drop on absolute-low valence"
+        );
+        assert_eq!(
+            world.get::<Aspirations>(cat).unwrap().active[0].misaligned_since_tick,
+            None
+        );
+        assert_eq!(
+            world
+                .resource::<SystemActivation>()
+                .counts
+                .get(&Feature::AspirationDriftAbandoned)
+                .copied()
+                .unwrap_or(0),
+            0
+        );
+    }
+
+    /// Kinship carve-out: even with sustained low valence, the kinship
+    /// arc is exempt (parallels the 398 carve-out in
+    /// `check_aspiration_abandonment`).
+    #[test]
+    fn mood_drift_kinship_arc_is_exempt() {
+        let (mut world, mut schedule) = setup_drift_world();
+        let sustain = world
+            .resource::<crate::resources::SimConstants>()
+            .aspirations
+            .drift_sustain_duration
+            .ticks(world.resource::<TimeScale>());
+        // RAISE_OFFSPRING_ASPIRATION target 0.40; even with valence at
+        // the floor, the Kinship carve-out must skip the check.
+        let cat = spawn_drift_cat(
+            &mut world,
+            "Raise Offspring",
+            AspirationDomain::Kinship,
+            -1.0,
+        );
+
+        for tick in 0..=(sustain + 1) {
+            world.resource_mut::<TimeState>().tick = tick;
+            schedule.run(&mut world);
+        }
+
+        assert_eq!(
+            world.get::<Aspirations>(cat).unwrap().active.len(),
+            1,
+            "kinship arc must not drop via mood drift"
+        );
+        assert_eq!(
+            world
+                .resource::<SystemActivation>()
+                .counts
+                .get(&Feature::AspirationDriftAbandoned)
+                .copied()
+                .unwrap_or(0),
+            0
+        );
     }
 }

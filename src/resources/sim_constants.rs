@@ -6452,6 +6452,27 @@ pub struct AspirationConstants {
     pub chain_complete_mood_bonus: f32,
     pub chain_complete_mood_ticks: u64,
     pub chain_complete_purpose_gain: f32,
+    /// §7.7.d (ticket 055) hysteresis ENTER band. Mood drift-threshold
+    /// detection enters the misaligned state when
+    /// `Mood::valence < AspirationChain::expected_valence_target −
+    /// drift_enter_margin`. Author-set valence targets sit in
+    /// `[-0.20, 0.30]`; margin `0.25` puts the entry threshold at
+    /// `[-0.45, 0.05]`, comfortably below the `Mood::default()`
+    /// valence of `0.2`.
+    pub drift_enter_margin: f32,
+    /// §7.7.d hysteresis EXIT band. The cat must recover to
+    /// `Mood::valence > expected_valence_target − drift_exit_margin`
+    /// to clear the misaligned state. Must satisfy
+    /// `drift_exit_margin < drift_enter_margin` for true hysteresis —
+    /// the recovery threshold sits strictly above the entry threshold,
+    /// so a single positive contagion tick can't erase accumulated
+    /// misalignment.
+    pub drift_exit_margin: f32,
+    /// §7.7.d sustain duration. Once a cat enters the misaligned
+    /// band, the arc is dropped after `drift_sustain_duration` of
+    /// continuous misalignment. First-light value is conservative;
+    /// tune in a follow-on once soak cadence is known.
+    pub drift_sustain_duration: DurationDays,
 }
 
 impl Default for AspirationConstants {
@@ -6475,6 +6496,9 @@ impl Default for AspirationConstants {
             chain_complete_mood_bonus: 0.4,
             chain_complete_mood_ticks: 200,
             chain_complete_purpose_gain: 0.1,
+            drift_enter_margin: 0.25,
+            drift_exit_margin: 0.10,
+            drift_sustain_duration: DurationDays::new(2.0),
         }
     }
 }

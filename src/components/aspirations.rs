@@ -95,6 +95,15 @@ pub struct ActiveAspiration {
     pub adopted_tick: u64,
     /// Tick when progress last advanced (for abandonment check).
     pub last_progress_tick: u64,
+    /// §7.7.d mood drift-threshold detection (ticket 055). `None` while
+    /// `Mood::valence` sits within the arc's expected-valence band;
+    /// `Some(tick)` while in the misaligned band. Two-band hysteresis:
+    /// enters at `valence < expected_target − drift_enter_margin`,
+    /// exits at `valence > expected_target − drift_exit_margin`. When
+    /// the misaligned interval reaches `drift_sustain_duration`,
+    /// `check_aspiration_mood_drift` drops the arc.
+    #[serde(default)]
+    pub misaligned_since_tick: Option<u64>,
 }
 
 // ---------------------------------------------------------------------------
