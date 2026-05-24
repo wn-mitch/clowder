@@ -4235,19 +4235,32 @@ fn default_preservation_pressure_multiplier() -> f32 {
 
 /// 369 — minimum count of `ItemKind::Hide` items in Stores before
 /// the Tanning Frame BuildPressure channel begins accumulating.
-/// Mirrors `build_pressure_preservation_min_raw_food`. Default 5 —
-/// roughly one prey kill's worth of hide; tune up if Tanning Frames
+/// Mirrors `build_pressure_preservation_min_raw_food`. Default 2 —
+/// two prey-rabbit kills' worth of hide (rabbits each drop one
+/// `ItemKind::Hide` per the `PreyByproductConstants` default table).
+/// 461 dropped from 5 → 2 after 369's first-light soak showed the
+/// 5-threshold was never met in 900 ticks; tune up if Tanning Frames
 /// are over-elected at the expense of foundational infrastructure.
 fn default_build_pressure_tanning_min_hides() -> usize {
-    5
+    2
 }
 
-/// 369 — multiplier on tanning pressure accumulation rate. Default
-/// 1.0 matches the preservation channel's default; iteration can
-/// lift if first-light shows tanning frames lagging behind hide
-/// accumulation.
+/// 369 — multiplier on tanning pressure accumulation rate. 461
+/// lifted from 1.0 → 2.0 after the first-light soak showed the
+/// channel never winning `highest_actionable` against the 11
+/// competing channels in 900-sec verification windows even with
+/// the hide-anywhere signal: tanning frames are a non-foundational
+/// secondary structure, and at 1.0 they accumulate too slowly to
+/// fire before foundational + preservation channels saturate the
+/// one-build-at-a-time slot. 2.0 is roughly cooking-tier urgency
+/// (cooking sits at 1.5) — high enough to win the contest after
+/// foundational infrastructure stands up, low enough that hide
+/// accumulation still has to be real (the threshold gate, not
+/// just a constant pressure floor, gates election). Tune down if
+/// tanning frames over-elect at the expense of foundational
+/// infrastructure (Stores / Kitchen / Den).
 fn default_tanning_pressure_multiplier() -> f32 {
-    1.0
+    2.0
 }
 
 fn default_cook_directive_priority() -> f32 {

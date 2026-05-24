@@ -867,7 +867,14 @@ pub fn accumulate_build_pressure(
         ),
         With<Coordinator>,
     >,
-    cats: Query<(&Position, &crate::ai::CurrentAction), Without<Dead>>,
+    cats: Query<
+        (
+            &Position,
+            &crate::ai::CurrentAction,
+            &crate::components::magic::Inventory,
+        ),
+        Without<Dead>,
+    >,
     buildings: Query<(&crate::components::building::Structure, &Position)>,
     construction_sites: Query<&crate::components::building::ConstructionSite>,
     stored_items_query: Query<(
@@ -916,7 +923,7 @@ pub fn accumulate_build_pressure(
     // Cats sleeping without a Den nearby.
     let unsheltered_sleepers = cats
         .iter()
-        .filter(|(cat_pos, action)| {
+        .filter(|(cat_pos, action, _inv)| {
             action.action == crate::ai::Action::Sleep
                 && !buildings.iter().any(|(s, bpos)| {
                     s.kind == StructureType::Den && cat_pos.manhattan_distance(&s.center(bpos)) <= 4
@@ -973,6 +980,22 @@ pub fn accumulate_build_pressure(
     // by item kind across all Stores aggregates). Hide accumulates
     // from prey kills via the 375 byproducts pipeline; without a
     // TanningFrame the hide piles up unused.
+    //
+    // 461: also count hides cats are carrying in inventory. Pre-463
+    // (item-aspiration substrate), cats pick up Hide from prey-kill
+    // deposit sites and try to craft warrior's-kit items at the
+    // Workshop, failing with `CraftAtWorkshop: no workshop recipe
+    // fully satisfied by inventory` (a generic-marker eligibility
+    // pass + lex-pick resolver chooses recipes the cat can't satisfy)
+    // and end up hoarding the Hide rather than depositing it to Stores.
+    // The colony then never sees enough hide-in-Stores to fire the
+    // TanningFrame BuildPressure channel even though the supply is
+    // physically present. Counting across Stores ∪ Inventory is the
+    // bridge signal; once 463 lands `CraftItemAspiration`, cats will
+    // either craft hides immediately or release them to Stores, and
+    // the inventory term should approach zero — at that point the
+    // inventory-aware shape can revert to Stores-only if the welfare
+    // metric prefers it.
     let hide_items_in_stores = stored_items_query
         .iter()
         .filter(|(s, _)| s.kind == StructureType::Stores)
@@ -988,6 +1011,16 @@ pub fn accumulate_build_pressure(
                 .count()
         })
         .sum::<usize>();
+    let hide_items_in_inventories = cats
+        .iter()
+        .map(|(_, _, inv)| {
+            inv.slots
+                .iter()
+                .filter(|s| s.kind == crate::components::items::ItemKind::Hide)
+                .count()
+        })
+        .sum::<usize>();
+    let hide_items_anywhere = hide_items_in_stores + hide_items_in_inventories;
 
     let skilled_crafters = cats.iter().count(); // simplified: count living cats as proxy
                                                 // Wildlife inside colony area (within ~wildlife_breach_range tiles of any building).
@@ -1163,7 +1196,7 @@ pub fn accumulate_build_pressure(
         // `SimConstants.crafting.build_pressure_tanning_min_hides`
         // and `.tanning_pressure_multiplier`.
         let has_tanning_frame = has_structure(StructureType::TanningFrame);
-        if !has_tanning_frame && hide_items_in_stores >= cc.build_pressure_tanning_min_hides {
+        if !has_tanning_frame && hide_items_anywhere >= cc.build_pressure_tanning_min_hides {
             pressure.tanning_frame += rate * cc.tanning_pressure_multiplier;
         } else {
             pressure.tanning_frame *= BuildPressure::DECAY;
