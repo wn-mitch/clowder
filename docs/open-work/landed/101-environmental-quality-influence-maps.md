@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [environmental-quality.md]
 related-balance: []
-landed-at: pending
+landed-at: efb3dff4b2da
 landed-on: 2026-05-25
 ---
 
