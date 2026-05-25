@@ -148,4 +148,9 @@
         tier: Micro,
         action: Some(Idle),
     ),
+    (
+        text: "{name} picks one feather from a small pile of feathers, carries it three paces away, and looks satisfied.",
+        tier: Micro,
+        action: Some(Idle),
+    ),
 ]
