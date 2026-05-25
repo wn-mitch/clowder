@@ -1,7 +1,7 @@
 ---
 id: 199
 title: Hunt / production / consumption pipeline-walk skill (194 P4)
-status: parked
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: swarm-safe
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-25
 ---
 
 ## Why
@@ -86,3 +86,4 @@ intent and the parking rationale.
   demands the per-pipeline funnel view. Cluster
   `process-discipline`.
 - 2026-05-19: accuracy audit pass — parked status rationale verified, skill design deferred appropriately.
+- 2026-05-25: Retired: per-pipeline funnel skill not needed; second-instance demand never materialized.

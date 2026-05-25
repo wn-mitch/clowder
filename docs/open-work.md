@@ -16,9 +16,9 @@ _Last generated: 2026-05-25._
 |---|---|
 | In progress | 4 |
 | Ready | 121 |
-| Parked | 14 |
+| Parked | 13 |
 | Blocked | 32 |
-| **Open total** | **171** |
+| **Open total** | **170** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,9 +40,9 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 - **[463](docs/open-work/tickets/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — "CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick" — _[items-crafting] · score 0.93_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.92_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
 - **[325](docs/open-work/tickets/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables — _[ai-substrate] · score 0.91_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.91_
 
 ## Epic progress (5)
 
@@ -459,12 +459,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[467](docs/open-work/tickets/467-fish-on-water-hunt-shoreline-pounce-resolver-or-cat-eligibility-cut.md)** — Fish-on-water hunt — shoreline-pounce resolver or cat eligibility cut — _[wildlife] · added 2026-05-25_
 - **[468](docs/open-work/tickets/468-craftatworkshop-recipe-not-satisfied-new-plan-failure-surface-post-465.md)** — CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465 — _[items-crafting] · added 2026-05-25_
 
-## Parked (14)
+## Parked (13)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _[life-cycle] · parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _[ai-substrate] · parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _[ai-substrate] · parked 2026-04-27 · added 2026-04-27_
-- **[199](docs/open-work/tickets/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) — _[tooling-diagnostics-ui] · parked 2026-05-06 · added 2026-05-06_
 - **[212](docs/open-work/tickets/212-tune-caretake-food-security-weight.md)** — tune caretake_food_security_weight — _[life-cycle] · parked 2026-05-10 · added 2026-05-07_
 - **[214](docs/open-work/tickets/214-tune-patrol-fox-scent-weight.md)** — tune patrol_fox_scent_weight — _[combat-threat] · parked 2026-05-07 · added 2026-05-07_
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _[ai-substrate] · parked 2026-05-09 · added 2026-05-08_
@@ -511,13 +510,14 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 
-## Landed archive (325)
+## Landed archive (326)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (259)
+### 2026-05 (260)
 
 - **[465](docs/open-work/landed/465-cat-approach-pathing-failure-at-stalk-range.md)** — Cat approach pathing failure at stalk range _(2026-05-25)_
+- **[199](docs/open-work/landed/199-pipeline-walk-skill.md)** — Hunt / production / consumption pipeline-walk skill (194 P4) _(2026-05-25)_
 - **[101](docs/open-work/landed/101-environmental-quality-influence-maps.md)** — Environmental quality — five influence maps for ambient spatial pressure _(2026-05-25)_
 - **[464](docs/open-work/landed/464-tune-effective-stalk-distance-defaults-to-recover-hunt-success-rate-100-follow-on.md)** — Tune effective_stalk_distance defaults to recover hunt success rate (100 follow-on) _(2026-05-24)_
 - **[462](docs/open-work/landed/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md)** — HTN item-aspiration substrate: GoalKind enum + templated method registry + parameterized RetrieveCraftInputs(recipe.inputs) _(2026-05-24)_
