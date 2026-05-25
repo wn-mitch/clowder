@@ -3,6 +3,7 @@ id: 466
 title: TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
 added: 2026-05-25
 parked: null

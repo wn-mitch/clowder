@@ -2,36 +2,35 @@
 
 # Gameplay Enums
 
-24 key enumerations defining game mechanics.
+23 key enumerations defining game mechanics.
 
 ## Overview
 
 | Enum | Variants | Source |
 |------|----------|--------|
-| [ItemKind](#itemkind) | 30 | `src/components/items.rs` |
-| [DispositionKind](#dispositionkind) | 23 | `src/components/disposition.rs` |
+| [ItemKind](#itemkind) | 59 | `src/components/items.rs` |
+| [DispositionKind](#dispositionkind) | 28 | `src/components/disposition.rs` |
 | [Weather](#weather) | 8 | `src/resources/weather.rs` |
 | [Terrain](#terrain) | 21 | `src/resources/map.rs` |
-| [StructureType](#structuretype) | 11 | `src/components/building.rs` |
+| [StructureType](#structuretype) | 14 | `src/components/building.rs` |
 | [HerbKind](#herbkind) | 8 | `src/components/magic.rs` |
 | [WardKind](#wardkind) | 2 | `src/components/magic.rs` |
 | [ZodiacSign](#zodiacsign) | 8 | `src/components/zodiac.rs` |
 | [BondType](#bondtype) | 3 | `src/resources/relationships.rs` |
 | [DeathCause](#deathcause) | 3 | `src/components/physical.rs` |
-| [InjuryKind](#injurykind) | 3 | `src/components/physical.rs` |
 | [LifeStage](#lifestage) | 4 | `src/components/identity.rs` |
 | [Season](#season) | 4 | `src/resources/time.rs` |
 | [DayPhase](#dayphase) | 4 | `src/resources/time.rs` |
 | [PreyKind](#preykind) | 5 | `src/components/prey.rs` |
 | [FleeStrategy](#fleestrategy) | 4 | `src/components/prey.rs` |
 | [WildSpecies](#wildspecies) | 4 | `src/components/wildlife.rs` |
-| [EventKind](#eventkind) | 234 | `src/resources/event_log.rs` |
+| [EventKind](#eventkind) | 236 | `src/resources/event_log.rs` |
 | [NarrativeTier](#narrativetier) | 6 | `src/resources/narrative.rs` |
 | [PriorityKind](#prioritykind) | 4 | `src/resources/colony_priority.rs` |
 | [DirectiveKind](#directivekind) | 10 | `src/components/coordination.rs` |
 | [StepKind](#stepkind) | 36 | `src/components/task_chain.rs` |
 | [ZoneKind](#zonekind) | 3 | `src/components/zone.rs` |
-| [AspirationDomain](#aspirationdomain) | 7 | `src/components/aspirations.rs` |
+| [AspirationDomain](#aspirationdomain) | 13 | `src/components/aspirations.rs` |
 
 ---
 
@@ -76,6 +75,35 @@
 | `Shelf` | — | — |
 | `Wood` | — | — |
 | `Stone` | — | — |
+| `RemedyHealingPoultice` | — | — |
+| `RemedyEnergyTonic` | — | — |
+| `RemedyMoodTonic` | — | — |
+| `RawOrgan` | — | 0.4 |
+| `Bone` | — | — |
+| `Sinew` | — | — |
+| `Whisker` | — | — |
+| `Hide` | — | — |
+| `FishScale` | — | — |
+| `Tallow` | — | — |
+| `DriedFish` | — | 0.49 |
+| `SmokedMeat` | — | 0.64 |
+| `PreservedOrgan` | — | 0.3 |
+| `Twig` | — | — |
+| `Bristle` | — | — |
+| `Fiber` | — | — |
+| `Flower` | — | — |
+| `PolishedStone` | — | — |
+| `GroomingBrush` | — | — |
+| `PlayBundle` | — | — |
+| `CourtshipGift` | — | — |
+| `BoneTipSpear` | — | — |
+| `BoneStiletto` | — | — |
+| `FlintBlade` | — | — |
+| `HideBracers` | — | — |
+| `HidePlatedWrap` | — | — |
+| `Sling` | — | — |
+| `WovenReedCloak` | — | — |
+| `ToothNotchedClub` | — | — |
 
 ## DispositionKind
 
@@ -106,6 +134,11 @@
 | `PickingUp` |
 | `Fleeing` |
 | `Burying` |
+| `DryingFood` |
+| `SmokingMeat` |
+| `TendingSmokingRack` |
+| `Crafting` |
+| `Begging` |
 
 ## Weather
 
@@ -167,6 +200,9 @@
 | `Wall` |
 | `Gate` |
 | `Midden` |
+| `DryingRack` |
+| `SmokingRack` |
+| `TanningFrame` |
 
 ## HerbKind
 
@@ -226,16 +262,6 @@
 | `Starvation` |
 | `OldAge` |
 | `Injury` |
-
-## InjuryKind
-
-*Source: `src/components/physical.rs`*
-
-| Variant |
-|---------|
-| `Minor` |
-| `Moderate` |
-| `Severe` |
 
 ## LifeStage
 
@@ -338,6 +364,8 @@
 | `is_pregnant` |
 | `season` |
 | `social_warmth` |
+| `parenting` |
+| `goal_state` |
 | `FoodLevel` |
 | `current` |
 | `capacity` |
@@ -652,4 +680,10 @@
 | `Exploration` |
 | `Building` |
 | `Leadership` |
+| `Kinship` |
+| `Weaving` |
+| `BoneShaping` |
+| `Hidework` |
+| `Pigment` |
+| `Cairn` |
 

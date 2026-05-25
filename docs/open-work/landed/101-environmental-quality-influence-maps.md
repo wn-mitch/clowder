@@ -1,7 +1,7 @@
 ---
 id: 101
 title: Environmental quality — five influence maps for ambient spatial pressure
-status: ready
+status: done
 cluster: belief-perception
 orchestration: substrate-sensitive
 initiative: [environmental-simulation]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [environmental-quality.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-25
 ---
 
 ## Why
@@ -250,3 +250,4 @@ Follow the `CarcassScentMap` pattern in `src/resources/`:
   table locked: comfort→warmth/(1−independence), cleanliness→anxiety,
   beauty→spirituality, mystery→curiosity, corruption→none.
 - 2026-05-19: accuracy audit pass — ready status correct; blocked-by 100 correct (tremor influence map infrastructure prerequisite); EnvironmentalQualityModifier symbol exists in src/ai/eval.rs.
+- 2026-05-25: Landed via env-quality first-light soak. Verdict concern, survival pass, env-quality positive canary fires 50/cycle and negative fires 84/cycle. Drift bundled with intervening commits — re-baseline before any per-ticket tuning.

@@ -1016,6 +1016,12 @@ pub fn evaluate_dispositions(
             // 301: coordinator-stamped ward-placement intent at cat's
             // position. Dormant at default; see `goap.rs` mirror site.
             ward_intent_at_position: colony.ward_intent_map.get(pos.x, pos.y),
+            // 101: env-quality influence-map samples at the cat's tile.
+            local_comfort: colony.comfort_map.get(pos.x, pos.y),
+            local_cleanliness: colony.cleanliness_map.get(pos.x, pos.y),
+            local_beauty: colony.beauty_map.get(pos.x, pos.y),
+            local_mystery: colony.mystery_map.get(pos.x, pos.y),
+            local_corruption: colony.corruption_influence_map.get(pos.x, pos.y),
             // 209: per-cat proxy for colony-tension; see goap.rs
             // construction site for rationale.
             colony_tension_recent: (1.0 - needs.safety).clamp(0.0, 1.0),

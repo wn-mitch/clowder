@@ -516,6 +516,28 @@ pub struct ScoringContext<'a> {
     /// populated. Surfaced in `ctx_scalars` for `trace-*.jsonl`
     /// visibility.
     pub ward_intent_at_position: f32,
+    /// 101 — `ComfortMap` sample at the cat's current tile. Combined
+    /// with the `warmth` / `independence` personality axes inside
+    /// `EnvironmentalQualityModifier`. Range `[-1.0, 1.0]`.
+    pub local_comfort: f32,
+    /// 101 — `CleanlinessMap` sample at the cat's current tile.
+    /// Combined with `anxiety` inside `EnvironmentalQualityModifier`.
+    /// Range `[-1.0, 1.0]`.
+    pub local_cleanliness: f32,
+    /// 101 — `BeautyMap` sample. Combined with `spirituality`.
+    /// Range `[-1.0, 1.0]`.
+    pub local_beauty: f32,
+    /// 101 — `MysteryMap` sample. Combined with `curiosity`.
+    /// Range `[-1.0, 1.0]`.
+    pub local_mystery: f32,
+    /// 101 — `CorruptionInfluenceMap` sample. **Not** consumed by
+    /// `EnvironmentalQualityModifier`; surfaced as `local_corruption`
+    /// in `ctx_scalars` so future DSEs / considerations can read the
+    /// gradient before a cat steps into a corrupted tile. The magic
+    /// system's `corruption_tile_effects` continues to point-sample
+    /// `TileMap.corruption` directly. Range `[0.0, 1.0]` in practice
+    /// (corruption is positive-only).
+    pub local_corruption: f32,
     /// 209: Colony-tension proxy — currently `(1 - needs.safety)` of
     /// the cat being scored. Consumed by `TensionDefusionGroomLift`
     /// modifier as the "is the colony stressed enough that
@@ -853,6 +875,12 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs, m: &mut HashMap<&'stat
     m.insert("temper", ctx.personality.temper.clamp(0.0, 1.0));
     m.insert("playfulness", ctx.personality.playfulness.clamp(0.0, 1.0));
     m.insert("warmth", ctx.personality.warmth.clamp(0.0, 1.0));
+    // 101: surfaced for EnvironmentalQualityModifier's cleanliness-axis
+    // scaling. Anxiety has no other modifier-pipeline consumer at land,
+    // so the scalar is otherwise unused — but the personality axis is
+    // already part of the canonical 18-axis kit, so exposing it here
+    // is a one-line wiring with no balance impact on existing DSEs.
+    m.insert("anxiety", ctx.personality.anxiety.clamp(0.0, 1.0));
     m.insert("ambition", ctx.personality.ambition.clamp(0.0, 1.0));
     m.insert("compassion", ctx.personality.compassion.clamp(0.0, 1.0));
     // Phase 4c.4 alloparenting Reframe A: bond-weighted compassion for
@@ -1032,6 +1060,17 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs, m: &mut HashMap<&'stat
         "recent_ambush_at_position",
         ctx.recent_ambush_at_position.clamp(0.0, 1.0),
     );
+    // 101 — env-quality scalars. Signed range `[-1.0, 1.0]`. The four
+    // mood-relevant axes (comfort / cleanliness / beauty / mystery)
+    // thread through `EnvironmentalQualityModifier`; `local_corruption`
+    // is exposed for spatial-perception consumers that read the
+    // gradient (no modifier consumes it — magic system owns
+    // corruption's behavioural response).
+    m.insert("local_comfort", ctx.local_comfort.clamp(-1.0, 1.0));
+    m.insert("local_cleanliness", ctx.local_cleanliness.clamp(-1.0, 1.0));
+    m.insert("local_beauty", ctx.local_beauty.clamp(-1.0, 1.0));
+    m.insert("local_mystery", ctx.local_mystery.clamp(-1.0, 1.0));
+    m.insert("local_corruption", ctx.local_corruption.clamp(0.0, 1.0));
     // 263: per-cat `LocationBeliefs.recency_of_threat_cue` facet at
     // the cat's patrol perimeter anchor bucket. Dormant in DSE
     // scoring at land (patrol_threat_recency_weight = 0.0); emitted
@@ -3117,6 +3156,11 @@ mod tests {
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
+            local_comfort: 0.0,
+            local_cleanliness: 0.0,
+            local_beauty: 0.0,
+            local_mystery: 0.0,
+            local_corruption: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             territory_max_corruption: 0.0,
@@ -3323,6 +3367,11 @@ mod tests {
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
+            local_comfort: 0.0,
+            local_cleanliness: 0.0,
+            local_beauty: 0.0,
+            local_mystery: 0.0,
+            local_corruption: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             territory_max_corruption: 0.0,
@@ -3553,6 +3602,11 @@ mod tests {
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
+            local_comfort: 0.0,
+            local_cleanliness: 0.0,
+            local_beauty: 0.0,
+            local_mystery: 0.0,
+            local_corruption: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             territory_max_corruption: 0.0,
@@ -3846,6 +3900,11 @@ mod tests {
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
+            local_comfort: 0.0,
+            local_cleanliness: 0.0,
+            local_beauty: 0.0,
+            local_mystery: 0.0,
+            local_corruption: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             territory_max_corruption: 0.0,
@@ -4000,6 +4059,11 @@ mod tests {
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
+            local_comfort: 0.0,
+            local_cleanliness: 0.0,
+            local_beauty: 0.0,
+            local_mystery: 0.0,
+            local_corruption: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             territory_max_corruption: 0.0,
@@ -4166,6 +4230,11 @@ mod tests {
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
+            local_comfort: 0.0,
+            local_cleanliness: 0.0,
+            local_beauty: 0.0,
+            local_mystery: 0.0,
+            local_corruption: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             territory_max_corruption: 0.0,
@@ -4565,6 +4634,11 @@ mod tests {
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
+            local_comfort: 0.0,
+            local_cleanliness: 0.0,
+            local_beauty: 0.0,
+            local_mystery: 0.0,
+            local_corruption: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             territory_max_corruption: 0.0,
@@ -4701,6 +4775,11 @@ mod tests {
             recent_ambush_at_position: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
+            local_comfort: 0.0,
+            local_cleanliness: 0.0,
+            local_beauty: 0.0,
+            local_mystery: 0.0,
+            local_corruption: 0.0,
             colony_tension_recent: 0.0,
             carcass_nearby: false,
             territory_max_corruption: 0.0,

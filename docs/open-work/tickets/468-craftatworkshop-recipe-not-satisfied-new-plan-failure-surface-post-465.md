@@ -3,6 +3,7 @@ id: 468
 title: CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465
 status: ready
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-25
 parked: null

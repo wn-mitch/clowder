@@ -53,6 +53,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Time anchor | *[Aspirational]* | — | [doc](../systems/time-anchor.md) |
 | Trade & Visitors | *[Aspirational]* | — | [doc](../systems/trade.md) |
 | Warmth Split — temperature need vs social warmth fulfillment axis | *[Aspirational]* | — | [doc](../systems/warmth-split.md) |
+| WorldSnapshots — cross-system per-tick aggregates | *[Aspirational]* | — | [doc](../systems/world-snapshots.md) |
 
 ## Undocumented Modules
 
@@ -60,9 +61,11 @@ System modules with registered functions but no design doc:
 
 - **affordance_writer**: affordance_writer
 - **aspiration_picker**: pick_aspiration_emissions
-- **aspirations**: update_training_markers, update_mentoring_target_markers, select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
+- **aspirations**: update_training_markers, update_mentoring_target_markers, adopt_kinship_aspiration, select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
 - **belief_integrator**: gossip_inventory_observations, integrate_beliefs
+- **cat_movement**: emit_cat_moved_messages
 - **colony_score**: emit_colony_score
+- **env_quality**: update_env_quality_maps, emit_env_quality_features
 - **fate**: assign_fated_connections, awaken_fated_connections
 - **fertility**: handle_post_partum_reinsert, update_fertility_phase
 - **fox_goap**: sync_fox_needs, fox_evaluate_and_plan, fox_resolve_goap_plans, feed_cubs_at_dens, resolve_paired_confrontations
@@ -73,13 +76,16 @@ System modules with registered functions but no design doc:
 - **hawk_goap**: hawk_needs_tick, sync_hawk_needs, hawk_evaluate_and_plan, hawk_resolve_goap_plans, hawk_lifecycle_tick
 - **incapacitation**: update_incapacitation
 - **interoception**: author_self_markers
+- **parenting_activity**: ParentingScalars, update_parenting_activity_biological, tick_parental_engagement, populate_parenting_scalars
 - **plan_substrate**: expire_reservations, sensors, update_prev_safety_deficit
 - **pregnancy**: tick_pregnancy
+- **preservation**: advance_preservation_drying
 - **prey**: prey_population, prey_hunger, prey_ai, prey_scent_tick, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
-- **sensing**: update_terrain_markers, update_target_existence_markers
+- **sensing**: tremor_tick, update_terrain_markers, update_target_existence_markers, update_hide_eligible_markers
 - **snake_goap**: snake_needs_tick, sync_snake_needs, snake_evaluate_and_plan, snake_resolve_goap_plans, snake_lifecycle_tick
 - **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
 - **task_chains**: resolve_task_chains
 - **trace_emit**: emit_focal_trace
 - **wildlife**: shadowfox_coherence_tick, shadowfox_motivation_tick, shadowfox_haunting_drain, spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, update_recent_ambush_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
+- **world_snapshots**: populate_world_snapshots
 

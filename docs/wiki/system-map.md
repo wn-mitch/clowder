@@ -8,6 +8,9 @@ How systems execute each tick in `SimulationPlugin::build()`.
 
 ```mermaid
 graph TD
+    subgraph chain1["Chain 1: World Simulation"]
+        preservation_advance_preservation_drying["preservation::advance_preservation_drying"]
+    end
     subgraph chain1_5["Chain 1.5: Items & Den Management"]
         items_prune_stored_items["items::prune_stored_items"]
         items_sync_food_stores["items::sync_food_stores"]
@@ -47,10 +50,20 @@ graph TD
         aspirations_update_training_markers --> aspirations_update_mentoring_target_markers
         growth_update_parent_markers["growth::update_parent_markers"]
         aspirations_update_mentoring_target_markers --> growth_update_parent_markers
+        aspirations_adopt_kinship_aspiration["aspirations::adopt_kinship_aspiration"]
+        growth_update_parent_markers --> aspirations_adopt_kinship_aspiration
+        parenting_activity_update_parenting_activity_biological["parenting_activity::update_parenting_activity_biological"]
+        aspirations_adopt_kinship_aspiration --> parenting_activity_update_parenting_activity_biological
+        parenting_activity_tick_parental_engagement["parenting_activity::tick_parental_engagement"]
+        parenting_activity_update_parenting_activity_biological --> parenting_activity_tick_parental_engagement
+        parenting_activity_populate_parenting_scalars["parenting_activity::populate_parenting_scalars"]
+        parenting_activity_tick_parental_engagement --> parenting_activity_populate_parenting_scalars
         sensing_update_target_existence_markers["sensing::update_target_existence_markers"]
-        growth_update_parent_markers --> sensing_update_target_existence_markers
+        parenting_activity_populate_parenting_scalars --> sensing_update_target_existence_markers
+        sensing_update_hide_eligible_markers["sensing::update_hide_eligible_markers"]
+        sensing_update_target_existence_markers --> sensing_update_hide_eligible_markers
         fox_spatial_update_store_awareness_markers["fox_spatial::update_store_awareness_markers"]
-        sensing_update_target_existence_markers --> fox_spatial_update_store_awareness_markers
+        sensing_update_hide_eligible_markers --> fox_spatial_update_store_awareness_markers
         fox_spatial_update_den_threat_markers["fox_spatial::update_den_threat_markers"]
         fox_spatial_update_store_awareness_markers --> fox_spatial_update_den_threat_markers
         fox_spatial_update_ward_detection_markers["fox_spatial::update_ward_detection_markers"]
@@ -138,7 +151,11 @@ graph TD
         buildings_process_gates --> buildings_tidy_buildings
     end
     subgraph chain4["Chain 4: Social, Combat, Death & Narrative"]
+        cat_movement_emit_cat_moved_messages["cat_movement::emit_cat_moved_messages"]
+        social_update_near_pair_cache["social::update_near_pair_cache"]
+        cat_movement_emit_cat_moved_messages --> social_update_near_pair_cache
         social_passive_familiarity["social::passive_familiarity"]
+        social_update_near_pair_cache --> social_passive_familiarity
         personality_friction_personality_friction["personality_friction::personality_friction"]
         social_passive_familiarity --> personality_friction_personality_friction
         social_check_bonds["social::check_bonds"]
@@ -183,8 +200,10 @@ graph TD
         magic_update_ward_coverage_markers --> magic_update_ward_siege_marker
         goap_evaluate_and_plan["goap::evaluate_and_plan"]
         magic_update_ward_siege_marker --> goap_evaluate_and_plan
+        world_snapshots_populate_world_snapshots["world_snapshots::populate_world_snapshots"]
+        goap_evaluate_and_plan --> world_snapshots_populate_world_snapshots
         aspiration_picker_pick_aspiration_emissions["aspiration_picker::pick_aspiration_emissions"]
-        goap_evaluate_and_plan --> aspiration_picker_pick_aspiration_emissions
+        world_snapshots_populate_world_snapshots --> aspiration_picker_pick_aspiration_emissions
         goap_resolve_goap_plans["goap::resolve_goap_plans"]
         aspiration_picker_pick_aspiration_emissions --> goap_resolve_goap_plans
         goap_emit_plan_narrative["goap::emit_plan_narrative"]
@@ -194,6 +213,7 @@ graph TD
     end
     subgraph standalone["Standalone Systems"]
         magic_CorruptionPushback["magic::CorruptionPushback"]
+        parenting_activity_ParentingScalars["parenting_activity::ParentingScalars"]
         time_advance_time["time::advance_time"]
         weather_update_weather["weather::update_weather"]
         wind_update_wind["wind::update_wind"]
@@ -201,6 +221,8 @@ graph TD
         magic_corruption_spread["magic::corruption_spread"]
         magic_ward_decay["magic::ward_decay"]
         magic_update_ward_coverage_map["magic::update_ward_coverage_map"]
+        coordination_update_colony_center["coordination::update_colony_center"]
+        coordination_update_colony_district_map["coordination::update_colony_district_map"]
         magic_herb_seasonal_check["magic::herb_seasonal_check"]
         magic_advance_herb_growth["magic::advance_herb_growth"]
         magic_advance_flavor_growth["magic::advance_flavor_growth"]
@@ -243,6 +265,7 @@ graph TD
         prey_prey_hunger["prey::prey_hunger"]
         prey_prey_ai["prey::prey_ai"]
         prey_prey_scent_tick["prey::prey_scent_tick"]
+        sensing_tremor_tick["sensing::tremor_tick"]
         prey_prey_den_lifecycle["prey::prey_den_lifecycle"]
         wildlife_detect_threats["wildlife::detect_threats"]
         buildings_apply_building_effects["buildings::apply_building_effects"]
@@ -251,6 +274,8 @@ graph TD
         buildings_update_food_location_map["buildings::update_food_location_map"]
         buildings_update_garden_location_map["buildings::update_garden_location_map"]
         buildings_update_construction_site_map["buildings::update_construction_site_map"]
+        env_quality_update_env_quality_maps["env_quality::update_env_quality_maps"]
+        env_quality_emit_env_quality_features["env_quality::emit_env_quality_features"]
         items_decay_items["items::decay_items"]
         disposition_cat_scent_tick["disposition::cat_scent_tick"]
         disposition_cat_patrol_deterrent_tick["disposition::cat_patrol_deterrent_tick"]

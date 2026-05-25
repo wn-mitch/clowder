@@ -54,7 +54,7 @@ use bevy::prelude::Entity;
 
 use crate::ai::dse::{DseId, EvalCtx};
 use crate::ai::eval::{ModifierPipeline, ScoreModifier};
-use crate::resources::sim_constants::ScoringConstants;
+use crate::resources::sim_constants::{EnvironmentalQualityConstants, ScoringConstants};
 
 // ---------------------------------------------------------------------------
 // Scalar keys
@@ -64,6 +64,19 @@ use crate::resources::sim_constants::ScoringConstants;
 // scalar surface (`ctx_scalars` in `scoring.rs`). Keys are duplicated
 // here as `&'static str` constants so drift between modifier triggers
 // and `ctx_scalars` producers is visible at grep time.
+
+// 101 — env-quality scalar keys. Mirrors `ctx_scalars` producer
+// keys in `scoring.rs`; per-cat personality scaling is fetched from
+// the existing `WARMTH` / `INDEPENDENCE` / `ANXIETY` / `SPIRITUALITY` /
+// `CURIOSITY` axes published by `ctx_scalars`.
+const LOCAL_COMFORT: &str = "local_comfort";
+const LOCAL_CLEANLINESS: &str = "local_cleanliness";
+const LOCAL_BEAUTY: &str = "local_beauty";
+const LOCAL_MYSTERY: &str = "local_mystery";
+const WARMTH: &str = "warmth";
+const ANXIETY: &str = "anxiety";
+const SPIRITUALITY: &str = "spirituality";
+const CURIOSITY: &str = "curiosity";
 
 // §3.5.1 modifier trigger inputs.
 const RESPECT: &str = "respect";
@@ -2463,6 +2476,120 @@ impl ScoreModifier for ThermalDistress {
 }
 
 // ---------------------------------------------------------------------------
+// EnvironmentalQualityModifier — ticket 101
+// ---------------------------------------------------------------------------
+
+/// Ticket 101 — ambient spatial pressure on stay-and-engage DSEs.
+///
+/// **Trigger:** any cat reading the four mood-relevant env-quality
+/// maps (`local_comfort`, `local_cleanliness`, `local_beauty`,
+/// `local_mystery`) — by construction every cat does, so the modifier
+/// is "always on" but reduces to a no-op when the maps read zero.
+///
+/// **Transform:** additive shift by [`combined_env_quality`][cev]
+/// (clamped to `[combined_min, combined_max]`, default `[-0.3, 0.3]`).
+/// Positive shift lifts stay-and-engage DSEs (a cat in a comfortable
+/// spot prefers to stay and engage with what it's doing); negative
+/// shift dampens them (a cat in a bad spot prefers to leave). Softmax
+/// is shift-invariant on global lifts, so this modifier targets a
+/// subset of DSEs — non-targeted movement DSEs (Wander, Explore,
+/// Patrol, Forage, Hunt, Flee, Hide) stay unmoved, making the modifier
+/// a relative-preference shift rather than a no-op.
+///
+/// **Applies to:** Sleep, Idle, GroomSelf, GroomOther, Socialize —
+/// the five clearest stay-and-engage DSEs. Future tickets can broaden
+/// the affected set (Mentor / Caretake / Mate / Cook / Build / etc.)
+/// once first-light soak data confirms the shape works.
+///
+/// **Personality scaling** lives inside [`combined_env_quality`][cev]
+/// — `warmth` and `independence` modulate comfort, `anxiety` amplifies
+/// cleanliness response, `spirituality` scales beauty, `curiosity`
+/// scales mystery. `local_corruption` is **not** consumed here; the
+/// magic system owns the response to corruption.
+///
+/// **Gated-boost contract:** returns `score` unchanged on score `<= 0`
+/// — environmental comfort does not resurrect a DSE the Maslow gate
+/// suppressed. Preserves the §3.5.1 gated-additive-boost pattern.
+///
+/// [cev]: crate::resources::env_quality::combined_env_quality
+pub struct EnvironmentalQualityModifier {
+    constants: EnvironmentalQualityConstants,
+}
+
+impl EnvironmentalQualityModifier {
+    pub fn new(constants: &EnvironmentalQualityConstants) -> Self {
+        Self {
+            constants: constants.clone(),
+        }
+    }
+
+    /// True when this modifier should lift / dampen `dse_id`. Pulled
+    /// out as a method so the verification test can read the targeted
+    /// set without recomputing the match.
+    fn affects(dse_id: DseId) -> bool {
+        matches!(
+            dse_id.0,
+            SLEEP | IDLE | GROOM_SELF | GROOM_OTHER | SOCIALIZE
+        )
+    }
+
+    /// Replicates `combined_env_quality` over the scalar-fetch surface
+    /// — the modifier-pipeline can't access the resource directly, so
+    /// it pulls the four maps' per-cat samples and the personality
+    /// axes through the fetcher and runs the math here.
+    fn combined(&self, ctx: &EvalCtx, fetch: &dyn Fn(&str, Entity) -> f32) -> f32 {
+        let warmth = fetch(WARMTH, ctx.cat);
+        let independence = fetch(INDEPENDENCE, ctx.cat);
+        let anxiety = fetch(ANXIETY, ctx.cat);
+        let spirituality = fetch(SPIRITUALITY, ctx.cat);
+        let curiosity = fetch(CURIOSITY, ctx.cat);
+
+        let comfort = fetch(LOCAL_COMFORT, ctx.cat);
+        let cleanliness = fetch(LOCAL_CLEANLINESS, ctx.cat);
+        let beauty = fetch(LOCAL_BEAUTY, ctx.cat);
+        let mystery = fetch(LOCAL_MYSTERY, ctx.cat);
+
+        let c = &self.constants;
+        let comfort_contrib = comfort
+            * (1.0 + warmth * c.warmth_bonus)
+            * (1.0 - independence * c.independence_dampen);
+        let cleanliness_contrib = cleanliness * (1.0 + anxiety * c.anxiety_bonus);
+        let beauty_contrib = beauty * (1.0 + spirituality * c.spirituality_bonus);
+        let mystery_contrib = mystery * (1.0 + curiosity * c.curiosity_bonus);
+
+        let combined = (comfort_contrib + cleanliness_contrib + beauty_contrib + mystery_contrib)
+            * c.combination_weight;
+        combined.clamp(c.combined_min, c.combined_max)
+    }
+}
+
+impl ScoreModifier for EnvironmentalQualityModifier {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !Self::affects(dse_id) {
+            return score;
+        }
+        if score <= 0.0 {
+            return score;
+        }
+        let combined = self.combined(ctx, fetch);
+        if combined == 0.0 {
+            return score;
+        }
+        score + combined
+    }
+
+    fn name(&self) -> &'static str {
+        "environmental_quality"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // ThreatProximityAdrenalineFlee — ticket 108
 // ---------------------------------------------------------------------------
 
@@ -3791,6 +3918,18 @@ pub fn default_modifier_pipeline(
     pipeline.push(Box::new(TensionDefusionGroomLift::new(sc)));
     pipeline.push(Box::new(ExhaustionPressure::new(sc)));
     pipeline.push(Box::new(ThermalDistress::new(sc)));
+    // Ticket 101 — `EnvironmentalQualityModifier` registers after the
+    // foundational pressure modifiers (107 / 110) and before the
+    // adrenaline / damp modifiers. Additive lift on stay-and-engage
+    // DSEs (Sleep / Idle / GroomSelf / GroomOther / Socialize) keyed on
+    // the four mood-relevant env-quality maps; `local_corruption` is
+    // exposed as a perception scalar but not consumed here. Default
+    // tuning is gentle (`combination_weight = 0.5`, clamp ±0.3) so the
+    // first-light land doesn't disturb existing balance; future tuning
+    // tickets can lift the weight or broaden the affected DSE set.
+    pipeline.push(Box::new(EnvironmentalQualityModifier::new(
+        &constants.environmental_quality,
+    )));
     // Ticket 108 — `ThreatProximityAdrenalineFlee` registers after the
     // pressure modifiers (106 / 107 / 110) and before the
     // multiplicative damps. Composes additively with 047's Flee
@@ -4709,7 +4848,10 @@ mod tests {
         // `IntraspeciesConflictResponseFreeze` (Hide-targeting sibling
         // of `IntraspeciesConflictResponseFlight`; ships inert at
         // hide_lift = 0.0).
-        assert_eq!(pipeline.len(), 37, "expected 37 registered modifiers");
+        // 101: bumped 37 → 38 with `EnvironmentalQualityModifier`
+        // (additive lift on Sleep/Idle/GroomSelf/GroomOther/Socialize
+        // keyed on the five env-quality influence maps).
+        assert_eq!(pipeline.len(), 38, "expected 38 registered modifiers");
     }
 
     // -----------------------------------------------------------------------

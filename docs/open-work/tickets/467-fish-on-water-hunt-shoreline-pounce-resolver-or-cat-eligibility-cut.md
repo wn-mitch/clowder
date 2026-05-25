@@ -3,6 +3,7 @@ id: 467
 title: Fish-on-water hunt — shoreline-pounce resolver or cat eligibility cut
 status: ready
 cluster: wildlife
+orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
 added: 2026-05-25
 parked: null

@@ -24,9 +24,23 @@ consideration axis.
 | Mystery | `Tile.mystery` radiated outward | `curiosity` |
 | Corruption | `Tile.corruption` radiated outward | — (magic system owns response) |
 
-Maps are rebuilt on a cadence (not per-tick). The update system does a single
-sweep: clear → terrain loop → building query → dead-entity query → weather
-overlay → clamp to `[−1.0, 1.0]`.
+Maps are rebuilt every tick by `update_env_quality_maps` (registered after
+`decay_building_condition`). The sweep is a single pass: clear → terrain loop
+over `TileMap` → buildings query → unburied-dead query → weather overlay →
+clamp to `[−1.0, 1.0]`. Sources change slowly (building decay, dead entities,
+weather phase shifts), so a tighter cadence would buy little; matching the
+precedent of every existing influence-map writer keeps the substrate visible
+to soak-trace verification on every recorded tick. Resolution is true tile
+(120×90 grid, `bucket_size = 1`) so the 1–3 tile stamping radii produce
+meaningful spatial gradients rather than step functions.
+
+The `Feature::EnvironmentalComfortPositive` / `Negative` canaries are emitted
+by a companion system `emit_env_quality_features` that runs immediately after
+the sweep. It mirrors the modifier's combine math, samples each living cat's
+tile, and records the feature when at least one cat clears
+`feature_emit_threshold`. The companion exists because `ScoreModifier::apply`
+is pure (no `SystemActivation` access) — see the 101 plan for the design
+rationale.
 
 Corruption's map is spatial perception infrastructure — cats sense the gradient
 before stepping on a hot tile. The magic system's behavioral response (health
@@ -41,8 +55,15 @@ without additional plumbing.
 
 ## Modifier Formula
 
-`EnvironmentalQualityModifier` in the modifier pipeline combines the four
-mood-relevant maps with personality scaling:
+`EnvironmentalQualityModifier` registers in `default_modifier_pipeline` after
+`ThermalDistress`. It applies a per-cat additive shift to a curated set of
+*stay-and-engage* DSEs (Sleep / Idle / GroomSelf / GroomOther / Socialize) —
+the modifier targets a subset of DSEs because softmax is shift-invariant on a
+global lift, so an "ambient quality" shift only changes behaviour if it lifts
+some DSEs relative to others. Movement DSEs (Wander, Explore, Patrol, Forage,
+Hunt, Flee, Hide) are unaffected at first land; future tickets can broaden
+the affected DSE set if soak data warrants it. The combine math reads the
+four mood-relevant maps with personality scaling:
 
 ```
 comfort_contrib     = local_comfort     × (1.0 + warmth × 0.3) × (1.0 − independence × 0.2)

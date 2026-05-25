@@ -2397,6 +2397,15 @@ pub fn evaluate_and_plan(
             // but unwritten because the populator short-circuits under
             // `ward_placement_semantics == SingleShotArgmax`.
             ward_intent_at_position: colony.ward_intent_map.get(pos.x, pos.y),
+            // 101: env-quality influence-map samples at the cat's tile.
+            // The four mood-relevant maps feed
+            // `EnvironmentalQualityModifier`; `local_corruption` is
+            // surfaced as a perception scalar for future DSE consumers.
+            local_comfort: colony.comfort_map.get(pos.x, pos.y),
+            local_cleanliness: colony.cleanliness_map.get(pos.x, pos.y),
+            local_beauty: colony.beauty_map.get(pos.x, pos.y),
+            local_mystery: colony.mystery_map.get(pos.x, pos.y),
+            local_corruption: colony.corruption_influence_map.get(pos.x, pos.y),
             // 209: per-cat proxy for colony-tension. `(1 - safety)` is
             // the cat's current threat-deficit; consumed by the
             // `TensionDefusionGroomLift` modifier (dormant at 0.0).

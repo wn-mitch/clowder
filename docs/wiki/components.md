@@ -2,7 +2,7 @@
 
 # Components
 
-169 component types derived from `#[derive(Component)]`.
+207 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspiration_emission.rs`
 
@@ -79,6 +79,16 @@
 |-------|------|
 | `reserves` | `HashMap<ResourceKind, ReserveBelief>` |
 
+## `src/components/body_zones.rs`
+
+### CatBodyModel (struct)
+
+> Anatomical body model for a cat (13 parts). Replaces `Health.injuries: Vec<Injury>` as the canonical injury substrate; ships co-resident with `Health` during Stage A and becomes sole source of truth at Stage B cutover.
+
+| Field | Type |
+|-------|------|
+| `parts` | `[BodyPartState; CAT_BODY_PART_COUNT]` |
+
 ## `src/components/building.rs`
 
 ### ColonyWell (struct)
@@ -124,6 +134,14 @@
 |-------|------|
 | `items` | `Vec<Entity>` |
 
+### StoredHerbs (struct)
+
+> Ticket 084: per-Stores aggregate count of stashed herbs, keyed by `HerbKind`. Sibling to `StoredItems` (food/material Entities), but herbs stash as a lightweight count rather than spawned Item entities — matches the existing `Inventory.slots` herb representation, where herb slots carry no Entity identity and no per-instance modifiers. Capacity is per-kind and provided by the caller (sourced from `ScoringConstants::stores_herb_capacity_per_kind`).  Lifecycle: - Inserted on every `StructureType::Stores` at construction (`steps/building/construct.rs`). - Mutated by `resolve_deposit_herbs_to_stores` (add) and `resolve_retrieve_herbs_from_stores(kind)` (take). - Aggregated by `update_colony_building_markers` to author `HasStoredThornbriar` and (Commit 3) `ColonyThornbriarChronicallyLow`.
+
+| Field | Type |
+|-------|------|
+| `counts` | `HashMap<HerbKind, u32>` |
+
 ### GateState (struct)
 
 > Tracks whether a gate is open or closed.  Open gates allow wildlife through. Cats can always pass regardless of state, but personality (diligence) determines whether they close the gate behind them.
@@ -131,6 +149,28 @@
 | Field | Type |
 |-------|------|
 | `open` | `bool` |
+
+### DryingRackState (struct)
+
+> Per-Drying-Rack runtime state (ticket 367). Inserted on construction completion (see `src/steps/building/construct.rs`). `progress` advances per tick by `preservation` system only when `Weather::Clear`; output `Item` spawns on completion.
+
+| Field | Type |
+|-------|------|
+| `loaded` | `Option<DryingLoad>` |
+| `progress` | `f32` |
+
+### SmokingRackState (struct)
+
+> Per-Smoking-Rack runtime state (ticket 367). Inserted on construction completion. Smoking progress does NOT advance per tick — it's driven entirely by discrete tend-cycle completions.  Tend cycles are the novel substrate for 367: each tend (a short, single-tick resolver) increments `tends_completed` and advances `progress` by `1.0 / tends_needed`. The per-rack `last_tended_at_tick` + `CraftingConstants::smoking_tend_cooldown_ticks` cooldown forces interleaving — the cat must do something else for ~2 sim-hours between tends, producing the "tend, walk away, come back, tend, ..." rhythm the design doc calls for.
+
+| Field | Type |
+|-------|------|
+| `loaded` | `Option<SmokingLoad>` |
+| `fuel_loaded` | `bool` |
+| `progress` | `f32` |
+| `last_tended_at_tick` | `u64` |
+| `tends_completed` | `u32` |
+| `tends_needed` | `u32` |
 
 ## `src/components/coordination.rs`
 
@@ -178,6 +218,9 @@
 | `cooking` | `f32` |
 | `farming` | `f32` |
 | `defense` | `f32` |
+| `drying_rack` | `f32` |
+| `smoking_rack` | `f32` |
+| `tanning_frame` | `f32` |
 
 ## `src/components/disposition.rs`
 
@@ -510,13 +553,14 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### KittenDependency (struct)
 
-> Marks an entity as a dependent kitten that hasn't reached independence.  Maturity advances linearly from 0.0 to 1.0 over 4 seasons. At 1.0 this component is removed and the cat gains full capabilities.  Parent entity references may become stale if a parent dies and is despawned — the growth system handles this gracefully.
+> Marks an entity as a dependent kitten that hasn't reached independence.  Maturity advances linearly from 0.0 to 1.0 over 4 seasons. At 1.0 this component is removed and the cat gains full capabilities.  Parent entity references may become stale if a parent dies and is despawned — the growth system handles this gracefully.  `skills_learned` is incremented by `resolve_teach` over the Teach phase of the `rear_kitten` HTN method (ticket 364). Substrate-only at 364 land: the count exists so downstream memory/personality attribution can read it without re-authoring substrate; no consumer reads it today.
 
 | Field | Type |
 |-------|------|
 | `mother` | `Option<Entity>` |
 | `father` | `Option<Entity>` |
 | `maturity` | `f32` |
+| `skills_learned` | `u8` |
 
 ## `src/components/magic.rs`
 
@@ -607,6 +651,22 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 > `Age::stage() == Elder` (60+ seasons).
 
+### NewbornKitten (struct)
+
+> Sub-stage 1: `Kitten ∧ maturity < 0.33` — newborn, motionless, eyes closed. Co-authored with `Incapacitated` so every existing `.forbid(Incapacitated::KEY)` filter (fetch / forage / hunt / mate / cook / ward / mentor-target / mentor) already excludes them without any per-DSE gate work. Reader: the HTN method `[BegForFood]`'s `ApplicableWhen::Kitten ∧ ¬HasFoodInInventory` plus the `MentorableAge` author (which excludes `NewbornKitten`).
+
+### EyesOpenKitten (struct)
+
+> Sub-stage 2: `Kitten ∧ 0.33 ≤ maturity < 0.67` — eyes open, mobile, can play / beg / sleep. `Incapacitated` is removed at the Stage 1 → Stage 2 transition. Still excluded from foraging / hunting / mating / mentoring by the `Kitten` marker on existing capability gates.
+
+### JuvenileKitten (struct)
+
+> Sub-stage 3: `Kitten ∧ 0.67 ≤ maturity < 1.0` — juvenile, the "mentorable" phase. Co-authored with `MentorableAge`. `CanForage` gate widens to include this stage (juvenile kittens can forage alongside Young / Adult); `CanHunt` stays gated on Young/Adult (Stage 3 kittens learn hunting by mentoring, not by hunting solo). At maturity ≥ 1.0 the `KittenDependency` + `Kitten` markers retire (existing `tick_kitten_growth` semantics).
+
+### MentorableAge (struct)
+
+> Mentee-side eligibility gate: cat is old enough to absorb mentoring. `JuvenileKitten ∨ Young ∨ Adult`. Newborn / Eyes-open kittens cannot receive mentoring even though they're alive and present. Reader: `src/ai/dses/mentor_target.rs`'s `.require(MentorableAge::KEY)`. Author: `growth.rs::update_life_stage_markers` (co-authored with the life-stage markers themselves so the marker shape stays consistent across the same maturity read).
+
 ### Incapacitated (struct)
 
 > Severe unhealed injury — downed. `systems::incapacitation::update_incapacitation`. Used as the eligibility gate that retires the §2.3 incapacitated branch: `Q<_, With<Incapacitated>>` picks the narrow DSE set (Eat, Sleep, Idle); every other DSE uses `Without<Incapacitated>`.
@@ -671,11 +731,31 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### CanWard (struct)
 
+### CanWardFromSupply (struct)
+
+> Ticket 084: combined ward-eligibility marker that expands `CanWard` to cover cats who can reach a stashed thornbriar even without currently carrying one. Fires when: `Adult ∧ ¬Injured ∧ (HasWardHerbs ∨ HasStoredThornbriar)`. Reader: the `HerbcraftSetWard` DSE's eligibility filter (replaces the `CanWard::KEY` require). Writer: `capabilities.rs::update_capability_markers` (extended in Commit 2 of 084 to take a colony `HasStoredThornbriar` reference). GOAP then composes either `[Travel → SetWard]` (carrying-path) or `[Travel(Stores) → RetrieveHerbs(Thornbriar) → Travel → SetWard]` (retrieve-path) based on which `CarryingIs` precondition holds.
+
 ### CanCook (struct)
+
+### CanDry (struct)
+
+> 367: per-cat capability — `Adult ∧ ¬Injured`, mirrors `CanCook`. Gates `DryFoodDse`. Colony-scoped station availability stays on the DSE eligibility filter so a "wants to dry but no rack" latent signal could later flow into BuildPressure (paralleling the `wants_cook_but_no_kitchen` pattern in `scoring.rs`).
+
+### CanSmoke (struct)
+
+> 367: per-cat capability — `Adult ∧ ¬Injured`, mirrors `CanCook`. Gates `SmokeMeatDse` (which loads a rack) and `TendSmokingRackDse` (which advances per-rack progress one tend at a time).
+
+### CanCraft (struct)
+
+> 457: per-cat capability — `Adult ∧ ¬Injured`, mirrors `CanCook` / `CanDry` / `CanSmoke`. Gates `CraftAtWorkshopDse` (the elect-side pipeline that lets cats autonomously craft the 368 Phase 2 behavioral tools — Grooming Brush, Play Bundle, Courtship Gift — and the Polished Stone intermediate). Colony-scoped Workshop availability stays on the DSE eligibility filter via `HasFunctionalWorkshop`.
 
 ### HasHerbsInInventory (struct)
 
 > Authoring: `items.rs::update_inventory_markers`.
+
+### HasFoodInInventory (struct)
+
+> 450: per-cat — `inventory.has_food()` (any slot holds an item kind classified as food, raw or cooked). Authored by `items::update_inventory_markers`. Read by: - the HTN method `[BegForFood]`'s `ApplicableWhen::Kitten ∧ ¬HasFoodInInventory` (a kitten with food doesn't beg); - 429 Phase 2's `EatFromOwnInventoryDse` eligibility filter (`.require(HasFoodInInventory::KEY).forbid(Incapacitated::KEY)`).  Distinct from the existing slot-kind markers (`HasRawFishInInventory`, `HasRawMeatInInventory`, …) which gate preservation-chain DSEs on specific raw inputs — this marker fires on *any* food, the way "cat carries something it could eat" is the right perceptual axis for the Eat-aspiration's method cascade and the eat-Sink DSE.
 
 ### HasRemedyHerbs (struct)
 
@@ -689,15 +769,91 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 > 231: per-cat marker indicating the cat has at least one empty inventory slot (`!Inventory::is_full()`). Authored by `items.rs::update_inventory_markers`.  Read on the substrate-path variant of the four pickup-class plan actions (`PickUpItemFromGround` / `RetrieveRawFood` / `RetrieveFoodForKitten` / `GatherHerb`). When absent, the planner's substrate path fails its precondition and only the plan-path variant (gated on `HasFreeSlotThisPlan(true)` after a DropItem-as- prefix step) remains expandable — A* composes `[DropItem, PickUp]` automatically when the cat is full. Mirrors the ticket-096 Construct dual-branch precedent.
 
+### HasRawFishInInventory (struct)
+
+> 367: per-cat — inventory contains at least one raw fish. Reader: `DryFoodDse` eligibility filter. Writer: `items::update_inventory_markers`. Distinct from `HasRawFoodInStores` (colony-scoped) — this is the "I'm carrying drying-eligible food right now" personal signal.
+
+### HasRawOrganInInventory (struct)
+
+> 367: per-cat — inventory contains at least one raw organ. Reader: `DryFoodDse` eligibility filter (organ → Preserved Organ recipe). Writer: `items::update_inventory_markers`.
+
+### HasRawMeatInInventory (struct)
+
+> 367: per-cat — inventory contains at least one raw meat (`ItemKind::is_raw_meat()` — mammals + birds; fish goes through drying). Reader: `SmokeMeatDse` eligibility filter. Writer: `items::update_inventory_markers`.
+
+### HasFuelInInventory (struct)
+
+> 367: per-cat — inventory contains at least one fuel item (currently `ItemKind::Wood`). Reader: `SmokeMeatDse` eligibility filter (the load chain requires meat + fuel). Writer: `items::update_inventory_markers`. Separate marker from `HasMaterialsInInventory` because the semantic ("can I light a fire") is narrower than "carries any build material"; Stone is a material but not a fuel.
+
+### HasDryableInInventory (struct)
+
+> 367: per-cat — inventory contains *something* that can go onto a Drying Rack — either a Raw Fish (→ DriedFish recipe) or a Raw Organ (→ PreservedOrgan recipe, also needs a herb but the resolver-side pick handles that). Unified gate marker because `EligibilityFilter` only supports AND across required markers, and the DSE needs an OR-of-{fish, organ} signal. Sister marker to `HasRawFoodInStores` (which OR's across many food kinds at the colony layer for `CookDse`). Writer: `items::update_inventory_markers`.
+
+### HasSmokeableInInventory (struct)
+
+> 367: per-cat — inventory satisfies the *full* Smoke Meat load requirement (meat AND fuel). Conjunction marker because the load resolver consumes both in one step; gating on just meat or just fuel would let the DSE fire and the load step fail at runtime. Writer: `items::update_inventory_markers`.
+
+### HasMaterialsInInventory (struct)
+
+> 235: per-cat marker — the cat's inventory contains at least one build material (Wood/Stone/Moss/DriedGrass/Feather/ShadowBone). Authored by `items.rs::update_inventory_markers` from `inventory.has_any_material()`.  Reader lands with the 235-follow-on ticket that introduces the central material pile destination + materials-deposit-prefix branch in plan templates. Allowlisted in `scripts/substrate_stubs.allowlist` under that follow-on id until the reader ships.
+
+### HasCuriosInInventory (struct)
+
+> 235: per-cat marker — the cat's inventory contains at least one curio (ShinyPebble/GlassShard/ColorfulShell). Authored by `items.rs::update_inventory_markers` from `inventory.has_any_curio()`.  Reader lands with ticket 16's Cache building (the curio sink). Curios stay droppable-anywhere (v1 from 231) until that destination exists. Allowlisted in `scripts/substrate_stubs.allowlist` under ticket 16 until the reader ships.
+
+### HasHerbStashAccessible (struct)
+
+> 235: per-cat marker — at least one `Stores` building is within `DispositionConstants::herb_stash_reachable_radius` Manhattan tiles of this cat's position. Authored by `goap.rs::herb_stash_accessible_for` in the per-cat MarkerSnapshot loop (twin call sites: `evaluate_and_plan` and `build_planner_markers`, both required for snapshot/planner-replay parity).  Read on the deposit-prefix branch of pickup-class plan templates (PickingUp / Cooking / Caretaking / Herbalism / Hunting). Combined with `HasHerbsInInventory` + `CarryingIs(Herbs)` precondition + the existing `ZoneIs(Stores)` constraint, A* composes `[TravelTo(Stores), DepositHerbs(prefix), <goal-action>]` as an alternative to `[DropItem, <goal-action>]` when the stash is reachable, picking by cost. Far-from-stores cats fall back to the DropItem prefix because the marker is false.  Sibling pattern to `MaterialsAvailable` (per-cat reachability author at `goap.rs::materials_available_for`).
+
 ### ColonyState (struct)
 
-> Marker for the single colony-state entity. Spawned exactly once per simulation by `setup.rs::build_new_world` (production) and `scenarios/env.rs::init_scenario_world_with` (scenario harness). Colony-scoped markers below (ThornbriarAvailable, HasFunctionalKitchen, …) attach to this entity. Authored each FixedUpdate tick by the colony-marker chain (`buildings::update_colony_building_markers`, `magic::update_{herb_availability,ward_coverage,ward_siege}_markers`) and read by `goap::evaluate_and_plan` via `WorldStateQueries::colony_state_query` to populate `MarkerSnapshot`. Ticket 168.
+> Marker for the single colony-state entity. Spawned exactly once per simulation by `setup.rs::build_new_world` (production) and `scenarios/env.rs::init_scenario_world_with` (scenario harness). Colony-scoped markers below (ThornbriarAvailable, HasFunctionalKitchen, …) attach to this entity. Authored each FixedUpdate tick by the colony-marker chain (`buildings::update_colony_building_markers`, `magic::update_{herb_availability,ward_coverage,ward_siege}_markers`) and cached into `WorldSnapshots::colony_markers` by `world_snapshots::populate_world_snapshots`; `goap::evaluate_and_plan` reads the cached bundle to populate `MarkerSnapshot`. Tickets 168, 433.
 
 ### HasFunctionalKitchen (struct)
 
 > Authoring: `buildings.rs::update_colony_building_markers`.
 
 ### HasRawFoodInStores (struct)
+
+### HasFunctionalDryingRack (struct)
+
+> 367: colony — ≥1 functional, idle Drying Rack exists in the colony. "Functional" = `Structure::effectiveness() > 0.0` (condition above the 0.2 floor); "idle" = `DryingRackState.loaded.is_none()`. Reader: `DryFoodDse` eligibility filter. Writer: `buildings::update_colony_building_markers`. When all racks are loaded, this drops to false and DryFood DSE shuts off — cats stop trying to load racks that are already drying something.
+
+### HasFunctionalSmokingRack (struct)
+
+> 367: colony — ≥1 functional, idle Smoking Rack exists in the colony. Same shape as `HasFunctionalDryingRack`. Reader: `SmokeMeatDse` eligibility filter (the load chain). Writer: `buildings::update_colony_building_markers`.
+
+### HasFunctionalWorkshop (struct)
+
+> 457: colony — ≥1 functional Workshop structure exists in the colony. "Functional" = `Structure::effectiveness() > 0.0` (condition above the damaged floor). Reader: `CraftAtWorkshopDse` eligibility filter. Writer: `buildings::update_colony_building_markers`. Unlike the preservation racks, Workshops don't carry a per-station load state — any functional Workshop can host any of the six Phase 2 recipes, so the marker is presence-only (no "idle" predicate layered on top).
+
+### HasFunctionalTanningFrame (struct)
+
+> 369: colony — ≥1 functional Tanning Frame exists in the colony. Same presence-only shape as `HasFunctionalWorkshop` — Tanning Frames host single-pass Phase 2b hide-craft recipes (HideBracers / HidePlatedWrap) with no per-rack load state. Reader: `CraftAtTanningFrameDse` eligibility filter. Writer: `buildings::update_colony_building_markers`.
+
+### HasDryableInStores (struct)
+
+> 367 follow-on: colony — ≥1 RawFish or RawOrgan item sits in any `StoredItems` aggregate. Reader: composite per-cat marker `HasDryableAccessible` populated in `goap::evaluate_and_plan`; the composite is what `DryFoodDse` eligibility consults. Writer: `buildings::update_colony_building_markers`.  Distinct from `HasRawFoodInStores`, which fires on *any* raw food (including RawMouse / RawRat which the drying recipes don't accept). Pre-existence of this marker is what lets a cat with an empty inventory still elect `DryFood` — the planner builds a `[RetrieveDryable, DryFood]` chain.
+
+### HasDryableAccessible (struct)
+
+> 367 follow-on: per-cat composite — the cat could conceivably elect `DryFood` this tick. Fires when EITHER the cat already carries a dryable item (`HasDryableInInventory`) OR the cat has a free inventory slot AND the colony has a dryable in `StoredItems` (`HasFreeSlot && HasDryableInStores`). Reader: `DryFoodDse` eligibility filter. Writer: `goap::evaluate_and_plan` via `MarkerSnapshot::set_entity`.  Replaces `HasDryableInInventory` in the DSE eligibility list. Pre- follow-on the narrow inventory marker gated the DSE; cats almost never held raw fish / organ at score-time (deposit-at-stores drains inventory on every hunt-return), so `DryFood` never fired even when a functional rack existed and stores were full of fish. `HasDryableInInventory` is still authored — runtime resolvers (`resolve_load_drying_rack`) read it to know whether to consume the cat's slot or run the retrieve step first.
+
+### HasSmokeableInStores (struct)
+
+> 443: colony — ≥1 raw-meat item AND ≥1 fuel (Wood) item sit in any `StoredItems`. Reader: per-cat composite `HasSmokeableAccessible` in `goap::evaluate_and_plan`. Writer: `buildings::update_colony_building_markers`.  Distinct from `HasRawFoodInStores` (fires on all raw food) and `HasDryableInStores` (RawFish/RawOrgan only). Smoking requires both meat AND fuel present together; the marker encodes the conjunction so the per-cat composite can gate on a single colony-level boolean.
+
+### HasSmokeableAccessible (struct)
+
+> 443: per-cat composite — the cat could conceivably elect `SmokeMeat` this tick. Fires when EITHER the cat already carries smokeable inventory (`HasSmokeableInInventory`) OR has a free slot AND the colony has smokeable meat + fuel in `StoredItems` (`HasFreeSlot && HasSmokeableInStores`). Reader: `SmokeMeatDse` eligibility filter. Writer: `goap::evaluate_and_plan` via `MarkerSnapshot::set_entity`.  Mirrors `HasDryableAccessible` for the two-ingredient smoking chain. `HasSmokeableInInventory` (both meat AND fuel) is still authored — resolvers read it to short-circuit retrieve steps when the cat already carries the needed items.
+
+### HasCraftInputInInventory (struct)
+
+> 457: per-cat — the cat carries ≥1 Phase 2 Workshop-recipe input (Twig / Bristle / Fiber / Flower / Stone / Feather / PolishedStone). Authored by `items::update_inventory_markers` mirroring the existing `HasRawFishInInventory` / `HasFuelInInventory` rows. Reader: `CraftAtWorkshopDse` eligibility filter.  Recipe-agnostic by design — any single Workshop input present in inventory satisfies the marker; the resolver picks the specific recipe at execute time. Mirrors the 367 inventory-marker shape (`HasDryableInInventory` fires on any RawFish OR RawOrgan; the drying resolver picks the specific raw input). A cat with Twig but no Bristle still fires the marker — the L3 may elect Crafting, the resolver finds no full recipe satisfied, returns Fail, and the cat re-plans (substrate-honest: the per-recipe scoring lives at recipe- variety, deferred per ticket scope).  Stores-side retrieve is intentionally NOT in scope for first-light. Cats gather inputs via hunt (Bristle from `PreyByproductConstants`) plus forage (`resolve_forage` drops Twig / Fiber / Flower at `forage_ingredient_drop_chance = 0.10`) and craft when inputs are already in hand. The plan template is single-step `[CraftAtWorkshop]`, no `RetrieveCraftInput` leg.
+
+### HasLoadedSmokingRackOffCooldown (struct)
+
+> 367: colony — ≥1 loaded Smoking Rack exists in the colony AND its per-rack tend cooldown has elapsed (i.e. it's ready to be tended right now). Reader: `TendSmokingRackDse` eligibility filter. Writer: `buildings::update_colony_building_markers` (the writer evaluates `current_tick - rack.last_tended_at_tick >= crafting.smoking_tend_cooldown_ticks` per rack).  Distinct from "any loaded smoking rack" because we want the Tend DSE to score zero when every rack is on cooldown — that's the interleaving discipline (cats do something else for ~2 sim-hours between tends).
 
 ### HasStoredFood (struct)
 
@@ -706,6 +862,14 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 ### ThornbriarAvailable (struct)
 
 > ≥1 harvestable Thornbriar exists in the world. `magic.rs::update_herb_availability_markers`.
+
+### HasStoredThornbriar (struct)
+
+> Ticket 084: ≥1 Thornbriar count exists in the colony's `StoredHerbs` aggregate (summed across all Stores buildings). Authored by `buildings.rs::update_colony_building_markers`. Read by `HerbcraftSetWard`'s `CanWardFromSupply` eligibility gate in Commit 2, and by `RetrieveHerbs(Thornbriar)` planner action preconditions. Distinct from `ThornbriarAvailable` which gates on *wild* harvestable thornbriar entities — this marker gates on *stashed* thornbriar inside Stores.
+
+### ColonyThornbriarChronicallyLow (struct)
+
+> Ticket 084 Commit 3: colony-scoped chronicity marker — total stashed thornbriar across all Stores has been *below* `ScoringConstants::thornbriar_stash_low_threshold` for at least one full `chronicity_window_ticks` window. Mirrors the 179 pattern (`ColonyStoresChronicallyFull`): a slow-rolling latch that only flips at window boundaries, filtering out single-tick transients from gather/retrieve traffic.  Reader 1: the coordinator's `accumulate_build_pressure` Farming gate (`coordination.rs:~1090`) — drives "we need to commit to a Garden for thornbriar." Reader 2: `FarmDse`'s `farm_herb_pressure` axis (replaces the per-tick scalar with a marker consideration mirroring `BuildDse::colony_stores_chronically_full`). Writer: `buildings.rs::update_colony_building_markers` extended with a `ThornbriarPressureTracker`-backed window latch.
 
 ### MaterialsAvailable (struct)
 
@@ -737,9 +901,9 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 > 178: colony has at least one `StructureType::Midden` building. Authored by `update_colony_building_markers` in `src/systems/buildings.rs` (single pass: any Midden structure exists ⇒ insert; else remove). Read by the Trashing DSE's `EligibilityFilter::require(HasMidden::KEY)` — without it, the disposition is dormant and the cat falls back to Discarding (which gates on `ColonyStoresChronicallyFull`).
 
-### HasHandoffRecipient (struct)
+### HasDependentCat (struct)
 
-> 188: colony-scoped marker indicating ≥1 cat in the colony is a plausible handoff recipient — i.e., at least one `Kitten` exists. Read by the Handing DSE's `EligibilityFilter::require(HasHandoffRecipient::KEY)`. Authored by `update_colony_building_markers` (ticket 188 wave-closeout).  Colony-scope rather than per-cat: adults give to kittens; the existence of *any* kitten in the colony enables Handing for *any* adult holding food. The actual recipient resolution happens at dispatch time (`goap.rs::HandoffItem` fallback resolves the nearest hungry kitten via `caretake_resolution`-style proximity search) — the per-cat target picker is a balance follow-on, not load-bearing for the structural plumbing.
+> Colony-scoped marker: ≥1 cat in the colony is a *care dependent* — a creature who cannot self-provision and needs another cat to bring it food. Read by both the Handing DSE's `EligibilityFilter::require(HasDependentCat::KEY)` and (ticket 410) the Caretake DSE's same requirement. Authored by `update_colony_building_markers`.  **Narrative, not mechanic.** This marker says "a creature here needs care," not "a slot exists to receive an item" — the latter (`HasHandoffRecipient` pre-410) would equally apply to a construction-kitty waiting on reeds, conflating distinct narratives. Per the "mechanics are the narrative" design pillar.  **Current population:** any living `Kitten` (kittens cannot hunt and depend on adults for food). The populator (`src/systems/buildings.rs::update_colony_building_markers`) trivially extends to other categories — incapacitated adults who cannot reach food, other future dependents — as `kittens.is_empty() && other_dependents.is_empty()`. No consumer changes required when the union grows.  **Colony-scope rather than per-cat:** any caregiver responds to any dependent; the existence of *any* dependent in the colony enables Caretake/Handing for *any* eligible cat. Actual recipient resolution happens at dispatch time (`goap.rs::HandoffItem` picks the hungriest-then-nearest from the kitten roster); per-cat picker is a balance follow-on (ticket 192).  Ticket 188 authored the marker (then `HasHandoffRecipient`); ticket 410 renamed and extended its consumer set.
 
 ### HasGroundCarcass (struct)
 
@@ -776,6 +940,14 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 ### Parent (struct)
 
 > **Active parenthood** (not lifetime identity) — cat has ≥1 living entity with `KittenDependency.mother == self` or `…father == self`. Removed when the last dependent kitten matures or dies. See §4.3 prose on the ordering hazard: grief consumers MUST NOT infer grief-parent status from `With<Parent>` on survivors post-death. The canonical parent-at-time-of-death channel is the future `CatDied.survivors_by_relationship` event payload.  Authoring: `growth.rs::update_parent_markers` (new). Insert/remove in a single tick pass over `Query<&KittenDependency>`.
+
+### HasJuvenileDependent (struct)
+
+> **Active milestone-arc availability** (ticket 395). Cat has ≥1 living dependent kitten where this cat is `mother` or `father` AND the kitten is in either: - **Early arc window** `[0, teach_done_threshold)` — Wean / Teach milestones still have eligibility, OR - **Near-mature window** `[release_threshold, 1.0)` — Release is pickable AND the kitten has not yet been symbolically released (no `RearKittenReleased` marker).  Gates the `kitten_reared` reactive emit so the arc doesn't churn during the long `[teach_done_threshold, release_threshold)` idle gap (queen does Caretake-only there) or after symbolic Release has fired for the kitten. Both parents pitch in — 395 retired the 333/364 mother-only deferral on the picker too.  **§4.3 ordering hazard.** Same as [`Parent`]: a kitten's death removes its parents' markers within the same tick. Don't infer grief-parent status from `With<HasJuvenileDependent>` post-death.  Authoring: `growth.rs::update_parent_markers` (merged pass with `Parent`).
+
+### RearKittenReleased (struct)
+
+> **Symbolic Release fired** (ticket 395). Inserted by the `rear_kitten` arc's Release drain when a parent (mother or father) witnesses `Feature::KittenReleased` for this kitten. One-shot semantics: the second parent's concurrent frame, on its next dispatch, sees `released_by_arc=true` in the picker snapshot and returns None → R11 Advance → frame pops without re-witnessing. The marker also flips `HasJuvenileDependent` false on the parents' side so the near-mature emit window stops firing for this kitten even before natural maturation.  Persists on the kitten until despawn — survives natural maturation alongside `BornInSim`.  Authoring: drain arm `KittenRearingAdvance::Release` in `goap.rs`.
 
 ### BornInSim (struct)
 
@@ -859,6 +1031,27 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 |-------|------|
 | `last_pride_crisis_tick` | `Option<u64>` |
 
+## `src/components/mourning.rs`
+
+### Mourning (struct)
+
+> A cat actively mourning a specific deceased colony-mate. Insertion path is the §7.7.b grief-event-emission follow-on (out of scope for #332). Removal path is the terminal `release_grief` sub-goal of the `mourn_at_grave` HTN method, executed via [`crate::steps::disposition::resolve_release_grief`] once the HTN-driven action dispatch wiring lands.
+
+| Field | Type |
+|-------|------|
+| `deceased_name` | `String` |
+| `started_tick` | `u64` |
+
+## `src/components/parenting_activity.rs`
+
+### ParentingActivity (struct)
+
+> L2 `ParentingActivity` Component persisted on the cat. Ticket 400.  Inserted by `update_parenting_activity_biological` (`src/systems/parenting_activity.rs`) on a cat's first tick of biological parenthood; subsequently appended to (never shrunk) by adoption-rule systems. Bevy drops the Component on entity despawn, so the "DROP only on self-death" contract is automatic.  Only `Serialize` is derived (not `Deserialize`) because `RelationshipTo.target: Entity` has no `Default` and the Component is pure runtime state — no save/load path round-trips it. The trace pipeline reads it via `Serialize` only, mirroring `JointIntention`'s pattern.  The `relationships` Vec may be empty (a freshly-inserted Component before any entry is appended), but typical adult-cat lifetimes carry 1-5 entries (1-3 biological children + InLaw entries from partner's parents).
+
+| Field | Type |
+|-------|------|
+| `relationships` | `Vec<RelationshipTo>` |
+
 ## `src/components/personality.rs`
 
 ### Personality (struct)
@@ -910,13 +1103,12 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### Health (struct)
 
-> Health component. `current` and `max` are normalised to `[0.0, 1.0]`.
+> Health component. `current` and `max` are normalised to `[0.0, 1.0]`.  095 Phase 1 Stage B retired the `injuries: Vec<Injury>` field — the 13-part `CatBodyModel` is now the canonical anatomical injury substrate. `Health.current` remains the canonical HP scalar; starvation and magic still write it directly.
 
 | Field | Type |
 |-------|------|
 | `current` | `f32` |
 | `max` | `f32` |
-| `injuries` | `Vec<Injury>` |
 | `total_starvation_damage` | `f32` |
 
 ### Dead (struct)
@@ -1016,16 +1208,6 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `den_name` | `&'static str` |
 | `raid_drop` | `u32` |
 
-## `src/components/recent_disposition_failures.rs`
-
-### RecentDispositionFailures (struct)
-
-> Per-cat memory of recently-failed dispositions. See the module docs for placement, lifecycle, and contract notes.  `failures.get(&kind)` returns the **tick** at which the disposition last hit `make_plan → None`. Cooldown age is `now - failed_tick`. Higher-level code never reads the raw map; the `disposition_recent_failure_age_normalized` sensor in `plan_substrate` is the only sanctioned read.
-
-| Field | Type |
-|-------|------|
-| `failures` | `HashMap<DispositionKind, u64>` |
-
 ## `src/components/recent_target_failures.rs`
 
 ### RecentTargetFailures (struct)
@@ -1035,6 +1217,18 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | Field | Type |
 |-------|------|
 | `failures` | `HashMap<(GoapActionKind, Entity), u64>` |
+
+## `src/components/recipe.rs`
+
+### CraftedItem (struct)
+
+> Provenance metadata attached to every item produced by a crafting recipe. Carries the recipe id, the crafter, and the tick the item was made. Phase 1a attaches this to spawned `Ward` entities; Phase 1b+ attaches it to inventory items (preservation outputs) and to placed decorations.  Per `docs/systems/crafting.md` "items are not stat sticks": this Component carries narrative/identity data ONLY — no generic numeric modifier fields. Effects live on action resolvers keyed to item identity, never as bolted-on numeric bonuses here.  Not deserializable for the same reason as [`Recipe`] — `RecipeId` carries `&'static str` keys. `CraftedItem` is attached at spawn time by the producing resolver; if it ever needs to round-trip through `persistence::save_world`, the crafter (`Option<Entity>`) wouldn't survive anyway (entity handles aren't stable across save/load).
+
+| Field | Type |
+|-------|------|
+| `recipe` | `RecipeId` |
+| `crafter` | `Option<Entity>` |
+| `crafted_at_tick` | `u64` |
 
 ## `src/components/reserved.rs`
 
@@ -1105,6 +1299,11 @@ Variants: `Cat`, `Wild`, `Prey`
 | `building` | `f32` |
 | `combat` | `f32` |
 | `magic` | `f32` |
+| `weaving` | `f32` |
+| `bone_shaping` | `f32` |
+| `hidework` | `f32` |
+| `pigment` | `f32` |
+| `cairn` | `f32` |
 
 ### MagicAffinity (struct)
 
@@ -1172,7 +1371,7 @@ Variants: `Cat`, `Wild`, `Prey`
 
 > Mutable AI state for wildlife movement decisions.
 
-Variants: `Patrolling`, `Circling`, `center_x`, `center_y`, `angle`, `Waiting`, `Fleeing`, `Stalking`, `EncirclingWard`, `ward_x`, `ward_y`, `angle`, `ticks`, `Reconstituting`, `Tending`, `ward_x`, `ward_y`, `angle`, `Haunting`, `target_x`, `target_y`, `edge_distance`, `ticks`, `Seeding`, `frontier_x`, `frontier_y`
+Variants: `Patrolling`, `Circling`, `center_x`, `center_y`, `angle`, `Waiting`, `Fleeing`, `Stalking`, `EncirclingWard`, `ward_x`, `ward_y`, `angle`, `ticks`, `Reconstituting`, `Tending`, `ward_x`, `ward_y`, `angle`, `Haunting`, `target_x`, `target_y`, `edge_distance`, `ticks`, `Seeding`
 
 ### ShadowFoxDrives (struct)
 

@@ -37,6 +37,22 @@ pub enum FeatureCategory {
 pub enum Feature {
     CorruptionSpread,
     CorruptionTileEffect,
+    /// Ticket 101 — emitted by `emit_env_quality_features` when at
+    /// least one living cat's `EnvironmentalQualityModifier` combined
+    /// value clears `+feature_emit_threshold` on a given tick. Positive
+    /// valence: the seed-42 canonical colony has a hearth and gardens,
+    /// so a cat near them should produce a positive combined modifier.
+    /// `expected_to_fire_per_soak() => true` — never-fired means the
+    /// influence-map sweep, the modifier wiring, or the personality
+    /// scaling is broken; treat as a failed verification.
+    EnvironmentalComfortPositive,
+    /// Ticket 101 — emitted by `emit_env_quality_features` when at
+    /// least one living cat's combined env-quality value falls below
+    /// `-feature_emit_threshold`. Negative valence: requires unburied
+    /// corpses, dirty buildings, or sustained mud/rock exposure to
+    /// fire. `expected_to_fire_per_soak() => false` until a scenario
+    /// reliably produces a negative-dominant environment in seed 42.
+    EnvironmentalComfortNegative,
     ShadowFoxSpawn,
     WardDecay,
     HerbSeasonalCheck,
@@ -687,6 +703,9 @@ impl Feature {
     pub const ALL: &[Feature] = &[
         Feature::CorruptionSpread,
         Feature::CorruptionTileEffect,
+        // 101: env-quality influence-map canaries.
+        Feature::EnvironmentalComfortPositive,
+        Feature::EnvironmentalComfortNegative,
         Feature::ShadowFoxSpawn,
         Feature::WardDecay,
         Feature::HerbSeasonalCheck,
@@ -1077,6 +1096,8 @@ impl Feature {
             Feature::DeathInjury => Negative,
             Feature::CorruptionSpread => Negative,
             Feature::CorruptionTileEffect => Negative,
+            Feature::EnvironmentalComfortPositive => Positive,
+            Feature::EnvironmentalComfortNegative => Negative,
             Feature::CorruptionHealthDrain => Negative,
             Feature::PersonalCorruptionEffect => Negative,
             Feature::ShadowFoxSpawn => Negative,
@@ -1552,6 +1573,8 @@ impl Feature {
             // -------------------------------------------------------------
             Feature::CorruptionSpread => true,
             Feature::CorruptionTileEffect => true,
+            Feature::EnvironmentalComfortPositive => true,
+            Feature::EnvironmentalComfortNegative => false,
             Feature::WardDecay => true,
             Feature::HerbSeasonalCheck => true,
             Feature::CombatResolved => true,
@@ -1617,6 +1640,8 @@ pub fn feature_name(f: Feature) -> &'static str {
     match f {
         Feature::CorruptionSpread => "CorruptionSpread",
         Feature::CorruptionTileEffect => "CorruptionTileEffect",
+        Feature::EnvironmentalComfortPositive => "EnvironmentalComfortPositive",
+        Feature::EnvironmentalComfortNegative => "EnvironmentalComfortNegative",
         Feature::ShadowFoxSpawn => "ShadowFoxSpawn",
         Feature::WardDecay => "WardDecay",
         Feature::HerbSeasonalCheck => "HerbSeasonalCheck",
@@ -2001,7 +2026,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 157;
+        const EXPECTED_VARIANT_COUNT: usize = 159;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2139,8 +2164,11 @@ mod tests {
         // `expected_to_fire_per_soak == false` (mirror of
         // `AspirationAbandoned`) until first-light soak cadence
         // confirms the canary expectation.
-        assert_eq!(positive, 90);
-        assert_eq!(negative, 24);
+        // Ticket 101: +1 Positive (EnvironmentalComfortPositive) and
+        // +1 Negative (EnvironmentalComfortNegative) for the env-quality
+        // canary pair (`emit_env_quality_features`).
+        assert_eq!(positive, 91);
+        assert_eq!(negative, 25);
         assert_eq!(neutral, 43);
     }
 
@@ -2244,13 +2272,15 @@ mod tests {
         // first-light canary.
         // Ticket 055: +1 Negative (AspirationDriftAbandoned) for §7.7.d
         // mood drift-threshold detection.
+        // Ticket 101: +1 Positive (EnvironmentalComfortPositive) and
+        // +1 Negative (EnvironmentalComfortNegative).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            90
+            91
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
-            24
+            25
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),

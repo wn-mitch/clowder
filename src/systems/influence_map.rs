@@ -621,6 +621,89 @@ impl InfluenceMap for CorruptionLens<'_> {
 }
 
 // ---------------------------------------------------------------------------
+// 101: env-quality influence maps
+// ---------------------------------------------------------------------------
+
+impl InfluenceMap for crate::resources::ComfortMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // 101: terrain ease + building proximity + weather overlay.
+            // Sight × Neutral matches `CorruptionLens` — there's no
+            // "ambient quality" channel today; future scope may add one
+            // if the distinction becomes load-bearing.
+            name: "env_comfort",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
+impl InfluenceMap for crate::resources::CleanlinessMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            name: "env_cleanliness",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
+impl InfluenceMap for crate::resources::BeautyMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            name: "env_beauty",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
+impl InfluenceMap for crate::resources::MysteryMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            name: "env_mystery",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
+impl InfluenceMap for crate::resources::CorruptionInfluenceMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // 101: stamped corruption gradient (perception). Distinct
+            // from `CorruptionLens` which exposes the raw on-tile field
+            // as "corruption" — this is the radially-stamped influence
+            // version cats sample to perceive the gradient *before*
+            // stepping onto a hot tile.
+            name: "env_corruption",
+            channel: ChannelKind::Sight,
+            faction: Faction::Neutral,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // §5.6.6 attenuation pipeline
 // ---------------------------------------------------------------------------
 

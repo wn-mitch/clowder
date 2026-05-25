@@ -100,6 +100,12 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     // 100: aggregate tremor influence-map; required by `tremor_tick`
     // in the prey-side influence-map writer sub-chain.
     world.insert_resource(crate::resources::TremorMap::default_map());
+    // 101: five-axis env-quality influence maps.
+    world.insert_resource(crate::resources::ComfortMap::default_map());
+    world.insert_resource(crate::resources::CleanlinessMap::default_map());
+    world.insert_resource(crate::resources::BeautyMap::default_map());
+    world.insert_resource(crate::resources::MysteryMap::default_map());
+    world.insert_resource(crate::resources::CorruptionInfluenceMap::default_map());
     // Ticket 423: cover-availability map. Required by
     // `update_cover_availability_map` + `update_hide_eligible_markers`
     // in Chain 2a. Cold-start `dirty = true` so the first scheduler

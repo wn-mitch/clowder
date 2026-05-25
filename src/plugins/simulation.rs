@@ -144,11 +144,11 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // and §4.7 of `docs/systems/ai-substrate-refactor.md` for the
     // substrate-vs-search-state boundary.
     use crate::resources::{
-        CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, ColonyDistrictMap,
-        ConstructionSiteMap, CoverAvailabilityMap, ExplorationMap, FoodLocationMap,
-        FoxApproachCorridorMap, FoxScentMap, GardenLocationMap, GraveAuraMap, HerbLocationMap,
-        KittenCryMap, PreyScentMaps, RecentAmbushMap, TileMap, TremorMap, WardCoverageMap,
-        WardIntentMap,
+        BeautyMap, CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, CleanlinessMap,
+        ColonyDistrictMap, ComfortMap, ConstructionSiteMap, CorruptionInfluenceMap,
+        CoverAvailabilityMap, ExplorationMap, FoodLocationMap, FoxApproachCorridorMap, FoxScentMap,
+        GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, MysteryMap, PreyScentMaps,
+        RecentAmbushMap, TileMap, TremorMap, WardCoverageMap, WardIntentMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -177,6 +177,15 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // `tremor_tick`; read by `try_detect_cat` and the EngagePrey
     // approach phase's ambient opportunity-quality reads.
     registry.register::<TremorMap>();
+    // 101: five-axis environmental quality maps. Tile-resolution
+    // influence over comfort / cleanliness / beauty / mystery /
+    // corruption-perception. Registered so the per-cell readings
+    // surface in `trace-*.jsonl` for soak-trace verification.
+    registry.register::<ComfortMap>();
+    registry.register::<CleanlinessMap>();
+    registry.register::<BeautyMap>();
+    registry.register::<MysteryMap>();
+    registry.register::<CorruptionInfluenceMap>();
     // Ticket 423: cover-availability map. Tile-resolution boolean
     // (within sprint_radius of any `Terrain::is_low_cover()` tile).
     // Consumer: `update_hide_eligible_markers`; trace emitter walks
@@ -1289,6 +1298,15 @@ impl Plugin for SimulationPlugin {
                         systems::buildings::update_food_location_map,
                         systems::buildings::update_garden_location_map,
                         systems::buildings::update_construction_site_map,
+                        // 101: env-quality influence-map sweep + feature
+                        // emission. Runs after `decay_building_condition`
+                        // so `structure.condition` / `structure.cleanliness`
+                        // reads in the building sweep see post-decay
+                        // values. `emit_env_quality_features` reads the
+                        // four mood-relevant maps the sweep just
+                        // populated and records the per-soak canaries.
+                        systems::env_quality::update_env_quality_maps,
+                        systems::env_quality::emit_env_quality_features,
                     )
                         .chain(),
                     systems::items::decay_items,

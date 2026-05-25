@@ -112,6 +112,13 @@ pub struct SimConstants {
     /// pre-375 archives deserialize cleanly.
     #[serde(default)]
     pub prey_byproducts: PreyByproductConstants,
+    /// Ticket 101 — five-axis environmental quality influence maps
+    /// (comfort / cleanliness / beauty / mystery / corruption). Per-source
+    /// radii + peak values, personality scaling factors, combination
+    /// weight, and clamp bounds. `#[serde(default)]` so pre-101 archive
+    /// headers deserialize cleanly.
+    #[serde(default)]
+    pub environmental_quality: EnvironmentalQualityConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -7402,6 +7409,164 @@ impl Default for TremorConstants {
             decay_per_tick: 0.4,
             detect_threshold: 0.25,
             detect_radius: 6,
+        }
+    }
+}
+
+// ---------- EnvironmentalQualityConstants (ticket 101) ----------
+
+/// Ticket 101 — tunables for the five ambient influence maps. Per-source
+/// stamping radii + peak values for the terrain / buildings / corpse
+/// sweep, personality scaling factors used by
+/// `EnvironmentalQualityModifier`, modifier clamp bounds, and the
+/// `feature_emit_threshold` that gates
+/// `Feature::EnvironmentalComfortPositive`. Carried through the
+/// `events.jsonl` header by virtue of `SimConstants`' Serialize impl.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EnvironmentalQualityConstants {
+    // --- Comfort: terrain base values (on-tile, no falloff) ---
+    pub comfort_terrain_fairy_ring: f32,
+    pub comfort_terrain_light_forest: f32,
+    pub comfort_terrain_dense_forest: f32,
+    pub comfort_terrain_sand: f32,
+    pub comfort_terrain_mud: f32,
+    pub comfort_terrain_rock: f32,
+    // --- Comfort: building bonuses (peak × condition, with radii) ---
+    pub comfort_building_den_peak: f32,
+    pub comfort_building_den_radius: i32,
+    pub comfort_building_hearth_peak: f32,
+    pub comfort_building_hearth_radius: i32,
+    pub comfort_building_stores_peak: f32,
+    pub comfort_building_stores_radius: i32,
+    pub comfort_building_workshop_peak: f32,
+    pub comfort_building_workshop_radius: i32,
+    pub comfort_building_garden_peak: f32,
+    pub comfort_building_garden_radius: i32,
+    pub comfort_building_ward_post_peak: f32,
+    pub comfort_building_ward_post_radius: i32,
+    // --- Cleanliness ---
+    pub cleanliness_terrain_mud: f32,
+    pub cleanliness_corpse_peak: f32,
+    pub cleanliness_corpse_radius: i32,
+    pub cleanliness_dirty_building_peak: f32,
+    pub cleanliness_dirty_building_radius: i32,
+    // --- Beauty (terrain sources) ---
+    pub beauty_terrain_fairy_ring_peak: f32,
+    pub beauty_terrain_fairy_ring_radius: i32,
+    pub beauty_terrain_standing_stone_peak: f32,
+    pub beauty_terrain_standing_stone_radius: i32,
+    pub beauty_terrain_deep_pool_peak: f32,
+    pub beauty_terrain_deep_pool_radius: i32,
+    pub beauty_terrain_garden_peak: f32,
+    pub beauty_terrain_garden_radius: i32,
+    pub beauty_terrain_ancient_ruin: f32,
+    /// Subtracted from on-tile beauty proportional to `tile.corruption`
+    /// during the terrain sweep. High corruption suppresses beauty.
+    pub beauty_corruption_suppression: f32,
+    // --- Beauty (building aesthetic upkeep) ---
+    pub beauty_building_den_peak: f32,
+    pub beauty_building_den_radius: i32,
+    pub beauty_building_hearth_peak: f32,
+    pub beauty_building_hearth_radius: i32,
+    pub beauty_building_garden_peak: f32,
+    pub beauty_building_garden_radius: i32,
+    // --- Mystery ---
+    pub mystery_stamp_radius: i32,
+    pub mystery_stamp_threshold: f32,
+    // --- Corruption (perception map) ---
+    pub corruption_stamp_radius: i32,
+    pub corruption_stamp_threshold: f32,
+    // --- Modifier (personality scaling + combination) ---
+    /// Multiplier on `local_comfort` per unit warmth. `0.3` ⇒ a
+    /// warmth-1.0 cat reads comfort 30% larger than a warmth-0 cat.
+    pub warmth_bonus: f32,
+    /// Multiplier on `local_comfort` damped by independence. `0.2` ⇒
+    /// an independence-1.0 cat reads comfort 20% smaller.
+    pub independence_dampen: f32,
+    /// Multiplier on `local_cleanliness` per unit anxiety.
+    pub anxiety_bonus: f32,
+    /// Multiplier on `local_beauty` per unit spirituality.
+    pub spirituality_bonus: f32,
+    /// Multiplier on `local_mystery` per unit curiosity.
+    pub curiosity_bonus: f32,
+    /// Weight applied to the summed contribution before clamping.
+    /// Default `0.5` keeps the modifier modest relative to acute
+    /// drives.
+    pub combination_weight: f32,
+    /// Lower clamp on the combined modifier value.
+    pub combined_min: f32,
+    /// Upper clamp on the combined modifier value.
+    pub combined_max: f32,
+    /// Threshold on the combined modifier for emitting
+    /// `Feature::EnvironmentalComfortPositive`. The feature fires once
+    /// per tick if any living cat clears `+feature_emit_threshold`;
+    /// the negative pendant uses `-feature_emit_threshold`.
+    pub feature_emit_threshold: f32,
+}
+
+impl Default for EnvironmentalQualityConstants {
+    fn default() -> Self {
+        Self {
+            // Comfort terrain
+            comfort_terrain_fairy_ring: 0.3,
+            comfort_terrain_light_forest: 0.1,
+            comfort_terrain_dense_forest: 0.05,
+            comfort_terrain_sand: -0.05,
+            comfort_terrain_mud: -0.15,
+            comfort_terrain_rock: -0.1,
+            // Comfort buildings
+            comfort_building_den_peak: 0.20,
+            comfort_building_den_radius: 2,
+            comfort_building_hearth_peak: 0.25,
+            comfort_building_hearth_radius: 3,
+            comfort_building_stores_peak: 0.05,
+            comfort_building_stores_radius: 1,
+            comfort_building_workshop_peak: 0.10,
+            comfort_building_workshop_radius: 1,
+            comfort_building_garden_peak: 0.15,
+            comfort_building_garden_radius: 2,
+            comfort_building_ward_post_peak: 0.05,
+            comfort_building_ward_post_radius: 1,
+            // Cleanliness
+            cleanliness_terrain_mud: -0.15,
+            cleanliness_corpse_peak: -0.4,
+            cleanliness_corpse_radius: 3,
+            cleanliness_dirty_building_peak: -0.3,
+            cleanliness_dirty_building_radius: 2,
+            // Beauty terrain
+            beauty_terrain_fairy_ring_peak: 0.4,
+            beauty_terrain_fairy_ring_radius: 3,
+            beauty_terrain_standing_stone_peak: 0.25,
+            beauty_terrain_standing_stone_radius: 2,
+            beauty_terrain_deep_pool_peak: 0.15,
+            beauty_terrain_deep_pool_radius: 2,
+            beauty_terrain_garden_peak: 0.20,
+            beauty_terrain_garden_radius: 2,
+            beauty_terrain_ancient_ruin: -0.1,
+            beauty_corruption_suppression: 0.2,
+            // Beauty buildings
+            beauty_building_den_peak: 0.10,
+            beauty_building_den_radius: 1,
+            beauty_building_hearth_peak: 0.10,
+            beauty_building_hearth_radius: 1,
+            beauty_building_garden_peak: 0.20,
+            beauty_building_garden_radius: 2,
+            // Mystery
+            mystery_stamp_radius: 2,
+            mystery_stamp_threshold: 0.0,
+            // Corruption perception
+            corruption_stamp_radius: 3,
+            corruption_stamp_threshold: 0.0,
+            // Modifier
+            warmth_bonus: 0.3,
+            independence_dampen: 0.2,
+            anxiety_bonus: 0.4,
+            spirituality_bonus: 0.4,
+            curiosity_bonus: 0.4,
+            combination_weight: 0.5,
+            combined_min: -0.3,
+            combined_max: 0.3,
+            feature_emit_threshold: 0.05,
         }
     }
 }

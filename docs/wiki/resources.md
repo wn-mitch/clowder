@@ -2,7 +2,7 @@
 
 # Resources
 
-51 resource types derived from `#[derive(Resource)]`.
+59 resource types derived from `#[derive(Resource)]`.
 
 ## `src/components/coordination.rs`
 
@@ -76,6 +76,21 @@
 ### ColonyCenter (struct)
 
 > The colony's founding position, persisted at world generation.  Used as the origin for territory-based queries (corruption ring, threat proximity) and anchors the decorative colony well sprite.
+
+## `src/resources/colony_district_map.rs`
+
+### ColonyDistrictMap (struct)
+
+> Spatial influence map of "where the colony wants to grow."  Three orthogonal axes per bucket, each in `[0.0, 1.0]`:  - **`frontier`** — colony-friendly tile. Stamped from `CatScentMap` (where cats live) plus a halo around existing structures so a single-building peninsula scores above raw wilderness. Positive lift in `compute_building_placement`. - **`crowding`** — too many buildings already touch this tile. Stamped from existing `Structure` positions with a small radial penalty (footprint expanded by ~3 tiles). Negative lift. - **`threat`** — predator territory. Max of `FoxScentMap`, `FoxApproachCorridorMap`, and `TileMap` corruption. Negative lift for non-defensive kinds; positive for `Watchtower` / `WardPost` via per-kind weight tables in placement scoring.  Bucketed-overlay pattern matches `WardCoverageMap` (ticket 045) and `FoodLocationMap` (ticket 006). Re-stamped each tick from a dedicated populator that runs alongside `update_ward_coverage_map` to share schedule-edge slot rather than introduce a new one (`learning_bevy_schedule_edge_perturbation`).  Ticket 382: replaces the radius-16 spiral search in `find_building_placement` with an influence-map argmax over the whole map.
+
+| Field | Type |
+|-------|------|
+| `frontier` | `Vec<f32>` |
+| `crowding` | `Vec<f32>` |
+| `threat` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
 
 ## `src/resources/colony_hunting_map.rs`
 
@@ -173,6 +188,28 @@
 
 > Per-tick cached centroid of the colony's corruption field. `None` when no tile has corruption above the floor (clean colony).
 
+## `src/resources/cover_availability_map.rs`
+
+### CoverAvailabilityMap (struct)
+
+> Tile-resolution boolean map flagging tiles within sprint-radius of any `Terrain::is_low_cover()` tile. Rebuilt lazily via the `dirty` flag.
+
+## `src/resources/dse_target_scratchpad.rs`
+
+### DseTargetScratchpad (struct)
+
+| Field | Type |
+|-------|------|
+| `entities` | `Vec<Entity>` |
+| `positions` | `Vec<Position>` |
+| `map_f32_a` | `HashMap<Entity, f32>` |
+| `map_f32_b` | `HashMap<Entity, f32>` |
+| `skills_by_entity` | `HashMap<Entity, Skills>` |
+| `build_kind` | `HashMap<Entity, BuildTargetKind>` |
+| `kitten_by_entity` | `HashMap<Entity, KittenState>` |
+| `species_map` | `HashMap<Entity, FactionSpecies>` |
+| `prey_kind_map` | `HashMap<Entity, PreyKind>` |
+
 ## `src/resources/event_log.rs`
 
 ### EventLog (struct)
@@ -206,12 +243,16 @@
 
 ### FoodStores (struct)
 
-> Colony food supply. Cats deposit food from hunting/foraging and consume it when eating. Spoils slowly each tick.
+> Colony food supply. Cats deposit food from hunting/foraging and consume it when eating. Spoils slowly each tick.  **Semantic note (190).** `current` / `capacity` describe food in `Stores` buildings only — the historical resource the chronic-full latch (`ColonyStoresChronicallyFull`), `HasStoredFood`, and the coordinator's food-pressure assessment all reason about. The `in_stores` / `in_dens` / `in_workshops` / `held` breakdown fields cover the broader UI question "where is all the food right now?" without shifting the meaning of `current` under existing backend consumers.
 
 | Field | Type |
 |-------|------|
 | `current` | `f32` |
 | `capacity` | `f32` |
+| `in_stores` | `u32` |
+| `in_dens` | `u32` |
+| `in_workshops` | `u32` |
+| `held` | `u32` |
 | `spoilage_rate` | `f32` |
 | `spoilage_multiplier` | `f32` |
 
@@ -343,6 +384,17 @@
 
 ### TemplateRegistry (struct)
 
+## `src/resources/near_pair_cache.rs`
+
+### NearPairCache (struct)
+
+> Cat pairs within `passive_familiarity_range` of each other and their last-known Manhattan distance. Built incrementally from `CatMoved` messages by `update_near_pair_cache` (Stage B); read by `passive_familiarity` for the per-tick delta application.  `last_seen` tracks the live cat set as of the previous tick so the cache update can detect newborn cats (in `live` but not in `last_seen`) and pull them into a re-scan. Without this, newborns would have no pair-entries until their first movement event — they'd silently lose passive familiarity for their first few ticks.
+
+| Field | Type |
+|-------|------|
+| `pairs` | `BTreeMap<(Entity, Entity), i32>` |
+| `last_seen` | `BTreeSet<Entity>` |
+
 ## `src/resources/prey_scent_map.rs`
 
 ### PreyScentMaps (struct)
@@ -361,6 +413,12 @@
 | `grid_w` | `usize` |
 | `grid_h` | `usize` |
 | `bucket_size` | `i32` |
+
+## `src/resources/recipe_registry.rs`
+
+### RecipeRegistry (struct)
+
+> Catalog of every recipe the simulation knows about.
 
 ## `src/resources/relationships.rs`
 
@@ -416,6 +474,12 @@
 | `escape_viability` | `EscapeViabilityConstants` |
 | `beliefs` | `BeliefsConstants` |
 | `affordances` | `AffordancesConstants` |
+| `kitten_rearing` | `KittenRearingConstants` |
+| `parenting` | `ParentingActivityConstants` |
+| `crafting` | `CraftingConstants` |
+| `tremor` | `TremorConstants` |
+| `prey_byproducts` | `PreyByproductConstants` |
+| `environmental_quality` | `EnvironmentalQualityConstants` |
 
 ## `src/resources/snapshot_config.rs`
 
@@ -451,6 +515,15 @@
 | Field | Type |
 |-------|------|
 | `counts` | `BTreeMap<Feature, u64>` |
+
+## `src/resources/thornbriar_pressure.rs`
+
+### ThornbriarPressureTracker (struct)
+
+| Field | Type |
+|-------|------|
+| `last_window_tick` | `u64` |
+| `latched_chronic` | `bool` |
 
 ## `src/resources/time.rs`
 
@@ -504,6 +577,19 @@
 | Field | Type |
 |-------|------|
 | `inner` | `Mutex<FocalScoreCaptureInner>` |
+
+## `src/resources/tremor_map.rs`
+
+### TremorMap (struct)
+
+> Spatial grid tracking the substrate-vibration field — the §5.6 tremor channel as an `InfluenceMap`. Ticket 100.  Same shape as `PreyScentMap` (`marks` row-major over `grid_w × grid_h` 3-tile buckets) but with markedly faster decay: scent persists for a sim-day; tremor empties a full bucket in roughly 1–3 ticks. The rationale lives in the design: vibration is a *behavioral* signal, not a chemical residue. A running cat deposits heavily; a stalking cat deposits nearly nothing; a stationary cat fades within a few ticks.  Aggregate across species by construction — prey cannot discriminate cat vibration from fox vibration. That's the ecological reality the channel encodes; per-species splits don't help and would force the detection layer to invent a non-existent classification ability.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
 
 ## `src/resources/unmet_demand.rs`
 
@@ -564,6 +650,17 @@
 |-------|------|
 | `angle` | `f32` |
 | `strength` | `f32` |
+
+## `src/resources/world_snapshots.rs`
+
+### WorldSnapshots (struct)
+
+| Field | Type |
+|-------|------|
+| `tick` | `u64` |
+| `colony_markers` | `ColonyMarkerBundle` |
+| `food_fraction` | `f32` |
+| `food_available` | `bool` |
 
 ## `src/resources/zodiac.rs`
 

@@ -504,6 +504,16 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // current-tick motion, not residue.
     world.insert_resource(crate::resources::TremorMap::default_map());
 
+    // 101: five-axis environmental quality influence maps. True
+    // tile-resolution (`bucket_size = 1`) so the 1–3 tile stamping
+    // radii produce meaningful spatial gradients. Rebuilt every tick
+    // by `update_env_quality_maps` after `decay_building_condition`.
+    world.insert_resource(crate::resources::ComfortMap::default_map());
+    world.insert_resource(crate::resources::CleanlinessMap::default_map());
+    world.insert_resource(crate::resources::BeautyMap::default_map());
+    world.insert_resource(crate::resources::MysteryMap::default_map());
+    world.insert_resource(crate::resources::CorruptionInfluenceMap::default_map());
+
     // Insert carcass scent map resource (ticket 048 — Phase 2C
     // §5.6.3 row #6).
     world.insert_resource(crate::resources::CarcassScentMap::default());

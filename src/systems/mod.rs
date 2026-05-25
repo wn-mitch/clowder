@@ -59,6 +59,17 @@ pub struct ColonyContext<'w> {
     /// sample reads 0.0 everywhere and the dormant weight makes the
     /// DSE score byte-identical pre-301.
     pub ward_intent_map: Res<'w, crate::resources::WardIntentMap>,
+    /// 101 — environmental quality influence maps (comfort,
+    /// cleanliness, beauty, mystery, corruption). Sampled at the cat's
+    /// current tile to populate the five `local_*` scalars on
+    /// `ScoringContext`. `corruption_influence_map` is sampled but
+    /// not consumed by `EnvironmentalQualityModifier` — it exists for
+    /// spatial perception by future DSEs.
+    pub comfort_map: Res<'w, crate::resources::ComfortMap>,
+    pub cleanliness_map: Res<'w, crate::resources::CleanlinessMap>,
+    pub beauty_map: Res<'w, crate::resources::BeautyMap>,
+    pub mystery_map: Res<'w, crate::resources::MysteryMap>,
+    pub corruption_influence_map: Res<'w, crate::resources::CorruptionInfluenceMap>,
     /// 263 — `ActionAffordances` resource borrow for `ScoringContext`
     /// population. The substrate (261) is colony-wide and read by
     /// both production scoring paths (`evaluate_and_plan` and the
@@ -93,6 +104,7 @@ pub mod combat;
 pub mod coordination;
 pub mod death;
 pub mod disposition;
+pub mod env_quality;
 pub mod fate;
 pub mod fertility;
 pub mod fox_goap;

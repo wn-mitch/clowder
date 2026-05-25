@@ -15,6 +15,7 @@ pub mod construction_site_map;
 pub mod corruption_landmarks;
 pub mod cover_availability_map;
 pub mod dse_target_scratchpad;
+pub mod env_quality;
 pub mod event_log;
 pub mod exploration_map;
 pub mod food;
@@ -77,6 +78,10 @@ pub use construction_site_map::ConstructionSiteMap;
 pub use corruption_landmarks::CorruptionLandmarks;
 pub use cover_availability_map::{update_cover_availability_map, CoverAvailabilityMap};
 pub use dse_target_scratchpad::DseTargetScratchpad;
+pub use env_quality::{
+    combined_env_quality, stamp as env_quality_stamp, BeautyMap, CleanlinessMap, ComfortMap,
+    CorruptionInfluenceMap, EnvField, MysteryMap,
+};
 pub use event_log::{EventEntry, EventKind, EventLog};
 pub use exploration_map::ExplorationMap;
 pub use food::FoodStores;
