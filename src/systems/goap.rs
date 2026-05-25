@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::pathfinding::{find_free_adjacent, step_toward};
+use crate::ai::pathfinding::{find_free_adjacent, find_path, step_toward};
 use crate::ai::planner::actions::actions_for_disposition;
 use crate::ai::planner::goals::goal_for_disposition;
 use crate::ai::planner::{
@@ -9521,9 +9521,19 @@ fn resolve_engage_prey(
         // === APPROACH ===
         let mut moved = false;
         for _ in 0..d.approach_speed {
-            if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
+            // Greedy step_toward returns None in a concave-terrain local-minimum
+            // (rustdoc on `step_toward`). Without a fallback the cat freezes for
+            // `chase_stuck_ticks` and bails. A few specific map tiles on any
+            // given seed catch many repeated hunt attempts at the same trap —
+            // see ticket 465. Fall back to A* once; take just the next step.
+            let next = step_toward(pos, &prey_pos, map, &cat_overlays).or_else(|| {
+                find_path(*pos, prey_pos, map, &cat_overlays).and_then(|p| p.into_iter().next())
+            });
+            if let Some(next) = next {
                 *pos = next;
                 moved = true;
+            } else {
+                break;
             }
         }
         if moved {

@@ -134,3 +134,89 @@ from intermediate tickets, not 100's contribution. Survival gates
 pass. Recommend landing; follow-on tuning per-personality cohort
 should compose with a multi-focal sweep once the next baseline is
 promoted.
+
+## Iter-3 (2026-05-25) — ticket 465 A* fallback in hunt approach
+
+### Hypothesis
+
+The prior "stuck during approach" pattern (80.9% of hunt losses
+post-464 R1, 91.8% pre-100) was a load-bearing defect in
+`goap.rs::resolve_engage_prey`'s approach phase, not the natural
+failure-mode distribution. Greedy `step_toward`
+(`src/ai/pathfinding.rs:342-423`) has no backtrack capability and
+returns `None` in concave-terrain local-minima — the rustdoc explicitly
+names this as a known Phase-1 limitation. The seed=42 map has ~5
+specific trap configurations near common prey-resting tiles (Rabbit
+events clustered 112-at-(18,15), 32-at-(17,14), 21-at-(16,13)…). Same
+trap × same prey-resting-tile × repeated cat attempts = the
+1068-events / 67k-ticks observation.
+
+**Predicted direction:** falling back to A* (`find_path`) when greedy
+returns `None` should drop "stuck during approach" dramatically for
+land prey (Rabbit/Rat/Mouse/Bird). **Fish** would remain stuck because
+`find_path` correctly refuses impassable targets (water is impassable
+to cats; Fish-on-water is structurally unhuntable — orthogonal).
+
+**Predicted magnitude:** Rabbit success ≥ 29.7% (ticket §Verification
+target, within ±10% of pre-100 baseline 33.0%).
+
+### Observation (`logs/tuned-42-59e26d68`, seed=42, dirty)
+
+| Species | Pre-fix (cfc6f4fa) | Post-fix (59e26d68) | Δ |
+|---|---:|---:|---:|
+| Colony | 18.47% (1619 att) | 23.89% (1348 att) | +5.4 pp |
+| Rabbit | 17.05% (434) | **96.06% (127)** | **+79.0 pp** |
+| Rat    | 45.40% (163) | **100.0% (43)** | +54.6 pp |
+| Mouse  | 54.40% (125) | 87.10% (62) | +32.7 pp |
+| Bird   | 16.34% (361) | 22.01% (359) | +5.7 pp |
+| Fish   | 4.48% (536) | 3.17% (757) | −1.3 pp |
+
+`EngagePrey: lost prey during approach` plan-failure rate: 1069 → 579
+events (−46% absolute). Of the remaining 578 stuck events, **78.9% are
+Fish** (cats trying to enter water tiles) — confirming the orthogonal
+Fish defect that this ticket does not address.
+
+### Concordance
+
+**Direction:** matches prediction across all five species. Land-prey
+hunts (Rabbit/Rat/Mouse) recover dramatically; Fish unchanged
+(predicted); Bird recovers modestly (much of Bird "stuck" was prey-
+teleport — birds correctly flee when cats approach).
+
+**Magnitude:** **far exceeds** the ±10% concordance band (and the
+±30% scrutiny threshold). Rabbit 17% → 96% is a 5.6× swing. This is
+**defect-removal magnitude**, not parameter-tuning magnitude — the
+prior baselines (pre-100 33.0%, post-100 17.5%, post-464 17.05%) were
+all bug-corrupted by the greedy-stuck defect. The post-465 number is
+the *true* success rate that the substrate would have produced absent
+the pathing bug.
+
+**Verdict:** `concern` (not fail). Survival/never-fired gates pass.
+Welfare metrics overshoot baseline coherently — `nourishment`,
+`seasons_survived` (+50%), `peak_population`, `structures_built`
+(+36%), `bonds_formed` (+33%) all moved in the predicted
+positive-uplift direction per pillar #3 ("richer perception, better
+strategy" — cats with route knowledge make better strategic decisions
+and welfare improves). The drift exceeds concordance bands but in the
+*intended* direction.
+
+### Follow-ons opened (blocked-by 465)
+
+- **TravelTo same-defect** — `TravelTo(HerbPatch): no path and stuck`
+  went 278 → 452 (cats travel more now that hunts complete faster;
+  same greedy defect in a different consumer). Substrate-correct fix
+  is to lift the A*-fallback into `CatPathPlan::next_step`.
+- **Fish-on-water hunt resolver** — 578 of 579 remaining stuck events
+  are Fish. Options: retire Fish from cat hunt eligibility, OR wire a
+  shoreline-pounce resolver. Design question, not a parameter tune.
+- **CraftAtWorkshop recipe-not-satisfied** — new plan-failure surface
+  at 0.01364/tick (964 events). Likely secondary to the larger /
+  better-fed population; needs investigation before next balance pass.
+
+### Decision
+
+**Ship 465** as a defect removal. The prior baselines should be
+treated as bug-corrupted; future balance work on hunt substrate (per-
+personality cohorts, tremor-action retunes) should compose against
+the post-465 metric distribution. Balance retuning of hunt rates (if
+desired) is a separate concern from the path-defect fix.
