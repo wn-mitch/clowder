@@ -1,13 +1,13 @@
 ---
 id: 474
 title: Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple)
-status: blocked
+status: ready
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [welfare-fidelity, world-richness]
 added: 2026-05-26
 parked: null
-blocked-by: [472]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, htn-methods.md]
 related-balance: []

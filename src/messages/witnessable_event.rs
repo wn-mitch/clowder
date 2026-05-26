@@ -10,9 +10,10 @@
 
 use bevy_ecs::prelude::*;
 
+use crate::components::body_zones::BodyPart;
 use crate::components::disposition::DispositionKind;
 use crate::components::magic::ResourceKind;
-use crate::components::physical::Position;
+use crate::components::physical::{InjurySource, Position};
 use crate::components::prey::PreyKind;
 
 /// Observable simulation events that update per-cat mental models.
@@ -183,6 +184,26 @@ pub enum WitnessableEvent {
         actor: Entity,
         target: Entity,
         ticks_held: u32,
+        position: Position,
+        tick: u64,
+    },
+    /// 472 — `actor` carries a `WoundKind::Festering` wound on the named
+    /// `body_part`. Emitted at a throttled cadence per festering cat by
+    /// `emit_festering_observations` rather than at the moment the wound
+    /// is authored (festering is a *persistent state*, not a one-shot
+    /// event — witnesses build belief over many observations of the
+    /// same wound, not one). Updates witnesses' `perceived_injury_level`
+    /// on the actor; lift scales by severity (the current
+    /// `tissue_damage` on the festering part). `source_kind` carries
+    /// the curse's origin (today: `InjurySource::MagicMisfire`; future
+    /// kin-care tickets may emit other sources). Self-witness skipped
+    /// per the 258 invariant — self-festering is handled by the
+    /// `OwnInjurySite` interoceptive anchor from ticket 089.
+    CarriesFesteringWound {
+        actor: Entity,
+        body_part: BodyPart,
+        source_kind: InjurySource,
+        severity: f32,
         position: Position,
         tick: u64,
     },

@@ -469,6 +469,15 @@ pub mod socialize;
 // canary on JointIntention substrate, retiring the four-AND × RNG
 // direct-emit at `personality_events.rs:80-90`.
 pub mod play_bout;
+// 472: Dormant HTN method anchor — `seek_healing` catches the
+// `festering_wound_healed` compound goal label on any cat carrying a
+// `WoundKind::Festering` part. `ApplicableWhen::PendingSubstrate { blocker:
+// "473" }` keeps it dormant until 473 lands the corrupted-kin perception
+// map + `TendFestering` cat-side DSE that wires the recipient-side
+// completion proxy. The 473 ticket frontmatter carries
+// `wires-method: [seek_healing]`; `scripts/check_method_registry.sh`
+// Pass B verifies the bidirectional reference.
+pub mod seek_healing;
 // 462: HaveItem decomposition substrate — standalone helper that
 // turns a `GoalKind::HaveItem(item)` into the per-recipe GOAP plan
 // `[RetrieveCraftInputs(id), TravelTo(zone), CraftAt<station>]`.

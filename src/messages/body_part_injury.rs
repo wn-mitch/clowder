@@ -8,7 +8,7 @@
 
 use bevy_ecs::prelude::*;
 
-use crate::components::body_zones::{BodyPart, PartCondition};
+use crate::components::body_zones::{BodyPart, PartCondition, WoundKind};
 use crate::components::physical::InjurySource;
 
 #[derive(Message, Debug, Clone, Copy)]
@@ -22,5 +22,10 @@ pub struct BodyPartInjury {
     /// `apply_damage`) if a condition-change predicate is needed.
     pub condition: PartCondition,
     pub source: InjurySource,
+    /// 472 — wound flavor applied this tick. `Normal` for combat /
+    /// wildlife / starvation; `Festering` for the magic-misfire
+    /// `WoundTransfer` arm (gated by
+    /// `MagicConstants::misfire_festering_chance`).
+    pub kind: WoundKind,
     pub tick: u64,
 }

@@ -107,6 +107,7 @@ pub mod disposition;
 pub mod env_quality;
 pub mod fate;
 pub mod fertility;
+pub mod festering_authoring;
 pub mod fox_goap;
 pub mod fox_spatial;
 pub mod fulfillment;

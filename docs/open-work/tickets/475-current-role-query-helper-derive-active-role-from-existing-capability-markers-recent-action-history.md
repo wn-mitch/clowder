@@ -1,13 +1,13 @@
 ---
 id: 475
 title: Current-role query helper (derive active role from existing capability markers + recent action history)
-status: blocked
+status: ready
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
 added: 2026-05-26
 parked: null
-blocked-by: [472]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

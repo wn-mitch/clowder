@@ -252,6 +252,16 @@ pub struct PlayBowCooldown {
     pub last_reciprocal_advance_tick: Option<u64>,
 }
 
+/// Ticket 472 — per-cat throttle for `CarriesFesteringWound` emit cadence.
+/// Festering is a *persistent state* (not a one-shot event), so the
+/// emitter fires once per cat every `festering_observation_interval_ticks`
+/// rather than every tick. Lifetime is bound to the cat; the emitter
+/// inserts on first emit and re-stamps subsequently.
+#[derive(Component, Debug, Clone, Default)]
+pub struct FesteringObservationCooldown {
+    pub last_emit_tick: Option<u64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -552,6 +552,34 @@ pub struct BodyZoneHealing {
     pub tail_bruised_to_healthy: DurationDays,
     pub tail_wounded_to_bruised: DurationDays,
     pub tail_mangled_to_wounded: DurationDays,
+    /// 472 — heal-rate multiplier for parts in `WoundKind::Festering`.
+    /// Applied multiplicatively to the per-tick `tissue_damage`
+    /// decrement: `decrement *= festering_heal_rate_multiplier`. At
+    /// 0.05 a festering wound recovers ~20× more slowly than a normal
+    /// wound of the same category × condition. Pulls the Ashitaka
+    /// anchor onto a concrete substrate knob: cure only advances
+    /// meaningfully via intervention (the kin-care surface in
+    /// 473/474 wires the active healing path). Future flavors (Frozen,
+    /// Poisoned) add one new f32 each — no per-(category, condition,
+    /// kind) field explosion.
+    #[serde(default = "default_festering_heal_rate_multiplier")]
+    pub festering_heal_rate_multiplier: f32,
+}
+
+fn default_festering_heal_rate_multiplier() -> f32 {
+    0.05
+}
+
+fn default_misfire_festering_chance() -> f32 {
+    0.5
+}
+
+fn default_festering_seed_damage() -> f32 {
+    0.10
+}
+
+fn default_festering_observation_interval_ticks() -> u64 {
+    200
 }
 
 impl Default for BodyZoneHealing {
@@ -573,6 +601,7 @@ impl Default for BodyZoneHealing {
             tail_bruised_to_healthy: DurationDays::new(0.03),
             tail_wounded_to_bruised: DurationDays::new(0.08),
             tail_mangled_to_wounded: DurationDays::new(0.20),
+            festering_heal_rate_multiplier: default_festering_heal_rate_multiplier(),
         }
     }
 }
@@ -772,6 +801,33 @@ pub struct MagicConstants {
     pub misfire_wound_transfer_threshold: f32,
     pub misfire_fizzle_mood_penalty: f32,
     pub misfire_corruption_backsplash_amount: f32,
+    /// 472 — conditional chance, given that a `WoundTransfer` misfire
+    /// has already rolled, that the synthetic wound is authored as
+    /// `WoundKind::Festering` on a randomly-selected body part
+    /// (rather than only draining `Health.current`). At default 0.5
+    /// this fires on roughly half of WoundTransfer misfires, and
+    /// because WoundTransfer is one of five misfire kinds (~20% of
+    /// all misfires) the steady-state festering-author rate per
+    /// misfire-having cat is ~10%. This is the substrate anchor for
+    /// the Ashitaka-from-Princess-Mononoke arc: visible, source-
+    /// attributed, progressive wound that drives kin-care behavior.
+    #[serde(default = "default_misfire_festering_chance")]
+    pub misfire_festering_chance: f32,
+    /// 472 — initial `tissue_damage` increment applied to the
+    /// randomly-selected body part when a `WoundTransfer` misfire
+    /// authors a festering wound. Tuned to land in `Bruised` so the
+    /// part is observable but not immediately incapacitating; the
+    /// festering kind axis (and its slow heal rate) is what drives
+    /// the long-tail behavior, not the initial severity.
+    #[serde(default = "default_festering_seed_damage")]
+    pub festering_seed_damage: f32,
+    /// 472 — cooldown between `CarriesFesteringWound` emits per cat.
+    /// Festering is a *persistent state* — witnesses build belief
+    /// over many observations of the same wound rather than one
+    /// emit-per-tick. Default 200 matches the SustainedCoPresence
+    /// cadence order of magnitude (279's affiliative cue rate).
+    #[serde(default = "default_festering_observation_interval_ticks")]
+    pub festering_observation_interval_ticks: u64,
     /// Multiplier on ward repel radius for shadow foxes (corrupted creatures).
     pub shadow_fox_ward_repel_multiplier: f32,
     /// Chance per attempt that a regrowth herb actually spawns.
@@ -870,6 +926,9 @@ impl Default for MagicConstants {
             misfire_wound_transfer_threshold: 0.9,
             misfire_fizzle_mood_penalty: -0.1,
             misfire_corruption_backsplash_amount: 0.1,
+            misfire_festering_chance: default_misfire_festering_chance(),
+            festering_seed_damage: default_festering_seed_damage(),
+            festering_observation_interval_ticks: default_festering_observation_interval_ticks(),
             // Bumped from 2.0 to 3.0: the 15-min sim showed wards deflecting
             // shadow foxes but still allowing kills because cat activity zones
             // were outside the effective radius. 3.0 makes a ward cover a cat

@@ -202,7 +202,8 @@ fn event_position(ev: &WitnessableEvent) -> Position {
         | WitnessableEvent::InventoryObserved { position, .. }
         | WitnessableEvent::PlayBow { position, .. }
         | WitnessableEvent::ReciprocalAdvance { position, .. }
-        | WitnessableEvent::SustainedCoPresence { position, .. } => *position,
+        | WitnessableEvent::SustainedCoPresence { position, .. }
+        | WitnessableEvent::CarriesFesteringWound { position, .. } => *position,
     }
 }
 
@@ -623,6 +624,32 @@ fn apply_observation(
                 observed,
                 tick,
                 &cfg.perceived_intent_clarity,
+            );
+            model.last_updated_tick = tick;
+            model.evidence_count = model.evidence_count.saturating_add(1);
+        }
+
+        WitnessableEvent::CarriesFesteringWound {
+            actor, severity, ..
+        } => {
+            // 472: observer sees a peer carrying a festering wound.
+            // Lifts `perceived_injury_level` on the actor scaled by
+            // observed severity (the part's current tissue_damage at
+            // emit time). Self-witness skipped — self-festering is the
+            // 089 `OwnInjurySite` anchor's job, not the social belief
+            // layer's. Source attribution rides on the message for
+            // narrative consumers (`source_kind`); the belief lift is
+            // source-agnostic — what witnesses perceive is "this cat
+            // is wounded badly," not "wounded by X."
+            if *actor == witness {
+                return;
+            }
+            let model = cats.models.entry(*actor).or_default();
+            update_facet(
+                &mut model.perceived_injury_level,
+                *severity,
+                tick,
+                &cfg.perceived_injury_level,
             );
             model.last_updated_tick = tick;
             model.evidence_count = model.evidence_count.saturating_add(1);

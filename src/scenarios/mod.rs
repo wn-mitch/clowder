@@ -38,6 +38,7 @@ pub mod env;
 pub mod exploration_ranging;
 pub mod farm_herb_demand;
 pub mod farming_cycle;
+pub mod festering_wound;
 pub mod flee_calibration;
 pub mod flee_commitment;
 pub mod fondness_kitten_imprint;
@@ -266,6 +267,12 @@ pub const ALL: &[&Scenario] = &[
     &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_STALK_FOR_OBLIVIOUS_PREY,
     &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_CHASE_FOR_ALERTED_PREY,
     &play_engagement_cues::SCENARIO_PLAY_ENGAGEMENT_CUES,
+    // 472 — festering-wound substrate. Preloads Ashitaka with a
+    // WoundKind::Festering on FrontRightPaw and asserts (a) the wound
+    // persists under the slow heal rate, (b) the bonded peer Mononoke
+    // accrues `perceived_injury_level` via the CarriesFesteringWound
+    // belief-layer lift.
+    &festering_wound::SCENARIO_FESTERING_WOUND,
     // 382 — district placement under colony-crowd pressure. Six
     // founder buildings packed inside the radius-16 spiral disc;
     // pre-loaded `Build` directive for `Stores`. Asserts the

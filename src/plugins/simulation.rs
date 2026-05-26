@@ -946,6 +946,13 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // via `EventKind::JointPlayBoutCompleted` (emitted from
     // `author_joint_intentions` on `JointDropBranch::Completed`).
     registry.push(crate::ai::methods::play_bout::play_bout_method());
+
+    // 472: Dormant HTN method — `seek_healing` decomposes the
+    // `festering_wound_healed` compound goal into rest + accept-tending
+    // sub-goals. `ApplicableWhen::PendingSubstrate { blocker: "473" }`
+    // keeps it dormant; 473 wires the `TendFestering` cat-side DSE +
+    // corrupted-kin perception map and flips the method to Live.
+    registry.push(crate::ai::methods::seek_healing::seek_healing());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of
@@ -1661,6 +1668,13 @@ impl Plugin for SimulationPlugin {
                         systems::playbow_emitter::emit_play_bows,
                         systems::playbow_emitter::emit_reciprocal_advances,
                         systems::sustained_copresence::track_sustained_copresence,
+                        // 472 — broadcast `CarriesFesteringWound` from
+                        // cats with a festering wound, throttled per
+                        // cat by `festering_observation_interval_ticks`.
+                        // Sits next to the 279 affiliation emitters
+                        // because both feed `belief_integrator` via
+                        // `WitnessableEvent`.
+                        systems::festering_authoring::emit_festering_observations,
                     )
                         .chain(),
                     systems::personality_friction::personality_friction,
@@ -1672,17 +1686,20 @@ impl Plugin for SimulationPlugin {
                     systems::wildlife::fox_confrontation_tick,
                     systems::wildlife::fox_store_raid_tick,
                     systems::magic::personal_corruption_effects,
-                    // 471 — drain BodyPartInjury into the per-cat
-                    // last-injury cache, then run the death
-                    // discriminator. Nested sub-chain (same arity-20
-                    // accommodation as the 279 group above) keeps the
-                    // cache strictly before `check_death`'s read of
-                    // `LastBodyPartInjury`. The cache must run after
-                    // every BodyPartInjury emitter in this Chain
-                    // (combat, wildlife, magic-misfire on the 472
-                    // follow-on) so death.rs sees the freshest source
-                    // attribution.
+                    // 471 / 472 — telemetry-then-attribution sub-chain.
+                    // `author_festering_from_misfire` (472) drains the
+                    // MisfireEffect stream emitted by resolve_magic_
+                    // task_chains and resolve_goap_plans earlier in the
+                    // tick; for WoundTransfer arms it rolls
+                    // `misfire_festering_chance` and authors a
+                    // WoundKind::Festering wound on a random body part,
+                    // emitting a BodyPartInjury that `cache_last_body_
+                    // part_injury` (471) then drains for death
+                    // attribution before `check_death` reads the cache.
+                    // Nested sub-chain (same arity-20 accommodation as
+                    // the 279 group above).
                     (
+                        systems::festering_authoring::author_festering_from_misfire,
                         systems::injury_cache::cache_last_body_part_injury,
                         systems::death::check_death,
                     )

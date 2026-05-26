@@ -157,6 +157,41 @@ impl PartCondition {
     }
 }
 
+/// Orthogonal wound-flavor axis on each body part (ticket 472).
+///
+/// Composes with [`PartCondition`] — a part's state is `(severity, kind)`.
+/// `Festering` is a slow-healing flavor that fits the Ashitaka-from-
+/// Princess-Mononoke anchor (visible mark on a body part, festers
+/// progressively, socially perceived as such). The shape is designed to
+/// admit future flavors (Frozen, Poisoned, etc.) — each added as a
+/// variant with its own multiplier on [`BodyZoneHealing`].
+///
+/// Pre-472 every part was effectively `Normal`. The kind axis was added
+/// to give the magic-misfire `WoundTransfer` path a place to land a
+/// distinct, slow-healing wound at a randomly-selected body part — the
+/// (26,61) seed-42 death class needed a substrate hook for "this wound
+/// won't heal without intervention," and a generic 6th `PartCondition`
+/// tier would have conflated severity with kind.
+#[repr(u8)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum WoundKind {
+    #[default]
+    Normal = 0,
+    Festering = 1,
+}
+
 /// Per-part state.
 ///
 /// `tissue_damage` is continuous in `[0.0, 1.0]`. `condition` is the derived
@@ -164,11 +199,18 @@ impl PartCondition {
 /// flags a part whose Destroyed condition does not heal — set at the moment
 /// the part first reaches Destroyed if its category is configured permanent
 /// in `BodyZoneConstants::permanent_at_destroyed`.
+///
+/// 472 — `kind` is the orthogonal wound-flavor axis. Damage application
+/// promotes the kind in `(Normal < Festering)` order: once a part is
+/// Festering, additional Normal damage keeps it Festering. Healing
+/// resets to Normal only when `tissue_damage` returns to zero.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BodyPartState {
     pub tissue_damage: f32,
     pub condition: PartCondition,
     pub permanent: bool,
+    #[serde(default)]
+    pub kind: WoundKind,
 }
 
 impl Default for BodyPartState {
@@ -177,6 +219,7 @@ impl Default for BodyPartState {
             tissue_damage: 0.0,
             condition: PartCondition::Healthy,
             permanent: false,
+            kind: WoundKind::default(),
         }
     }
 }
@@ -234,15 +277,43 @@ impl CatBodyModel {
         1.0 - pain_fraction
     }
 
-    /// Apply raw damage to one part. Updates `tissue_damage`, recomputes
-    /// `condition`, and sets `permanent = true` iff the part first reaches
-    /// `Destroyed` and its category is configured permanent.
-    /// Returns the post-application `PartCondition` for the caller to thread
-    /// into a `BodyPartInjury` message.
+    /// Apply raw damage to one part with the default `WoundKind::Normal`.
+    /// Thin wrapper over [`apply_damage_with_kind`] preserving every
+    /// pre-472 call site as a Normal-flavor wound.
     pub fn apply_damage(
         &mut self,
         part: BodyPart,
         damage: f32,
+        thresholds: &[f32; 4],
+        permanent_at_destroyed: &[bool; CAT_BODY_PART_COUNT],
+    ) -> PartCondition {
+        self.apply_damage_with_kind(
+            part,
+            damage,
+            WoundKind::Normal,
+            thresholds,
+            permanent_at_destroyed,
+        )
+    }
+
+    /// Apply raw damage to one part with an explicit `WoundKind`. Updates
+    /// `tissue_damage`, recomputes `condition`, sets `permanent = true`
+    /// iff the part first reaches `Destroyed` and its category is
+    /// configured permanent, and promotes `kind` monotonically along
+    /// `Normal < Festering`. Returns the post-application
+    /// `PartCondition` for the caller to thread into a
+    /// `BodyPartInjury` message.
+    ///
+    /// Kind promotion: once a part is `Festering`, additional `Normal`
+    /// damage leaves the kind alone (the festering signature dominates).
+    /// Festering on top of an existing `Normal` wound is a strict
+    /// upgrade. `tissue_damage = 0` is the only event that resets kind
+    /// back to `Normal` (handled in `heal_tick`).
+    pub fn apply_damage_with_kind(
+        &mut self,
+        part: BodyPart,
+        damage: f32,
+        kind: WoundKind,
         thresholds: &[f32; 4],
         permanent_at_destroyed: &[bool; CAT_BODY_PART_COUNT],
     ) -> PartCondition {
@@ -257,13 +328,26 @@ impl CatBodyModel {
             state.permanent = true;
         }
         state.condition = new_condition;
+        // Kind promotion: max along the WoundKind order (Festering > Normal).
+        if kind > state.kind {
+            state.kind = kind;
+        }
         new_condition
     }
 
     /// Heal one tick on every non-permanent-Destroyed part. Caller supplies
     /// the per-tick decrement (already converted from
-    /// `BodyZoneConstants::healing_*` durations × time_scale). Permanent parts
-    /// at Destroyed stay locked.
+    /// `BodyZoneConstants::healing_*` durations × time_scale, and — per
+    /// ticket 472 — divided by `festering_heal_rate_multiplier` for
+    /// `Festering` parts so they recover much more slowly). Permanent
+    /// parts at Destroyed stay locked.
+    ///
+    /// 472 — when `tissue_damage` returns to `0.0`, the kind axis resets
+    /// to `Normal`. This is the only path that clears `Festering`
+    /// without an external authoring action; in healthy colonies the
+    /// near-zero festering heal rate makes this rare without
+    /// intervention (the design surface the kin-care cluster wires up
+    /// in 473/474).
     pub fn heal_tick(
         &mut self,
         per_part_decrement: &[f32; CAT_BODY_PART_COUNT],
@@ -278,7 +362,19 @@ impl CatBodyModel {
             }
             state.tissue_damage = (state.tissue_damage - per_part_decrement[idx]).max(0.0);
             state.condition = PartCondition::from_tissue_damage(state.tissue_damage, thresholds);
+            if state.tissue_damage <= 0.0 {
+                state.kind = WoundKind::Normal;
+            }
         }
+    }
+
+    /// 472 — any part is currently in a `Festering` state. Predicate
+    /// consumed by `SeekHealing` HTN method applicability (dormant
+    /// until ticket 473 ships the `TendFestering` leaf action) and by
+    /// the `emit_festering_observations` system that broadcasts
+    /// `WitnessableEvent::CarriesFesteringWound` to nearby witnesses.
+    pub fn has_festering_wound(&self) -> bool {
+        self.parts.iter().any(|p| p.kind == WoundKind::Festering)
     }
 
     /// True if any part is at Wounded or worse. Used by the `Injured` marker

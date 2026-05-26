@@ -749,13 +749,45 @@ pub(crate) fn damage_to_body_part(
     writer: &mut MessageWriter<BodyPartInjury>,
     activation: &mut SystemActivation,
 ) -> Option<(BodyPart, crate::components::body_zones::PartCondition)> {
+    damage_to_body_part_with_kind(
+        entity,
+        body_model,
+        damage,
+        crate::components::body_zones::WoundKind::Normal,
+        tick,
+        source,
+        c,
+        rng,
+        writer,
+        activation,
+    )
+}
+
+/// 472 — variant of `damage_to_body_part` that explicitly carries the
+/// `WoundKind` flavor. `apply_misfire`'s `WoundTransfer` arm calls this
+/// with `WoundKind::Festering` to author the slow-healing wound that
+/// drives the `SeekHealing` HTN method (when wired in 473).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn damage_to_body_part_with_kind(
+    entity: Entity,
+    body_model: &mut CatBodyModel,
+    damage: f32,
+    kind: crate::components::body_zones::WoundKind,
+    tick: u64,
+    source: InjurySource,
+    c: &crate::resources::sim_constants::CombatConstants,
+    rng: &mut SimRng,
+    writer: &mut MessageWriter<BodyPartInjury>,
+    activation: &mut SystemActivation,
+) -> Option<(BodyPart, crate::components::body_zones::PartCondition)> {
     if damage < c.injury_negligible_threshold {
         return None;
     }
     let part = select_body_part_for_attacker(source, rng);
-    let condition = body_model.apply_damage(
+    let condition = body_model.apply_damage_with_kind(
         part,
         damage,
+        kind,
         &c.body_zone_condition_thresholds,
         &c.body_zone_permanent_at_destroyed,
     );
@@ -766,6 +798,7 @@ pub(crate) fn damage_to_body_part(
         tissue_damage_delta: damage,
         condition,
         source,
+        kind,
         tick,
     });
     Some((part, condition))
@@ -788,11 +821,12 @@ fn per_part_heal_decrements(
     time_scale: &crate::resources::time::TimeScale,
 ) -> [f32; crate::components::body_zones::CAT_BODY_PART_COUNT] {
     use crate::components::body_zones::{
-        BodyPart, PartCategory, PartCondition, CAT_BODY_PART_COUNT,
+        BodyPart, PartCategory, PartCondition, WoundKind, CAT_BODY_PART_COUNT,
     };
     let mut out = [0.0_f32; CAT_BODY_PART_COUNT];
     for (i, part) in BodyPart::ALL.iter().enumerate() {
         let condition = body_model.parts[i].condition;
+        let kind = body_model.parts[i].kind;
         if condition == PartCondition::Healthy {
             continue;
         }
@@ -831,7 +865,14 @@ fn per_part_heal_decrements(
             (_, PartCondition::Healthy) => continue,
         };
         let ticks = duration.ticks(time_scale).max(1);
-        out[i] = 1.0 / ticks as f32;
+        let base_decrement = 1.0 / ticks as f32;
+        // 472 — festering wounds heal much more slowly. Exhaustive
+        // match on `WoundKind` so a future variant (Frozen, Poisoned)
+        // is a compile error here until its multiplier is named.
+        out[i] = match kind {
+            WoundKind::Normal => base_decrement,
+            WoundKind::Festering => base_decrement * healing.festering_heal_rate_multiplier,
+        };
     }
     out
 }

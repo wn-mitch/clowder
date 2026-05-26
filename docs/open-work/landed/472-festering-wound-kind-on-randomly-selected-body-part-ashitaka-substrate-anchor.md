@@ -1,7 +1,7 @@
 ---
 id: 472
 title: Festering wound kind on randomly-selected body part (Ashitaka substrate anchor)
-status: ready
+status: done
 cluster: combat-threat
 orchestration: substrate-sensitive
 initiative: [welfare-fidelity, mythic-texture]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [body-zones.md, magic.md, htn-methods.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-26
 ---
 
 ## Why
@@ -112,3 +112,4 @@ Landing approach:
 ## Log
 
 - 2026-05-26: opened from seed-42 soak `logs/tuned-42-01eb555d` death-class investigation. User reframe (Princess Mononoke / Ashitaka's arm): festering substrate must be visible, progressive, socially-perceived, source-attributed, and quest-driving. *"Festering wound actually does look like it fits, but it's a type of wound on a body part, randomly selected."* This ticket is the foundation of the aftermath layer; sibling consumer tickets [[473]] [[474]] [[475]] are blocked-by this one. Cluster: [[470]] (before), [[471]] (during), [[472]] (this — anchor), [[473]]/[[474]]/[[475]] (after).
+- 2026-05-26: Verified clean: just check / just test (2516 passed) / just scenario festering_wound (2/2 pass on persistence + nearby-peer-perceives assertions) / just soak-trace 42 Simba — verdict: survival pass, continuity pass, never_fired=[], deaths_by_cause={} (no misfires in this seed post-279; festering substrate stays dormant in soak but the scenario verifies the persistence + observation + belief-lift paths). misfire_festering_chance=0.5 active at land; 273's frontmatter carries wires-method:[seek_healing]; SeekHealing HTN method registered as PendingSubstrate { blocker: 473 }. WoundKind axis on BodyPartState extends to Frozen / Poisoned later by adding one f32 multiplier on BodyZoneHealing.

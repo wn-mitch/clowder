@@ -1,16 +1,17 @@
 ---
 id: 473
 title: Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers)
-status: blocked
+status: ready
 cluster: belief-perception
 orchestration: substrate-sensitive
 initiative: [full-sensory-perception, welfare-fidelity]
 added: 2026-05-26
 parked: null
-blocked-by: [472]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, htn-methods.md]
 related-balance: []
+wires-method: [seek_healing]
 landed-at: null
 landed-on: null
 ---
