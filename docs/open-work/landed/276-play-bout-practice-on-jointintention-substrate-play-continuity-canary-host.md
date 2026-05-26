@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: [415]
 related-systems: [ai-substrate-refactor.md]
 related-balance: [healthy-colony.md]
-landed-at: pending
+landed-at: 3d5b4dc74d7c
 landed-on: 2026-05-26
 ---
 
