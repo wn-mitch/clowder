@@ -1010,6 +1010,13 @@ impl Plugin for SimulationPlugin {
         // `JointIntention { Courtship }.partner`. Consumed by
         // `author_joint_intentions` to bump `last_interaction_tick`.
         app.add_message::<crate::ai::joint_intention::JointInteractionObserved>();
+        // Ticket 276 Commit B — PlayBout `PlayBoutApproach → PlayBoutBouting`
+        // stage transition. `author_joint_intentions` emits this from
+        // the lower-`Entity::index()` side of the pair; consumed by
+        // `cascade_play_bout_bouting` to apply the Bouting-stage
+        // mood-lift cascade + narrative entry (the substrate replacement
+        // for the legacy `on_play_initiated` observer).
+        app.add_message::<crate::ai::joint_intention::PlayBoutBoutingEntered>();
         // 258 — observable side-effects consumed by `belief_integrator` to
         // update per-cat mental models. Action resolvers emit variants at
         // completion; the integrator finds witnesses by sensing-range query.
@@ -1390,7 +1397,20 @@ impl Plugin for SimulationPlugin {
                             // bias raising median food_fraction) stays
                             // in band; Farm dormancy under abundant
                             // food remains intended per ticket 084.
-                            crate::ai::joint_intention::author_joint_intentions,
+                            // Ticket 276 Commit B — wrap the JI author +
+                            // PlayBout cascade in a 2-tuple sub-chain
+                            // to stay under Bevy's 20-system outer-tuple
+                            // limit. The cascade drains
+                            // `PlayBoutBoutingEntered` messages emitted
+                            // by the author and applies the Bouting-
+                            // stage mood-lift + play_social narrative
+                            // (substrate replacement for the retired
+                            // `on_play_initiated` observer).
+                            (
+                                crate::ai::joint_intention::author_joint_intentions,
+                                crate::ai::joint_intention::cascade_play_bout_bouting,
+                            )
+                                .chain(),
                             // §4 batch 2: capability markers — reads
                             // life-stage, injury, inventory markers
                             // authored above.

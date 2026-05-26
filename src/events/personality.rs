@@ -16,12 +16,6 @@ pub struct DirectiveRefused {
     pub coordinator: Entity,
 }
 
-/// A playful cat initiated a group play session.
-#[derive(Event)]
-pub struct PlayInitiated {
-    pub cat: Entity,
-}
-
 /// A proud cat's respect dropped critically low, triggering status-seeking.
 #[derive(Event)]
 pub struct PrideCrisis {

@@ -1,7 +1,7 @@
 ---
 id: 276
 title: Play-bout practice on JointIntention substrate (play continuity canary host)
-status: ready
+status: done
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [mythic-texture]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: [415]
 related-systems: [ai-substrate-refactor.md]
 related-balance: [healthy-colony.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-26
 ---
 
 ## Why
@@ -232,3 +232,4 @@ and `retire` chosen:
 - 2026-05-25: body authored. 10-soak audit (seed 42, range 0–13 with intermittent zeros) confirms `personality_events.rs:80-90` four-AND gate × RNG·0.1 as the structural fragility — pre-066 play was 348; post-066 stuck at 8–14. Per design pillar #2, retiring the direct-emit in favor of a JointIntention `PlayBout` practice is the substrate-correct fix. Structural-option menu chose `retire`; layer-walk audit promoted all rows from `[suspect]` to `[verified-*]`. Supersedes 415 (PlayFired gate orthogonal to Explore), which had named R5 (retire / cross-ref 276) as its candidate; this ticket executes it.
 - 2026-05-26: Commit A landed (PlayBout substrate + matchmaker + drop-arm `EventKind::JointPlayBoutCompleted`). Seed-42 15-min soak: `JointPlayBoutCompleted = 12`, footer `continuity_tallies.play = 21` (12 substrate + 9 legacy), survival + continuity hard gates pass. Substrate verified. Matchmaker emits 8247 JIs / drops 8247 / ~12 complete (0.14% completion rate) — the churn surfaces a substrate gap: matchmaker fiat without mutual-perception grounding. Opened **469** (Ground JointIntention emission in mutual perception — confidence + candidacy) as the substrate-correct follow-on; this ticket continues with Commit B (retire direct-emit + Bouting-stage cascade) under the current substrate shape. 469 composes with **279** (body-cue source) and **280** (mental-model belief-holder) on the same JointIntention substrate.
 - 2026-05-26 (later): 469 retired after substrate audit against `docs/systems/ai-substrate-refactor.md` §4.7 / §7.M.4 / §12.3 / §12.4 — 469's proposed `confidence: f32` field and `PracticeCandidate` marker duplicate `MentalModel<Cat>.perceived_intent_clarity` (landed 258, `src/components/beliefs.rs:148`). See landed/469's Log for the audit. The substrate-correct fix path for the matchmaker churn is now **279** (adds `PlayBow` / `ReciprocalAdvance` / `SustainedOrientation` `WitnessableEvent` variants + `belief_integrator` arms) → **280** (matchmaker rebind on mutual `MentalModel<other>.perceived_intent_clarity > floor`). 276 Commit B (retire direct-emit + Bouting-stage cascade) continues under the current matchmaker shape; the matchmaker rebind itself moves to 280.
+- 2026-05-26 (Commit B landed): retired the legacy direct-emit (`personality_events.rs:80-90` trigger + `on_play_initiated` observer + `events::personality::PlayInitiated` struct + `EventKind::PlayFired` variant) and migrated the mood-lift + narrative cascade onto a new `cascade_play_bout_bouting` system reading a fresh `PlayBoutBoutingEntered` Message emitted from `author_joint_intentions`'s stage_advances loop on `PlayBoutApproach → PlayBoutBouting`. Lower-`Entity::index()` side guards against double-fire on symmetric pair transitions. Bundled `JointInteractionObserved` + `PlayBoutBoutingEntered` into a `JointMessageStreams` SystemParam to stay under Bevy's 16-param ceiling; wrapped the JI author + cascade in a 2-tuple sub-chain to stay under the 20-system outer-tuple limit. Seed-42 15-min soak (binary tagged commit_hash `2f3ea1ce` per jj+git HEAD lag; actual @ = `871c93c2`): `PlayFired = 0`, `JointPlayBoutCompleted = 10`, footer `continuity_tallies.play = 10` (≥ hard-gate threshold; sole writer now `JointPlayBoutCompleted`). Survival hard gates clean (`deaths_by_cause: {}`). Frame-diff vs `tuned-42-f2a11f1d` (Commit A's soak): per-DSE Simba trace shows `socialize +15.5%`, `groom_other +18.8%`, `mentor -79.4%` deltas (advisory cross-commit; no concordance violations on tracked DSEs). Footer-level vs Commit A: grooming 1054→819 (-22%), courtship 1465→799 (-45%), play 21→10 (-52% — composed of legacy `PlayFired` going to 0 + substrate plays slightly lower 12→10). The grooming/courtship drift attributes to substrate-perturbation signature (per `learning_bevy_schedule_edge_perturbation` + RNG-stream removal of the per-tick `PlayInitiated` `random::<f32>()` roll); survival + continuity hold across the perturbation. PlayBout `Feature::*` (Emitted / BiasApplied / StageAdvanced) already inherit `true` from blanket classification in `expected_to_fire_per_soak`; parallel PlayBout asserts added to the feature-classification test to lock the contract.

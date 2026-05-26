@@ -1,25 +1,16 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::{Action, CurrentAction};
 use crate::components::coordination::ActiveDirective;
-use crate::components::identity::{Age, Gender, Name};
+use crate::components::identity::Name;
 use crate::components::mental::{Mood, MoodModifier, MoodSource, PrideCooldown};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Needs, Position};
-use crate::events::personality::{DirectiveRefused, PlayInitiated, PrideCrisis, TemperFlared};
-use crate::resources::event_log::{EventKind, EventLog};
-use crate::resources::map::TileMap;
+use crate::events::personality::{DirectiveRefused, PrideCrisis, TemperFlared};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
-use crate::resources::narrative_templates::{
-    emit_event_narrative, MoodBucket, TemplateContext, TemplateRegistry, VariableContext,
-};
 use crate::resources::relationships::Relationships;
 use crate::resources::rng::SimRng;
-use crate::resources::sim_constants::SimConstants;
-use crate::resources::time::{DayPhase, Season, SimConfig, TimeState};
-use crate::resources::weather::WeatherState;
-use crate::systems::mood::patience_extend;
+use crate::resources::time::TimeState;
 
 // ---------------------------------------------------------------------------
 // emit_personality_events
@@ -40,7 +31,6 @@ pub fn emit_personality_events(
             &Personality,
             &Needs,
             &Mood,
-            &CurrentAction,
             &Position,
             Option<&ActiveDirective>,
             Option<&PrideCooldown>,
@@ -48,7 +38,7 @@ pub fn emit_personality_events(
         Without<Dead>,
     >,
 ) {
-    for (entity, personality, needs, mood, current, _pos, directive, pride_cd) in &cats {
+    for (entity, personality, needs, mood, _pos, directive, pride_cd) in &cats {
         let phys = needs.physiological_satisfaction();
 
         // --- TemperFlared ---
@@ -74,18 +64,6 @@ pub fn emit_personality_events(
                         coordinator: dir.coordinator,
                     });
                 }
-            }
-        }
-
-        // --- PlayInitiated ---
-        // Playful cat socializing in a good mood may start a game.
-        if current.action == Action::Socialize
-            && personality.playfulness > 0.6
-            && mood.valence > 0.0
-        {
-            let chance = personality.playfulness * 0.1;
-            if rng.rng.random::<f32>() < chance {
-                commands.trigger(PlayInitiated { cat: entity });
             }
         }
 
@@ -118,7 +96,6 @@ pub fn emit_personality_events(
 pub fn register_observers(app: &mut bevy::prelude::App) {
     app.add_observer(on_temper_flared);
     app.add_observer(on_directive_refused);
-    app.add_observer(on_play_initiated);
     app.add_observer(on_pride_crisis);
 }
 
@@ -131,7 +108,6 @@ pub fn register_observers(app: &mut bevy::prelude::App) {
 pub fn register_observers_world(world: &mut bevy::prelude::World) {
     world.add_observer(on_temper_flared);
     world.add_observer(on_directive_refused);
-    world.add_observer(on_play_initiated);
     world.add_observer(on_pride_crisis);
 }
 
@@ -260,146 +236,6 @@ fn on_directive_refused(
     );
 }
 
-/// PlayInitiated cascade: mood boost to nearby cats, template-driven narrative,
-/// and a `play` continuity-canary tally via [`EventKind::PlayFired`].
-#[allow(clippy::too_many_arguments, clippy::type_complexity)]
-fn on_play_initiated(
-    trigger: On<PlayInitiated>,
-    cats: Query<(Entity, &Position, &Personality, &Name, &Gender, &Age), Without<Dead>>,
-    needs_q: Query<&Needs, Without<Dead>>,
-    mut moods: Query<&mut Mood>,
-    mut log: ResMut<NarrativeLog>,
-    mut event_log: Option<ResMut<EventLog>>,
-    time: Res<TimeState>,
-    constants: Res<SimConstants>,
-    config: Res<SimConfig>,
-    weather: Res<WeatherState>,
-    map: Res<TileMap>,
-    registry: Option<Res<TemplateRegistry>>,
-    mut rng: ResMut<SimRng>,
-) {
-    let event = trigger.event();
-    let Ok((_, cat_pos, personality, cat_name, gender, age)) = cats.get(event.cat) else {
-        return;
-    };
-    let cat_pos = *cat_pos;
-    let cat_name = cat_name.0.clone();
-    let gender = *gender;
-    let life_stage = age.stage(time.tick, config.ticks_per_season);
-
-    let mut play_partner: Option<String> = None;
-    for (other, other_pos, other_pers, other_name, _, _) in &cats {
-        if other == event.cat {
-            continue;
-        }
-        if cat_pos.manhattan_distance(other_pos) > 4 {
-            continue;
-        }
-        // Mood boost to all nearby.
-        if let Ok(mut other_mood) = moods.get_mut(other) {
-            let mut modifier =
-                MoodModifier::new(0.1, 15, "watched play nearby").with_kind(MoodSource::Social);
-            patience_extend(&mut modifier, other_pers.patience, &constants.mood);
-            other_mood.modifiers.push_back(modifier);
-        }
-        if play_partner.is_none() {
-            play_partner = Some(other_name.0.clone());
-        }
-    }
-
-    // Tally for the `play` continuity canary. Mirrors the GroomingFired
-    // / MentoringFired pattern in `goap.rs` — the cascade emits a
-    // narrative entry *and* an EventLog record so the footer's
-    // `continuity_tallies.play` field counts each fired event.
-    // Without this push the canary stays at zero even when the
-    // observer fires (the trigger / observer flow only routes through
-    // narrative). See ticket 028.
-    if let Some(ref mut events) = event_log {
-        events.push(
-            time.tick,
-            EventKind::PlayFired {
-                cat: cat_name.clone(),
-                partner: play_partner.clone(),
-            },
-        );
-    }
-
-    // Build template context from available state.
-    let day_phase = DayPhase::from_tick(time.tick, &config);
-    let season = Season::from_tick(time.tick, &config);
-    let terrain = if map.in_bounds(cat_pos.x, cat_pos.y) {
-        map.get(cat_pos.x, cat_pos.y).terrain
-    } else {
-        crate::resources::map::Terrain::Grass
-    };
-    let mood_bucket = moods
-        .get(event.cat)
-        .map(|m| MoodBucket::from_valence(m.valence))
-        .unwrap_or(MoodBucket::Neutral);
-    let needs = needs_q
-        .get(event.cat)
-        .cloned()
-        .unwrap_or_else(|_| Needs::default());
-
-    let has_partner = play_partner.is_some();
-    let event_tag = if has_partner {
-        "play_social"
-    } else {
-        "play_solo"
-    };
-
-    let ctx = TemplateContext {
-        action: Action::Socialize,
-        day_phase,
-        season,
-        weather: weather.current,
-        mood_bucket,
-        life_stage,
-        has_target: has_partner,
-        terrain,
-        event: Some(event_tag.into()),
-    };
-    let var_ctx = VariableContext {
-        name: &cat_name,
-        gender,
-        weather: weather.current,
-        day_phase,
-        season,
-        life_stage,
-        fur_color: "unknown",
-        other: play_partner.as_deref(),
-        prey: None,
-        item: None,
-        item_singular: None,
-        quality: None,
-    };
-
-    let (fallback, fallback_tier) = if let Some(ref partner) = play_partner {
-        (
-            format!("A game breaks out. {cat_name} bats a pinecone toward {partner}."),
-            NarrativeTier::Action,
-        )
-    } else {
-        (
-            format!("{cat_name} chases their own tail, briefly entertained."),
-            NarrativeTier::Micro,
-        )
-    };
-
-    emit_event_narrative(
-        registry.as_deref(),
-        &mut log,
-        time.tick,
-        fallback,
-        fallback_tier,
-        &ctx,
-        &var_ctx,
-        personality,
-        &needs,
-        &mut rng.rng,
-    );
-}
-
 /// PrideCrisis cascade: narrative entry. Status-seeking boost is handled via
 /// the wounded pride mood modifier in update_mood (already implemented).
 fn on_pride_crisis(
@@ -429,6 +265,7 @@ fn on_pride_crisis(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::systems::mood::patience_extend;
 
     #[test]
     fn patience_extend_positive_modifier() {

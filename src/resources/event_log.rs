@@ -480,18 +480,11 @@ pub enum EventKind {
         cat: String,
         deceased: String,
     },
-    /// A cat engaged in play. Reserved; no emitting system today.
-    PlayFired {
-        cat: String,
-        partner: Option<String>,
-    },
     /// Ticket 276 — a PlayBout JointIntention completed (Cooldown stage
-    /// elapsed and `JointDropBranch::Completed` fired). Increments
-    /// `continuity_tallies["play"]`, replacing the legacy
-    /// `EventKind::PlayFired` direct-emit hosted on the four-AND × RNG
-    /// gate at `personality_events.rs:80-90`. Both events feed the
-    /// same tally key during the dual-path migration (Commit A); the
-    /// retire commit deletes `PlayFired`.
+    /// elapsed and `JointDropBranch::Completed` fired). Sole writer of
+    /// `continuity_tallies["play"]` post-Commit-B; replaces the retired
+    /// `EventKind::PlayFired` direct-emit that ran on the four-AND ×
+    /// RNG·0.1 gate at the former `personality_events.rs:80-90` site.
     JointPlayBoutCompleted {
         actor: String,
         partner: String,
@@ -808,9 +801,6 @@ impl EventLog {
             }
             EventKind::BurialFired { .. } => {
                 *self.continuity_tallies.entry("burial".into()).or_insert(0) += 1;
-            }
-            EventKind::PlayFired { .. } => {
-                *self.continuity_tallies.entry("play".into()).or_insert(0) += 1;
             }
             EventKind::JointPlayBoutCompleted { .. } => {
                 *self.continuity_tallies.entry("play".into()).or_insert(0) += 1;

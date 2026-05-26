@@ -2411,6 +2411,32 @@ mod tests {
             practice: PracticeKind::Courtship,
         }
         .expected_to_fire_per_soak());
+        // Ticket 276 Commit B — PlayBout inherits the same blanket
+        // classification: Emitted / BiasApplied / StageAdvanced enrolled
+        // as expected-to-fire (positive canary); Dropped + Mismatch
+        // tick remain exempt (bursty / healthy-sometimes-zero). The
+        // explicit asserts lock the contract so a future per-practice
+        // override can't silently demote PlayBout.
+        assert!(Feature::JointIntentionEmitted {
+            practice: PracticeKind::PlayBout,
+        }
+        .expected_to_fire_per_soak());
+        assert!(Feature::JointBiasApplied {
+            practice: PracticeKind::PlayBout,
+        }
+        .expected_to_fire_per_soak());
+        assert!(Feature::JointStageAdvanced {
+            practice: PracticeKind::PlayBout,
+        }
+        .expected_to_fire_per_soak());
+        assert!(!Feature::JointIntentionDropped {
+            practice: PracticeKind::PlayBout,
+        }
+        .expected_to_fire_per_soak());
+        assert!(!Feature::JointStageMismatchTickAccrued {
+            practice: PracticeKind::PlayBout,
+        }
+        .expected_to_fire_per_soak());
         // Rare-legend events must be exempted.
         assert!(!Feature::ShadowFoxBanished.expected_to_fire_per_soak());
         assert!(!Feature::ShadowFoxDissolved.expected_to_fire_per_soak());

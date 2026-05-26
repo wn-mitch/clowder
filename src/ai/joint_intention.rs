@@ -52,23 +52,31 @@ use bevy_ecs::prelude::*;
 
 use crate::ai::mating::{MatingFitness, MatingFitnessParams};
 use crate::ai::{Action, CurrentAction};
-use crate::components::identity::{LifeStage, Name, Orientation};
+use crate::components::identity::{Age, Gender, LifeStage, Name, Orientation};
 use crate::components::joint_intention::{
     next_stage, should_drop_joint, JointDropBranch, JointIntention, JointIntentionDropConfig,
     JointIntentionProxies, PracticeKind, PracticeStage, StageAdvanceProxies,
 };
-use crate::components::mental::Mood;
+use crate::components::mental::{Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::Dead;
-use crate::components::physical::Position;
+use crate::components::physical::{Needs, Position};
 use crate::components::pregnancy::Pregnant;
 use crate::resources::event_log::{EventKind, EventLog};
+use crate::resources::map::TileMap;
+use crate::resources::narrative::{NarrativeLog, NarrativeTier};
+use crate::resources::narrative_templates::{
+    emit_event_narrative, MoodBucket, TemplateContext, TemplateRegistry, VariableContext,
+};
 use crate::resources::relationships::{BondType, Relationships};
+use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::{
     CourtshipPracticeConstants, PlayBoutPracticeConstants, SimConstants,
 };
 use crate::resources::system_activation::{Feature, SystemActivation};
-use crate::resources::time::{SimConfig, TimeState};
+use crate::resources::time::{DayPhase, Season, SimConfig, TimeState};
+use crate::resources::weather::WeatherState;
+use crate::systems::mood::patience_extend;
 use crate::systems::social::are_orientation_compatible;
 use std::collections::{HashMap, HashSet};
 
@@ -90,6 +98,33 @@ pub struct JointInteractionObserved {
     pub tick: u64,
 }
 
+/// Ticket 276 Commit B — emitted by `author_joint_intentions` when a
+/// PlayBout JointIntention transitions from `PlayBoutApproach` into
+/// `PlayBoutBouting`. Drives [`cascade_play_bout_bouting`], which
+/// applies the Bouting-stage mood-lift to nearby witnesses and emits
+/// the play_social narrative — the substrate replacement for the legacy
+/// `on_play_initiated` observer's cascade.
+///
+/// Emitted from the lower-`Entity::index()` side only, mirroring the
+/// mismatch-tracking convention, so symmetric stage transitions don't
+/// double-fire the cascade.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct PlayBoutBoutingEntered {
+    pub actor: Entity,
+    pub partner: Entity,
+    pub tick: u64,
+}
+
+/// Bundled message channels so `author_joint_intentions` stays under
+/// Bevy's 16-param SystemParam ceiling. Reads `JointInteractionObserved`
+/// (Pass 0 last_interaction_tick bump) and writes `PlayBoutBoutingEntered`
+/// (ticket 276 Commit B, stage_advances loop).
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct JointMessageStreams<'w, 's> {
+    pub interactions: MessageReader<'w, 's, JointInteractionObserved>,
+    pub bouting_entered: MessageWriter<'w, PlayBoutBoutingEntered>,
+}
+
 /// Ticket 127 Commit B — full author / drop / stage-advance / cascade
 /// system. Replaces the Commit A `mirror_joint_intentions` mirror.
 ///
@@ -102,7 +137,7 @@ pub fn author_joint_intentions(
     constants: Res<SimConstants>,
     relationships: Res<Relationships>,
     mut activation: ResMut<SystemActivation>,
-    mut interactions: MessageReader<JointInteractionObserved>,
+    mut messages: JointMessageStreams,
     mut event_log: Option<ResMut<EventLog>>,
     mating: MatingFitnessParams,
     // Mutable JI query — needed for `last_interaction_tick` bump and
@@ -150,7 +185,7 @@ pub fn author_joint_intentions(
     // actor matched both message and component.
     // -----------------------------------------------------------------
     let mut interaction_tick_for: HashMap<Entity, u64> = HashMap::new();
-    for msg in interactions.read() {
+    for msg in messages.interactions.read() {
         // Keep the latest tick per entity, regardless of practice — the
         // bump applies whether the JI is Courtship or PlayBout.
         let entry = interaction_tick_for.entry(msg.entity).or_insert(msg.tick);
@@ -341,6 +376,25 @@ pub fn author_joint_intentions(
             joint.stage = new_stage;
             joint.stage_entered_tick = now_tick;
             activation.record(Feature::JointStageAdvanced { practice });
+            // Ticket 276 Commit B — PlayBout Approach→Bouting is the
+            // substrate equivalent of "play just began". Emit the
+            // Bouting-entry message so `cascade_play_bout_bouting`
+            // applies the mood-lift + narrative cascade migrated from
+            // the legacy `on_play_initiated` observer.
+            //
+            // Lower-`Entity::index()` side emits — mirrors the
+            // mismatch-tracking convention above so symmetric pair
+            // transitions don't double-fire the cascade.
+            if practice == PracticeKind::PlayBout
+                && new_stage == PracticeStage::PlayBoutBouting
+                && entity.index() < joint.partner.index()
+            {
+                messages.bouting_entered.write(PlayBoutBoutingEntered {
+                    actor: entity,
+                    partner: joint.partner,
+                    tick: now_tick,
+                });
+            }
         }
     }
     for practice in mismatch_emissions {
@@ -462,6 +516,151 @@ pub fn author_joint_intentions(
         // cats in `claimed_this_tick` are skipped by both the PlayBout
         // top-loop guard and `pick_playbout_partner`'s candidate
         // filter.
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PlayBoutBouting cascade (ticket 276 Commit B)
+// ---------------------------------------------------------------------------
+
+/// Ticket 276 Commit B — drains [`PlayBoutBoutingEntered`] messages and
+/// applies the Bouting-stage cascade: a +0.1 / 15-tick Social mood-lift
+/// to every non-dead cat within manhattan-4 of the actor (the legacy
+/// `on_play_initiated` cascade's bystander reach), plus a
+/// template-driven `play_social` narrative entry naming actor + partner.
+///
+/// **Replaces** the legacy `on_play_initiated` observer that fired at
+/// PlayInitiated time on the four-AND × RNG·0.1 gate. The substrate
+/// equivalent of "play just began" is the `PlayBoutApproach →
+/// PlayBoutBouting` transition; the cascade fires once per bout from
+/// the lower-`Entity::index()` side (per the message emit guard in
+/// `author_joint_intentions`'s stage_advances loop), preserving the
+/// legacy one-fire-per-bout shape.
+///
+/// Note: `EventKind::JointPlayBoutCompleted` is emitted separately from
+/// `author_joint_intentions`'s drop loop at `JointDropBranch::Completed`
+/// (Cooldown elapsed); that's the canary tally site. The cascade here
+/// only handles the cosmetic / mood side-effects.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+pub fn cascade_play_bout_bouting(
+    mut messages: MessageReader<PlayBoutBoutingEntered>,
+    cats: Query<(Entity, &Position, &Personality, &Name, &Gender, &Age), Without<Dead>>,
+    needs_q: Query<&Needs, Without<Dead>>,
+    mut moods: Query<&mut Mood, Without<Dead>>,
+    mut narrative_log: ResMut<NarrativeLog>,
+    config: Res<SimConfig>,
+    constants: Res<SimConstants>,
+    weather: Res<WeatherState>,
+    map: Res<TileMap>,
+    registry: Option<Res<TemplateRegistry>>,
+    mut rng: ResMut<SimRng>,
+) {
+    for msg in messages.read() {
+        let Ok((_, actor_pos, actor_pers, actor_name, actor_gender, actor_age)) =
+            cats.get(msg.actor)
+        else {
+            // Actor died / despawned between stage_advance and cascade
+            // drain (cross-system race). Skip silently.
+            continue;
+        };
+        let actor_pos = *actor_pos;
+        let actor_name_str = actor_name.0.clone();
+        let actor_gender = *actor_gender;
+        let life_stage = actor_age.stage(msg.tick, config.ticks_per_season);
+
+        // Mood-lift sweep: every non-dead cat within manhattan-4 of the
+        // actor (including the partner; legacy observer's behavior).
+        // Collect (entity, patience) under the read-only `cats` query
+        // then push modifiers via the disjoint `moods` write query —
+        // single Mood query avoids the B0001 conflict that would arise
+        // from holding `&Mood` and `&mut Mood` in overlapping queries.
+        let mut nearby: Vec<(Entity, f32)> = Vec::new();
+        for (other, other_pos, other_pers, _, _, _) in cats.iter() {
+            if other == msg.actor {
+                continue;
+            }
+            if actor_pos.manhattan_distance(other_pos) > 4 {
+                continue;
+            }
+            nearby.push((other, other_pers.patience));
+        }
+        for (other, patience) in nearby {
+            if let Ok(mut other_mood) = moods.get_mut(other) {
+                let mut modifier =
+                    MoodModifier::new(0.1, 15, "watched play nearby").with_kind(MoodSource::Social);
+                patience_extend(&mut modifier, patience, &constants.mood);
+                other_mood.modifiers.push_back(modifier);
+            }
+        }
+
+        // Partner name for the narrative — JointIntention guarantees a
+        // partner, but the partner may have despawned. Fall back to a
+        // placeholder so the template still resolves.
+        let partner_name = cats
+            .get(msg.partner)
+            .map(|(_, _, _, n, _, _)| n.0.clone())
+            .unwrap_or_else(|_| "their playmate".to_string());
+
+        // Template context — matches the legacy observer's
+        // `play_social` event tag (JointIntention guarantees a partner;
+        // there is no solo branch).
+        let day_phase = DayPhase::from_tick(msg.tick, &config);
+        let season = Season::from_tick(msg.tick, &config);
+        let terrain = if map.in_bounds(actor_pos.x, actor_pos.y) {
+            map.get(actor_pos.x, actor_pos.y).terrain
+        } else {
+            crate::resources::map::Terrain::Grass
+        };
+        let mood_bucket = moods
+            .get(msg.actor)
+            .map(|m| MoodBucket::from_valence(m.valence))
+            .unwrap_or(MoodBucket::Neutral);
+        let needs = needs_q
+            .get(msg.actor)
+            .cloned()
+            .unwrap_or_else(|_| Needs::default());
+
+        let ctx = TemplateContext {
+            action: Action::Socialize,
+            day_phase,
+            season,
+            weather: weather.current,
+            mood_bucket,
+            life_stage,
+            has_target: true,
+            terrain,
+            event: Some("play_social".into()),
+        };
+        let var_ctx = VariableContext {
+            name: &actor_name_str,
+            gender: actor_gender,
+            weather: weather.current,
+            day_phase,
+            season,
+            life_stage,
+            fur_color: "unknown",
+            other: Some(&partner_name),
+            prey: None,
+            item: None,
+            item_singular: None,
+            quality: None,
+        };
+
+        let fallback =
+            format!("A game breaks out. {actor_name_str} bats a pinecone toward {partner_name}.");
+
+        emit_event_narrative(
+            registry.as_deref(),
+            &mut narrative_log,
+            msg.tick,
+            fallback,
+            NarrativeTier::Action,
+            &ctx,
+            &var_ctx,
+            actor_pers,
+            &needs,
+            &mut rng.rng,
+        );
     }
 }
 
@@ -865,6 +1064,7 @@ mod tests {
         world.insert_resource(Relationships::default());
         world.insert_resource(SystemActivation::default());
         world.insert_resource(bevy_ecs::message::Messages::<JointInteractionObserved>::default());
+        world.insert_resource(bevy_ecs::message::Messages::<PlayBoutBoutingEntered>::default());
         world
     }
 
