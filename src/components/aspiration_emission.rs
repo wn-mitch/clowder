@@ -34,7 +34,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::ai::aspirations::Priority;
-use crate::ai::dse::CommitmentStrategy;
+use crate::ai::dse::{CommitmentStrategy, GoalKind};
 
 /// One per-aspiration emission row the picker produced this tick.
 ///
@@ -68,6 +68,19 @@ pub struct EmissionRow {
     /// (§H step 3) rather than the milestone's authored `emits[]`
     /// table (§H step 2). Surfaced in the L1Aspiration trace record.
     pub fallback_used: bool,
+    /// Typed goal-state carried by this emission (ticket 463). When
+    /// `Some(kind)`, the L2 author site wraps an `Intention::Goal`
+    /// whose `state.kind` is this variant directly — used by
+    /// `CraftItemAspiration` to carry the per-cat per-tick winning
+    /// recipe identity (`GoalKind::HaveItem(recipe.output)`) through
+    /// to L2 and the HTN frame-push without round-tripping through a
+    /// `&'static str` label. When `None`, the L2 author falls back to
+    /// the legacy `GoalState::predicate(row.label, |_,_| false)` path
+    /// so existing static aspirations (Hunting, Kinship, etc.) are
+    /// untouched. `GoalKind` is not `Serialize`; `serde(skip)` keeps
+    /// the trace payload shape unchanged for label-only consumers.
+    #[serde(skip)]
+    pub goal_kind: Option<GoalKind>,
 }
 
 /// Per-cat ephemeral substrate carrying every emission this picker

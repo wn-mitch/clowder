@@ -3196,16 +3196,21 @@ pub fn evaluate_and_plan(
                 .and_then(|e| e.winner().cloned())
             {
                 Some(row) => {
+                    // Ticket 463 — exhaustive match on the row's typed
+                    // `goal_kind`. `Some(kind)` carries a runtime-shaped
+                    // goal (e.g. `CraftItemAspiration`'s per-cat-per-tick
+                    // winning recipe as `GoalKind::HaveItem(item)`).
+                    // `None` preserves the pre-463 path: every static
+                    // aspiration emits a label-only row whose achievement
+                    // fires via 320's frame-pop, not via this predicate.
+                    let state = match row.goal_kind {
+                        Some(kind) => crate::ai::dse::GoalState { kind },
+                        None => {
+                            crate::ai::dse::GoalState::predicate(row.label, |_world, _entity| false)
+                        }
+                    };
                     let goal = crate::ai::dse::Intention::Goal {
-                        state: crate::ai::dse::GoalState::predicate(
-                            row.label,
-                            // §Future deferred: auto-derived
-                            // `achieved` predicate. Until then,
-                            // fulfillment fires via 320's
-                            // frame-pop on leaf completion, not
-                            // via this predicate.
-                            |_world, _entity| false,
-                        ),
+                        state,
                         strategy: row.strategy,
                     };
                     let source =

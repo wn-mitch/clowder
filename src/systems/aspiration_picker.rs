@@ -272,6 +272,7 @@ fn compute_outcome(
                 strategy: reactive.strategy,
                 priority: reactive.priority,
                 fallback_used: false,
+                goal_kind: None,
             });
             // First match wins per ordering — Primary reactive emits
             // dominate any later Secondary/Tertiary reactive entry.
@@ -324,6 +325,7 @@ fn step2_emits_walk(
                 strategy: emit.strategy,
                 priority: emit.priority,
                 fallback_used: false,
+                goal_kind: None,
             });
         }
     }
@@ -380,6 +382,7 @@ fn step3_domain_fallback(
                 strategy: CommitmentStrategy::OpenMinded,
                 priority: Priority::Tertiary,
                 fallback_used: true,
+                goal_kind: None,
             });
         }
     }
