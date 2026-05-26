@@ -219,6 +219,16 @@ pub struct PlannerState {
     /// DropItem-as-prefix. Mirrors `materials_delivered_this_plan`'s
     /// pattern (ticket 096).
     pub has_free_slot_this_plan: bool,
+    /// Search-state only (ticket 463): `true` iff a
+    /// `RetrieveCraftInputs(_)` step has been simulated earlier in
+    /// *this* A* expansion. Pair with
+    /// `HasMarker(HasCraftInputInInventory::KEY)` as alternate
+    /// preconditions on `CraftAtWorkshop` / `CraftAtTanningFrame` —
+    /// substrate branch covers cats already carrying recipe inputs
+    /// (the legacy 457 path), this branch covers in-plan Stores
+    /// retrieval for cats holding `Intention::Goal(HaveItem(_))`.
+    /// Mirrors `has_free_slot_this_plan`'s pattern (ticket 231).
+    pub has_craft_inputs_this_plan: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -478,6 +488,14 @@ pub enum StatePredicate {
     /// branch covers cats with a free slot; this branch covers in-plan
     /// clutter clearance via DropItem-as-prefix.
     HasFreeSlotThisPlan(bool),
+    /// Ticket 463: search-state predicate. True iff the planner has
+    /// simulated a `RetrieveCraftInputs(_)` step earlier in this A*
+    /// expansion. Paired with `HasMarker(HasCraftInputInInventory)` as
+    /// alternate preconditions on `CraftAtWorkshop` /
+    /// `CraftAtTanningFrame` — substrate branch covers cats already
+    /// carrying inputs; this branch covers in-plan Stores retrieval
+    /// for HaveItem-emitting aspirations.
+    HasCraftInputsThisPlan(bool),
 }
 
 impl StatePredicate {
@@ -499,6 +517,7 @@ impl StatePredicate {
             Self::HasMarker(name) => ctx.markers.has(name, ctx.entity),
             Self::FleeTargetPicked(v) => state.flee_target_picked == *v,
             Self::HasFreeSlotThisPlan(v) => state.has_free_slot_this_plan == *v,
+            Self::HasCraftInputsThisPlan(v) => state.has_craft_inputs_this_plan == *v,
         }
     }
 }
@@ -527,6 +546,11 @@ pub enum StateEffect {
     /// composition lets pickup actions fire after a planned DropItem
     /// step.
     SetHasFreeSlotThisPlan(bool),
+    /// Ticket 463: set the search-state `has_craft_inputs_this_plan`
+    /// flag, applied by the `RetrieveCraftInputs(_)` step in the
+    /// HaveItem craft template so `CraftAtWorkshop` /
+    /// `CraftAtTanningFrame` can fire on the next A* step.
+    SetHasCraftInputsThisPlan(bool),
 }
 
 impl StateEffect {
@@ -545,6 +569,7 @@ impl StateEffect {
             Self::SetMaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan = *v,
             Self::SetFleeTargetPicked(v) => state.flee_target_picked = *v,
             Self::SetHasFreeSlotThisPlan(v) => state.has_free_slot_this_plan = *v,
+            Self::SetHasCraftInputsThisPlan(v) => state.has_craft_inputs_this_plan = *v,
         }
     }
 }
@@ -881,6 +906,7 @@ mod tests {
             materials_delivered_this_plan: false,
             flee_target_picked: false,
             has_free_slot_this_plan: false,
+            has_craft_inputs_this_plan: false,
         }
     }
 

@@ -306,6 +306,14 @@ pub struct PlanResources<'w, 's> {
     /// shaped intentions) and 323's `courtship_method` (the first
     /// `Live` method) are the tickets that exercise this path.
     pub method_registry: Res<'w, crate::ai::methods::MethodRegistry>,
+    /// Ticket 463 — recipe catalog for the HaveItem aspiration
+    /// dispatch. When the cat holds
+    /// `Intention::Goal(GoalKind::HaveItem(item))`, the L2 author
+    /// site reads this registry to build the templated plan
+    /// (`RetrieveCraftInputs(recipe.id)` prefix + zone travel +
+    /// `CraftAt<Station>(recipe.id)`) via
+    /// `crate::ai::planner::actions::craft_have_item_actions`.
+    pub recipes: Res<'w, crate::resources::recipe_registry::RecipeRegistry>,
     /// 258 — `WitnessableEvent` emit from the
     /// `make_plan → None` site. Bundled here rather than as a separate
     /// SystemParam to keep `evaluate_and_plan` under Bevy's 16-param
@@ -2998,8 +3006,35 @@ pub fn evaluate_and_plan(
         // full action catalog. The dispatch arm at
         // `evaluate_step_for_action` then resolves the target + runs the
         // resolver.
+        // 463 — HaveItem aspiration override. When the cat holds
+        // `Intention::Goal(GoalKind::HaveItem(item))` AND just elected
+        // `Crafting`, swap the disposition's single-step crafting
+        // template for the dual-arm `craft_have_item_actions` template
+        // that prefixes `RetrieveCraftInputs(recipe.id)` so the cat
+        // walks to Stores, pulls the recipe's specific inputs, and
+        // crafts the aspired item (not the lex-first satisfied recipe
+        // the legacy `pick_satisfied_recipe` would pick). Dormant
+        // until 463's `CraftItemAspiration` emits HaveItem rows; the
+        // override is a no-op for every existing cat-tick.
+        let have_item_target: Option<crate::components::items::ItemKind> = world_state
+            .held_intentions
+            .get(entity)
+            .ok()
+            .and_then(|h| match &h.intention {
+                crate::ai::dse::Intention::Goal { state, .. } => match state.kind {
+                    crate::ai::dse::GoalKind::HaveItem(item) => Some(item),
+                    crate::ai::dse::GoalKind::Predicate { .. } => None,
+                },
+                _ => None,
+            });
         let mut actions = if frame_pinned_primitive.is_some() {
             crate::ai::planner::actions::htn_primitive_actions(chosen_action, &zone_distances)
+        } else if let (Some(item), DispositionKind::Crafting) = (have_item_target, chosen) {
+            crate::ai::planner::actions::craft_have_item_actions(
+                item,
+                &res.recipes,
+                &zone_distances,
+            )
         } else {
             actions_for_disposition(chosen, chosen_action, &zone_distances)
         };
@@ -10261,6 +10296,10 @@ fn build_planner_state(
         // `HasFreeSlot` (the marker) and the plan-path variant reads
         // this search-state flag, set by DropItem-as-prefix.
         has_free_slot_this_plan: false,
+        // 463: HaveItem craft plans always start without a planned
+        // retrieve; `RetrieveCraftInputs(_)` flips this and unblocks
+        // the plan-path arm of `CraftAt<Station>`.
+        has_craft_inputs_this_plan: false,
     }
 }
 

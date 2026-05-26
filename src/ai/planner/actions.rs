@@ -1,5 +1,6 @@
 use crate::ai::Action;
 use crate::components::markers;
+use crate::components::recipe::StationRequirement;
 
 use super::{
     Carrying, GoapActionDef, GoapActionKind, PlannerZone, StateEffect, StatePredicate,
@@ -570,6 +571,109 @@ pub fn crafting_actions() -> Vec<GoapActionDef> {
             effects: vec![StateEffect::IncrementTrips],
         },
     ]
+}
+
+/// 463: HaveItem plan template. Used when the cat holds
+/// `Intention::Goal(GoalKind::HaveItem(item))` and elected `Crafting`.
+/// Returns the action list that includes a `RetrieveCraftInputs(recipe.id)`
+/// prefix so A* sequences `[TravelTo(Stores), RetrieveCraftInputs(recipe.id),
+/// TravelTo(station), CraftAtStation]` (with an optional `DropItem` head
+/// for full-inventory cats).
+///
+/// Returns an empty Vec when no recipe produces `item` or when the
+/// recipe's station lacks a HaveItem-decomposable craft action; A* will
+/// then short-circuit with `NoApplicableActions` and the L2 author site
+/// records the planning failure (caller handles re-election).
+///
+/// Mirrors `drying_food_actions` / `smoking_meat_actions`'s dual-arm
+/// pattern: substrate-path retrieve fires for cats with a live
+/// `HasFreeSlot` marker; plan-path retrieve fires after the
+/// `DropItem` prefix sets `HasFreeSlotThisPlan(true)`. Both retrieve
+/// arms set `HasCraftInputsThisPlan(true)`, which the plan-path
+/// `CraftAt<Station>` arm consumes. The substrate-marker
+/// `CraftAt<Station>` arm stays available for cats already carrying
+/// recipe inputs (no Stores trip needed).
+pub fn craft_have_item_actions(
+    item: crate::components::items::ItemKind,
+    recipes: &crate::resources::recipe_registry::RecipeRegistry,
+    distances: &ZoneDistances,
+) -> Vec<GoapActionDef> {
+    let Some(recipe) = recipes.recipe_producing(item) else {
+        return Vec::new();
+    };
+    let (station_zone, craft_action) = match recipe.station {
+        StationRequirement::Workshop => (PlannerZone::Workshop, GoapActionKind::CraftAtWorkshop),
+        StationRequirement::TanningFrame => (
+            PlannerZone::TanningFrame,
+            GoapActionKind::CraftAtTanningFrame,
+        ),
+        // Kitchen / DryingRack / SmokingRack / None have their own
+        // dedicated dispositions (Cooking / DryingFood / SmokingMeat).
+        // A HaveItem(_) recipe with one of those stations is a
+        // registration mistake — return empty so A* short-circuits.
+        StationRequirement::None
+        | StationRequirement::Kitchen
+        | StationRequirement::DryingRack
+        | StationRequirement::SmokingRack => return Vec::new(),
+    };
+    let mut actions = travel_actions(distances);
+    actions.push(GoapActionDef {
+        // DropItem prefix — clears one slot so the plan-path retrieve
+        // can fire on cats whose inventory is full at chain entry.
+        // Mirrors `drying_food_actions` / `smoking_meat_actions`.
+        kind: GoapActionKind::DropItem,
+        cost: 1,
+        preconditions: vec![],
+        effects: vec![
+            StateEffect::SetHasFreeSlotThisPlan(true),
+            StateEffect::SetCarrying(Carrying::Nothing),
+        ],
+    });
+    // Substrate-path retrieve: cat has a live free slot — direct
+    // retrieve from Stores into inventory.
+    actions.push(GoapActionDef {
+        kind: GoapActionKind::RetrieveCraftInputs(recipe.id),
+        cost: 2,
+        preconditions: vec![
+            StatePredicate::ZoneIs(PlannerZone::Stores),
+            StatePredicate::HasMarker(markers::HasFreeSlot::KEY),
+        ],
+        effects: vec![StateEffect::SetHasCraftInputsThisPlan(true)],
+    });
+    // Plan-path retrieve: after `DropItem` cleared the slot.
+    actions.push(GoapActionDef {
+        kind: GoapActionKind::RetrieveCraftInputs(recipe.id),
+        cost: 2,
+        preconditions: vec![
+            StatePredicate::ZoneIs(PlannerZone::Stores),
+            StatePredicate::HasFreeSlotThisPlan(true),
+        ],
+        effects: vec![StateEffect::SetHasCraftInputsThisPlan(true)],
+    });
+    // Substrate-marker `CraftAt<Station>` arm — cat already carries
+    // recipe inputs at chain entry. The legacy 457 path; keeps the
+    // single-step plan available when the cat has what it needs.
+    actions.push(GoapActionDef {
+        kind: craft_action,
+        cost: 2,
+        preconditions: vec![
+            StatePredicate::ZoneIs(station_zone),
+            StatePredicate::HasMarker(markers::HasCraftInputInInventory::KEY),
+        ],
+        effects: vec![StateEffect::IncrementTrips],
+    });
+    // Plan-state `CraftAt<Station>` arm — cat retrieved inputs in
+    // this A* expansion; consumes `HasCraftInputsThisPlan(true)`.
+    actions.push(GoapActionDef {
+        kind: craft_action,
+        cost: 2,
+        preconditions: vec![
+            StatePredicate::ZoneIs(station_zone),
+            StatePredicate::HasCraftInputsThisPlan(true),
+        ],
+        effects: vec![StateEffect::IncrementTrips],
+    });
+    actions
 }
 
 /// 364: plan template for an HTN leaf primitive. The L2 frame-pin
@@ -1473,6 +1577,7 @@ mod tests {
             materials_delivered_this_plan: false,
             flee_target_picked: false,
             has_free_slot_this_plan: false,
+            has_craft_inputs_this_plan: false,
         }
     }
 
@@ -2456,6 +2561,122 @@ mod tests {
         assert!(
             !kinds.contains(&GoapActionKind::GatherHerb),
             "stash-only regime must not use GatherHerb (wild thornbriar unavailable); got {kinds:?}"
+        );
+    }
+
+    /// 463 — HaveItem-craft template produces the expected
+    /// 3-leg plan: TravelTo(Stores) → RetrieveCraftInputs(recipe.id) →
+    /// TravelTo(Workshop) → CraftAtWorkshop. The cat starts in Wilds
+    /// carrying nothing; HasFreeSlot marker is set (substrate-path
+    /// retrieve arm). The plan must NOT call into the legacy
+    /// `crafting_actions` lex-pick path — the recipe identity is
+    /// pinned by the held HaveItem Intention.
+    #[test]
+    fn craft_have_item_workshop_plan() {
+        use crate::components::items::ItemKind;
+        use crate::components::recipe::{
+            DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeId, RecipeInput,
+            RecipeOutput, StationRequirement,
+        };
+        use crate::resources::recipe_registry::RecipeRegistry;
+        let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        // Extend distances with Workshop (basic_distances omits it).
+        let mut distances = basic_distances();
+        let extra = [PlannerZone::Workshop, PlannerZone::TanningFrame];
+        let basic_zones = [
+            PlannerZone::Stores,
+            PlannerZone::HuntingGround,
+            PlannerZone::ForagingGround,
+            PlannerZone::Farm,
+            PlannerZone::ConstructionSite,
+            PlannerZone::HerbPatch,
+            PlannerZone::Kitchen,
+            PlannerZone::RestingSpot,
+            PlannerZone::SocialTarget,
+            PlannerZone::Wilds,
+            PlannerZone::PatrolZone,
+            PlannerZone::MaterialPile,
+        ];
+        for &x in &extra {
+            for &y in basic_zones.iter().chain(extra.iter()) {
+                if x != y {
+                    distances.set(x, y, 2);
+                    distances.set(y, x, 2);
+                }
+            }
+        }
+        let mut recipes = RecipeRegistry::default();
+        recipes.insert(Recipe {
+            id: RecipeId("bone_tip_spear"),
+            discipline: DisciplineKind::BoneShellCraft,
+            inputs: vec![
+                RecipeInput {
+                    kind: ItemKind::Bone,
+                    count: 1,
+                },
+                RecipeInput {
+                    kind: ItemKind::Sinew,
+                    count: 1,
+                },
+            ],
+            station: StationRequirement::Workshop,
+            duration: RecipeDuration::Fixed { ticks: 10 },
+            output: RecipeOutput {
+                item_kind: ItemKind::BoneTipSpear,
+                destination: ItemDestination::Inventory,
+            },
+            skill_gate: None,
+        });
+        let actions = craft_have_item_actions(ItemKind::BoneTipSpear, &recipes, &distances);
+        // Markers: free slot present (so the substrate-path retrieve
+        // arm fires); HasCraftInputInInventory NOT set (so the legacy
+        // craft arm isn't picked — A* must sequence the retrieve).
+        let mut markers = empty_markers();
+        markers.set_entity(markers::HasFreeSlot::KEY, test_entity(), true);
+        let plan = plan!(start, &actions, &goal, 12, 1000, markers = markers)
+            .expect("HaveItem craft must plan when free slot + recipe are present");
+        let kinds: Vec<_> = plan.iter().map(|s| s.action).collect();
+        assert!(
+            kinds.contains(&GoapActionKind::RetrieveCraftInputs(RecipeId(
+                "bone_tip_spear"
+            ))),
+            "plan must include the parameterized RetrieveCraftInputs(bone_tip_spear); got {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&GoapActionKind::CraftAtWorkshop),
+            "plan must terminate with CraftAtWorkshop; got {kinds:?}"
+        );
+        // Ordering invariant: retrieve before craft.
+        let retrieve_idx = kinds.iter().position(|k| {
+            matches!(
+                k,
+                GoapActionKind::RetrieveCraftInputs(RecipeId("bone_tip_spear"))
+            )
+        });
+        let craft_idx = kinds
+            .iter()
+            .position(|k| *k == GoapActionKind::CraftAtWorkshop);
+        assert!(retrieve_idx < craft_idx, "retrieve must precede craft");
+    }
+
+    /// 463 — HaveItem-craft for a recipe with no matching recipe
+    /// returns an empty action set; the planner short-circuits with
+    /// `NoApplicableActions`.
+    #[test]
+    fn craft_have_item_missing_recipe_returns_empty() {
+        use crate::components::items::ItemKind;
+        use crate::resources::recipe_registry::RecipeRegistry;
+        let distances = basic_distances();
+        let recipes = RecipeRegistry::default();
+        let actions = craft_have_item_actions(ItemKind::BoneTipSpear, &recipes, &distances);
+        // travel_actions still populates the list, but no
+        // RetrieveCraftInputs / CraftAtWorkshop variants present.
+        assert!(
+            actions.is_empty(),
+            "no recipe → empty action set (planner reports NoApplicableActions)"
         );
     }
 
