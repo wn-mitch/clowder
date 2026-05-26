@@ -15,10 +15,10 @@ _Last generated: 2026-05-26._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 117 |
+| Ready | 120 |
 | Parked | 12 |
-| Blocked | 32 |
-| **Open total** | **165** |
+| Blocked | 35 |
+| **Open total** | **171** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (117)
+## Ready by cluster (120)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -101,7 +101,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
 - **[466](docs/open-work/tickets/466-travelto-greedy-step-pathing-lift-a-fallback-into-catpathplannext-step.md)** — TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step — _[ai-substrate] · added 2026-05-25_
 
-### social-coordination (16 ready, 4 blocked)
+### social-coordination (16 ready, 6 blocked)
 
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
 - **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[social-coordination] · added 2026-05-07_
@@ -135,6 +135,20 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[463](docs/open-work/tickets/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick — _[items-crafting] · added 2026-05-24_
 - **[468](docs/open-work/tickets/468-craftatworkshop-recipe-not-satisfied-new-plan-failure-surface-post-465.md)** — CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465 — _[items-crafting] · added 2026-05-25_
 
+### belief-perception (11 ready, 5 blocked)
+
+- **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
+- **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[belief-perception] · added 2026-05-01_
+- **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
+- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
+- **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _[belief-perception] · added 2026-05-08_
+- **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _[belief-perception] · added 2026-05-08_
+- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
+- **[292](docs/open-work/tickets/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) — _[belief-perception] · added 2026-05-11_
+- **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
+- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
+- **[470](docs/open-work/tickets/470-ward-siege-fear-influence-map-spirituality-modulated-perception-of-besieged-tiles.md)** — Ward-siege fear influence map (spirituality-modulated perception of besieged tiles) — _[belief-perception] · added 2026-05-26_
+
 ### life-cycle (11 ready, 1 blocked)
 
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
@@ -149,20 +163,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
-### belief-perception (10 ready, 4 blocked)
-
-- **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
-- **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[belief-perception] · added 2026-05-01_
-- **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
-- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
-- **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _[belief-perception] · added 2026-05-08_
-- **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _[belief-perception] · added 2026-05-08_
-- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
-- **[292](docs/open-work/tickets/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) — _[belief-perception] · added 2026-05-11_
-- **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
-- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
-
-### combat-threat (8 ready, 2 blocked)
+### combat-threat (10 ready, 2 blocked)
 
 - **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[combat-threat] · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[combat-threat] · added 2026-05-02_
@@ -172,6 +173,8 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[287](docs/open-work/tickets/287-move-boldness-out-of-fleedse-cp-axes-onto-a-boldnessfleemodulation-modifier-271-r3-structural-follow-on.md)** — Move boldness out of FleeDse CP axes onto a BoldnessFleeModulation modifier (271 R3 structural follow-on) — _[combat-threat] · added 2026-05-11_
 - **[289](docs/open-work/tickets/289-engagethreat-retry-cooldown-after-morale-break-suppress-immediate-guarding-re-election-under-active-fight-directive.md)** — EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive — _[combat-threat] · added 2026-05-11_
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
+- **[471](docs/open-work/tickets/471-damage-events-emit-to-log-bodypartinjury-stream-misfireeffect-stream-injury-source-attribution-at-death.md)** — Damage events emit to log (BodyPartInjury stream + MisfireEffect stream + injury_source attribution at death) — _[combat-threat] · added 2026-05-26_
+- **[472](docs/open-work/tickets/472-festering-wound-kind-on-randomly-selected-body-part-ashitaka-substrate-anchor.md)** — Festering wound kind on randomly-selected body part (Ashitaka substrate anchor) — _[combat-threat] · added 2026-05-26_
 
 ### wildlife (8 ready, 1 blocked)
 
@@ -220,7 +223,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
-## Ready by initiative (77 tag-memberships across 9 initiatives)
+## Ready by initiative (82 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -242,7 +245,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
 
-### mythic-texture (12 open, 4 landed)
+### mythic-texture (13 open, 4 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
@@ -256,8 +259,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[458](docs/open-work/tickets/458-practicemagic-soft-affinity-skill-considerations.md)** — PracticeMagic soft affinity / skill considerations — _[magic-mythic] · added 2026-05-23_
 - **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
+- **[472](docs/open-work/tickets/472-festering-wound-kind-on-randomly-selected-body-part-ashitaka-substrate-anchor.md)** — Festering wound kind on randomly-selected body part (Ashitaka substrate anchor) — _[combat-threat] · added 2026-05-26_
 
-### full-sensory-perception (10 open, 6 landed)
+### full-sensory-perception (11 open, 6 landed)
 
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
 - **[124](docs/open-work/tickets/124-own-territory-center-anchor.md)** — `LandmarkAnchor::OwnTerritoryCenter` — third interoceptive self-anchor (territory bias) — _[belief-perception] · added 2026-05-01_
@@ -269,6 +273,21 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[292](docs/open-work/tickets/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
+- **[470](docs/open-work/tickets/470-ward-siege-fear-influence-map-spirituality-modulated-perception-of-besieged-tiles.md)** — Ward-siege fear influence map (spirituality-modulated perception of besieged tiles) — _[belief-perception] · added 2026-05-26_
+
+### welfare-fidelity (11 open, 4 landed)
+
+- **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
+- **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
+- **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[life-cycle] · added 2026-05-04_
+- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
+- **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
+- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
+- **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
+- **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
+- **[470](docs/open-work/tickets/470-ward-siege-fear-influence-map-spirituality-modulated-perception-of-besieged-tiles.md)** — Ward-siege fear influence map (spirituality-modulated perception of besieged tiles) — _[belief-perception] · added 2026-05-26_
+- **[471](docs/open-work/tickets/471-damage-events-emit-to-log-bodypartinjury-stream-misfireeffect-stream-injury-source-attribution-at-death.md)** — Damage events emit to log (BodyPartInjury stream + MisfireEffect stream + injury_source attribution at death) — _[combat-threat] · added 2026-05-26_
+- **[472](docs/open-work/tickets/472-festering-wound-kind-on-randomly-selected-body-part-ashitaka-substrate-anchor.md)** — Festering wound kind on randomly-selected body part (Ashitaka substrate anchor) — _[combat-threat] · added 2026-05-26_
 
 ### predator-prey-dynamics (10 open, 9 landed)
 
@@ -294,17 +313,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
-### welfare-fidelity (8 open, 4 landed)
-
-- **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
-- **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
-- **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[life-cycle] · added 2026-05-04_
-- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
-- **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
-- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
-- **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
-- **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
-
 ### world-richness (8 open, 10 landed)
 
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
@@ -328,7 +336,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (117)
+## Ready (120)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -447,6 +455,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[466](docs/open-work/tickets/466-travelto-greedy-step-pathing-lift-a-fallback-into-catpathplannext-step.md)** — TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step — _[ai-substrate] · added 2026-05-25_
 - **[467](docs/open-work/tickets/467-fish-on-water-hunt-shoreline-pounce-resolver-or-cat-eligibility-cut.md)** — Fish-on-water hunt — shoreline-pounce resolver or cat eligibility cut — _[wildlife] · added 2026-05-25_
 - **[468](docs/open-work/tickets/468-craftatworkshop-recipe-not-satisfied-new-plan-failure-surface-post-465.md)** — CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465 — _[items-crafting] · added 2026-05-25_
+- **[470](docs/open-work/tickets/470-ward-siege-fear-influence-map-spirituality-modulated-perception-of-besieged-tiles.md)** — Ward-siege fear influence map (spirituality-modulated perception of besieged tiles) — _[belief-perception] · added 2026-05-26_
+- **[471](docs/open-work/tickets/471-damage-events-emit-to-log-bodypartinjury-stream-misfireeffect-stream-injury-source-attribution-at-death.md)** — Damage events emit to log (BodyPartInjury stream + MisfireEffect stream + injury_source attribution at death) — _[combat-threat] · added 2026-05-26_
+- **[472](docs/open-work/tickets/472-festering-wound-kind-on-randomly-selected-body-part-ashitaka-substrate-anchor.md)** — Festering wound kind on randomly-selected body part (Ashitaka substrate anchor) — _[combat-threat] · added 2026-05-26_
 
 ## Parked (12)
 
@@ -463,7 +474,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · parked 2026-05-25 · added 2026-05-18_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · parked 2026-05-20 · added 2026-05-20_
 
-## Blocked (32)
+## Blocked (35)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[017](docs/open-work/tickets/017-anatomical-slot-inventory.md)** — Anatomical slot inventory — _[items-crafting] · blocked-by 016 · added 2026-04-22_
@@ -497,6 +508,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[442](docs/open-work/tickets/442-split-resourcessim-constantsrs-into-a-sim-constants-submodule-per-substruct-family.md)** — Split resources/sim_constants.rs into a sim_constants/ submodule per substruct family — _[ai-substrate] · blocked-by 441 · added 2026-05-21_
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
+- **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · blocked-by 472 · added 2026-05-26_
+- **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · blocked-by 472 · added 2026-05-26_
+- **[475](docs/open-work/tickets/475-current-role-query-helper-derive-active-role-from-existing-capability-markers-recent-action-history.md)** — Current-role query helper (derive active role from existing capability markers + recent action history) — _[social-coordination] · blocked-by 472 · added 2026-05-26_
 
 ## Landed archive (332)
 
