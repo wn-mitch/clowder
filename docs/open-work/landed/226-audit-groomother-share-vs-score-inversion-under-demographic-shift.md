@@ -1,7 +1,7 @@
 ---
 id: 226
 title: audit GroomOther share-vs-score inversion under demographic shift
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [211-coordinate-food-security.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-25
 ---
 
 ## Why
@@ -75,3 +75,4 @@ share-vs-score behavior across seeds.
 - 2026-05-07: opened from 211 closeout — share inversion needs
   multi-seed confirmation before 213 ships.
 - 2026-05-19: accuracy audit pass — frontmatter clean, no file path issues.
+- 2026-05-25: closed without multi-seed sweep — 211 balance doc's per-cat L2 vs share-pp decomposition already characterizes GroomOther -5.05pp share / per-cat +56.9% as a demographic-cohort artifact (peak_pop 8 vs 10), not substrate suppression. The per-cat lift is the signal 213 was designed to find; the audit's gating role for 213 is moot.

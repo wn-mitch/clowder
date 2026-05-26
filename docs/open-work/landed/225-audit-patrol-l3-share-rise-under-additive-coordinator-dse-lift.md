@@ -1,7 +1,7 @@
 ---
 id: 225
 title: audit Patrol L3 share rise under additive coordinator-DSE lift
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [211-coordinate-food-security.md, 181-hunt-forage-saturation-tune.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-25
 ---
 
 ## Why
@@ -80,3 +80,4 @@ sibling lifts.
   with per-cat L2 score dropping -22.4% needs mechanism analysis
   before 212/213 land.
 - 2026-05-19: accuracy audit pass — frontmatter clean, no file path issues.
+- 2026-05-25: closed without multi-seed sweep — 211 balance doc's per-cat L2 vs share-pp decomposition already characterizes the mechanism as softmax-mass redistribution (Patrol +1.45pp share / per-cat -22.4%), distinct from the 181 cascade pattern. Multi-seed corroboration deferred as non-load-bearing; 212 is parked for unrelated demographic reasons and 213 reads its own substrate directly.
