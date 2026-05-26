@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [211-coordinate-food-security.md, 181-hunt-forage-saturation-tune.md]
-landed-at: pending
+landed-at: ca054618
 landed-on: 2026-05-25
 ---
 

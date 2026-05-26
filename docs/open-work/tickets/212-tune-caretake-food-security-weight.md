@@ -1,12 +1,12 @@
 ---
 id: 212
 title: tune caretake_food_security_weight
-status: parked
+status: ready
 cluster: life-cycle
 initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-07
-parked: 2026-05-10
+parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
@@ -56,3 +56,4 @@ value. Single-seed soak + `just verdict`.
 - 2026-05-07: opened from 209 closeout.
 - 2026-05-10: parked. Post-256 regime carries `MatingOccurred` in the baseline `never_fired_expected_positives` list (ticket 257 — Mate election crowded out by Patrol). With no new kittens past the founder population, Caretake's eligibility gate (`hungry_kitten_urgency > 0.0` at `src/ai/scoring.rs:1845`) rarely fires; tuning the food-security lift would produce a frame-diff null-by-eligibility-bottleneck. Resume after 257 (or its substrate-fix descendants) restores reliable kitten births. `blocked-by` repointed 209 → 257; 209 is landed but the real blocker for verifying Caretake tuning is the absence of hungry-kitten windows.
 - 2026-05-19: accuracy audit — parked status correct; ticket 257 is landed; recommend revalidation: kitten births may now be sufficient to unpark this ticket; decision deferred to user.
+- 2026-05-25: unparked. Cross-archive logdb scan confirms 257 (landed 2026-05-10) restored the birth pipeline: of 425 runs in the 70-150k elapsed-tick band, 207 (49%) produce ≥1 KittenBorn; recent post-257 seed-42 soaks at 80-130k elapsed reliably produce 1-4 kittens. The 2026-05-10 park rationale ("no hungry-kitten windows") was structurally repaired by 257; what looked like a persistent regression in shorter soaks (<60k elapsed, 0 births) is exposure-time, not substrate. Tuning the food-security lift can now be verified — use a Caretake-eligible focal cat per the ticket-227 multi-focal convention; bracket trace ticks against `KittenBorn` events to find hungry-kitten windows in the per-cat L2 frame-diff.
