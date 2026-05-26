@@ -119,6 +119,15 @@ pub struct SimConstants {
     /// headers deserialize cleanly.
     #[serde(default)]
     pub environmental_quality: EnvironmentalQualityConstants,
+    /// Ticket 279 — play-engagement cue emission tunables (PlayBow,
+    /// ReciprocalAdvance, SustainedCoPresence). Eligibility thresholds,
+    /// candidate ranges, probabilistic emit chance, and cooldowns. The
+    /// *belief lift* magnitude lives on `BeliefsConstants` (which
+    /// `belief_integrator` already reads); only the *emit cadence*
+    /// knobs live here. `#[serde(default)]` so pre-279 archives
+    /// deserialize cleanly.
+    #[serde(default)]
+    pub play_cue_emission: PlayCueEmissionConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -8151,6 +8160,13 @@ pub struct BeliefsConstants {
     /// cat's `ColonyReservesBelief.reserves` map. Mirrors
     /// `BeliefAxisTunables::strength_decay_per_tick × period`.
     pub reserve_decay_per_stagger: f32,
+    /// 279: tick count at which a `SustainedCoPresence` event's
+    /// EMA observed-value saturates at `OBSERVED_MAX`. Shorter windows
+    /// produce a proportionally weaker lift; ticks held beyond this point
+    /// don't lift further (cooldown re-arms the emit anyway). Lives on
+    /// `BeliefsConstants` rather than `PlayCueEmission` because it shapes
+    /// the *belief lift* magnitude, not the emit cadence.
+    pub sustained_copresence_saturation_ticks: u32,
 }
 
 impl Default for BeliefsConstants {
@@ -8198,6 +8214,10 @@ impl Default for BeliefsConstants {
             low_ward_reserve_threshold: 2,
             reserve_strength_per_observation: 0.3,
             reserve_decay_per_stagger: 0.05,
+            // 279: 60 ticks ≈ a short interaction window. ticks_held / 60
+            // yields a lift in [0,1]; sustained co-presence over many
+            // seconds saturates at OBSERVED_MAX.
+            sustained_copresence_saturation_ticks: 60,
         }
     }
 }
@@ -8365,6 +8385,71 @@ impl Default for AffordancesConstants {
             conflict_low: ConflictLowAffordanceConstants::default(),
             social: SocialAffordanceConstants::default(),
             prey_side: PreySideAffordanceConstants::default(),
+        }
+    }
+}
+
+// ---------- PlayCueEmissionConstants (ticket 279) ----------
+
+/// Per-cue emission tunables for the play-engagement perception substrate
+/// (`PlayBow`, `ReciprocalAdvance`, `SustainedCoPresence` `WitnessableEvent`
+/// variants). Thresholds, ranges, chances, and cooldowns governing when
+/// the emitters fire. The *belief lift* magnitude downstream of emission
+/// lives on `BeliefsConstants` (per-axis `BeliefAxisTunables`).
+///
+/// Defaults are first-light placeholders; tuning belongs to balance work
+/// once 280's matchmaker rebind reads the resulting facets.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PlayCueEmissionConstants {
+    /// `PlayBow` emit requires `Personality.playfulness >= this`. Default 0.4
+    /// — moderate playfulness suffices; a strict cutoff would silence the
+    /// substrate in colonies skewed toward serious personalities.
+    pub playbow_min_playfulness: f32,
+    /// `PlayBow` emit requires `Mood.valence >= this`. Default 0.0 —
+    /// neutral-or-better mood. Negative-mood cats don't solicit play.
+    pub playbow_min_mood_valence: f32,
+    /// `PlayBow` candidate-range in tiles. A peer must be within this
+    /// range (Manhattan) for the actor to consider soliciting. Default 5
+    /// — close enough for the bow to be perceived.
+    pub playbow_candidate_range_tiles: i32,
+    /// Per-tick probability that an eligible cat emits a `PlayBow`.
+    /// Default `0.002` — roughly one solicitation per 500 eligible ticks,
+    /// modulated by cooldown.
+    pub playbow_emit_chance_per_tick: f32,
+    /// Minimum ticks between successive `PlayBow` emissions from the same
+    /// actor. Default 200 — prevents serial-soliciter spam.
+    pub playbow_cooldown_ticks: u64,
+    /// Window after a `PlayBow` (or prior `ReciprocalAdvance`) during which
+    /// a peer's movement-toward-actor counts as `ReciprocalAdvance`.
+    /// Default 80 ticks — long enough for a movement to land, short
+    /// enough that stale solicitations don't trigger false reciprocity.
+    pub reciprocal_window_ticks: u64,
+    /// Manhattan range within which an approaching peer counts as
+    /// "advanced into engagement range". Default 3 tiles.
+    pub reciprocal_engagement_range_tiles: i32,
+    /// Tick count a pair must remain in `NearPairCache` together before
+    /// the tracker emits `SustainedCoPresence`. Default 30 — short
+    /// adjacencies don't count as engagement signal; ~30 ticks of
+    /// continuous proximity does.
+    pub sustained_copresence_threshold_ticks: u32,
+    /// Per-pair cooldown between `SustainedCoPresence` emissions. Default
+    /// 200 — keeps the belief-lift cadence within the same order of
+    /// magnitude as other affiliative cues.
+    pub sustained_copresence_emit_cooldown_ticks: u64,
+}
+
+impl Default for PlayCueEmissionConstants {
+    fn default() -> Self {
+        Self {
+            playbow_min_playfulness: 0.4,
+            playbow_min_mood_valence: 0.0,
+            playbow_candidate_range_tiles: 5,
+            playbow_emit_chance_per_tick: 0.002,
+            playbow_cooldown_ticks: 200,
+            reciprocal_window_ticks: 80,
+            reciprocal_engagement_range_tiles: 3,
+            sustained_copresence_threshold_ticks: 30,
+            sustained_copresence_emit_cooldown_ticks: 200,
         }
     }
 }

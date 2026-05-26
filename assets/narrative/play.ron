@@ -200,4 +200,10 @@
         event: Some("play_solo"),
         life_stage: Some(Kitten),
     ),
+    (
+        text: "{name} pounces at {other}, misses, and lands sitting on the pinecone instead. {other}, unimpressed, knocks it back.",
+        tier: Action,
+        action: Some(Socialize),
+        event: Some("play_social"),
+    ),
 ]

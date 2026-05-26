@@ -240,6 +240,18 @@ pub struct PrideCooldown {
     pub last_pride_crisis_tick: Option<u64>,
 }
 
+/// Ticket 279 — per-cat tracker for `PlayBow` / `ReciprocalAdvance` emit
+/// cadence. `last_playbow_tick` is read by the reciprocal-advance emitter
+/// to test whether a peer's recent solicitation is still inside
+/// `reciprocal_window_ticks`; `last_reciprocal_advance_tick` chains
+/// reciprocity (advance → counter-advance) within the same window without
+/// requiring a fresh play-bow.
+#[derive(Component, Debug, Clone, Default)]
+pub struct PlayBowCooldown {
+    pub last_playbow_tick: Option<u64>,
+    pub last_reciprocal_advance_tick: Option<u64>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -7,7 +7,7 @@ orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-05-11
 parked: null
-blocked-by: [279]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []

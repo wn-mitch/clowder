@@ -50,6 +50,12 @@ const OBSERVED_MAX: f32 = 1.0;
 /// pull toward 0 rather than the full `OBSERVED_MAX`.
 const OBSERVED_FAIL: f32 = 0.0;
 
+/// Half-strength EMA observed-value used when the witness is a third party
+/// to a directed cue (e.g. play-bow contributes a weaker `perceived_receptivity`
+/// lift than the explicit-accept signal from Groom/Mate; sustained-co-presence
+/// from third-party perspective is weaker than the recipient's perspective).
+const OBSERVED_HALF: f32 = 0.5;
+
 #[allow(clippy::type_complexity)]
 pub fn integrate_beliefs(
     time: Res<TimeState>,
@@ -193,7 +199,10 @@ fn event_position(ev: &WitnessableEvent) -> Position {
         | WitnessableEvent::SelfPlanFailed { position, .. }
         | WitnessableEvent::ReserveDeposited { position, .. }
         | WitnessableEvent::ReserveConsumed { position, .. }
-        | WitnessableEvent::InventoryObserved { position, .. } => *position,
+        | WitnessableEvent::InventoryObserved { position, .. }
+        | WitnessableEvent::PlayBow { position, .. }
+        | WitnessableEvent::ReciprocalAdvance { position, .. }
+        | WitnessableEvent::SustainedCoPresence { position, .. } => *position,
     }
 }
 
@@ -531,6 +540,92 @@ fn apply_observation(
                 }
                 bump_reserve_strength(entry, cfg, tick);
             }
+        }
+
+        WitnessableEvent::PlayBow { actor, .. } => {
+            // 279: play-bow is the strongest play-engagement cue. Lifts
+            // `perceived_intent_clarity` (full strength — the actor is
+            // publicly signaling an unambiguous play solicitation) and
+            // `perceived_receptivity` at half strength (a solicitation is
+            // also a tractable receptivity tell, but weaker than the
+            // explicit accept signals from Groom/Mate/Care). Self-witness
+            // skipped per the 258 invariant.
+            if *actor == witness {
+                return;
+            }
+            let model = cats.models.entry(*actor).or_default();
+            update_facet(
+                &mut model.perceived_intent_clarity,
+                OBSERVED_MAX,
+                tick,
+                &cfg.perceived_intent_clarity,
+            );
+            update_facet(
+                &mut model.perceived_receptivity,
+                OBSERVED_HALF,
+                tick,
+                &cfg.perceived_receptivity,
+            );
+            model.last_updated_tick = tick;
+            model.evidence_count = model.evidence_count.saturating_add(1);
+        }
+
+        WitnessableEvent::ReciprocalAdvance { actor, target, .. } => {
+            // 279: actor advanced toward target after a prior play-bow or
+            // reciprocal-advance. When `target == witness`, this is "they
+            // advanced toward *me*" — full-strength intent-clarity lift.
+            // Third-party witnesses lift at half strength (still observable,
+            // but the recipient gets the cleanest signal).
+            if *actor == witness {
+                return;
+            }
+            let model = cats.models.entry(*actor).or_default();
+            let observed = if *target == witness {
+                OBSERVED_MAX
+            } else {
+                OBSERVED_HALF
+            };
+            update_facet(
+                &mut model.perceived_intent_clarity,
+                observed,
+                tick,
+                &cfg.perceived_intent_clarity,
+            );
+            model.last_updated_tick = tick;
+            model.evidence_count = model.evidence_count.saturating_add(1);
+        }
+
+        WitnessableEvent::SustainedCoPresence {
+            actor,
+            target,
+            ticks_held,
+            ..
+        } => {
+            // 279: continuous in-range duration. Lift scales by
+            // `ticks_held / saturation_ticks` — short windows produce
+            // weak evidence, long windows saturate at OBSERVED_MAX. When
+            // `target == witness`, lift at full scaled strength (the
+            // co-presence is *with me*); third-party witnesses lift at
+            // half the scaled value.
+            if *actor == witness {
+                return;
+            }
+            let saturation = cfg.sustained_copresence_saturation_ticks.max(1) as f32;
+            let scale = (*ticks_held as f32 / saturation).clamp(0.0, 1.0);
+            let observed = if *target == witness {
+                OBSERVED_MAX * scale
+            } else {
+                OBSERVED_HALF * scale
+            };
+            let model = cats.models.entry(*actor).or_default();
+            update_facet(
+                &mut model.perceived_intent_clarity,
+                observed,
+                tick,
+                &cfg.perceived_intent_clarity,
+            );
+            model.last_updated_tick = tick;
+            model.evidence_count = model.evidence_count.saturating_add(1);
         }
     }
 }
@@ -1332,5 +1427,224 @@ mod tests {
             "400 ticks is not long enough for full recovery toward prior=1.0; got {}",
             model.predictability.value
         );
+    }
+
+    // 279 — play-engagement cue coverage. Each test fires one new variant
+    // and asserts the integrator lifts `perceived_intent_clarity` (and, for
+    // PlayBow, `perceived_receptivity`) on the witness's model of the actor.
+
+    #[test]
+    fn playbow_event_lifts_witness_intent_clarity_and_receptivity() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let witness = spawn_cat(&mut world, Position::new(11, 10));
+
+        world.write_message(WitnessableEvent::PlayBow {
+            actor,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let cats = world.get::<CatBeliefs>(witness).unwrap();
+        let model = cats
+            .models
+            .get(&actor)
+            .expect("witness holds belief on play-bowing actor");
+        assert!(
+            model.perceived_intent_clarity.value > 0.0,
+            "PlayBow should lift perceived_intent_clarity; got {}",
+            model.perceived_intent_clarity.value
+        );
+        assert_eq!(
+            model.perceived_intent_clarity.last_source,
+            EvidenceKind::Observation
+        );
+        // Receptivity also lifts, but at half strength — its EMA step from a
+        // 0.5 observation is strictly smaller than the intent-clarity step
+        // from a 1.0 observation under the same axis math, so receptivity
+        // ends below intent-clarity is NOT guaranteed (different axes), but
+        // receptivity must be strictly positive.
+        assert!(
+            model.perceived_receptivity.value > 0.0,
+            "PlayBow should lift perceived_receptivity; got {}",
+            model.perceived_receptivity.value
+        );
+    }
+
+    #[test]
+    fn playbow_self_witness_skips_facet_update() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+
+        world.write_message(WitnessableEvent::PlayBow {
+            actor,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        // The actor is its own witness (in range of its own position) but
+        // must not form a belief about itself — preserves the 258 invariant
+        // that own-action declarations don't update own beliefs.
+        let cats = world.get::<CatBeliefs>(actor).unwrap();
+        assert!(
+            !cats.models.contains_key(&actor),
+            "self-witness of own PlayBow must not seed a self-belief"
+        );
+    }
+
+    #[test]
+    fn reciprocal_advance_target_self_lifts_more_than_third_party() {
+        // Witness == target: "they advanced toward me" → full-strength lift.
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let target_witness = spawn_cat(&mut world, Position::new(11, 10));
+
+        world.write_message(WitnessableEvent::ReciprocalAdvance {
+            actor,
+            target: target_witness,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        let self_lift = world
+            .get::<CatBeliefs>(target_witness)
+            .unwrap()
+            .models
+            .get(&actor)
+            .expect("target witness holds belief on advancing actor")
+            .perceived_intent_clarity
+            .value;
+
+        // Third-party witness: same event, witness is neither actor nor
+        // target → half-strength lift.
+        let (mut world2, mut schedule2) = test_world(100);
+        let actor2 = spawn_cat(&mut world2, Position::new(10, 10));
+        let target2 = spawn_cat(&mut world2, Position::new(11, 10));
+        let third_party = spawn_cat(&mut world2, Position::new(12, 10));
+
+        world2.write_message(WitnessableEvent::ReciprocalAdvance {
+            actor: actor2,
+            target: target2,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule2.run(&mut world2);
+
+        let third_party_lift = world2
+            .get::<CatBeliefs>(third_party)
+            .unwrap()
+            .models
+            .get(&actor2)
+            .expect("third-party witness holds belief on advancing actor")
+            .perceived_intent_clarity
+            .value;
+
+        assert!(
+            self_lift > third_party_lift,
+            "recipient lift ({self_lift}) should exceed third-party lift ({third_party_lift})"
+        );
+        assert!(
+            third_party_lift > 0.0,
+            "third-party lift should be positive"
+        );
+    }
+
+    #[test]
+    fn sustained_copresence_scales_by_ticks_held() {
+        // Short window → small lift; long (saturated) window → larger lift.
+        let saturation = SimConstants::default()
+            .beliefs
+            .sustained_copresence_saturation_ticks;
+
+        let lift_for = |ticks_held: u32| -> f32 {
+            let (mut world, mut schedule) = test_world(100);
+            let actor = spawn_cat(&mut world, Position::new(10, 10));
+            let witness = spawn_cat(&mut world, Position::new(11, 10));
+            world.write_message(WitnessableEvent::SustainedCoPresence {
+                actor,
+                target: witness,
+                ticks_held,
+                position: Position::new(10, 10),
+                tick: 100,
+            });
+            schedule.run(&mut world);
+            world
+                .get::<CatBeliefs>(witness)
+                .unwrap()
+                .models
+                .get(&actor)
+                .expect("witness holds belief on co-present actor")
+                .perceived_intent_clarity
+                .value
+        };
+
+        let short = lift_for(saturation / 4);
+        let saturated = lift_for(saturation);
+        assert!(
+            saturated > short,
+            "saturated co-presence lift ({saturated}) should exceed short-window lift ({short})"
+        );
+        assert!(short > 0.0, "short-window lift should still be positive");
+    }
+
+    #[test]
+    fn sustained_copresence_target_self_lifts_more_than_third_party() {
+        let saturation = SimConstants::default()
+            .beliefs
+            .sustained_copresence_saturation_ticks;
+
+        // Witness == target.
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let target_witness = spawn_cat(&mut world, Position::new(11, 10));
+        world.write_message(WitnessableEvent::SustainedCoPresence {
+            actor,
+            target: target_witness,
+            ticks_held: saturation,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+        let self_lift = world
+            .get::<CatBeliefs>(target_witness)
+            .unwrap()
+            .models
+            .get(&actor)
+            .unwrap()
+            .perceived_intent_clarity
+            .value;
+
+        // Third-party witness.
+        let (mut world2, mut schedule2) = test_world(100);
+        let actor2 = spawn_cat(&mut world2, Position::new(10, 10));
+        let target2 = spawn_cat(&mut world2, Position::new(11, 10));
+        let third_party = spawn_cat(&mut world2, Position::new(12, 10));
+        world2.write_message(WitnessableEvent::SustainedCoPresence {
+            actor: actor2,
+            target: target2,
+            ticks_held: saturation,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule2.run(&mut world2);
+        let third_party_lift = world2
+            .get::<CatBeliefs>(third_party)
+            .unwrap()
+            .models
+            .get(&actor2)
+            .unwrap()
+            .perceived_intent_clarity
+            .value;
+
+        assert!(
+            self_lift > third_party_lift,
+            "recipient lift ({self_lift}) should exceed third-party lift ({third_party_lift})"
+        );
+        assert!(third_party_lift > 0.0);
     }
 }

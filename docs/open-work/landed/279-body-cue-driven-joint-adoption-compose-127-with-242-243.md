@@ -1,7 +1,7 @@
 ---
 id: 279
 title: Body-cue-driven joint adoption (compose 127 with 242 + 243)
-status: ready
+status: done
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: [generational-continuity, full-sensory-perception]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-26
 ---
 
 ## Why
@@ -28,16 +28,16 @@ This is the upstream wiring for 280's matchmaker rebind; the two land in sequenc
 - **Add `WitnessableEvent` variants** in `src/messages/witnessable_event.rs`:
   - `PlayBow { actor: Entity, position: Position, tick: u64 }` — observable play-solicitation posture. Strongest play-engagement signal.
   - `ReciprocalAdvance { actor: Entity, target: Entity, position: Position, tick: u64 }` — actor moved into engagement range of target after a prior advance from target (or directly approached an actively-soliciting target). Mutual-engagement signal.
-  - `SustainedOrientation { actor: Entity, target: Entity, ticks_held: u32, position: Position, tick: u64 }` — actor maintained facing-toward-target for ≥ `sustained_orientation_threshold_ticks`. Generic engagement signal (used by Courtship and PlayBout).
+  - `SustainedCoPresence { actor: Entity, target: Entity, ticks_held: u32, position: Position, tick: u64 }` — actor and target remained within sensing range for ≥ `sustained_copresence_threshold_ticks` consecutive ticks. **Renamed from `SustainedOrientation` at implementation** (see 2026-05-26 Log entry): cats have no `Heading`/facing substrate (`Position` is grid-only), so the cue records continuous *co-presence* rather than directional facing — substrate-honest. Generic engagement signal (used by Courtship and PlayBout consumers).
 - **Wire `belief_integrator`** (`src/systems/belief_integrator.rs`) to consume the new variants and update `MentalModel<actor>` facets on the witness:
-  - `PlayBow` → `perceived_intent_clarity` (large lift) + `perceived_receptivity` (medium lift).
-  - `ReciprocalAdvance` → `perceived_intent_clarity` (medium lift). When `target == witness`, this is a "they advanced toward *me*" signal — apply a larger lift.
-  - `SustainedOrientation` → `perceived_intent_clarity` (small lift, ticks-scaled). When `target == witness`, larger lift.
+  - `PlayBow` → `perceived_intent_clarity` (full lift) + `perceived_receptivity` (half lift).
+  - `ReciprocalAdvance` → `perceived_intent_clarity`. When `target == witness`, full lift ("they advanced toward *me*"); third-party witnesses get half.
+  - `SustainedCoPresence` → `perceived_intent_clarity`, scaled by `ticks_held / sustained_copresence_saturation_ticks`. When `target == witness`, full scaled value; third-party witnesses get half.
 - **Emit the variants from resolver / system code**:
-  - `PlayBow` — emitted when a cat in `Action::Idle` / `Action::Wander` / `Action::Socialize` enters a play-eligible mood-and-personality state and a peer is in candidate-range. (Specific emit site identified in the implementation phase; likely a small new system that runs alongside `personality_events.rs`.)
-  - `ReciprocalAdvance` — emitted by `dispatch_step_action` (or a small companion system) when a MoveTo step lands the actor within engagement-range of a peer who emitted PlayBow or ReciprocalAdvance toward the actor within `reciprocal_window_ticks`.
-  - `SustainedOrientation` — emitted by a small new per-tick system that tracks pairs within sensing range, accumulates sustained-facing tick counts, emits at threshold, then resets.
-- **Per-cue tunables in `SimConstants`** — emit thresholds, EMA learning rates, witness-vs-third-party weight differences. One block per cue.
+  - `PlayBow` — `src/systems/playbow_emitter.rs::emit_play_bows`: per-tick probabilistic emit for cats in `Action::Idle`/`Wander`/`Socialize`/`Explore` with `playfulness >= threshold`, `mood.valence >= threshold`, a peer in candidate range, and cooldown elapsed (`PlayBowCooldown` component).
+  - `ReciprocalAdvance` — `src/systems/playbow_emitter.rs::emit_reciprocal_advances`: `CatMoved`-driven; when a moved cat lands within engagement range of a peer whose `PlayBowCooldown` shows a recent solicitation/reciprocation inside `reciprocal_window_ticks`, emit and stamp `last_reciprocal_advance_tick` to chain reciprocity.
+  - `SustainedCoPresence` — `src/systems/sustained_copresence.rs::track_sustained_copresence`: per-tick tracker consuming `NearPairCache`; accumulates per-pair consecutive-tick counts in a `BTreeMap`, emits both directions at threshold with a per-pair cooldown, resets.
+- **Per-cue tunables in `SimConstants`** — `PlayCueEmissionConstants` (emit thresholds / ranges / chance / cooldowns) holds the emit-cadence knobs; `BeliefsConstants.sustained_copresence_saturation_ticks` holds the belief-lift-shape knob (the integrator reads `BeliefsConstants`). Facet lifts reuse existing `perceived_intent_clarity` / `perceived_receptivity` `BeliefAxisTunables`.
 
 ## Out of scope
 
@@ -94,3 +94,5 @@ This is the upstream wiring for 280's matchmaker rebind; the two land in sequenc
 - 2026-05-11: opened as joint-adoption body-cue composition stub.
 - 2026-05-19: accuracy audit — ticket body incomplete (template boilerplate with no substantive content). [needs-review] on scope/approach/verification sections before work commences.
 - 2026-05-26: body reshape after 469 retirement audit. Scope concretized to three `WitnessableEvent` variants (`PlayBow`, `ReciprocalAdvance`, `SustainedOrientation`) + `belief_integrator` arms + per-tick `SustainedOrientation` tracker. Behaviour-neutral at land; 280 is the downstream consumer. Removed `[blocked-by: 242/243]` framing — emit sites are system-level observations, not marker reads.
+- 2026-05-26: implemented. Three variants + integrator arms (`OBSERVED_HALF` for third-party/receptivity lifts) + `PlayCueEmissionConstants` + `SustainedCoPresenceTracker` (consumes `NearPairCache`) + `emit_play_bows` / `emit_reciprocal_advances` + `PlayBowCooldown` component. Registered after `update_near_pair_cache` in Chain 4 (one-tick integrator latency, matching existing emitters). **`SustainedOrientation` → `SustainedCoPresence` rename**: no `Heading` substrate exists, so the cue records continuous co-presence, not directional facing (substrate-honest; a `SustainedFacing` sibling can be added if 242/243 or a `Heading` component lands later). Not strictly behaviour-neutral: `affordance_writer::write_cat_vs_cat` reads `perceived_intent_clarity` (was decay-only / always 0 pre-279) to discount cat→cat Stalk/Chase/Pounce — expected small drift, verified at soak. 6 new `belief_integrator` unit tests + `play_engagement_cues` scenario all green; `just check`/`just test` clean.
+- 2026-05-26: seed-42 deep-soak `logs/tuned-42-01eb555d` failed survival hard-gate (`never_fired_expected_positives=[MatingOccurred]`) + 2 new `Injury` deaths at tile (26,61) — Heron 1229681, Simba 1242756. Diagnostic investigation traced the death class to **magic-misfire damage on a corrupted besieged-ward tile**: verified mechanism `apply_misfire` at `magic.rs:1163-1178` resolving `WoundTransfer` / `CorruptionBacksplash` repeatedly during `MagicCleanse`-on-hotspot, with `safety=1.00` perception throughout the death sequence because `cover_at(ward)` reads warded tile as safe. **Pre-existing pathology**, not 279-introduced — the misfire damage path is untouched by `perceived_intent_clarity` (which only enters cat-vs-cat Stalk/Chase/Pounce/Freeze via `affordance_writer::write_cat_vs_cat`, not cat-vs-environment corruption-tile bleed or cat-vs-wildlife siege combat). 279 may have shifted *which* cats fell into the trap in seed-42, but the death class is structurally pre-existing. Surfaced six bugfix tickets (the kin-care cluster, with Princess Mononoke / Ashitaka's-arm reframe from user): [[470]] (ward-siege fear influence map, perception-before), [[471]] (damage events to log, telemetry-during), [[472]] (festering wound kind on body part, aftermath foundation), [[473]] (corrupted-kin signal map, aftermath perception), [[474]] (warder succession + shaman dispatch, aftermath ripple), [[475]] (current-role query helper). 279 **lands as-is**; the `MatingOccurred` miss is a separate concern deferred to a follow-on per `feedback_chain_rare_events` if it persists after the cluster lands.

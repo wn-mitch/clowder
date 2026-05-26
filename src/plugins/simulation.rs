@@ -1062,6 +1062,10 @@ impl Plugin for SimulationPlugin {
         // Built incrementally on CatMoved by `update_near_pair_cache`; read
         // by `passive_familiarity` for the per-tick delta application.
         app.init_resource::<crate::resources::near_pair_cache::NearPairCache>();
+        // Ticket 279 — per-pair sustained-co-presence accumulator. Consumes
+        // NearPairCache; emits WitnessableEvent::SustainedCoPresence on
+        // threshold. See `systems::sustained_copresence`.
+        app.init_resource::<crate::systems::sustained_copresence::SustainedCoPresenceTracker>();
         // Ticket 433 — cross-system per-tick aggregates (colony markers +
         // food snapshot). Populated by `populate_world_snapshots`; read by
         // `evaluate_and_plan`. See `docs/systems/world-snapshots.md`.
@@ -1639,6 +1643,21 @@ impl Plugin for SimulationPlugin {
                     // (64.43% inclusive CPU at the 2026-05-20 baseline).
                     systems::social::update_near_pair_cache,
                     systems::social::passive_familiarity,
+                    // 279 — play-engagement perception cues. Nested as one
+                    // chained sub-group (keeps the outer Chain-4 tuple within
+                    // Bevy's 20-element `.chain()` arity). All three run after
+                    // `update_near_pair_cache` so they read a fresh pair set
+                    // and the head-of-Chain-4 CatMoved stream. They emit
+                    // WitnessableEvent variants consumed by `integrate_beliefs`
+                    // on the following tick (same one-tick latency as the
+                    // goap.rs / disposition.rs emitters, which also fire after
+                    // the integrator).
+                    (
+                        systems::playbow_emitter::emit_play_bows,
+                        systems::playbow_emitter::emit_reciprocal_advances,
+                        systems::sustained_copresence::track_sustained_copresence,
+                    )
+                        .chain(),
                     systems::personality_friction::personality_friction,
                     systems::social::check_bonds,
                     systems::colony_knowledge::update_colony_knowledge,

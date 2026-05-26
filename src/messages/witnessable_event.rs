@@ -152,6 +152,40 @@ pub enum WitnessableEvent {
         inventory: Vec<(ResourceKind, u32)>,
         tick: u64,
     },
+    /// A cat performed an observable play-bow solicitation posture. Witnesses
+    /// lift `perceived_intent_clarity` on the actor (strongest play-engagement
+    /// signal) and `perceived_receptivity` at lower strength. Ticket 279.
+    PlayBow {
+        actor: Entity,
+        position: Position,
+        tick: u64,
+    },
+    /// `actor` moved into engagement range of `target` while a recent play-bow
+    /// or reciprocal-advance from `target` toward `actor` was within
+    /// `reciprocal_window_ticks`. Mutual-engagement signal: when `target` is
+    /// the witness, this is "they advanced toward me" (full-strength lift on
+    /// `perceived_intent_clarity`); third-party witnesses lift at half
+    /// strength. Ticket 279.
+    ReciprocalAdvance {
+        actor: Entity,
+        target: Entity,
+        position: Position,
+        tick: u64,
+    },
+    /// `actor` and `target` remained within sensing range of each other for
+    /// `ticks_held` consecutive ticks. Substrate-honest reframe of the
+    /// "sustained orientation" cue named in the JointIntention rustdoc — no
+    /// `Heading` substrate exists today, so this records continuous
+    /// co-presence rather than directional facing. Generic engagement signal
+    /// (used by Courtship and PlayBout in downstream consumers). Lift on
+    /// `perceived_intent_clarity` scales by `ticks_held`. Ticket 279.
+    SustainedCoPresence {
+        actor: Entity,
+        target: Entity,
+        ticks_held: u32,
+        position: Position,
+        tick: u64,
+    },
 }
 
 /// Behavioral state of a relay cat at the moment of a startle cue. Drives

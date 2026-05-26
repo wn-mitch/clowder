@@ -61,6 +61,7 @@ pub mod parenting_handoff_recipient_resolution;
 pub mod parenting_joint_suppression;
 pub mod patrol_recalibration;
 pub mod picking_up_scavenging;
+pub mod play_engagement_cues;
 pub mod preset;
 pub mod prey_byproduct_spawn;
 pub mod route_cost_decision;
@@ -264,6 +265,7 @@ pub const ALL: &[&Scenario] = &[
     &belief_affordance_dse_consumers::SCENARIO_PATROL_AVOIDS_HIGH_THREAT_SECTOR,
     &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_STALK_FOR_OBLIVIOUS_PREY,
     &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_CHASE_FOR_ALERTED_PREY,
+    &play_engagement_cues::SCENARIO_PLAY_ENGAGEMENT_CUES,
     // 382 — district placement under colony-crowd pressure. Six
     // founder buildings packed inside the radius-16 spiral disc;
     // pre-loaded `Build` directive for `Stores`. Asserts the
