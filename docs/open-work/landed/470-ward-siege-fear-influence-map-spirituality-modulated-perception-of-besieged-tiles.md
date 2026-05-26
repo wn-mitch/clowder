@@ -1,7 +1,7 @@
 ---
 id: 470
 title: Ward-siege fear influence map (spirituality-modulated perception of besieged tiles)
-status: ready
+status: done
 cluster: belief-perception
 orchestration: substrate-sensitive
 initiative: [full-sensory-perception, welfare-fidelity]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md, magic.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-26
 ---
 
 ## Why
@@ -97,3 +97,4 @@ Default behavior at land: the new map producer ships, but consumers read with we
 ## Log
 
 - 2026-05-26: opened from seed-42 soak `logs/tuned-42-01eb555d` (Heron + Simba deaths at besieged-ward tile (26,61)). User reframe: "wards under siege should instead be a sensory input for the cats modulated on their magical perception — ie influence maps." Sibling tickets [[471]] [[472]] [[473]] [[474]] [[475]] opened in the same session.
+- 2026-05-26: Verified clean: just check / just test (2522 passed) / 3 new unit tests (ward_siege_fear_map_stamps_besieged_wards, _clears_when_no_siege, stamp_paints_falloff) / just soak-trace 42 Simba — verdict survival pass, continuity pass, never_fired=[], deaths_by_cause={}. L1 trace shows ward_siege_fear channel populated 62780x (producer active every tick). Consumer DSE weights ship dormant (ward_siege_fear_weight=0.0) per the 301 byte-identical-at-land precedent; activation + the 5 consumer-site conditional considerations (Flee / Wander / Explore / HerbcraftWard / cover_at) are deferred to a follow-on tuning ticket. WardSiegeFearMap registered in populate_influence_map_registry (25 impls now). Verdict concern band is constants-drift vs stale 1799e798 baseline, not a 470 regression.

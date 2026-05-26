@@ -121,6 +121,10 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     // 256 R5: cat patrol deterrent map (read by fox A* via overlay).
     world.insert_resource(crate::resources::CatPatrolDeterrentMap::default());
     world.insert_resource(crate::resources::WardCoverageMap::default());
+    // 470: per-tile siege-fear from besieged wards. Required by
+    // `update_ward_siege_fear_map` (Chain 1). Substrate-active producer;
+    // consumer DSE weights ship dormant (`ward_siege_fear_weight = 0.0`).
+    world.insert_resource(crate::resources::WardSiegeFearMap::default());
     // 382: colony-district composite map. Populated by
     // `update_colony_district_map`; consumed by
     // `compute_building_placement`.

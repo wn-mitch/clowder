@@ -441,6 +441,31 @@ impl InfluenceMap for crate::resources::WardCoverageMap {
     }
 }
 
+impl InfluenceMap for crate::resources::WardSiegeFearMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // 470: per-tile siege-fear stamped at every besieged-ward
+            // position by `update_ward_siege_fear_map`. Sight × Colony
+            // matching the WardCoverageMap convention. Consumers
+            // (Flee / Wander / Explore / HerbcraftWard / `cover_at`)
+            // read this sibling to discount "ward present" with "ward
+            // under attack" — modulated at the consideration layer by
+            // the perceiver's `spirituality` scalar (curve set per
+            // consumer; high-spirituality cats see siege at lower
+            // intensity, mundane cats only at high intensity). All
+            // consumer weights ship dormant at land (the 301 byte-
+            // identical-at-land precedent from `herbcraft_ward.rs`).
+            name: "ward_siege_fear",
+            channel: ChannelKind::Sight,
+            faction: Faction::Colony,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x, pos.y)
+    }
+}
+
 impl InfluenceMap for crate::resources::WardIntentMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

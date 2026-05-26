@@ -554,6 +554,16 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // Insert ward coverage map resource (ticket 045 — substrate-refactor §5.6.3).
     world.insert_resource(crate::resources::WardCoverageMap::default());
 
+    // 470 — per-tile siege-fear from besieged wards. Recomputed each
+    // tick by `update_ward_siege_fear_map` from the live
+    // `WildlifeAiState::EncirclingWard` set. Substrate ships active
+    // at land (the producer always runs); consumer DSE weights stay
+    // dormant (`ward_siege_fear_weight = 0.0`) per the 301 byte-
+    // identical-at-land precedent. The (26,61) seed-42 death class
+    // (Heron / Simba bleeding to death while reading safety=1.00 on
+    // a besieged-ward tile) motivates this perception channel.
+    world.insert_resource(crate::resources::WardSiegeFearMap::default());
+
     // 382: colony-district composite map. Populated each tick by
     // `update_colony_district_map`; consumed by
     // `compute_building_placement` to retire the radius-16 spiral search.

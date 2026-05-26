@@ -148,7 +148,7 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
         ColonyDistrictMap, ComfortMap, ConstructionSiteMap, CorruptionInfluenceMap,
         CoverAvailabilityMap, ExplorationMap, FoodLocationMap, FoxApproachCorridorMap, FoxScentMap,
         GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, MysteryMap, PreyScentMaps,
-        RecentAmbushMap, TileMap, TremorMap, WardCoverageMap, WardIntentMap,
+        RecentAmbushMap, TileMap, TremorMap, WardCoverageMap, WardIntentMap, WardSiegeFearMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -206,6 +206,14 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     registry.register::<CatPatrolDeterrentMap>();
     registry.register::<ExplorationMap>();
     registry.register::<WardCoverageMap>();
+    // 470: per-tile siege-fear stamped each tick from
+    // `WildlifeAiState::EncirclingWard`. Substrate ships ACTIVE (the
+    // producer system always runs); consumer DSE weights stay dormant
+    // at land (`ward_siege_fear_weight = 0.0`) per the 301 byte-
+    // identical-at-land precedent. Registered here so the field
+    // surfaces in `trace-*.jsonl` for soak-trace verification once
+    // consumers activate.
+    registry.register::<WardSiegeFearMap>();
     // 301: coordinator-stamped ward-placement intent. Substrate is
     // dormant at default `SimConstants` (semantics is
     // `SingleShotArgmax` so the populator short-circuits, and the
@@ -1160,6 +1168,13 @@ impl Plugin for SimulationPlugin {
                     (
                         systems::magic::ward_decay,
                         systems::magic::update_ward_coverage_map,
+                        // 470: per-tile siege-fear stamp from the live
+                        // `WildlifeAiState::EncirclingWard` set. Sits
+                        // next to `update_ward_coverage_map` so the
+                        // two ward-side maps recompute together each
+                        // tick (consumers sample both at the same
+                        // freshness).
+                        systems::magic::update_ward_siege_fear_map,
                         // 382: sliding ColonyCenter. Runs before
                         // `update_colony_district_map` so the district
                         // populator sees the current anchor (the

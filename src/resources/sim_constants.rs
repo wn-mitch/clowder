@@ -582,6 +582,18 @@ fn default_festering_observation_interval_ticks() -> u64 {
     200
 }
 
+fn default_siege_fear_ramp_ticks() -> u64 {
+    60
+}
+
+fn default_siege_fear_radius() -> f32 {
+    6.0
+}
+
+fn default_ward_siege_fear_weight() -> f32 {
+    0.0
+}
+
 impl Default for BodyZoneHealing {
     fn default() -> Self {
         Self {
@@ -828,6 +840,30 @@ pub struct MagicConstants {
     /// cadence order of magnitude (279's affiliative cue rate).
     #[serde(default = "default_festering_observation_interval_ticks")]
     pub festering_observation_interval_ticks: u64,
+    /// 470 — number of `WildlifeAiState::EncirclingWard.ticks` over
+    /// which the `WardSiegeFearMap` intensity ramps from 0.0 to 1.0
+    /// for a single besieged ward. At 60 ticks (~1 in-sim minute at
+    /// the canonical 1000-ticks/day scale) a fresh siege reads as
+    /// low-intensity; a sustained siege reads as full intensity.
+    /// Substrate-active at land but byte-identical because the
+    /// consumer DSE weight is 0.0 (the 301 conditional-axis pattern).
+    #[serde(default = "default_siege_fear_ramp_ticks")]
+    pub siege_fear_ramp_ticks: u64,
+    /// 470 — falloff radius in world tiles for siege-fear stamps.
+    /// `stamp_siege_at(intensity, radius)` paints a linear falloff so
+    /// tiles inside the radius read non-zero. Default 6 — wider than
+    /// `ward_repel_radius` (3) by design: cats perceive the siege at
+    /// some standoff distance, not only on the besieged tile itself.
+    #[serde(default = "default_siege_fear_radius")]
+    pub siege_fear_radius: f32,
+    /// 470 — dormant DSE-consumer weight for the
+    /// `WardSiegeFearMap` consideration. At 0.0 the conditional-axis
+    /// pattern (`slope=w, intercept=1-w`) collapses to identity, so
+    /// every consumer DSE scores byte-identically pre-470. A follow-
+    /// on tuning ticket lifts this above 0.0 to activate the fear
+    /// signal in Flee / Wander / Explore / HerbcraftWard / `cover_at`.
+    #[serde(default = "default_ward_siege_fear_weight")]
+    pub ward_siege_fear_weight: f32,
     /// Multiplier on ward repel radius for shadow foxes (corrupted creatures).
     pub shadow_fox_ward_repel_multiplier: f32,
     /// Chance per attempt that a regrowth herb actually spawns.
@@ -929,6 +965,9 @@ impl Default for MagicConstants {
             misfire_festering_chance: default_misfire_festering_chance(),
             festering_seed_damage: default_festering_seed_damage(),
             festering_observation_interval_ticks: default_festering_observation_interval_ticks(),
+            siege_fear_ramp_ticks: default_siege_fear_ramp_ticks(),
+            siege_fear_radius: default_siege_fear_radius(),
+            ward_siege_fear_weight: default_ward_siege_fear_weight(),
             // Bumped from 2.0 to 3.0: the 15-min sim showed wards deflecting
             // shadow foxes but still allowing kills because cat activity zones
             // were outside the effective radius. 3.0 makes a ward cover a cat

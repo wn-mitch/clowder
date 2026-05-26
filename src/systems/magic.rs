@@ -1319,6 +1319,46 @@ pub fn update_ward_coverage_markers(
     }
 }
 
+/// Ticket 470 — recomputes [`WardSiegeFearMap`](crate::resources::WardSiegeFearMap)
+/// from the live `WildlifeAiState::EncirclingWard` set each tick.
+///
+/// Stamps an intensity at every besieged ward's position scaled by the
+/// siege duration on that pair (`encircling.ticks /
+/// siege_fear_ramp_ticks`, clamped to 1.0); falloff radius is
+/// `siege_fear_radius`. Sibling to `WardCoverageMap` — both are
+/// per-tick fully recomputed from live state rather than accumulated
+/// + decayed.
+///
+/// Substrate ships ACTIVE at land. Consumer DSE weights stay dormant
+/// (`ward_siege_fear_weight = 0.0` knob), but the producer always
+/// writes — so the field surfaces in `trace-*.jsonl` for soak-trace
+/// verification before any consumer is activated.
+pub fn update_ward_siege_fear_map(
+    mut map: ResMut<crate::resources::WardSiegeFearMap>,
+    wildlife_ai: Query<&WildlifeAiState, With<WildAnimal>>,
+    constants: Res<SimConstants>,
+) {
+    let m = &constants.magic;
+    map.clear();
+    let ramp = m.siege_fear_ramp_ticks.max(1) as f32;
+    let radius = m.siege_fear_radius;
+    if radius <= 0.0 {
+        return;
+    }
+    for state in &wildlife_ai {
+        if let WildlifeAiState::EncirclingWard {
+            ward_x,
+            ward_y,
+            ticks,
+            ..
+        } = state
+        {
+            let intensity = (*ticks as f32 / ramp).clamp(0.0, 1.0);
+            map.stamp_siege_at(*ward_x, *ward_y, intensity, radius);
+        }
+    }
+}
+
 /// Authors `WardsUnderSiege` on the `ColonyState` singleton each
 /// FixedUpdate tick (substrate spec §4.3 Colony). Wraps the existing
 /// `is_any_ward_under_siege` predicate helper.
@@ -1579,6 +1619,78 @@ mod tests {
         assert!(
             world.get_entity(ward_entity).is_err(),
             "ward should be despawned after strength drops to zero"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // update_ward_siege_fear_map (ticket 470)
+    // -----------------------------------------------------------------------
+
+    /// 470 — siege-fear map stamps an intensity at every besieged-ward
+    /// position from the live `WildlifeAiState::EncirclingWard` set. A
+    /// fresh siege reads low intensity; a long-sustained siege reads
+    /// high. No wildlife in `EncirclingWard` means the map is all
+    /// zeros — the (26,61) seed-42 death class would have been
+    /// preventable if consumers (Flee / `cover_at`) had read this
+    /// non-zero value at that tile.
+    #[test]
+    fn ward_siege_fear_map_stamps_besieged_wards() {
+        let mut world = test_world();
+        world.insert_resource(crate::resources::WardSiegeFearMap::default_map());
+
+        // Spawn a wildlife entity in EncirclingWard state at (26, 61).
+        // The fixture mirrors the (26,61) death-class telemetry from
+        // logs/tuned-42-01eb555d.
+        world.spawn((
+            WildAnimal::new(WildSpecies::ShadowFox),
+            crate::components::physical::Position::new(26, 61),
+            WildlifeAiState::EncirclingWard {
+                ward_x: 26,
+                ward_y: 61,
+                angle: 0.0,
+                ticks: 30,
+            },
+        ));
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_ward_siege_fear_map);
+        schedule.run(&mut world);
+
+        let map = world.resource::<crate::resources::WardSiegeFearMap>();
+        let at_ward = map.get(26, 61);
+        assert!(
+            at_ward > 0.0,
+            "siege-fear should stamp at besieged ward tile; got {at_ward}"
+        );
+        // Far-away tile stays zero (radius = 6, default).
+        assert_eq!(
+            map.get(0, 0),
+            0.0,
+            "tile far from any siege should read zero fear"
+        );
+    }
+
+    /// 470 — without `EncirclingWard` entries the map clears to zero.
+    /// Important: the producer must `clear()` at the start of each
+    /// rebuild so a siege that ended last tick doesn't leak forward.
+    #[test]
+    fn ward_siege_fear_map_clears_when_no_siege() {
+        let mut world = test_world();
+        let mut map = crate::resources::WardSiegeFearMap::default_map();
+        // Pre-stamp leftover from a "prior tick" to verify the clear.
+        map.stamp_siege_at(20, 20, 1.0, 6.0);
+        world.insert_resource(map);
+
+        // No wildlife → no encircling state → producer clears to zero.
+        let mut schedule = Schedule::default();
+        schedule.add_systems(update_ward_siege_fear_map);
+        schedule.run(&mut world);
+
+        let map = world.resource::<crate::resources::WardSiegeFearMap>();
+        assert_eq!(
+            map.get(22, 22),
+            0.0,
+            "stale stamps must clear when no siege is active"
         );
     }
 
