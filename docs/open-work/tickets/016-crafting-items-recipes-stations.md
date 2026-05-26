@@ -45,7 +45,7 @@ Full architectural design lives in [`docs/systems/crafting.md`](../../systems/cr
 
 ## Design constraints
 
-Load-bearing — drift toward random/decoupled stat-stick fields or RNG affix rolls re-triggers ranking (F→2, H→2, score → ~96); identity/material-grounded effect-data composed by the aggregation layer is the sanctioned shape (doctrine corrected in 476). Quick anchors (see [`docs/systems/crafting.md`](../../systems/crafting.md) §Design constraints for the full statement):
+Load-bearing — drift toward random/decoupled stat-stick fields or RNG affix rolls is a thesis-breaking change; identity/material-grounded effect-data composed by the aggregation layer is the sanctioned shape (doctrine corrected in 476). Quick anchors (see [`docs/systems/crafting.md`](../../systems/crafting.md) §Design constraints for the full statement):
 
 - §5-first catalog. Combat gear (spears, bracers, blades, slings) included as Phase 2b recipe cluster.
 - Items are characterization, not commodity, but they have bite — real mechanical effects keyed to item identity/material (+ quality), composed by the uniform modifier-aggregation layer (ticket 477) and applied in resolvers, never as random stat-sticks.
@@ -123,17 +123,13 @@ Three conditions, all required:
 
 Crafting is the anchor of the 2026-04-22 three-way split (this entry, #17 slot-inventory, #18 ruin-clearings) and ships first. De-risks 017 at Phase 3 (first wearable producer) and 018 at Phase 1 (preservation recipes consume cleared-ruin food). Phase 4 decorations become the second primary consumer of #20 (naming substrate). Phase 5 is long-horizon and gated on aspirations-mastery arcs.
 
-## Score
-
-V=5 F=4 R=3 C=3 H=3 = **540** — "worthwhile; plan carefully" (300–1000 bucket). Promoted from 288 → 540 on 2026-04-22 when Phase 4 (Domestic refinement / folk-craft decorations) and Phase 5 (Elevated cat-craft / collective multi-season) were added. Originally rank 6 in `docs/systems-backlog-ranking.md`.
-
 ## Resume when
 
 Phase 1a (365) and 1b (367) are done. Pick up next: Phase 2 (368, behavioral tools) and Phase 2b (369, warrior's kit) are both ready and can run in parallel.
 
 ## Log
 
-- 2026-04-22: opened with V=5 F=4 R=3 C=3 H=3 = 540 score; Phase 4 added on promotion from 288 → 540. Phase 5 added (collective / multi-season tier with not-DF guardrail).
+- 2026-04-22: opened; Phase 4 (decorations) and Phase 5 (collective / multi-season, with the not-DF guardrail) added on promotion.
 - 2026-05-16: promoted to epic dashboard (128-style — read-only over child tickets). Opened 8 phase children (365 Phase 1a substrate, 366 Phase 5 prereq, 367 Phase 1b recipes, 368 Phase 2 tools, 369 Phase 2b warrior's kit, 370 Phase 3 identity, 371 Phase 4 decorations, 372 Phase 5). Status flipped `ready → in-progress`. 334 (stealth-cloak) re-blocked on 365 + 017.
 - 2026-05-18: 366 Phase 5 prereq landed (9d41d3ebc5cf). Five mastery arcs registered + Skills/SkillKind axes + Recipe.skill_gate field + RecipeRegistry::is_phase5_unlocked predicate. Adoption deferred to 372 (Kinship-pattern skip preserves seed-42 determinism). 372 unblocked; ready to start.
 - 2026-05-18: 365 Phase 1a landed (4ecfaf0cd49b). Crafting substrate — Recipe / Station / CraftAction; remedy_prep + ward_setting generalized into unified catalog. 368, 369 unblocked.

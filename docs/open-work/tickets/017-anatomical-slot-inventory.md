@@ -24,14 +24,9 @@ enumeration imports from `body-zones.md`.
 **Design captured at:** `docs/systems/slot-inventory.md`
 (Aspirational, 2026-04-22).
 
-**Score:** V=2 F=3 R=4 C=4 H=4 = **384** — "worthwhile; plan
-carefully" (300–1000 bucket). Added as rank 5 in
-`docs/systems-backlog-ranking.md`.
-
-**Ship-order note: do not ship standalone.** Score reflects
-isolated-feature value, but lived utility is gated on at least one
-wearable producer existing. Candidate producers, thesis-fit
-ordered:
+**Ship-order note: do not ship standalone.** Lived utility is gated
+on at least one wearable producer existing. Candidate producers,
+thesis-fit ordered:
 1. `crafting.md` Phase 3 (mentorship tokens, heirlooms) — see #16.
 2. `the-calling.md` (Named Objects as wearable hooks).
 3. `trade.md` (visitor-sourced worn objects).
@@ -44,11 +39,8 @@ narrative-event tag, and a `quality` scalar — **not random stats.**
 Effects are real and mechanical but keyed to `kind` (+ `quality`)
 and applied via the uniform modifier-aggregation layer (ticket 477),
 never as decoupled floats bolted onto the item and never via random
-affix rolls. The thesis-breaking trigger that re-opens this ranking
-(F→2, H→2, ~96) is adding **random/decoupled stat-stick fields**, not
-identity-grounded effect-data. (Doctrine corrected in 476; see
-`crafting.md` rule #1 + the "Items are real, and items have bite"
-pillar.)
+affix rolls. (Doctrine corrected in 476; see `crafting.md` rule #1 +
+the "Items are real, and items have bite" pillar.)
 
 **Dependencies:** hard-gated on a producer; otherwise migration is
 mechanical over a known finite consumer set (5–6 call sites:

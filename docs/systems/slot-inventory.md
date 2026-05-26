@@ -3,7 +3,7 @@
 ## Purpose
 Replaces the flat `Inventory { slots: Vec<ItemSlot> }` in `src/components/magic.rs:242` with an anatomy-indexed wearable-slot structure plus a stackable consumable-pouch. Anatomical slots draw from the 13-part enumeration in `body-zones.md`. Wearables carry **identity** (name, origin, creator, narrative hook, material) **and identity-keyed mechanical effects** — never random or decoupled stat-stick fields. Effects derive from the item's identity/material classifiers (per `crafting.md` rule #1) and are applied via the uniform modifier-aggregation layer (ticket 477), not stored as floats on the wearable. Crafted bags (from `crafting.md`) expand pouch capacity without introducing random stat rolls.
 
-Score: **V=2 F=3 R=4 C=4 H=4 = 384** — "worthwhile; plan carefully" per `systems-backlog-ranking.md`. **Do not ship standalone.** This is scaffolding without a producer. Gated on at least one wearable producer shipping: `crafting.md` Phase 3 (mentorship tokens, heirlooms), `the-calling.md` (Named Objects as wearable hooks), or `trade.md` (visitor-sourced worn objects). Absent a producer, the refactor is cost without benefit.
+**Do not ship standalone.** This is scaffolding without a producer. Gated on at least one wearable producer shipping: `crafting.md` Phase 3 (mentorship tokens, heirlooms), `the-calling.md` (Named Objects as wearable hooks), or `trade.md` (visitor-sourced worn objects). Absent a producer, the refactor is cost without benefit.
 
 ## Slot enumeration
 | Slot | Underlying BodyPart | Typical Wearable |
