@@ -45,10 +45,10 @@ Full architectural design lives in [`docs/systems/crafting.md`](../../systems/cr
 
 ## Design constraints
 
-Load-bearing — drift re-triggers ranking (F→2, H→2, score → ~96). Quick anchors (see [`docs/systems/crafting.md`](../../systems/crafting.md) §Design constraints for the full statement):
+Load-bearing — drift toward random/decoupled stat-stick fields or RNG affix rolls re-triggers ranking (F→2, H→2, score → ~96); identity/material-grounded effect-data composed by the aggregation layer is the sanctioned shape (doctrine corrected in 476). Quick anchors (see [`docs/systems/crafting.md`](../../systems/crafting.md) §Design constraints for the full statement):
 
 - §5-first catalog. Combat gear (spears, bracers, blades, slings) included as Phase 2b recipe cluster.
-- Items are characterization, not commodity — effects live on action resolvers keyed to item identity and ecological properties.
+- Items are characterization, not commodity, but they have bite — real mechanical effects keyed to item identity/material (+ quality), composed by the uniform modifier-aggregation layer (ticket 477) and applied in resolvers, never as random stat-sticks.
 - Decorations are place-anchored, not cat-anchored (Phase 4+).
 - Cat-native materials palette: reed, bone, fur, feather, shell, fat, pigment, hide, sinew, flint, fieldstone. Metal arrives via `ScavengedMetal` / `TradedMetal` — never produced by a cat discipline.
 - Phase 5 not-DF guardrail: collective (multi-cat) or cumulative (multi-season), never individual-rare-strike. `the-calling.md` owns individual mood-strike craft.

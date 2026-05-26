@@ -39,10 +39,16 @@ ordered:
 Without a producer this is cost without benefit.
 
 **Type guardrail (load-bearing invariant):** `WearableItem` carries
-`name`, `origin_tick`, `creator_entity`, `narrative_template_id`
-only. No numeric capability modifiers. If a future PR adds modifier
-fields to the wearable type, F drops 3→2 and H drops 4→2 (composite
-falls from 384 to ~96) — treat such PRs as re-opening this ranking.
+identity — `kind`, `name`, `origin_tick`, `creator_entity`, a
+narrative-event tag, and a `quality` scalar — **not random stats.**
+Effects are real and mechanical but keyed to `kind` (+ `quality`)
+and applied via the uniform modifier-aggregation layer (ticket 477),
+never as decoupled floats bolted onto the item and never via random
+affix rolls. The thesis-breaking trigger that re-opens this ranking
+(F→2, H→2, ~96) is adding **random/decoupled stat-stick fields**, not
+identity-grounded effect-data. (Doctrine corrected in 476; see
+`crafting.md` rule #1 + the "Items are real, and items have bite"
+pillar.)
 
 **Dependencies:** hard-gated on a producer; otherwise migration is
 mechanical over a known finite consumer set (5–6 call sites:

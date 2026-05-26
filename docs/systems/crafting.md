@@ -9,10 +9,10 @@ Score: **V=5 F=4 R=3 C=3 H=3 = 540** — "worthwhile; plan carefully" per `syste
 
 Every recipe targets at least one continuity canary or §5 sideways axis (grooming, play, courtship, burial, preservation, generational knowledge — `project-vision.md` §5). Recipes that don't justify themselves under §5 don't ship. The OSRS gravity well is avoided by construction:
 
-1. **Items are not stat sticks.** The `CraftedItem` type carries narrative/identity fields (name, origin, creator, material, weapon class) and **no generic numeric modifier fields**. Items have real mechanical effects — a grooming brush improves grooming output; hide bracers reduce damage taken; a bone-tip spear extends hunt reach — but those effects live on the *action resolver*, keyed to item identity and ecological properties, not on `attack_bonus` / `armor_rating` floats bolted to the item. A cat should never feel like they are comparing `+3` vs `+5`; they should feel like they are choosing between a spear that pierces well but snaps, and bracers that are quiet and durable but offer no reach. The equipment is a characterization system: a cat carrying bone knives and a woven cloak reads differently from one carrying hide-plated bracers and a flint-tipped spear, and those reads connect to the sim's existing noise, stealth, and hunting systems.
-2. **Decorations are place-anchored, not cat-anchored.** A rug warms the hearth tile; a lamp illuminates a room; a tapestry marks a wall. The cat that *placed* the decoration gets no personal bonus. Every colony member benefits from the decoration while occupying the site; nobody carries it as personal inventory. Carried-crafted-objects (tokens, gifts, talismans) stay narrative-only per rule 1.
+1. **Items have bite, but no boring stat-sticks.** The `CraftedItem` type carries identity/material fields (name, origin, creator, material, weapon class) and **no random or decoupled numeric modifier fields**. Items have real mechanical effects — a grooming brush improves grooming output; hide bracers reduce damage taken; a bone-tip spear extends hunt reach — but those effects derive from the item's *identity and material classifiers* (`weapon_class` / `armor_class` / `noise_class` / `durability_tier`, scaled by `quality`), composed by a uniform modifier-aggregation layer and applied by the *action resolver* — not from `attack_bonus` / `armor_rating` floats bolted onto the item, and never from a random affix roll (the PoE trap). A cat should never feel like they are comparing `+3` vs `+5`; they should feel like they are choosing between a spear that pierces well but snaps, and bracers that are quiet and durable but offer no reach. The equipment is a characterization system: a cat carrying bone knives and a woven cloak reads differently from one carrying hide-plated bracers and a flint-tipped spear, and those reads connect to the sim's existing noise, stealth, and hunting systems.
+2. **Decorations are place-anchored, not cat-anchored.** A rug warms the hearth tile; a lamp illuminates a room; a tapestry marks a wall. The cat that *placed* the decoration gets no personal bonus. Every colony member benefits from the decoration while occupying the site; nobody carries it as personal inventory. Carried-crafted-objects (tokens, gifts, talismans) *may* carry identity-keyed effects too (a mentorship token shifts an apprentice's fondness; a lucky token grants a one-shot fate-escape per 377) — the place-vs-cat distinction governs *where the benefit anchors*, not whether carried items have mechanical bite.
 
-Drift from *either* constraint is a thesis-breaking change and re-triggers ranking (F→2, H→2, composite score falls to ~96).
+Drift toward random/decoupled stat-stick fields or RNG affix rolls is a thesis-breaking change and re-triggers ranking (F→2, H→2, composite score falls to ~96). Identity/material-grounded effect-data composed by the aggregation layer is the sanctioned shape, not drift.
 
 ## Material tiers
 
@@ -135,7 +135,7 @@ Place-anchored decorations that shape the environment every cat shares. Targets 
 | Wall-Hanging | Fiber + pigment (berry / clay) | Workshop | Placed at a wall: colony-memory marker; naming-eligible on any Significant event near it; visually distinguishes sub-colony identity |
 | Nesting Inlay | Shell + Stone + Fine fiber | Workshop | Placed into a nesting alcove: permanent upgrade of that alcove's preservation-weight and sleep quality; highly heritable |
 
-All Phase 4 items are `CraftedDecoration` entries — placed at a tile, not carried on a cat. No numeric modifier fields on the item; effects live on the tile (warmth, scent, illumination) or the action resolver (grooming quality).
+All Phase 4 items are `CraftedDecoration` entries — placed at a tile, not carried on a cat. No random/decoupled stat fields on the item; effects anchor to the place — the tile (warmth, scent, illumination) or the action resolver (grooming quality) — per the place-anchored rule.
 
 ## Phase 5 — Elevated cat-craft (collective, multi-season)
 Long-horizon tier: objects cats "work up to" as the colony matures. **Explicit not-DF guardrail:** no individual-cat artifact obsession; no season-long solo trances (that remains `the-calling.md`'s niche). Phase 5 production is collective (multi-cat) or cumulative (multi-season), never individual-rare-strike.
@@ -205,8 +205,9 @@ Ticket 365 (016 Phase 1a) shipped the typed recipe substrate:
   `RecipeOutput`, `ItemDestination` (`Inventory` / `EquippedSlot` /
   `WorldPosition`), `StationRequirement`, `RecipeDuration`,
   `DisciplineKind`, and the `CraftedItem` Component (provenance:
-  recipe id + crafter + tick; no numeric modifier fields per the
-  no-stat-sticks invariant).
+  recipe id + crafter + tick; no random/decoupled stat fields per the
+  no-stat-sticks invariant — effects derive from identity/material
+  classifiers via the aggregation layer).
 - `src/resources/recipe_registry.rs` — `RecipeRegistry` Resource;
   populated by `populate_recipe_registry` in
   `src/plugins/simulation.rs` (mirrors
