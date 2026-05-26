@@ -1,7 +1,7 @@
 ---
 id: 214
 title: tune patrol_fox_scent_weight
-status: parked
+status: done
 cluster: combat-threat
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: [181-hunt-forage-saturation-tune.md]
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-25
 ---
 
 ## Why
@@ -86,3 +86,4 @@ modest weight has multiplicative impact). Single-seed
   `FoxTerritorySuppression`'s damping branch are subsumed by A*-level
   path-cost; 214 likely retires entirely. Re-evaluate after 224 lands.
 - 2026-05-19: accuracy audit pass — parked status rationale verified, structural tension sound, pathfinder-risk-awareness cluster referenced correctly.
+- 2026-05-25: retired — pathfinder-risk-awareness cluster (222/223/224, all landed 2026-05-07) subsumes the proposed L2 axis at the A* path-cost layer. Lifting patrol_fox_scent_weight would double-price the fox-scent signal that is now priced structurally via scent-aware pathfinding (223) and boldness-conditioned path risk (224). The ticket's own 2026-05-07 park log predicted this outcome.
