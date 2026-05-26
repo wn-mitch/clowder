@@ -776,8 +776,13 @@ pub struct RemedyEffect {
 // ---------------------------------------------------------------------------
 
 /// Possible outcomes when a magic attempt goes wrong.
+///
+/// Ticket 471 rename: this was `MisfireEffect`. The bare enum now lives at
+/// `MisfireEffectKind` because the Message type (which carries the
+/// per-event identity + position + tick) is named `MisfireEffect` and
+/// references this enum as its `kind` discriminant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MisfireEffect {
+pub enum MisfireEffectKind {
     /// Nothing happens. Mild embarrassment.
     Fizzle,
     /// Caster gains +0.1 personal corruption.

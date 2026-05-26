@@ -360,6 +360,10 @@ pub struct MagicResolverParams<'w, 's> {
         With<Harvestable>,
     >,
     pub pushback_writer: MessageWriter<'w, crate::systems::magic::CorruptionPushback>,
+    /// Ticket 471 — emitted by `apply_misfire` so the per-event misfire
+    /// stream is visible to the event log and to the festering-wound
+    /// authoring path (ticket 472).
+    pub misfire_writer: MessageWriter<'w, crate::messages::misfire_effect::MisfireEffect>,
     pub carcass_query: Query<
         'w,
         's,
@@ -6929,6 +6933,7 @@ fn dispatch_step_action(
                     };
                     let result = crate::steps::magic::resolve_set_ward(
                         ticks,
+                        cat_entity,
                         ward_kind,
                         &name.0,
                         inventory,
@@ -6942,6 +6947,7 @@ fn dispatch_step_action(
                         commands,
                         &mut narr.log,
                         ec.event_log.as_deref_mut(),
+                        &mut magic_params.misfire_writer,
                         ec.time.tick,
                         &ec.constants.magic,
                         &ec.constants.combat,
@@ -6987,6 +6993,7 @@ fn dispatch_step_action(
                 };
                 let result = crate::steps::magic::resolve_set_ward(
                     ticks,
+                    cat_entity,
                     ward_kind,
                     &name.0,
                     inventory,
@@ -7000,6 +7007,7 @@ fn dispatch_step_action(
                     commands,
                     &mut narr.log,
                     ec.event_log.as_deref_mut(),
+                    &mut magic_params.misfire_writer,
                     ec.time.tick,
                     &ec.constants.magic,
                     &ec.constants.combat,
@@ -7115,6 +7123,7 @@ fn dispatch_step_action(
         GoapActionKind::Scry => {
             let result = crate::steps::magic::resolve_scry(
                 ticks,
+                cat_entity,
                 &name.0,
                 magic_aff,
                 skills,
@@ -7127,6 +7136,7 @@ fn dispatch_step_action(
                 &mut rng.rng,
                 commands,
                 &mut narr.log,
+                &mut magic_params.misfire_writer,
                 ec.time.tick,
                 &ec.constants.magic,
                 &ec.constants.combat,
@@ -7144,6 +7154,7 @@ fn dispatch_step_action(
             let act = &mut narr.activation;
             let result = crate::steps::magic::resolve_spirit_communion(
                 ticks,
+                cat_entity,
                 &name.0,
                 magic_aff,
                 skills,
@@ -7154,6 +7165,7 @@ fn dispatch_step_action(
                 &mut rng.rng,
                 commands,
                 &mut narr.log,
+                &mut magic_params.misfire_writer,
                 ec.time.tick,
                 act.as_deref_mut().unwrap(),
                 &ec.constants.magic,
@@ -7206,6 +7218,7 @@ fn dispatch_step_action(
                     // Arrived: perform the cleanse.
                     let result = crate::steps::magic::resolve_cleanse_corruption(
                         ticks,
+                        cat_entity,
                         &name.0,
                         magic_aff,
                         skills,
@@ -7217,6 +7230,7 @@ fn dispatch_step_action(
                         &mut rng.rng,
                         commands,
                         &mut narr.log,
+                        &mut magic_params.misfire_writer,
                         ec.time.tick,
                         &ec.constants.magic,
                         &ec.constants.combat,

@@ -15,10 +15,10 @@ _Last generated: 2026-05-26._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 120 |
+| Ready | 119 |
 | Parked | 12 |
 | Blocked | 35 |
-| **Open total** | **171** |
+| **Open total** | **170** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -39,10 +39,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.91_
-- **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · score 0.91_
-- **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[social-coordination] · score 0.91_
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.91_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.91_
+- **[216](docs/open-work/tickets/216-mentor-coordinate-caretake-axis-ethology-audit.md)** — Mentor / Coordinate / Caretake axis ethology audit — _[social-coordination] · score 0.91_
 
 ## Epic progress (5)
 
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (120)
+## Ready by cluster (119)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -163,7 +163,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 
-### combat-threat (10 ready, 2 blocked)
+### combat-threat (9 ready, 2 blocked)
 
 - **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[combat-threat] · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[combat-threat] · added 2026-05-02_
@@ -173,7 +173,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[287](docs/open-work/tickets/287-move-boldness-out-of-fleedse-cp-axes-onto-a-boldnessfleemodulation-modifier-271-r3-structural-follow-on.md)** — Move boldness out of FleeDse CP axes onto a BoldnessFleeModulation modifier (271 R3 structural follow-on) — _[combat-threat] · added 2026-05-11_
 - **[289](docs/open-work/tickets/289-engagethreat-retry-cooldown-after-morale-break-suppress-immediate-guarding-re-election-under-active-fight-directive.md)** — EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive — _[combat-threat] · added 2026-05-11_
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
-- **[471](docs/open-work/tickets/471-damage-events-emit-to-log-bodypartinjury-stream-misfireeffect-stream-injury-source-attribution-at-death.md)** — Damage events emit to log (BodyPartInjury stream + MisfireEffect stream + injury_source attribution at death) — _[combat-threat] · added 2026-05-26_
 - **[472](docs/open-work/tickets/472-festering-wound-kind-on-randomly-selected-body-part-ashitaka-substrate-anchor.md)** — Festering wound kind on randomly-selected body part (Ashitaka substrate anchor) — _[combat-threat] · added 2026-05-26_
 
 ### wildlife (8 ready, 1 blocked)
@@ -223,7 +222,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
-## Ready by initiative (82 tag-memberships across 9 initiatives)
+## Ready by initiative (81 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -275,20 +274,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 - **[470](docs/open-work/tickets/470-ward-siege-fear-influence-map-spirituality-modulated-perception-of-besieged-tiles.md)** — Ward-siege fear influence map (spirituality-modulated perception of besieged tiles) — _[belief-perception] · added 2026-05-26_
 
-### welfare-fidelity (11 open, 4 landed)
-
-- **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
-- **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
-- **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[life-cycle] · added 2026-05-04_
-- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
-- **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
-- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
-- **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
-- **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
-- **[470](docs/open-work/tickets/470-ward-siege-fear-influence-map-spirituality-modulated-perception-of-besieged-tiles.md)** — Ward-siege fear influence map (spirituality-modulated perception of besieged tiles) — _[belief-perception] · added 2026-05-26_
-- **[471](docs/open-work/tickets/471-damage-events-emit-to-log-bodypartinjury-stream-misfireeffect-stream-injury-source-attribution-at-death.md)** — Damage events emit to log (BodyPartInjury stream + MisfireEffect stream + injury_source attribution at death) — _[combat-threat] · added 2026-05-26_
-- **[472](docs/open-work/tickets/472-festering-wound-kind-on-randomly-selected-body-part-ashitaka-substrate-anchor.md)** — Festering wound kind on randomly-selected body part (Ashitaka substrate anchor) — _[combat-threat] · added 2026-05-26_
-
 ### predator-prey-dynamics (10 open, 9 landed)
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
@@ -301,6 +286,19 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[351](docs/open-work/tickets/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches — _[wildlife] · added 2026-05-15_
 - **[466](docs/open-work/tickets/466-travelto-greedy-step-pathing-lift-a-fallback-into-catpathplannext-step.md)** — TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step — _[ai-substrate] · added 2026-05-25_
 - **[467](docs/open-work/tickets/467-fish-on-water-hunt-shoreline-pounce-resolver-or-cat-eligibility-cut.md)** — Fish-on-water hunt — shoreline-pounce resolver or cat eligibility cut — _[wildlife] · added 2026-05-25_
+
+### welfare-fidelity (10 open, 5 landed)
+
+- **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
+- **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
+- **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[life-cycle] · added 2026-05-04_
+- **[234](docs/open-work/tickets/234-damage-recency-perception-scalar-couple-acutehealthadrenalineflee-to-felt-danger.md)** — Damage-recency perception scalar — couple AcuteHealthAdrenalineFlee to felt danger — _[belief-perception] · added 2026-05-08_
+- **[239](docs/open-work/tickets/239-grief-modeling-rest-at-grave-chain-lostbonds-grave-as-rest-target-via-existing-rest-target-picker.md)** — Grief modeling + rest-at-grave chain — LostBonds + grave-as-rest-target via existing rest-target picker — _[life-cycle] · added 2026-05-08_
+- **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
+- **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
+- **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
+- **[470](docs/open-work/tickets/470-ward-siege-fear-influence-map-spirituality-modulated-perception-of-besieged-tiles.md)** — Ward-siege fear influence map (spirituality-modulated perception of besieged tiles) — _[belief-perception] · added 2026-05-26_
+- **[472](docs/open-work/tickets/472-festering-wound-kind-on-randomly-selected-body-part-ashitaka-substrate-anchor.md)** — Festering wound kind on randomly-selected body part (Ashitaka substrate anchor) — _[combat-threat] · added 2026-05-26_
 
 ### generational-continuity (8 open, 6 landed)
 
@@ -336,7 +334,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (120)
+## Ready (119)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -456,7 +454,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[467](docs/open-work/tickets/467-fish-on-water-hunt-shoreline-pounce-resolver-or-cat-eligibility-cut.md)** — Fish-on-water hunt — shoreline-pounce resolver or cat eligibility cut — _[wildlife] · added 2026-05-25_
 - **[468](docs/open-work/tickets/468-craftatworkshop-recipe-not-satisfied-new-plan-failure-surface-post-465.md)** — CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465 — _[items-crafting] · added 2026-05-25_
 - **[470](docs/open-work/tickets/470-ward-siege-fear-influence-map-spirituality-modulated-perception-of-besieged-tiles.md)** — Ward-siege fear influence map (spirituality-modulated perception of besieged tiles) — _[belief-perception] · added 2026-05-26_
-- **[471](docs/open-work/tickets/471-damage-events-emit-to-log-bodypartinjury-stream-misfireeffect-stream-injury-source-attribution-at-death.md)** — Damage events emit to log (BodyPartInjury stream + MisfireEffect stream + injury_source attribution at death) — _[combat-threat] · added 2026-05-26_
 - **[472](docs/open-work/tickets/472-festering-wound-kind-on-randomly-selected-body-part-ashitaka-substrate-anchor.md)** — Festering wound kind on randomly-selected body part (Ashitaka substrate anchor) — _[combat-threat] · added 2026-05-26_
 
 ## Parked (12)
@@ -512,12 +509,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · blocked-by 472 · added 2026-05-26_
 - **[475](docs/open-work/tickets/475-current-role-query-helper-derive-active-role-from-existing-capability-markers-recent-action-history.md)** — Current-role query helper (derive active role from existing capability markers + recent action history) — _[social-coordination] · blocked-by 472 · added 2026-05-26_
 
-## Landed archive (332)
+## Landed archive (333)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (266)
+### 2026-05 (267)
 
+- **[471](docs/open-work/landed/471-damage-events-emit-to-log-bodypartinjury-stream-misfireeffect-stream-injury-source-attribution-at-death.md)** — Damage events emit to log (BodyPartInjury stream + MisfireEffect stream + injury_source attribution at death) _(2026-05-26)_
 - **[469](docs/open-work/landed/469-ground-jointintention-emission-in-mutual-perception-confidence-candidacy.md)** — Ground JointIntention emission in mutual perception (confidence + candidacy) _(2026-05-26)_
 - **[279](docs/open-work/landed/279-body-cue-driven-joint-adoption-compose-127-with-242-243.md)** — Body-cue-driven joint adoption (compose 127 with 242 + 243) _(2026-05-26)_
 - **[276](docs/open-work/landed/276-play-bout-practice-on-jointintention-substrate-play-continuity-canary-host.md)** — Play-bout practice on JointIntention substrate (play continuity canary host) _(2026-05-26)_

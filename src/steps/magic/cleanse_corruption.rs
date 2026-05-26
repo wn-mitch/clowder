@@ -1,10 +1,11 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::components::magic::MisfireEffect;
+use crate::components::magic::MisfireEffectKind;
 use crate::components::mental::Mood;
 use crate::components::physical::{Health, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
+use crate::messages::misfire_effect::MisfireEffect;
 use crate::resources::map::TileMap;
 use crate::resources::narrative::NarrativeLog;
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
@@ -32,6 +33,7 @@ use crate::steps::StepResult;
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_cleanse_corruption(
     ticks: u64,
+    entity: Entity,
     cat_name: &str,
     magic_aff: &MagicAffinity,
     skills: &mut Skills,
@@ -43,6 +45,7 @@ pub fn resolve_cleanse_corruption(
     rng: &mut impl Rng,
     commands: &mut Commands,
     log: &mut NarrativeLog,
+    misfire_writer: &mut MessageWriter<MisfireEffect>,
     tick: u64,
     m: &MagicConstants,
     combat: &CombatConstants,
@@ -53,10 +56,22 @@ pub fn resolve_cleanse_corruption(
             crate::systems::magic::check_misfire(magic_aff.0, skills.magic, rng, m)
         {
             crate::systems::magic::apply_misfire(
-                misfire, cat_name, mood, corruption, health, pos, commands, log, tick, m, combat,
+                entity,
+                misfire,
+                cat_name,
+                mood,
+                corruption,
+                health,
+                pos,
+                commands,
+                log,
+                misfire_writer,
+                tick,
+                m,
+                combat,
                 time_scale,
             );
-            if matches!(misfire, MisfireEffect::Fizzle) {
+            if matches!(misfire, MisfireEffectKind::Fizzle) {
                 return StepResult::Fail("misfire: fizzle".into());
             }
         }

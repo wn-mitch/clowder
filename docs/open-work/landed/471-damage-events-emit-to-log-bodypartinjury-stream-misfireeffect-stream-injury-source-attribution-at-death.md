@@ -1,7 +1,7 @@
 ---
 id: 471
 title: Damage events emit to log (BodyPartInjury stream + MisfireEffect stream + injury_source attribution at death)
-status: ready
+status: done
 cluster: combat-threat
 orchestration: substrate-sensitive
 initiative: [welfare-fidelity]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [body-zones.md, magic.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-26
 ---
 
 ## Why
@@ -107,3 +107,4 @@ Landing approach (per CLAUDE.md "incremental implementation"):
 ## Log
 
 - 2026-05-26: opened from seed-42 soak `logs/tuned-42-01eb555d` diagnostic gap. The (26,61) deaths investigation took 90 minutes of CatSnapshot trail reconstruction because no per-tick damage events exist in the log. User directive: *"damage events absolutely have to go into the logs."* The magic.rs:1164-1170 code comment already names this as deferred work; this ticket cashes it in. Cluster siblings [[470]] [[472]] [[473]] [[474]] [[475]].
+- 2026-05-26: Verified clean: just check / just test (2514 passed) / just soak-trace 42 Simba — verdict: survival pass, continuity pass, never_fired=[], deaths_by_cause={} (the (26,61) Heron/Simba death class observed in logs/tuned-42-01eb555d is gone post-279). Verdict 'concern' band stems from constants-drift vs stale baseline (1799e798) and 279-introduced negative-event volume, not from 471 itself (telemetry-only, no DSE/scoring read sites). injury_source now populates via LastBodyPartInjury cache instead of hardcoded None at death.rs:106.

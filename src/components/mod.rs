@@ -20,6 +20,7 @@ pub mod held_goal_stack;
 pub mod held_intention;
 pub mod hunting_priors;
 pub mod identity;
+pub mod injury_cache;
 pub mod item_transfer;
 pub mod items;
 pub mod joint_intention;
@@ -88,7 +89,7 @@ pub use joint_intention::{
 pub use kitten::KittenDependency;
 pub use magic::{
     FlavorKind, FlavorPlant, GrowthStage, Harvestable, Herb, HerbKind, Inventory, ItemSlot,
-    MisfireEffect, RemedyEffect, RemedyKind, Seasonal, Ward, WardKind,
+    MisfireEffectKind, RemedyEffect, RemedyKind, Seasonal, Ward, WardKind,
 };
 pub use mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier};
 pub use mourning::Mourning;

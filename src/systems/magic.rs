@@ -4,7 +4,7 @@ use rand::Rng;
 use crate::ai::CurrentAction;
 use crate::components::identity::Name;
 use crate::components::magic::{
-    FlavorPlant, GrowthStage, Harvestable, Herb, Inventory, MisfireEffect, RemedyEffect,
+    FlavorPlant, GrowthStage, Harvestable, Herb, Inventory, MisfireEffectKind, RemedyEffect,
     RemedyKind, Seasonal, Ward, WardKind,
 };
 use crate::components::mental::{Memory, Mood, MoodModifier, MoodSource};
@@ -12,6 +12,7 @@ use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::components::task_chain::{StepKind, StepStatus, TaskChain};
 use crate::components::wildlife::{WildAnimal, WildSpecies, WildlifeAiState};
+use crate::messages::misfire_effect::MisfireEffect;
 use crate::resources::map::{Terrain, TileMap};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::relationships::Relationships;
@@ -798,6 +799,7 @@ pub fn resolve_magic_task_chains(
     mut witnessable: bevy_ecs::message::MessageWriter<
         crate::messages::witnessable_event::WitnessableEvent,
     >,
+    mut misfire_writer: bevy_ecs::message::MessageWriter<MisfireEffect>,
 ) {
     let m = &constants.magic;
     // Collect workshop positions for speed bonus detection.
@@ -973,6 +975,7 @@ pub fn resolve_magic_task_chains(
             StepKind::SetWard { kind } => {
                 let result = crate::steps::magic::resolve_set_ward(
                     ticks,
+                    cat_entity,
                     kind,
                     &name.0,
                     &mut inventory,
@@ -986,6 +989,7 @@ pub fn resolve_magic_task_chains(
                     &mut commands,
                     &mut log,
                     None,
+                    &mut misfire_writer,
                     time.tick,
                     m,
                     &constants.combat,
@@ -1020,6 +1024,7 @@ pub fn resolve_magic_task_chains(
                 apply(
                     crate::steps::magic::resolve_scry(
                         ticks,
+                        cat_entity,
                         &name.0,
                         magic_aff,
                         &mut skills,
@@ -1032,6 +1037,7 @@ pub fn resolve_magic_task_chains(
                         &mut rng.rng,
                         &mut commands,
                         &mut log,
+                        &mut misfire_writer,
                         time.tick,
                         m,
                         &constants.combat,
@@ -1045,6 +1051,7 @@ pub fn resolve_magic_task_chains(
                 apply(
                     crate::steps::magic::resolve_cleanse_corruption(
                         ticks,
+                        cat_entity,
                         &name.0,
                         magic_aff,
                         &mut skills,
@@ -1056,6 +1063,7 @@ pub fn resolve_magic_task_chains(
                         &mut rng.rng,
                         &mut commands,
                         &mut log,
+                        &mut misfire_writer,
                         time.tick,
                         m,
                         &constants.combat,
@@ -1069,6 +1077,7 @@ pub fn resolve_magic_task_chains(
                 apply(
                     crate::steps::magic::resolve_spirit_communion(
                         ticks,
+                        cat_entity,
                         &name.0,
                         magic_aff,
                         &mut skills,
@@ -1079,6 +1088,7 @@ pub fn resolve_magic_task_chains(
                         &mut rng.rng,
                         &mut commands,
                         &mut log,
+                        &mut misfire_writer,
                         time.tick,
                         &mut activation,
                         m,
@@ -1113,9 +1123,18 @@ pub fn resolve_magic_task_chains(
 }
 
 /// Apply a misfire effect to the caster.
+///
+/// **Ticket 471** — emits a [`MisfireEffect`] message for every resolved
+/// outcome. Before 471, this function mutated `Corruption.0` /
+/// `Health.current` synthetically with no log trace, which is what made
+/// the seed-42 (26,61) death class take 90 minutes of `CatSnapshot`
+/// reconstruction to attribute. The event stream now closes that
+/// telemetry gap; the festering-wound substrate ([ticket 472]) consumes
+/// the same stream to author per-body-part festering on `WoundTransfer`.
 #[allow(clippy::too_many_arguments)]
 pub fn apply_misfire(
-    effect: MisfireEffect,
+    entity: Entity,
+    effect: MisfireEffectKind,
     cat_name: &str,
     mood: &mut Mood,
     corruption: &mut Corruption,
@@ -1123,13 +1142,20 @@ pub fn apply_misfire(
     pos: &Position,
     commands: &mut Commands,
     log: &mut NarrativeLog,
+    misfire_writer: &mut MessageWriter<MisfireEffect>,
     tick: u64,
     m: &MagicConstants,
     combat: &crate::resources::sim_constants::CombatConstants,
     time_scale: &TimeScale,
 ) {
+    misfire_writer.write(MisfireEffect {
+        entity,
+        kind: effect,
+        position: *pos,
+        tick,
+    });
     match effect {
-        MisfireEffect::Fizzle => {
+        MisfireEffectKind::Fizzle => {
             mood.modifiers.push_back(
                 MoodModifier::new(
                     m.misfire_fizzle_mood_penalty,
@@ -1144,7 +1170,7 @@ pub fn apply_misfire(
                 NarrativeTier::Significant,
             );
         }
-        MisfireEffect::CorruptionBacksplash => {
+        MisfireEffectKind::CorruptionBacksplash => {
             corruption.0 = (corruption.0 + m.misfire_corruption_backsplash_amount).min(1.0);
             log.push(
                 tick,
@@ -1152,7 +1178,7 @@ pub fn apply_misfire(
                 NarrativeTier::Significant,
             );
         }
-        MisfireEffect::InvertedWard => {
+        MisfireEffectKind::InvertedWard => {
             // Spawned by the caller — just log here.
             log.push(
                 tick,
@@ -1160,7 +1186,7 @@ pub fn apply_misfire(
                 NarrativeTier::Significant,
             );
         }
-        MisfireEffect::WoundTransfer => {
+        MisfireEffectKind::WoundTransfer => {
             // 095 Phase 1 Stage B — `apply_injury` retired. Misfire still
             // applies a synthetic minor wound to `Health.current`. The
             // `CatBodyModel` write is deferred (would require threading
@@ -1177,7 +1203,7 @@ pub fn apply_misfire(
                 NarrativeTier::Significant,
             );
         }
-        MisfireEffect::LocationReveal => {
+        MisfireEffectKind::LocationReveal => {
             // Create a MagicEvent memory that wildlife systems can check.
             log.push(
                 tick,
@@ -1204,7 +1230,7 @@ pub fn check_misfire(
     skill: f32,
     rng: &mut impl Rng,
     m: &MagicConstants,
-) -> Option<MisfireEffect> {
+) -> Option<MisfireEffectKind> {
     if skill >= affinity * m.misfire_skill_safe_ratio {
         return None;
     }
@@ -1214,11 +1240,13 @@ pub fn check_misfire(
     }
     let roll: f32 = rng.random();
     Some(match roll {
-        r if r < m.misfire_fizzle_threshold => MisfireEffect::Fizzle,
-        r if r < m.misfire_corruption_backsplash_threshold => MisfireEffect::CorruptionBacksplash,
-        r if r < m.misfire_inverted_ward_threshold => MisfireEffect::InvertedWard,
-        r if r < m.misfire_wound_transfer_threshold => MisfireEffect::WoundTransfer,
-        _ => MisfireEffect::LocationReveal,
+        r if r < m.misfire_fizzle_threshold => MisfireEffectKind::Fizzle,
+        r if r < m.misfire_corruption_backsplash_threshold => {
+            MisfireEffectKind::CorruptionBacksplash
+        }
+        r if r < m.misfire_inverted_ward_threshold => MisfireEffectKind::InvertedWard,
+        r if r < m.misfire_wound_transfer_threshold => MisfireEffectKind::WoundTransfer,
+        _ => MisfireEffectKind::LocationReveal,
     })
 }
 
@@ -1375,6 +1403,152 @@ mod tests {
             some_count > 40,
             "expected many misfires with unskilled cat, got {some_count}/200"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // apply_misfire — emits MisfireEffect (ticket 471)
+    // -----------------------------------------------------------------------
+
+    /// Run `apply_misfire` against each `MisfireEffectKind` and assert a
+    /// `MisfireEffect` message is emitted with the caster entity + kind +
+    /// position. Closes the diagnostic-invisibility gap that made the
+    /// seed-42 (26,61) death class take 90 minutes to attribute.
+    #[test]
+    fn apply_misfire_emits_misfire_effect_message() {
+        use bevy_ecs::system::SystemState;
+
+        let mut world = test_world();
+        world.init_resource::<bevy_ecs::message::Messages<MisfireEffect>>();
+
+        let entity = world.spawn_empty().id();
+        let pos = Position::new(7, 9);
+
+        // Use SystemState to obtain Commands + MessageWriter.
+        let mut state: SystemState<(Commands, MessageWriter<MisfireEffect>)> =
+            SystemState::new(&mut world);
+
+        let constants = SimConstants::default();
+        let m = &constants.magic;
+        let combat = &constants.combat;
+        let ts = test_time_scale();
+
+        for (idx, kind) in [
+            MisfireEffectKind::Fizzle,
+            MisfireEffectKind::CorruptionBacksplash,
+            MisfireEffectKind::InvertedWard,
+            MisfireEffectKind::WoundTransfer,
+            MisfireEffectKind::LocationReveal,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut mood = Mood::default();
+            let mut corruption = Corruption(0.0);
+            let mut health = Health::default();
+            let mut log = NarrativeLog::default();
+            let tick = 100 + idx as u64;
+
+            let (mut commands, mut writer) = state.get_mut(&mut world);
+            apply_misfire(
+                entity,
+                kind,
+                "Ashitaka",
+                &mut mood,
+                &mut corruption,
+                &mut health,
+                &pos,
+                &mut commands,
+                &mut log,
+                &mut writer,
+                tick,
+                m,
+                combat,
+                &ts,
+            );
+            state.apply(&mut world);
+        }
+
+        let messages = world.resource::<bevy_ecs::message::Messages<MisfireEffect>>();
+        let mut reader = messages.get_cursor();
+        let emitted: Vec<MisfireEffect> = reader.read(messages).copied().collect();
+        assert_eq!(
+            emitted.len(),
+            5,
+            "expected one MisfireEffect per kind, got {}",
+            emitted.len()
+        );
+        for msg in &emitted {
+            assert_eq!(msg.entity, entity);
+            assert_eq!(msg.position, pos);
+        }
+        let kinds: Vec<MisfireEffectKind> = emitted.iter().map(|m| m.kind).collect();
+        assert!(kinds.contains(&MisfireEffectKind::Fizzle));
+        assert!(kinds.contains(&MisfireEffectKind::CorruptionBacksplash));
+        assert!(kinds.contains(&MisfireEffectKind::InvertedWard));
+        assert!(kinds.contains(&MisfireEffectKind::WoundTransfer));
+        assert!(kinds.contains(&MisfireEffectKind::LocationReveal));
+    }
+
+    /// `WoundTransfer` still drains `health.current` synthetically (the
+    /// festering-wound authoring lives in ticket 472). This test pins
+    /// the 471 emit alongside the existing health mutation so 472 can
+    /// extend without regressing the telemetry path.
+    #[test]
+    fn wound_transfer_emits_and_drains_health() {
+        use bevy_ecs::system::SystemState;
+
+        let mut world = test_world();
+        world.init_resource::<bevy_ecs::message::Messages<MisfireEffect>>();
+        let entity = world.spawn_empty().id();
+        let mut state: SystemState<(Commands, MessageWriter<MisfireEffect>)> =
+            SystemState::new(&mut world);
+
+        let constants = SimConstants::default();
+        let m = &constants.magic;
+        let combat = &constants.combat;
+        let ts = test_time_scale();
+        let initial_hp = 0.7_f32;
+        let mut mood = Mood::default();
+        let mut corruption = Corruption(0.0);
+        let mut health = Health {
+            current: initial_hp,
+            ..Default::default()
+        };
+        let mut log = NarrativeLog::default();
+        let pos = Position::new(26, 61);
+        let (mut commands, mut writer) = state.get_mut(&mut world);
+        apply_misfire(
+            entity,
+            MisfireEffectKind::WoundTransfer,
+            "Ashitaka",
+            &mut mood,
+            &mut corruption,
+            &mut health,
+            &pos,
+            &mut commands,
+            &mut log,
+            &mut writer,
+            500,
+            m,
+            combat,
+            &ts,
+        );
+        state.apply(&mut world);
+
+        assert!(
+            health.current < initial_hp,
+            "WoundTransfer should drain HP; was {} → now {}",
+            initial_hp,
+            health.current
+        );
+
+        let messages = world.resource::<bevy_ecs::message::Messages<MisfireEffect>>();
+        let mut reader = messages.get_cursor();
+        let emitted: Vec<MisfireEffect> = reader.read(messages).copied().collect();
+        assert_eq!(emitted.len(), 1);
+        assert_eq!(emitted[0].kind, MisfireEffectKind::WoundTransfer);
+        assert_eq!(emitted[0].position, pos);
+        assert_eq!(emitted[0].entity, entity);
     }
 
     // -----------------------------------------------------------------------

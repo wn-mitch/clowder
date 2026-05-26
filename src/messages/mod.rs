@@ -10,4 +10,5 @@
 pub mod body_part_injury;
 pub mod cat_moved;
 pub mod fox_lifecycle;
+pub mod misfire_effect;
 pub mod witnessable_event;

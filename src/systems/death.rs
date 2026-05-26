@@ -2,6 +2,7 @@ use bevy_ecs::prelude::*;
 use rand::Rng;
 
 use crate::components::identity::{Age, Name};
+use crate::components::injury_cache::LastBodyPartInjury;
 use crate::components::kitten::KittenDependency;
 use crate::components::markers;
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
@@ -38,6 +39,7 @@ pub fn check_death(
             &Position,
             Has<markers::BornInSim>,
             Has<KittenDependency>,
+            Option<&LastBodyPartInjury>,
         ),
         Without<Dead>,
     >,
@@ -55,7 +57,9 @@ pub fn check_death(
     let tick = time.tick;
     let mut newly_dead: Vec<(Entity, Position, String, DeathCause, Option<String>)> = Vec::new();
 
-    for (entity, name, health, needs, age, pos, born_in_sim, has_kitten_dep) in &alive_query {
+    for (entity, name, health, needs, age, pos, born_in_sim, has_kitten_dep, last_injury) in
+        &alive_query
+    {
         let cause = if health.current <= 0.0 {
             // Ticket 032 — discriminator branches on cliff mode. Legacy:
             // hard `hunger == 0.0 ⇒ Starvation`. Graded: the cat may bottom
@@ -99,11 +103,20 @@ pub fn check_death(
 
         if let Some(cause) = cause {
             commands.entity(entity).insert(Dead { tick, cause });
-            // 095 Phase 1 Stage B — `Health.injuries` retired; the per-
-            // tick `Injury.source` history isn't preserved on the body
-            // model. Future TendInjury / detailed-cause narratives can
-            // hook the `BodyPartInjury` event stream if needed.
-            let injury_source: Option<String> = None;
+            // 471 — populate `injury_source` from the per-cat
+            // `LastBodyPartInjury` cache (drained from the
+            // `BodyPartInjury` event stream each tick by
+            // `cache_last_body_part_injury`). Pre-471 this was
+            // hardcoded `None` because 095 Phase 1 Stage B retired the
+            // legacy `Health.injuries` history without re-establishing
+            // the source-attribution path. Only meaningful for
+            // `DeathCause::Injury`; Starvation / OldAge ignore the
+            // field per `EventLog::push`'s key-selection.
+            let injury_source: Option<String> = if cause == DeathCause::Injury {
+                last_injury.map(|li| format!("{:?}", li.source))
+            } else {
+                None
+            };
             newly_dead.push((entity, *pos, name.0.clone(), cause, injury_source));
 
             match cause {
@@ -399,6 +412,74 @@ mod tests {
             world.get::<Dead>(entity).is_some(),
             "cat with 0 health should be marked Dead"
         );
+    }
+
+    /// 471 — when a cat dies of Injury and carries a `LastBodyPartInjury`
+    /// cache entry, the death event records the injury source as a
+    /// string (e.g. `"MagicMisfire"`, `"ShadowFoxAmbush"`). Pre-471 this
+    /// was hardcoded `None`, which is the gap that made the seed-42
+    /// (26,61) death class diagnostically opaque.
+    #[test]
+    fn injury_death_populates_injury_source_from_cache() {
+        let (mut world, mut schedule) = setup_world();
+        world.insert_resource(crate::resources::event_log::EventLog::default());
+        let entity = spawn_cat(&mut world, "Heron", 0.0, 0.5);
+        world.entity_mut(entity).insert(LastBodyPartInjury {
+            source: crate::components::physical::InjurySource::MagicMisfire,
+            part: crate::components::body_zones::BodyPart::Flanks,
+            tick: 99,
+        });
+
+        schedule.run(&mut world);
+
+        let elog = world.resource::<crate::resources::event_log::EventLog>();
+        // Expect 1 Death event with injury_source = Some("MagicMisfire").
+        let death_count = elog
+            .entries
+            .iter()
+            .filter_map(|e| match &e.kind {
+                crate::resources::event_log::EventKind::Death { injury_source, .. } => {
+                    Some(injury_source.clone())
+                }
+                _ => None,
+            })
+            .filter(|s| s.as_deref() == Some("MagicMisfire"))
+            .count();
+        assert_eq!(
+            death_count, 1,
+            "expected exactly one Injury death with injury_source=MagicMisfire"
+        );
+    }
+
+    /// 471 — when a cat dies of Injury with no cached `LastBodyPartInjury`
+    /// (e.g. shouldn't happen in practice because every damage path
+    /// emits BodyPartInjury post-472, but the death.rs fallback should
+    /// still be sensible), `injury_source` is `None` and the EventLog
+    /// falls back to keying by the cause enum name (`"Injury"`).
+    #[test]
+    fn injury_death_falls_back_to_none_without_cache() {
+        let (mut world, mut schedule) = setup_world();
+        world.insert_resource(crate::resources::event_log::EventLog::default());
+        let _entity = spawn_cat(&mut world, "Simba", 0.0, 0.5);
+        // No LastBodyPartInjury inserted.
+
+        schedule.run(&mut world);
+
+        let elog = world.resource::<crate::resources::event_log::EventLog>();
+        let injury_deaths_with_none = elog
+            .entries
+            .iter()
+            .filter_map(|e| match &e.kind {
+                crate::resources::event_log::EventKind::Death {
+                    cause,
+                    injury_source,
+                    ..
+                } if cause == "Injury" => Some(injury_source.clone()),
+                _ => None,
+            })
+            .filter(|s| s.is_none())
+            .count();
+        assert_eq!(injury_deaths_with_none, 1);
     }
 
     #[test]

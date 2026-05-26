@@ -1042,6 +1042,11 @@ impl Plugin for SimulationPlugin {
         // `damage_to_body_part` (combat.rs) alongside the legacy `Injury`
         // push during Stage A; becomes the sole signal at Stage B.
         app.add_message::<crate::messages::body_part_injury::BodyPartInjury>();
+        // 471 — per-event magic-misfire stream. Emitted by `apply_misfire`
+        // (magic.rs) for every resolved misfire outcome; consumed by the
+        // event-log replay path and by the festering-wound authoring path
+        // (ticket 472, on the WoundTransfer arm).
+        app.add_message::<crate::messages::misfire_effect::MisfireEffect>();
         // 431 Stage A — cat-movement substrate. Emitted by
         // `emit_cat_moved_messages` (cat_movement.rs) once per FixedUpdate
         // after every cat-stepping resolver. Substrate for event-driven
@@ -1667,7 +1672,21 @@ impl Plugin for SimulationPlugin {
                     systems::wildlife::fox_confrontation_tick,
                     systems::wildlife::fox_store_raid_tick,
                     systems::magic::personal_corruption_effects,
-                    systems::death::check_death,
+                    // 471 — drain BodyPartInjury into the per-cat
+                    // last-injury cache, then run the death
+                    // discriminator. Nested sub-chain (same arity-20
+                    // accommodation as the 279 group above) keeps the
+                    // cache strictly before `check_death`'s read of
+                    // `LastBodyPartInjury`. The cache must run after
+                    // every BodyPartInjury emitter in this Chain
+                    // (combat, wildlife, magic-misfire on the 472
+                    // follow-on) so death.rs sees the freshest source
+                    // attribution.
+                    (
+                        systems::injury_cache::cache_last_body_part_injury,
+                        systems::death::check_death,
+                    )
+                        .chain(),
                     systems::coordination::flag_coordinator_death,
                     systems::coordination::expire_directives,
                     systems::death::cleanup_dead,

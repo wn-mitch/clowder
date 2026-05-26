@@ -115,6 +115,7 @@ pub mod growth;
 pub mod hawk_goap;
 pub mod incapacitation;
 pub mod influence_map;
+pub mod injury_cache;
 pub mod interoception;
 pub mod items;
 pub mod magic;

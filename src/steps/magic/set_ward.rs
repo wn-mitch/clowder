@@ -1,11 +1,12 @@
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::components::magic::{Inventory, MisfireEffect, Ward, WardKind};
+use crate::components::magic::{Inventory, MisfireEffectKind, Ward, WardKind};
 use crate::components::mental::Mood;
 use crate::components::physical::{Health, Position};
 use crate::components::recipe::CraftedItem;
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
+use crate::messages::misfire_effect::MisfireEffect;
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
 use crate::resources::sim_constants::{CombatConstants, MagicConstants};
@@ -48,6 +49,7 @@ use crate::steps::StepResult;
 #[allow(clippy::too_many_arguments)]
 pub fn resolve_set_ward(
     ticks: u64,
+    entity: Entity,
     kind: WardKind,
     cat_name: &str,
     inventory: &mut Inventory,
@@ -61,6 +63,7 @@ pub fn resolve_set_ward(
     commands: &mut Commands,
     log: &mut NarrativeLog,
     event_log: Option<&mut EventLog>,
+    misfire_writer: &mut MessageWriter<MisfireEffect>,
     tick: u64,
     m: &MagicConstants,
     combat: &CombatConstants,
@@ -89,13 +92,25 @@ pub fn resolve_set_ward(
                 crate::systems::magic::check_misfire(magic_aff.0, skills.magic, rng, m)
             {
                 crate::systems::magic::apply_misfire(
-                    misfire, cat_name, mood, corruption, health, pos, commands, log, tick, m,
-                    combat, time_scale,
+                    entity,
+                    misfire,
+                    cat_name,
+                    mood,
+                    corruption,
+                    health,
+                    pos,
+                    commands,
+                    log,
+                    misfire_writer,
+                    tick,
+                    m,
+                    combat,
+                    time_scale,
                 );
-                if matches!(misfire, MisfireEffect::Fizzle) {
+                if matches!(misfire, MisfireEffectKind::Fizzle) {
                     return StepResult::Fail("misfire: fizzle".into());
                 }
-                if matches!(misfire, MisfireEffect::InvertedWard) {
+                if matches!(misfire, MisfireEffectKind::InvertedWard) {
                     // Spawn inverted ward instead. Carries CraftedItem
                     // even though the misfire path produced an inverted
                     // outcome — the cat still performed the craft work,
@@ -206,7 +221,9 @@ mod tests {
     #[test]
     fn thornward_spawn_carries_crafted_item_provenance() {
         let mut world = World::new();
-        let mut state: SystemState<Commands> = SystemState::new(&mut world);
+        world.init_resource::<bevy_ecs::message::Messages<MisfireEffect>>();
+        let mut state: SystemState<(Commands, MessageWriter<MisfireEffect>)> =
+            SystemState::new(&mut world);
 
         let constants = SimConstants::default();
         let m = &constants.magic;
@@ -223,12 +240,14 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(42);
         let magic_aff = MagicAffinity(0.0);
         let mut log = NarrativeLog::default();
+        let entity = world.spawn_empty().id();
         let crafter = world.spawn_empty().id();
 
         let required = m.set_ward_duration.ticks(&ts);
-        let mut commands = state.get_mut(&mut world);
+        let (mut commands, mut misfire_writer) = state.get_mut(&mut world);
         let result = resolve_set_ward(
             required,
+            entity,
             WardKind::Thornward,
             "Sage",
             &mut inventory,
@@ -242,7 +261,8 @@ mod tests {
             &mut commands,
             &mut log,
             None, // no event log
-            500,  // tick
+            &mut misfire_writer,
+            500, // tick
             m,
             combat,
             &ts,
