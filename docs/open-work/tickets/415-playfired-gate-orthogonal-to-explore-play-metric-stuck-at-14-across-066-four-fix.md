@@ -1,12 +1,12 @@
 ---
 id: 415
 title: PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix
-status: ready
+status: parked
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-18
-parked: null
+parked: 2026-05-25
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
@@ -102,3 +102,4 @@ Focal-cat replay if PlayFired fires for one cat but not others.
   by preconditions orthogonal to Explore scoring. Cross-reference 276 in
   case JointIntention-based play is the canonical canary path now.
 - 2026-05-19: accuracy audit pass — 066 verified in landed/; ai-substrate-refactor.md and healthy-colony.md file paths verified
+- 2026-05-25: superseded by 276 (play-bout practice on JointIntention substrate). A 10-soak audit (seed 42, range 0–13 with intermittent zeros) reframes the residual: the `personality_events.rs:80-90` four-AND gate × RNG·0.1 is structurally fragile by construction, not a regression to debug. The `[suspect]` rows in the layer-walk above are not promoted independently here — the structural fix is to retire the direct-emit path 415 was diagnosing, which is what 276 executes. 276's frontmatter carries `supersedes: [415]`. Parked rather than landed because no independent code change ships against 415; the work flows through 276.

@@ -104,6 +104,14 @@ pub enum PracticeKind {
     /// Mating-pipeline practice. The first and only consumer in 127.
     /// Subsumes the entire `PairingActivity` substrate.
     Courtship,
+    /// Ticket 276 — play-bout practice. Hosts the `play` continuity
+    /// canary on JointIntention substrate (retires the four-AND × RNG
+    /// direct-emit at `personality_events.rs:80-90`). Approach → Bouting
+    /// → Cooldown stage progression; Cooldown→done fires
+    /// `JointDropBranch::Completed` and emits
+    /// `EventKind::JointPlayBoutCompleted` which feeds
+    /// `continuity_tallies["play"]`.
+    PlayBout,
 }
 
 impl PracticeKind {
@@ -112,6 +120,7 @@ impl PracticeKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Courtship => "courtship",
+            Self::PlayBout => "play_bout",
         }
     }
 }
@@ -157,6 +166,21 @@ pub enum PracticeStage {
     /// active; mating-DSE eligibility paused. Today's "PairingActivity
     /// held during pregnancy" maps here.
     CourtshipBonded,
+    /// Ticket 276 — PlayBout Approach. Both cats matched but no
+    /// paired-resolver interaction tick has fired yet (mirrors
+    /// `CourtshipApproach`). Advances to `PlayBoutBouting` on the first
+    /// bias-amplified Socialize interaction.
+    PlayBoutApproach,
+    /// Ticket 276 — PlayBout Bouting. The cats are actively playing
+    /// together; the Bouting-stage cascade (mood-lift to nearby
+    /// witnesses, narrative entry) fires from this stage. Advances to
+    /// `PlayBoutCooldown` after `bouting_duration_ticks` in stage.
+    PlayBoutBouting,
+    /// Ticket 276 — PlayBout Cooldown. Bout has wound down; the cats
+    /// stay associated for `cooldown_duration_ticks` before
+    /// `JointDropBranch::Completed` fires, emitting
+    /// `EventKind::JointPlayBoutCompleted` and removing the JI.
+    PlayBoutCooldown,
 }
 
 impl PracticeStage {
@@ -167,6 +191,9 @@ impl PracticeStage {
             Self::CourtshipCourting => "courting",
             Self::CourtshipMating => "mating",
             Self::CourtshipBonded => "bonded",
+            Self::PlayBoutApproach => "play_approach",
+            Self::PlayBoutBouting => "play_bouting",
+            Self::PlayBoutCooldown => "play_cooldown",
         }
     }
 }
@@ -230,10 +257,11 @@ pub enum JointDropBranch {
     /// **Dead code for Courtship in 127** — `CourtshipBonded` persists
     /// until `PartnerInvalid` / `BondLost` / `PartnerLeftPractice`
     /// fires, matching today's PairingActivity-during-pregnancy
-    /// behavior. The variant exists for future practices with natural
-    /// termination (e.g., play-bouts that end when both cats lose
-    /// interest).
-    #[allow(dead_code)]
+    /// behavior. Activated by ticket 276 for `PracticeKind::PlayBout`:
+    /// fires when a cat in `PracticeStage::PlayBoutCooldown` has been
+    /// in stage for `playbout_cooldown_ticks`. The author emits
+    /// `EventKind::JointPlayBoutCompleted` before removing the JI
+    /// (which increments `continuity_tallies["play"]`).
     Completed,
 }
 
@@ -294,6 +322,7 @@ impl JointIntention {
     pub fn new(practice: PracticeKind, partner: Entity, tick: u64) -> Self {
         let stage = match practice {
             PracticeKind::Courtship => PracticeStage::CourtshipApproach,
+            PracticeKind::PlayBout => PracticeStage::PlayBoutApproach,
         };
         Self {
             practice,
@@ -433,6 +462,11 @@ pub struct JointIntentionDropConfig {
     /// (winter pause, gestation) while still catching never-progresses
     /// pairs.
     pub stage_stall_ticks: u64,
+    /// Ticket 276 — ticks a PlayBout cat must sit in
+    /// `PracticeStage::PlayBoutCooldown` before `JointDropBranch::Completed`
+    /// fires. Read only when `current_stage == PlayBoutCooldown`; otherwise
+    /// the Completed arm is inert.
+    pub playbout_cooldown_ticks: u64,
 }
 
 /// Pure drop gate. Returns `Some(branch)` iff any drop trigger fires;
@@ -477,27 +511,49 @@ pub fn should_drop_joint(
     if !proxies.partner_in_practice {
         return Some(JointDropBranch::PartnerLeftPractice);
     }
-    // BondLost — Courtship requires Friends-or-better.
-    match proxies.bond {
-        Some(BondType::Friends | BondType::Partners | BondType::Mates) => {}
-        _ => return Some(JointDropBranch::BondLost),
-    }
-    // AspirationCascade — self no longer reproductive-eligible.
-    let aspiration_cascade = !matches!(proxies.self_stage, LifeStage::Adult | LifeStage::Elder)
-        || matches!(proxies.self_orientation, Orientation::Asexual)
-        || proxies.self_is_pregnant;
-    if aspiration_cascade {
-        return Some(JointDropBranch::AspirationCascade);
-    }
-    // SeasonOut — Tom-in-Winter or Queen-Anestrus/Postpartum.
-    let season_out = matches!(proxies.self_gender, Gender::Tom)
-        && matches!(proxies.season, Season::Winter)
-        || matches!(
-            proxies.self_fertility_phase,
-            Some(FertilityPhase::Anestrus) | Some(FertilityPhase::Postpartum)
-        );
-    if season_out {
-        return Some(JointDropBranch::SeasonOut);
+    // Practice-specific eligibility gates. Courtship requires
+    // Friends+ bond + fertility eligibility + season-in; PlayBout is
+    // broadly permissive (just Adult/Elder life-stage). Without these
+    // carve-outs, ticket 276's matchmaker emits PlayBout JIs at full
+    // throughput and the drop gate cascades them on tick T+1
+    // (BondLost on any non-Friends pair, etc.) producing 10k+
+    // emission churn with zero stage progression.
+    match proxies.practice {
+        PracticeKind::Courtship => {
+            // BondLost — Courtship requires Friends-or-better.
+            match proxies.bond {
+                Some(BondType::Friends | BondType::Partners | BondType::Mates) => {}
+                _ => return Some(JointDropBranch::BondLost),
+            }
+            // AspirationCascade — self no longer reproductive-eligible.
+            let aspiration_cascade =
+                !matches!(proxies.self_stage, LifeStage::Adult | LifeStage::Elder)
+                    || matches!(proxies.self_orientation, Orientation::Asexual)
+                    || proxies.self_is_pregnant;
+            if aspiration_cascade {
+                return Some(JointDropBranch::AspirationCascade);
+            }
+            // SeasonOut — Tom-in-Winter or Queen-Anestrus/Postpartum.
+            let season_out = matches!(proxies.self_gender, Gender::Tom)
+                && matches!(proxies.season, Season::Winter)
+                || matches!(
+                    proxies.self_fertility_phase,
+                    Some(FertilityPhase::Anestrus) | Some(FertilityPhase::Postpartum)
+                );
+            if season_out {
+                return Some(JointDropBranch::SeasonOut);
+            }
+        }
+        PracticeKind::PlayBout => {
+            // PlayBout has no bond floor, no orientation gate, no
+            // fertility gate, no season gate. The only life-stage
+            // requirement is Adult/Elder (kittens get Caretake,
+            // not PlayBout). A cat aging out of Adult/Elder is the
+            // only AspirationCascade trigger here.
+            if !matches!(proxies.self_stage, LifeStage::Adult | LifeStage::Elder) {
+                return Some(JointDropBranch::AspirationCascade);
+            }
+        }
     }
     // CompatibilityLost — author re-ran is_practice_compatible.
     if !proxies.still_compatible {
@@ -508,9 +564,24 @@ pub fn should_drop_joint(
     if ticks_in_stage > config.stage_stall_ticks {
         return Some(JointDropBranch::StageStalled);
     }
-    // DesireDrift — both axes collapse.
-    if proxies.romantic < config.romantic_floor && proxies.fondness < config.fondness_floor {
+    // DesireDrift — both axes collapse. Skipped for PlayBout (the
+    // romantic/fondness floors are calibrated for Courtship; PlayBout
+    // pairs may have low romantic and still play happily together).
+    if !matches!(proxies.practice, PracticeKind::PlayBout)
+        && proxies.romantic < config.romantic_floor
+        && proxies.fondness < config.fondness_floor
+    {
         return Some(JointDropBranch::DesireDrift);
+    }
+    // Completed — PlayBout cooldown elapsed. Activates the previously-
+    // dead `Completed` branch (ticket 276). Gated on practice + stage
+    // so Courtship's Bonded stage stays terminal-by-drop-cascade
+    // (matching the pre-276 behavior).
+    if matches!(proxies.practice, PracticeKind::PlayBout)
+        && matches!(proxies.current_stage, PracticeStage::PlayBoutCooldown)
+        && ticks_in_stage > config.playbout_cooldown_ticks
+    {
+        return Some(JointDropBranch::Completed);
     }
     None
 }
@@ -534,6 +605,20 @@ pub struct StageAdvanceProxies {
     pub self_fertility_phase: Option<FertilityPhase>,
     pub self_is_pregnant: bool,
     pub partner_is_pregnant: bool,
+    /// Ticket 276 — current tick. Drives the PlayBout
+    /// `Approach → Bouting` and `Bouting → Cooldown` tick-based
+    /// advances.
+    pub now_tick: u64,
+    /// Ticket 276 — tick the cat entered `current_stage`. Drives the
+    /// PlayBout tick-based stage advances.
+    pub stage_entered_tick: u64,
+    /// Ticket 276 — `Approach → Bouting` gate (ticks in stage). No
+    /// bias-reader dependency — the matchmaker already matched on
+    /// co-presence within `candidate_range`, so this gate models the
+    /// brief approach window before play kicks off.
+    pub playbout_approach_duration_ticks: u64,
+    /// Ticket 276 — `Bouting → Cooldown` gate (ticks in stage).
+    pub playbout_bouting_duration_ticks: u64,
 }
 
 /// Pure stage-advance predicate. Returns `Some(new_stage)` when the
@@ -579,6 +664,38 @@ pub fn next_stage(proxies: &StageAdvanceProxies) -> Option<PracticeStage> {
             }
         }
         CourtshipBonded => None,
+        // Ticket 276 — PlayBout stage progression.
+        //
+        // | From | To | Predicate |
+        // |---|---|---|
+        // | Approach | Bouting | `now_tick - stage_entered_tick > playbout_approach_duration_ticks` |
+        // | Bouting | Cooldown | `now_tick - stage_entered_tick > playbout_bouting_duration_ticks` |
+        // | Cooldown | — | terminal in `next_stage`; advances via `should_drop_joint`'s `Completed` arm |
+        //
+        // All three transitions are tick-elapsed gates — PlayBout
+        // doesn't depend on `JointInteractionObserved` bias-reader
+        // messages (which Courtship uses for `Approach → Courting`).
+        // The matchmaker emission predicate already gates on
+        // co-presence within `candidate_range`, so the cats start the
+        // practice co-located. Bias-reader wiring lands in a follow-on
+        // ticket; the substrate is self-contained without it.
+        PlayBoutApproach => {
+            let ticks_in_stage = proxies.now_tick.saturating_sub(proxies.stage_entered_tick);
+            if ticks_in_stage > proxies.playbout_approach_duration_ticks {
+                Some(PlayBoutBouting)
+            } else {
+                None
+            }
+        }
+        PlayBoutBouting => {
+            let ticks_in_stage = proxies.now_tick.saturating_sub(proxies.stage_entered_tick);
+            if ticks_in_stage > proxies.playbout_bouting_duration_ticks {
+                Some(PlayBoutCooldown)
+            } else {
+                None
+            }
+        }
+        PlayBoutCooldown => None,
     }
 }
 
@@ -634,6 +751,7 @@ mod tests {
             romantic_floor: 0.05,
             fondness_floor: 0.30,
             stage_stall_ticks: 10_000,
+            playbout_cooldown_ticks: 30,
         }
     }
 
@@ -951,6 +1069,10 @@ mod tests {
             self_fertility_phase: Some(FertilityPhase::Estrus),
             self_is_pregnant: false,
             partner_is_pregnant: false,
+            now_tick: 100,
+            stage_entered_tick: 100,
+            playbout_approach_duration_ticks: 30,
+            playbout_bouting_duration_ticks: 60,
         }
     }
 
@@ -1061,5 +1183,174 @@ mod tests {
         assert_eq!(j.adopted_tick, 200);
         assert_eq!(j.stage_entered_tick, 200);
         assert_eq!(j.last_interaction_tick, 200);
+    }
+
+    // -----------------------------------------------------------------
+    // Ticket 276 — PlayBout practice.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn new_starts_play_bout_at_play_bout_approach() {
+        let partner = entity(3);
+        let j = JointIntention::new(PracticeKind::PlayBout, partner, 200);
+        assert_eq!(j.practice, PracticeKind::PlayBout);
+        assert_eq!(j.stage, PracticeStage::PlayBoutApproach);
+    }
+
+    #[test]
+    fn play_bout_approach_advances_to_bouting_after_duration() {
+        let mut p = stage_proxies();
+        p.current_stage = PracticeStage::PlayBoutApproach;
+        p.stage_entered_tick = 100;
+        p.now_tick = 200; // 100 ticks elapsed > 30-tick default duration.
+        assert_eq!(next_stage(&p), Some(PracticeStage::PlayBoutBouting));
+    }
+
+    #[test]
+    fn play_bout_approach_holds_within_duration() {
+        let mut p = stage_proxies();
+        p.current_stage = PracticeStage::PlayBoutApproach;
+        p.stage_entered_tick = 100;
+        p.now_tick = 110; // 10 ticks elapsed < 30-tick duration.
+        assert_eq!(next_stage(&p), None);
+    }
+
+    #[test]
+    fn play_bout_bouting_advances_to_cooldown_after_duration() {
+        let mut p = stage_proxies();
+        p.current_stage = PracticeStage::PlayBoutBouting;
+        p.stage_entered_tick = 100;
+        p.now_tick = 200; // 100 ticks elapsed > 60-tick default duration.
+        assert_eq!(next_stage(&p), Some(PracticeStage::PlayBoutCooldown));
+    }
+
+    #[test]
+    fn play_bout_bouting_holds_within_duration() {
+        let mut p = stage_proxies();
+        p.current_stage = PracticeStage::PlayBoutBouting;
+        p.stage_entered_tick = 100;
+        p.now_tick = 130; // 30 ticks elapsed < 60-tick duration.
+        assert_eq!(next_stage(&p), None);
+    }
+
+    #[test]
+    fn play_bout_cooldown_terminal_in_next_stage() {
+        let mut p = stage_proxies();
+        p.current_stage = PracticeStage::PlayBoutCooldown;
+        p.now_tick = u64::MAX / 2;
+        assert_eq!(next_stage(&p), None);
+    }
+
+    fn play_bout_proxies() -> JointIntentionProxies {
+        JointIntentionProxies {
+            self_stage: LifeStage::Adult,
+            self_orientation: Orientation::Straight,
+            self_gender: Gender::Queen,
+            self_is_pregnant: false,
+            self_fertility_phase: Some(FertilityPhase::Estrus),
+            partner_invalid: false,
+            partner_in_practice: true,
+            partner_is_pregnant: false,
+            bond: Some(BondType::Friends),
+            romantic: 0.0,
+            fondness: 0.0,
+            season: Season::Spring,
+            practice: PracticeKind::PlayBout,
+            current_stage: PracticeStage::PlayBoutBouting,
+            stage_entered_tick: 100,
+            now_tick: 120,
+            still_compatible: true,
+        }
+    }
+
+    #[test]
+    fn play_bout_skips_desire_drift() {
+        // PlayBout with low romantic/fondness should NOT drop on
+        // DesireDrift — the floors are Courtship-calibrated.
+        let p = play_bout_proxies();
+        assert_eq!(should_drop_joint(&p, &config()), None);
+    }
+
+    #[test]
+    fn play_bout_skips_bond_lost() {
+        // PlayBout has no bond floor — `None` / `Acquaintance` /
+        // `Hostile` bonds are still eligible. (Two cats can play
+        // without being Friends-or-better bonded; the bond grows from
+        // co-presence in social DSEs, not vice versa.) Without this
+        // carve-out, the matchmaker's permissive eligibility (just
+        // playfulness + mood + co-presence) collides with the BondLost
+        // gate, dropping every fresh JI on tick T+1.
+        let mut p = play_bout_proxies();
+        p.bond = None;
+        assert_eq!(should_drop_joint(&p, &config()), None);
+    }
+
+    #[test]
+    fn play_bout_skips_season_out_for_tom_in_winter() {
+        // Tom-in-Winter shouldn't drop a PlayBout (the SeasonOut
+        // gate is fertility-photoperiodic, irrelevant to play).
+        let mut p = play_bout_proxies();
+        p.self_gender = Gender::Tom;
+        p.self_fertility_phase = None;
+        p.season = Season::Winter;
+        assert_eq!(should_drop_joint(&p, &config()), None);
+    }
+
+    #[test]
+    fn play_bout_skips_aspiration_cascade_for_pregnant() {
+        // Pregnant queens can still play (orthogonal to reproductive
+        // eligibility). AspirationCascade for PlayBout only fires on
+        // life-stage transitions away from Adult/Elder.
+        let mut p = play_bout_proxies();
+        p.self_is_pregnant = true;
+        assert_eq!(should_drop_joint(&p, &config()), None);
+    }
+
+    #[test]
+    fn play_bout_drops_kitten_via_aspiration_cascade() {
+        // The one AspirationCascade trigger that DOES apply to
+        // PlayBout: life-stage outside Adult/Elder.
+        let mut p = play_bout_proxies();
+        p.self_stage = LifeStage::Kitten;
+        assert_eq!(
+            should_drop_joint(&p, &config()),
+            Some(JointDropBranch::AspirationCascade)
+        );
+    }
+
+    #[test]
+    fn play_bout_completed_fires_when_cooldown_elapsed() {
+        let mut p = play_bout_proxies();
+        p.current_stage = PracticeStage::PlayBoutCooldown;
+        p.stage_entered_tick = 100;
+        p.now_tick = 200; // 100 ticks in cooldown > 30-tick default.
+        assert_eq!(
+            should_drop_joint(&p, &config()),
+            Some(JointDropBranch::Completed)
+        );
+    }
+
+    #[test]
+    fn play_bout_cooldown_holds_within_duration() {
+        let mut p = play_bout_proxies();
+        p.current_stage = PracticeStage::PlayBoutCooldown;
+        p.stage_entered_tick = 100;
+        p.now_tick = 110; // 10 ticks in cooldown < 30-tick duration.
+        assert_eq!(should_drop_joint(&p, &config()), None);
+    }
+
+    #[test]
+    fn completed_does_not_fire_for_courtship() {
+        // Courtship in Bonded stage with enormous ticks_in_stage still
+        // doesn't fire Completed — that branch is PlayBout-only.
+        // StageStalled fires instead (precedence-correct).
+        let mut p = happy_proxies();
+        p.current_stage = PracticeStage::CourtshipBonded;
+        p.stage_entered_tick = 0;
+        p.now_tick = 50_000;
+        assert_eq!(
+            should_drop_joint(&p, &config()),
+            Some(JointDropBranch::StageStalled)
+        );
     }
 }

@@ -485,6 +485,17 @@ pub enum EventKind {
         cat: String,
         partner: Option<String>,
     },
+    /// Ticket 276 — a PlayBout JointIntention completed (Cooldown stage
+    /// elapsed and `JointDropBranch::Completed` fired). Increments
+    /// `continuity_tallies["play"]`, replacing the legacy
+    /// `EventKind::PlayFired` direct-emit hosted on the four-AND × RNG
+    /// gate at `personality_events.rs:80-90`. Both events feed the
+    /// same tally key during the dual-path migration (Commit A); the
+    /// retire commit deletes `PlayFired`.
+    JointPlayBoutCompleted {
+        actor: String,
+        partner: String,
+    },
     /// A pair of cats accumulated romantic attraction under the
     /// courtship-drift gate in `social::check_bonds`. Lighter-weight
     /// than `MatingOccurred` — registers an observable courtship tick,
@@ -799,6 +810,9 @@ impl EventLog {
                 *self.continuity_tallies.entry("burial".into()).or_insert(0) += 1;
             }
             EventKind::PlayFired { .. } => {
+                *self.continuity_tallies.entry("play".into()).or_insert(0) += 1;
+            }
+            EventKind::JointPlayBoutCompleted { .. } => {
                 *self.continuity_tallies.entry("play".into()).or_insert(0) += 1;
             }
             EventKind::MythicTexture { .. } => {

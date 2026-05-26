@@ -51,20 +51,26 @@
 use bevy_ecs::prelude::*;
 
 use crate::ai::mating::{MatingFitness, MatingFitnessParams};
-use crate::components::identity::{LifeStage, Orientation};
+use crate::ai::{Action, CurrentAction};
+use crate::components::identity::{LifeStage, Name, Orientation};
 use crate::components::joint_intention::{
-    next_stage, should_drop_joint, JointIntention, JointIntentionDropConfig, JointIntentionProxies,
-    PracticeKind, PracticeStage, StageAdvanceProxies,
+    next_stage, should_drop_joint, JointDropBranch, JointIntention, JointIntentionDropConfig,
+    JointIntentionProxies, PracticeKind, PracticeStage, StageAdvanceProxies,
 };
+use crate::components::mental::Mood;
+use crate::components::personality::Personality;
 use crate::components::physical::Dead;
 use crate::components::physical::Position;
 use crate::components::pregnancy::Pregnant;
+use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::relationships::{BondType, Relationships};
-use crate::resources::sim_constants::{CourtshipPracticeConstants, SimConstants};
+use crate::resources::sim_constants::{
+    CourtshipPracticeConstants, PlayBoutPracticeConstants, SimConstants,
+};
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
 use crate::systems::social::are_orientation_compatible;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Ticket 127 — Bias-reader call sites emit this when their resolver
 /// target matches the actor's `JointIntention { Courtship }.partner`.
@@ -97,6 +103,7 @@ pub fn author_joint_intentions(
     relationships: Res<Relationships>,
     mut activation: ResMut<SystemActivation>,
     mut interactions: MessageReader<JointInteractionObserved>,
+    mut event_log: Option<ResMut<EventLog>>,
     mating: MatingFitnessParams,
     // Mutable JI query — needed for `last_interaction_tick` bump and
     // stage advance. Disjoint from `Without<JointIntention>` query below
@@ -116,6 +123,11 @@ pub fn author_joint_intentions(
         Has<crate::components::markers::Incapacitated>,
     )>,
     pregnant_q: Query<(), With<Pregnant>>,
+    // Ticket 276 — PlayBout matchmaker reads playfulness + mood +
+    // current action + name (for event emit on completion). Dead cats
+    // get filtered at iteration time.
+    names: Query<&Name>,
+    playbout_q: Query<(Entity, &Personality, &Mood, Option<&CurrentAction>), Without<Dead>>,
 ) {
     let now_tick = time.tick;
     let season = time.season(&config);
@@ -123,21 +135,27 @@ pub fn author_joint_intentions(
         romantic_floor: constants.practices.courtship.romantic_floor,
         fondness_floor: constants.practices.courtship.fondness_floor,
         stage_stall_ticks: constants.practices.courtship.stage_stall_ticks,
+        playbout_cooldown_ticks: constants.practices.play_bout.cooldown_duration_ticks,
     };
+    let playbout_approach_duration_ticks = constants.practices.play_bout.approach_duration_ticks;
+    let playbout_bouting_duration_ticks = constants.practices.play_bout.bouting_duration_ticks;
 
     // -----------------------------------------------------------------
     // Pass 0: drain interaction messages → bump last_interaction_tick.
+    //
+    // Ticket 276 removed the Courtship-only filter — PlayBout
+    // interactions also drive `Approach → Bouting`. The author's drop
+    // gate still gates per-practice on `joint.practice`, so a stray
+    // message would only bump `last_interaction_tick` on a JI whose
+    // actor matched both message and component.
     // -----------------------------------------------------------------
     let mut interaction_tick_for: HashMap<Entity, u64> = HashMap::new();
     for msg in interactions.read() {
-        // Practice + partner filter at consume time — defensive against
-        // future practices wiring stale messages.
-        if msg.practice == PracticeKind::Courtship {
-            // Keep the latest tick per entity.
-            let entry = interaction_tick_for.entry(msg.entity).or_insert(msg.tick);
-            if msg.tick > *entry {
-                *entry = msg.tick;
-            }
+        // Keep the latest tick per entity, regardless of practice — the
+        // bump applies whether the JI is Courtship or PlayBout.
+        let entry = interaction_tick_for.entry(msg.entity).or_insert(msg.tick);
+        if msg.tick > *entry {
+            *entry = msg.tick;
         }
     }
     for (entity, mut joint) in joints.iter_mut() {
@@ -174,14 +192,20 @@ pub fn author_joint_intentions(
     // are made.
     // -----------------------------------------------------------------
     let fitness = mating.snapshot();
-    let mut drop_decisions: Vec<(Entity, bool)> = Vec::new();
-    let mut stage_advances: Vec<(Entity, PracticeStage)> = Vec::new();
-    let mut mismatch_emissions: Vec<()> = Vec::new();
+    // Ticket 276 — drop decisions carry the branch + practice so the
+    // mutation pass can emit `EventKind::JointPlayBoutCompleted` when
+    // PlayBout cooldown elapses (the canary's continuity-tally site).
+    let mut drop_decisions: Vec<(Entity, PracticeKind, Entity, Option<JointDropBranch>)> =
+        Vec::new();
+    let mut stage_advances: Vec<(Entity, PracticeKind, PracticeStage)> = Vec::new();
+    let mut mismatch_emissions: Vec<PracticeKind> = Vec::new();
 
     for (entity, joint) in joints.iter() {
         let Some(self_fit) = fitness.get(&entity).copied() else {
-            // Cat is dead / not in fitness snapshot — drop defensively.
-            drop_decisions.push((entity, true));
+            // Cat is dead / not in fitness snapshot — drop defensively
+            // without a branch (no event emit). Practice is recorded so
+            // the per-practice Feature still attributes correctly.
+            drop_decisions.push((entity, joint.practice, joint.partner, None));
             continue;
         };
 
@@ -235,8 +259,8 @@ pub fn author_joint_intentions(
             ),
         };
 
-        if let Some(_branch) = should_drop_joint(&proxies, &drop_config) {
-            drop_decisions.push((entity, true));
+        if let Some(branch) = should_drop_joint(&proxies, &drop_config) {
+            drop_decisions.push((entity, joint.practice, joint.partner, Some(branch)));
             continue;
         }
 
@@ -251,9 +275,13 @@ pub fn author_joint_intentions(
             self_fertility_phase: self_fit.fertility_phase,
             self_is_pregnant,
             partner_is_pregnant,
+            now_tick,
+            stage_entered_tick: joint.stage_entered_tick,
+            playbout_approach_duration_ticks,
+            playbout_bouting_duration_ticks,
         };
         if let Some(new_stage) = next_stage(&stage_proxies) {
-            stage_advances.push((entity, new_stage));
+            stage_advances.push((entity, joint.practice, new_stage));
         }
 
         // Mismatch tracking — lower-Entity-index side reports to avoid
@@ -266,7 +294,7 @@ pub fn author_joint_intentions(
                 {
                     if entity.index() < joint.partner.index() && partner_joint.stage != joint.stage
                     {
-                        mismatch_emissions.push(());
+                        mismatch_emissions.push(joint.practice);
                     }
                 }
             }
@@ -275,46 +303,71 @@ pub fn author_joint_intentions(
 
     // -----------------------------------------------------------------
     // Apply mutations.
+    //
+    // Ticket 276 — when a PlayBout drops on `JointDropBranch::Completed`
+    // (Cooldown elapsed), emit `EventKind::JointPlayBoutCompleted` to
+    // increment `continuity_tallies["play"]`. The event is the canary's
+    // structural-replacement for the legacy `EventKind::PlayFired`
+    // direct-emit (`personality_events.rs:80-90`); both feed the same
+    // tally key during migration.
     // -----------------------------------------------------------------
-    for (entity, drop) in drop_decisions {
-        if drop {
-            commands.entity(entity).remove::<JointIntention>();
-            activation.record(Feature::JointIntentionDropped {
-                practice: PracticeKind::Courtship,
-            });
+    for (entity, practice, partner, branch) in drop_decisions {
+        commands.entity(entity).remove::<JointIntention>();
+        activation.record(Feature::JointIntentionDropped { practice });
+        if let Some(JointDropBranch::Completed) = branch {
+            if practice == PracticeKind::PlayBout {
+                if let Some(ref mut events) = event_log {
+                    let actor = names
+                        .get(entity)
+                        .map(|n| n.0.clone())
+                        .unwrap_or_else(|_| "<unknown>".to_string());
+                    let partner_name = names
+                        .get(partner)
+                        .map(|n| n.0.clone())
+                        .unwrap_or_else(|_| "<unknown>".to_string());
+                    events.push(
+                        now_tick,
+                        EventKind::JointPlayBoutCompleted {
+                            actor,
+                            partner: partner_name,
+                        },
+                    );
+                }
+            }
         }
     }
-    for (entity, new_stage) in stage_advances {
+    for (entity, practice, new_stage) in stage_advances {
         if let Ok((_, mut joint)) = joints.get_mut(entity) {
             joint.stage = new_stage;
             joint.stage_entered_tick = now_tick;
-            activation.record(Feature::JointStageAdvanced {
-                practice: PracticeKind::Courtship,
-            });
+            activation.record(Feature::JointStageAdvanced { practice });
         }
     }
-    for _ in mismatch_emissions {
-        activation.record(Feature::JointStageMismatchTickAccrued {
-            practice: PracticeKind::Courtship,
-        });
+    for practice in mismatch_emissions {
+        activation.record(Feature::JointStageMismatchTickAccrued { practice });
     }
 
     // -----------------------------------------------------------------
     // Pass 3: matchmaker — emit JointIntention for eligible cats
-    // lacking one. Replaces the Commit B PA-mirror with a real
-    // matchmaker now that Commit C deletes `author_pairing_intentions`.
+    // lacking one.
     //
-    // Matchmaker: scan within `candidate_range`; orientation-compatible
-    // + reproductive + Friends-or-better bonded peers; quality score
-    // > `emission_threshold`; tie-break by stable Entity::index() asc.
-    // Mirrors the prior PA matchmaker 1:1 so migration parity is
-    // mechanical — the only behavioral lift comes from the substrate
-    // adding stage progression and partner-cascade, not from the
-    // emission predicate changing.
+    // Two-phase: Courtship picks first (its eligibility is narrower —
+    // gated on fertility / orientation / reproductive life-stage), then
+    // PlayBout picks from remaining cats. Each cat emits at most one
+    // JI per tick (a cat can only hold one JointIntention Component);
+    // the `claimed_this_tick` set tracks Courtship picks so PlayBout
+    // doesn't try to pair a Courtship-just-matched cat.
+    //
+    // Order matters: Courtship is the higher-stakes practice; PlayBout
+    // is the background social practice. Picking PlayBout first would
+    // starve Courtship of candidates.
     // -----------------------------------------------------------------
-    let practice_constants = &constants.practices.courtship;
+    let courtship_constants = &constants.practices.courtship;
+    let playbout_constants = &constants.practices.play_bout;
     let positions: Vec<(Entity, Position)> = all_positions.iter().map(|(e, p)| (e, *p)).collect();
+    let mut claimed_this_tick: HashSet<Entity> = HashSet::new();
 
+    // ---------- Courtship pass ----------
     for (entity, position) in needs_emit.iter() {
         let Some(self_fit) = fitness.get(&entity).copied() else {
             continue;
@@ -329,7 +382,7 @@ pub fn author_joint_intentions(
             &positions,
             &fitness,
             &relationships,
-            practice_constants,
+            courtship_constants,
         ) else {
             continue;
         };
@@ -342,6 +395,73 @@ pub fn author_joint_intentions(
         activation.record(Feature::JointIntentionEmitted {
             practice: PracticeKind::Courtship,
         });
+        claimed_this_tick.insert(entity);
+    }
+
+    // ---------- PlayBout pass ----------
+    //
+    // Ticket 276 — PlayBout matchmaker. Eligibility: both cats
+    // `Personality.playfulness > playfulness_floor`, both
+    // `Mood.valence > mood_valence_floor`, both current action is
+    // `Socialize` / `Idle` / `Wander` (light-bandwidth coexistence),
+    // both alive and within `candidate_range` tiles.
+    //
+    // Per CLAUDE.md design pillar #2, this substrate replaces the
+    // direct-emit at `personality_events.rs:80-90` (the four-AND × RNG
+    // gate that collapsed to 0–13 play events/soak post-066). Hosting
+    // the canary on JointIntention means "playing together" becomes
+    // mutually-public practice state rather than a softmax coincidence.
+    let mut playbout_q_cache: HashMap<Entity, (f32, f32, Action)> = HashMap::new();
+    for (entity, personality, mood, current_action) in playbout_q.iter() {
+        playbout_q_cache.insert(
+            entity,
+            (
+                personality.playfulness,
+                mood.valence,
+                current_action.map(|c| c.action).unwrap_or(Action::Idle),
+            ),
+        );
+    }
+
+    for (entity, position) in needs_emit.iter() {
+        if claimed_this_tick.contains(&entity) {
+            continue;
+        }
+        let Some(&(self_play, self_mood, self_action)) = playbout_q_cache.get(&entity) else {
+            continue;
+        };
+        if !is_playbout_eligible(self_play, self_mood, self_action, playbout_constants) {
+            continue;
+        }
+        let Some(partner) = pick_playbout_partner(
+            entity,
+            position,
+            &positions,
+            &playbout_q_cache,
+            &claimed_this_tick,
+            playbout_constants,
+        ) else {
+            continue;
+        };
+
+        commands.entity(entity).insert(JointIntention::new(
+            PracticeKind::PlayBout,
+            partner,
+            now_tick,
+        ));
+        activation.record(Feature::JointIntentionEmitted {
+            practice: PracticeKind::PlayBout,
+        });
+        // Intentionally NOT adding `entity` to `claimed_this_tick`.
+        // Mirrors Courtship's symmetric matchmaker (both partners
+        // iterate independently and pick each other when each is the
+        // other's best match). Self-claiming would force asymmetric
+        // pairing (A.JI=B but B.JI=C), and the `PartnerLeftPractice`
+        // cascade would drop every fresh JI on tick T+1. The set
+        // remains used for cross-practice exclusion: Courtship-matched
+        // cats in `claimed_this_tick` are skipped by both the PlayBout
+        // top-loop guard and `pick_playbout_partner`'s candidate
+        // filter.
     }
 }
 
@@ -477,7 +597,85 @@ fn is_practice_compatible_now(
                 && orientation != Orientation::Asexual
                 && !self_is_pregnant
         }
+        // Ticket 276 — PlayBout is broadly compatible. Kittens get
+        // their own play substrate via Caretake; adults / elders play
+        // together. Orientation / pregnancy don't gate play. The
+        // playfulness / mood floors live in the matchmaker, not here
+        // — `still_compatible` only captures predicates that should
+        // *drop a held JI* if they flip. A cat losing playfulness
+        // mid-bout shouldn't cascade-drop; a stage transition off
+        // Adult/Elder should.
+        PracticeKind::PlayBout => matches!(stage, LifeStage::Adult | LifeStage::Elder),
     }
+}
+
+/// Ticket 276 — PlayBout per-cat eligibility predicate. Both partners
+/// must satisfy this for the matchmaker to emit a `PlayBout`
+/// JointIntention.
+fn is_playbout_eligible(
+    playfulness: f32,
+    mood_valence: f32,
+    current_action: Action,
+    constants: &PlayBoutPracticeConstants,
+) -> bool {
+    playfulness > constants.playfulness_floor
+        && mood_valence > constants.mood_valence_floor
+        && matches!(
+            current_action,
+            Action::Socialize | Action::Idle | Action::Wander
+        )
+}
+
+/// Ticket 276 — pick the best PlayBout partner for `self_entity` from
+/// within `candidate_range`. Returns `None` when no candidate passes
+/// the eligibility predicate. Stable tie-break via `Entity::index()`
+/// asc; quality score = `playfulness_avg + mood_valence_avg`.
+///
+/// Skips cats already picked this tick (Courtship-claimed or earlier
+/// PlayBout-claimed) to prevent the matchmaker from emitting a JI
+/// pointing at a cat that already holds one.
+fn pick_playbout_partner(
+    self_entity: Entity,
+    self_position: &Position,
+    positions: &[(Entity, Position)],
+    cache: &HashMap<Entity, (f32, f32, Action)>,
+    claimed_this_tick: &HashSet<Entity>,
+    constants: &PlayBoutPracticeConstants,
+) -> Option<Entity> {
+    let &(self_play, self_mood, _) = cache.get(&self_entity)?;
+    let range = constants.candidate_range;
+    let mut best: Option<(Entity, f32)> = None;
+    for (other, other_pos) in positions.iter() {
+        if *other == self_entity {
+            continue;
+        }
+        if claimed_this_tick.contains(other) {
+            continue;
+        }
+        let manhattan =
+            (self_position.x - other_pos.x).abs() + (self_position.y - other_pos.y).abs();
+        if manhattan > range {
+            continue;
+        }
+        let Some(&(other_play, other_mood, other_action)) = cache.get(other) else {
+            continue;
+        };
+        if !is_playbout_eligible(other_play, other_mood, other_action, constants) {
+            continue;
+        }
+        let score = (self_play + other_play) * 0.5 + (self_mood + other_mood) * 0.5;
+        if score < constants.emission_threshold {
+            continue;
+        }
+        match best {
+            // Strict-better keeps the lowest-Entity-index winner on ties.
+            Some((best_e, best_score))
+                if best_score > score
+                    || (best_score == score && best_e.index() < other.index()) => {}
+            _ => best = Some((*other, score)),
+        }
+    }
+    best.map(|(e, _)| e)
 }
 
 // Helper trait extension — keeps the mismatch comparison readable.

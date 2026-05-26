@@ -935,6 +935,17 @@ pub fn populate_method_registry(registry: &mut MethodRegistry) {
     // `courtship_method` (sub_goal_index=2) → `mate_with_goal`. That
     // recursion is the worked example screenshot for the 128 epic.
     registry.push(crate::ai::methods::mating::mate_with_goal());
+
+    // 276: Tier-1 Live HTN method — second JointIntention practice
+    // after `courtship_method`. `play_bout_method` catches the
+    // `play_bout_completed` label on any cat carrying `JointIntention {
+    // practice: PlayBout, .. }`. Three sub-goals
+    // (`approach_play_partner` → `play_with_partner` →
+    // `cool_down_after_play`), all dispatching to `Action::Socialize`.
+    // Hosts the `play` continuity canary on JointIntention substrate
+    // via `EventKind::JointPlayBoutCompleted` (emitted from
+    // `author_joint_intentions` on `JointDropBranch::Completed`).
+    registry.push(crate::ai::methods::play_bout::play_bout_method());
 }
 
 /// Startup system that populates [`MethodRegistry`]. Independent of

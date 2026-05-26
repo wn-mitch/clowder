@@ -460,6 +460,15 @@ pub mod mating;
 // Live primitives mirroring `build_method`'s 330 shape.
 pub mod groom_other;
 pub mod socialize;
+// 276: Tier-1 Live HTN method — second JointIntention practice (after
+// 323's `courtship_method`). `play_bout_method` catches the
+// `play_bout_completed` label on any cat carrying `JointIntention {
+// practice: PlayBout, .. }` and decomposes the three `PracticeStage`
+// values (Approach → Bouting → Cooldown) into three primitive sub-goals,
+// all dispatching to `Action::Socialize`. Hosts the `play` continuity
+// canary on JointIntention substrate, retiring the four-AND × RNG
+// direct-emit at `personality_events.rs:80-90`.
+pub mod play_bout;
 // 462: HaveItem decomposition substrate — standalone helper that
 // turns a `GoalKind::HaveItem(item)` into the per-recipe GOAP plan
 // `[RetrieveCraftInputs(id), TravelTo(zone), CraftAt<station>]`.

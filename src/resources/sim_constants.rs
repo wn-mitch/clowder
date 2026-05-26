@@ -7794,6 +7794,10 @@ pub struct PracticeConstants {
     /// deletes `pairing`).
     #[serde(default)]
     pub courtship: CourtshipPracticeConstants,
+    /// Ticket 276 — PlayBout practice. Hosts the `play` continuity
+    /// canary on JointIntention substrate.
+    #[serde(default)]
+    pub play_bout: PlayBoutPracticeConstants,
 }
 
 /// Ticket 127 — Courtship-practice knobs. Mirrors `PairingConstants`
@@ -7854,6 +7858,78 @@ impl Default for CourtshipPracticeConstants {
             quality_romantic_weight: 0.40,
             quality_bond_weight: 0.20,
             stage_stall_ticks: 10_000,
+        }
+    }
+}
+
+/// Ticket 276 — PlayBout-practice knobs. Hosts the `play` continuity
+/// canary on JointIntention substrate. Defaults are first-pass;
+/// post-Commit-A soak data will refine the cooldown / playfulness
+/// floors against the pre-066 stable range (50–150 play events/soak).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PlayBoutPracticeConstants {
+    /// Manhattan-distance candidate filter when scanning for a play
+    /// partner. Tighter than Courtship (4 vs 25) — play is opportunistic
+    /// co-presence rather than colony-wide pursuit.
+    pub candidate_range: i32,
+    /// Minimum quality score for a peer to trigger PlayBout emission.
+    /// Score = playfulness_avg + mood_valence_avg + bond_score; floor of
+    /// 0.5 keeps emissions out of the noise-floor for low-mood pairs.
+    pub emission_threshold: f32,
+    /// Multiplier applied to fondness / familiarity deltas when the
+    /// actor's resolver target matches its `JointIntention.partner` AND
+    /// `JointIntention.practice == PlayBout`. Lighter lift than
+    /// Courtship's 1.5 — PlayBout is supposed to be a low-intensity
+    /// background social practice, not a softmax-dominator. (Bias
+    /// readers wire in a follow-on ticket — Commit A relies on stage-
+    /// tick gates for stage progression rather than bias-reader
+    /// `JointInteractionObserved` messages.)
+    pub bias_multiplier: f32,
+    /// Minimum `Personality.playfulness` for either partner to qualify
+    /// as eligible. Mirrors the pre-276 direct-emit gate at
+    /// `personality_events.rs:83`; both partners must clear.
+    pub playfulness_floor: f32,
+    /// Minimum `Mood.valence` for either partner to qualify as
+    /// eligible. Mirrors the pre-276 direct-emit gate at
+    /// `personality_events.rs:84`; both partners must clear.
+    pub mood_valence_floor: f32,
+    /// Ticks a cat spends in `PracticeStage::PlayBoutApproach` before
+    /// advancing to `PlayBoutBouting`. Stage-tick gate (no bias-reader
+    /// dependency) — the matchmaker emitted on co-presence within
+    /// `candidate_range`; this gate models the brief approach window
+    /// before play kicks off.
+    pub approach_duration_ticks: u64,
+    /// Ticks a cat spends in `PracticeStage::PlayBoutBouting` before
+    /// advancing to `PlayBoutCooldown`. 60 ticks ≈ 6 sim-minutes; long
+    /// enough for the Bouting cascade to fire repeatedly, short enough
+    /// that paired cats churn through bouts (rather than getting locked
+    /// in one practice for a sim-hour).
+    pub bouting_duration_ticks: u64,
+    /// Ticks a cat spends in `PracticeStage::PlayBoutCooldown` before
+    /// `JointDropBranch::Completed` fires and the JI is removed. The
+    /// `EventKind::JointPlayBoutCompleted` event emits on this drop,
+    /// incrementing `continuity_tallies["play"]`.
+    pub cooldown_duration_ticks: u64,
+    /// Per-practice `stage_stall_ticks` override for PlayBout. Tighter
+    /// than Courtship's 10_000 because PlayBout stages are short —
+    /// Approach should turn into Bouting within a sim-day or the pair
+    /// is misclassified (e.g., they're not actually in proximity any
+    /// more).
+    pub stage_stall_ticks: u64,
+}
+
+impl Default for PlayBoutPracticeConstants {
+    fn default() -> Self {
+        Self {
+            candidate_range: 4,
+            emission_threshold: 0.5,
+            bias_multiplier: 1.2,
+            playfulness_floor: 0.6,
+            mood_valence_floor: 0.0,
+            approach_duration_ticks: 30,
+            bouting_duration_ticks: 60,
+            cooldown_duration_ticks: 30,
+            stage_stall_ticks: 1_000,
         }
     }
 }

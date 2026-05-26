@@ -1784,6 +1784,25 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::JointStageMismatchTickAccrued {
             practice: PracticeKind::Courtship,
         } => "JointStageMismatchTickAccrued_Courtship",
+        // Ticket 276 — PlayBout practice display names. The footer
+        // emits separate per-practice counters so PlayBout's emission /
+        // bias / stage-advance / drop / mismatch counts are
+        // independently observable from Courtship's.
+        Feature::JointIntentionEmitted {
+            practice: PracticeKind::PlayBout,
+        } => "JointIntentionEmitted_PlayBout",
+        Feature::JointIntentionDropped {
+            practice: PracticeKind::PlayBout,
+        } => "JointIntentionDropped_PlayBout",
+        Feature::JointBiasApplied {
+            practice: PracticeKind::PlayBout,
+        } => "JointBiasApplied_PlayBout",
+        Feature::JointStageAdvanced {
+            practice: PracticeKind::PlayBout,
+        } => "JointStageAdvanced_PlayBout",
+        Feature::JointStageMismatchTickAccrued {
+            practice: PracticeKind::PlayBout,
+        } => "JointStageMismatchTickAccrued_PlayBout",
         Feature::ReservationContended => "ReservationContended",
         Feature::TargetCooldownApplied => "TargetCooldownApplied",
         Feature::HideFreezeFired => "HideFreezeFired",
