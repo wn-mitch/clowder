@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [body-zones.md, magic.md, htn-methods.md]
 related-balance: []
-landed-at: pending
+landed-at: 29707d49ade8
 landed-on: 2026-05-26
 ---
 
