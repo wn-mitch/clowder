@@ -35,6 +35,7 @@ pub mod physical;
 pub mod pregnancy;
 pub mod prev_safety_deficit;
 pub mod prey;
+pub mod recent_crafts;
 pub mod recent_target_failures;
 pub mod recipe;
 pub mod reserved;

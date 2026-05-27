@@ -3727,6 +3727,11 @@ pub fn resolve_goap_plans(
                 Option<&crate::components::RouteCostField>,
                 // Ticket 095 Phase 1 Stage B — body-zone substrate.
                 &crate::components::CatBodyModel,
+                // Ticket 463 — per-cat ring buffer of recent crafts,
+                // written here on a witnessed craft so the
+                // aspiration's anti-monotony term reads the recency
+                // map next tick.
+                &mut crate::components::recent_crafts::CatRecentCrafts,
             ),
         ),
         (
@@ -4054,7 +4059,7 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _, _, _))| {
+                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _, _, _, _))| {
                     (e, g.as_ref().map_or(0.8, |g| g.0))
                 },
             )
@@ -4065,7 +4070,9 @@ pub fn resolve_goap_plans(
         gender: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _))| (e, *g),
+                |((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _, _))| {
+                    (e, *g)
+                },
             )
             .collect(),
         cat_tile_counts: {
@@ -4114,7 +4121,7 @@ pub fn resolve_goap_plans(
             .collect(),
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _, _))| {
+            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _, _, _))| {
                 health.current < health.max
             })
             .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
@@ -4147,7 +4154,7 @@ pub fn resolve_goap_plans(
         cat_grooming: cats
             .iter()
             .filter_map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, gc, _, _, _, _, _, _, _, _, _, _))| {
+                |((e, _, _, _, _, _, _, _, _), (_, _, _, gc, _, _, _, _, _, _, _, _, _, _, _))| {
                     gc.map(|g| (e, g.0))
                 },
             )
@@ -4253,6 +4260,7 @@ pub fn resolve_goap_plans(
             mut recent_failures,
             route_cost_field,
             body_model,
+            mut recent_crafts,
         ),
     ) in &mut cats
     {
@@ -4627,6 +4635,7 @@ pub fn resolve_goap_plans(
             recent_failures.as_deref(),
             route_cost_field,
             body_model,
+            &mut recent_crafts,
         );
 
         // Re-derive `d` after the dispatch call so the immutable borrow
@@ -5260,7 +5269,7 @@ pub fn resolve_goap_plans(
     // Deferred grooming restorations — apply grooming condition delta and
     // §7.W social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _))) =
+        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _, _))) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -5561,6 +5570,11 @@ fn dispatch_step_action(
     // Ticket 095 Phase 1 Stage B — body-zone substrate. Provides
     // `health_derived` for the 046-Layer-1 carry in EngageThreat.
     body_model: &crate::components::CatBodyModel,
+    // Ticket 463 — per-cat ring buffer of recent crafts; the craft
+    // caller arms (`CraftAtWorkshop` / `CraftAtTanningFrame`) write
+    // the witnessed `RecipeId` here on success so the aspiration's
+    // anti-monotony score reads recency next tick.
+    recent_crafts: &mut crate::components::recent_crafts::CatRecentCrafts,
 ) -> crate::steps::StepResult {
     let d = &ec.constants.disposition;
 
@@ -8164,6 +8178,14 @@ fn dispatch_step_action(
                 &snaps.workshop_positions,
                 3,
             );
+            // Ticket 463 — on a witnessed craft, append the actual
+            // recipe id to the cat's ring buffer so
+            // CraftItemAspiration's anti-monotony term reads recency
+            // next tick. Borrowing the witness via `as_ref()` lets us
+            // peek before the move into `record_if_witnessed`.
+            if let Some(recipe_id) = outcome.witness.as_ref() {
+                recent_crafts.record(*recipe_id, ec.time.tick);
+            }
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
                 crate::resources::system_activation::Feature::ItemCrafted,
@@ -8182,6 +8204,9 @@ fn dispatch_step_action(
                 &snaps.tanning_frame_positions,
                 3,
             );
+            if let Some(recipe_id) = outcome.witness.as_ref() {
+                recent_crafts.record(*recipe_id, ec.time.tick);
+            }
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
                 crate::resources::system_activation::Feature::ItemCrafted,

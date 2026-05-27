@@ -3,6 +3,7 @@ id: 478
 title: ItemSet enum on item kinds (retire is_warriors_kit recipe metadata)
 status: blocked
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-26
 parked: null
