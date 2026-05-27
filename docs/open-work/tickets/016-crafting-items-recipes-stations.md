@@ -39,30 +39,30 @@ Full architectural design lives in [`docs/systems/crafting.md`](../../systems/cr
 
 ## Related existing tickets
 
-- **017** (ready) — Anatomical slot inventory. The wearable-substrate prereq: Phase 3 (370) is blocked on it, and it's the held-vs-worn-vs-stowed semantics the 477 aggregation layer reads under (today every carried equipment item reads as "worn"). Item-crafting clade member, surfaced here for dashboard completeness.
-- **309** (ready) — Herbcraft DSE reserve-deficit consideration / anticipatory crafting. Phase 1.5 extension; unblocked after 308 (ColonyReservesBelief) landed.
-- **334** (blocked-by 17) — Stealth-cloak crafting recipe + WearItem resolver. 128 epic Tier-2 glue; partially subsumed by 369 (recipe scope retired; WearItem + HTN-method flip remain live).
+- [017](017-anatomical-slot-inventory.md) (ready) — Anatomical slot inventory. The wearable-substrate prereq: Phase 3 (370) is blocked on it, and it's the held-vs-worn-vs-stowed semantics the 477 aggregation layer reads under (today every carried equipment item reads as "worn"). Item-crafting clade member, surfaced here for dashboard completeness.
+- [309](309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md) (ready) — Herbcraft DSE reserve-deficit consideration / anticipatory crafting. Phase 1.5 extension; unblocked after 308 (ColonyReservesBelief) landed.
+- [334](334-stealth-cloak-crafting-recipe-wearitem-resolver.md) (blocked-by 17) — Stealth-cloak crafting recipe + WearItem resolver. 128 epic Tier-2 glue; partially subsumed by 369 (recipe scope retired; WearItem + HTN-method flip remain live).
 
 ## Phase 2b follow-on clade (369 warrior's-kit → equipment effects)
 
 The Phase 2b warrior's-kit substrate (369) spawned a follow-on lineage that realizes the "items have bite" pillar — the consumption layer for the identity/material classifiers. Per the **follow-ons-inherit-their-parent's-epic** convention, these are 016 children (369 is Phase 2b, so its descendants live in this dashboard):
 
-- **461** (done) — TanningFrame BuildPressure threshold tuning (369 follow-on).
-- **462** (done) — HTN item-aspiration substrate: `GoalKind` enum + templated method registry + parameterized `RetrieveCraftInputs(recipe.inputs)`.
-- **463** (done) — `CraftItemAspiration`: per-recipe `Goal(HaveItem)` emission + threat-cue/skill/anti-monotony scoring + retire resolver lex-pick (made kit items exist organically in seed-42).
-- **476** (done) — item-effect doctrine correction: retire cosmetic-only framing, sanction identity-keyed modifier-fetch.
-- **477** (done) — equipment-modifier aggregation: `equipment_modifiers_for()` seam + resolver wiring (armor / weapon-strike+snap / cloak / noise) + the L4Resolver trace hook.
-- **478** (ready) — `ItemSet` enum on item kinds (retire `is_warriors_kit` recipe metadata).
-- **479** (ready) — ranged-attack mode for Sling — Action / phase / ammo model + read of `EquipmentModifiers.ranged_enabled` (477 follow-on).
+- [461](../landed/461-phase-2b-warriors-kit-tanningframe-buildpressure-tuning-369-follow-on.md) (done) — TanningFrame BuildPressure threshold tuning (369 follow-on).
+- [462](../landed/462-htn-item-aspiration-substrate-goalkind-enum-templated-method-registry-parameterized-retrievecraftinputsrecipeinputs.md) (done) — HTN item-aspiration substrate: `GoalKind` enum + templated method registry + parameterized `RetrieveCraftInputs(recipe.inputs)`.
+- [463](../landed/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md) (done) — `CraftItemAspiration`: per-recipe `Goal(HaveItem)` emission + threat-cue/skill/anti-monotony scoring + retire resolver lex-pick (made kit items exist organically in seed-42).
+- [476](../landed/476-item-effect-doctrine-retire-cosmetic-only-framing-sanction-identity-keyed-modifier-fetch.md) (done) — item-effect doctrine correction: retire cosmetic-only framing, sanction identity-keyed modifier-fetch.
+- [477](../landed/477-equipment-modifier-aggregation-fetch-modifiers-for-a-cat-from-369-classifiers-resolver-wiring-l2-trace-hook.md) (done) — equipment-modifier aggregation: `equipment_modifiers_for()` seam + resolver wiring (armor / weapon-strike+snap / cloak / noise) + the L4Resolver trace hook.
+- [478](478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md) (ready) — `ItemSet` enum on item kinds (retire `is_warriors_kit` recipe metadata).
+- [479](479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md) (ready) — ranged-attack mode for Sling — Action / phase / ammo model + read of `EquipmentModifiers.ranged_enabled` (477 follow-on).
 
 ## Related items-crafting work (not yet phased)
 
 Items-crafting tickets that live alongside the phased catalog rather than inside a phase — material substrate, byproduct producers, item routing, and crafting-pipeline surfaces. Surfaced here so the dashboard answers "what's in the crafting layer?" completely; promote into the phase map if/when one becomes a coherent shippable phase.
 
-- **Material + recipe substrate:** **376** (ready, terrain-keyed harvestables — reed/flint/clay/ochre/charcoal/shell as discrete entities) · **421** (ready, central material pile + smart material-deposit routing) · **429** (ready, items-are-real Source/Transfer/Sink transition contracts) · **435** (ready, `RecipeInput::AnyOf` — collapse the 4 smoked.* recipes, unblock generalized fuel).
-- **Byproduct producers:** **379** (ready, ShadowFox banishment byproducts — shadow-bone / fox-pelt / shadow-tooth) · **380** (ready, cat-death heirloom-eligible bones + fur-tuft, feeds 370 Heirloom + 372 Tapestry).
-- **Item routing + pickup:** **191** (ready, PickingUp scavenge_urgency curve tuning + scenario, 185 follow-on) · **186** (ready, `add_effective` command-buffer race drops `capacity_bonus` on just-spawned items) · **422** (blocked, Curio Cache deposit-prefix routing).
-- **Crafting pipeline surfaces:** **377** (ready, rare drops & narrative items — situational-trigger RPG-expression layer; shares 477's resolver-trace hook + `escape_from_predator` read site) · **468** (ready, `CraftAtWorkshop` recipe-not-satisfied plan-failure surface, post-465).
+- **Material + recipe substrate:** [376](376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md) (ready, terrain-keyed harvestables — reed/flint/clay/ochre/charcoal/shell as discrete entities) · [421](421-central-material-pile-smart-material-deposit-routing.md) (ready, central material pile + smart material-deposit routing) · [429](429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md) (ready, items-are-real Source/Transfer/Sink transition contracts) · [435](435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md) (ready, `RecipeInput::AnyOf` — collapse the 4 smoked.* recipes, unblock generalized fuel).
+- **Byproduct producers:** [379](379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md) (ready, ShadowFox banishment byproducts — shadow-bone / fox-pelt / shadow-tooth) · [380](380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md) (ready, cat-death heirloom-eligible bones + fur-tuft, feeds 370 Heirloom + 372 Tapestry).
+- **Item routing + pickup:** [191](191-picking-up-scavenging-tune.md) (ready, PickingUp scavenge_urgency curve tuning + scenario, 185 follow-on) · [186](186-add-effective-bevy-command-buffer-race.md) (ready, `add_effective` command-buffer race drops `capacity_bonus` on just-spawned items) · [422](422-curio-cache-routing-deposit-prefix-on-curio-cache.md) (blocked, Curio Cache deposit-prefix routing).
+- **Crafting pipeline surfaces:** [377](377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md) (ready, rare drops & narrative items — situational-trigger RPG-expression layer; shares 477's resolver-trace hook + `escape_from_predator` read site) · [468](468-craftatworkshop-recipe-not-satisfied-new-plan-failure-surface-post-465.md) (ready, `CraftAtWorkshop` recipe-not-satisfied plan-failure surface, post-465).
 
 ## Design constraints
 

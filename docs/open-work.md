@@ -50,7 +50,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 8 | 5 | 3 (0 / 0 / 3 / 0) | `▰▰▰▰▰▰▱▱▱▱` 62% |
+| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 29 | 10 | 19 (0 / 14 / 5 / 0) | `▰▰▰▱▱▱▱▱▱▱` 34% |
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 8 | 25 (1 / 17 / 5 / 2) | `▰▰▱▱▱▱▱▱▱▱` 24% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
