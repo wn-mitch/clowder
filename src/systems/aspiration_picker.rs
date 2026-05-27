@@ -114,6 +114,19 @@ struct CatSnapshot {
     in_flight_chain: Option<&'static str>,
 }
 
+/// Ticket 463 — colony-level Stores aggregate, computed once per
+/// picker tick before the per-cat compute pass. Each entry pre-
+/// aggregates one Stores building's `Vec<Entity>` of contained items
+/// into a `HashMap<ItemKind, u32>` so the per-cat recipe-scoring
+/// loop in `step2_craft_item_recipe_scoring` doesn't re-walk every
+/// store entity. Stores positions are static, so the cost is
+/// O(total_stored_items) once per tick (not once per cat).
+struct StoresSnapshot {
+    stores: Vec<(crate::components::physical::Position, ItemAggregate)>,
+}
+
+type ItemAggregate = std::collections::HashMap<crate::components::items::ItemKind, u32>;
+
 /// Computed per-cat picker result — buffered before the mutation pass.
 struct CatOutcome {
     entity: Entity,
@@ -135,6 +148,7 @@ struct CatOutcome {
 pub fn pick_aspiration_emissions(world: &mut World) {
     // -------- Snapshot pass --------
     let snapshot = collect_snapshot(world);
+    let stores_snapshot = collect_stores_snapshot(world);
 
     // -------- Compute pass --------
     let tick = world.resource::<TimeState>().tick;
@@ -144,7 +158,7 @@ pub fn pick_aspiration_emissions(world: &mut World) {
 
     let mut outcomes: Vec<CatOutcome> = Vec::with_capacity(snapshot.len());
     for snap in &snapshot {
-        let outcome = compute_outcome(world, snap, tick, focal_entity);
+        let outcome = compute_outcome(world, snap, tick, focal_entity, &stores_snapshot);
         outcomes.push(outcome);
     }
 
@@ -152,6 +166,45 @@ pub fn pick_aspiration_emissions(world: &mut World) {
     for outcome in outcomes {
         apply_outcome(world, outcome);
     }
+}
+
+/// Ticket 463 — collect the per-store ItemAggregate for the
+/// CraftItemAspiration recipe-scoring loop. Walks every Stores
+/// building's `StoredItems.items` vec and resolves each entity's
+/// `Item.kind` into a per-store `HashMap<ItemKind, u32>`. Excludes
+/// `BuildMaterialItem` entries (Stores carry only food / craft
+/// inputs, not building materials).
+fn collect_stores_snapshot(world: &mut World) -> StoresSnapshot {
+    use crate::components::building::{StoredItems, Structure, StructureType};
+    use crate::components::items::Item;
+    use crate::components::physical::Position;
+    // Materialize all `Item.kind` entries in one pass so the
+    // per-store loop avoids re-fetching them per store.
+    let mut item_kinds: std::collections::HashMap<Entity, crate::components::items::ItemKind> =
+        std::collections::HashMap::new();
+    {
+        let mut q = world.query::<(Entity, &Item)>();
+        for (entity, item) in q.iter(world) {
+            item_kinds.insert(entity, item.kind);
+        }
+    }
+    let mut stores: Vec<(Position, ItemAggregate)> = Vec::new();
+    {
+        let mut q = world.query_filtered::<(&Structure, &Position, &StoredItems), ()>();
+        for (structure, pos, stored) in q.iter(world) {
+            if structure.kind != StructureType::Stores {
+                continue;
+            }
+            let mut agg: ItemAggregate = std::collections::HashMap::new();
+            for &item_entity in &stored.items {
+                if let Some(&kind) = item_kinds.get(&item_entity) {
+                    *agg.entry(kind).or_insert(0) += 1;
+                }
+            }
+            stores.push((*pos, agg));
+        }
+    }
+    StoresSnapshot { stores }
 }
 
 fn collect_snapshot(world: &mut World) -> Vec<CatSnapshot> {
@@ -181,6 +234,7 @@ fn compute_outcome(
     snap: &CatSnapshot,
     tick: u64,
     focal_entity: Option<Entity>,
+    stores_snapshot: &StoresSnapshot,
 ) -> CatOutcome {
     let mut emissions = AspirationEmissions::empty();
     let mut traces: Vec<TraceEntry> = Vec::new();
@@ -208,6 +262,19 @@ fn compute_outcome(
         let (row, walk, fallback_used) = if already_in_flight {
             // Step 1: skip emission, momentum carries the arc.
             (None, Vec::new(), false)
+        } else if chain.name == crate::ai::aspirations::crafting::CRAFT_ITEM_ASPIRATION.name {
+            // Ticket 463 — CraftItemAspiration bypasses the static
+            // step-2 method-live gate. The chain's emit row carries a
+            // sentinel label that no MethodRegistry entry matches; the
+            // *real* emission picks a recipe per cat per tick and
+            // attaches a dynamic `goal_kind = Some(HaveItem(_))` so the
+            // L2 wrap (goap.rs:3192) constructs a typed Goal Intention
+            // directly. The HTN frame-push special-case for HaveItem
+            // (goap.rs ~3279) builds the 3-step craft plan
+            // (RetrieveCraftInputs → TravelTo(station) → CraftAt).
+            let (step_row, step_walk) =
+                step2_craft_item_recipe_scoring(world, snap.entity, chain, asp, stores_snapshot);
+            (step_row, step_walk, false)
         } else {
             // Step 2: emits walk.
             let (step2_row, step2_walk) = step2_emits_walk(world, snap.entity, chain, asp);
@@ -242,6 +309,61 @@ fn compute_outcome(
                     milestone: asp.current_milestone,
                     emit_walk: walk,
                     fallback_used,
+                },
+            });
+        }
+    }
+
+    // 463 — implicit CRAFT_ITEM_ASPIRATION pass. The chain is always
+    // available to every cat (no adoption needed) — analogous to
+    // reactive emits, but driven by the per-cat recipe-scoring loop
+    // rather than a marker-gated predicate. Skip if the cat already
+    // has Crafting in its active list (the loop above already ran
+    // it) or if the chain is in-flight (commitment momentum carries
+    // it).
+    let crafting_in_active = snap
+        .active
+        .iter()
+        .any(|a| a.chain_name == crate::ai::aspirations::crafting::CRAFT_ITEM_ASPIRATION.name);
+    let crafting_in_flight = snap.in_flight_chain
+        == Some(crate::ai::aspirations::crafting::CRAFT_ITEM_ASPIRATION.name);
+    if !crafting_in_active && !crafting_in_flight {
+        // Synthesize an ActiveAspiration on the fly. The chain is
+        // implicit — the cat's Aspirations Component doesn't carry
+        // it. milestone 0, no real progress tracking yet (commit 7+
+        // wires progress via ActionCount when adoption surface
+        // matures).
+        let synthetic_asp = ActiveAspiration {
+            chain_name: crate::ai::aspirations::crafting::CRAFT_ITEM_ASPIRATION
+                .name
+                .to_string(),
+            domain: crate::components::aspirations::AspirationDomain::Crafting,
+            current_milestone: 0,
+            progress: 0,
+            adopted_tick: tick,
+            last_progress_tick: tick,
+            misaligned_since_tick: None,
+        };
+        let chain = &crate::ai::aspirations::crafting::CRAFT_ITEM_ASPIRATION;
+        let (row, walk) = step2_craft_item_recipe_scoring(
+            world,
+            snap.entity,
+            chain,
+            &synthetic_asp,
+            stores_snapshot,
+        );
+        if let Some(row) = row {
+            emissions.rows.push(row);
+        }
+        if is_focal {
+            traces.push(TraceEntry {
+                tick,
+                cat: snap.name.clone(),
+                record: TraceRecord::L1Aspiration {
+                    aspiration: synthetic_asp.chain_name,
+                    milestone: 0,
+                    emit_walk: walk,
+                    fallback_used: false,
                 },
             });
         }
@@ -388,6 +510,203 @@ fn step3_domain_fallback(
     }
 
     (chosen, walk)
+}
+
+/// Ticket 463 — first-light scoring weights. Tertiary-priority row +
+/// these damped weights keep the new aspiration legible in the L2
+/// trace (label = "have_<item>") without preempting established arcs.
+/// Commit 7 lifts these (W_THREAT 0.3, W_SKILL 0.2, W_RECENT 0.5)
+/// once the variation gate confirms emission.
+const CRAFT_ITEM_W_THREAT: f32 = 0.05;
+const CRAFT_ITEM_W_SKILL: f32 = 0.05;
+const CRAFT_ITEM_W_RECENT: f32 = 1.0;
+
+/// Ticket 463 — Manhattan reach threshold for a cat's Stores. Cats
+/// within this distance of a Stores building can pull its inputs into
+/// inventory via `RetrieveCraftInputs`. Matches the proximity used by
+/// other Stores-walking resolvers (cooking / drying / smoking).
+const CRAFT_ITEM_STORES_REACH: i32 = 64;
+
+/// Ticket 463 — per-cat recipe-scoring loop for `CraftItemAspiration`.
+/// Walks every recipe in the registry, computes the per-cat reachable-
+/// input aggregate once (inventory + nearby Stores), scores each
+/// satisfiable recipe along three axes, and emits one
+/// `EmissionRow { goal_kind: Some(GoalKind::HaveItem(winner.output)) }`.
+/// Returns `(None, walk)` when no recipe is satisfiable for this cat.
+///
+/// Score formula (per the user's "downwind of the stat" framing):
+///   score = W_threat * (recipe.is_warriors_kit as f32)
+///                    * hide_recency_of_threat_cue(cat)
+///         + W_skill  * recipe.discipline_skill_affinity
+///                       .map(|s| 1.0 - s.value(skills))
+///                       .unwrap_or(0.0)
+///         - W_recent / (1.0 + ticks_since(recipe.id))
+///
+/// First-light weights are damped (Tertiary priority + small W's) so
+/// the row doesn't dominate adoption. Commit 7 lifts after the
+/// variation gate confirms emission.
+fn step2_craft_item_recipe_scoring(
+    world: &World,
+    entity: Entity,
+    chain: &'static AspirationChain,
+    asp: &ActiveAspiration,
+    stores_snapshot: &StoresSnapshot,
+) -> (Option<EmissionRow>, Vec<EmitWalkRow>) {
+    use crate::ai::dse::GoalKind;
+    use crate::components::beliefs::{ContextBeliefs, PredatorBeliefs};
+    use crate::components::items::ItemKind;
+    use crate::components::magic::Inventory;
+    use crate::components::physical::Position;
+    use crate::components::recent_crafts::CatRecentCrafts;
+    use crate::components::recipe::Recipe;
+    use crate::components::skills::Skills;
+    use crate::resources::recipe_registry::RecipeRegistry;
+
+    let mut walk: Vec<EmitWalkRow> = Vec::new();
+
+    let Some(pos) = world.get::<Position>(entity) else {
+        return (None, walk);
+    };
+    let Some(inventory) = world.get::<Inventory>(entity) else {
+        return (None, walk);
+    };
+    let Some(skills) = world.get::<Skills>(entity) else {
+        return (None, walk);
+    };
+    let now = world.resource::<TimeState>().tick;
+    let recipes = world.resource::<RecipeRegistry>();
+
+    // Threat-cue scalar: max over PredatorBeliefs[nearest] +
+    // ContextBeliefs[HereNow] recency_of_threat_cue facets. Mirrors
+    // the read in ai::scoring.rs:563. Both Components carry
+    // `models: HashMap<_, MentalModel>` and MentalModel has a
+    // `recency_of_threat_cue: Facet` field; we read `.value`.
+    let threat_cue = {
+        let predator_max = world
+            .get::<PredatorBeliefs>(entity)
+            .map(|pb| {
+                pb.models
+                    .values()
+                    .map(|m| m.recency_of_threat_cue.value)
+                    .fold(0.0_f32, f32::max)
+            })
+            .unwrap_or(0.0);
+        let context_now = world
+            .get::<ContextBeliefs>(entity)
+            .and_then(|cb| {
+                cb.models
+                    .get(&crate::components::beliefs::EnvironmentalContextKey::HereNow)
+                    .map(|m| m.recency_of_threat_cue.value)
+            })
+            .unwrap_or(0.0);
+        predator_max.max(context_now)
+    };
+    let recent_crafts = world.get::<CatRecentCrafts>(entity);
+
+    // Build the cat's reachable-input aggregate ONCE (mirroring the
+    // ticket-431 "default to event-driven, justify per-tick" pillar:
+    // bounded ≈ O(stores × recipes × inputs) per cat per tick,
+    // dwarfed by the picker's existing per-cat costs).
+    let mut reachable: ItemAggregate = std::collections::HashMap::new();
+    for slot in &inventory.slots {
+        *reachable.entry(slot.kind).or_insert(0) += 1;
+    }
+    for (store_pos, store_agg) in &stores_snapshot.stores {
+        if pos.manhattan_distance(store_pos) > CRAFT_ITEM_STORES_REACH {
+            continue;
+        }
+        for (&kind, &count) in store_agg {
+            *reachable.entry(kind).or_insert(0) += count;
+        }
+    }
+
+    // Score each satisfiable recipe; track the winner. Filter to
+    // recipes that `craft_have_item_actions` (commit 2) can actually
+    // decompose — Workshop / TanningFrame only. Other stations
+    // (Kitchen / DryingRack / SmokingRack / None) belong to their
+    // own dispositions (Cooking / DryingFood / SmokingMeat / herbal
+    // ward-placement) and aren't valid HaveItem aspiration targets.
+    let mut best: Option<(&Recipe, f32)> = None;
+    for recipe in recipes.iter() {
+        let craft_decomposable = matches!(
+            recipe.station,
+            crate::components::recipe::StationRequirement::Workshop
+                | crate::components::recipe::StationRequirement::TanningFrame
+        );
+        if !craft_decomposable {
+            // Don't surface non-craft-decomposable recipes in the
+            // walk — they aren't candidates the picker considers.
+            continue;
+        }
+        if !recipe_inputs_reachable(recipe, &reachable) {
+            walk.push(EmitWalkRow {
+                label: recipe.id.0.to_string(),
+                applicable: false,
+                method_live: false,
+                emitted: false,
+            });
+            continue;
+        }
+        let threat_term = CRAFT_ITEM_W_THREAT * (recipe.is_warriors_kit as i32 as f32) * threat_cue;
+        let skill_term = CRAFT_ITEM_W_SKILL
+            * recipe
+                .discipline_skill_affinity
+                .map(|s| (1.0 - s.value(skills)).max(0.0))
+                .unwrap_or(0.0);
+        let recent_penalty = match recent_crafts.and_then(|rc| rc.ticks_since(recipe.id, now)) {
+            Some(elapsed) => CRAFT_ITEM_W_RECENT / (1.0 + elapsed as f32),
+            None => 0.0,
+        };
+        let score = threat_term + skill_term - recent_penalty;
+        walk.push(EmitWalkRow {
+            label: recipe.id.0.to_string(),
+            applicable: true,
+            method_live: true,
+            emitted: false, // patched after the winner pass
+        });
+        match best {
+            Some((_, bs)) if score <= bs => {}
+            _ => best = Some((recipe, score)),
+        }
+    }
+
+    let Some((winner, _)) = best else {
+        return (None, walk);
+    };
+    // Patch the walk to mark the winner's row `emitted: true`. Linear
+    // scan over `recipes.iter()` order; cheap (≤ 20 entries).
+    if let Some(row) = walk.iter_mut().find(|r| r.label == winner.id.0) {
+        row.emitted = true;
+    }
+    // Sentinel label for the EmissionRow; the L2 wrap reads
+    // goal_kind directly and derives the trace label from ItemKind.
+    let row = EmissionRow {
+        chain: chain.name,
+        milestone_index: asp.current_milestone,
+        label: chain.milestones[asp.current_milestone].emits[0].label,
+        strategy: chain.milestones[asp.current_milestone].emits[0].strategy,
+        priority: chain.milestones[asp.current_milestone].emits[0].priority,
+        fallback_used: false,
+        goal_kind: Some(GoalKind::HaveItem(winner.output.item_kind)),
+    };
+    let _ = ItemKind::Bone; // touch the import so unused-warning stays clean
+    (Some(row), walk)
+}
+
+/// Helper: returns `true` iff every `RecipeInput { kind, count }` is
+/// present in the reachable-aggregate at sufficient count. Same shape
+/// as `recipe_inputs_satisfied` in `craft_at_workshop.rs` but reads
+/// the aggregated map rather than a `Vec<Slot>`.
+fn recipe_inputs_reachable(
+    recipe: &crate::components::recipe::Recipe,
+    reachable: &ItemAggregate,
+) -> bool {
+    for input in &recipe.inputs {
+        if reachable.get(&input.kind).copied().unwrap_or(0) < input.count {
+            return false;
+        }
+    }
+    true
 }
 
 fn apply_outcome(world: &mut World, outcome: CatOutcome) {
