@@ -1,7 +1,7 @@
 ---
 id: 477
 title: Equipment-modifier aggregation: fetch modifiers for a cat from 369 classifiers + resolver wiring + L2-trace hook
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-27
 ---
 
 ## Why
@@ -85,3 +85,4 @@ property→resolver mapping.
 ## Log
 - 2026-05-26: opened as 369's deferred resolver-consumption layer (named out-of-scope in
   461 + 463). Blocked on 463. Companion to the 476 doctrine correction.
+- 2026-05-27: 2026-05-27: landed foundation + 4 read sites (armor / weapon-strike+snap / cloak / noise-dormant). Hard gates pass (Starvation 0, ShadowFoxAmbush 0, never-fired 0, continuity grooming/play/mentoring/courtship all ok); verdict 'concern' is constants-drift only (new CombatConstants fields make the events.jsonl header non-comparable vs the pre-477 baseline). Opened 479 (ranged-attack mode for Sling, blocked-by 477).

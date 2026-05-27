@@ -51,6 +51,12 @@ pub struct TickReport {
     pub pre_bonus_pool: Vec<(String, f32)>,
     /// Post-filter, pre-Independence-penalty pool the softmax saw.
     pub pre_penalty_pool: Vec<(String, f32)>,
+    /// Ticket 477 — resolver-level modifier reads captured this tick,
+    /// projected from `TraceRecord::L4Resolver`. `(resolver, modifier,
+    /// delta)` rows. Used by the equipment scenarios to assert that a
+    /// resolver read surfaced as a named modifier rather than a hidden
+    /// post-hoc bonus.
+    pub resolver_modifiers: Vec<(String, String, f32)>,
 }
 
 /// Compact per-DSE L2 row for the scenario report. Trims
@@ -402,6 +408,7 @@ fn drain_tick_report(app: &mut App) -> TickReport {
     let mut l2: Vec<L2RowSummary> = Vec::new();
     let mut pre_bonus_pool: Vec<(String, f32)> = Vec::new();
     let mut pre_penalty_pool: Vec<(String, f32)> = Vec::new();
+    let mut resolver_modifiers: Vec<(String, String, f32)> = Vec::new();
     for entry in log.entries.drain(..) {
         let TraceEntry { record, .. } = entry;
         match record {
@@ -458,6 +465,18 @@ fn drain_tick_report(app: &mut App) -> TickReport {
                         .collect(),
                 });
             }
+            TraceRecord::L4Resolver {
+                resolver,
+                modifiers,
+            } => {
+                for m in modifiers {
+                    resolver_modifiers.push((
+                        resolver.clone(),
+                        m.name,
+                        m.delta.or(m.multiplier).unwrap_or(0.0),
+                    ));
+                }
+            }
             _ => {}
         }
     }
@@ -469,5 +488,6 @@ fn drain_tick_report(app: &mut App) -> TickReport {
         l2,
         pre_bonus_pool,
         pre_penalty_pool,
+        resolver_modifiers,
     }
 }

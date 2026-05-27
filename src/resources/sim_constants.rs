@@ -487,10 +487,108 @@ pub struct CombatConstants {
     /// Healing Rates.
     #[serde(default)]
     pub body_zone_healing: BodyZoneHealing,
+
+    // --- Equipment-effect substrate (ticket 477) ---
+    /// Quality multiplier floor for equipment effects. A freshly-failed
+    /// craft (quality≈0) still contributes `floor × base_magnitude`; a
+    /// perfect craft (quality=1) contributes the full magnitude. Linear
+    /// curve: `effective = base * (floor + (1 - floor) * quality)`.
+    /// Single curve shared across every equipment classifier so the
+    /// per-magnitude tuning constants below stay legible in isolation.
+    #[serde(default = "default_equipment_quality_floor")]
+    pub equipment_quality_floor: f32,
+    /// Fraction of incoming blunt damage absorbed by HideBracers at
+    /// quality `1.0`. Read by `damage_to_body_part` via the equipment
+    /// aggregation layer.
+    #[serde(default = "default_armor_blunt_absorb_magnitude")]
+    pub armor_blunt_absorb_magnitude: f32,
+    /// Blunt-damage contribution of HidePlatedWrap at quality `1.0`
+    /// (composes additively with HideBracers; floor-clamped at
+    /// `armor_reduction_floor_blunt`).
+    #[serde(default = "default_armor_pierce_partial_blunt_magnitude")]
+    pub armor_pierce_partial_blunt_magnitude: f32,
+    /// Pierce-damage contribution of HidePlatedWrap at quality `1.0`.
+    #[serde(default = "default_armor_pierce_partial_pierce_magnitude")]
+    pub armor_pierce_partial_pierce_magnitude: f32,
+    /// Additive ceiling on blunt armor reduction (prevents stacking
+    /// past invulnerability).
+    #[serde(default = "default_armor_reduction_floor_blunt")]
+    pub armor_reduction_floor_blunt: f32,
+    /// Additive ceiling on pierce armor reduction.
+    #[serde(default = "default_armor_reduction_floor_pierce")]
+    pub armor_reduction_floor_pierce: f32,
+    /// Visual-detection mask from a WovenReedCloak at quality `1.0`.
+    /// Multiplies the *sight* component of prey detection (before its
+    /// `max` with tremor). Read by `try_detect_cat`.
+    #[serde(default = "default_cloak_visual_mask_magnitude")]
+    pub cloak_visual_mask_magnitude: f32,
+    /// Strike-success bonus applied to the catch threshold when the cat
+    /// wields a `WeaponClass::Pierce` weapon at quality `1.0`. Read by
+    /// `resolve_engage_prey` at pounce-success eval.
+    #[serde(default = "default_hunt_strike_pierce_bonus")]
+    pub hunt_strike_pierce_bonus: f32,
+    /// Strike-success bonus for `WeaponClass::Slash` at quality `1.0`.
+    #[serde(default = "default_hunt_strike_slash_bonus")]
+    pub hunt_strike_slash_bonus: f32,
+    /// Strike-success bonus for `WeaponClass::Blunt` at quality `1.0`.
+    #[serde(default = "default_hunt_strike_blunt_bonus")]
+    pub hunt_strike_blunt_bonus: f32,
+    /// Per-strike probability that a `DurabilityTier::Fragile` weapon
+    /// (the three bone weapons) snaps on a *failed* strike. On snap, the
+    /// weapon is removed from the cat's inventory and
+    /// `Feature::BoneWeaponSnapped` fires.
+    #[serde(default = "default_bone_weapon_snap_chance_on_miss")]
+    pub bone_weapon_snap_chance_on_miss: f32,
+    /// Tremor floor lifted by carrying `NoiseClass::Loud` kit. Replaces
+    /// the action-derived tremor multiplier inside `try_detect_cat` so a
+    /// patient stalker carrying loud metal can still be heard. Phase 2b
+    /// items are all Silent; 370's metal items flip this read live.
+    #[serde(default = "default_noise_class_loud_tremor_floor")]
+    pub noise_class_loud_tremor_floor: f32,
 }
 
 fn default_pain_incapacitation_threshold() -> f32 {
     0.9
+}
+
+// Equipment-effect defaults (ticket 477). Conservative initial magnitudes —
+// balance iteration follows in `docs/balance/equipment-effects.md` gated on
+// the post-477 soak verdict.
+fn default_equipment_quality_floor() -> f32 {
+    0.25
+}
+fn default_armor_blunt_absorb_magnitude() -> f32 {
+    0.20
+}
+fn default_armor_pierce_partial_blunt_magnitude() -> f32 {
+    0.30
+}
+fn default_armor_pierce_partial_pierce_magnitude() -> f32 {
+    0.10
+}
+fn default_armor_reduction_floor_blunt() -> f32 {
+    0.50
+}
+fn default_armor_reduction_floor_pierce() -> f32 {
+    0.40
+}
+fn default_cloak_visual_mask_magnitude() -> f32 {
+    0.35
+}
+fn default_hunt_strike_pierce_bonus() -> f32 {
+    0.12
+}
+fn default_hunt_strike_slash_bonus() -> f32 {
+    0.10
+}
+fn default_hunt_strike_blunt_bonus() -> f32 {
+    0.08
+}
+fn default_bone_weapon_snap_chance_on_miss() -> f32 {
+    0.04
+}
+fn default_noise_class_loud_tremor_floor() -> f32 {
+    1.2
 }
 
 fn default_body_zone_pain_weights() -> [f32; 13] {
@@ -678,6 +776,18 @@ impl Default for CombatConstants {
             body_zone_condition_thresholds: default_body_zone_condition_thresholds(),
             body_zone_permanent_at_destroyed: default_body_zone_permanent_at_destroyed(),
             body_zone_healing: BodyZoneHealing::default(),
+            equipment_quality_floor: default_equipment_quality_floor(),
+            armor_blunt_absorb_magnitude: default_armor_blunt_absorb_magnitude(),
+            armor_pierce_partial_blunt_magnitude: default_armor_pierce_partial_blunt_magnitude(),
+            armor_pierce_partial_pierce_magnitude: default_armor_pierce_partial_pierce_magnitude(),
+            armor_reduction_floor_blunt: default_armor_reduction_floor_blunt(),
+            armor_reduction_floor_pierce: default_armor_reduction_floor_pierce(),
+            cloak_visual_mask_magnitude: default_cloak_visual_mask_magnitude(),
+            hunt_strike_pierce_bonus: default_hunt_strike_pierce_bonus(),
+            hunt_strike_slash_bonus: default_hunt_strike_slash_bonus(),
+            hunt_strike_blunt_bonus: default_hunt_strike_blunt_bonus(),
+            bone_weapon_snap_chance_on_miss: default_bone_weapon_snap_chance_on_miss(),
+            noise_class_loud_tremor_floor: default_noise_class_loud_tremor_floor(),
         }
     }
 }

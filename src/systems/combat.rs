@@ -3,7 +3,9 @@ use rand::Rng;
 
 use crate::ai::{Action, CurrentAction};
 use crate::components::body_zones::{BodyPart, CatBodyModel};
+use crate::components::equipment_effects::{equipment_modifiers_for, EquipmentModifiers};
 use crate::components::identity::{Gender, LifeStage, Name};
+use crate::components::magic::Inventory;
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, InjurySource, Needs, Position};
@@ -19,6 +21,7 @@ use crate::resources::rng::SimRng;
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::{DayPhase, Season, TimeState};
+use crate::resources::trace_log::FocalResolverSink;
 use crate::resources::weather::Weather;
 
 // ---------------------------------------------------------------------------
@@ -32,6 +35,15 @@ fn combat_jitter(rng: &mut impl Rng, jitter_range: f32) -> f32 {
 // ---------------------------------------------------------------------------
 // Combat resolution system
 // ---------------------------------------------------------------------------
+
+/// Message writers used by `resolve_combat`, bundled into one
+/// `SystemParam` so the system stays within Bevy's 16-param ceiling
+/// after ticket 477 added the focal-trace param.
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct CombatWriters<'w> {
+    pub pushback: MessageWriter<'w, crate::systems::magic::CorruptionPushback>,
+    pub body_part: MessageWriter<'w, BodyPartInjury>,
+}
 
 /// Per-tick combat between cats (Action::Fight) and adjacent wildlife.
 ///
@@ -55,6 +67,7 @@ pub fn resolve_combat(
             &mut Memory,
             &mut Mood,
             &mut CatBodyModel,
+            &Inventory,
         ),
         Without<Dead>,
     >,
@@ -76,14 +89,16 @@ pub fn resolve_combat(
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
     mut relationships: ResMut<crate::resources::relationships::Relationships>,
-    mut pushback_writer: MessageWriter<crate::systems::magic::CorruptionPushback>,
-    mut body_part_writer: MessageWriter<BodyPartInjury>,
+    mut writers: CombatWriters,
     mut colony_score: Option<ResMut<crate::resources::colony_score::ColonyScore>>,
     mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     registry: Option<Res<TemplateRegistry>>,
+    // 477 — focal-cat resolver-trace sink for armor-reduction reads.
+    focal_trace: crate::resources::trace_log::FocalTraceParam,
     mut commands: Commands,
 ) {
     let c = &constants.combat;
+    let focal_sink = focal_trace.sink(time.tick);
     // Collect fighting cats and their targets.
     struct FightInfo {
         cat_entity: Entity,
@@ -92,13 +107,15 @@ pub fn resolve_combat(
 
     let fights: Vec<FightInfo> = cats
         .iter()
-        .filter(|(_, current, _, _, _, _, _, _, _, _, _)| {
+        .filter(|(_, current, _, _, _, _, _, _, _, _, _, _)| {
             current.action == Action::Fight && current.target_entity.is_some()
         })
-        .map(|(entity, current, _, _, _, _, _, _, _, _, _)| FightInfo {
-            cat_entity: entity,
-            target_entity: current.target_entity.unwrap(),
-        })
+        .map(
+            |(entity, current, _, _, _, _, _, _, _, _, _, _)| FightInfo {
+                cat_entity: entity,
+                target_entity: current.target_entity.unwrap(),
+            },
+        )
         .collect();
 
     if fights.is_empty() {
@@ -162,7 +179,7 @@ pub fn resolve_combat(
             combat_effective,
             cat_name,
         ) = {
-            if let Ok((_, _, health, _, skills, personality, pos, name, _, _, _)) =
+            if let Ok((_, _, health, _, skills, personality, pos, name, _, _, _, _)) =
                 cats.get(fight.cat_entity)
             {
                 let ce = skills.combat + skills.hunting * c.combat_effective_hunting_weight;
@@ -294,10 +311,23 @@ pub fn resolve_combat(
             mut memory,
             mut mood,
             mut cat_body_model,
+            inventory,
         )) = cats.get_mut(fight.cat_entity)
         {
             let injury_pos = *cat_pos;
-            cat_health.current = (cat_health.current - wildlife_damage).max(0.0);
+            // 477 — worn-equipment aggregate for armor reduction. The
+            // health scalar and the body-model injury must agree on the
+            // post-armor damage, so reduce once here and pass the reduced
+            // value to both. `damage_to_body_part` still receives the
+            // equipment + sink so the reduction surfaces in the trace.
+            let em = equipment_modifiers_for(inventory, c);
+            let reduced_damage = armor_reduced_damage(
+                wildlife_damage,
+                InjurySource::WildlifeCombat,
+                crate::components::body_zones::WoundKind::Normal,
+                &em,
+            );
+            cat_health.current = (cat_health.current - reduced_damage).max(0.0);
 
             // 095 Phase 1 — anatomical substrate is canonical. Legacy
             // `Injury` record + injury_*_health_penalty retired.
@@ -309,8 +339,10 @@ pub fn resolve_combat(
                 InjurySource::WildlifeCombat,
                 c,
                 &mut rng,
-                &mut body_part_writer,
+                &mut writers.body_part,
                 &mut activation,
+                Some(&em),
+                focal_sink.as_ref(),
             );
 
             // Narrative + memory side-effects derived from raw damage
@@ -393,11 +425,13 @@ pub fn resolve_combat(
             score.banishments += 1;
         }
         // Pushback corruption from the banishment site.
-        pushback_writer.write(crate::systems::magic::CorruptionPushback {
-            position: *target_pos,
-            radius: c.banishment_pushback_radius,
-            amount: c.banishment_pushback_amount,
-        });
+        writers
+            .pushback
+            .write(crate::systems::magic::CorruptionPushback {
+                position: *target_pos,
+                radius: c.banishment_pushback_radius,
+                amount: c.banishment_pushback_amount,
+            });
 
         // Identify posse leader (first cat) for narrative. Capture name,
         // personality, and needs now — the `cats` query is iterated mutably
@@ -408,7 +442,7 @@ pub fn resolve_combat(
         let leader_read: Option<(String, Personality, Needs)> = posse
             .first()
             .and_then(|e| cats.get(*e).ok())
-            .map(|(_, _, _, needs, _, personality, _, name, _, _, _)| {
+            .map(|(_, _, _, needs, _, personality, _, name, _, _, _, _)| {
                 (name.0.clone(), personality.clone(), needs.clone())
             });
         let leader_name = leader_read
@@ -420,10 +454,10 @@ pub fn resolve_combat(
         // not in the posse) so we can iter_mut without aliasing.
         let witnesses: Vec<Entity> = cats
             .iter()
-            .filter(|(e, _, _, _, _, _, pos, _, _, _, _)| {
+            .filter(|(e, _, _, _, _, _, pos, _, _, _, _, _)| {
                 !posse.contains(e) && pos.manhattan_distance(target_pos) <= c.legend_witness_range
             })
-            .map(|(e, _, _, _, _, _, _, _, _, _, _)| e)
+            .map(|(e, _, _, _, _, _, _, _, _, _, _, _)| e)
             .collect();
 
         // Apply posse boons. Skill gain diminishes per prior banishment a
@@ -434,7 +468,7 @@ pub fn resolve_combat(
         let valor_ticks = config.ticks_per_season * 2;
         let seasonal_ticks = config.ticks_per_season;
         for cat_entity in posse {
-            if let Ok((_, _, _, _, mut skills, _, _, _, mut memory, mut mood, _)) =
+            if let Ok((_, _, _, _, mut skills, _, _, _, mut memory, mut mood, _, _)) =
                 cats.get_mut(*cat_entity)
             {
                 let prior_triumphs = memory
@@ -466,7 +500,7 @@ pub fn resolve_combat(
 
         // Apply witness boons.
         for witness in &witnesses {
-            if let Ok((_, _, _, mut w_needs, _, _, _, _, mut w_memory, mut w_mood, _)) =
+            if let Ok((_, _, _, mut w_needs, _, _, _, _, mut w_memory, mut w_mood, _, _)) =
                 cats.get_mut(*witness)
             {
                 w_needs.safety = w_needs.safety.max(c.banishment_witness_safety_floor);
@@ -543,7 +577,7 @@ pub fn resolve_combat(
             let posse_names: Vec<String> = posse
                 .iter()
                 .filter_map(|e| cats.get(*e).ok())
-                .map(|(_, _, _, _, _, _, _, name, _, _, _)| name.0.clone())
+                .map(|(_, _, _, _, _, _, _, name, _, _, _, _)| name.0.clone())
                 .collect();
             elog.push(
                 time.tick,
@@ -556,7 +590,7 @@ pub fn resolve_combat(
 
         // Release posse cats from Fight action so they can re-evaluate.
         for cat_entity in posse {
-            if let Ok((_, mut current, _, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
+            if let Ok((_, mut current, _, _, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
                 current.ticks_remaining = 0;
             }
         }
@@ -565,7 +599,7 @@ pub fn resolve_combat(
 
     // Apply victory rewards.
     for (cat_entity, _defeated) in &victorious_cats {
-        if let Ok((_, mut current, _, mut needs, _, personality, _, _, _memory, mut mood, _)) =
+        if let Ok((_, mut current, _, mut needs, _, personality, _, _, _memory, mut mood, _, _)) =
             cats.get_mut(*cat_entity)
         {
             needs.respect = (needs.respect + c.victory_respect_gain).min(1.0);
@@ -621,7 +655,7 @@ pub fn resolve_combat(
     // until they starved (ticket 043, mirrors ticket 042's pattern for
     // a different urgency path).
     for cat_entity in &cats_to_flee {
-        if let Ok((_, mut current, _, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
+        if let Ok((_, mut current, _, _, _, _, _, _, _, _, _, _)) = cats.get_mut(*cat_entity) {
             current.action = Action::Flee;
             current.ticks_remaining = 0;
             // Keep target_position — will be recalculated next evaluate_actions.
@@ -632,7 +666,7 @@ pub fn resolve_combat(
     // Despawn dead/fleeing wildlife and reset any cats targeting them.
     for wl_entity in &wildlife_to_despawn {
         // Reset cats targeting this wildlife.
-        for (_, mut current, _, _, _, _, _, _, _, _, _) in &mut cats {
+        for (_, mut current, _, _, _, _, _, _, _, _, _, _) in &mut cats {
             if current.target_entity == Some(*wl_entity) {
                 current.ticks_remaining = 0;
                 current.target_entity = None;
@@ -748,6 +782,8 @@ pub(crate) fn damage_to_body_part(
     rng: &mut SimRng,
     writer: &mut MessageWriter<BodyPartInjury>,
     activation: &mut SystemActivation,
+    equipment: Option<&EquipmentModifiers>,
+    focal_sink: Option<&FocalResolverSink>,
 ) -> Option<(BodyPart, crate::components::body_zones::PartCondition)> {
     damage_to_body_part_with_kind(
         entity,
@@ -760,7 +796,68 @@ pub(crate) fn damage_to_body_part(
         rng,
         writer,
         activation,
+        equipment,
+        focal_sink,
     )
+}
+
+/// Which armor channel an incoming hit is reduced by (ticket 477).
+/// `Unarmored` means physical armor offers no protection — the doctrine
+/// call is that hide bracers don't blunt magical / festering damage, so
+/// `MagicMisfire` and `WoundKind::Festering` route here regardless of
+/// what the cat wears.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArmorDamageClass {
+    Blunt,
+    /// Dormant until a pierce-class attacker exists. `PiercePartial`
+    /// armor already aggregates `armor_pierce_reduction`, and the
+    /// `armor_reduced_damage` match consumes this arm — but no current
+    /// `InjurySource` maps here (claws/bites read as `Blunt`). The sling
+    /// follow-up (or a future pierce-class wildlife) flips a source to
+    /// this variant; the read site is wired now so that change is a
+    /// one-arm edit. Mirrors the dormant `NoiseClass::Loud` read site.
+    #[allow(dead_code)]
+    Pierce,
+    Unarmored,
+}
+
+fn armor_damage_class(
+    source: InjurySource,
+    kind: crate::components::body_zones::WoundKind,
+) -> ArmorDamageClass {
+    use crate::components::body_zones::WoundKind;
+    if matches!(kind, WoundKind::Festering) {
+        return ArmorDamageClass::Unarmored;
+    }
+    match source {
+        // Claws + bites read as blunt-class physical contact. No pierce-
+        // class incoming attacker exists yet (a future ranged/pierce
+        // wildlife or the sling follow-up would route to `Pierce`).
+        InjurySource::WildlifeCombat
+        | InjurySource::ShadowFoxAmbush
+        | InjurySource::FoxConfrontation => ArmorDamageClass::Blunt,
+        // Magic + legacy untagged damage bypass physical armor.
+        InjurySource::MagicMisfire | InjurySource::Unknown => ArmorDamageClass::Unarmored,
+    }
+}
+
+/// 477 — armor-reduced damage for a hit of the given source/kind against
+/// a cat wearing `em`. Single source of truth shared by the `Health`
+/// scalar path and `damage_to_body_part`'s body-model path so they never
+/// diverge. Pure; no trace side-effect (the caller that wants the trace
+/// row routes through `damage_to_body_part`).
+pub(crate) fn armor_reduced_damage(
+    damage: f32,
+    source: InjurySource,
+    kind: crate::components::body_zones::WoundKind,
+    em: &EquipmentModifiers,
+) -> f32 {
+    let reduction = match armor_damage_class(source, kind) {
+        ArmorDamageClass::Blunt => em.armor_blunt_reduction,
+        ArmorDamageClass::Pierce => em.armor_pierce_reduction,
+        ArmorDamageClass::Unarmored => 0.0,
+    };
+    damage * (1.0 - reduction)
 }
 
 /// 472 — variant of `damage_to_body_part` that explicitly carries the
@@ -779,7 +876,35 @@ pub(crate) fn damage_to_body_part_with_kind(
     rng: &mut SimRng,
     writer: &mut MessageWriter<BodyPartInjury>,
     activation: &mut SystemActivation,
+    // 477 — worn-equipment aggregate for armor reduction. `None` from
+    // callers where armor doesn't apply (magic misfire path) or isn't
+    // plumbed.
+    equipment: Option<&EquipmentModifiers>,
+    // 477 — focal-cat trace sink. Records the armor-reduction modifier
+    // as a named `L4Resolver` row when the struck cat is the focal cat.
+    focal_sink: Option<&FocalResolverSink>,
 ) -> Option<(BodyPart, crate::components::body_zones::PartCondition)> {
+    // 477 — armor reduction. Composes the worn-armor aggregate against
+    // the hit's damage class, surfacing the applied reduction in the
+    // resolver trace (never a hidden post-hoc bonus).
+    let damage = if let Some(em) = equipment {
+        let reduced = armor_reduced_damage(damage, source, kind, em);
+        if reduced < damage {
+            if let Some(sink) = focal_sink {
+                sink.record(
+                    entity,
+                    "damage_to_body_part",
+                    "armor.reduction",
+                    damage,
+                    reduced,
+                );
+            }
+        }
+        reduced
+    } else {
+        damage
+    };
+
     if damage < c.injury_negligible_threshold {
         return None;
     }
@@ -1018,6 +1143,102 @@ mod tests {
         );
     }
 
+    // ----- 477 — equipment armor-reduction read site -----
+
+    #[test]
+    fn armor_reduces_blunt_damage_and_records_trace_row() {
+        use crate::components::equipment_effects::EquipmentModifiers;
+        use crate::resources::trace_log::{FocalResolverSink, FocalScoreCapture, FocalTraceTarget};
+        use bevy_ecs::system::SystemState;
+
+        let c = &SimConstants::default().combat;
+        let mut world = bevy_ecs::world::World::new();
+        world.insert_resource(bevy_ecs::message::Messages::<BodyPartInjury>::default());
+        let mut writer_state = SystemState::<MessageWriter<BodyPartInjury>>::new(&mut world);
+
+        let mut model = CatBodyModel::default();
+        let mut rng = test_rng();
+        let mut activation = SystemActivation::default();
+
+        let cat = Entity::PLACEHOLDER;
+        let em = EquipmentModifiers {
+            weapon: None,
+            armor_blunt_reduction: 0.30,
+            armor_pierce_reduction: 0.0,
+            ranged_enabled: false,
+            detection_visual_mask: 0.0,
+            noise_level: crate::components::equipment::NoiseClass::Silent,
+        };
+        let capture = FocalScoreCapture::default();
+        let target = FocalTraceTarget {
+            name: "focal".into(),
+            entity: Some(cat),
+        };
+        let sink = FocalResolverSink::new(Some(&capture), Some(&target), 42).unwrap();
+
+        let raw_damage = 0.30_f32;
+        {
+            let mut writer = writer_state.get_mut(&mut world);
+            damage_to_body_part(
+                cat,
+                &mut model,
+                raw_damage,
+                42,
+                InjurySource::WildlifeCombat,
+                c,
+                &mut rng,
+                &mut writer,
+                &mut activation,
+                Some(&em),
+                Some(&sink),
+            );
+        }
+        writer_state.apply(&mut world);
+
+        // The body model + emitted message must reflect the *reduced*
+        // damage (0.30 × (1 − 0.30) = 0.21), not the raw 0.30.
+        let messages = world.resource::<bevy_ecs::message::Messages<BodyPartInjury>>();
+        let mut cursor = messages.get_cursor();
+        let msg = cursor
+            .read(messages)
+            .next()
+            .expect("a BodyPartInjury message");
+        assert!(
+            (msg.tissue_damage_delta - 0.21).abs() < 1e-5,
+            "expected reduced damage 0.21, got {}",
+            msg.tissue_damage_delta
+        );
+
+        // The reduction must surface as a named resolver-trace row.
+        let inner = capture.drain();
+        let row = inner
+            .resolver_modifiers
+            .iter()
+            .find(|r| r.resolver == "damage_to_body_part" && r.modifier == "armor.reduction")
+            .expect("an armor.reduction resolver-trace row");
+        assert!((row.pre - 0.30).abs() < 1e-5);
+        assert!((row.post - 0.21).abs() < 1e-5);
+    }
+
+    #[test]
+    fn magic_damage_bypasses_armor() {
+        use crate::components::body_zones::WoundKind;
+        use crate::components::equipment_effects::EquipmentModifiers;
+        // Festering / magic damage routes through `Unarmored` regardless
+        // of worn armor (deliberate doctrine call).
+        let em = EquipmentModifiers {
+            weapon: None,
+            armor_blunt_reduction: 0.30,
+            armor_pierce_reduction: 0.30,
+            ranged_enabled: false,
+            detection_visual_mask: 0.0,
+            noise_level: crate::components::equipment::NoiseClass::Silent,
+        };
+        let reduced =
+            armor_reduced_damage(0.50, InjurySource::MagicMisfire, WoundKind::Festering, &em);
+        assert_eq!(reduced, 0.50, "magic damage must not be blunted by armor");
+    }
+
     // ----- 095 Phase 1 — damage_to_body_part substrate tests -----
 
     /// Helper: a fresh SimRng with a fixed seed for deterministic
@@ -1052,6 +1273,8 @@ mod tests {
                 &mut rng,
                 &mut writer,
                 &mut activation,
+                None,
+                None,
             )
         };
         writer_state.apply(&mut world);
@@ -1089,6 +1312,8 @@ mod tests {
                 &mut rng,
                 &mut writer,
                 &mut activation,
+                None,
+                None,
             )
         };
         writer_state.apply(&mut world);
@@ -1182,6 +1407,8 @@ mod tests {
                 &mut rng,
                 &mut writer,
                 &mut activation,
+                None,
+                None,
             );
         }
         writer_state.apply(&mut world);

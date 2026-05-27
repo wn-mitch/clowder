@@ -531,6 +531,13 @@ pub fn observer_smells_at(
 /// `crate::resources::action_tremor_mul(action, &constants.tremor)`.
 /// Callers that don't know the cat's action (test helpers, etc.) pass
 /// `1.0` to recover the pre-100 baseline (walking cat).
+///
+/// **Ticket 477 — `cat_visual_mask`.** A worn cloak masks the *sight*
+/// component only (multiplied by `1 - mask` before the `max` with
+/// tremor): a cloaked cat is harder to see but the tremor of motion
+/// still gives them away. Pass `0.0` to recover the no-cloak baseline.
+/// Noise-class effects ride on `cat_action_tremor_mul` (the caller
+/// raises that floor for Loud kit) rather than a separate param.
 pub fn prey_cat_proximity(
     prey_pos: Position,
     prey_kind: crate::components::prey::PreyKind,
@@ -538,6 +545,7 @@ pub fn prey_cat_proximity(
     cat_pos: Position,
     alert_radius: i32,
     cat_action_tremor_mul: f32,
+    cat_visual_mask: f32,
 ) -> f32 {
     let dist = prey_pos.manhattan_distance(&cat_pos);
     if dist == 0 {
@@ -558,12 +566,14 @@ pub fn prey_cat_proximity(
     // pre-100 callers depend on). Cliff vs Linear falloff on the
     // species' sight channel is preserved.
     let sight_result = if dist <= alert_radius {
-        detect(
+        let raw_sight = detect(
             observer_ctx,
             target_ctx,
             EnvCtx::identity().with_max_range(alert_radius as f32 + 1.0),
         )
-        .sight
+        .sight;
+        // 477 — cloak masks the visual channel only.
+        raw_sight * (1.0 - cat_visual_mask.clamp(0.0, 1.0))
     } else {
         0.0
     };
@@ -1304,6 +1314,7 @@ mod tests {
             cat_pos,
             alert_radius,
             running_mul,
+            0.0,
         );
         assert!(
             p > 0.0,
@@ -1329,6 +1340,7 @@ mod tests {
             cat_pos,
             alert_radius,
             stalk_mul,
+            0.0,
         );
         assert_eq!(
             p, 0.0,
@@ -1629,6 +1641,7 @@ mod tests {
                             profile,
                             cat_pos,
                             alert_radius,
+                            0.0,
                             0.0,
                         );
                         let diff = (old_proximity - new_proximity).abs();

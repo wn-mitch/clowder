@@ -76,6 +76,10 @@ pub fn author_festering_from_misfire(
             &mut rng,
             &mut writer,
             &mut activation,
+            // 477 — physical armor does not blunt magical / festering
+            // damage (deliberate doctrine call); pass no equipment.
+            None,
+            None,
         );
     }
 }

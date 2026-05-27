@@ -5783,6 +5783,14 @@ fn dispatch_step_action(
                 &ec.target_validity,
                 None, // RecentTargetFailures lands in 073
             );
+            // 477 — focal-cat resolver-trace sink for the equipment
+            // weapon-strike read. Built from `ec`'s focal-trace resources
+            // (headless-only); `None` in interactive runs / non-focal cats.
+            let engage_focal_sink = crate::resources::trace_log::FocalResolverSink::new(
+                ec.focal_capture.as_deref(),
+                ec.focal_target.as_deref(),
+                ec.time.tick,
+            );
             resolve_engage_prey(
                 &mut plan.step_state[step_idx],
                 ticks,
@@ -5817,6 +5825,10 @@ fn dispatch_step_action(
                 // correct emission multiplier.
                 &ec.constants.sensory,
                 current,
+                // 477: combat constants + focal sink for the equipment
+                // weapon-strike bonus + bone-snap canary.
+                &ec.constants.combat,
+                engage_focal_sink.as_ref(),
             )
         }
 
@@ -9092,6 +9104,11 @@ fn resolve_engage_prey(
     // on stalk-phase entry and `Action::Pounce` on pounce-phase entry
     // so `tremor_tick` reads the right multiplier next tick.
     current_action: &mut CurrentAction,
+    // 477 — combat constants for the equipment weapon-strike bonus +
+    // bone-snap roll, and the focal-cat resolver-trace sink so the
+    // weapon modifier surfaces as a named L4Resolver row.
+    combat: &crate::resources::sim_constants::CombatConstants,
+    focal_sink: Option<&crate::resources::trace_log::FocalResolverSink>,
 ) -> crate::steps::StepResult {
     use crate::components::magic::ItemSlot;
     use crate::components::prey::PreyAiState;
@@ -9281,11 +9298,35 @@ fn resolve_engage_prey(
         } else {
             1.0
         };
-        let success_chance = awareness_base
+        let base_success_chance = awareness_base
             * (d.pounce_skill_base + skills.hunting * d.pounce_skill_scale)
             * distance_mod
             * catch_mod
             * density_bonus;
+
+        // 477 — equipment weapon-strike bonus. A wielded melee weapon
+        // raises the catch threshold by a class-keyed, quality-scaled
+        // amount, surfaced in the resolver trace as a named modifier
+        // (never a hidden post-hoc bonus). Ranged weapons contribute
+        // nothing here (their mode is the 477 follow-up).
+        let em = crate::components::equipment_effects::equipment_modifiers_for(inventory, combat);
+        let weapon_bonus = em.weapon.map(|w| w.strike_bonus(combat)).unwrap_or(0.0);
+        let success_chance = (base_success_chance + weapon_bonus).clamp(0.0, 1.0);
+        if let Some(sink) = focal_sink.filter(|_| weapon_bonus > 0.0) {
+            let label = match em.weapon.map(|w| w.class) {
+                Some(crate::components::equipment::WeaponClass::Pierce) => "weapon.pierce.bonus",
+                Some(crate::components::equipment::WeaponClass::Slash) => "weapon.slash.bonus",
+                Some(crate::components::equipment::WeaponClass::Blunt) => "weapon.blunt.bonus",
+                _ => "weapon.bonus",
+            };
+            sink.record(
+                cat_entity,
+                "resolve_engage_prey",
+                label,
+                base_success_chance,
+                success_chance,
+            );
+        }
 
         if rng.rng.random::<f32>() < success_chance {
             // Catch!
@@ -9489,6 +9530,45 @@ fn resolve_engage_prey(
             }
         } else {
             // Miss — prey bolts.
+            // 477 — a fragile (bone) weapon may snap on the failed strike.
+            // Deterministic-from-state roll (no fresh affix): fragile gate
+            // + per-strike snap chance. On snap, remove the weapon from
+            // inventory (items-are-real: the tool is gone) and fire the
+            // durability canary.
+            let snapped = em.weapon.filter(|w| {
+                w.fragile
+                    && rng.rng.random::<f32>() < combat.bone_weapon_snap_chance_on_miss
+                    && inventory.take_item(w.kind)
+            });
+            if snapped.is_some() {
+                if let Some(sink) = focal_sink {
+                    sink.record(
+                        cat_entity,
+                        "resolve_engage_prey",
+                        "weapon.bone_snap",
+                        1.0,
+                        0.0,
+                    );
+                }
+                if let Some(act) = narr.activation.as_deref_mut() {
+                    act.record(crate::resources::system_activation::Feature::BoneWeaponSnapped);
+                }
+                emit_hunt_narrative(
+                    narr,
+                    time,
+                    rng,
+                    map,
+                    pos,
+                    name,
+                    gender,
+                    personality,
+                    needs,
+                    "miss",
+                    &format!("{}'s bone weapon snaps against the strike.", name.0),
+                    Some(species_name),
+                    None,
+                );
+            }
             if let Ok((_, _, _, mut prey_st)) = prey_query.get_mut(target_entity) {
                 prey_st.ai_state = PreyAiState::Fleeing {
                     from: cat_entity,

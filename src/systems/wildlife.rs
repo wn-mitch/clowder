@@ -1627,6 +1627,7 @@ pub fn predator_stalk_cats(
             &mut Mood,
             &Name,
             &mut crate::components::CatBodyModel,
+            &crate::components::magic::Inventory,
         ),
         (Without<WildAnimal>, Without<Dead>),
     >,
@@ -1640,7 +1641,10 @@ pub fn predator_stalk_cats(
     mut activation: ResMut<SystemActivation>,
     mut recent_ambush_map: ResMut<crate::resources::RecentAmbushMap>,
     mut body_part_writer: MessageWriter<crate::messages::body_part_injury::BodyPartInjury>,
+    // 477 — focal-cat resolver-trace sink for ambush armor reduction.
+    focal_trace: crate::resources::trace_log::FocalTraceParam,
 ) {
+    let focal_sink = focal_trace.sink(time.tick);
     let c = &constants.wildlife;
     let ward_multiplier = constants.magic.shadow_fox_ward_repel_multiplier;
 
@@ -1652,8 +1656,10 @@ pub fn predator_stalk_cats(
         .collect();
 
     // Snapshot cat positions for stalking target selection.
-    let cat_positions: Vec<(Entity, Position)> =
-        cats.iter().map(|(e, p, _, _, _, _, _)| (e, *p)).collect();
+    let cat_positions: Vec<(Entity, Position)> = cats
+        .iter()
+        .map(|(e, p, _, _, _, _, _, _)| (e, *p))
+        .collect();
 
     for (mut animal, wl_pos, mut ai_state, _health) in &mut wildlife {
         // Query filter `With<ShadowFoxDrives>` gates this loop to shadow
@@ -1755,6 +1761,7 @@ pub fn predator_stalk_cats(
                             mut mood,
                             name,
                             mut cat_body_model,
+                            inventory,
                         )) = cats.get_mut(*cat_entity)
                         {
                             let tile_corruption = if map.in_bounds(wl_pos.x, wl_pos.y) {
@@ -1764,7 +1771,20 @@ pub fn predator_stalk_cats(
                             };
                             let damage = animal.threat_power
                                 * (1.0 + tile_corruption * c.corruption_threat_multiplier);
-                            cat_health.current = (cat_health.current - damage).max(0.0);
+                            // 477 — armor reduces ambush damage. Reduce once
+                            // for the health scalar; `damage_to_body_part`
+                            // reduces internally for the body model + trace.
+                            let em = crate::components::equipment_effects::equipment_modifiers_for(
+                                inventory,
+                                &constants.combat,
+                            );
+                            let reduced = crate::systems::combat::armor_reduced_damage(
+                                damage,
+                                crate::components::physical::InjurySource::ShadowFoxAmbush,
+                                crate::components::body_zones::WoundKind::Normal,
+                                &em,
+                            );
+                            cat_health.current = (cat_health.current - reduced).max(0.0);
                             // 095 Phase 1 — anatomical substrate is canonical.
                             // Legacy `Injury` record retired.
                             let _ = cat_pos; // injury_pos no longer needed
@@ -1778,6 +1798,8 @@ pub fn predator_stalk_cats(
                                 &mut rng,
                                 &mut body_part_writer,
                                 &mut activation,
+                                Some(&em),
+                                focal_sink.as_ref(),
                             );
                             needs.safety = (needs.safety - c.threat_safety_drain).max(0.0);
 
@@ -1830,7 +1852,7 @@ pub fn predator_stalk_cats(
                                 continue;
                             }
                             if wl_pos.manhattan_distance(witness_pos) <= c.ambush_witness_range {
-                                if let Ok((_, _, _, mut w_needs, mut w_mood, _, _)) =
+                                if let Ok((_, _, _, mut w_needs, mut w_mood, _, _, _)) =
                                     cats.get_mut(*witness_entity)
                                 {
                                     w_needs.safety =
@@ -3088,6 +3110,7 @@ pub fn fox_confrontation_tick(
             &mut Mood,
             &Name,
             &mut crate::components::CatBodyModel,
+            &crate::components::magic::Inventory,
         ),
         (Without<WildAnimal>, Without<Dead>),
     >,
@@ -3099,8 +3122,11 @@ pub fn fox_confrontation_tick(
     mut activation: ResMut<SystemActivation>,
     map: Res<TileMap>,
     mut body_part_writer: MessageWriter<crate::messages::body_part_injury::BodyPartInjury>,
+    // 477 — focal-cat resolver-trace sink for confrontation armor reduction.
+    focal_trace: crate::resources::trace_log::FocalTraceParam,
 ) {
     let fc = &constants.fox_ecology;
+    let focal_sink = focal_trace.sink(time.tick);
     let post_action_cooldown_ticks = fc.post_action_cooldown.ticks(&time_scale);
 
     for (_fox_entity, mut fox, mut phase, mut ai_state, pos, mut fox_health) in &mut foxes {
@@ -3170,11 +3196,21 @@ pub fn fox_confrontation_tick(
 
             // Try to find the target cat and damage it.
             let target_entity = Entity::from_bits(target_id);
-            if let Ok((_cat_pos, mut cat_health, mut mood, name, mut cat_body_model)) =
+            if let Ok((_cat_pos, mut cat_health, mut mood, name, mut cat_body_model, inventory)) =
                 cats.get_mut(target_entity)
             {
-                cat_health.current =
-                    (cat_health.current - fc.standoff_damage_on_escalation).max(0.0);
+                // 477 — armor reduces confrontation escalation damage.
+                let em = crate::components::equipment_effects::equipment_modifiers_for(
+                    inventory,
+                    &constants.combat,
+                );
+                let reduced = crate::systems::combat::armor_reduced_damage(
+                    fc.standoff_damage_on_escalation,
+                    crate::components::physical::InjurySource::FoxConfrontation,
+                    crate::components::body_zones::WoundKind::Normal,
+                    &em,
+                );
+                cat_health.current = (cat_health.current - reduced).max(0.0);
                 // 095 Phase 1 — anatomical substrate is canonical.
                 crate::systems::combat::damage_to_body_part(
                     target_entity,
@@ -3186,6 +3222,8 @@ pub fn fox_confrontation_tick(
                     &mut rng,
                     &mut body_part_writer,
                     &mut activation,
+                    Some(&em),
+                    focal_sink.as_ref(),
                 );
                 mood.modifiers.push_back(
                     MoodModifier::new(

@@ -91,26 +91,70 @@ fn try_detect_cat(
     alertness_base: f32,
     alertness_range: f32,
     cat_positions: &Query<
-        (Entity, &Position, &crate::ai::CurrentAction),
+        (
+            Entity,
+            &Position,
+            &crate::ai::CurrentAction,
+            &crate::components::magic::Inventory,
+        ),
         (With<Needs>, Without<Dead>, Without<PreyAnimal>),
     >,
     tremor_constants: &crate::resources::sim_constants::TremorConstants,
+    // 477 — combat constants for the equipment cloak-mask / noise-floor
+    // reads, and the focal-cat resolver-trace sink so they surface as
+    // named L4Resolver rows.
+    combat: &crate::resources::sim_constants::CombatConstants,
+    focal_sink: Option<&crate::resources::trace_log::FocalResolverSink>,
     rng: &mut SimRng,
 ) -> Option<Entity> {
-    for (entity, cat_pos, current) in cat_positions.iter() {
+    for (entity, cat_pos, current, inventory) in cat_positions.iter() {
         // 100: per-cat tremor multiplier from the cat's current action.
         // A stalking cat returns ≈0.2 (suppressed); a running cat ≈1.8
         // (loud). `prey_cat_proximity` now returns `sight.max(tremor)`
         // so the prey hears the chase even if the cat is out of sight,
         // but is fooled by a patient stalk inside tremor range.
         let cat_tremor_mul = crate::resources::action_tremor_mul(current.action, tremor_constants);
+        // 477 — equipment cloak-mask + noise-class reads.
+        let em = crate::components::equipment_effects::equipment_modifiers_for(inventory, combat);
+        // Loud kit raises the tremor floor so a patient stalker carrying
+        // metal can still be heard. Phase 2b items are all Silent, so
+        // this is a dormant read until 370 flips metal variants to Loud.
+        let noise_floor = match em.noise_level {
+            crate::components::equipment::NoiseClass::Silent => 0.0,
+            crate::components::equipment::NoiseClass::Loud => combat.noise_class_loud_tremor_floor,
+        };
+        let effective_tremor_mul = cat_tremor_mul.max(noise_floor);
+        // 477 — focal-trace rows for the two reads, gated to the focal
+        // cat + the sight band where the cloak mask actually bites.
+        if let Some(sink) = focal_sink {
+            let dist = pos.manhattan_distance(cat_pos);
+            if em.detection_visual_mask > 0.0 && dist <= alert_radius {
+                sink.record(
+                    entity,
+                    "try_detect_cat",
+                    "cloak.visual_mask",
+                    1.0,
+                    1.0 - em.detection_visual_mask,
+                );
+            }
+            if effective_tremor_mul > cat_tremor_mul {
+                sink.record(
+                    entity,
+                    "try_detect_cat",
+                    "noise.tremor_floor",
+                    cat_tremor_mul,
+                    effective_tremor_mul,
+                );
+            }
+        }
         let proximity = crate::systems::sensing::prey_cat_proximity(
             *pos,
             prey_kind,
             prey_profile,
             *cat_pos,
             alert_radius,
-            cat_tremor_mul,
+            effective_tremor_mul,
+            em.detection_visual_mask,
         );
         if proximity <= 0.0 {
             continue;
@@ -219,7 +263,12 @@ pub fn prey_ai(
     // cat the same way regardless of behavior — the silent-failure
     // mode the ticket fixes.
     cat_positions: Query<
-        (Entity, &Position, &crate::ai::CurrentAction),
+        (
+            Entity,
+            &Position,
+            &crate::ai::CurrentAction,
+            &crate::components::magic::Inventory,
+        ),
         (With<Needs>, Without<Dead>, Without<PreyAnimal>),
     >,
     positions: Query<&Position, Without<PreyAnimal>>,
@@ -228,8 +277,12 @@ pub fn prey_ai(
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
     time_scale: Res<TimeScale>,
+    time: Res<TimeState>,
+    // 477 — focal-cat resolver-trace sink for cloak-mask / noise reads.
+    focal_trace: crate::resources::trace_log::FocalTraceParam,
 ) {
     let p = &constants.prey;
+    let focal_sink = focal_trace.sink(time.tick);
     let grazing_max_ticks = p.grazing_max_duration.ticks(&time_scale);
     for (config, mut state, mut pos) in &mut query {
         // O(1) den lookup for predation pressure → vigilance.
@@ -262,12 +315,14 @@ pub fn prey_ai(
                     p.alertness_range,
                     &cat_positions,
                     &constants.tremor,
+                    &constants.combat,
+                    focal_sink.as_ref(),
                     &mut rng,
                 ) {
                     if config.flee_strategy == FleeStrategy::Teleport {
                         let threat_pos = cat_positions
                             .get(threat)
-                            .map(|(_, p, _)| *p)
+                            .map(|(_, p, _, _)| *p)
                             .unwrap_or(*pos);
                         bird_teleport(
                             &mut pos,
@@ -319,12 +374,14 @@ pub fn prey_ai(
                     p.alertness_range,
                     &cat_positions,
                     &constants.tremor,
+                    &constants.combat,
+                    focal_sink.as_ref(),
                     &mut rng,
                 ) {
                     if config.flee_strategy == FleeStrategy::Teleport {
                         let threat_pos = cat_positions
                             .get(threat)
-                            .map(|(_, p, _)| *p)
+                            .map(|(_, p, _, _)| *p)
                             .unwrap_or(*pos);
                         bird_teleport(
                             &mut pos,
@@ -403,7 +460,7 @@ pub fn prey_ai(
 
                 let threat_pos = cat_positions
                     .get(threat)
-                    .map(|(_, p, _)| p)
+                    .map(|(_, p, _, _)| p)
                     .or_else(|_| positions.get(threat))
                     .ok();
 
@@ -438,7 +495,7 @@ pub fn prey_ai(
 
                 let threat_pos = cat_positions
                     .get(from)
-                    .map(|(_, p, _)| p)
+                    .map(|(_, p, _, _)| p)
                     .or_else(|_| positions.get(from))
                     .ok();
 
@@ -1324,6 +1381,11 @@ mod tests {
         world.insert_resource(crate::species::build_registry());
         world.insert_resource(SimConstants::default());
         world.insert_resource(test_time_scale());
+        world.insert_resource(TimeState {
+            tick: 0,
+            paused: false,
+            speed: crate::resources::SimSpeed::Normal,
+        });
         let mut schedule = Schedule::default();
         schedule.add_systems(prey_ai);
         (world, schedule)
@@ -1409,6 +1471,7 @@ mod tests {
             Health::default(),
             Position::new(10, 10),
             crate::ai::CurrentAction::default(),
+            crate::components::magic::Inventory::default(),
         ));
 
         // Spawn a rabbit (alert_radius=6) very close to the cat.

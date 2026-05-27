@@ -14,6 +14,7 @@ use std::sync::Mutex;
 
 use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude::Resource;
+use bevy_ecs::system::{Res, SystemParam};
 
 use crate::ai::dse::{DseId, Intention};
 use crate::ai::eval::EvalTrace;
@@ -436,6 +437,25 @@ pub enum TraceRecord {
         /// own `emits[]` table.
         fallback_used: bool,
     },
+    /// L4 — resolver-level modifier read (ticket 477). One record per
+    /// (focal cat × resolver × tick) where a `resolve_*` step (or a
+    /// combat system function) read the equipment-modifier aggregate
+    /// and applied a non-trivial modifier. Makes "items have bite"
+    /// legible: `damage_to_body_part` armor reduction, hunt-strike
+    /// weapon bonus, and the prey-detection cloak/noise masks all
+    /// surface here as named `ModifierApplication` rows, never as a
+    /// hidden post-hoc bonus. Joinable with `events.jsonl` and the other
+    /// trace layers by `(tick, cat)`.
+    ///
+    /// Modeled on the §3.5.1 DSE-side `ModifierApplication` shape so
+    /// `frame-diff` / `just inspect` read it without schema changes; the
+    /// `delta` field carries `post - pre`.
+    L4Resolver {
+        /// Resolver / system function name — `"damage_to_body_part"`,
+        /// `"resolve_engage_prey"`, `"try_detect_cat"`.
+        resolver: String,
+        modifiers: Vec<ModifierApplication>,
+    },
 }
 
 /// One row in the [`TraceRecord::L1Aspiration::emit_walk`] list — the
@@ -590,6 +610,24 @@ pub struct FocalScoreCaptureInner {
     /// capture is drained on a later tick (shouldn't happen under normal
     /// cadence, but we guard against drift).
     pub captured_tick: Option<u64>,
+    /// Ticket 477 — resolver-level modifier reads observed this tick.
+    /// One row per (resolver × modifier) the focal cat's resolvers
+    /// applied. Grouped by `resolver` name into `TraceRecord::L4Resolver`
+    /// records at emit time.
+    pub resolver_modifiers: Vec<ResolverModifierCapture>,
+}
+
+/// One resolver-level modifier read (ticket 477). Carries the resolver
+/// name, the modifier label, and the pre/post scalar so the trace
+/// records `post - pre` as the `ModifierApplication.delta`. Pushed via
+/// [`FocalResolverSink::record`] (focal-gated) and grouped by resolver
+/// at emit time.
+#[derive(Debug, Clone)]
+pub struct ResolverModifierCapture {
+    pub resolver: &'static str,
+    pub modifier: String,
+    pub pre: f32,
+    pub post: f32,
 }
 
 /// One commitment-gate decision. Fields mirror the §11.3 L3Commitment
@@ -688,6 +726,20 @@ impl FocalScoreCapture {
         inner.captured_tick = Some(tick);
     }
 
+    /// Ticket 477 — record a resolver-level modifier read for the focal
+    /// cat. Accumulates per tick; grouped by resolver name into
+    /// `TraceRecord::L4Resolver` rows by `emit_focal_trace`. Callers
+    /// should prefer [`FocalResolverSink::record`], which gates on the
+    /// focal entity before reaching this write path.
+    pub fn push_resolver_modifier(&self, row: ResolverModifierCapture, tick: u64) {
+        let mut inner = self
+            .inner
+            .lock()
+            .expect("focal score capture mutex poisoned");
+        inner.resolver_modifiers.push(row);
+        inner.captured_tick = Some(tick);
+    }
+
     /// Drain captured data for emission. Returns the inner state by
     /// value and resets the capture for the next tick.
     pub fn drain(&self) -> FocalScoreCaptureInner {
@@ -696,6 +748,83 @@ impl FocalScoreCapture {
             .lock()
             .expect("focal score capture mutex poisoned");
         std::mem::take(&mut *inner)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FocalResolverSink — focal-gated resolver-trace handle (ticket 477)
+// ---------------------------------------------------------------------------
+
+/// Borrowed handle a system constructs once (when a focal cat is
+/// resolved) and threads into the resolvers it calls. Resolvers receive
+/// `Option<&FocalResolverSink>` and call [`record`](Self::record)
+/// unconditionally on any non-trivial modifier read — the focal-cat gate
+/// lives inside `record`, so a non-focal cat's call is a cheap no-op.
+///
+/// This is deliberately NOT routed through `NarrativeEmitter`: narrative
+/// fires for every cat, whereas resolver-trace emission is focal-only
+/// like the rest of the §11 trace surface. Bundling the capture handle +
+/// focal entity + tick here keeps resolver signatures from widening into
+/// three separate parameters.
+pub struct FocalResolverSink<'a> {
+    capture: &'a FocalScoreCapture,
+    focal: Entity,
+    tick: u64,
+}
+
+impl<'a> FocalResolverSink<'a> {
+    /// Build a sink for the resolved focal cat. Returns `None` when the
+    /// focal target hasn't resolved to an entity yet, so callers can
+    /// pass `Option<&FocalResolverSink>` straight through.
+    pub fn new(
+        capture: Option<&'a FocalScoreCapture>,
+        target: Option<&FocalTraceTarget>,
+        tick: u64,
+    ) -> Option<Self> {
+        let capture = capture?;
+        let focal = target?.entity?;
+        Some(Self {
+            capture,
+            focal,
+            tick,
+        })
+    }
+
+    /// Record a modifier read iff `cat` is the focal cat. No-op
+    /// otherwise — callers don't need to pre-check the focal identity.
+    pub fn record(&self, cat: Entity, resolver: &'static str, modifier: &str, pre: f32, post: f32) {
+        if cat != self.focal {
+            return;
+        }
+        self.capture.push_resolver_modifier(
+            ResolverModifierCapture {
+                resolver,
+                modifier: modifier.to_string(),
+                pre,
+                post,
+            },
+            self.tick,
+        );
+    }
+}
+
+/// Bundles the two focal-trace resources (ticket 477) into one
+/// `SystemParam` so a system that wants to emit resolver-level trace
+/// rows spends a single param slot instead of two — relevant because
+/// equipment-aware systems like `resolve_combat` already sit at Bevy's
+/// 16-param ceiling. Both resources are headless-only (`Option`), so the
+/// param is a no-op in windowed/interactive runs.
+#[derive(SystemParam)]
+pub struct FocalTraceParam<'w> {
+    pub capture: Option<Res<'w, FocalScoreCapture>>,
+    pub target: Option<Res<'w, FocalTraceTarget>>,
+}
+
+impl FocalTraceParam<'_> {
+    /// Construct a focal sink for `tick`, or `None` when tracing is off
+    /// or the focal cat hasn't resolved to an entity yet.
+    pub fn sink(&self, tick: u64) -> Option<FocalResolverSink<'_>> {
+        FocalResolverSink::new(self.capture.as_deref(), self.target.as_deref(), tick)
     }
 }
 

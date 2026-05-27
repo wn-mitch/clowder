@@ -6,6 +6,7 @@ pub mod building;
 pub mod coordination;
 pub mod disposition;
 pub mod equipment;
+pub mod equipment_effects;
 pub mod fate;
 pub mod fertility;
 pub mod fox_goap_plan;

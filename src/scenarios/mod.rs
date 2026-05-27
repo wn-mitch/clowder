@@ -35,6 +35,9 @@ pub mod district_placement_under_pressure;
 pub mod drying_chain_eligibility;
 pub mod dying_arc_softmax;
 pub mod env;
+pub mod equipment_bone_snap;
+pub mod equipment_cloak_mask;
+pub mod equipment_weapon_strike;
 pub mod exploration_ranging;
 pub mod farm_herb_demand;
 pub mod farming_cycle;
@@ -115,6 +118,12 @@ pub const ALL: &[&Scenario] = &[
     &wildlife_fight::SCENARIO,
     &fondness_kitten_imprint::SCENARIO,
     &hunt_acquisition::SCENARIO,
+    // 477 — equipment weapon-strike bonus surfaces in the resolver trace.
+    &equipment_weapon_strike::SCENARIO,
+    // 477 — cloak visual-mask surfaces in the resolver trace.
+    &equipment_cloak_mask::SCENARIO,
+    // 477 — fragile bone weapon snaps on a missed strike.
+    &equipment_bone_snap::SCENARIO,
     // 184 — kill→travel→DepositPrey pipeline regression triage.
     &hunt_deposit_chain::SCENARIO,
     // 184 — fix lock: injured cats can still elect Hunt.

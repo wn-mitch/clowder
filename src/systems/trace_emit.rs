@@ -52,8 +52,8 @@ use crate::resources::trace_log::{
     AttenuationBreakdown, BeliefProxySummary, CapturedDse, CommitmentCapture, CompositionSummary,
     ConsiderationContribution, EligibilitySummary, FocalScoreCapture, FocalTraceTarget,
     IntentionSummary, MethodFrameTraceRecord, ModifierApplication, MomentumSummary,
-    PlanFailureCapture, PlanStateSummary, SoftmaxSummary, SpatialRef, TraceEntry, TraceLog,
-    TraceRecord,
+    PlanFailureCapture, PlanStateSummary, ResolverModifierCapture, SoftmaxSummary, SpatialRef,
+    TraceEntry, TraceLog, TraceRecord,
 };
 use crate::systems::influence_map::{
     channel_label, Attenuation, Faction, InfluenceMapRegistry, MapMetadata,
@@ -234,6 +234,21 @@ pub fn emit_focal_trace(world: &mut World) {
             base_sample,
             attenuation,
         );
+    }
+
+    // -----------------------------------------------------------------
+    // L4Resolver — resolver-level modifier reads (ticket 477). Emitted
+    // independent of the L2/L3 capture gate because combat / detection
+    // resolvers fire on any tick, not just planning ticks. Grouped by
+    // resolver name into one record each so a tick's worth of one
+    // resolver's modifier reads stays on a single line.
+    // -----------------------------------------------------------------
+    for record in l4_resolver_records(&captured.resolver_modifiers) {
+        trace_log.push(TraceEntry {
+            tick: snapshot.tick,
+            cat: snapshot.cat_name.clone(),
+            record,
+        });
     }
 
     // L2/L3 paths only fire when the scoring pass produced capture
@@ -498,6 +513,38 @@ fn l3_plan_failure_record(row: &PlanFailureCapture) -> TraceRecord {
         disposition: row.disposition.clone(),
         detail: row.detail.clone(),
     }
+}
+
+/// Group a tick's captured resolver-modifier reads (ticket 477) by
+/// resolver name into one [`TraceRecord::L4Resolver`] per resolver.
+/// Preserves first-seen resolver order and per-resolver push order so
+/// the trace is stable across runs. Each modifier becomes a
+/// [`ModifierApplication`] with `delta = post - pre` (the §3.5.1 shape).
+fn l4_resolver_records(rows: &[ResolverModifierCapture]) -> Vec<TraceRecord> {
+    let mut order: Vec<&'static str> = Vec::new();
+    let mut grouped: std::collections::HashMap<&'static str, Vec<ModifierApplication>> =
+        std::collections::HashMap::new();
+    for row in rows {
+        if !grouped.contains_key(row.resolver) {
+            order.push(row.resolver);
+        }
+        grouped
+            .entry(row.resolver)
+            .or_default()
+            .push(ModifierApplication {
+                name: row.modifier.clone(),
+                delta: Some(row.post - row.pre),
+                multiplier: None,
+                details: None,
+            });
+    }
+    order
+        .into_iter()
+        .map(|resolver| TraceRecord::L4Resolver {
+            resolver: resolver.to_string(),
+            modifiers: grouped.remove(resolver).unwrap_or_default(),
+        })
+        .collect()
 }
 
 fn intention_summary(intention: &crate::ai::dse::Intention) -> IntentionSummary {

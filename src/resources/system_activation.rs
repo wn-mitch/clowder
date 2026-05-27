@@ -697,6 +697,16 @@ pub enum Feature {
     /// forming, marker not authored, or resolver not dispatched) and
     /// the wiring needs fixing before ship.
     ItemCrafted,
+    /// Ticket 477 — a `DurabilityTier::Fragile` weapon (one of the three
+    /// bone weapons) snapped on a failed hunt-strike and was removed from
+    /// the cat's inventory. Neutral valence — wear is a mechanical texture
+    /// event, neither a colony win nor a welfare loss (it surfaces the
+    /// "items have bite" durability substrate). Classified
+    /// `expected_to_fire_per_soak() == false`: it needs a fragile bone
+    /// weapon wielded plus a missed strike plus the snap roll landing,
+    /// which doesn't reliably reproduce in a 15-min seed-42 soak.
+    /// Exercised by the `equipment_bone_snap` scenario.
+    BoneWeaponSnapped,
 }
 
 impl Feature {
@@ -916,6 +926,8 @@ impl Feature {
         Feature::CourtshipGiftOffered,
         // 457: Workshop-craft first-light canary.
         Feature::ItemCrafted,
+        // 477: bone-weapon durability snap.
+        Feature::BoneWeaponSnapped,
     ];
 
     /// The valence of this feature.
@@ -1090,6 +1102,9 @@ impl Feature {
             // valence + `expected_to_fire_per_soak() => false` (below)
             // demotes the canary while preserving the footer tally.
             Feature::BurialPerformed => Neutral,
+            // 477: bone-weapon snap is mechanical wear texture — surfaces
+            // the durability substrate, neither a colony win nor loss.
+            Feature::BoneWeaponSnapped => Neutral,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -1561,6 +1576,11 @@ impl Feature {
             Feature::MeatLoadedOnSmokingRack => false,
             Feature::SmokingRackTended => false,
             Feature::MeatSmoked => false,
+            // 477: bone-weapon snap needs a fragile bone weapon wielded
+            // + a missed strike + the snap roll landing — too rare to
+            // gate the seed-42 canary. The `equipment_bone_snap` scenario
+            // exercises the branch deterministically.
+            Feature::BoneWeaponSnapped => false,
 
             // -------------------------------------------------------------
             // Healthy-trunk Features: a canonical seed-42 soak fires each
@@ -1838,6 +1858,8 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ItemCrafted => "ItemCrafted",
         // 450: kitten begs for food canary.
         Feature::KittenBegged => "KittenBegged",
+        // 477: bone-weapon durability snap.
+        Feature::BoneWeaponSnapped => "BoneWeaponSnapped",
     }
 }
 
@@ -2045,7 +2067,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 159;
+        const EXPECTED_VARIANT_COUNT: usize = 160;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2186,9 +2208,11 @@ mod tests {
         // Ticket 101: +1 Positive (EnvironmentalComfortPositive) and
         // +1 Negative (EnvironmentalComfortNegative) for the env-quality
         // canary pair (`emit_env_quality_features`).
+        // Ticket 477: +1 Neutral (BoneWeaponSnapped) for the bone-weapon
+        // durability snap canary (mechanical wear texture).
         assert_eq!(positive, 91);
         assert_eq!(negative, 25);
-        assert_eq!(neutral, 43);
+        assert_eq!(neutral, 44);
     }
 
     #[test]
@@ -2303,7 +2327,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            43
+            44
         );
     }
 
