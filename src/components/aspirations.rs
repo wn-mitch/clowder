@@ -51,6 +51,17 @@ pub enum AspirationDomain {
     Hidework,
     Pigment,
     Cairn,
+    /// Ticket 463 — `CraftItemAspiration` domain. A general-purpose
+    /// "I want to make warrior's-kit items" aspiration that emits
+    /// per-recipe `Goal(HaveItem(_))` Intentions scored by threat-cue
+    /// × `is_warriors_kit`, skill-affinity × `(1 - skill.value)`, and
+    /// anti-monotony via [`CatRecentCrafts`]. Distinct from the Phase 5
+    /// mastery domains because mastery arcs track *skill advancement*
+    /// (the cat wants to *get good* at a discipline); CraftItemAspiration
+    /// tracks *item production* (the cat wants to *have* a specific
+    /// kit item). `matching_actions: &[Action::Craft]` so the
+    /// `AspirationLift` modifier reads it correctly.
+    Crafting,
 }
 
 impl AspirationDomain {
@@ -75,6 +86,10 @@ impl AspirationDomain {
             // discipline-specific Action variants (Weave, Knap,
             // TanHide, MixPigment, LayCairn) and updates these arms.
             Self::Weaving | Self::BoneShaping | Self::Hidework | Self::Pigment | Self::Cairn => &[],
+            // 463 — CraftItemAspiration; the cat's matching action is
+            // `Action::Craft` so the `AspirationLift` modifier lifts
+            // Crafting L3 scores for cats holding this chain.
+            Self::Crafting => &[Action::Craft],
         }
     }
 }

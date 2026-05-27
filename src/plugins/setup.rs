@@ -144,15 +144,6 @@ pub fn cat_bundle(
             // co-resident with Health during Stage A; sole source of
             // truth after Stage B cutover.
             crate::components::CatBodyModel::default(),
-            // Ticket 463 — per-cat ring buffer of recent crafts,
-            // read by `CraftItemAspiration`'s anti-monotony score
-            // term. Default = eight empty slots; `ticks_since(_)`
-            // reads as `None` for every recipe until the first
-            // craft lands. Placed in this tuple (vs the 2nd) so
-            // Bevy's Bundle tuple-impl ceiling (15 items per tuple)
-            // doesn't bite — the 2nd tuple was already at 14 with
-            // RecentTargetFailures + PrevSafetyDeficit on the end.
-            crate::components::recent_crafts::CatRecentCrafts::default(),
         ),
     )
 }

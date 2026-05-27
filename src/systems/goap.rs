@@ -3730,8 +3730,12 @@ pub fn resolve_goap_plans(
                 // Ticket 463 — per-cat ring buffer of recent crafts,
                 // written here on a witnessed craft so the
                 // aspiration's anti-monotony term reads the recency
-                // map next tick.
-                &mut crate::components::recent_crafts::CatRecentCrafts,
+                // map next tick. Optional + lazy-inserted via commands
+                // (mirrors `RecentTargetFailures`) so cats that never
+                // craft don't pay the archetype shift — preserves
+                // seed-1's scenario-test invariance (memory
+                // `learning_bevy_schedule_edge_perturbation`).
+                Option<&mut crate::components::recent_crafts::CatRecentCrafts>,
             ),
         ),
         (
@@ -4635,7 +4639,7 @@ pub fn resolve_goap_plans(
             recent_failures.as_deref(),
             route_cost_field,
             body_model,
-            &mut recent_crafts,
+            recent_crafts.as_deref_mut(),
         );
 
         // Re-derive `d` after the dispatch call so the immutable borrow
@@ -5573,8 +5577,11 @@ fn dispatch_step_action(
     // Ticket 463 — per-cat ring buffer of recent crafts; the craft
     // caller arms (`CraftAtWorkshop` / `CraftAtTanningFrame`) write
     // the witnessed `RecipeId` here on success so the aspiration's
-    // anti-monotony score reads recency next tick.
-    recent_crafts: &mut crate::components::recent_crafts::CatRecentCrafts,
+    // anti-monotony score reads recency next tick. `Option<&mut>`
+    // because the component is lazy-inserted on first craft —
+    // `None` means "no recent crafts" (the absence is itself the
+    // initial state).
+    recent_crafts: Option<&mut crate::components::recent_crafts::CatRecentCrafts>,
 ) -> crate::steps::StepResult {
     let d = &ec.constants.disposition;
 
@@ -8181,10 +8188,17 @@ fn dispatch_step_action(
             // Ticket 463 — on a witnessed craft, append the actual
             // recipe id to the cat's ring buffer so
             // CraftItemAspiration's anti-monotony term reads recency
-            // next tick. Borrowing the witness via `as_ref()` lets us
-            // peek before the move into `record_if_witnessed`.
+            // next tick. Lazy-insert pattern: if the component is
+            // absent (cat's first-ever craft), spawn it with the new
+            // entry pre-recorded.
             if let Some(recipe_id) = outcome.witness.as_ref() {
-                recent_crafts.record(*recipe_id, ec.time.tick);
+                record_recent_craft(
+                    cat_entity,
+                    recent_crafts,
+                    commands,
+                    *recipe_id,
+                    ec.time.tick,
+                );
             }
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
@@ -8205,13 +8219,43 @@ fn dispatch_step_action(
                 3,
             );
             if let Some(recipe_id) = outcome.witness.as_ref() {
-                recent_crafts.record(*recipe_id, ec.time.tick);
+                record_recent_craft(
+                    cat_entity,
+                    recent_crafts,
+                    commands,
+                    *recipe_id,
+                    ec.time.tick,
+                );
             }
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
                 crate::resources::system_activation::Feature::ItemCrafted,
             );
             outcome.result
+        }
+    }
+}
+
+/// Ticket 463 — record a witnessed craft on the cat's `CatRecentCrafts`
+/// ring buffer. When the component is already present (post-first-
+/// craft cat), writes in-place. When absent (first-craft cat), uses
+/// `commands.entity().insert(...)` to lazy-insert a freshly-recorded
+/// component — the archetype shift only fires for cats who actually
+/// craft, preserving non-crafting cats' archetype identity (memory
+/// `learning_bevy_schedule_edge_perturbation`).
+fn record_recent_craft(
+    cat_entity: Entity,
+    recent_crafts: Option<&mut crate::components::recent_crafts::CatRecentCrafts>,
+    commands: &mut Commands,
+    recipe_id: crate::components::recipe::RecipeId,
+    tick: u64,
+) {
+    match recent_crafts {
+        Some(rc) => rc.record(recipe_id, tick),
+        None => {
+            let mut rc = crate::components::recent_crafts::CatRecentCrafts::default();
+            rc.record(recipe_id, tick);
+            commands.entity(cat_entity).insert(rc);
         }
     }
 }

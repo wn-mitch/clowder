@@ -51,6 +51,19 @@ fn domain_personality_axis(domain: AspirationDomain, p: &Personality) -> f32 {
         AspirationDomain::Hidework => p.diligence,
         AspirationDomain::Pigment => p.spirituality,
         AspirationDomain::Cairn => p.spirituality,
+        // 463 — CraftItemAspiration. First-light personality alignment
+        // is 0.0 — Crafting is not yet a passive-scoring adoption
+        // candidate. The arc lives in `ALL_CHAINS` so the picker
+        // (commit 6) can score it on the per-tick *emit* loop (where
+        // the threat-cue + skill-affinity + anti-monotony axes drive
+        // recipe selection), but it doesn't compete with Hunting /
+        // Combat / etc. for top-of-list adoption via personality bias.
+        // Memory `feedback_dormant_substrate_activation_soak_first` —
+        // verify the L2 emit path fires before tuning the adoption
+        // surface. Commit 7+ may re-introduce `p.diligence` if the
+        // post-first-light verdict shows Crafting under-firing for
+        // diligent cats.
+        AspirationDomain::Crafting => 0.0,
     }
 }
 
@@ -119,6 +132,14 @@ fn score_chain(
         | AspirationDomain::Hidework
         | AspirationDomain::Pigment
         | AspirationDomain::Cairn => 0.0,
+        // 463 — CraftItemAspiration. Adoption pressure is the cat's
+        // accumulated craft history (a cat who has crafted is more
+        // likely to want to craft again — the practiced hand pattern);
+        // 463 follow-on may add a CraftedItem MemoryType if Memory
+        // currently lacks one. Tertiary-priority emission means the
+        // arc's adoption can be passive (no specific memory-driven
+        // bump at first-light).
+        AspirationDomain::Crafting => 0.0,
     };
     score += experience.min(c.experience_cap); // cap experience contribution
 
@@ -283,6 +304,13 @@ pub fn select_aspirations(
                     | AspirationDomain::Hidework
                     | AspirationDomain::Pigment
                     | AspirationDomain::Cairn
+                    // 463 — CraftItemAspiration is a daily-driver
+                    // L2-emission chain, not a passive-adoption
+                    // candidate. The picker (commit 6) scores it on
+                    // the per-tick emit loop; skip before rng-
+                    // consumption to preserve seed determinism (memory
+                    // `learning_bevy_schedule_edge_perturbation`).
+                    | AspirationDomain::Crafting
             ) {
                 continue;
             }
@@ -419,6 +447,13 @@ pub fn check_second_aspiration_slot(
                     | AspirationDomain::Hidework
                     | AspirationDomain::Pigment
                     | AspirationDomain::Cairn
+                    // 463 — CraftItemAspiration is a daily-driver
+                    // L2-emission chain, not a passive-adoption
+                    // candidate. The picker (commit 6) scores it on
+                    // the per-tick emit loop; skip before rng-
+                    // consumption to preserve seed determinism (memory
+                    // `learning_bevy_schedule_edge_perturbation`).
+                    | AspirationDomain::Crafting
             ) {
                 continue;
             }

@@ -74,6 +74,8 @@ mod tests {
             AspirationDomain::Leadership,
             // 398: Kinship — single chain `RAISE_OFFSPRING_ASPIRATION`.
             AspirationDomain::Kinship,
+            // 463: Crafting — single chain `CRAFT_ITEM_ASPIRATION`.
+            AspirationDomain::Crafting,
         ];
         for domain in domains {
             assert!(

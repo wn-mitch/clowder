@@ -37,6 +37,7 @@ use crate::resources::relationships::BondType;
 
 pub mod building;
 pub mod combat;
+pub mod crafting;
 pub mod exploration;
 pub mod herbcraft;
 pub mod hunting;
@@ -270,6 +271,10 @@ pub const ALL_CHAINS: &[&AspirationChain] = &[
     &mastery::HIDEWORK_MASTERY,
     &mastery::PIGMENT_MASTERY,
     &mastery::CAIRN_MASTERY,
+    // 463 — CraftItemAspiration. Daily-driver "I want to make warrior's-
+    // kit items" chain whose picker (commit 6) scores per-recipe and
+    // emits typed `Goal(HaveItem(_))` Intentions into the L2 pool.
+    &crafting::CRAFT_ITEM_ASPIRATION,
 ];
 
 // ---------------------------------------------------------------------------
