@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: [slot-inventory.md]
 related-balance: []
-landed-at: pending
+landed-at: d2e863b910da
 landed-on: 2026-05-27
 ---
 
