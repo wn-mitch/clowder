@@ -55,6 +55,15 @@ The Phase 2b warrior's-kit substrate (369) spawned a follow-on lineage that real
 - **478** (ready) — `ItemSet` enum on item kinds (retire `is_warriors_kit` recipe metadata).
 - **479** (ready) — ranged-attack mode for Sling — Action / phase / ammo model + read of `EquipmentModifiers.ranged_enabled` (477 follow-on).
 
+## Related items-crafting work (not yet phased)
+
+Items-crafting tickets that live alongside the phased catalog rather than inside a phase — material substrate, byproduct producers, item routing, and crafting-pipeline surfaces. Surfaced here so the dashboard answers "what's in the crafting layer?" completely; promote into the phase map if/when one becomes a coherent shippable phase.
+
+- **Material + recipe substrate:** **376** (ready, terrain-keyed harvestables — reed/flint/clay/ochre/charcoal/shell as discrete entities) · **421** (ready, central material pile + smart material-deposit routing) · **429** (ready, items-are-real Source/Transfer/Sink transition contracts) · **435** (ready, `RecipeInput::AnyOf` — collapse the 4 smoked.* recipes, unblock generalized fuel).
+- **Byproduct producers:** **379** (ready, ShadowFox banishment byproducts — shadow-bone / fox-pelt / shadow-tooth) · **380** (ready, cat-death heirloom-eligible bones + fur-tuft, feeds 370 Heirloom + 372 Tapestry).
+- **Item routing + pickup:** **191** (ready, PickingUp scavenge_urgency curve tuning + scenario, 185 follow-on) · **186** (ready, `add_effective` command-buffer race drops `capacity_bonus` on just-spawned items) · **422** (blocked, Curio Cache deposit-prefix routing).
+- **Crafting pipeline surfaces:** **377** (ready, rare drops & narrative items — situational-trigger RPG-expression layer; shares 477's resolver-trace hook + `escape_from_predator` read site) · **468** (ready, `CraftAtWorkshop` recipe-not-satisfied plan-failure surface, post-465).
+
 ## Design constraints
 
 Load-bearing — drift toward random/decoupled stat-stick fields or RNG affix rolls is a thesis-breaking change; identity/material-grounded effect-data composed by the aggregation layer is the sanctioned shape (doctrine corrected in 476). Quick anchors (see [`docs/systems/crafting.md`](../../systems/crafting.md) §Design constraints for the full statement):
