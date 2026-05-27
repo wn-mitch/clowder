@@ -512,14 +512,21 @@ fn step3_domain_fallback(
     (chosen, walk)
 }
 
-/// Ticket 463 — first-light scoring weights. Tertiary-priority row +
-/// these damped weights keep the new aspiration legible in the L2
-/// trace (label = "have_<item>") without preempting established arcs.
-/// Commit 7 lifts these (W_THREAT 0.3, W_SKILL 0.2, W_RECENT 0.5)
-/// once the variation gate confirms emission.
-const CRAFT_ITEM_W_THREAT: f32 = 0.05;
-const CRAFT_ITEM_W_SKILL: f32 = 0.05;
-const CRAFT_ITEM_W_RECENT: f32 = 1.0;
+/// Ticket 463 — variation-gate scoring weights (commit 7 lift).
+/// First-light (commit 6) shipped at W_THREAT=0.05, W_SKILL=0.05,
+/// W_RECENT=1.0 to verify the L1 emit walk fires without perturbing
+/// behavior. With the substrate verified (29405 L1Aspiration entries
+/// on the seed-42 soak), commit 7 raises the weights so the
+/// per-recipe softmax actually shapes the cat's recipe selection:
+/// - W_THREAT rises to 0.30 so warrior's-kit recipes win under
+///   recent-threat conditions.
+/// - W_SKILL rises to 0.20 so the discipline-skill-affinity axis
+///   becomes a meaningful tie-breaker between same-station recipes.
+/// - W_RECENT drops to 0.50 so anti-monotony still pressures variety
+///   but doesn't dominate the recent-craft penalty curve.
+const CRAFT_ITEM_W_THREAT: f32 = 0.30;
+const CRAFT_ITEM_W_SKILL: f32 = 0.20;
+const CRAFT_ITEM_W_RECENT: f32 = 0.50;
 
 /// Ticket 463 — Manhattan reach threshold for a cat's Stores. Cats
 /// within this distance of a Stores building can pull its inputs into

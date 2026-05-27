@@ -68,15 +68,19 @@ use crate::components::aspirations::AspirationDomain;
 /// recipe) lives in commit 6's picker extension where the recipe-
 /// scoring loop runs.
 ///
-/// `Priority::Tertiary` keeps the row below the Primary/Secondary rows
-/// of existing chains (Hunting, Kinship, etc.) so first-light
-/// activation doesn't preempt established arcs. Lifts to Secondary in
-/// commit 7 once the variation gate confirms emission.
+/// `Priority::Secondary` (commit 7 lift, was `Tertiary` at first-light).
+/// The row competes with existing Secondary rows (e.g. social /
+/// herbcraft fallbacks) but stays below Primary aspiration rows
+/// (Hunting "First Blood", Kinship "kitten_reared") so the
+/// well-being-of-dependents arcs always win when active. The
+/// AspirationEmissions::winner() selector picks the lowest Priority
+/// numerically (Primary = 0 < Secondary = 1 < Tertiary = 2), so the
+/// promotion makes Crafting wins when there's no Primary row present.
 const CRAFT_ITEM_EMITS: &[Emit] = &[Emit {
     label: "craft_item",
     applicable_when: always_true,
     strategy: CommitmentStrategy::OpenMinded,
-    priority: Priority::Tertiary,
+    priority: Priority::Secondary,
 }];
 
 /// `CraftItemAspiration` — "I want to make warrior's-kit items".
