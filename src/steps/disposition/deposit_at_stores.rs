@@ -74,7 +74,7 @@ pub fn resolve_deposit_at_stores(
     // No store exists — drop food on the ground at the cat's position.
     if target_entity.is_none() {
         let food_items: Vec<(ItemKind, crate::components::items::ItemModifiers)> = inventory
-            .slots
+            .pouch
             .iter()
             .filter(|slot| slot.kind.is_food())
             .map(|slot| (slot.kind, slot.modifiers))
@@ -89,7 +89,7 @@ pub fn resolve_deposit_at_stores(
             };
         }
 
-        inventory.slots.retain(|slot| !slot.kind.is_food());
+        inventory.pouch.retain(|slot| !slot.kind.is_food());
 
         let quality = (d.deposit_quality_base + skills.hunting * d.deposit_quality_skill_scale)
             .clamp(0.0, 1.0);
@@ -116,7 +116,7 @@ pub fn resolve_deposit_at_stores(
     // un-deposited items must remain in inventory so the cat
     // either deposits the rest later or finds another sink.
     let food_slot_indices: Vec<usize> = inventory
-        .slots
+        .pouch
         .iter()
         .enumerate()
         .filter_map(|(i, slot)| if slot.kind.is_food() { Some(i) } else { None })
@@ -133,10 +133,10 @@ pub fn resolve_deposit_at_stores(
             // The pre-collection filter only matched food slots; if
             // concurrent mutation changed the kind out from under us,
             // skip silently.
-            if !inventory.slots[slot_idx].kind.is_food() {
+            if !inventory.pouch[slot_idx].kind.is_food() {
                 continue;
             }
-            let slot = &inventory.slots[slot_idx];
+            let slot = &inventory.pouch[slot_idx];
             let (kind, mods) = (slot.kind, slot.modifiers);
             let item_entity = commands
                 .spawn(Item::with_modifiers(
@@ -165,7 +165,7 @@ pub fn resolve_deposit_at_stores(
         // `swap_remove` doesn't disturb earlier indices.
         deposited.sort_unstable_by(|a, b| b.cmp(a));
         for idx in deposited {
-            inventory.slots.swap_remove(idx);
+            inventory.pouch.swap_remove(idx);
         }
     }
     DepositResult {

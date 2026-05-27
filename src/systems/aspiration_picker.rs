@@ -615,7 +615,7 @@ fn step2_craft_item_recipe_scoring(
     // bounded ≈ O(stores × recipes × inputs) per cat per tick,
     // dwarfed by the picker's existing per-cat costs).
     let mut reachable: ItemAggregate = std::collections::HashMap::new();
-    for slot in &inventory.slots {
+    for slot in &inventory.pouch {
         *reachable.entry(slot.kind).or_insert(0) += 1;
     }
     for (store_pos, store_agg) in &stores_snapshot.stores {

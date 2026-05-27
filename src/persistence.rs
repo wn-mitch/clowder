@@ -73,6 +73,11 @@ pub struct CatSnapshot {
     pub dead: Option<Dead>,
     #[serde(default)]
     pub inventory: Vec<ItemSlot>,
+    /// Ticket 017 — worn gear (OSRS-style equip slots). Pre-017 saves use
+    /// `Default` (nothing worn); the legacy `inventory` field above carries
+    /// all items, including any equipment, which loads into the pouch.
+    #[serde(default)]
+    pub wearables: crate::components::equipment::WearableSlots,
     #[serde(default)]
     pub is_coordinator: bool,
     #[serde(default)]
@@ -248,6 +253,7 @@ fn snapshot_cat(world: &World, entity: Entity, entity_map: &HashMap<Entity, usiz
     let current_action = world.get::<CurrentAction>(entity).unwrap();
     let dead = world.get::<Dead>(entity);
     let inventory = world.get::<Inventory>(entity);
+    let wearables = world.get::<crate::components::equipment::WearableSlots>(entity);
     let body_model = world.get::<crate::components::CatBodyModel>(entity);
 
     let is_coordinator = world
@@ -275,7 +281,8 @@ fn snapshot_cat(world: &World, entity: Entity, entity_map: &HashMap<Entity, usiz
         training: save_training(training, entity_map),
         current_action: current_action.clone(),
         dead: dead.cloned(),
-        inventory: inventory.map(|i| i.slots.clone()).unwrap_or_default(),
+        inventory: inventory.map(|i| i.pouch.clone()).unwrap_or_default(),
+        wearables: wearables.cloned().unwrap_or_default(),
         is_coordinator,
         directive_queue,
         body_model: body_model.cloned().unwrap_or_default(),
@@ -368,8 +375,10 @@ pub fn load_world(world: &mut World, save: SaveFile) {
                     Training::default(),
                     cat.current_action.clone(),
                     Inventory {
-                        slots: cat.inventory.clone(),
+                        pouch: cat.inventory.clone(),
+                        ..Default::default()
                     },
+                    cat.wearables.clone(),
                     cat.body_model.clone(),
                 ),
             ))

@@ -89,7 +89,7 @@ pub fn resolve_retrieve_craft_inputs(
     for input in &recipe.inputs {
         let required: usize = input.count as usize;
         let carried = inventory
-            .slots
+            .pouch
             .iter()
             .filter(|s| s.kind == input.kind)
             .count();

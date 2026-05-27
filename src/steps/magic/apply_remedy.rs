@@ -290,7 +290,7 @@ mod tests {
             !inventory.has_remedy(RemedyKind::HealingPoultice),
             "remedy slot should be consumed on Advance"
         );
-        assert_eq!(inventory.slots.len(), 0);
+        assert_eq!(inventory.pouch.len(), 0);
     }
 
     #[test]

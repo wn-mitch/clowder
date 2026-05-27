@@ -374,31 +374,55 @@ impl ItemSlot {
     }
 }
 
-/// A cat's carried inventory. Capacity-limited; holds both herbs and items.
-#[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+/// A cat's carry bag (pouch) — the OSRS-style "backpack" half of the
+/// slot-inventory model (ticket 017). Holds consumables (herbs, food,
+/// remedies, materials, curios, craft inputs) and any *unworn* / carried
+/// items. Worn gear lives in the sibling [`WearableSlots`] component
+/// (`src/components/equipment.rs`), and `equipment_modifiers_for` reads
+/// only those equipped slots — presence in the pouch no longer counts as
+/// "worn." Capacity-limited via `pouch_capacity`.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Inventory {
-    pub slots: Vec<ItemSlot>,
+    #[serde(alias = "slots")]
+    pub pouch: Vec<ItemSlot>,
+    /// Max items the pouch holds. Defaults to [`Inventory::MAX_SLOTS`];
+    /// a future Crafted Bag (370/Phase 3) raises it via `bag_capacity_bonus`.
+    #[serde(default = "default_pouch_capacity")]
+    pub pouch_capacity: u16,
+}
+
+fn default_pouch_capacity() -> u16 {
+    Inventory::MAX_SLOTS as u16
+}
+
+impl Default for Inventory {
+    fn default() -> Self {
+        Self {
+            pouch: Vec::new(),
+            pouch_capacity: Self::MAX_SLOTS as u16,
+        }
+    }
 }
 
 impl Inventory {
     pub const MAX_SLOTS: usize = 5;
 
     pub fn is_full(&self) -> bool {
-        self.slots.len() >= Self::MAX_SLOTS
+        self.pouch.len() >= self.pouch_capacity as usize
     }
 
     // --- Herb compatibility methods ---
 
     pub fn has_herb(&self, kind: HerbKind) -> bool {
         let target = kind.to_item_kind();
-        self.slots.iter().any(|s| s.kind == target)
+        self.pouch.iter().any(|s| s.kind == target)
     }
 
     /// Remove one instance of `kind` from inventory. Returns true if found.
     pub fn take_herb(&mut self, kind: HerbKind) -> bool {
         let target = kind.to_item_kind();
-        if let Some(idx) = self.slots.iter().position(|s| s.kind == target) {
-            self.slots.swap_remove(idx);
+        if let Some(idx) = self.pouch.iter().position(|s| s.kind == target) {
+            self.pouch.swap_remove(idx);
             true
         } else {
             false
@@ -410,19 +434,19 @@ impl Inventory {
         if self.is_full() {
             return false;
         }
-        self.slots.push(ItemSlot::herb(kind));
+        self.pouch.push(ItemSlot::herb(kind));
         true
     }
 
     /// Whether the inventory contains any herb at all.
     pub fn has_any_herb(&self) -> bool {
-        self.slots.iter().any(|s| s.kind.is_herb())
+        self.pouch.iter().any(|s| s.kind.is_herb())
     }
 
     /// Whether the inventory has any herb usable for a remedy.
     pub fn has_remedy_herb(&self) -> bool {
         use crate::components::items::ItemKind;
-        self.slots.iter().any(|s| {
+        self.pouch.iter().any(|s| {
             matches!(
                 s.kind,
                 ItemKind::HerbHealingMoss | ItemKind::HerbMoonpetal | ItemKind::HerbCalmroot
@@ -441,7 +465,7 @@ impl Inventory {
     /// Ticket 235.
     pub fn has_any_material(&self) -> bool {
         use crate::components::items::ItemCategory;
-        self.slots
+        self.pouch
             .iter()
             .any(|s| s.kind.category() == ItemCategory::Material)
     }
@@ -450,7 +474,7 @@ impl Inventory {
     /// ColorfulShell). Ticket 235.
     pub fn has_any_curio(&self) -> bool {
         use crate::components::items::ItemCategory;
-        self.slots
+        self.pouch
             .iter()
             .any(|s| s.kind.category() == ItemCategory::Curiosity)
     }
@@ -464,7 +488,7 @@ impl Inventory {
     /// `has_raw_meat`, …) which gate the drying/smoking chains on
     /// specific raw inputs.
     pub fn has_food(&self) -> bool {
-        self.slots.iter().any(|s| s.kind.is_food())
+        self.pouch.iter().any(|s| s.kind.is_food())
     }
 
     /// 367: whether the inventory contains at least one Raw Fish.
@@ -472,21 +496,21 @@ impl Inventory {
     /// `items::update_inventory_markers`.
     pub fn has_raw_fish(&self) -> bool {
         use crate::components::items::ItemKind;
-        self.slots.iter().any(|s| s.kind == ItemKind::RawFish)
+        self.pouch.iter().any(|s| s.kind == ItemKind::RawFish)
     }
 
     /// 367: whether the inventory contains at least one Raw Organ.
     /// Reader: `HasRawOrganInInventory` writer.
     pub fn has_raw_organ(&self) -> bool {
         use crate::components::items::ItemKind;
-        self.slots.iter().any(|s| s.kind == ItemKind::RawOrgan)
+        self.pouch.iter().any(|s| s.kind == ItemKind::RawOrgan)
     }
 
     /// 367: whether the inventory contains at least one Raw Meat
     /// (mammals + birds — fish goes through drying, not smoking).
     /// Reader: `HasRawMeatInInventory` writer.
     pub fn has_raw_meat(&self) -> bool {
-        self.slots.iter().any(|s| s.kind.is_raw_meat())
+        self.pouch.iter().any(|s| s.kind.is_raw_meat())
     }
 
     /// 367: whether the inventory contains at least one Fuel item
@@ -494,7 +518,7 @@ impl Inventory {
     /// `has_any_material` — Stone is a build material but not a fuel.
     /// Reader: `HasFuelInInventory` writer.
     pub fn has_fuel(&self) -> bool {
-        self.slots.iter().any(|s| s.kind.is_fuel())
+        self.pouch.iter().any(|s| s.kind.is_fuel())
     }
 
     /// 457: whether the inventory contains at least one Phase 2 Workshop
@@ -509,7 +533,7 @@ impl Inventory {
     /// execute time.
     pub fn has_craft_input(&self) -> bool {
         use crate::components::items::ItemKind;
-        self.slots.iter().any(|s| {
+        self.pouch.iter().any(|s| {
             matches!(
                 s.kind,
                 // 368 Phase 2 inputs.
@@ -533,15 +557,15 @@ impl Inventory {
     /// Ticket 365 — Phase 1a real-items migration.
     pub fn has_remedy(&self, kind: RemedyKind) -> bool {
         let target = kind.to_item_kind();
-        self.slots.iter().any(|s| s.kind == target)
+        self.pouch.iter().any(|s| s.kind == target)
     }
 
     /// Remove one instance of a prepared remedy. Returns true
     /// if found.
     pub fn take_remedy(&mut self, kind: RemedyKind) -> bool {
         let target = kind.to_item_kind();
-        if let Some(idx) = self.slots.iter().position(|s| s.kind == target) {
-            self.slots.swap_remove(idx);
+        if let Some(idx) = self.pouch.iter().position(|s| s.kind == target) {
+            self.pouch.swap_remove(idx);
             true
         } else {
             false
@@ -551,7 +575,7 @@ impl Inventory {
     /// Return the first remedy kind that can be prepared from current herbs.
     pub fn first_remedy_kind(&self) -> Option<RemedyKind> {
         use crate::components::items::ItemKind;
-        for slot in &self.slots {
+        for slot in &self.pouch {
             match slot.kind {
                 ItemKind::HerbHealingMoss => return Some(RemedyKind::HealingPoultice),
                 ItemKind::HerbMoonpetal => return Some(RemedyKind::EnergyTonic),
@@ -565,7 +589,7 @@ impl Inventory {
     // --- Item methods ---
 
     pub fn has_item(&self, kind: crate::components::items::ItemKind) -> bool {
-        self.slots.iter().any(|s| s.kind == kind)
+        self.pouch.iter().any(|s| s.kind == kind)
     }
 
     /// Add an item with default (clean) modifiers. Returns false if inventory is full.
@@ -583,7 +607,7 @@ impl Inventory {
         if self.is_full() {
             return false;
         }
-        self.slots.push(ItemSlot::new(kind, modifiers));
+        self.pouch.push(ItemSlot::new(kind, modifiers));
         true
     }
 
@@ -600,15 +624,15 @@ impl Inventory {
         if self.is_full() {
             return false;
         }
-        self.slots
+        self.pouch
             .push(ItemSlot::with_quality(kind, quality, modifiers));
         true
     }
 
     /// Remove one instance of `kind` from inventory. Returns true if found.
     pub fn take_item(&mut self, kind: crate::components::items::ItemKind) -> bool {
-        if let Some(idx) = self.slots.iter().position(|s| s.kind == kind) {
-            self.slots.swap_remove(idx);
+        if let Some(idx) = self.pouch.iter().position(|s| s.kind == kind) {
+            self.pouch.swap_remove(idx);
             true
         } else {
             false
@@ -622,8 +646,8 @@ impl Inventory {
         crate::components::items::ItemKind,
         crate::components::items::ItemModifiers,
     )> {
-        let idx = self.slots.iter().position(|s| s.kind.is_food())?;
-        let slot = self.slots.remove(idx);
+        let idx = self.pouch.iter().position(|s| s.kind.is_food())?;
+        let slot = self.pouch.remove(idx);
         Some((slot.kind, slot.modifiers))
     }
 
@@ -631,7 +655,7 @@ impl Inventory {
     /// `take_food` uses (`ItemKind::is_food`); 178 reads this for the
     /// per-cat `inventory_excess` scoring axis.
     pub fn food_count(&self) -> usize {
-        self.slots.iter().filter(|s| s.kind.is_food()).count()
+        self.pouch.iter().filter(|s| s.kind.is_food()).count()
     }
 }
 

@@ -153,12 +153,12 @@ impl Carrying {
     pub fn from_inventory(inventory: &crate::components::magic::Inventory) -> Self {
         use crate::components::items::ItemKind;
 
-        if inventory.slots.iter().any(|s| s.kind.material().is_some()) {
+        if inventory.pouch.iter().any(|s| s.kind.material().is_some()) {
             Carrying::BuildMaterials
-        } else if inventory.slots.iter().any(|s| s.kind.is_remedy()) {
+        } else if inventory.pouch.iter().any(|s| s.kind.is_remedy()) {
             Carrying::Remedy
-        } else if inventory.slots.iter().any(|s| s.kind.is_food()) {
-            if inventory.slots.iter().any(|s| {
+        } else if inventory.pouch.iter().any(|s| s.kind.is_food()) {
+            if inventory.pouch.iter().any(|s| {
                 matches!(
                     s.kind,
                     ItemKind::RawMouse
@@ -172,7 +172,7 @@ impl Carrying {
             } else {
                 Carrying::ForagedFood
             }
-        } else if inventory.slots.iter().any(|s| s.kind.is_herb()) {
+        } else if inventory.pouch.iter().any(|s| s.kind.is_herb()) {
             Carrying::Herbs
         } else {
             Carrying::Nothing
@@ -279,7 +279,7 @@ pub enum GoapActionKind {
     // every herb-kind slot from a cat's `Inventory` into the nearest
     // Stores' `StoredHerbs`. RetrieveHerbs(kind) is the inverse —
     // pulls one count of `kind` from `StoredHerbs` back into
-    // `Inventory.slots`. Mirrors `DepositFood`/`RetrieveFoodForKitten`
+    // `Inventory.pouch`. Mirrors `DepositFood`/`RetrieveFoodForKitten`
     // shape but operates on the per-kind count surface rather than
     // the Entity-backed `StoredItems` surface.
     DepositHerbs,

@@ -494,7 +494,7 @@ impl StoredItems {
 /// Ticket 084: per-Stores aggregate count of stashed herbs, keyed by
 /// `HerbKind`. Sibling to `StoredItems` (food/material Entities), but
 /// herbs stash as a lightweight count rather than spawned Item entities
-/// — matches the existing `Inventory.slots` herb representation, where
+/// — matches the existing `Inventory.pouch` herb representation, where
 /// herb slots carry no Entity identity and no per-instance modifiers.
 /// Capacity is per-kind and provided by the caller (sourced from
 /// `ScoringConstants::stores_herb_capacity_per_kind`).

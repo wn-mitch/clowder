@@ -58,7 +58,7 @@ pub fn resolve_deposit_herbs_to_stores(
     // reverse-index order at the end (mirrors the
     // `resolve_deposit_at_stores` discipline from ticket 175).
     let herb_indices: Vec<(usize, HerbKind)> = inventory
-        .slots
+        .pouch
         .iter()
         .enumerate()
         .filter_map(|(i, slot)| {
@@ -86,7 +86,7 @@ pub fn resolve_deposit_herbs_to_stores(
     // indices stable across `swap_remove` calls.
     absorbed_indices.sort_unstable_by(|a, b| b.cmp(a));
     for idx in absorbed_indices {
-        inventory.slots.swap_remove(idx);
+        inventory.pouch.swap_remove(idx);
     }
 
     if transferred > 0 {
@@ -129,7 +129,7 @@ mod tests {
         let outcome = run_resolver(&mut world, Some(store), &mut inv, 20);
         assert!(outcome.witness);
         assert!(matches!(outcome.result, StepResult::Advance));
-        assert!(inv.slots.is_empty());
+        assert!(inv.pouch.is_empty());
         let stash = world.get::<StoredHerbs>(store).unwrap();
         assert_eq!(stash.count(HerbKind::Thornbriar), 2);
     }
@@ -143,7 +143,7 @@ mod tests {
         assert!(!outcome.witness);
         assert!(matches!(outcome.result, StepResult::Advance));
         // Herb stays in inventory (items-are-real).
-        assert_eq!(inv.slots.len(), 1);
+        assert_eq!(inv.pouch.len(), 1);
     }
 
     #[test]
@@ -169,7 +169,7 @@ mod tests {
         // Thornbriar slot bounces (cap), HealingMoss absorbs.
         let outcome = run_resolver(&mut world, Some(store), &mut inv, 5);
         assert!(outcome.witness);
-        assert_eq!(inv.slots.len(), 1, "Thornbriar remainder stays carried");
+        assert_eq!(inv.pouch.len(), 1, "Thornbriar remainder stays carried");
         assert!(inv.has_herb(HerbKind::Thornbriar));
         assert!(!inv.has_herb(HerbKind::HealingMoss));
         let stash = world.get::<StoredHerbs>(store).unwrap();

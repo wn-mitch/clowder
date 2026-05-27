@@ -1627,7 +1627,7 @@ pub fn predator_stalk_cats(
             &mut Mood,
             &Name,
             &mut crate::components::CatBodyModel,
-            &crate::components::magic::Inventory,
+            &crate::components::equipment::WearableSlots,
         ),
         (Without<WildAnimal>, Without<Dead>),
     >,
@@ -1761,7 +1761,7 @@ pub fn predator_stalk_cats(
                             mut mood,
                             name,
                             mut cat_body_model,
-                            inventory,
+                            wearables,
                         )) = cats.get_mut(*cat_entity)
                         {
                             let tile_corruption = if map.in_bounds(wl_pos.x, wl_pos.y) {
@@ -1775,7 +1775,7 @@ pub fn predator_stalk_cats(
                             // for the health scalar; `damage_to_body_part`
                             // reduces internally for the body model + trace.
                             let em = crate::components::equipment_effects::equipment_modifiers_for(
-                                inventory,
+                                wearables,
                                 &constants.combat,
                             );
                             let reduced = crate::systems::combat::armor_reduced_damage(
@@ -3110,7 +3110,7 @@ pub fn fox_confrontation_tick(
             &mut Mood,
             &Name,
             &mut crate::components::CatBodyModel,
-            &crate::components::magic::Inventory,
+            &crate::components::equipment::WearableSlots,
         ),
         (Without<WildAnimal>, Without<Dead>),
     >,
@@ -3196,12 +3196,12 @@ pub fn fox_confrontation_tick(
 
             // Try to find the target cat and damage it.
             let target_entity = Entity::from_bits(target_id);
-            if let Ok((_cat_pos, mut cat_health, mut mood, name, mut cat_body_model, inventory)) =
+            if let Ok((_cat_pos, mut cat_health, mut mood, name, mut cat_body_model, wearables)) =
                 cats.get_mut(target_entity)
             {
                 // 477 — armor reduces confrontation escalation damage.
                 let em = crate::components::equipment_effects::equipment_modifiers_for(
-                    inventory,
+                    wearables,
                     &constants.combat,
                 );
                 let reduced = crate::systems::combat::armor_reduced_damage(

@@ -699,7 +699,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         output: RecipeOutput {
             item_kind: ItemKind::BoneTipSpear,
-            destination: ItemDestination::Inventory,
+            // 017 — worn gear auto-equips on craft into its anatomical slot.
+            destination: ItemDestination::EquippedSlot,
         },
         skill_gate: None,
         is_warriors_kit: true,
@@ -719,7 +720,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         output: RecipeOutput {
             item_kind: ItemKind::BoneStiletto,
-            destination: ItemDestination::Inventory,
+            // 017 — worn gear auto-equips on craft into its anatomical slot.
+            destination: ItemDestination::EquippedSlot,
         },
         skill_gate: None,
         is_warriors_kit: true,
@@ -748,7 +750,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         output: RecipeOutput {
             item_kind: ItemKind::FlintBlade,
-            destination: ItemDestination::Inventory,
+            // 017 — worn gear auto-equips on craft into its anatomical slot.
+            destination: ItemDestination::EquippedSlot,
         },
         skill_gate: None,
         // 463 — knapping rides BoneShaping today (Stonecraft
@@ -776,7 +779,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         output: RecipeOutput {
             item_kind: ItemKind::HideBracers,
-            destination: ItemDestination::Inventory,
+            // 017 — worn gear auto-equips on craft into its anatomical slot.
+            destination: ItemDestination::EquippedSlot,
         },
         skill_gate: None,
         is_warriors_kit: true,
@@ -802,7 +806,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         output: RecipeOutput {
             item_kind: ItemKind::HidePlatedWrap,
-            destination: ItemDestination::Inventory,
+            // 017 — worn gear auto-equips on craft into its anatomical slot.
+            destination: ItemDestination::EquippedSlot,
         },
         skill_gate: None,
         is_warriors_kit: true,
@@ -828,7 +833,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         output: RecipeOutput {
             item_kind: ItemKind::Sling,
-            destination: ItemDestination::Inventory,
+            // 017 — worn gear auto-equips on craft into its anatomical slot.
+            destination: ItemDestination::EquippedSlot,
         },
         skill_gate: None,
         is_warriors_kit: true,
@@ -848,7 +854,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         output: RecipeOutput {
             item_kind: ItemKind::WovenReedCloak,
-            destination: ItemDestination::Inventory,
+            // 017 — worn gear auto-equips on craft into its anatomical slot.
+            destination: ItemDestination::EquippedSlot,
         },
         skill_gate: None,
         is_warriors_kit: true,
@@ -874,7 +881,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
         },
         output: RecipeOutput {
             item_kind: ItemKind::ToothNotchedClub,
-            destination: ItemDestination::Inventory,
+            // 017 — worn gear auto-equips on craft into its anatomical slot.
+            destination: ItemDestination::EquippedSlot,
         },
         skill_gate: None,
         is_warriors_kit: true,

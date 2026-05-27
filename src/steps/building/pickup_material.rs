@@ -245,7 +245,7 @@ mod tests {
         let mut cat_pos = Position::new(5, 5);
         let mut cached: Option<Vec<Position>> = None;
         let mut inv = Inventory {
-            slots: (0..Inventory::MAX_SLOTS)
+            pouch: (0..Inventory::MAX_SLOTS)
                 .map(|_| {
                     crate::components::magic::ItemSlot::new(
                         ItemKind::ShinyPebble,
@@ -253,6 +253,7 @@ mod tests {
                     )
                 })
                 .collect(),
+            ..Default::default()
         };
 
         let outcome = run_with_resolver(

@@ -160,7 +160,7 @@ pub fn gossip_inventory_observations(
         }
         let mut thornbriar = 0u32;
         let mut remedy = 0u32;
-        for slot in &inventory.slots {
+        for slot in &inventory.pouch {
             match ResourceKind::from_item_kind(slot.kind) {
                 Some(ResourceKind::Thornbriar) => thornbriar += 1,
                 Some(ResourceKind::RemedyHerb) => remedy += 1,

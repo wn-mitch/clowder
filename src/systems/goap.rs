@@ -3709,6 +3709,11 @@ pub fn resolve_goap_plans(
                 &mut Inventory,
                 &Personality,
                 &Name,
+                // Ticket 017 — worn equip slots. Read by the weapon-strike
+                // bonus in `resolve_engage_prey`; mutated by the craft
+                // resolvers to auto-equip a freshly-crafted wearable.
+                // Required (inserted at spawn).
+                &mut crate::components::equipment::WearableSlots,
             ),
             (
                 &Gender,
@@ -4016,7 +4021,7 @@ pub fn resolve_goap_plans(
     // haul→deliver→construct compose case where the marker still reads
     // false at plan entry.
     let herb_stash_radius = ec.constants.disposition.herb_stash_reachable_radius;
-    for ((entity, _, _, pos, _, _, inventory, _, _), _) in &cats {
+    for ((entity, _, _, pos, _, _, inventory, _, _, _), _) in &cats {
         planner_markers.set_entity(
             markers::MaterialsAvailable::KEY,
             entity,
@@ -4050,7 +4055,7 @@ pub fn resolve_goap_plans(
     let builders_per_site: HashMap<Entity, usize> = {
         let cat_pos_list: Vec<Position> = cats
             .iter()
-            .map(|((_, _, _, pos, _, _, _, _, _), _)| *pos)
+            .map(|((_, _, _, pos, _, _, _, _, _, _), _)| *pos)
             .collect();
         let mut counts = HashMap::with_capacity(building_snapshot.len());
         for (site_e, _, site_pos, is_site, _) in &building_snapshot {
@@ -4071,9 +4076,10 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, g, _, _, _, _, _, _, _, _, _, _, _))| {
-                    (e, g.as_ref().map_or(0.8, |g| g.0))
-                },
+                |(
+                    (e, _, _, _, _, _, _, _, _, _),
+                    (_, _, _, g, _, _, _, _, _, _, _, _, _, _, _),
+                )| { (e, g.as_ref().map_or(0.8, |g| g.0)) },
             )
             .collect(),
         // Gender snapshot for §7.M.7.4's `resolve_mate_with` partner lookup —
@@ -4082,9 +4088,10 @@ pub fn resolve_goap_plans(
         gender: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _, _))| {
-                    (e, *g)
-                },
+                |(
+                    (e, _, _, _, _, _, _, _, _, _),
+                    (g, _, _, _, _, _, _, _, _, _, _, _, _, _, _),
+                )| { (e, *g) },
             )
             .collect(),
         cat_tile_counts: {
@@ -4092,7 +4099,7 @@ pub fn resolve_goap_plans(
             // HashMap is bounded above by the number of cats).
             let cat_count = cats.iter().count();
             let mut counts = HashMap::with_capacity(cat_count);
-            for ((_, _, _, pos, _, _, _, _, _), _) in &cats {
+            for ((_, _, _, pos, _, _, _, _, _, _), _) in &cats {
                 *counts.entry(*pos).or_insert(0) += 1;
             }
             counts
@@ -4129,14 +4136,14 @@ pub fn resolve_goap_plans(
         builders_per_site,
         cat_positions: cats
             .iter()
-            .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
+            .map(|((e, _, _, pos, _, _, _, _, _, _), _)| (e, *pos))
             .collect(),
         injured_cat_positions: cats
             .iter()
             .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _, _, _))| {
                 health.current < health.max
             })
-            .map(|((e, _, _, pos, _, _, _, _, _), _)| (e, *pos))
+            .map(|((e, _, _, pos, _, _, _, _, _, _), _)| (e, *pos))
             .collect(),
         // §6.5.3 mentor-target DSE snapshot: candidate-side Skills lookup
         // table. Built once per tick so the MentorCat branch can rank
@@ -4144,7 +4151,7 @@ pub fn resolve_goap_plans(
         // mutably held by the outer loop).
         cat_skills: cats
             .iter()
-            .map(|((e, _, _, _, skills, _, _, _, _), _)| (e, (*skills).clone()))
+            .map(|((e, _, _, _, skills, _, _, _, _, _), _)| (e, (*skills).clone()))
             .collect(),
         // §6.5.4 groom-other-target DSE snapshot: candidate-side
         // `needs.temperature` lookup. Same rationale as skills — the outer
@@ -4152,7 +4159,7 @@ pub fn resolve_goap_plans(
         // the GroomOther branch's `resolve_groom_other_target` call.
         cat_temperature: cats
             .iter()
-            .map(|((e, _, _, _, _, needs, _, _, _), _)| (e, needs.temperature))
+            .map(|((e, _, _, _, _, needs, _, _, _, _), _)| (e, needs.temperature))
             .collect(),
         // Ticket 452 — per-cat `GroomingCondition.0` snapshot for the
         // `target_grooming_deficit` axis on `GroomOtherTargetDse`.
@@ -4166,9 +4173,10 @@ pub fn resolve_goap_plans(
         cat_grooming: cats
             .iter()
             .filter_map(
-                |((e, _, _, _, _, _, _, _, _), (_, _, _, gc, _, _, _, _, _, _, _, _, _, _, _))| {
-                    gc.map(|g| (e, g.0))
-                },
+                |(
+                    (e, _, _, _, _, _, _, _, _, _),
+                    (_, _, _, gc, _, _, _, _, _, _, _, _, _, _, _),
+                )| { gc.map(|g| (e, g.0)) },
             )
             .collect(),
         // §6.5.4 kinship lookup — `(kitten_entity) → (mother, father)`.
@@ -4211,7 +4219,7 @@ pub fn resolve_goap_plans(
         kitten_snapshot: {
             let kitten_hunger: std::collections::HashMap<Entity, (f32, Position)> = cats
                 .iter()
-                .map(|((e, _, _, pos, _, needs, _, _, _), _)| (e, (needs.hunger, *pos)))
+                .map(|((e, _, _, pos, _, needs, _, _, _, _), _)| (e, (needs.hunger, *pos)))
                 .collect();
             ec.kitten_parentage
                 .iter()
@@ -4256,6 +4264,7 @@ pub fn resolve_goap_plans(
             mut inventory,
             personality,
             name,
+            mut wearables,
         ),
         (
             gender,
@@ -4618,6 +4627,7 @@ pub fn resolve_goap_plans(
             &mut skills,
             &mut needs,
             &mut inventory,
+            &mut wearables,
             personality,
             name,
             gender,
@@ -5194,7 +5204,7 @@ pub fn resolve_goap_plans(
         let plan_last_action_kind: Option<GoapActionKind> = cats
             .get(entity)
             .ok()
-            .and_then(|((_, plan, _, _, _, _, _, _, _), _)| plan.steps.last().map(|s| s.action));
+            .and_then(|((_, plan, _, _, _, _, _, _, _, _), _)| plan.steps.last().map(|s| s.action));
         let plan_was_htn_leaf = matches!(
             plan_last_action_kind,
             Some(
@@ -5455,7 +5465,7 @@ pub fn resolve_goap_plans(
                 s.magic,
                 s.growth_rate(),
             ))
-        } else if let Ok(((_, _, _, _, s, _, _, _, _), _)) = cats.get(effect.apprentice) {
+        } else if let Ok(((_, _, _, _, s, _, _, _, _, _), _)) = cats.get(effect.apprentice) {
             Some((
                 s.hunting,
                 s.foraging,
@@ -5500,7 +5510,7 @@ pub fn resolve_goap_plans(
                         5 => s.magic += growth,
                         _ => {}
                     }
-                } else if let Ok(((_, _, _, _, mut s, _, _, _, _), _)) =
+                } else if let Ok(((_, _, _, _, mut s, _, _, _, _, _), _)) =
                     cats.get_mut(effect.apprentice)
                 {
                     match idx {
@@ -5540,6 +5550,11 @@ fn dispatch_step_action(
     skills: &mut Skills,
     needs: &mut Needs,
     inventory: &mut Inventory,
+    // Ticket 017 — worn equip slots. Read by `resolve_engage_prey`'s
+    // weapon-strike bonus; mutated by the craft resolvers to auto-equip a
+    // freshly-crafted wearable. The pouch (`inventory`) holds carried items;
+    // only worn gear contributes to combat/hunt modifiers.
+    wearables: &mut crate::components::equipment::WearableSlots,
     personality: &Personality,
     name: &Name,
     gender: &Gender,
@@ -5796,6 +5811,7 @@ fn dispatch_step_action(
                 ticks,
                 pos,
                 inventory,
+                wearables,
                 skills,
                 hunting_priors,
                 prey_query,
@@ -7615,7 +7631,7 @@ fn dispatch_step_action(
                     .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
                     .map(|(e, _)| *e);
             }
-            let material_carried = inventory.slots.iter().find_map(|s| s.kind.material());
+            let material_carried = inventory.pouch.iter().find_map(|s| s.kind.material());
             match material_carried {
                 Some(material) => {
                     let outcome = crate::steps::building::resolve_deliver(
@@ -7940,7 +7956,7 @@ fn dispatch_step_action(
                     "handoff: no recipient on disposition (no dependent cat in colony)".to_string(),
                 );
             };
-            let has_transferable = !inventory.slots.is_empty();
+            let has_transferable = !inventory.pouch.is_empty();
             if !has_transferable {
                 return crate::steps::StepResult::Fail(
                     "handoff: no transferable slot in actor inventory".to_string(),
@@ -8202,6 +8218,7 @@ fn dispatch_step_action(
                 recipe_id,
                 *pos,
                 inventory,
+                wearables,
                 &ec.recipes,
                 &snaps.workshop_positions,
                 3,
@@ -8234,6 +8251,7 @@ fn dispatch_step_action(
                 recipe_id,
                 *pos,
                 inventory,
+                wearables,
                 &ec.recipes,
                 &snaps.tanning_frame_positions,
                 3,
@@ -8760,7 +8778,7 @@ fn resolve_search_prey(
                     crate::components::items::ItemModifiers::with_corruption(den_corruption);
                 for _ in 0..kills {
                     if !inventory.is_full() {
-                        inventory.slots.push(ItemSlot::new(drop_item, den_mods));
+                        inventory.pouch.push(ItemSlot::new(drop_item, den_mods));
                     } else {
                         commands.spawn((
                             crate::components::items::Item::with_modifiers(
@@ -8965,7 +8983,7 @@ fn resolve_search_prey(
 
     // Timeout.
     if ticks > d.search_timeout_ticks {
-        if inventory.slots.iter().any(|s| s.kind.is_food()) {
+        if inventory.pouch.iter().any(|s| s.kind.is_food()) {
             // Have food from earlier — advance to deposit.
             return crate::steps::StepResult::Advance;
         }
@@ -9063,6 +9081,9 @@ fn resolve_engage_prey(
     ticks: u64,
     pos: &mut Position,
     inventory: &mut Inventory,
+    // Ticket 017 — worn equip slots. Read for the weapon-strike bonus;
+    // mutated to remove a wielded bone weapon when it snaps on a miss.
+    wearables: &mut crate::components::equipment::WearableSlots,
     skills: &mut Skills,
     hunting_priors: &mut HuntingPriors,
     prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
@@ -9309,7 +9330,7 @@ fn resolve_engage_prey(
         // amount, surfaced in the resolver trace as a named modifier
         // (never a hidden post-hoc bonus). Ranged weapons contribute
         // nothing here (their mode is the 477 follow-up).
-        let em = crate::components::equipment_effects::equipment_modifiers_for(inventory, combat);
+        let em = crate::components::equipment_effects::equipment_modifiers_for(wearables, combat);
         let weapon_bonus = em.weapon.map(|w| w.strike_bonus(combat)).unwrap_or(0.0);
         let success_chance = (base_success_chance + weapon_bonus).clamp(0.0, 1.0);
         if let Some(sink) = focal_sink.filter(|_| weapon_bonus > 0.0) {
@@ -9359,7 +9380,7 @@ fn resolve_engage_prey(
                 // Inventory has room — slot-push directly. Inventory
                 // slots are value-typed `(kind, modifiers)` so no
                 // entity is needed when the catch goes straight in.
-                inventory.slots.push(ItemSlot::new(item_kind, modifiers));
+                inventory.pouch.push(ItemSlot::new(item_kind, modifiers));
             } else {
                 // 176: inventory full and not self-eating. Pre-fix,
                 // this arm silently dropped the catch (the prey
@@ -9396,7 +9417,7 @@ fn resolve_engage_prey(
             // self-eat branch is structurally inapplicable.
             for &byp_kind in prey_byproducts.for_kind(prey_kind) {
                 if !inventory.is_full() {
-                    inventory.slots.push(ItemSlot::new(byp_kind, modifiers));
+                    inventory.pouch.push(ItemSlot::new(byp_kind, modifiers));
                 } else {
                     commands.spawn((
                         crate::components::items::Item::with_modifiers(
@@ -9532,13 +9553,15 @@ fn resolve_engage_prey(
             // Miss — prey bolts.
             // 477 — a fragile (bone) weapon may snap on the failed strike.
             // Deterministic-from-state roll (no fresh affix): fragile gate
-            // + per-strike snap chance. On snap, remove the weapon from
-            // inventory (items-are-real: the tool is gone) and fire the
-            // durability canary.
-            let snapped = em.weapon.filter(|w| {
-                w.fragile
-                    && rng.rng.random::<f32>() < combat.bone_weapon_snap_chance_on_miss
-                    && inventory.take_item(w.kind)
+            // + per-strike snap chance. On snap, remove the weapon from its
+            // worn slot (017 — items-are-real: the wielded tool is gone) and
+            // fire the durability canary.
+            let snapped = em.weapon.and_then(|w| {
+                if w.fragile && rng.rng.random::<f32>() < combat.bone_weapon_snap_chance_on_miss {
+                    w.kind.equip_slot().and_then(|slot| wearables.take(slot))
+                } else {
+                    None
+                }
             });
             if snapped.is_some() {
                 if let Some(sink) = focal_sink {
@@ -9882,7 +9905,7 @@ fn resolve_forage_item(
                     act.record(crate::resources::system_activation::Feature::FoodEaten);
                 }
             } else if !inventory.is_full() {
-                inventory.slots.push(ItemSlot::new(item_kind, modifiers));
+                inventory.pouch.push(ItemSlot::new(item_kind, modifiers));
             } else {
                 // 176: inventory full. Pre-fix, this arm silently
                 // skipped — no item was ever spawned, the foraged

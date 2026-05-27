@@ -84,9 +84,9 @@ pub fn resolve_load_smoking_rack(
     // ticket 367's recipe registry, which registers four parallel
     // recipes (smoked.mouse / .rat / .rabbit / .bird) all outputting
     // `ItemKind::SmokedMeat`. We pick the first qualifying slot.
-    let meat_idx = inventory.slots.iter().position(|s| s.kind.is_raw_meat());
+    let meat_idx = inventory.pouch.iter().position(|s| s.kind.is_raw_meat());
     let fuel_idx = inventory
-        .slots
+        .pouch
         .iter()
         .position(|s| s.kind == ItemKind::Wood);
     let (Some(m_idx), Some(_)) = (meat_idx, fuel_idx) else {
@@ -96,14 +96,14 @@ pub fn resolve_load_smoking_rack(
     };
 
     // Drain meat first, capturing source identity for the load.
-    let meat_slot = inventory.slots.swap_remove(m_idx);
+    let meat_slot = inventory.pouch.swap_remove(m_idx);
     // Re-locate fuel because the swap_remove may have shifted indices.
     let fuel_idx = inventory
-        .slots
+        .pouch
         .iter()
         .position(|s| s.kind == ItemKind::Wood);
     if let Some(f_idx) = fuel_idx {
-        inventory.slots.swap_remove(f_idx);
+        inventory.pouch.swap_remove(f_idx);
     } else {
         // Shouldn't happen — we checked above — but bail rather
         // than leave the rack half-loaded with no fuel.

@@ -5,6 +5,14 @@ Replaces the flat `Inventory { slots: Vec<ItemSlot> }` in `src/components/magic.
 
 **Do not ship standalone.** This is scaffolding without a producer. Gated on at least one wearable producer shipping: `crafting.md` Phase 3 (mentorship tokens, heirlooms), `the-calling.md` (Named Objects as wearable hooks), or `trade.md` (visitor-sourced worn objects). Absent a producer, the refactor is cost without benefit.
 
+## Status — shipped in ticket 017 (Built, against the 369 producer)
+The producer gate was met by the **369 warrior's-kit** (8 craftable equippables, organic in seed-42 per 463), so 017 shipped the worn-slot substrate the 477 aggregation layer reads under. What landed:
+- `Inventory { pouch: Vec<ItemSlot>, pouch_capacity: u16 }` — the carry bag (was `slots`). Capacity defaults to `MAX_SLOTS`; the Crafted Bag `bag_capacity_bonus` override is **deferred to 370** (no bag producer yet).
+- `WearableSlots` component (`src/components/equipment.rs`) — `EquipSlot`-keyed (`Wielded` / `Paws` / `Body` / `Cape`; `Collar` / `Ear` / `Tail` reserved for 370 adornments). One item per slot. `equip_slot(ItemKind)` is an exhaustive classifier.
+- `equipment_modifiers_for` reads `WearableSlots` only (worn ≠ carried). A cat wields exactly one weapon (one `Wielded` slot), so the pre-017 multi-weapon ranking was retired.
+- **Auto-equip on craft**: the 8 kit recipes route to `ItemDestination::EquippedSlot`, deposited into the matching slot at craft time (pouch fallback if occupied). Deliberate don/doff/swap (`Action::WearItem`) is **334**.
+- The **`WearableItem` identity type** below (name / origin_tick / creator_entity / narrative_event_tag) is **deferred to 370**, where the first adornment producer populates it. 017's slots hold the existing `ItemSlot`/`ItemKind` equipment, keyed on `ItemKind` + `ItemSlot.quality`.
+
 ## Slot enumeration
 | Slot | Underlying BodyPart | Typical Wearable |
 |------|---------------------|------------------|

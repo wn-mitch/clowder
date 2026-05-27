@@ -1014,7 +1014,7 @@ pub fn accumulate_build_pressure(
     let hide_items_in_inventories = cats
         .iter()
         .map(|(_, _, inv)| {
-            inv.slots
+            inv.pouch
                 .iter()
                 .filter(|s| s.kind == crate::components::items::ItemKind::Hide)
                 .count()

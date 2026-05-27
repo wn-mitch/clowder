@@ -139,10 +139,10 @@ fn trash_dispatch_moves_item_into_midden() {
         .get::<Inventory>()
         .expect("focal has Inventory");
     assert_eq!(
-        inv.slots.len(),
+        inv.pouch.len(),
         0,
         "trash dispatch should empty the actor's inventory; got {} slot(s)",
-        inv.slots.len()
+        inv.pouch.len()
     );
 
     let mut q = world.query::<(&Structure, &StoredItems)>();
@@ -229,10 +229,10 @@ fn pick_up_dispatch_brings_ground_item_into_inventory() {
         .get::<Inventory>()
         .expect("focal has Inventory");
     assert_eq!(
-        inv.slots.len(),
+        inv.pouch.len(),
         1,
         "pick-up dispatch should add one slot to the actor's inventory; got {} slot(s)",
-        inv.slots.len()
+        inv.pouch.len()
     );
 
     let mut items_q = world.query::<&Item>();
@@ -335,13 +335,13 @@ fn handoff_dispatch_transfers_slot_to_recipient() {
         .entity(focal)
         .get::<Inventory>()
         .expect("focal has Inventory")
-        .slots
+        .pouch
         .len();
     let recipient_slots = world
         .entity(recipient)
         .get::<Inventory>()
         .expect("recipient has Inventory")
-        .slots
+        .pouch
         .len();
 
     assert_eq!(

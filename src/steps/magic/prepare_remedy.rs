@@ -98,7 +98,7 @@ mod tests {
         assert!(matches!(result, StepResult::Advance));
         assert!(!inventory.has_herb(HerbKind::HealingMoss));
         assert!(inventory.has_remedy(RemedyKind::HealingPoultice));
-        assert_eq!(inventory.slots.len(), 1);
+        assert_eq!(inventory.pouch.len(), 1);
     }
 
     #[test]

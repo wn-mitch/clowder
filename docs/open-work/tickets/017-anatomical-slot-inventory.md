@@ -1,7 +1,7 @@
 ---
 id: 017
 title: Anatomical slot inventory
-status: ready
+status: in-progress
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []

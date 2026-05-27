@@ -75,7 +75,7 @@ pub fn resolve_deliver(
     // are the only `ItemKind::material()` returns; the slot lookup uses
     // the same bridge.
     let slot_idx = inventory
-        .slots
+        .pouch
         .iter()
         .position(|s| s.kind.material() == Some(material));
     let Some(slot_idx) = slot_idx else {
@@ -93,7 +93,7 @@ pub fn resolve_deliver(
     };
 
     // Both checks passed — consume the slot and bump the site.
-    inventory.slots.swap_remove(slot_idx);
+    inventory.pouch.swap_remove(slot_idx);
     site.deliver(material, 1);
 
     StepOutcome::witnessed(StepResult::Advance)

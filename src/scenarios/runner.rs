@@ -212,7 +212,7 @@ pub fn run(
             final_focal_inventory_count = q
                 .iter(world)
                 .find(|(n, _)| n.0 == focal)
-                .map(|(_, inv)| inv.slots.len())
+                .map(|(_, inv)| inv.pouch.len())
                 .unwrap_or(0);
         }
         // Live prey entities.
@@ -247,7 +247,7 @@ pub fn run(
         {
             let mut q = world.query::<&Inventory>();
             for inv in q.iter(world) {
-                for slot in &inv.slots {
+                for slot in &inv.pouch {
                     *histogram
                         .entry(slot.kind.singular_name().to_string())
                         .or_insert(0) += 1;

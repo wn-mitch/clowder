@@ -7,7 +7,7 @@ use crate::steps::{StepOutcome, StepResult};
 /// # GOAP step resolver: `RetrieveHerbs(kind)` (ticket 084)
 ///
 /// **Real-world effect** — transfers one herb of `kind` from the
-/// target Stores' `StoredHerbs` into the actor's `Inventory.slots`
+/// target Stores' `StoredHerbs` into the actor's `Inventory.pouch`
 /// via `Inventory::add_herb`. Decrements `StoredHerbs.counts[kind]`
 /// by 1.
 ///

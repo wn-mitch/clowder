@@ -45,7 +45,7 @@ pub fn resolve_handoff(
     recipient: Entity,
     recipient_inventory: &mut Inventory,
 ) -> StepOutcome<Option<HandoffOutcome>> {
-    let Some(slot_idx) = (!actor_inventory.slots.is_empty()).then_some(0) else {
+    let Some(slot_idx) = (!actor_inventory.pouch.is_empty()).then_some(0) else {
         return StepOutcome::unwitnessed(StepResult::Fail(
             "handoff: no transferable slot in actor inventory".to_string(),
         ));

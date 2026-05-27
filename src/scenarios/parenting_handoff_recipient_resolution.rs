@@ -301,7 +301,7 @@ mod tests {
         let mut q = world.query::<(&Name, &Inventory)>();
         q.iter(world)
             .find(|(n, _)| n.0 == PARENT_NAME)
-            .map(|(_, inv)| inv.slots.len())
+            .map(|(_, inv)| inv.pouch.len())
             .expect("parent Magnolia must be alive at end-of-scenario")
     }
 }

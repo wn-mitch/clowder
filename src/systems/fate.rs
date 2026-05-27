@@ -415,6 +415,10 @@ mod tests {
                     Training::default(),
                     CurrentAction::default(),
                     Inventory::default(),
+                    // Ticket 017 — worn equip slots; required by the
+                    // `resolve_goap_plans` query (else this cat is silently
+                    // excluded from planning).
+                    crate::components::equipment::WearableSlots::default(),
                 ),
             ))
             .id()

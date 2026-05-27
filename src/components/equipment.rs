@@ -21,6 +21,9 @@
 //! the sole gate.
 
 use crate::components::items::ItemKind;
+use crate::components::magic::ItemSlot;
+use bevy_ecs::prelude::Component;
+use std::collections::BTreeMap;
 
 /// Material class for crafted equipment items. Names the substance,
 /// which downstream resolvers consult to choose pierce / slash /
@@ -101,7 +104,162 @@ pub enum DurabilityTier {
     Durable,
 }
 
+/// Anatomical equip slot for a worn item (ticket 017). The OSRS-style
+/// "worn" half of the slot-inventory model: each slot holds at most one
+/// item ([`WearableSlots`]), and `equipment_modifiers_for` reads only
+/// these slots. Slots map onto the [`crate::components::body_zones::BodyPart`]
+/// anatomy (ticket 095) — `Wielded`/`Paws` ride the paws, `Cape`/`Body` the
+/// flanks. `Collar`/`Ear`/`Tail` are reserved for the Phase 3 adornment
+/// producer (370); declared now so the enum is stable, populated then.
+///
+/// `Ord` is derived and load-bearing: [`WearableSlots`] iterates worn items
+/// in `EquipSlot` order, and that order feeds tie-breaking in downstream
+/// modifier aggregation — keep variants in a deterministic declaration order.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub enum EquipSlot {
+    /// Held weapon — spear, stiletto, club, blade, sling.
+    Wielded,
+    /// Paw-worn light armor — hide bracers.
+    Paws,
+    /// Torso armor — hide-plated wrap.
+    Body,
+    /// Cloak / drape over the flanks — woven reed cloak.
+    Cape,
+    /// Reserved for Phase 3 adornment (370): woven collar, charm, pendant.
+    Collar,
+    /// Reserved for Phase 3 adornment (370): notched ear tag.
+    Ear,
+    /// Reserved for Phase 3 adornment (370): tail ribbon, mentorship tag.
+    Tail,
+}
+
+/// A cat's worn gear — the OSRS-style equipped half of the slot-inventory
+/// model (ticket 017). At most one item per [`EquipSlot`]. Crafting a
+/// wearable auto-equips it here (see `craft_at_workshop` /
+/// `craft_at_tanning_frame`); deliberate don/doff/swap is ticket 334's
+/// `WearItem` resolver. `equipment_modifiers_for` reads only these slots —
+/// an item sitting in the pouch is carried, not worn, and contributes
+/// nothing to combat/hunt/stealth modifiers.
+#[derive(Component, Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct WearableSlots {
+    /// Deterministic-iteration map (BTreeMap by `EquipSlot` order).
+    worn: BTreeMap<EquipSlot, ItemSlot>,
+}
+
+impl WearableSlots {
+    /// Equip `item` into the slot its kind maps to. Returns the previously
+    /// worn item (if the slot was occupied) so the caller can route it back
+    /// to the pouch, or `None` if the slot was empty. Returns `Err(item)` if
+    /// the item's kind isn't equippable (no [`EquipSlot`]) — caller keeps it
+    /// in the pouch.
+    pub fn equip(&mut self, item: ItemSlot) -> Result<Option<ItemSlot>, ItemSlot> {
+        match item.kind.equip_slot() {
+            Some(slot) => Ok(self.worn.insert(slot, item)),
+            None => Err(item),
+        }
+    }
+
+    /// The item worn in `slot`, if any.
+    pub fn get(&self, slot: EquipSlot) -> Option<&ItemSlot> {
+        self.worn.get(&slot)
+    }
+
+    /// Remove and return the item worn in `slot`, if any (334's doff path).
+    pub fn take(&mut self, slot: EquipSlot) -> Option<ItemSlot> {
+        self.worn.remove(&slot)
+    }
+
+    /// Iterate worn items in deterministic `EquipSlot` order.
+    pub fn worn_iter(&self) -> impl Iterator<Item = &ItemSlot> {
+        self.worn.values()
+    }
+
+    /// Whether any item is worn at all.
+    pub fn is_empty(&self) -> bool {
+        self.worn.is_empty()
+    }
+}
+
 impl ItemKind {
+    /// The anatomical [`EquipSlot`] this item is worn in, or `None` for
+    /// non-wearables (consumables, materials, curios, build items).
+    ///
+    /// **Exhaustive match** — adding a new `ItemKind` is a compile error
+    /// until its slot (or `None`) is declared, mirroring `equip_material`
+    /// and the compile-time-contracts pillar in CLAUDE.md. A future
+    /// adornment (370) declares its `Collar`/`Ear`/`Tail` slot here.
+    pub fn equip_slot(self) -> Option<EquipSlot> {
+        match self {
+            // Wielded weapons.
+            Self::BoneTipSpear
+            | Self::BoneStiletto
+            | Self::ToothNotchedClub
+            | Self::FlintBlade
+            | Self::Sling => Some(EquipSlot::Wielded),
+            // Paw-worn light armor.
+            Self::HideBracers => Some(EquipSlot::Paws),
+            // Torso armor.
+            Self::HidePlatedWrap => Some(EquipSlot::Body),
+            // Cloak.
+            Self::WovenReedCloak => Some(EquipSlot::Cape),
+
+            // Non-wearable items.
+            Self::RawMouse
+            | Self::RawRat
+            | Self::RawRabbit
+            | Self::RawFish
+            | Self::RawBird
+            | Self::Berries
+            | Self::Nuts
+            | Self::Roots
+            | Self::WildOnion
+            | Self::Mushroom
+            | Self::Moss
+            | Self::DriedGrass
+            | Self::Feather
+            | Self::HerbHealingMoss
+            | Self::HerbMoonpetal
+            | Self::HerbCalmroot
+            | Self::HerbThornbriar
+            | Self::HerbDreamroot
+            | Self::HerbCatnip
+            | Self::HerbSlumbershade
+            | Self::HerbOracleOrchid
+            | Self::ShinyPebble
+            | Self::GlassShard
+            | Self::ColorfulShell
+            | Self::ShadowBone
+            | Self::Barrel
+            | Self::Crate
+            | Self::Shelf
+            | Self::Wood
+            | Self::Stone
+            | Self::RemedyHealingPoultice
+            | Self::RemedyEnergyTonic
+            | Self::RemedyMoodTonic
+            | Self::RawOrgan
+            | Self::DriedFish
+            | Self::SmokedMeat
+            | Self::PreservedOrgan
+            | Self::Bone
+            | Self::Sinew
+            | Self::Whisker
+            | Self::Hide
+            | Self::FishScale
+            | Self::Tallow
+            | Self::Twig
+            | Self::Bristle
+            | Self::Fiber
+            | Self::Flower
+            | Self::PolishedStone
+            | Self::GroomingBrush
+            | Self::PlayBundle
+            | Self::CourtshipGift => None,
+        }
+    }
+
     /// Equipment material class. `Some(_)` for Phase 2b warrior's-kit
     /// items; `None` for everything else (raw food, herbs,
     /// curiosities, build materials, remedies, behavioral tools).
@@ -463,6 +621,113 @@ impl ItemKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::items::ItemModifiers;
+
+    #[test]
+    fn equip_slot_maps_every_kit_item() {
+        assert_eq!(
+            ItemKind::BoneTipSpear.equip_slot(),
+            Some(EquipSlot::Wielded)
+        );
+        assert_eq!(
+            ItemKind::BoneStiletto.equip_slot(),
+            Some(EquipSlot::Wielded)
+        );
+        assert_eq!(
+            ItemKind::ToothNotchedClub.equip_slot(),
+            Some(EquipSlot::Wielded)
+        );
+        assert_eq!(ItemKind::FlintBlade.equip_slot(), Some(EquipSlot::Wielded));
+        assert_eq!(ItemKind::Sling.equip_slot(), Some(EquipSlot::Wielded));
+        assert_eq!(ItemKind::HideBracers.equip_slot(), Some(EquipSlot::Paws));
+        assert_eq!(ItemKind::HidePlatedWrap.equip_slot(), Some(EquipSlot::Body));
+        assert_eq!(ItemKind::WovenReedCloak.equip_slot(), Some(EquipSlot::Cape));
+    }
+
+    #[test]
+    fn equip_slot_is_none_for_non_wearables() {
+        assert_eq!(ItemKind::RawFish.equip_slot(), None);
+        assert_eq!(ItemKind::HerbHealingMoss.equip_slot(), None);
+        assert_eq!(ItemKind::Wood.equip_slot(), None);
+        assert_eq!(ItemKind::GroomingBrush.equip_slot(), None);
+    }
+
+    #[test]
+    fn equip_into_empty_slot_returns_no_displacement() {
+        let mut w = WearableSlots::default();
+        let prior = w
+            .equip(ItemSlot::new(
+                ItemKind::WovenReedCloak,
+                ItemModifiers::default(),
+            ))
+            .expect("cloak is equippable");
+        assert!(prior.is_none());
+        assert_eq!(
+            w.get(EquipSlot::Cape).map(|s| s.kind),
+            Some(ItemKind::WovenReedCloak)
+        );
+    }
+
+    #[test]
+    fn equip_same_slot_displaces_and_returns_prior() {
+        let mut w = WearableSlots::default();
+        w.equip(ItemSlot::new(
+            ItemKind::BoneTipSpear,
+            ItemModifiers::default(),
+        ))
+        .unwrap();
+        let displaced = w
+            .equip(ItemSlot::new(
+                ItemKind::FlintBlade,
+                ItemModifiers::default(),
+            ))
+            .unwrap()
+            .expect("spear displaced from the wielded slot");
+        assert_eq!(displaced.kind, ItemKind::BoneTipSpear);
+        assert_eq!(
+            w.get(EquipSlot::Wielded).map(|s| s.kind),
+            Some(ItemKind::FlintBlade)
+        );
+    }
+
+    #[test]
+    fn equip_rejects_non_wearable() {
+        let mut w = WearableSlots::default();
+        let err = w.equip(ItemSlot::new(ItemKind::RawFish, ItemModifiers::default()));
+        assert!(err.is_err(), "raw fish is not equippable");
+        assert!(w.is_empty());
+    }
+
+    #[test]
+    fn worn_iter_is_deterministic_by_slot_order() {
+        let mut w = WearableSlots::default();
+        // Insert out of slot order; iteration must follow EquipSlot order.
+        w.equip(ItemSlot::new(
+            ItemKind::WovenReedCloak,
+            ItemModifiers::default(),
+        ))
+        .unwrap();
+        w.equip(ItemSlot::new(
+            ItemKind::BoneTipSpear,
+            ItemModifiers::default(),
+        ))
+        .unwrap();
+        w.equip(ItemSlot::new(
+            ItemKind::HideBracers,
+            ItemModifiers::default(),
+        ))
+        .unwrap();
+        let kinds: Vec<_> = w.worn_iter().map(|s| s.kind).collect();
+        // Wielded < Paws < Cape per declaration order.
+        assert_eq!(
+            kinds,
+            vec![
+                ItemKind::BoneTipSpear,
+                ItemKind::HideBracers,
+                ItemKind::WovenReedCloak
+            ]
+        );
+    }
 
     #[test]
     fn warriors_kit_material_table_matches_crafting_doc() {

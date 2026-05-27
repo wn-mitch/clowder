@@ -3231,7 +3231,7 @@ pub fn resolve_disposition_chains(
                             );
                             for _ in 0..kills {
                                 if !inventory.is_full() {
-                                    inventory.slots.push(ItemSlot::new(drop_item, den_mods));
+                                    inventory.pouch.push(ItemSlot::new(drop_item, den_mods));
                                 } else {
                                     commands.spawn((
                                         crate::components::items::Item::with_modifiers(
@@ -3754,7 +3754,7 @@ fn dispatch_chain_step(
                         };
 
                         if !inventory.is_full() {
-                            inventory.slots.push(ItemSlot::new(
+                            inventory.pouch.push(ItemSlot::new(
                                 item_kind,
                                 crate::components::items::ItemModifiers::with_corruption(
                                     catch_corruption,
@@ -3792,7 +3792,7 @@ fn dispatch_chain_step(
                                 );
                             organ_modifiers.from_organ = true;
                             inventory
-                                .slots
+                                .pouch
                                 .push(ItemSlot::new(ItemKind::RawOrgan, organ_modifiers));
                         }
 
@@ -4126,7 +4126,7 @@ fn dispatch_chain_step(
 
                 if ticks > d.search_timeout_ticks {
                     // Multi-kill: if we already have food, head to stores.
-                    if inventory.slots.iter().any(|s| s.kind.is_food()) {
+                    if inventory.pouch.iter().any(|s| s.kind.is_food()) {
                         chain.advance();
                         chain.sync_targets(current);
                     } else {
@@ -4193,7 +4193,7 @@ fn dispatch_chain_step(
                         0.0
                     };
                     if !inventory.is_full() {
-                        inventory.slots.push(ItemSlot::new(
+                        inventory.pouch.push(ItemSlot::new(
                             item_kind,
                             crate::components::items::ItemModifiers::with_corruption(
                                 forage_corruption,
@@ -4889,7 +4889,10 @@ mod tests {
         let needs = Needs::default();
         let mut skills = Skills::default();
         skills.herbcraft = 0.5; // above threshold
-        let mut inventory = Inventory { slots: Vec::new() };
+        let mut inventory = Inventory {
+            pouch: Vec::new(),
+            ..Default::default()
+        };
         inventory.add_herb(HerbKind::HealingMoss); // remedy herb
 
         // One injured cat nearby for the ApplyRemedy target.

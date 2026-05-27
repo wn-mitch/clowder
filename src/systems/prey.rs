@@ -95,7 +95,7 @@ fn try_detect_cat(
             Entity,
             &Position,
             &crate::ai::CurrentAction,
-            &crate::components::magic::Inventory,
+            &crate::components::equipment::WearableSlots,
         ),
         (With<Needs>, Without<Dead>, Without<PreyAnimal>),
     >,
@@ -107,7 +107,7 @@ fn try_detect_cat(
     focal_sink: Option<&crate::resources::trace_log::FocalResolverSink>,
     rng: &mut SimRng,
 ) -> Option<Entity> {
-    for (entity, cat_pos, current, inventory) in cat_positions.iter() {
+    for (entity, cat_pos, current, wearables) in cat_positions.iter() {
         // 100: per-cat tremor multiplier from the cat's current action.
         // A stalking cat returns ≈0.2 (suppressed); a running cat ≈1.8
         // (loud). `prey_cat_proximity` now returns `sight.max(tremor)`
@@ -115,7 +115,7 @@ fn try_detect_cat(
         // but is fooled by a patient stalk inside tremor range.
         let cat_tremor_mul = crate::resources::action_tremor_mul(current.action, tremor_constants);
         // 477 — equipment cloak-mask + noise-class reads.
-        let em = crate::components::equipment_effects::equipment_modifiers_for(inventory, combat);
+        let em = crate::components::equipment_effects::equipment_modifiers_for(wearables, combat);
         // Loud kit raises the tremor floor so a patient stalker carrying
         // metal can still be heard. Phase 2b items are all Silent, so
         // this is a dormant read until 370 flips metal variants to Loud.
@@ -267,7 +267,7 @@ pub fn prey_ai(
             Entity,
             &Position,
             &crate::ai::CurrentAction,
-            &crate::components::magic::Inventory,
+            &crate::components::equipment::WearableSlots,
         ),
         (With<Needs>, Without<Dead>, Without<PreyAnimal>),
     >,
@@ -1472,6 +1472,9 @@ mod tests {
             Position::new(10, 10),
             crate::ai::CurrentAction::default(),
             crate::components::magic::Inventory::default(),
+            // 017 — `cat_positions` requires `WearableSlots`; without it the
+            // detection query skips this cat and the rabbit never alerts.
+            crate::components::equipment::WearableSlots::default(),
         ));
 
         // Spawn a rabbit (alert_radius=6) very close to the cat.

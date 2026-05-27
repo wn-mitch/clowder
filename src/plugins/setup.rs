@@ -103,7 +103,15 @@ pub fn cat_bundle(
             Corruption(0.0),
             Training::default(),
             crate::ai::CurrentAction::default(),
-            Inventory::default(),
+            // Ticket 017 — carry pouch + worn equip slots (OSRS-style),
+            // nested as a sub-bundle to keep this tuple within Bevy's
+            // 15-element limit. `WearableSlots` is required by the
+            // `resolve_goap_plans` query + the equipment-aware combat/hunt
+            // systems; empty at spawn, populated by auto-equip-on-craft.
+            (
+                Inventory::default(),
+                crate::components::equipment::WearableSlots::default(),
+            ),
             crate::components::disposition::ActionHistory::default(),
             HuntingPriors::default(),
             grooming,

@@ -8,11 +8,12 @@
 //! "items have bite" (CLAUDE.md): resolvers fetch the aggregate and
 //! apply it, never per-resolver `match item.kind` effect logic.
 //!
-//! Pre-017 semantic: there is no separate `Wearables` component yet, so
-//! every carried equipment item reads as "worn" (per
-//! [`crate::components::equipment`] module rustdoc). When 017 lands the
-//! slot-aware structure, [`equipment_modifiers_for`] gains an optional
-//! `wearables` parameter; the return type does not change.
+//! 017 semantic: only *worn* items contribute. [`equipment_modifiers_for`]
+//! reads the cat's [`WearableSlots`] (the OSRS-style equip slots), not the
+//! carry pouch — an equipment item sitting in the pouch is carried, not
+//! wielded/worn, and contributes nothing. Crafting a wearable auto-equips
+//! it (see `craft_at_workshop` / `craft_at_tanning_frame`); deliberate
+//! don/doff is ticket 334.
 //!
 //! Composition precedent: `preservation_output_quality`
 //! (`src/steps/disposition/tend_smoking_rack.rs`) — accept data slices,
@@ -20,10 +21,10 @@
 //! aggregate.
 
 use crate::components::equipment::{
-    ArmorClass, DurabilityTier, EquipMaterial, NoiseClass, WeaponClass,
+    ArmorClass, DurabilityTier, EquipMaterial, NoiseClass, WeaponClass, WearableSlots,
 };
 use crate::components::items::ItemKind;
-use crate::components::magic::{Inventory, ItemSlot};
+use crate::components::magic::ItemSlot;
 use crate::resources::sim_constants::CombatConstants;
 
 /// Aggregate combat/stealth modifier surface read by every equipment-aware
@@ -105,19 +106,6 @@ fn quality_multiplier(quality: f32, floor: f32) -> f32 {
     f + (1.0 - f) * q
 }
 
-/// Weapon-class ranking for "best weapon" selection. Pierce beats Slash
-/// beats Blunt beats Ranged (Ranged is a separate mode; until the
-/// follow-up resolver lands, it should not displace a melee weapon in
-/// the strike branch). Tie-broken by quality.
-fn weapon_class_priority(class: WeaponClass) -> u8 {
-    match class {
-        WeaponClass::Pierce => 3,
-        WeaponClass::Slash => 2,
-        WeaponClass::Blunt => 1,
-        WeaponClass::Ranged => 0,
-    }
-}
-
 fn weapon_view_for(slot: &ItemSlot) -> Option<WeaponView> {
     let class = slot.kind.weapon_class()?;
     let material = slot.kind.equip_material()?;
@@ -158,15 +146,13 @@ fn noisier(a: NoiseClass, b: NoiseClass) -> NoiseClass {
     }
 }
 
-/// Compose the modifier aggregate for one cat. Walks `inventory.slots`
-/// exactly once.
-///
-/// Pre-017: there is no separate worn-vs-carried distinction, so every
-/// equipment item contributes (per `equipment.rs` module rustdoc). When
-/// 017 lands, this signature will gain an optional `wearables` parameter
-/// and the iteration source will narrow to actually-worn items; the
-/// return type stays the same so resolver call sites are stable.
-pub fn equipment_modifiers_for(inventory: &Inventory, c: &CombatConstants) -> EquipmentModifiers {
+/// Compose the modifier aggregate for one cat. Walks the cat's worn equip
+/// slots ([`WearableSlots`]) exactly once — items in the carry pouch are
+/// not worn and do not contribute (017).
+pub fn equipment_modifiers_for(
+    wearables: &WearableSlots,
+    c: &CombatConstants,
+) -> EquipmentModifiers {
     let mut weapon: Option<WeaponView> = None;
     let mut blunt = 0.0_f32;
     let mut pierce = 0.0_f32;
@@ -174,26 +160,14 @@ pub fn equipment_modifiers_for(inventory: &Inventory, c: &CombatConstants) -> Eq
     let mut visual_mask = 0.0_f32;
     let mut noise = NoiseClass::Silent;
 
-    for slot in &inventory.slots {
+    for slot in wearables.worn_iter() {
+        // At most one worn item is a weapon — `equip_slot` maps every
+        // weapon to the single `EquipSlot::Wielded` slot, so no ranking
+        // among multiple weapons is possible (017). The wielded weapon is
+        // whatever occupies that slot.
         if let Some(candidate) = weapon_view_for(slot) {
             ranged_enabled |= matches!(candidate.class, WeaponClass::Ranged);
-            let candidate_key = (
-                weapon_class_priority(candidate.class),
-                (candidate.quality * 1000.0) as i32,
-            );
-            let displaces = match weapon {
-                None => true,
-                Some(existing) => {
-                    let existing_key = (
-                        weapon_class_priority(existing.class),
-                        (existing.quality * 1000.0) as i32,
-                    );
-                    candidate_key > existing_key
-                }
-            };
-            if displaces {
-                weapon = Some(candidate);
-            }
+            weapon = Some(candidate);
         }
         let (b, p) = armor_contribution(slot, c);
         blunt += b;
@@ -221,18 +195,21 @@ mod tests {
         CombatConstants::default()
     }
 
-    fn inv(items: &[(ItemKind, f32)]) -> Inventory {
-        let mut i = Inventory::default();
+    /// Build a [`WearableSlots`] by equipping each item. Inputs must occupy
+    /// distinct slots (one weapon, one cape, …) — a same-slot collision
+    /// silently displaces, which the equip-collision test covers separately.
+    fn worn(items: &[(ItemKind, f32)]) -> WearableSlots {
+        let mut w = WearableSlots::default();
         for (kind, q) in items {
-            i.slots
-                .push(ItemSlot::with_quality(*kind, *q, ItemModifiers::default()));
+            w.equip(ItemSlot::with_quality(*kind, *q, ItemModifiers::default()))
+                .expect("test items are equippable");
         }
-        i
+        w
     }
 
     #[test]
-    fn empty_inventory_yields_zero_aggregate() {
-        let em = equipment_modifiers_for(&Inventory::default(), &ctx());
+    fn empty_wearables_yield_zero_aggregate() {
+        let em = equipment_modifiers_for(&WearableSlots::default(), &ctx());
         assert!(em.weapon.is_none());
         assert_eq!(em.armor_blunt_reduction, 0.0);
         assert_eq!(em.armor_pierce_reduction, 0.0);
@@ -244,7 +221,7 @@ mod tests {
     #[test]
     fn single_hide_bracers_blunt_only() {
         let c = ctx();
-        let em = equipment_modifiers_for(&inv(&[(ItemKind::HideBracers, 1.0)]), &c);
+        let em = equipment_modifiers_for(&worn(&[(ItemKind::HideBracers, 1.0)]), &c);
         assert!((em.armor_blunt_reduction - c.armor_blunt_absorb_magnitude).abs() < 1e-6);
         assert_eq!(em.armor_pierce_reduction, 0.0);
     }
@@ -253,8 +230,8 @@ mod tests {
     fn quality_floor_linear_scaling() {
         let c = ctx();
         // q=0 → floor * base; q=1 → base.
-        let em0 = equipment_modifiers_for(&inv(&[(ItemKind::HideBracers, 0.0)]), &c);
-        let em1 = equipment_modifiers_for(&inv(&[(ItemKind::HideBracers, 1.0)]), &c);
+        let em0 = equipment_modifiers_for(&worn(&[(ItemKind::HideBracers, 0.0)]), &c);
+        let em1 = equipment_modifiers_for(&worn(&[(ItemKind::HideBracers, 1.0)]), &c);
         let expected_q0 = c.armor_blunt_absorb_magnitude * c.equipment_quality_floor;
         assert!((em0.armor_blunt_reduction - expected_q0).abs() < 1e-6);
         assert!((em1.armor_blunt_reduction - c.armor_blunt_absorb_magnitude).abs() < 1e-6);
@@ -262,9 +239,11 @@ mod tests {
 
     #[test]
     fn dual_armor_composes_additively_then_floor_clamps() {
+        // Bracers (Paws) + plated wrap (Body) occupy distinct slots, so both
+        // are worn and their reductions compose.
         let c = ctx();
         let em = equipment_modifiers_for(
-            &inv(&[
+            &worn(&[
                 (ItemKind::HideBracers, 1.0),
                 (ItemKind::HidePlatedWrap, 1.0),
             ]),
@@ -278,48 +257,66 @@ mod tests {
     }
 
     #[test]
-    fn weapon_ranking_pierce_beats_blunt_regardless_of_quality() {
-        let em = equipment_modifiers_for(
-            &inv(&[
-                (ItemKind::ToothNotchedClub, 1.0),
-                (ItemKind::BoneStiletto, 0.3),
-            ]),
-            &ctx(),
-        );
+    fn wielded_weapon_is_read_from_the_slot() {
+        let em = equipment_modifiers_for(&worn(&[(ItemKind::BoneStiletto, 0.3)]), &ctx());
         let w = em.weapon.expect("weapon present");
         assert_eq!(w.class, WeaponClass::Pierce);
         assert!(w.fragile, "bone is fragile");
+        assert!((w.quality - 0.3).abs() < 1e-6);
     }
 
     #[test]
-    fn weapon_ranking_quality_breaks_class_ties() {
-        let em = equipment_modifiers_for(
-            &inv(&[(ItemKind::BoneTipSpear, 0.4), (ItemKind::BoneStiletto, 0.9)]),
-            &ctx(),
+    fn equipping_a_second_weapon_displaces_the_first() {
+        // One Wielded slot: equipping a stiletto over a spear swaps it out.
+        let mut w = WearableSlots::default();
+        assert!(w
+            .equip(ItemSlot::with_quality(
+                ItemKind::BoneTipSpear,
+                0.4,
+                ItemModifiers::default()
+            ))
+            .expect("equippable")
+            .is_none());
+        let displaced = w
+            .equip(ItemSlot::with_quality(
+                ItemKind::BoneStiletto,
+                0.9,
+                ItemModifiers::default(),
+            ))
+            .expect("equippable")
+            .expect("spear displaced");
+        assert_eq!(displaced.kind, ItemKind::BoneTipSpear);
+        let em = equipment_modifiers_for(&w, &ctx());
+        assert_eq!(
+            em.weapon.expect("weapon present").kind,
+            ItemKind::BoneStiletto
         );
-        let w = em.weapon.expect("weapon present");
-        assert!((w.quality - 0.9).abs() < 1e-6);
     }
 
     #[test]
-    fn sling_sets_ranged_enabled_but_does_not_displace_melee() {
-        let em = equipment_modifiers_for(
-            &inv(&[(ItemKind::BoneTipSpear, 0.5), (ItemKind::Sling, 1.0)]),
-            &ctx(),
-        );
+    fn wielding_a_sling_sets_ranged_enabled() {
+        let em = equipment_modifiers_for(&worn(&[(ItemKind::Sling, 1.0)]), &ctx());
         assert!(em.ranged_enabled);
-        // Melee should still win the `weapon` slot (Ranged priority 0).
         let w = em.weapon.expect("weapon present");
-        assert_eq!(w.class, WeaponClass::Pierce);
+        assert_eq!(w.class, WeaponClass::Ranged);
     }
 
     #[test]
     fn cloak_contributes_visual_mask_only() {
         let c = ctx();
-        let em = equipment_modifiers_for(&inv(&[(ItemKind::WovenReedCloak, 1.0)]), &c);
+        let em = equipment_modifiers_for(&worn(&[(ItemKind::WovenReedCloak, 1.0)]), &c);
         assert!((em.detection_visual_mask - c.cloak_visual_mask_magnitude).abs() < 1e-6);
         assert_eq!(em.armor_blunt_reduction, 0.0);
         assert!(em.weapon.is_none());
+    }
+
+    #[test]
+    fn carried_but_unworn_equipment_contributes_nothing() {
+        // Items in the pouch are not worn — the worn-only model means a
+        // spear in the bag yields a zero aggregate (017's core invariant).
+        let em = equipment_modifiers_for(&WearableSlots::default(), &ctx());
+        assert!(em.weapon.is_none());
+        assert_eq!(em.armor_blunt_reduction, 0.0);
     }
 
     #[test]
@@ -348,13 +345,13 @@ mod tests {
     #[test]
     fn strike_bonus_is_class_keyed_and_quality_scaled() {
         let c = ctx();
-        let em = equipment_modifiers_for(&inv(&[(ItemKind::BoneTipSpear, 0.9)]), &c);
+        let em = equipment_modifiers_for(&worn(&[(ItemKind::BoneTipSpear, 0.9)]), &c);
         let w = em.weapon.expect("weapon present");
         // Pierce base × floor-linear(0.9) = 0.12 × (0.25 + 0.75·0.9).
         let expected = c.hunt_strike_pierce_bonus * (0.25 + 0.75 * 0.9);
         assert!((w.strike_bonus(&c) - expected).abs() < 1e-6);
         // Ranged weapons contribute no melee strike bonus.
-        let sling = equipment_modifiers_for(&inv(&[(ItemKind::Sling, 1.0)]), &c)
+        let sling = equipment_modifiers_for(&worn(&[(ItemKind::Sling, 1.0)]), &c)
             .weapon
             .expect("sling is a weapon");
         assert_eq!(sling.strike_bonus(&c), 0.0);

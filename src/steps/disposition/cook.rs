@@ -39,7 +39,7 @@ pub fn resolve_cook(
     if ticks < d.cook_duration.ticks(time_scale) {
         return StepOutcome::unwitnessed(StepResult::Continue);
     }
-    for slot in inventory.slots.iter_mut() {
+    for slot in inventory.pouch.iter_mut() {
         if slot.kind.is_food() && !slot.modifiers.cooked {
             slot.modifiers.cooked = true;
             return StepOutcome::witnessed(StepResult::Advance);

@@ -146,7 +146,7 @@ pub fn transfer_item_inventory_to_stored(
 ) -> Result<Entity, TransferError> {
     use crate::components::items::{Item, ItemLocation};
 
-    let (kind, modifiers) = match inventory.slots.get(slot_idx) {
+    let (kind, modifiers) = match inventory.pouch.get(slot_idx) {
         Some(slot) if !slot.kind.is_herb() => (slot.kind, slot.modifiers),
         _ => return Err(TransferError::DestinationFull),
     };
@@ -174,7 +174,7 @@ pub fn transfer_item_inventory_to_stored(
         return Err(TransferError::DestinationFull);
     }
 
-    inventory.slots.swap_remove(slot_idx);
+    inventory.pouch.swap_remove(slot_idx);
     Ok(item_entity)
 }
 
@@ -197,7 +197,7 @@ pub fn transfer_item_inventory_to_ground(
 ) -> Result<Entity, TransferError> {
     use crate::components::items::{Item, ItemLocation};
 
-    let (kind, modifiers) = match inventory.slots.get(slot_idx) {
+    let (kind, modifiers) = match inventory.pouch.get(slot_idx) {
         Some(slot) => (slot.kind, slot.modifiers),
         None => return Err(TransferError::DestinationFull),
     };
@@ -209,7 +209,7 @@ pub fn transfer_item_inventory_to_ground(
         ))
         .id();
 
-    inventory.slots.swap_remove(slot_idx);
+    inventory.pouch.swap_remove(slot_idx);
     Ok(item_entity)
 }
 
@@ -228,14 +228,14 @@ pub fn transfer_item_inventory_to_inventory(
         return Err(TransferError::DestinationFull);
     }
 
-    let added = match source.slots.get(slot_idx) {
+    let added = match source.pouch.get(slot_idx) {
         Some(slot) => target.add_item_with_modifiers(slot.kind, slot.modifiers),
         None => return Err(TransferError::DestinationFull),
     };
     if !added {
         return Err(TransferError::DestinationFull);
     }
-    source.slots.swap_remove(slot_idx);
+    source.pouch.swap_remove(slot_idx);
     Ok(())
 }
 
@@ -290,7 +290,7 @@ mod tests {
         // own resources; the deferred queue is implicit. We
         // can't apply it here without a Schedule, but we don't
         // need to — the tests assert synchronous state on
-        // `stored.items` and `inventory.slots`.
+        // `stored.items` and `inventory.pouch`.
 
         // Contract assertion: the transfer refused, the item
         // entity is still in Stores, the inventory wasn't

@@ -155,8 +155,8 @@ pub fn resolve_load_drying_rack(
 /// per-instance `quality` propagated from the source `Item.quality`
 /// at pickup time).
 fn take_kind(inventory: &mut Inventory, kind: ItemKind) -> (f32, ItemModifiers) {
-    if let Some(idx) = inventory.slots.iter().position(|s| s.kind == kind) {
-        let slot = inventory.slots.swap_remove(idx);
+    if let Some(idx) = inventory.pouch.iter().position(|s| s.kind == kind) {
+        let slot = inventory.pouch.swap_remove(idx);
         (slot.quality, slot.modifiers)
     } else {
         (1.0, ItemModifiers::default())
@@ -167,8 +167,8 @@ fn take_kind(inventory: &mut Inventory, kind: ItemKind) -> (f32, ItemModifiers) 
 /// Preserved Organ recipe — the recipe consumes "1 herb" without
 /// caring which kind.
 fn take_any_herb(inventory: &mut Inventory) -> Option<ItemKind> {
-    if let Some(idx) = inventory.slots.iter().position(|s| s.kind.is_herb()) {
-        let slot = inventory.slots.swap_remove(idx);
+    if let Some(idx) = inventory.pouch.iter().position(|s| s.kind.is_herb()) {
+        let slot = inventory.pouch.swap_remove(idx);
         Some(slot.kind)
     } else {
         None

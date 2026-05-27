@@ -5,7 +5,6 @@ use crate::ai::{Action, CurrentAction};
 use crate::components::body_zones::{BodyPart, CatBodyModel};
 use crate::components::equipment_effects::{equipment_modifiers_for, EquipmentModifiers};
 use crate::components::identity::{Gender, LifeStage, Name};
-use crate::components::magic::Inventory;
 use crate::components::mental::{Memory, MemoryEntry, MemoryType, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, InjurySource, Needs, Position};
@@ -67,7 +66,7 @@ pub fn resolve_combat(
             &mut Memory,
             &mut Mood,
             &mut CatBodyModel,
-            &Inventory,
+            &crate::components::equipment::WearableSlots,
         ),
         Without<Dead>,
     >,
@@ -311,7 +310,7 @@ pub fn resolve_combat(
             mut memory,
             mut mood,
             mut cat_body_model,
-            inventory,
+            wearables,
         )) = cats.get_mut(fight.cat_entity)
         {
             let injury_pos = *cat_pos;
@@ -320,7 +319,7 @@ pub fn resolve_combat(
             // post-armor damage, so reduce once here and pass the reduced
             // value to both. `damage_to_body_part` still receives the
             // equipment + sink so the reduction surfaces in the trace.
-            let em = equipment_modifiers_for(inventory, c);
+            let em = equipment_modifiers_for(wearables, c);
             let reduced_damage = armor_reduced_damage(
                 wildlife_damage,
                 InjurySource::WildlifeCombat,

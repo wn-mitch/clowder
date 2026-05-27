@@ -13,7 +13,7 @@
 use bevy_ecs::world::World;
 
 use crate::components::items::{ItemKind, ItemModifiers};
-use crate::components::magic::{Inventory, ItemSlot};
+use crate::components::magic::ItemSlot;
 use crate::components::physical::Position;
 use crate::components::prey::PreyKind;
 
@@ -72,8 +72,13 @@ fn setup(world: &mut World, seed: u64) {
     );
 
     // Wield a high-quality bone-tip spear (Pierce class, Fragile tier).
-    if let Some(mut inv) = world.entity_mut(cat).get_mut::<Inventory>() {
-        inv.slots.push(ItemSlot::with_quality(
+    // 017 — equip into the worn slot; equipment_modifiers_for reads worn
+    // gear, not the pouch.
+    if let Some(mut wearables) = world
+        .entity_mut(cat)
+        .get_mut::<crate::components::equipment::WearableSlots>()
+    {
+        let _ = wearables.equip(ItemSlot::with_quality(
             ItemKind::BoneTipSpear,
             0.9,
             ItemModifiers::default(),

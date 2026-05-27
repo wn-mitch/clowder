@@ -172,14 +172,23 @@ impl GoalState {
     }
 
     /// True iff the goal is satisfied for `entity` in `world`. For
-    /// `Predicate`, dispatches to the authored fn; for `HaveItem`,
-    /// checks the cat's `Inventory` for a slot carrying `item`.
+    /// `Predicate`, dispatches to the authored fn; for `HaveItem`, the
+    /// cat "has" the item if it's in the carry pouch **or** worn in an
+    /// equip slot (017 — a crafted wearable auto-equips, so a worn item
+    /// satisfies the goal; checking only the pouch would loop the cat
+    /// into re-crafting gear it's already wearing).
     pub fn achieved(&self, world: &World, entity: Entity) -> bool {
         match &self.kind {
             GoalKind::Predicate { achieved, .. } => achieved(world, entity),
-            GoalKind::HaveItem(item) => world
-                .get::<crate::components::magic::Inventory>(entity)
-                .is_some_and(|inv| inv.slots.iter().any(|s| s.kind == *item)),
+            GoalKind::HaveItem(item) => {
+                let in_pouch = world
+                    .get::<crate::components::magic::Inventory>(entity)
+                    .is_some_and(|inv| inv.pouch.iter().any(|s| s.kind == *item));
+                let worn = world
+                    .get::<crate::components::equipment::WearableSlots>(entity)
+                    .is_some_and(|w| w.worn_iter().any(|s| s.kind == *item));
+                in_pouch || worn
+            }
         }
     }
 }

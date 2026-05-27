@@ -372,7 +372,7 @@ pub fn sync_food_stores(
 
     let mut held = 0u32;
     for inventory in cats.iter() {
-        for slot in &inventory.slots {
+        for slot in &inventory.pouch {
             if slot.kind.is_food() {
                 held += 1;
             }
@@ -405,7 +405,7 @@ pub fn sync_colony_reserves(
     let mut remedy = 0u32;
 
     for inventory in cats.iter() {
-        for slot in &inventory.slots {
+        for slot in &inventory.pouch {
             match ResourceKind::from_item_kind(slot.kind) {
                 Some(ResourceKind::Thornbriar) => thornbriar += 1,
                 Some(ResourceKind::RemedyHerb) => remedy += 1,
@@ -682,7 +682,8 @@ mod tests {
         use crate::components::magic::{Inventory, ItemSlot};
 
         world.spawn(Inventory {
-            slots: vec![ItemSlot::new(ItemKind::RawRabbit, ItemModifiers::default())],
+            pouch: vec![ItemSlot::new(ItemKind::RawRabbit, ItemModifiers::default())],
+            ..Default::default()
         });
 
         schedule.run(&mut world);
@@ -704,7 +705,8 @@ mod tests {
 
         world.spawn((
             Inventory {
-                slots: vec![ItemSlot::new(ItemKind::RawBird, ItemModifiers::default())],
+                pouch: vec![ItemSlot::new(ItemKind::RawBird, ItemModifiers::default())],
+                ..Default::default()
             },
             Dead {
                 tick: 0,
@@ -764,7 +766,8 @@ mod tests {
             .items = vec![den_fish];
 
         world.spawn(Inventory {
-            slots: vec![ItemSlot::new(ItemKind::RawRabbit, ItemModifiers::default())],
+            pouch: vec![ItemSlot::new(ItemKind::RawRabbit, ItemModifiers::default())],
+            ..Default::default()
         });
 
         schedule.run(&mut world);
@@ -814,7 +817,12 @@ mod tests {
     }
 
     fn spawn_cat_with_inventory(world: &mut World, slots: Vec<ItemSlot>) -> Entity {
-        world.spawn(Inventory { slots }).id()
+        world
+            .spawn(Inventory {
+                pouch: slots,
+                ..Default::default()
+            })
+            .id()
     }
 
     fn has_marker<M: bevy_ecs::component::Component>(world: &World, entity: Entity) -> bool {
@@ -875,7 +883,7 @@ mod tests {
         assert!(has_marker::<HasHerbsInInventory>(&world, cat));
 
         // Remove the herb.
-        world.get_mut::<Inventory>(cat).unwrap().slots.clear();
+        world.get_mut::<Inventory>(cat).unwrap().pouch.clear();
         schedule.run(&mut world);
         assert!(
             !has_marker::<HasHerbsInInventory>(&world, cat),
@@ -890,7 +898,8 @@ mod tests {
         let cat = world
             .spawn((
                 Inventory {
-                    slots: vec![ItemSlot::herb(HerbKind::HealingMoss)],
+                    pouch: vec![ItemSlot::herb(HerbKind::HealingMoss)],
+                    ..Default::default()
                 },
                 crate::components::physical::Dead {
                     tick: 0,

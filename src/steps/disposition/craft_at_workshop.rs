@@ -9,7 +9,9 @@
 //! resolver no longer chooses "best satisfied" recipe; the choice
 //! happens upstream in the aspiration picker.
 
-use crate::components::magic::Inventory;
+use crate::components::equipment::WearableSlots;
+use crate::components::items::ItemModifiers;
+use crate::components::magic::{Inventory, ItemSlot};
 use crate::components::physical::Position;
 use crate::components::recipe::{ItemDestination, RecipeId, StationRequirement};
 use crate::resources::recipe_registry::RecipeRegistry;
@@ -18,10 +20,12 @@ use crate::steps::{StepOutcome, StepResult};
 /// # GOAP step resolver: `CraftAtWorkshop`
 ///
 /// **Real-world effect** — consumes one Workshop recipe's full input
-/// set from the actor's `Inventory` and adds the output item (Phase 2:
-/// all six recipes use `ItemDestination::Inventory`). Recipe selection
-/// is deterministic — lexicographic by `RecipeId.0`, first satisfied
-/// wins.
+/// set from the actor's `Inventory` pouch and produces the output:
+/// `ItemDestination::Inventory` outputs land in the pouch;
+/// `ItemDestination::EquippedSlot` outputs auto-equip into the cat's
+/// `WearableSlots` (017), falling back to the pouch if the slot is
+/// occupied. Recipe selection is deterministic — lexicographic by
+/// `RecipeId.0`, first satisfied wins.
 ///
 /// **Plan-level preconditions** — emitted under `StatePredicate::ZoneIs(
 /// PlannerZone::Workshop)` and `StatePredicate::HasMarker(
@@ -52,6 +56,7 @@ pub fn resolve_craft_at_workshop(
     recipe_id: Option<RecipeId>,
     cat_pos: Position,
     inventory: &mut Inventory,
+    wearables: &mut WearableSlots,
     recipes: &RecipeRegistry,
     workshop_positions: &[Position],
     proximity: i32,
@@ -60,6 +65,7 @@ pub fn resolve_craft_at_workshop(
         recipe_id,
         cat_pos,
         inventory,
+        wearables,
         recipes,
         workshop_positions,
         StationRequirement::Workshop,
@@ -84,6 +90,7 @@ pub(crate) fn resolve_craft_at_station(
     recipe_id: Option<RecipeId>,
     cat_pos: Position,
     inventory: &mut Inventory,
+    wearables: &mut WearableSlots,
     recipes: &RecipeRegistry,
     station_positions: &[Position],
     station_filter: StationRequirement,
@@ -133,11 +140,11 @@ pub(crate) fn resolve_craft_at_station(
     for input in &recipe.inputs {
         for _ in 0..input.count {
             let idx = inventory
-                .slots
+                .pouch
                 .iter()
                 .position(|s| s.kind == input.kind)
                 .expect("input verified present by recipe_inputs_satisfied");
-            inventory.slots.swap_remove(idx);
+            inventory.pouch.swap_remove(idx);
         }
     }
 
@@ -149,10 +156,30 @@ pub(crate) fn resolve_craft_at_station(
                 ));
             }
         }
-        ItemDestination::EquippedSlot | ItemDestination::WorldPosition => {
+        ItemDestination::EquippedSlot => {
+            // 017 — auto-equip the freshly-crafted wearable into its
+            // anatomical slot. If the slot is already occupied (or the
+            // kind isn't equippable), the new item stays in the pouch as
+            // carried/unworn gear — crafting never displaces worn gear
+            // (deliberate don/doff/swap is ticket 334). Either way the
+            // item exists, so the craft is witnessed.
+            let kind = recipe.output.item_kind;
+            let item = ItemSlot::new(kind, ItemModifiers::default());
+            let slot_free = kind
+                .equip_slot()
+                .is_some_and(|s| wearables.get(s).is_none());
+            if slot_free {
+                let _ = wearables.equip(item);
+            } else if !inventory.add_item(kind) {
+                return StepOutcome::unwitnessed(StepResult::Fail(
+                    "pouch full at equipped-output fallback".into(),
+                ));
+            }
+        }
+        ItemDestination::WorldPosition => {
             return StepOutcome::unwitnessed(StepResult::Fail(format!(
-                "{station_label} recipe output destination not yet supported \
-                 (Phase 2/2b are Inventory-only)"
+                "{station_label} recipe output destination WorldPosition not yet \
+                 supported (place-anchored decorations land in Phase 4)"
             )));
         }
     }
@@ -181,7 +208,7 @@ fn pick_satisfied_recipe(
 }
 
 /// Helper: returns `true` iff every `RecipeInput { kind, count }` is
-/// present in `inventory.slots` at sufficient count. Kept after the
+/// present in `inventory.pouch` at sufficient count. Kept after the
 /// 463 commit 8 lex-pick retirement because the resolver still
 /// defensively re-checks before draining — the held Intention's
 /// recipe may not match the inventory (inputs dropped en route, or
@@ -192,7 +219,7 @@ fn recipe_inputs_satisfied(
 ) -> bool {
     for input in &recipe.inputs {
         let have = inventory
-            .slots
+            .pouch
             .iter()
             .filter(|s| s.kind == input.kind)
             .count() as u32;
@@ -201,4 +228,102 @@ fn recipe_inputs_satisfied(
         }
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::equipment::{EquipSlot, WearableSlots};
+    use crate::components::items::{ItemKind, ItemModifiers};
+    use crate::components::recipe::DisciplineKind;
+    use crate::components::recipe::{Recipe, RecipeDuration, RecipeInput, RecipeOutput};
+
+    /// A Workshop recipe producing a wielded weapon, routed to the equip
+    /// slot (017). Bone input → BoneTipSpear, EquippedSlot destination.
+    fn spear_recipe() -> Recipe {
+        Recipe {
+            id: RecipeId("test_spear"),
+            discipline: DisciplineKind::BoneShellCraft,
+            inputs: vec![RecipeInput {
+                kind: ItemKind::Bone,
+                count: 1,
+            }],
+            station: StationRequirement::Workshop,
+            duration: RecipeDuration::Fixed { ticks: 1 },
+            output: RecipeOutput {
+                item_kind: ItemKind::BoneTipSpear,
+                destination: ItemDestination::EquippedSlot,
+            },
+            skill_gate: None,
+            is_warriors_kit: true,
+            discipline_skill_affinity: None,
+        }
+    }
+
+    fn registry_with(recipe: Recipe) -> RecipeRegistry {
+        let mut r = RecipeRegistry::default();
+        r.insert(recipe);
+        r
+    }
+
+    #[test]
+    fn equipped_slot_output_auto_equips_into_worn_slot() {
+        let mut inv = Inventory::default();
+        inv.add_item(ItemKind::Bone);
+        let mut wearables = WearableSlots::default();
+        let stations = [Position::new(0, 0)];
+
+        let outcome = resolve_craft_at_workshop(
+            Some(RecipeId("test_spear")),
+            Position::new(0, 0),
+            &mut inv,
+            &mut wearables,
+            &registry_with(spear_recipe()),
+            &stations,
+            3,
+        );
+
+        assert!(matches!(outcome.result, StepResult::Advance));
+        assert!(outcome.witness.is_some(), "craft witnessed");
+        // The spear is worn, not in the pouch; the Bone input was consumed.
+        assert_eq!(
+            wearables.get(EquipSlot::Wielded).map(|s| s.kind),
+            Some(ItemKind::BoneTipSpear)
+        );
+        assert!(inv.pouch.is_empty(), "Bone consumed, spear not in pouch");
+    }
+
+    #[test]
+    fn equipped_slot_falls_back_to_pouch_when_slot_occupied() {
+        let mut inv = Inventory::default();
+        inv.add_item(ItemKind::Bone);
+        // Already wielding a flint blade — the Wielded slot is taken.
+        let mut wearables = WearableSlots::default();
+        wearables
+            .equip(ItemSlot::new(
+                ItemKind::FlintBlade,
+                ItemModifiers::default(),
+            ))
+            .unwrap();
+        let stations = [Position::new(0, 0)];
+
+        let outcome = resolve_craft_at_workshop(
+            Some(RecipeId("test_spear")),
+            Position::new(0, 0),
+            &mut inv,
+            &mut wearables,
+            &registry_with(spear_recipe()),
+            &stations,
+            3,
+        );
+
+        assert!(matches!(outcome.result, StepResult::Advance));
+        // Crafting never displaces worn gear (deliberate swap is 334) — the
+        // flint blade stays wielded and the new spear lands in the pouch.
+        assert_eq!(
+            wearables.get(EquipSlot::Wielded).map(|s| s.kind),
+            Some(ItemKind::FlintBlade)
+        );
+        assert!(inv.pouch.iter().any(|s| s.kind == ItemKind::BoneTipSpear));
+    }
 }

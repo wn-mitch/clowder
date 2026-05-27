@@ -115,12 +115,12 @@ pub fn resolve_drop_item(
     has_construction_site: bool,
     commands: &mut Commands,
 ) -> StepOutcome<Option<DropOutcome>> {
-    if inventory.slots.is_empty() {
+    if inventory.pouch.is_empty() {
         return StepOutcome::unwitnessed(StepResult::Fail("drop: empty inventory".to_string()));
     }
 
     let has_remedy_herbs = inventory.has_remedy_herb();
-    let Some((slot_idx, _)) = inventory.slots.iter().enumerate().min_by(|(_, a), (_, b)| {
+    let Some((slot_idx, _)) = inventory.pouch.iter().enumerate().min_by(|(_, a), (_, b)| {
         drop_priority(
             a.kind,
             disposition,
