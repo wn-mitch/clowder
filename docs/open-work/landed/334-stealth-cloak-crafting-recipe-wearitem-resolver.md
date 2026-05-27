@@ -13,7 +13,7 @@ wires-method: [acquire_stealth_via_self_craft]
 supersedes: []
 related-systems: [htn-methods.md, slot-inventory.md, crafting.md]
 related-balance: []
-landed-at: pending
+landed-at: 96e982bbd325
 landed-on: 2026-05-27
 ---
 
