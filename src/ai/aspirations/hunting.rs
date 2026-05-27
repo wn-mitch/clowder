@@ -4,8 +4,11 @@
 //! [`MASTER_OF_THE_HUNT`] chain's first milestone ("First Blood")
 //! carries a single `Emit` row pointing at the `hunt_prey` label so
 //! ticket 321's soak exercises the picker→L2-wrap→320-gate path
-//! end-to-end. The remaining Hunting milestones land empty (`#325`
-//! fills them).
+//! end-to-end. #325 filled the remaining milestones: every milestone
+//! past First Blood emits `hunt_prey` (Primary), and the
+//! Master-of-the-Hunt chain's two skill-progression milestones
+//! additionally emit `stealth_gear_acquired` (Secondary) — the
+//! worked-example stealth-cloak arc, Live via 334's self-craft method.
 
 use super::{always_true, AspirationChain, Emit, Milestone, Priority, ProgressTracker};
 use crate::ai::dse::CommitmentStrategy;
@@ -15,15 +18,51 @@ use crate::components::aspirations::AspirationDomain;
 /// "First Blood" emits `hunt_prey` so the L2 wrap site replaces
 /// `Intention::Activity { Idle }` with `Intention::Goal { hunt_prey }`
 /// — the 320 HTN gate then catches the Goal shape and pushes the
-/// `hunt_method` frame. Combine-and-test slice; #325 will replace the
-/// `always_true` applicability check with a prey-in-range belief
-/// predicate.
+/// `hunt_method` frame. Combine-and-test slice; a follow-on balance
+/// pass replaces the `always_true` applicability check with a
+/// prey-in-range belief predicate.
 const FIRST_BLOOD_EMITS: &[Emit] = &[Emit {
     label: "hunt_prey",
     applicable_when: always_true,
     strategy: CommitmentStrategy::SingleMinded,
     priority: Priority::Primary,
 }];
+
+/// 325 — Hunting Primary emit, shared by every milestone past First
+/// Blood. Routes to `hunt_method` (Live, 321), binding `Action::Hunt`.
+/// Byte-identical to [`FIRST_BLOOD_EMITS`]; kept separate only to
+/// preserve that const's 321 combine-and-test provenance.
+const HUNT_EMITS: &[Emit] = &[Emit {
+    label: "hunt_prey",
+    applicable_when: always_true,
+    strategy: CommitmentStrategy::SingleMinded,
+    priority: Priority::Primary,
+}];
+
+/// 325 — mastery-tier emit: Primary hunt + Secondary stealth-gear
+/// acquisition. The Secondary catches `acquire_stealth_via_self_craft`
+/// (Live as of 334; its own `can_self_craft_stealth` predicate gates
+/// lacks-cloak ∧ can-craft, so the `always_true` emit gate here is not
+/// redundant-harmful) and falls through to the dormant commission
+/// sibling (#481) when self-craft is inapplicable. Applied to the
+/// Master-of-the-Hunt chain's two skill-progression milestones — the
+/// worked-example stealth-cloak arc (`docs/systems/htn-methods.md`
+/// §Worked example). A follow-on balance pass tightens the per-row
+/// `applicable_when` predicates.
+const HUNT_MASTERY_EMITS: &[Emit] = &[
+    Emit {
+        label: "hunt_prey",
+        applicable_when: always_true,
+        strategy: CommitmentStrategy::SingleMinded,
+        priority: Priority::Primary,
+    },
+    Emit {
+        label: "stealth_gear_acquired",
+        applicable_when: always_true,
+        strategy: CommitmentStrategy::SingleMinded,
+        priority: Priority::Secondary,
+    },
+];
 
 pub const MASTER_OF_THE_HUNT: AspirationChain = AspirationChain {
     name: "Master of the Hunt",
@@ -46,7 +85,7 @@ pub const MASTER_OF_THE_HUNT: AspirationChain = AspirationChain {
                 actions: &[Action::Hunt],
                 count: 10,
             },
-            emits: &[],
+            emits: HUNT_EMITS,
             narrative_on_complete: "{name} reads the undergrowth like a story now.",
         },
         Milestone {
@@ -56,7 +95,7 @@ pub const MASTER_OF_THE_HUNT: AspirationChain = AspirationChain {
                 actions: &[Action::Hunt],
                 count: 25,
             },
-            emits: &[],
+            emits: HUNT_MASTERY_EMITS,
             narrative_on_complete: "Prey doesn't hear {name} coming anymore.",
         },
         Milestone {
@@ -66,7 +105,7 @@ pub const MASTER_OF_THE_HUNT: AspirationChain = AspirationChain {
                 actions: &[Action::Hunt],
                 count: 50,
             },
-            emits: &[],
+            emits: HUNT_MASTERY_EMITS,
             narrative_on_complete:
                 "They will tell stories of {name}'s hunts long after {subject} is gone.",
         },
@@ -88,7 +127,7 @@ pub const PROVIDER_OF_THE_COLONY: AspirationChain = AspirationChain {
                 actions: &[Action::Hunt],
                 count: 5,
             },
-            emits: &[],
+            emits: HUNT_EMITS,
             narrative_on_complete: "{name} drops a mouse at the colony stores without a word.",
         },
         Milestone {
@@ -98,7 +137,7 @@ pub const PROVIDER_OF_THE_COLONY: AspirationChain = AspirationChain {
                 actions: &[Action::Hunt],
                 count: 20,
             },
-            emits: &[],
+            emits: HUNT_EMITS,
             narrative_on_complete: "When bellies rumble, eyes turn to {name}.",
         },
         Milestone {
@@ -108,7 +147,7 @@ pub const PROVIDER_OF_THE_COLONY: AspirationChain = AspirationChain {
                 actions: &[Action::Hunt],
                 count: 40,
             },
-            emits: &[],
+            emits: HUNT_EMITS,
             narrative_on_complete: "The colony has never gone hungry while {name} hunts.",
         },
     ],
