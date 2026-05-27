@@ -39,8 +39,21 @@ Full architectural design lives in [`docs/systems/crafting.md`](../../systems/cr
 
 ## Related existing tickets
 
+- **017** (ready) — Anatomical slot inventory. The wearable-substrate prereq: Phase 3 (370) is blocked on it, and it's the held-vs-worn-vs-stowed semantics the 477 aggregation layer reads under (today every carried equipment item reads as "worn"). Item-crafting clade member, surfaced here for dashboard completeness.
 - **309** (ready) — Herbcraft DSE reserve-deficit consideration / anticipatory crafting. Phase 1.5 extension; unblocked after 308 (ColonyReservesBelief) landed.
 - **334** (blocked-by 17) — Stealth-cloak crafting recipe + WearItem resolver. 128 epic Tier-2 glue; partially subsumed by 369 (recipe scope retired; WearItem + HTN-method flip remain live).
+
+## Phase 2b follow-on clade (369 warrior's-kit → equipment effects)
+
+The Phase 2b warrior's-kit substrate (369) spawned a follow-on lineage that realizes the "items have bite" pillar — the consumption layer for the identity/material classifiers. Per the **follow-ons-inherit-their-parent's-epic** convention, these are 016 children (369 is Phase 2b, so its descendants live in this dashboard):
+
+- **461** (done) — TanningFrame BuildPressure threshold tuning (369 follow-on).
+- **462** (done) — HTN item-aspiration substrate: `GoalKind` enum + templated method registry + parameterized `RetrieveCraftInputs(recipe.inputs)`.
+- **463** (done) — `CraftItemAspiration`: per-recipe `Goal(HaveItem)` emission + threat-cue/skill/anti-monotony scoring + retire resolver lex-pick (made kit items exist organically in seed-42).
+- **476** (done) — item-effect doctrine correction: retire cosmetic-only framing, sanction identity-keyed modifier-fetch.
+- **477** (done) — equipment-modifier aggregation: `equipment_modifiers_for()` seam + resolver wiring (armor / weapon-strike+snap / cloak / noise) + the L4Resolver trace hook.
+- **478** (ready) — `ItemSet` enum on item kinds (retire `is_warriors_kit` recipe metadata).
+- **479** (ready) — ranged-attack mode for Sling — Action / phase / ammo model + read of `EquipmentModifiers.ranged_enabled` (477 follow-on).
 
 ## Design constraints
 
