@@ -2629,6 +2629,8 @@ mod tests {
                 destination: ItemDestination::Inventory,
             },
             skill_gate: None,
+            is_warriors_kit: true,
+            discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::BoneShaping),
         });
         let actions = craft_have_item_actions(ItemKind::BoneTipSpear, &recipes, &distances);
         // Markers: free slot present (so the substrate-path retrieve

@@ -140,6 +140,8 @@ mod tests {
                 destination: ItemDestination::Inventory,
             },
             skill_gate: None,
+            is_warriors_kit: false,
+            discipline_skill_affinity: None,
         }
     }
 
@@ -201,6 +203,8 @@ mod tests {
                 destination: ItemDestination::EquippedSlot,
             },
             skill_gate: None,
+            is_warriors_kit: false,
+            discipline_skill_affinity: None,
         });
 
         let plan = decompose_goal_have_item(ItemKind::HideBracers, &recipes).unwrap();
@@ -240,6 +244,8 @@ mod tests {
                 destination: ItemDestination::WorldPosition,
             },
             skill_gate: None,
+            is_warriors_kit: false,
+            discipline_skill_affinity: None,
         });
 
         assert!(decompose_goal_have_item(ItemKind::ShinyPebble, &recipes).is_none());

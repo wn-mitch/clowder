@@ -122,6 +122,8 @@ mod tests {
                 destination: ItemDestination::Inventory,
             },
             skill_gate: None,
+            is_warriors_kit: false,
+            discipline_skill_affinity: None,
         }
     }
 

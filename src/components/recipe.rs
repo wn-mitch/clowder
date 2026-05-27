@@ -199,6 +199,24 @@ pub struct Recipe {
     /// then no recipe carries a `Some` value and the predicate
     /// returns false.
     pub skill_gate: Option<(SkillKind, f32)>,
+    /// Ticket 463 — `true` for the 369 Phase 2b warrior's-kit
+    /// recipes (BoneStiletto, BoneTipSpear, FlintBlade, HideBracers,
+    /// HidePlatedWrap, Sling, WovenReedCloak, ToothNotchedClub).
+    /// Read by `CraftItemAspiration` scoring: each warrior's-kit
+    /// recipe gets a `+W_threat * hide_recency_of_threat_cue`
+    /// score component, lifting kit-craving behavior under threat.
+    /// `false` for behavioral tools and preservation recipes.
+    pub is_warriors_kit: bool,
+    /// Ticket 463 — recipe's discipline skill affinity, used by
+    /// `CraftItemAspiration` to compute the skill-growth term:
+    /// `+W_skill * (1 - skills.value(axis))` so cats prefer recipes
+    /// whose discipline they're least developed at (the recipe is
+    /// "downwind of the stat the cat is trying to improve"). `None`
+    /// = recipe doesn't tie to any single skill axis (e.g.
+    /// behavioral tool prerequisites that all cats use the same way).
+    /// For Phase 5 mastery recipes carrying `skill_gate: Some(axis,
+    /// _)`, populate `discipline_skill_affinity` with the same axis.
+    pub discipline_skill_affinity: Option<SkillKind>,
 }
 
 /// Provenance metadata attached to every item produced by a

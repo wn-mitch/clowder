@@ -336,6 +336,12 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
                 destination: ItemDestination::Inventory,
             },
             skill_gate: None,
+            // 463 — remedies aren't warrior's-kit; they ride the
+            // existing Herbalism DSE chain (not Crafting). Affinity
+            // stays Herbcraft so a future HaveItem(remedy) aspiration
+            // would score against the herb-axis.
+            is_warriors_kit: false,
+            discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Herbcraft),
         });
     }
 
@@ -373,6 +379,10 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::WorldPosition,
         },
         skill_gate: None,
+        // 463 — Thornward isn't a warrior's-kit item (it's a placed
+        // structure, not a worn/carried weapon). Affinity is Herbcraft.
+        is_warriors_kit: false,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Herbcraft),
     });
     registry.insert(Recipe {
         id: crate::steps::magic::ward_recipe_id(WardKind::DurableWard),
@@ -388,6 +398,9 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::WorldPosition,
         },
         skill_gate: None,
+        // 463 — DurableWard is the Witchcraft variant; magic axis.
+        is_warriors_kit: false,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Magic),
     });
 
     // 367 Commit 5 — preservation recipes (Phase 1b).
@@ -438,6 +451,10 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::WorldPosition,
         },
         skill_gate: None,
+        // 463 — preservation rides the Herbcraft axis (the same
+        // discipline that handles herb preparation).
+        is_warriors_kit: false,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Herbcraft),
     });
 
     registry.insert(Recipe {
@@ -467,6 +484,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::WorldPosition,
         },
         skill_gate: None,
+        is_warriors_kit: false,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Herbcraft),
     });
 
     // Four parallel smoking recipes. All share `ItemKind::SmokedMeat`
@@ -508,6 +527,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
                 destination: ItemDestination::WorldPosition,
             },
             skill_gate: None,
+            is_warriors_kit: false,
+            discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Herbcraft),
         });
     }
 
@@ -546,6 +567,10 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        // 463 — polished-stone polishing is a Cairn discipline
+        // sub-recipe (StonecraftCairn → SkillKind::Cairn).
+        is_warriors_kit: false,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Cairn),
     });
 
     registry.insert(Recipe {
@@ -570,6 +595,9 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        // 463 — behavioral tool; BoneShellCraft discipline.
+        is_warriors_kit: false,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::BoneShaping),
     });
 
     registry.insert(Recipe {
@@ -594,6 +622,9 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        // 463 — behavioral tool; FiberWeaving discipline.
+        is_warriors_kit: false,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Weaving),
     });
 
     // Three parallel Courtship Gift recipes (one per acceptable input
@@ -629,6 +660,9 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
                 destination: ItemDestination::Inventory,
             },
             skill_gate: None,
+            // 463 — Courtship gift; AdornmentSetting → Pigment.
+            is_warriors_kit: false,
+            discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Pigment),
         });
     }
 
@@ -668,6 +702,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        is_warriors_kit: true,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::BoneShaping),
     });
 
     registry.insert(Recipe {
@@ -686,6 +722,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        is_warriors_kit: true,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::BoneShaping),
     });
 
     // Flint Blade — workshop-bench knapping for 369. crafting.md's
@@ -713,6 +751,10 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        // 463 — knapping rides BoneShaping today (Stonecraft
+        // discipline; same affinity as the bone-shaping siblings).
+        is_warriors_kit: true,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::BoneShaping),
     });
 
     registry.insert(Recipe {
@@ -737,6 +779,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        is_warriors_kit: true,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Hidework),
     });
 
     registry.insert(Recipe {
@@ -761,6 +805,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        is_warriors_kit: true,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Hidework),
     });
 
     registry.insert(Recipe {
@@ -785,6 +831,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        is_warriors_kit: true,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Weaving),
     });
 
     registry.insert(Recipe {
@@ -803,6 +851,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        is_warriors_kit: true,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::Weaving),
     });
 
     registry.insert(Recipe {
@@ -827,6 +877,8 @@ pub fn populate_recipe_registry(registry: &mut RecipeRegistry) {
             destination: ItemDestination::Inventory,
         },
         skill_gate: None,
+        is_warriors_kit: true,
+        discipline_skill_affinity: Some(crate::ai::aspirations::SkillKind::BoneShaping),
     });
 }
 
