@@ -1,7 +1,7 @@
 ---
 id: 334
 title: Stealth-cloak crafting recipe + WearItem resolver
-status: ready
+status: done
 cluster: items-crafting
 orchestration: coherent-block
 block: htn-method-composition
@@ -9,12 +9,12 @@ initiative: [smarter-cats, world-richness, htn-method-composition]
 added: 2026-05-14
 parked: null
 blocked-by: []
-wires-method: [acquire_stealth_via_self_craft, acquire_stealth_via_commission]
+wires-method: [acquire_stealth_via_self_craft]
 supersedes: []
 related-systems: [htn-methods.md, slot-inventory.md, crafting.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-27
 ---
 
 ## Why
@@ -132,3 +132,4 @@ lists both for enforcement.
   fold into 369's scope. Decide during 369 session.
 - 2026-05-19: accuracy audit pass — blockers 17 and 365 verified (17 exists in tickets/, 365 landed), wires-method frontmatter references valid methods (verified in populate_method_registry). No blocking issues.
 - 2026-05-24: **partial subsumption by 369.** 369's `ItemKind::WovenReedCloak` + recipe `warriors_kit.woven_reed_cloak` lands the stealth-cloak *item-of-record* — same crafting.md material profile (fiber-class, visual-mask, silent, no armor) and the §"How should 369 handle the stealth-cloak design" question was answered "Woven Reed Cloak IS the stealth cloak." Scope-narrowing accordingly: this ticket's StealthCloak-recipe scope is **retired** (deduped against 369). What remains live under 334: (a) `WearItem` resolver + slot-aware semantics (still depends on 017), (b) hunt-resolver wearable-effect read (also a 461 sibling-follow-on concern), (c) HTN-method flip of `acquire_stealth_via_self_craft` / `acquire_stealth_via_commission` from PendingSubstrate to Live (still blocked on the WearItem + slot work). 369 did **not** wire those methods, so the `wires-method` frontmatter on 334 stays accurate. Decide during 017 session whether 334 collapses further or splits.
+- 2026-05-27: **landed — full glue, with commission split to #481.** Final scope after the dependency audit: (a) recipe scope retired (369's `WovenReedCloak` + `warriors_kit.woven_reed_cloak`); (b) hunt-effect-read scope already satisfied (477's `equipment_modifiers_for` → `prey.rs::try_detect_cat` reads the cloak's `detection_visual_mask` + `noise_level`); (c) the real `WearItem` resolver (`resolve_wear_item` — don/swap/idempotent, witness-typed, `Feature::ItemWorn`) landed, replacing the #322 Fail-stub; (d) `Action::WearItem` HTN-primitive wiring (planner empty-precond leaf + dispatch + `GoapActionKind::WearItem`); (e) the **Craft frame-pin seam** — `frame_pinned_primitive` carries an `ItemKind` from the new `TargetHint::CraftItem`, and the pinned `Action::Craft` leaf routes through 463's `craft_have_item_actions` (recipe pinned, visible at the plan layer); (f) the **frame-advance gate** rewritten from a hardcoded terminal-`GoapActionKind` set to `plan.chosen_action == frame's pinned primitive action` (the signal 364's `MethodRegistry` field doc already described — covers the Craft leg whose `CraftAtWorkshop` terminal is shared with the non-HTN 463 path); (g) `acquire_stealth_via_self_craft` flipped `Live(can_self_craft_stealth)` — gate: `CanCraft` marker ∧ no Cape-slot cloak. **Commission could not flip Live** (`resolve_petition_coordinator` is a Fail-stub, `Action::PetitionCoordinator` has no `htn_primitive_actions` arm, `Goal("ordered_item_ready")` has no substrate — trader #381 parked); its `PendingSubstrate` blocker re-points 334→**481** (opened this commit, blocked-by 381, `wires-method: [acquire_stealth_via_commission]`). Verdict-skipped per coherent-block protocol (block anchor is #128). Regression soak (seed-42, `logs/tuned-42-c518483b`): **survival canaries PASS, continuity canaries PASS** (grooming 662 / play 36 / mentoring 184 / courtship 1471) — the shared frame-pin/advance machinery changes don't regress the rear_kitten/courtship/play paths. `just verdict` returns `concern`, but every drift flag (negative_events +391%, `CraftAtTanningFrame(None)` failures, ward/colony-score drift) is a **stale-baseline artifact**: the auto-baseline `post-055-mood-drift` (1799e798, 2026-05-24) predates the entire equipment/crafting epic (369/463/017/477) — it has zero `CraftAtTanningFrame` events because TanningFrame crafting didn't exist then. `constants_drift: drift` confirms the baseline is not comparability-valid. None of the drift traces to 334. self_craft is Live-but-unreachable until #325 lands the `stealth_gear_acquired` aspiration emitter; full end-to-end (pick → craft → don) verification deferred to that landing.

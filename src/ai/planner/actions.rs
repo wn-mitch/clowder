@@ -689,6 +689,17 @@ pub fn craft_have_item_actions(
 /// Panics on actions that are not HTN primitive leaves; the L2 frame-pin
 /// is the only authoritative caller and pre-filters to supported variants.
 pub fn htn_primitive_actions(action: Action, distances: &ZoneDistances) -> Vec<GoapActionDef> {
+    // 334: `WearItem` dons in place — no travel, no zone gate. Emit the
+    // single leaf with empty preconditions (mirrors `discarding_actions`),
+    // not the travel + `ZoneIs(zone)` shape the target-bound leaves use.
+    if action == Action::WearItem {
+        return vec![GoapActionDef {
+            kind: GoapActionKind::WearItem,
+            cost: 2,
+            preconditions: vec![],
+            effects: vec![StateEffect::SetInteractionDone(true)],
+        }];
+    }
     let (kind, zone) = match action {
         Action::Wean => (GoapActionKind::Wean, PlannerZone::SocialTarget),
         Action::Teach => (GoapActionKind::Teach, PlannerZone::SocialTarget),

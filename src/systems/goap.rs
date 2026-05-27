@@ -2874,25 +2874,41 @@ pub fn evaluate_and_plan(
         // instead of `htn_primitive_actions` (which panics on Caretake —
         // that function only handles Wean/Teach/Release/Vigil/GriefSit
         // /ReleaseGrief).
+        // 334: the pinned primitive carries an optional `ItemKind` payload
+        // (from `TargetHint::CraftItem`) so the Craft leaf can route the
+        // plan template through `craft_have_item_actions(item, …)` (the 463
+        // HaveItem craft path) — `htn_primitive_actions` only emits a single
+        // leaf and can't express the retrieve+travel+craft triple.
         let softmax_winner_preempts_pin = chosen_action == Action::Caretake;
-        let frame_pinned_primitive: Option<Action> = if softmax_winner_preempts_pin {
-            None
-        } else {
-            world_state
-                .held_goal_stacks
-                .get(entity)
-                .ok()
-                .and_then(|stack| stack.top())
-                .filter(|frame| frame.sub_goal_count > 1)
-                .and_then(|frame| {
-                    let method = res.method_registry.lookup_by_id(frame.method)?;
-                    match method.sub_goals.get(frame.sub_goal_index)? {
-                        crate::ai::methods::SubGoal::Primitive { action, .. } => Some(*action),
-                        crate::ai::methods::SubGoal::Goal(_) => None,
-                    }
-                })
-        };
-        if let Some(leaf_action) = frame_pinned_primitive {
+        let frame_pinned_primitive: Option<(Action, Option<ItemKind>)> =
+            if softmax_winner_preempts_pin {
+                None
+            } else {
+                world_state
+                    .held_goal_stacks
+                    .get(entity)
+                    .ok()
+                    .and_then(|stack| stack.top())
+                    .filter(|frame| frame.sub_goal_count > 1)
+                    .and_then(|frame| {
+                        let method = res.method_registry.lookup_by_id(frame.method)?;
+                        match method.sub_goals.get(frame.sub_goal_index)? {
+                            crate::ai::methods::SubGoal::Primitive {
+                                action,
+                                target_hint,
+                                ..
+                            } => {
+                                let craft_item = match target_hint {
+                                    crate::ai::methods::TargetHint::CraftItem(item) => Some(*item),
+                                    _ => None,
+                                };
+                                Some((*action, craft_item))
+                            }
+                            crate::ai::methods::SubGoal::Goal(_) => None,
+                        }
+                    })
+            };
+        if let Some((leaf_action, _)) = frame_pinned_primitive {
             chosen_action = leaf_action;
             if let Some(disp) = DispositionKind::from_action(leaf_action) {
                 chosen = disp;
@@ -3035,7 +3051,16 @@ pub fn evaluate_and_plan(
                     _ => None,
                 })
             });
-        let mut actions = if frame_pinned_primitive.is_some() {
+        let mut actions = if let Some((Action::Craft, Some(item))) = frame_pinned_primitive {
+            // 334: the pinned Craft leaf of `acquire_stealth_via_self_craft`
+            // reuses the 463 HaveItem craft template (retrieve → travel →
+            // craft) with the cloak's recipe pinned by `TargetHint::CraftItem`.
+            crate::ai::planner::actions::craft_have_item_actions(
+                item,
+                &res.recipes,
+                &zone_distances,
+            )
+        } else if frame_pinned_primitive.is_some() {
             crate::ai::planner::actions::htn_primitive_actions(chosen_action, &zone_distances)
         } else if let (Some(item), DispositionKind::Crafting) = (have_item_target, chosen) {
             crate::ai::planner::actions::craft_have_item_actions(
@@ -3089,12 +3114,18 @@ pub fn evaluate_and_plan(
         // `SetInteractionDone(true)` effect). The chosen disposition's
         // own goal (e.g., `Caretaking::TripsAtLeast`) wouldn't be
         // satisfied by the leaf's effects, so the plan would fail.
-        let goal = if frame_pinned_primitive.is_some() {
-            crate::ai::planner::GoalState {
-                predicates: vec![crate::ai::planner::StatePredicate::InteractionDone(true)],
+        // 334 — the pinned Craft leaf routes through `craft_have_item_actions`
+        // whose terminal `CraftAtWorkshop` step completes via `IncrementTrips`,
+        // not `SetInteractionDone`. Use the Crafting trips goal
+        // (`TripsAtLeast(1)`) for that pin so the plan is satisfiable.
+        let goal = match frame_pinned_primitive {
+            Some((Action::Craft, Some(_))) => {
+                goal_for_disposition(DispositionKind::Crafting, 0, &plan_ctx)
             }
-        } else {
-            goal_for_disposition(chosen, 0, &plan_ctx)
+            Some(_) => crate::ai::planner::GoalState {
+                predicates: vec![crate::ai::planner::StatePredicate::InteractionDone(true)],
+            },
+            None => goal_for_disposition(chosen, 0, &plan_ctx),
         };
 
         let plan_outcome = make_plan(
@@ -5197,25 +5228,38 @@ pub fn resolve_goap_plans(
         // Otherwise: leave the frame alone via `PreserveStackOnly`
         // (multi-step) or clear it (single-step).
         let stack_now = ec.held_goal_stacks.get(entity).ok().cloned();
-        // Read the plan's actual last-step GoapActionKind. The plan is
-        // still in the world (the remove command above is deferred); a
-        // read-only get on the cats query returns the current
-        // (possibly replanned) step sequence.
-        let plan_last_action_kind: Option<GoapActionKind> = cats
+        // 364 / 334 — advance the held frame only when the plan that just
+        // ended was built FOR the frame's currently-pinned leaf primitive.
+        // The plan's `chosen_action` is set to the pinned leaf at frame-pin
+        // time (`evaluate_and_plan` ~2896), so comparing it to the frame's
+        // current sub-goal action is the exact signal the `MethodRegistry`
+        // field's doc-comment describes. A replan rebuilds the plan with a
+        // different `chosen_action`, so this naturally excludes the
+        // "replanned away from the leaf" case the prior hardcoded
+        // GoapActionKind set guarded against — AND it covers the 334 Craft
+        // leg (whose terminal `CraftAtWorkshop` is shared with the non-HTN
+        // 463 HaveItem path) without a brittle terminal-kind classifier.
+        // The plan is still in the world (the remove command above is
+        // deferred); a read-only get returns the current chosen action.
+        let plan_chosen_action: Option<crate::ai::Action> = cats
             .get(entity)
             .ok()
-            .and_then(|((_, plan, _, _, _, _, _, _, _, _), _)| plan.steps.last().map(|s| s.action));
-        let plan_was_htn_leaf = matches!(
-            plan_last_action_kind,
-            Some(
-                GoapActionKind::Wean
-                    | GoapActionKind::Teach
-                    | GoapActionKind::Release
-                    | GoapActionKind::Vigil
-                    | GoapActionKind::GriefSit
-                    | GoapActionKind::ReleaseGrief
-            )
-        );
+            .map(|((_, plan, _, _, _, _, _, _, _, _), _)| plan.chosen_action);
+        let pinned_primitive_action: Option<crate::ai::Action> = stack_now
+            .as_ref()
+            .and_then(|s| s.top())
+            .filter(|frame| frame.sub_goal_count > 1)
+            .and_then(|frame| {
+                let method = ec.method_registry.lookup_by_id(frame.method)?;
+                match method.sub_goals.get(frame.sub_goal_index)? {
+                    crate::ai::methods::SubGoal::Primitive { action, .. } => Some(*action),
+                    crate::ai::methods::SubGoal::Goal(_) => None,
+                }
+            });
+        let plan_was_htn_leaf = match (pinned_primitive_action, plan_chosen_action) {
+            (Some(pinned), Some(chosen)) => pinned == chosen,
+            _ => false,
+        };
         let _ = accum; // accumulator unused at this site
         let top_is_multi_step = stack_now
             .as_ref()
@@ -8271,6 +8315,18 @@ fn dispatch_step_action(
             );
             outcome.result
         }
+        // 334: don the first equippable wearable from the cat's pouch into
+        // its anatomical slot (or swap the occupant). Idempotent — when the
+        // wearable was already auto-equipped on craft (017), the resolver
+        // witnesses success without re-equipping (no Feature recorded).
+        GoapActionKind::WearItem => {
+            let outcome = crate::steps::disposition::resolve_wear_item(inventory, wearables);
+            outcome.record_if_witnessed(
+                narr.activation.as_deref_mut(),
+                crate::resources::system_activation::Feature::ItemWorn,
+            );
+            outcome.result
+        }
     }
 }
 
@@ -11123,5 +11179,37 @@ mod tests {
         stack.push(make_frame("child_method", 3, 1)).unwrap();
         let outcome = htn_abandon_or_pop(stack);
         assert!(matches!(outcome, StackOutcome::Done));
+    }
+
+    #[test]
+    fn self_craft_two_step_frame_walks_craft_then_wear_then_pops() {
+        // 334: `acquire_stealth_via_self_craft` is `[Craft, WearItem]`. After
+        // the Craft leg (sub_goal 0) completes, the frame must advance to the
+        // WearItem leg (sub_goal 1), not pop. After WearItem completes the
+        // frame pops. (The gate that decides *whether* to call this — the
+        // `pinned == plan.chosen_action` check — lives inline in
+        // `resolve_goap_plans` and is exercised by the soak; this test
+        // pins the structural walk the gate drives.)
+        let mut stack = HeldGoalStack::empty();
+        stack
+            .push(make_frame("acquire_stealth_via_self_craft", 2, 0))
+            .unwrap();
+        let after_craft = htn_advance_or_pop(stack);
+        let stack = match after_craft {
+            StackOutcome::AdvanceTo(s) => {
+                let top = s.top().expect("frame remains after Craft leg");
+                assert_eq!(top.sub_goal_index, 1, "advanced to the WearItem leg");
+                s
+            }
+            other => panic!(
+                "expected AdvanceTo after Craft leg, got {:?}",
+                std::mem::discriminant(&other)
+            ),
+        };
+        let after_wear = htn_advance_or_pop(stack);
+        assert!(
+            matches!(after_wear, StackOutcome::Done),
+            "frame pops after the WearItem leg completes",
+        );
     }
 }

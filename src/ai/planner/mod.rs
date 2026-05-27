@@ -442,6 +442,15 @@ pub enum GoapActionKind {
     /// `target_completions = 1`: re-election rhythm IS the begging
     /// cadence.
     BegForFood,
+    /// 334: don a carried wearable from the cat's `Inventory` pouch into
+    /// its anatomical `WearableSlots` (or swap the occupant). Sub-goal 1
+    /// (`don_gear`) of the `acquire_stealth_via_self_craft` HTN method.
+    /// No travel, no preconditions — donning happens in place. Effect is
+    /// `SetInteractionDone(true)` (Pattern-B leaf shape, mirrors the
+    /// kitten/mourn HTN primitives). The resolver is idempotent: when the
+    /// target wearable was already auto-equipped on craft (017), it
+    /// witnesses success without re-equipping.
+    WearItem,
 }
 
 // ---------------------------------------------------------------------------

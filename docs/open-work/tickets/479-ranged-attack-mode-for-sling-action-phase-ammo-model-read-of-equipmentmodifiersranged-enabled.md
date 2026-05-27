@@ -3,6 +3,7 @@ id: 479
 title: Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled
 status: ready
 cluster: items-crafting
+orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-27
 parked: null

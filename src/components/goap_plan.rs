@@ -435,6 +435,10 @@ impl GoapActionKind {
             // Action so `CurrentAction` stays stable through the multi-
             // step plan (mirrors `RetrieveSmokeable => SmokeMeat`).
             Self::RetrieveCraftInputs(_) => Action::Craft,
+            // 334: WearItem don leaf maps directly to its Action label
+            // (the dispatch closure pins chosen_action from the held
+            // frame's sub-goal, mirroring the Wean/Teach/Release shape).
+            Self::WearItem => Action::WearItem,
         }
     }
 }

@@ -707,6 +707,16 @@ pub enum Feature {
     /// which doesn't reliably reproduce in a 15-min seed-42 soak.
     /// Exercised by the `equipment_bone_snap` scenario.
     BoneWeaponSnapped,
+    /// Ticket 334 — `resolve_wear_item` donned a carried wearable from the
+    /// cat's pouch into its anatomical `WearableSlots` (or swapped the
+    /// occupant). Positive — surfaces the deliberate don/swap path that the
+    /// `acquire_stealth_via_self_craft` HTN method's `WearItem` leaf drives.
+    /// Classified `expected_to_fire_per_soak() => false`: in the self-craft
+    /// happy path the freshly-crafted cloak is auto-equipped on craft (017),
+    /// so the don leaf is an idempotent no-op-success and `ItemWorn` only
+    /// fires when the Cape slot was occupied at craft time (a swap) — which
+    /// doesn't reliably reproduce in a 15-min seed-42 soak.
+    ItemWorn,
 }
 
 impl Feature {
@@ -928,6 +938,8 @@ impl Feature {
         Feature::ItemCrafted,
         // 477: bone-weapon durability snap.
         Feature::BoneWeaponSnapped,
+        // 334: deliberate don/swap of a worn item.
+        Feature::ItemWorn,
     ];
 
     /// The valence of this feature.
@@ -1105,6 +1117,9 @@ impl Feature {
             // 477: bone-weapon snap is mechanical wear texture — surfaces
             // the durability substrate, neither a colony win nor loss.
             Feature::BoneWeaponSnapped => Neutral,
+            // 334: deliberate don/swap of a worn item — surfaces the
+            // WearItem don path; a colony-equipping behavior, not adverse.
+            Feature::ItemWorn => Positive,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -1581,6 +1596,11 @@ impl Feature {
             // gate the seed-42 canary. The `equipment_bone_snap` scenario
             // exercises the branch deterministically.
             Feature::BoneWeaponSnapped => false,
+            // 334: the self-craft happy path auto-equips the freshly-crafted
+            // cloak on craft (017), so the WearItem don leaf is an idempotent
+            // no-op-success; `ItemWorn` only fires on a swap (Cape slot
+            // occupied at craft time), too rare to gate the seed-42 canary.
+            Feature::ItemWorn => false,
 
             // -------------------------------------------------------------
             // Healthy-trunk Features: a canonical seed-42 soak fires each
@@ -1860,6 +1880,8 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::KittenBegged => "KittenBegged",
         // 477: bone-weapon durability snap.
         Feature::BoneWeaponSnapped => "BoneWeaponSnapped",
+        // 334: deliberate don/swap of a worn item.
+        Feature::ItemWorn => "ItemWorn",
     }
 }
 
@@ -2067,7 +2089,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 160;
+        const EXPECTED_VARIANT_COUNT: usize = 161;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2210,7 +2232,10 @@ mod tests {
         // canary pair (`emit_env_quality_features`).
         // Ticket 477: +1 Neutral (BoneWeaponSnapped) for the bone-weapon
         // durability snap canary (mechanical wear texture).
-        assert_eq!(positive, 91);
+        // Ticket 334: +1 Positive (ItemWorn) for the deliberate don/swap
+        // path of the WearItem resolver. expected_to_fire_per_soak => false
+        // (auto-equip-on-craft makes the don leaf an idempotent no-op).
+        assert_eq!(positive, 92);
         assert_eq!(negative, 25);
         assert_eq!(neutral, 44);
     }
@@ -2317,9 +2342,10 @@ mod tests {
         // mood drift-threshold detection.
         // Ticket 101: +1 Positive (EnvironmentalComfortPositive) and
         // +1 Negative (EnvironmentalComfortNegative).
+        // Ticket 334: +1 Positive (ItemWorn) for the WearItem don/swap path.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            91
+            92
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

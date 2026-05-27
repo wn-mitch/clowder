@@ -98,6 +98,17 @@ pub enum TargetHint {
     /// affiliated cat with grooming need). Used by `groom_other_method`
     /// as THE_BELOVED's primary emit target.
     GroomingTarget,
+    /// 334 — primitive sub-goal names the item to craft. Carried on the
+    /// `craft_stealth_cloak` leaf of `acquire_stealth_via_self_craft`; the
+    /// L2 frame-pin reads the `ItemKind` and routes the plan template
+    /// through `craft_have_item_actions(item, …)` (the 463 HaveItem craft
+    /// path) instead of `htn_primitive_actions`. Recipe identity stays
+    /// visible at the plan layer as `CraftAtWorkshop(Some(recipe_id))`.
+    CraftItem(crate::components::items::ItemKind),
+    /// 334 — primitive sub-goal binds the WearItem resolver's pouch scan.
+    /// The resolver dons the first equippable item in the cat's pouch.
+    /// Used by the `don_gear` leaf of `acquire_stealth_via_self_craft`.
+    WornGear,
 }
 
 // ---------------------------------------------------------------------------

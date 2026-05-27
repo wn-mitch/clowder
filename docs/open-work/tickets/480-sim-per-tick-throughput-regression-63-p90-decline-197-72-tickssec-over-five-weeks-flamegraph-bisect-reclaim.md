@@ -3,6 +3,7 @@ id: 480
 title: Sim per-tick throughput regression — ~63% p90 decline (197->72 ticks/sec) over five weeks; flamegraph-bisect + reclaim
 status: ready
 cluster: ai-substrate
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-27
 parked: null
