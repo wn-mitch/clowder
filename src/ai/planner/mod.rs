@@ -402,25 +402,25 @@ pub enum GoapActionKind {
     /// `last_tended_at_tick`. Single-tick action; effect is
     /// `IncrementTrips`.
     TendSmokingRack,
-    /// 457: craft a 368 Phase 2 behavioral tool at a Workshop. Single-
-    /// tick action; effect is `IncrementTrips`. The resolver
-    /// (`resolve_craft_at_workshop`) scans the recipe registry for
-    /// `StationRequirement::Workshop` recipes, picks the first one
-    /// (lexicographic by `RecipeId`) whose inputs are all in the
-    /// actor's `Inventory`, consumes them, spawns the output `Item`
-    /// per `Recipe.output.destination`, and emits
-    /// `Feature::ItemCrafted`. Plan-level precondition is
-    /// `ZoneIs(Workshop) ∧ HasMarker(HasCraftInputInInventory)`.
-    CraftAtWorkshop,
-    /// 369: craft a Phase 2b hide-armor item at a Tanning Frame.
-    /// Sibling to `CraftAtWorkshop` — same single-tick shape and
-    /// effect (`IncrementTrips`) — but the resolver scans recipes
-    /// with `StationRequirement::TanningFrame` and the plan-level
-    /// precondition is `ZoneIs(TanningFrame) ∧
-    /// HasMarker(HasCraftInputInInventory)`. Two recipes live here
-    /// (HideBracers, HidePlatedWrap); resolver picks lex-order first
-    /// satisfied.
-    CraftAtTanningFrame,
+    /// 457 (parameterized in 463 commit 8): craft a recipe at a
+    /// Workshop. Single-tick action; effect is `IncrementTrips`.
+    /// `Option<RecipeId>` carries the recipe identity:
+    /// - `Some(id)`: pinned by the held `Intention::Goal(HaveItem(_))`
+    ///   via `craft_have_item_actions`. The resolver crafts that
+    ///   specific recipe — the L2 trace's `have_<item>` label and the
+    ///   resolved craft are guaranteed to match.
+    /// - `None`: fallback path emitted by the legacy `crafting_actions`
+    ///   template (cat elected Crafting but holds no HaveItem). The
+    ///   resolver lex-picks the first inventory-satisfied Workshop
+    ///   recipe. This branch is the 463-era "belt-and-braces" the
+    ///   ticket explicitly allowed — without it, every elected
+    ///   Crafting tick before a HaveItem cycle completes fails
+    ///   GoalUnreachable, breaking crafting outright.
+    CraftAtWorkshop(Option<crate::components::recipe::RecipeId>),
+    /// 369 (parameterized in 463 commit 8): craft a recipe at a
+    /// Tanning Frame. Sibling to `CraftAtWorkshop(_)` with the same
+    /// `Some / None` semantics.
+    CraftAtTanningFrame(Option<crate::components::recipe::RecipeId>),
     /// 462: retrieve every `RecipeInput { kind, count }` of the named
     /// recipe from a `StoredItems` building into the cat's
     /// `Inventory`. Carries `RecipeId` rather than the input set

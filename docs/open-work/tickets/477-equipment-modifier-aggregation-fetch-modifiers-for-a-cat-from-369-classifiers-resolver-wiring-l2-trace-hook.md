@@ -1,13 +1,13 @@
 ---
 id: 477
 title: Equipment-modifier aggregation: fetch modifiers for a cat from 369 classifiers + resolver wiring + L2-trace hook
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-26
 parked: null
-blocked-by: [463]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

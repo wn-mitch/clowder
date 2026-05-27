@@ -3016,16 +3016,24 @@ pub fn evaluate_and_plan(
         // the legacy `pick_satisfied_recipe` would pick). Dormant
         // until 463's `CraftItemAspiration` emits HaveItem rows; the
         // override is a no-op for every existing cat-tick.
-        let have_item_target: Option<crate::components::items::ItemKind> = world_state
-            .held_intentions
+        // 463 commit 8: scan ALL aspiration emission rows for a
+        // HaveItem `goal_kind`, not just `HeldIntention`. The
+        // HeldIntention reads only the AspirationEmissions::winner()
+        // row (lowest Priority), so the picker's `Priority::Secondary`
+        // CraftItem row gets overwritten by any Primary aspiration
+        // (Hunting "First Blood", Warrior's Path "engage_threat") and
+        // never reaches the held intention. Reading the rows directly
+        // lets the HaveItem dispatch fire whenever the picker emitted a
+        // CraftItem row this tick, even if Hunting also emitted.
+        let have_item_target: Option<crate::components::items::ItemKind> = marker_qs
+            .aspiration_emissions_q
             .get(entity)
             .ok()
-            .and_then(|h| match &h.intention {
-                crate::ai::dse::Intention::Goal { state, .. } => match state.kind {
-                    crate::ai::dse::GoalKind::HaveItem(item) => Some(item),
-                    crate::ai::dse::GoalKind::Predicate { .. } => None,
-                },
-                _ => None,
+            .and_then(|emissions| {
+                emissions.rows.iter().find_map(|row| match row.goal_kind {
+                    Some(crate::ai::dse::GoalKind::HaveItem(item)) => Some(item),
+                    _ => None,
+                })
             });
         let mut actions = if frame_pinned_primitive.is_some() {
             crate::ai::planner::actions::htn_primitive_actions(chosen_action, &zone_distances)
@@ -8172,13 +8180,14 @@ fn dispatch_step_action(
             );
             outcome.result
         }
-        // 457: Workshop-craft dispatch. Resolver scans the recipe
-        // registry for `StationRequirement::Workshop` recipes in
-        // lexicographic order and picks the first satisfied recipe
-        // from `inventory`. Inputs consumed, output added to inventory
-        // (Phase 2 outputs are all `ItemDestination::Inventory`).
-        GoapActionKind::CraftAtWorkshop => {
+        // 457 + 463 commit 8: Workshop-craft dispatch parameterized by
+        // `RecipeId`. The recipe identity flows from the held HaveItem
+        // Intention through the plan template (`craft_have_item_actions`)
+        // — the resolver crafts exactly the named recipe, retiring the
+        // pre-463 lex-pick at the resolver level.
+        GoapActionKind::CraftAtWorkshop(recipe_id) => {
             let outcome = crate::steps::disposition::resolve_craft_at_workshop(
+                recipe_id,
                 *pos,
                 inventory,
                 &ec.recipes,
@@ -8206,12 +8215,11 @@ fn dispatch_step_action(
             );
             outcome.result
         }
-        // 369: Tanning-frame-craft dispatch. Sibling to the Workshop
-        // arm — same shape but filters on `StationRequirement::TanningFrame`
-        // recipes. Shares `Feature::ItemCrafted` (the canary is per-
-        // craft, not per-station).
-        GoapActionKind::CraftAtTanningFrame => {
+        // 369 + 463 commit 8: TanningFrame-craft dispatch parameterized
+        // by `RecipeId`. Sibling to the Workshop arm; same shape.
+        GoapActionKind::CraftAtTanningFrame(recipe_id) => {
             let outcome = crate::steps::disposition::resolve_craft_at_tanning_frame(
+                recipe_id,
                 *pos,
                 inventory,
                 &ec.recipes,

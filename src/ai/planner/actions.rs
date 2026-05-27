@@ -525,48 +525,32 @@ pub fn tend_smoking_rack_actions() -> Vec<GoapActionDef> {
     }]
 }
 
-/// 457: plan template for crafting a 368 Phase 2 behavioral tool at a
-/// Workshop. Single-step `[CraftAtWorkshop]`. Eligibility was already
-/// gated by the cat-side `HasCraftInputInInventory` marker (cat carries
-/// ≥1 Phase 2 input) + colony-side `HasFunctionalWorkshop`, so by the
-/// time A* runs we know there's at least one Workshop and the cat has
-/// some input. The resolver scans the recipe registry for any
-/// `StationRequirement::Workshop` recipe whose full input set is in
-/// inventory and crafts it; partial-input cats see the resolver Fail
-/// without witnessing, prompting a re-plan.
-///
-/// No retrieve step in the template — first-light gathers inputs via
-/// the existing hunt-byproduct + forage-drop paths, then crafts when
-/// the cat returns to the Workshop. A stores-side retrieve leg
-/// (mirroring `drying_food_actions` / `smoking_meat_actions`) is a
-/// follow-on if cats deposit inputs at Stores before crafting.
+/// 457 / 463 commit 8: legacy fallback Crafting template. Emits
+/// `CraftAt<Station>(None)` so the resolver lex-picks an inventory-
+/// satisfied recipe at execute time (pre-463 behavior). The 463
+/// aspiration path uses `craft_have_item_actions` instead, emitting
+/// `CraftAt<Station>(Some(recipe.id))` — same action variants but
+/// pinned to the held HaveItem's specific recipe. The fallback is
+/// the ticket's explicit "belt-and-braces" allowance: every Crafting
+/// election without a held HaveItem still lands a craft via lex-pick,
+/// instead of failing `GoalUnreachable`.
 pub fn crafting_actions() -> Vec<GoapActionDef> {
     vec![
         GoapActionDef {
-            kind: GoapActionKind::CraftAtWorkshop,
+            kind: GoapActionKind::CraftAtWorkshop(None),
             cost: 2,
             preconditions: vec![
                 StatePredicate::ZoneIs(PlannerZone::Workshop),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasCraftInputInInventory::KEY,
-                ),
+                StatePredicate::HasMarker(markers::HasCraftInputInInventory::KEY),
             ],
             effects: vec![StateEffect::IncrementTrips],
         },
-        // 369: TanningFrame sibling — same plan-template shape as the
-        // Workshop entry; A* picks based on the cat's zone-reachability
-        // and the recipe's input-set satisfaction. Per the §L2.10.10
-        // sibling-DSE pattern: two craft DSEs share `Action::Craft` and
-        // `DispositionKind::Crafting`, the template lists both station
-        // options, and the resolver discriminates by `StationRequirement`.
         GoapActionDef {
-            kind: GoapActionKind::CraftAtTanningFrame,
+            kind: GoapActionKind::CraftAtTanningFrame(None),
             cost: 2,
             preconditions: vec![
                 StatePredicate::ZoneIs(PlannerZone::TanningFrame),
-                StatePredicate::HasMarker(
-                    crate::components::markers::HasCraftInputInInventory::KEY,
-                ),
+                StatePredicate::HasMarker(markers::HasCraftInputInInventory::KEY),
             ],
             effects: vec![StateEffect::IncrementTrips],
         },
@@ -602,10 +586,13 @@ pub fn craft_have_item_actions(
         return Vec::new();
     };
     let (station_zone, craft_action) = match recipe.station {
-        StationRequirement::Workshop => (PlannerZone::Workshop, GoapActionKind::CraftAtWorkshop),
+        StationRequirement::Workshop => (
+            PlannerZone::Workshop,
+            GoapActionKind::CraftAtWorkshop(Some(recipe.id)),
+        ),
         StationRequirement::TanningFrame => (
             PlannerZone::TanningFrame,
-            GoapActionKind::CraftAtTanningFrame,
+            GoapActionKind::CraftAtTanningFrame(Some(recipe.id)),
         ),
         // Kitchen / DryingRack / SmokingRack / None have their own
         // dedicated dispositions (Cooking / DryingFood / SmokingMeat).
@@ -650,20 +637,21 @@ pub fn craft_have_item_actions(
         ],
         effects: vec![StateEffect::SetHasCraftInputsThisPlan(true)],
     });
-    // Substrate-marker `CraftAt<Station>` arm — cat already carries
-    // recipe inputs at chain entry. The legacy 457 path; keeps the
-    // single-step plan available when the cat has what it needs.
-    actions.push(GoapActionDef {
-        kind: craft_action,
-        cost: 2,
-        preconditions: vec![
-            StatePredicate::ZoneIs(station_zone),
-            StatePredicate::HasMarker(markers::HasCraftInputInInventory::KEY),
-        ],
-        effects: vec![StateEffect::IncrementTrips],
-    });
-    // Plan-state `CraftAt<Station>` arm — cat retrieved inputs in
-    // this A* expansion; consumes `HasCraftInputsThisPlan(true)`.
+    // Plan-state `CraftAt<Station>` arm — cat retrieved the SPECIFIC
+    // recipe's inputs via `RetrieveCraftInputs(recipe.id)` earlier in
+    // this A* expansion. Consumes `HasCraftInputsThisPlan(true)`.
+    //
+    // The substrate-marker arm (gated on the generic
+    // `HasCraftInputInInventory` marker) is intentionally absent: the
+    // marker fires when the cat has *any* craft input, but the
+    // resolver checks the *specific* recipe's inputs. Without the
+    // per-recipe substrate marker, A* would prefer the cheaper
+    // substrate-marker path (cost 2 vs 6 for retrieve+craft) and
+    // emit a plan that the resolver then fails. Forcing the retrieve
+    // path guarantees the cat carries the exact inputs the held
+    // HaveItem Intention names. Future ticket: per-recipe substrate
+    // marker (`HasInputsFor(recipe_id)`) lets A* skip the retrieve
+    // when the cat already has the right inputs.
     actions.push(GoapActionDef {
         kind: craft_action,
         cost: 2,
@@ -2648,19 +2636,25 @@ mod tests {
             "plan must include the parameterized RetrieveCraftInputs(bone_tip_spear); got {kinds:?}"
         );
         assert!(
-            kinds.contains(&GoapActionKind::CraftAtWorkshop),
-            "plan must terminate with CraftAtWorkshop; got {kinds:?}"
+            kinds.contains(&GoapActionKind::CraftAtWorkshop(Some(RecipeId(
+                "bone_tip_spear"
+            )))),
+            "plan must terminate with CraftAtWorkshop(Some(bone_tip_spear)); got {kinds:?}"
         );
-        // Ordering invariant: retrieve before craft.
+        // Ordering invariant: retrieve before craft, both pinned to the
+        // same RecipeId (HaveItem path emits Some(recipe.id), not None).
         let retrieve_idx = kinds.iter().position(|k| {
             matches!(
                 k,
                 GoapActionKind::RetrieveCraftInputs(RecipeId("bone_tip_spear"))
             )
         });
-        let craft_idx = kinds
-            .iter()
-            .position(|k| *k == GoapActionKind::CraftAtWorkshop);
+        let craft_idx = kinds.iter().position(|k| {
+            matches!(
+                k,
+                GoapActionKind::CraftAtWorkshop(Some(RecipeId("bone_tip_spear")))
+            )
+        });
         assert!(retrieve_idx < craft_idx, "retrieve must precede craft");
     }
 

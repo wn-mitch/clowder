@@ -48,6 +48,7 @@ use crate::steps::StepOutcome;
 /// `record_if_witnessed` (same feature variant as Workshop crafting
 /// — the canary is "any item got crafted," not per-station).
 pub fn resolve_craft_at_tanning_frame(
+    recipe_id: Option<RecipeId>,
     cat_pos: Position,
     inventory: &mut Inventory,
     recipes: &RecipeRegistry,
@@ -55,6 +56,7 @@ pub fn resolve_craft_at_tanning_frame(
     proximity: i32,
 ) -> StepOutcome<Option<RecipeId>> {
     resolve_craft_at_station(
+        recipe_id,
         cat_pos,
         inventory,
         recipes,

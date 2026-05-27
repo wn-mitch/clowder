@@ -429,12 +429,8 @@ impl GoapActionKind {
             // (the L3 umbrella for generalised Workshop crafting). The
             // resolver picks the specific recipe at execute time, but
             // the plan-step label stays uniform.
-            Self::CraftAtWorkshop => Action::Craft,
-            // 369: TanningFrame-craft step shares the Craft umbrella
-            // with Workshop crafting. Both DSEs emit Action::Craft and
-            // DispositionKind::Crafting; the GoapActionKind discriminates
-            // the station at plan-execute time.
-            Self::CraftAtTanningFrame => Action::Craft,
+            Self::CraftAtWorkshop(_) => Action::Craft,
+            Self::CraftAtTanningFrame(_) => Action::Craft,
             // 462: retrieve-craft-inputs step inherits the parent Craft
             // Action so `CurrentAction` stays stable through the multi-
             // step plan (mirrors `RetrieveSmokeable => SmokeMeat`).

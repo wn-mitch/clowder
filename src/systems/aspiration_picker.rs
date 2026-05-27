@@ -325,8 +325,8 @@ fn compute_outcome(
         .active
         .iter()
         .any(|a| a.chain_name == crate::ai::aspirations::crafting::CRAFT_ITEM_ASPIRATION.name);
-    let crafting_in_flight = snap.in_flight_chain
-        == Some(crate::ai::aspirations::crafting::CRAFT_ITEM_ASPIRATION.name);
+    let crafting_in_flight =
+        snap.in_flight_chain == Some(crate::ai::aspirations::crafting::CRAFT_ITEM_ASPIRATION.name);
     if !crafting_in_active && !crafting_in_flight {
         // Synthesize an ActiveAspiration on the fly. The chain is
         // implicit — the cat's Aspirations Component doesn't carry

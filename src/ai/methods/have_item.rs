@@ -61,10 +61,15 @@ const fn station_to_zone(station: StationRequirement) -> Option<PlannerZone> {
 ///
 /// Future Phase ≥3 station-recipes (wearables / decorations / etc.)
 /// extend this match arm when they author dedicated craft actions.
-const fn station_to_craft_action(station: StationRequirement) -> Option<GoapActionKind> {
+const fn station_to_craft_action(
+    station: StationRequirement,
+    recipe_id: crate::components::recipe::RecipeId,
+) -> Option<GoapActionKind> {
     match station {
-        StationRequirement::Workshop => Some(GoapActionKind::CraftAtWorkshop),
-        StationRequirement::TanningFrame => Some(GoapActionKind::CraftAtTanningFrame),
+        StationRequirement::Workshop => Some(GoapActionKind::CraftAtWorkshop(Some(recipe_id))),
+        StationRequirement::TanningFrame => {
+            Some(GoapActionKind::CraftAtTanningFrame(Some(recipe_id)))
+        }
         StationRequirement::None
         | StationRequirement::Kitchen
         | StationRequirement::DryingRack
@@ -112,7 +117,7 @@ pub fn decompose_goal_have_item(
 ) -> Option<Vec<GoapActionKind>> {
     let recipe: &Recipe = recipes.recipe_producing(item)?;
     let zone = station_to_zone(recipe.station)?;
-    let craft_action = station_to_craft_action(recipe.station)?;
+    let craft_action = station_to_craft_action(recipe.station, recipe.id)?;
     Some(vec![
         GoapActionKind::RetrieveCraftInputs(recipe.id),
         GoapActionKind::TravelTo(zone),
@@ -181,8 +186,9 @@ mod tests {
         );
         assert_eq!(
             plan[2],
-            GoapActionKind::CraftAtWorkshop,
-            "third step executes the Workshop craft action",
+            GoapActionKind::CraftAtWorkshop(Some(RecipeId("bone_tip_spear"))),
+            "third step executes the Workshop craft action parameterized \
+             with the same RecipeId the retrieve step used",
         );
     }
 
@@ -214,7 +220,10 @@ mod tests {
             GoapActionKind::RetrieveCraftInputs(RecipeId("hide_bracers"))
         );
         assert_eq!(plan[1], GoapActionKind::TravelTo(PlannerZone::TanningFrame));
-        assert_eq!(plan[2], GoapActionKind::CraftAtTanningFrame);
+        assert_eq!(
+            plan[2],
+            GoapActionKind::CraftAtTanningFrame(Some(RecipeId("hide_bracers")))
+        );
     }
 
     #[test]

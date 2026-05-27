@@ -30,18 +30,17 @@ Full architectural design lives in [`docs/systems/crafting.md`](../../systems/cr
 |---|---|---|---|---|
 | 1a | Crafting substrate — Recipe / Station / CraftAction; generalize remedy_prep + ward_setting | done | [365](../landed/365-crafting-substrate-recipe-station-craftaction-generalize-remedy-prep-and-ward-setting-016-phase-1a.md) | — |
 | 1b | Preservation recipes + Drying Rack + Smoking Rack | done | [367](../landed/367-phase-1-preservation-recipes-dried-fish-smoked-meat-preserved-organ-drying-rack-and-smoking-rack-stations-016-phase-1b.md) | — |
-| 2 | §5 behavioral tools (Grooming Brush, Play Bundle, Courtship Gift) | ready | [368](368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md) | — |
-| 2b | Warrior's kit (8 items, Tanning Frame, material-property substrate) | ready | [369](369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md) | — |
-| 3 | Identity, mentorship, adornment (first wearable producer) | blocked | [370](370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md) | 368, 17 |
+| 2 | §5 behavioral tools (Grooming Brush, Play Bundle, Courtship Gift) | done | [368](../landed/368-phase-2-behavioral-tools-grooming-brush-play-bundle-courtship-gift-016-phase-2.md) | — |
+| 2b | Warrior's kit (8 items, Tanning Frame, material-property substrate) | done | [369](../landed/369-phase-2b-warriors-kit-8-items-tanning-frame-station-material-property-substrate-for-huntcombatnoise-resolvers-016-phase-2b.md) | — |
+| 3 | Identity, mentorship, adornment (first wearable producer) | blocked | [370](370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md) | 17 |
 | 4 | Domestic refinement — place-anchored decorations | blocked | [371](371-phase-4-domestic-refinement-place-anchored-decorations-reed-mat-tallow-lamp-scent-censer-carved-comb-wall-hanging-nesting-inlay-016-phase-4.md) | 370 |
 | 5-prereq | Aspirations mastery arcs (Weaving, BoneShaping, Hidework, Pigment, Cairn) | done | [366](../landed/366-aspirations-mastery-arcs-weaving-boneshaping-hidework-pigment-cairn-016-phase-5-precursor.md) | — |
 | 5 | Elevated cat-craft (collective / multi-season, triple-gated) | blocked | [372](372-phase-5-elevated-cat-craft-generational-tapestry-shrine-cairn-bone-lattice-lantern-pigment-deepened-textile-multi-cat-nesting-alcove-kitten-cradle-basket-016-phase-5-triple-gated.md) | 371 |
 
 ## Related existing tickets
 
-- **173** (parked) — `crafting-split-capability-markers`. Un-park or close decision happens in the first commit of 365's session (capability markers may fall out of the unified Recipe substrate naturally).
-- **309** (blocked-by 308) — Herbcraft DSE reserve-deficit consideration / anticipatory crafting. Phase 1.5 extension; remains gated on 308 (ColonyReservesBelief).
-- **334** (blocked-by [17]) — Stealth-cloak crafting recipe + WearItem resolver. 128 epic Tier-2 glue; scope may shrink to pure HTN-method-flip once 369 lands the WearItem resolver. Decide during 369 session.
+- **309** (ready) — Herbcraft DSE reserve-deficit consideration / anticipatory crafting. Phase 1.5 extension; unblocked after 308 (ColonyReservesBelief) landed.
+- **334** (blocked-by 17) — Stealth-cloak crafting recipe + WearItem resolver. 128 epic Tier-2 glue; partially subsumed by 369 (recipe scope retired; WearItem + HTN-method flip remain live).
 
 ## Design constraints
 
@@ -125,7 +124,7 @@ Crafting is the anchor of the 2026-04-22 three-way split (this entry, #17 slot-i
 
 ## Resume when
 
-Phase 1a (365) and 1b (367) are done. Pick up next: Phase 2 (368, behavioral tools) and Phase 2b (369, warrior's kit) are both ready and can run in parallel.
+Phases 1a (365), 1b (367), 2 (368), and 2b (369) are done. Pick up next: Phase 3 (370, identity/mentorship/adornment — first wearable producer) is blocked on ticket 17 (slot-inventory substrate).
 
 ## Log
 
@@ -134,6 +133,8 @@ Phase 1a (365) and 1b (367) are done. Pick up next: Phase 2 (368, behavioral too
 - 2026-05-18: 366 Phase 5 prereq landed (9d41d3ebc5cf). Five mastery arcs registered + Skills/SkillKind axes + Recipe.skill_gate field + RecipeRegistry::is_phase5_unlocked predicate. Adoption deferred to 372 (Kinship-pattern skip preserves seed-42 determinism). 372 unblocked; ready to start.
 - 2026-05-18: 365 Phase 1a landed (4ecfaf0cd49b). Crafting substrate — Recipe / Station / CraftAction; remedy_prep + ward_setting generalized into unified catalog. 368, 369 unblocked.
 - 2026-05-21: 367 Phase 1b landed (d8f49157). Preservation recipes (dried fish, smoked meat, preserved organ) + Drying Rack + Smoking Rack. First-light lessons logged above. 368 and 369 both ready.
+- 2026-05-23: 368 Phase 2 landed (ce8e2bc2). Grooming Brush, Play Bundle, Courtship Gift recipes + effects. 370 unblocked from 368's dependency.
+- 2026-05-24: 369 Phase 2b landed (5ca33577ba38). Eight warrior's-kit recipes + Tanning Frame + material-property substrate. Stealth-cloak recipe scope merged into 369's WovenReedCloak; 334 scope narrowed (recipe retired, WearItem + HTN-methods remain live). 461 follow-on opened for TanningFrame BuildPressure tuning.
 
 ## Related work
 
