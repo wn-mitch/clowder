@@ -1060,7 +1060,16 @@ def build_parser() -> argparse.ArgumentParser:
     ps = sub.add_parser("shell", help="open the duckdb interactive shell")
     ps.set_defaults(func=cmd_shell)
 
-    pc = sub.add_parser("chart", help="render a chart recipe to logs/charts/")
+    # `conflict_handler="resolve"` lets multiple recipes register the same
+    # shared filter flags (--archive / --seed / --commit) on this one parser
+    # without colliding — recipes are meant to share those conventions, and
+    # all recipes define them identically. Without this, adding a second
+    # recipe that reuses a flag name raises ArgumentError at parser build.
+    pc = sub.add_parser(
+        "chart",
+        help="render a chart recipe to logs/charts/",
+        conflict_handler="resolve",
+    )
     pc.add_argument("recipe", help="recipe name (e.g. colony-score-over-time)")
     pc.set_defaults(func=cmd_chart)
 
