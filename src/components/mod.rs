@@ -22,6 +22,7 @@ pub mod held_intention;
 pub mod hunting_priors;
 pub mod identity;
 pub mod injury_cache;
+pub mod item_gate;
 pub mod item_transfer;
 pub mod items;
 pub mod joint_intention;

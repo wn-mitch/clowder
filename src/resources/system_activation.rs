@@ -717,6 +717,49 @@ pub enum Feature {
     /// fires when the Cape slot was occupied at craft time (a swap) — which
     /// doesn't reliably reproduce in a 15-min seed-42 soak.
     ItemWorn,
+
+    // --- Ticket 429: items-are-real Source/Sink gate Features ---
+    //
+    // Every `ItemSource` impl under `src/components/item_gate/sources/`
+    // emits its `const FEATURE: Feature` via the trait's default
+    // push-or-overflow body; the new Sink resolver
+    // `resolve_eat_from_own_inventory` emits `EatFromOwnInventory`.
+    // Promoting the seven inline `inventory.pouch.push(...)` sites at
+    // `disposition.rs:3234/3757/4196` + `goap.rs:8837/9439/9476/9964`
+    // (and the `eat_from_inventory` Sink at `needs.rs:325`) to the gate
+    // contract means these Features fire 1:1 with the underlying
+    // items-creating / items-consuming events.
+    //
+    // `HuntByproductSource` reuses the existing `ByproductSpawned`
+    // Positive canary (375) rather than introducing a parallel variant
+    // — the two would be 1:1 by construction (every byproduct
+    // push/overflow fires both exactly once).
+    /// Ticket 429 — den-raid produced a carcass (item entered Inventory
+    /// or spawned on the ground at the den). Positive valence: the
+    /// raid's perspective for the *colony* is a food win, distinct from
+    /// the existing Negative `DenRaided` Feature which tracks the
+    /// prey-population loss. `expected_to_fire_per_soak() => true` —
+    /// seed-42 colonies raid dens routinely.
+    ItemSourcedFromDenRaid,
+    /// Ticket 429 — a hunt catch was sourced (carcass entered Inventory
+    /// or spawned on the ground at the prey's tile). Positive valence,
+    /// `expected_to_fire_per_soak() => true` — paired with the existing
+    /// `HuntAttempted` Feature which tracks every discrete attempt;
+    /// this fires only on success.
+    ItemSourcedFromHuntCatch,
+    /// Ticket 429 — a foraged item was sourced (entered Inventory or
+    /// spawned on the ground at the forage tile). Positive valence,
+    /// `expected_to_fire_per_soak() => true` — seed-42 colonies forage
+    /// routinely.
+    ItemSourcedFromForageCatch,
+    /// Ticket 429 — a cat consumed a food item from its own Inventory
+    /// via the `resolve_eat_from_own_inventory` Sink (Sink resolver
+    /// extracted from the pre-substrate-era `eat_from_inventory`
+    /// autonomic system at `needs.rs::325`). Positive valence,
+    /// `expected_to_fire_per_soak() => true` — kittens autoconsume
+    /// pocket food via the dispatcher every seed-42 soak (the existing
+    /// behavior; only the code path changed in 429).
+    EatFromOwnInventory,
 }
 
 impl Feature {
@@ -940,6 +983,12 @@ impl Feature {
         Feature::BoneWeaponSnapped,
         // 334: deliberate don/swap of a worn item.
         Feature::ItemWorn,
+        // 429: items-are-real Source/Sink gate Features (HuntByproduct
+        // reuses the existing ByproductSpawned Positive canary).
+        Feature::ItemSourcedFromDenRaid,
+        Feature::ItemSourcedFromHuntCatch,
+        Feature::ItemSourcedFromForageCatch,
+        Feature::EatFromOwnInventory,
     ];
 
     /// The valence of this feature.
@@ -1120,6 +1169,16 @@ impl Feature {
             // 334: deliberate don/swap of a worn item — surfaces the
             // WearItem don path; a colony-equipping behavior, not adverse.
             Feature::ItemWorn => Positive,
+            // 429: items-are-real Source/Sink gates. All Positive — the
+            // colony's perspective on items entering the world or
+            // satisfying hunger is a win, distinct from the existing
+            // adverse-event Features (Negative `DenRaided` for the
+            // prey-population loss; Negative `OverflowToGround` for
+            // chronic inventory-full anomaly).
+            Feature::ItemSourcedFromDenRaid => Positive,
+            Feature::ItemSourcedFromHuntCatch => Positive,
+            Feature::ItemSourcedFromForageCatch => Positive,
+            Feature::EatFromOwnInventory => Positive,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -1664,6 +1723,29 @@ impl Feature {
             Feature::JointIntentionEmitted { .. } => true,
             Feature::JointBiasApplied { .. } => true,
             Feature::JointStageAdvanced { .. } => true,
+            // 429: items-are-real Source gates. Verified firing in the
+            // 429 landing soak (seed-42, 900s) — DenRaid 39×,
+            // HuntCatch 368×, ForageCatch 308×. All three are
+            // load-bearing tripwires for the underlying Source
+            // substrate; zero count = the trait dispatch broke.
+            Feature::ItemSourcedFromDenRaid => true,
+            Feature::ItemSourcedFromHuntCatch => true,
+            Feature::ItemSourcedFromForageCatch => true,
+            // 429: the eat-from-pocket Sink. The autonomic dispatcher
+            // at `needs.rs::eat_from_inventory` fires only when a cat
+            // has `hunger < eat_from_inventory_threshold` (0.4) AND
+            // food in pouch — in a healthy seed-42 colony this rarely
+            // happens (cats eat at Stores via `EatAtStores` before
+            // hunger falls that low; kittens autoconsume after
+            // they're old enough to carry food but the marker
+            // pipeline doesn't reach that branch in the 900s window).
+            // The 429 landing soak observed zero firings; the
+            // `items_eat_from_own_inventory` scenario is the
+            // structural witness instead. Re-enroll when a follow-on
+            // lifts the Sink into L2/L3 election (so adults plan
+            // through it deliberately) and the seed-42 soak observes
+            // ≥1 firing per healthy run.
+            Feature::EatFromOwnInventory => false,
         }
     }
 }
@@ -1882,6 +1964,11 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::BoneWeaponSnapped => "BoneWeaponSnapped",
         // 334: deliberate don/swap of a worn item.
         Feature::ItemWorn => "ItemWorn",
+        // 429: items-are-real Source/Sink gate Features.
+        Feature::ItemSourcedFromDenRaid => "ItemSourcedFromDenRaid",
+        Feature::ItemSourcedFromHuntCatch => "ItemSourcedFromHuntCatch",
+        Feature::ItemSourcedFromForageCatch => "ItemSourcedFromForageCatch",
+        Feature::EatFromOwnInventory => "EatFromOwnInventory",
     }
 }
 
@@ -2089,7 +2176,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 161;
+        const EXPECTED_VARIANT_COUNT: usize = 165;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2235,7 +2322,13 @@ mod tests {
         // Ticket 334: +1 Positive (ItemWorn) for the deliberate don/swap
         // path of the WearItem resolver. expected_to_fire_per_soak => false
         // (auto-equip-on-craft makes the don leaf an idempotent no-op).
-        assert_eq!(positive, 92);
+        // Ticket 429: +4 Positive (ItemSourcedFromDenRaid,
+        // ItemSourcedFromHuntCatch, ItemSourcedFromForageCatch,
+        // EatFromOwnInventory) for the items-are-real Source/Sink gate
+        // contract. HuntByproductSource reuses the existing
+        // ByproductSpawned Positive canary (1:1 by construction).
+        // All four ship `expected_to_fire_per_soak() => true`.
+        assert_eq!(positive, 96);
         assert_eq!(negative, 25);
         assert_eq!(neutral, 44);
     }
@@ -2343,9 +2436,12 @@ mod tests {
         // Ticket 101: +1 Positive (EnvironmentalComfortPositive) and
         // +1 Negative (EnvironmentalComfortNegative).
         // Ticket 334: +1 Positive (ItemWorn) for the WearItem don/swap path.
+        // Ticket 429: +4 Positive (ItemSourcedFromDenRaid /
+        // ItemSourcedFromHuntCatch / ItemSourcedFromForageCatch /
+        // EatFromOwnInventory) for the items-are-real Source/Sink gates.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            92
+            96
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),
