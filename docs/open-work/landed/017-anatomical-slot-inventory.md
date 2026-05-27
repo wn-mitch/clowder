@@ -1,7 +1,7 @@
 ---
 id: 017
 title: Anatomical slot inventory
-status: in-progress
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [slot-inventory.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-27
 ---
 
 **Why it matters:** Split-out piece of the 2026-04-22 composite
@@ -65,3 +65,4 @@ up before either.
 ## Log
 
 - 2026-05-19: accuracy audit pass — no changes needed (blocked-by [016] correct, related-systems and linkages current)
+- 2026-05-27: Landed OSRS-style slot inventory (pouch + WearableSlots), auto-equip-on-craft for the 8-item 369 kit, equipment_modifiers_for narrowed to worn-only across 5 call sites. Verified: 2553 lib tests + clippy + all substrate linters green; 3-seed release soak (42/7/123) all 0 deaths, continuity canaries pass; equipment confirmed firing (618 ItemCrafted, 61.8k weapon/armor/cloak modifier rows in the Simba trace). Seed-42 verdict flagged one marginal chain-rare never-fired positive (JointStageAdvanced_Courtship) — it fires on seeds 7 and 123 under this code and the joint-stage machinery is healthy (618 generic JointStageAdvanced), so the seed-42 zero is archetype-perturbation noise from adding WearableSlots to the cat archetype, not a mechanical regression. Identity fields (name/origin/creator/event-tag) + Crafted Bag capacity deferred to 370; deliberate don/doff/swap is 334.

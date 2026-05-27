@@ -1,13 +1,13 @@
 ---
 id: 370
 title: Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer)
-status: blocked
+status: ready
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
 added: 2026-05-16
 parked: null
-blocked-by: [17]
+blocked-by: []
 supersedes: []
 related-systems: [crafting.md]
 related-balance: []
