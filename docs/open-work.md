@@ -14,18 +14,18 @@ _Last generated: 2026-05-28._
 
 | Status | Count |
 |---|---|
-| In progress | 4 |
-| Ready | 122 |
+| In progress | 5 |
+| Ready | 120 |
 | Parked | 12 |
 | Blocked | 30 |
-| **Open total** | **168** |
+| **Open total** | **167** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (4 in-progress · 0 ready blockers · 5 next-recommended)
+## Active focus (5 in-progress · 0 ready blockers · 5 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
@@ -35,14 +35,15 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
+- **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.90_
-- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
-- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · score 0.90_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
+- **[484](docs/open-work/tickets/484-refresh-seed-42-verdict-baseline-post-017463470472260-substrate-landings.md)** — Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings — _[diagnostics-and-tooling] · score 0.90_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.90_
 
 ## Epic progress (5)
 
@@ -56,18 +57,19 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 | **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 27 | 21 | 6 (0 / 3 / 1 / 2) | `▰▰▰▰▰▰▰▰▱▱` 78% |
 
-## In progress (4)
+## In progress (5)
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
+- **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (122)
+## Ready by cluster (120)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (34 ready, 6 blocked)
+### ai-substrate (32 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -99,9 +101,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · added 2026-05-21_
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
 - **[466](docs/open-work/tickets/466-travelto-greedy-step-pathing-lift-a-fallback-into-catpathplannext-step.md)** — TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step — _[ai-substrate] · added 2026-05-25_
-- **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput regression — ~63% p90 decline (197->72 ticks/sec) over five weeks; flamegraph-bisect + reclaim — _[ai-substrate] · added 2026-05-27_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
-- **[485](docs/open-work/tickets/485-track-sustained-copresence-per-tick-btreemap-retains-event-driven-eviction-25-percent-inclusive-cpu-at-head-480-child.md)** — track_sustained_copresence per-tick BTreeMap retains — event-driven eviction (25 percent inclusive CPU at HEAD, 480 child) — _[ai-substrate] · added 2026-05-28_
 - **[486](docs/open-work/tickets/486-update-near-pair-cache-death-retain-drive-eviction-off-catdied-message-13-percent-inclusive-cpu-at-head-480-child.md)** — update_near_pair_cache death-retain — drive eviction off CatDied Message (13 percent inclusive CPU at HEAD, 480 child) — _[ai-substrate] · added 2026-05-28_
 
 ### social-coordination (18 ready, 4 blocked)
@@ -343,7 +343,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (122)
+## Ready (120)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -462,10 +462,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[475](docs/open-work/tickets/475-current-role-query-helper-derive-active-role-from-existing-capability-markers-recent-action-history.md)** — Current-role query helper (derive active role from existing capability markers + recent action history) — _[social-coordination] · added 2026-05-26_
 - **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
 - **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
-- **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput regression — ~63% p90 decline (197->72 ticks/sec) over five weeks; flamegraph-bisect + reclaim — _[ai-substrate] · added 2026-05-27_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
 - **[484](docs/open-work/tickets/484-refresh-seed-42-verdict-baseline-post-017463470472260-substrate-landings.md)** — Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings — _[diagnostics-and-tooling] · added 2026-05-27_
-- **[485](docs/open-work/tickets/485-track-sustained-copresence-per-tick-btreemap-retains-event-driven-eviction-25-percent-inclusive-cpu-at-head-480-child.md)** — track_sustained_copresence per-tick BTreeMap retains — event-driven eviction (25 percent inclusive CPU at HEAD, 480 child) — _[ai-substrate] · added 2026-05-28_
 - **[486](docs/open-work/tickets/486-update-near-pair-cache-death-retain-drive-eviction-off-catdied-message-13-percent-inclusive-cpu-at-head-480-child.md)** — update_near_pair_cache death-retain — drive eviction off CatDied Message (13 percent inclusive CPU at HEAD, 480 child) — _[ai-substrate] · added 2026-05-28_
 
 ## Parked (12)
@@ -516,12 +514,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (346)
+## Landed archive (347)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (280)
+### 2026-05 (281)
 
+- **[485](docs/open-work/landed/485-track-sustained-copresence-per-tick-btreemap-retains-event-driven-eviction-25-percent-inclusive-cpu-at-head-480-child.md)** — track_sustained_copresence per-tick BTreeMap retains — event-driven eviction (25 percent inclusive CPU at HEAD, 480 child) _(2026-05-28)_
 - **[482](docs/open-work/landed/482-promote-remaining-source-shaped-inline-pushes-harvestcarcass-forageingredient-preservation-rack-output.md)** — Promote remaining Source-shaped inline pushes — HarvestCarcass / ForageIngredient / Preservation rack output _(2026-05-28)_
 - **[468](docs/open-work/landed/468-craftatworkshop-recipe-not-satisfied-new-plan-failure-surface-post-465.md)** — CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465 _(2026-05-28)_
 - **[191](docs/open-work/landed/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) _(2026-05-28)_

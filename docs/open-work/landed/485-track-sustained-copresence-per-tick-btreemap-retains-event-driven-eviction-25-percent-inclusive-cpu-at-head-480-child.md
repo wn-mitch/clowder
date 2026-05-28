@@ -1,7 +1,7 @@
 ---
 id: 485
 title: track_sustained_copresence per-tick BTreeMap retains — event-driven eviction (25 percent inclusive CPU at HEAD, 480 child)
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 added: 2026-05-28
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-28
 ---
 
 ## Why
@@ -87,3 +87,28 @@ assert before commit per 431 Stage B precedent.
 - 2026-05-28: opened from 480 flamegraph-bisect Phase 1. HEAD profile
   `42-50f5fb77e342` ranks copresence at 25.37% inclusive, retains at 28.13%
   self. Recommended approach (1) — lazy + batched retain.
+- 2026-05-28: landed at `cc4d0ee3` via approach (1) — added `last_touched_tick`
+  to `pair_ticks` values; main loop resets count to 1 on discontinuity (no
+  per-tick retain). Periodic batched GC every 5 cooldowns (~1000 ticks).
+  Debug-only invariant assert kept (last_touched == tick for every cache
+  pair, modulo despawn-mid-tick removals).
+
+  **Flamegraph (60s seed-42, samply 997 Hz, same HEAD commit pre/post):**
+  | frame | pre | post |
+  |---|---:|---:|
+  | track_sustained_copresence inclusive | **25.37%** | **12.44%** |
+  | track_sustained_copresence self | 7.69% | 10.81% |
+  | BTreeMap ExtractIf::next (frame #2 pre) | 28.13% (parent: copresence) | 14.42% (parent: update_near_pair_cache) |
+
+  **Apples-to-apples 60s soak comparison:**
+  - pre-fix `50f5fb77` 60s: 7369 ticks → **122.8 t/s**
+  - post-fix `cc4d0ee3` 60s: 8464 ticks → **141.1 t/s**
+  - delta: **+14.9%**
+
+  **Determinism verification.** Within the common tick range (post-fix's first
+  7369 sim-ticks against pre-fix's full 7369), event-type counts are
+  byte-identical; first 1000 events sequence-identical. No behavior change.
+  See `logs/short-prefix-50f5fb77/` and `logs/short-485-b70f9d3f/`.
+
+  Next knife: 459 (author_joint_intentions) — now top frame at 25.4% inclusive
+  share post-fix. 486 (update_near_pair_cache) is now #2 hot retain.
