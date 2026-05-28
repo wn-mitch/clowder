@@ -3242,7 +3242,7 @@ pub fn resolve_disposition_chains(
                                     ground_position,
                                 };
                                 let outcome = source.source(&mut SourceCtx {
-                                    inventory: &mut inventory,
+                                    inventory: Some(&mut inventory),
                                     commands: &mut commands,
                                     default_position: ground_position,
                                 });
@@ -3783,7 +3783,7 @@ fn dispatch_chain_step(
                             modifiers,
                         }
                         .source(&mut SourceCtx {
-                            inventory: &mut *inventory,
+                            inventory: Some(&mut *inventory),
                             commands: &mut *commands,
                             default_position: prey_pos,
                         });
@@ -3839,7 +3839,7 @@ fn dispatch_chain_step(
                                 modifiers: organ_modifiers,
                             }
                             .source(&mut SourceCtx {
-                                inventory: &mut *inventory,
+                                inventory: Some(&mut *inventory),
                                 commands: &mut *commands,
                                 default_position: prey_pos,
                             });
@@ -4258,7 +4258,7 @@ fn dispatch_chain_step(
                         ),
                     }
                     .source(&mut SourceCtx {
-                        inventory: &mut *inventory,
+                        inventory: Some(&mut *inventory),
                         commands: &mut *commands,
                         default_position: forage_pos,
                     });

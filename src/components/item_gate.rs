@@ -63,14 +63,36 @@ pub enum SourcePlacement {
     Ground { entity: Entity, kind: ItemKind },
 }
 
+/// How a Source places its output.
+///
+/// `InventoryFirst` is the default — push-or-overflow, used by all
+/// actor-pickup Sources (HuntCatch, ForageCatch, DenRaid, HuntByproduct,
+/// HarvestCarcass). `AlwaysGround` is used when the producing event is
+/// not a pickup: the actor (or fixture) emits the item into the world
+/// and a later cat retrieves it. Drying-rack output and herbcraft
+/// ingredient drops are the two AlwaysGround Sources today (ticket 482).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourcePlacementPolicy {
+    InventoryFirst,
+    AlwaysGround,
+}
+
 /// Context handed to every [`ItemSource`] impl.
 ///
-/// Holds the actor's mutable `Inventory` (for the inventory-push arm),
-/// the `Commands` queue (for the ground-overflow spawn arm), and the
-/// default spawn position used when the impl doesn't override
+/// Holds an optional actor `Inventory` reference (only consulted by
+/// the `InventoryFirst` placement arm — `AlwaysGround` Sources like
+/// preservation-rack output have no actor and pass `None`), the
+/// `Commands` queue (for the ground-spawn arm), and the default spawn
+/// position used when the impl doesn't override
 /// [`ItemSource::ground_position`].
 pub struct SourceCtx<'a, 'w, 's> {
-    pub inventory: &'a mut Inventory,
+    /// Actor's inventory. `Some` for actor-pickup Sources (every 429
+    /// Source + HarvestCarcass). `None` for fixture-emit Sources where
+    /// the producer isn't a cat (preservation-rack completion). An
+    /// `InventoryFirst` Source with `None` here falls back to the
+    /// ground-spawn arm and emits `OverflowToGround` — the same outcome
+    /// as a full pouch, surfaced via the same canary.
+    pub inventory: Option<&'a mut Inventory>,
     pub commands: &'a mut Commands<'w, 's>,
     /// Default position for the ground-overflow spawn. Most call sites
     /// pass the actor's current position; den-raid passes the den
@@ -123,14 +145,32 @@ pub trait ItemSource {
         default
     }
 
+    /// Selects between push-or-overflow and ground-only placement.
+    /// Default `InventoryFirst` matches the 429 actor-pickup Sources.
+    /// `AlwaysGround` is for fixture-emitted or world-emitted items
+    /// the actor doesn't pick up (preservation rack output; herbcraft
+    /// ingredient drop).
+    fn placement_policy(&self) -> SourcePlacementPolicy {
+        SourcePlacementPolicy::InventoryFirst
+    }
+
     /// Push the item into Inventory if room, else spawn on the ground.
-    /// Default impl handles both arms; override only if the per-Source
-    /// semantics genuinely diverge (none today).
+    /// `AlwaysGround` policy skips the inventory arm entirely; both
+    /// branches share the same witness shape, so call-site
+    /// `OverflowToGround` emission logic reads identically.
     fn source(&self, ctx: &mut SourceCtx<'_, '_, '_>) -> StepOutcome<Option<SourcePlacement>> {
         let kind = self.kind();
         let modifiers = self.modifiers();
-        let placement = if !ctx.inventory.is_full() {
-            ctx.inventory.pouch.push(ItemSlot::new(kind, modifiers));
+        let inventory_available = matches!(
+            self.placement_policy(),
+            SourcePlacementPolicy::InventoryFirst
+        ) && ctx.inventory.as_ref().is_some_and(|inv| !inv.is_full());
+        let placement = if inventory_available {
+            let inv = ctx
+                .inventory
+                .as_mut()
+                .expect("inventory_available implies Some");
+            inv.pouch.push(ItemSlot::new(kind, modifiers));
             SourcePlacement::Inventory { kind }
         } else {
             let position = self.ground_position(ctx.default_position);

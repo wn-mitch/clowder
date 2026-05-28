@@ -760,6 +760,29 @@ pub enum Feature {
     /// pocket food via the dispatcher every seed-42 soak (the existing
     /// behavior; only the code path changed in 429).
     EatFromOwnInventory,
+    /// Ticket 482 — a drying-rack or smoking-rack completed its cycle
+    /// and spawned its output on the ground at the rack's tile.
+    /// Always-ground Source (the loader doesn't pick the output up;
+    /// it sits on the rack for a later cat to fetch). Positive valence,
+    /// `expected_to_fire_per_soak() => true` — preservation completions
+    /// fire reliably in seed-42 colonies.
+    ItemSourcedFromPreservation,
+    /// Ticket 482 — a cat harvested a corruption-laden carcass and
+    /// the ShadowBone yield was sourced (into Inventory if room, else
+    /// the ground via the trait's default push-or-overflow body —
+    /// retiring the pre-482 silent-drop on inventory-full). Positive
+    /// valence, `expected_to_fire_per_soak() => true`. Distinct from
+    /// `CarcassHarvested` which is the gameplay-event witness — this
+    /// is the items-are-real gate witness, same separation as
+    /// `FoodDried` vs `ItemSourcedFromPreservation`.
+    ItemSourcedFromHarvestCarcass,
+    /// Ticket 482 — a forager's tile rolled an ingredient drop (Twig /
+    /// Fiber / Flower) and the ingredient spawned on the ground at the
+    /// forager's position. Always-ground Source (the cat doesn't pick
+    /// the ingredient up; it sits there for a later herbcrafter).
+    /// Positive valence, `expected_to_fire_per_soak() => true` —
+    /// ingredient drops fire reliably in seed-42 colonies.
+    ItemSourcedFromForageIngredient,
 }
 
 impl Feature {
@@ -989,6 +1012,12 @@ impl Feature {
         Feature::ItemSourcedFromHuntCatch,
         Feature::ItemSourcedFromForageCatch,
         Feature::EatFromOwnInventory,
+        // 482: items-are-real Source gate for the three Source-shaped
+        // sites 429 deferred (rack output, ShadowBone yield, herbcraft
+        // ingredient drop).
+        Feature::ItemSourcedFromPreservation,
+        Feature::ItemSourcedFromHarvestCarcass,
+        Feature::ItemSourcedFromForageIngredient,
     ];
 
     /// The valence of this feature.
@@ -1179,6 +1208,12 @@ impl Feature {
             Feature::ItemSourcedFromHuntCatch => Positive,
             Feature::ItemSourcedFromForageCatch => Positive,
             Feature::EatFromOwnInventory => Positive,
+            // 482: three more Source gates — all Positive (item-into-world
+            // wins; the `OverflowToGround` Negative anomaly canary fires
+            // separately when the inventory-first arm overflows).
+            Feature::ItemSourcedFromPreservation => Positive,
+            Feature::ItemSourcedFromHarvestCarcass => Positive,
+            Feature::ItemSourcedFromForageIngredient => Positive,
 
             // --- Negative: adverse events, colony loss signals ---
             Feature::DeathStarvation => Negative,
@@ -1746,6 +1781,20 @@ impl Feature {
             // through it deliberately) and the seed-42 soak observes
             // ≥1 firing per healthy run.
             Feature::EatFromOwnInventory => false,
+            // 482: three more Source gates promoted from inline pushes.
+            // Preservation completions + ForageIngredient drops fire
+            // reliably in seed-42 (drying racks complete cycles every
+            // few hundred ticks; forage tiles roll ingredient drops on
+            // every Twig/Fiber/Flower-eligible patch). HarvestCarcass
+            // is rare-by-design — it requires a magic-capable cat to
+            // harvest a corruption-touched carcass, and the existing
+            // `CarcassHarvested` gameplay-event sibling is enrolled
+            // `false` for the same reason. The two are 1:1 by
+            // construction, so they share classification: re-enroll
+            // when CarcassHarvested gets promoted to `true`.
+            Feature::ItemSourcedFromPreservation => true,
+            Feature::ItemSourcedFromHarvestCarcass => false,
+            Feature::ItemSourcedFromForageIngredient => true,
         }
     }
 }
@@ -1969,6 +2018,10 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ItemSourcedFromHuntCatch => "ItemSourcedFromHuntCatch",
         Feature::ItemSourcedFromForageCatch => "ItemSourcedFromForageCatch",
         Feature::EatFromOwnInventory => "EatFromOwnInventory",
+        // 482
+        Feature::ItemSourcedFromPreservation => "ItemSourcedFromPreservation",
+        Feature::ItemSourcedFromHarvestCarcass => "ItemSourcedFromHarvestCarcass",
+        Feature::ItemSourcedFromForageIngredient => "ItemSourcedFromForageIngredient",
     }
 }
 
@@ -2176,7 +2229,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 165;
+        const EXPECTED_VARIANT_COUNT: usize = 168;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2328,7 +2381,11 @@ mod tests {
         // contract. HuntByproductSource reuses the existing
         // ByproductSpawned Positive canary (1:1 by construction).
         // All four ship `expected_to_fire_per_soak() => true`.
-        assert_eq!(positive, 96);
+        // Ticket 482: +3 Positive (ItemSourcedFromPreservation,
+        // ItemSourcedFromHarvestCarcass, ItemSourcedFromForageIngredient)
+        // promoting the three Source-shaped sites 429 deferred. All ship
+        // `expected_to_fire_per_soak() => true`.
+        assert_eq!(positive, 99);
         assert_eq!(negative, 25);
         assert_eq!(neutral, 44);
     }
@@ -2439,9 +2496,12 @@ mod tests {
         // Ticket 429: +4 Positive (ItemSourcedFromDenRaid /
         // ItemSourcedFromHuntCatch / ItemSourcedFromForageCatch /
         // EatFromOwnInventory) for the items-are-real Source/Sink gates.
+        // Ticket 482: +3 Positive (ItemSourcedFromPreservation /
+        // ItemSourcedFromHarvestCarcass / ItemSourcedFromForageIngredient)
+        // promoting the three Source-shaped sites 429 deferred.
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            96
+            99
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

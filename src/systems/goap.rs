@@ -8849,7 +8849,7 @@ fn resolve_search_prey(
                         ground_position,
                     }
                     .source(&mut SourceCtx {
-                        inventory: &mut *inventory,
+                        inventory: Some(&mut *inventory),
                         commands: &mut *commands,
                         default_position: ground_position,
                     });
@@ -9460,7 +9460,7 @@ fn resolve_engage_prey(
                     modifiers,
                 }
                 .source(&mut SourceCtx {
-                    inventory: &mut *inventory,
+                    inventory: Some(&mut *inventory),
                     commands: &mut *commands,
                     default_position: prey_pos,
                 });
@@ -9497,7 +9497,7 @@ fn resolve_engage_prey(
                     modifiers,
                 }
                 .source(&mut SourceCtx {
-                    inventory: &mut *inventory,
+                    inventory: Some(&mut *inventory),
                     commands: &mut *commands,
                     default_position: prey_pos,
                 });
@@ -9990,7 +9990,7 @@ fn resolve_forage_item(
                     modifiers,
                 }
                 .source(&mut SourceCtx {
-                    inventory: &mut *inventory,
+                    inventory: Some(&mut *inventory),
                     commands: &mut *commands,
                     default_position: forage_pos,
                 });

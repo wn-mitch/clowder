@@ -11,10 +11,16 @@
 
 pub mod den_raid_carcass;
 pub mod forage_catch;
+pub mod forage_ingredient;
+pub mod harvest_carcass;
 pub mod hunt_byproduct;
 pub mod hunt_catch;
+pub mod preservation_output;
 
 pub use den_raid_carcass::DenRaidCarcassSource;
 pub use forage_catch::ForageCatchSource;
+pub use forage_ingredient::ForageIngredientSource;
+pub use harvest_carcass::HarvestCarcassSource;
 pub use hunt_byproduct::HuntByproductSource;
 pub use hunt_catch::HuntCatchSource;
+pub use preservation_output::PreservationOutputSource;
