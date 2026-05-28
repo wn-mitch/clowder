@@ -232,7 +232,7 @@ flamegraph SEED="42" DURATION="60":
     mkdir -p "${OUTDIR}"
     echo "Building profile binary (cargo build --profile profiling)..."
     cargo build --profile profiling --quiet
-    echo "Recording ${DURATION}s sample profile @ 997Hz..."
+    echo "Recording {{DURATION}}s sample profile @ 997Hz..."
     samply record \
       --save-only --no-open \
       --output "${OUTDIR}/profile.json.gz" \
