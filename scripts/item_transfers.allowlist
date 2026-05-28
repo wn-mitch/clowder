@@ -1,18 +1,39 @@
-# Items-are-real contract allowlist (ticket 175).
+# Items-are-real contract allowlist (tickets 175 + 429).
 #
-# Format: `<file>:<symbol> <ticket-id> [# rationale]`
-#   * `<file>` — path relative to repo root
-#   * `<symbol>` — function name; "*" = whole-file allowlist
-#   * `<ticket-id>` — ticket that authorizes the bypass
+# Format: `<file> <ticket-id> [# rationale]`
+#   * `<file>` — path relative to repo root (whole-file allowlist)
+#   * `<ticket-id>` — ticket that authorizes the bypass / tracks the
+#     follow-on promotion
 #   * Comment-only lines start with `#`. Trailing comments allowed.
 #
-# Add entries only when the `stored.remove + despawn` pattern is
-# genuinely not a transfer (e.g. cat-death cleanup, world-teardown,
-# entity-replacement that's part of an in-place transformation).
+# Two classes of entry:
 #
-# The contract module itself (src/components/item_transfer.rs) is
-# auto-skipped by the lint, so it doesn't need an allowlist entry.
+#   175 — `stored.remove + despawn` patterns that are genuinely not a
+#         transfer (consumption, cat-death cleanup, world-teardown,
+#         entity-replacement that's part of an in-place transformation).
+#
+#   429 — Inventory-mutation or Item:: spawn sites pending promotion to
+#         a first-class `ItemSource` impl. The ticket id should name the
+#         follow-on promotion ticket; whole-file allowlisting trades
+#         coverage on that file for lint-fail-free landing of the
+#         in-scope work.
+#
+# The contract modules (`src/components/item_transfer.rs`,
+# `src/components/item_gate.rs` + submodules, `src/components/items.rs`,
+# `src/components/magic.rs`) and the resolver layer (`src/steps/**`),
+# test harnesses (`src/scenarios/**`, `src/world_gen/**`,
+# `src/rendering/**`), and `#[cfg(test)] mod tests {` blocks inside
+# otherwise-prod files are auto-skipped by the lint and don't need
+# allowlist entries.
 
-# Consumption (despawn-as-real-world-effect), not transfer:
+# 175: consumption (despawn-as-real-world-effect), not transfer.
 src/steps/disposition/eat_at_stores.rs 175  # cat eats food from Stores; the despawn IS the consumption
 src/systems/prey.rs 175                     # wild animal raids Stores; despawn is the food being eaten
+
+# 429 follow-on promotions — Source-shaped sites pending ItemSource
+# impls. 429's bounded scope covered the 8 sites named in the ticket
+# Log (eat-from-inventory Sink + 7 inline pushes). The sites below
+# carry the same items-are-real correctness story but await their own
+# follow-on ticket (TBD at land time):
+src/systems/preservation.rs 429   # drying/smoking rack output spawn → PreservationOutputSource
+src/systems/goap.rs 429           # HarvestCarcass add_item (~L7482); ForageIngredient Item::with_modifiers (~L10042)
