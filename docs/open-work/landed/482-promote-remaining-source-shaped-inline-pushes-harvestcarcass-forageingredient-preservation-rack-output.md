@@ -1,7 +1,7 @@
 ---
 id: 482
 title: Promote remaining Source-shaped inline pushes — HarvestCarcass / ForageIngredient / Preservation rack output
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: [world-richness]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-28
 ---
 
 ## Why
@@ -59,3 +59,4 @@ The `ForageIngredientSource` always-ground variant is the only design-time decis
 ## Log
 
 - 2026-05-27: opened as a 429 follow-on. Three sites named in 429's landing log + allowlist; each is structurally a Source today but bypasses the named gate. Promotion mirrors 429's Commit 2b shape — minimum-viable trait impls + Feature enrollment + call-site swap + linter allowlist cleanup.
+- 2026-05-28: 2026-05-28: landed in two commits. Commit 1 extends ItemSource with SourcePlacementPolicy (InventoryFirst / AlwaysGround), changes SourceCtx::inventory to Option<&mut Inventory> for fixture-emit sites, ships PreservationOutputSource / HarvestCarcassSource / ForageIngredientSource + three Feature variants. Commit 2 swaps the three call sites and drops the allowlist entries. HarvestCarcass retired a silent-drop (inventory.add_item_with_modifiers's false return was ignored on full pouch). HarvestCarcass classification: expected_to_fire_per_soak=false to mirror its 1:1 sibling CarcassHarvested; the other two enrolled true after soak verification (logs/tuned-42-d531318e, promoted as post-482-source-promotions baseline).
