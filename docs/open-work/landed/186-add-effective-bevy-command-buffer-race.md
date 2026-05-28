@@ -1,7 +1,7 @@
 ---
 id: 186
 title: add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-28
 ---
 
 ## Why
@@ -175,3 +175,4 @@ callsite per commit.
   start. Tracked separately so 184 can close cleanly as
   "no defect for the food-stockpile observation."
 - 2026-05-19: accuracy audit pass — fixed link to landed ticket 184, approach candidates sound, test strategy verified.
+- 2026-05-28: Implemented eager-cache fix (option A); added two regression tests in components::building::tests. Cross-call same-tick race is residual — unreachable today behind the is_food() filter at the only call-site. Note for post-179 follow-on: when basket deposits become real, the cross-iteration case will need a caller-side pending_bonus accumulator or a stored bonus cache on StoredItems.

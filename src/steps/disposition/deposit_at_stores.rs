@@ -146,7 +146,12 @@ pub fn resolve_deposit_at_stores(
                     mods,
                 ))
                 .id();
-            if !stored.add_effective(item_entity, StructureType::Stores, items_query) {
+            if !stored.add_effective(
+                item_entity,
+                kind.capacity_bonus(),
+                StructureType::Stores,
+                items_query,
+            ) {
                 // Stores at capacity — despawn the entity we
                 // spawned, mark `rejected`, leave the inventory
                 // slot intact, and stop trying. The caller can

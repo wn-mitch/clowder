@@ -15,10 +15,10 @@ _Last generated: 2026-05-28._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 121 |
+| Ready | 120 |
 | Parked | 12 |
 | Blocked | 30 |
-| **Open total** | **167** |
+| **Open total** | **166** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -38,7 +38,7 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.90_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.90_
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · score 0.90_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
@@ -50,7 +50,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 29 | 15 | 14 (0 / 11 / 3 / 0) | `▰▰▰▰▰▱▱▱▱▱` 52% |
+| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 29 | 16 | 13 (0 / 10 / 3 / 0) | `▰▰▰▰▰▰▱▱▱▱` 55% |
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 8 | 25 (1 / 17 / 5 / 2) | `▰▰▱▱▱▱▱▱▱▱` 24% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (121)
+## Ready by cluster (120)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -137,20 +137,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
 - **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · added 2026-05-26_
 
-### items-crafting (11 ready, 4 blocked)
-
-- **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _[items-crafting] · added 2026-05-06_
-- **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
-- **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · added 2026-05-16_
-- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
-- **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
-- **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
-- **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
-- **[421](docs/open-work/tickets/421-central-material-pile-smart-material-deposit-routing.md)** — Central material pile + smart material-deposit routing — _[items-crafting] · added 2026-05-19_
-- **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
-- **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
-- **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
-
 ### life-cycle (11 ready, 1 blocked)
 
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
@@ -164,6 +150,19 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
+
+### items-crafting (10 ready, 4 blocked)
+
+- **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
+- **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · added 2026-05-16_
+- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
+- **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
+- **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
+- **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
+- **[421](docs/open-work/tickets/421-central-material-pile-smart-material-deposit-routing.md)** — Central material pile + smart material-deposit routing — _[items-crafting] · added 2026-05-19_
+- **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
+- **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
+- **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
 
 ### combat-threat (8 ready, 2 blocked)
 
@@ -342,7 +341,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (121)
+## Ready (120)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -362,7 +361,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
 - **[159](docs/open-work/tickets/159-parent-grief-consumer.md)** — Parent grief consumer for kitten / dependent death — _[life-cycle] · added 2026-05-04_
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
-- **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _[items-crafting] · added 2026-05-06_
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
 - **[200](docs/open-work/tickets/200-land-plannerzonemidden-building-singleton-zone-for-trashing.md)** — Land PlannerZone::Midden — building-singleton zone for Trashing — _[buildings-zones] · added 2026-05-06_
 - **[202](docs/open-work/tickets/202-static-cross-reference-dse-scenario-coverage-follow-on-to-198.md)** — Static cross-reference DSE → scenario coverage (follow-on to 198) — _[process-discipline] · added 2026-05-06_
@@ -514,15 +512,16 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (345)
+## Landed archive (346)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (279)
+### 2026-05 (280)
 
 - **[482](docs/open-work/landed/482-promote-remaining-source-shaped-inline-pushes-harvestcarcass-forageingredient-preservation-rack-output.md)** — Promote remaining Source-shaped inline pushes — HarvestCarcass / ForageIngredient / Preservation rack output _(2026-05-28)_
 - **[468](docs/open-work/landed/468-craftatworkshop-recipe-not-satisfied-new-plan-failure-surface-post-465.md)** — CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465 _(2026-05-28)_
 - **[191](docs/open-work/landed/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) _(2026-05-28)_
+- **[186](docs/open-work/landed/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items _(2026-05-28)_
 - **[477](docs/open-work/landed/477-equipment-modifier-aggregation-fetch-modifiers-for-a-cat-from-369-classifiers-resolver-wiring-l2-trace-hook.md)** — Equipment-modifier aggregation: fetch modifiers for a cat from 369 classifiers + resolver wiring + L2-trace hook _(2026-05-27)_
 - **[463](docs/open-work/landed/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick _(2026-05-27)_
 - **[429](docs/open-work/landed/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts _(2026-05-27)_

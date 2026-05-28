@@ -464,16 +464,30 @@ impl StoredItems {
     }
 
     /// Attempt to add an item, using effective capacity. Returns `false` if full.
+    ///
+    /// `item_capacity_bonus` is the in-flight item's own `capacity_bonus()` —
+    /// the caller passes it directly because `commands.spawn(...).id()` returns
+    /// before the bundle is flushed, so `items_q.get(item)` would silently miss
+    /// the just-spawned entity and drop its bonus from the capacity check.
+    /// Ticket 186.
     pub fn add_effective(
         &mut self,
         item: Entity,
+        item_capacity_bonus: usize,
         kind: StructureType,
         items_q: &Query<
             &Item,
             bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
         >,
     ) -> bool {
-        if self.is_effectively_full(kind, items_q) {
+        let base = Self::capacity(kind);
+        let existing_bonus: usize = self
+            .items
+            .iter()
+            .filter_map(|&e| items_q.get(e).ok())
+            .map(|i| i.kind.capacity_bonus())
+            .sum();
+        if self.items.len() >= base + existing_bonus + item_capacity_bonus {
             return false;
         }
         self.items.push(item);
@@ -915,6 +929,83 @@ mod tests {
         let e = world.spawn_empty().id();
         let mut storage = StoredItems::default();
         assert!(!storage.remove(e));
+    }
+
+    // Ticket 186: `Commands::spawn(...).id()` returns an entity ID whose
+    // bundle is buffered until the next flush, so `items_q.get(item)` returns
+    // `Err` during the same tick. The eager-cache fix folds the in-flight
+    // item's own `capacity_bonus()` into its own admission check, sidestepping
+    // the query lookup for the just-spawned entity.
+    #[test]
+    fn add_effective_admits_in_flight_storage_upgrade_at_base_cap() {
+        use crate::components::items::{Item, ItemKind, ItemLocation, ItemModifiers};
+        use bevy_ecs::world::World;
+        let mut world = World::new();
+
+        // Pre-fill stores to base capacity (50) with visible food items —
+        // none carry a capacity bonus.
+        let mut storage = StoredItems::default();
+        for _ in 0..50 {
+            let food = world
+                .spawn(Item::with_modifiers(
+                    ItemKind::SmokedMeat,
+                    0.5,
+                    ItemLocation::StoredIn(Entity::PLACEHOLDER),
+                    ItemModifiers::default(),
+                ))
+                .id();
+            storage.items.push(food);
+        }
+        assert_eq!(storage.items.len(), 50);
+
+        // Simulate an unflushed `Commands::spawn` for a basket: entity ID
+        // exists but the `Item` component isn't visible to the query yet.
+        let basket = world.spawn_empty().id();
+        let mut q_state = world
+            .query_filtered::<&Item, bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>>(
+            );
+        let q = q_state.query(&world);
+
+        // Without the fix: stores at base_cap, basket invisible to query,
+        // effective cap = 50, 50 >= 50 → reject.
+        // With the fix: in-flight bonus +10 folds in, effective cap = 60,
+        // 50 < 60 → admit.
+        assert!(storage.add_effective(basket, 10, StructureType::Stores, &q));
+        assert_eq!(storage.items.len(), 51);
+    }
+
+    // Ticket 186: complement to the admit case — verify that a non-upgrade
+    // item (food, capacity_bonus = 0) is still rejected when stores is at
+    // effective capacity. Guards against the fix accidentally relaxing the
+    // capacity gate.
+    #[test]
+    fn add_effective_still_rejects_at_effective_cap() {
+        use crate::components::items::{Item, ItemKind, ItemLocation, ItemModifiers};
+        use bevy_ecs::world::World;
+        let mut world = World::new();
+
+        let mut storage = StoredItems::default();
+        for _ in 0..50 {
+            let food = world
+                .spawn(Item::with_modifiers(
+                    ItemKind::SmokedMeat,
+                    0.5,
+                    ItemLocation::StoredIn(Entity::PLACEHOLDER),
+                    ItemModifiers::default(),
+                ))
+                .id();
+            storage.items.push(food);
+        }
+
+        let extra_food = world.spawn_empty().id();
+        let mut q_state = world
+            .query_filtered::<&Item, bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>>(
+            );
+        let q = q_state.query(&world);
+
+        // Food carries no in-flight bonus; effective cap = 50; 50 >= 50 → reject.
+        assert!(!storage.add_effective(extra_food, 0, StructureType::Stores, &q));
+        assert_eq!(storage.items.len(), 50);
     }
 
     // --- StoredHerbs (ticket 084) ---
