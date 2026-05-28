@@ -1,11 +1,13 @@
-//! Ticket 193 — election-side scenario for the re-routed PickingUp
-//! plan template. A focal cat with an empty inventory and no stored
-//! food encounters three OnGround food `Item` entities; the
-//! `HasGroundCarcass` colony marker (re-wired to gate on the food-
-//! Item surface) makes PickingUp eligible, the inverted-Logistic
-//! `colony_food_security` curve scores high, and the new
-//! `PlannerZone::CarcassPile` resolves to a real position so A*
-//! produces a viable plan.
+//! Ticket 193 / 191 — PickingUp DSE scenarios. Two siblings sharing
+//! the same carcass-spawn layout but differing in the slice of the
+//! pipeline they isolate.
+//!
+//! Both scenarios spawn a focal cat with an empty inventory and three
+//! OnGround food `Item` entities (no live prey). The `HasGroundCarcass`
+//! colony marker (185 → 193 re-wire to the food-Item surface) makes
+//! PickingUp eligible; the inverted-Logistic `colony_food_security`
+//! curve (185) scores it high; the `PlannerZone::CarcassPile` (193)
+//! resolves to a real position so A* produces a viable plan.
 //!
 //! Pre-193 baseline: the plan template routed through
 //! `PlannerZone::MaterialPile`, which filtered to build materials
@@ -13,11 +15,21 @@
 //! and the cat replanned every tick. The seed-42 canonical soak
 //! recorded 1367 such failures per 10kt, driving colony collapse.
 //!
-//! Pass criteria:
-//! - `Action::PickUp` wins L3 election at least once within the tick
-//!   budget, AND
-//! - the run completes without panicking on any zone-resolution path
-//!   (proves `CarcassPile` is wired everywhere `MaterialPile` was).
+//! `SCENARIO` (193): hunger 0.2, no Stores, 16-tick budget. Asserts
+//! L3 election + resolver execution for the *pickup* leg. Hunger is
+//! low so the cat is starving and PickingUp dominates the L3 softmax
+//! over Forage; no Stores so the cat can't accidentally deposit.
+//!
+//! `SCENARIO_TO_STORES` (191): hunger 0.55, Stores building four
+//! tiles west, 200-tick budget. Asserts the full scavenge → travel →
+//! deposit chain — `FoodStores.current >= 1` at end. Hunger sits
+//! above the kill-resolver's `production_self_eat_threshold` (0.5;
+//! see `hunt_deposit_chain.rs`) so the cat carries the picked-up
+//! carcass to Stores rather than eating in place. `food_fraction`
+//! stays pinned at 0 (empty Stores) so `colony_food_security =
+//! min(food_fraction, hunger_satisfaction) = 0` and PickingUp still
+//! scores ~0.99 — but the longer budget lets a non-starving cat
+//! reach PickingUp through the L3 softmax variance.
 
 use bevy_ecs::world::World;
 
@@ -53,23 +65,30 @@ fn assert_has_ground_carcass(world: &mut World) {
         .insert(crate::components::markers::HasGroundCarcass);
 }
 
-/// Set the focal cat's hunger low so `colony_food_security`
-/// (`min(food_fraction, hunger_satisfaction)`) is low and the
-/// inverted-Logistic curve gives PickingUp a high score. Empty
-/// `FoodStores` already drives `food_fraction` to 0, but the L2
-/// composite is the min of the two; making both small keeps the
-/// curve far from any near-1 corner.
-fn set_focal_hungry(world: &mut World, focal_name: &str) {
+/// Set the focal cat's hunger. `colony_food_security` reads
+/// `min(food_fraction, hunger_satisfaction)` so the value chosen
+/// here also clamps PickingUp's curve input, but only when
+/// `food_fraction` itself isn't already 0 from an empty FoodStores.
+fn set_focal_hunger(world: &mut World, focal_name: &str, hunger: f32) {
     use crate::components::identity::Name;
     let mut q = world.query::<(bevy_ecs::entity::Entity, &Name)>();
     let entity = q
         .iter(world)
         .find(|(_, n)| n.0 == focal_name)
         .map(|(e, _)| e)
-        .expect("focal cat must exist before set_focal_hungry");
+        .expect("focal cat must exist before set_focal_hunger");
     let mut em = world.entity_mut(entity);
     let mut needs = em.get_mut::<Needs>().expect("focal has Needs");
-    needs.hunger = 0.2;
+    needs.hunger = hunger;
+}
+
+/// Three RawMouse Items in an L-shape east of the cat at (20, 20).
+/// Used by both scenarios so the spatial layout of the pickup target
+/// is identical; only the deposit destination differs.
+fn spawn_three_carcasses_east(world: &mut World) {
+    spawn_ground_food(world, ItemKind::RawMouse, Position::new(22, 20));
+    spawn_ground_food(world, ItemKind::RawMouse, Position::new(20, 22));
+    spawn_ground_food(world, ItemKind::RawMouse, Position::new(18, 20));
 }
 
 fn setup_picking_up_scavenging(world: &mut World, seed: u64) {
@@ -78,15 +97,42 @@ fn setup_picking_up_scavenging(world: &mut World, seed: u64) {
         world,
         CatPreset::adult("Cinder", COLONY_CENTER).with_marker(MarkerKind::Adult),
     );
-    set_focal_hungry(world, "Cinder");
-    // Three RawMouse Items within an L2 walking step of the cat. The
-    // CarcassPile zone resolves to the nearest entity by manhattan
-    // distance; A* threads a TravelTo(CarcassPile) step ahead of the
-    // PickUpItemFromGround. We don't assert which one the cat picks —
-    // only that the plan resolves without GoalUnreachable.
-    spawn_ground_food(world, ItemKind::RawMouse, Position::new(22, 20));
-    spawn_ground_food(world, ItemKind::RawMouse, Position::new(20, 22));
-    spawn_ground_food(world, ItemKind::RawMouse, Position::new(18, 20));
+    // 0.2 — starving. Empty `FoodStores` already pins `food_fraction`
+    // to 0, but making hunger small too keeps the composite far from
+    // any near-1 corner and makes PickingUp dominate the L3 softmax
+    // over Forage within the 16-tick budget.
+    set_focal_hunger(world, "Cinder", 0.2);
+    spawn_three_carcasses_east(world);
+    assert_has_ground_carcass(world);
+}
+
+fn setup_picking_up_to_stores(world: &mut World, seed: u64) {
+    init_scenario_world(world, seed);
+    let _focal = spawn_cat(
+        world,
+        CatPreset::adult("Cinder", COLONY_CENTER).with_marker(MarkerKind::Adult),
+    );
+    // 0.55 — above the kill-resolver's `production_self_eat_threshold`
+    // of 0.5 (see `hunt_deposit_chain.rs`). The cat picks up the
+    // carcass and proceeds to TravelTo(Stores) → DepositPrey rather
+    // than eating in place. `colony_food_security` is still pinned at
+    // 0 by empty `FoodStores`, so PickingUp's curve evaluates the
+    // same as in the 0.2 case; the difference is downstream
+    // post-pickup election.
+    set_focal_hunger(world, "Cinder", 0.55);
+    // Stores building four tiles west of the cat — directional
+    // reversal from the carcasses (all east), so the post-pickup
+    // TravelTo(Stores) trip exercises a real spatial chain. Mirrors
+    // `hunt_deposit_chain::setup` (Stores at (18, 20), cat at
+    // (20, 20), prey east). FoodStores capacity derives from this
+    // structure via `sync_food_stores`; current starts at 0.
+    use crate::components::building::{StoredItems, Structure, StructureType};
+    world.spawn((
+        Structure::new(StructureType::Stores),
+        StoredItems::default(),
+        Position::new(16, 20),
+    ));
+    spawn_three_carcasses_east(world);
     assert_has_ground_carcass(world);
 }
 
@@ -107,6 +153,28 @@ pub static SCENARIO: Scenario = Scenario {
     // catches a future regression where the curve / eligibility / plan
     // path stays green at the L2/L3 layer but the resolver no longer
     // hits `record_if_witnessed`.
+    expected_features: &["ItemRetrieved"],
+};
+
+/// 191 — scavenge → travel → deposit pipeline gate. Sister to
+/// `hunt_deposit_chain::SCENARIO` (the kill-driven chain). The
+/// existence of two sibling scenarios in this file mirrors
+/// `hunt_deposit_chain.rs::{SCENARIO, SCENARIO_INJURED}` — same
+/// shared spawn helpers, different setup-time configuration.
+pub static SCENARIO_TO_STORES: Scenario = Scenario {
+    name: "picking_up_to_stores",
+    default_focal: "Cinder",
+    // 200 ticks — matches `hunt_deposit_chain`'s budget. The full
+    // chain is pickup (~1-3 ticks) + TravelTo(Stores) over four
+    // tiles (~10-20 ticks) + DepositPrey (1 tick), but the cat may
+    // commit to other plans first (Forage at hunger=0.55) before
+    // PickingUp wins. The 200-tick budget absorbs that variance.
+    default_ticks: 200,
+    setup: setup_picking_up_to_stores,
+    // ItemRetrieved fires on pickup; deposit success has no Feature
+    // (only failure modes — DepositRejected / DepositFailedNoStore /
+    // StorageUpgraded — emit). The deposit-side assertion lives in
+    // the test below as `final_food_current >= 1.0`.
     expected_features: &["ItemRetrieved"],
 };
 
@@ -161,6 +229,34 @@ mod tests {
             "ground item count must drop from 3 to ≤2 (proves Item entity despawned on pickup); \
              got {} ground items remaining",
             report.final_ground_item_count,
+        );
+    }
+
+    /// 191 regression: the full scavenge → travel → deposit chain
+    /// lands food in `Stores` within 200 ticks. The pre-191 gap was
+    /// that 193's regression-proofing stopped at "cat picked up an
+    /// item" — it didn't spawn a Stores or confirm the cat actually
+    /// completed the kill-equivalent pipeline. Mirrors
+    /// `hunt_deposit_chain::pipeline_lands_food_in_stores`. Hunger is
+    /// 0.55 (above the kill-resolver's eat-in-place threshold) so the
+    /// cat carries the picked-up carcass to Stores rather than eating
+    /// it; `colony_food_security` stays pinned at 0 by empty
+    /// FoodStores, so PickingUp's curve still saturates ~0.99 and
+    /// wins L3 within the 200-tick budget.
+    #[test]
+    fn pickup_chain_lands_food_in_stores() {
+        let report = run(&SCENARIO_TO_STORES, None, Some(200), 13);
+        assert!(
+            report.final_food_capacity > 0.0,
+            "Stores building should contribute capacity (>0); got {}",
+            report.final_food_capacity
+        );
+        assert!(
+            report.final_food_current >= 1.0,
+            "scavenge→deposit chain should land at least 1 food in Stores \
+             within 200 ticks; got {}/{}",
+            report.final_food_current,
+            report.final_food_capacity
         );
     }
 }

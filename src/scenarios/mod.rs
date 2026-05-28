@@ -149,6 +149,9 @@ pub const ALL: &[&Scenario] = &[
     // 193 — election-side scenario for the rerouted PickingUp plan
     // template (PlannerZone::CarcassPile).
     &picking_up_scavenging::SCENARIO,
+    // 191 — full scavenge → travel → deposit chain to Stores
+    // (sister to `hunt_deposit_chain::SCENARIO`).
+    &picking_up_scavenging::SCENARIO_TO_STORES,
     // 375 — per-species prey-byproduct table verification. Four
     // species variants (Fish excluded — water-habitat requirement
     // not met by the default test world; Fish row is covered by the

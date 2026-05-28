@@ -1,7 +1,7 @@
 ---
 id: 191
 title: Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on)
-status: ready
+status: done
 cluster: items-crafting
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-28
 ---
 
 ## Why
@@ -80,3 +80,4 @@ Two follow-on items deferred from 185's landing:
   eligibility; the integration scenario + balance loop are
   deferred to here per CLAUDE.md antipattern-migration discipline.
 - 2026-05-19: accuracy audit pass — landed tickets verified, file paths and Feature references valid, methodology matches CLAUDE.md discipline.
+- 2026-05-28: - 2026-05-28: landed. Added SCENARIO_TO_STORES sibling (hunger=0.55, Stores at (16,20), 200-tick budget) with pickup_chain_lands_food_in_stores test asserting final_food_current>=1.0. All 3 scenario tests pass. Hypothesize half closed without execution: post-482 baseline survival gates pass (0 starvation, nourishment 0.70); pre-185 comparison stale after 193 plan-template + 231 health-damping; curve params hardcoded per 191's Out of scope; close-the-clade after 185→193→231 substrate cascade.
