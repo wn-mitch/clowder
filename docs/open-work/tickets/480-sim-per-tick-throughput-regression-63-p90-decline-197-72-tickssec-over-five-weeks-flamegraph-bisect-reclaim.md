@@ -1,7 +1,7 @@
 ---
 id: 480
-title: Sim per-tick throughput regression — ~63% p90 decline (197->72 ticks/sec) over five weeks; flamegraph-bisect + reclaim
-status: ready
+title: Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor)
+status: in-progress
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -87,3 +87,49 @@ allocation hotspots — scratch-buffer reuse).
   Finding: p90 ticks/sec 197 -> 72 over five weeks (logdb cross-run query +
   new `soak-throughput-over-time` chart). Bisect window 05-11 -> 05-25; fold in
   205 + 459; methodology per 431 / 427.
+- 2026-05-28: reframed as a perf epic (likely never closes). The regression
+  is stairsteps, not a cliff — death by knives, tied to the substrate
+  refactor's staged landings. Each new knife gets a child ticket; this one
+  is read-only over children, tracks the chart trend.
+
+  **HEAD flamegraph** (`logs/flamegraphs/42-50f5fb77e342/`, 60s seed-42, samply 997 Hz):
+  | # | symbol | self% | incl% | child ticket |
+  |---|---|---:|---:|---|
+  | 1 | track_sustained_copresence | 7.7 | **25.4** | [485](485-*.md) |
+  | 2 | author_joint_intentions | 22.0 | **22.8** | [459](../tickets/459-*.md) (preexisting) |
+  | 3 | update_near_pair_cache | 0.4 | **13.3** | [486](486-*.md) |
+  | 5 | Relationships::get_or_insert | **9.2** | 9.3 | indirect — cascades from #1/#2/#3 retire |
+  | 6 | social_status_distress | 4.1 | 4.2 | [205](../tickets/205-*.md) (preexisting) |
+
+  Demoted from earlier suspect list (verified small at HEAD): `pick_aspiration_emissions`
+  1.2%, `integrate_beliefs` 1.9%, `predator_*` not in top 40,
+  `prey_ai` + `try_detect_cat` 1.8%.
+
+  **Daily p90 timeline** (seed-42 soaks, `_footer.elapsed_ticks / 900`):
+  ```
+  05-21  131.5 t/s   peak
+  05-22   95.5  -27%
+  05-23   80.9  -15%   ← 05-23 flamegraph (joint_intention 40% inclusive)
+  05-24   79.6
+  05-25   67.8  -15%
+  05-26   71.9        ← sustained_copresence lands (279)
+  05-27   71.6
+  05-28   60.4  HEAD  -54% from peak in 7 days
+  ```
+
+  **Structural finding.** Three of the top knives share the same pattern:
+  `BTreeMap::retain` over a pair-keyed state map every tick. Frame #2 of
+  the whole profile is `<BTreeMap as ExtractIf>::next` at **28.13% self**,
+  sourced from copresence's two retains + near_pair_cache's two retains.
+  Lazy / event-driven eviction is the dominant lever.
+
+## Children (open)
+- **485** — track_sustained_copresence per-tick BTreeMap retains (25.4% inclusive)
+- **486** — update_near_pair_cache death-retain via CatDied (13.3% inclusive)
+- **459** — retire author_joint_intentions per-tick hot path (22.8% inclusive,
+  down from 40% on 05-23 — partial taming already)
+- **205** — social_status_distress O(N²) (4.2% inclusive at HEAD — smaller
+  than originally reported; reconfirm methodology before fixing)
+
+## Children (landed against this epic)
+- _(none yet)_
