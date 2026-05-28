@@ -13,10 +13,10 @@
 //! - `.require(CanCraft)` — per-cat `Adult ∧ ¬Injured` capability.
 //! - `.require(HasFunctionalTanningFrame)` — colony-side station
 //!   presence (the 369 marker added in the same commit).
-//! - `.require(HasCraftInputInInventory)` — cat carries ≥1 craft
-//!   input (the same per-cat marker the Workshop DSE consults; the
-//!   marker writer was extended in 369 to include the prey-byproducts
-//!   Bone / Sinew / Whisker / Hide alongside the original 368 inputs).
+//! - `.require(CanSatisfyAnyTanningFrameRecipeFromPouch)` — cat's
+//!   pouch alone satisfies the full input set of at least one
+//!   TanningFrame recipe. 468 retire of 457's recipe-agnostic any-
+//!   input gate `HasCraftInputInInventory`.
 //! - `.forbid(Incapacitated)` — standard non-Eat/Sleep/Idle gate.
 //!
 //! Scoring rationale identical to CraftAtWorkshopDse — see that
@@ -68,7 +68,7 @@ impl CraftAtTanningFrameDse {
             eligibility: EligibilityFilter::new()
                 .require(markers::CanCraft::KEY)
                 .require(markers::HasFunctionalTanningFrame::KEY)
-                .require(markers::HasCraftInputInInventory::KEY)
+                .require(markers::CanSatisfyAnyTanningFrameRecipeFromPouch::KEY)
                 .forbid(markers::Incapacitated::KEY),
         }
     }
@@ -153,7 +153,7 @@ mod tests {
             vec![
                 markers::CanCraft::KEY,
                 markers::HasFunctionalTanningFrame::KEY,
-                markers::HasCraftInputInInventory::KEY,
+                markers::CanSatisfyAnyTanningFrameRecipeFromPouch::KEY,
             ]
         );
         assert_eq!(

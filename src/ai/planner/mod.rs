@@ -221,13 +221,10 @@ pub struct PlannerState {
     pub has_free_slot_this_plan: bool,
     /// Search-state only (ticket 463): `true` iff a
     /// `RetrieveCraftInputs(_)` step has been simulated earlier in
-    /// *this* A* expansion. Pair with
-    /// `HasMarker(HasCraftInputInInventory::KEY)` as alternate
-    /// preconditions on `CraftAtWorkshop` / `CraftAtTanningFrame` —
-    /// substrate branch covers cats already carrying recipe inputs
-    /// (the legacy 457 path), this branch covers in-plan Stores
-    /// retrieval for cats holding `Intention::Goal(HaveItem(_))`.
-    /// Mirrors `has_free_slot_this_plan`'s pattern (ticket 231).
+    /// *this* A* expansion. Sole precondition on
+    /// `CraftAtWorkshop` / `CraftAtTanningFrame` after 468 retired
+    /// the legacy substrate-marker shortcut arm. Mirrors
+    /// `has_free_slot_this_plan`'s pattern (ticket 231).
     pub has_craft_inputs_this_plan: bool,
 }
 
@@ -409,18 +406,19 @@ pub enum GoapActionKind {
     ///   via `craft_have_item_actions`. The resolver crafts that
     ///   specific recipe — the L2 trace's `have_<item>` label and the
     ///   resolved craft are guaranteed to match.
-    /// - `None`: fallback path emitted by the legacy `crafting_actions`
-    ///   template (cat elected Crafting but holds no HaveItem). The
-    ///   resolver lex-picks the first inventory-satisfied Workshop
-    ///   recipe. This branch is the 463-era "belt-and-braces" the
-    ///   ticket explicitly allowed — without it, every elected
-    ///   Crafting tick before a HaveItem cycle completes fails
-    ///   GoalUnreachable, breaking crafting outright.
-    CraftAtWorkshop(Option<crate::components::recipe::RecipeId>),
+    ///
+    /// 468: retired the legacy `None`-recipe variant. The type system
+    /// now forbids an unpinned craft step; every plan emitted into the
+    /// resolver carries the specific RecipeId the cat is committing to,
+    /// either via the HaveItem-aspiration `craft_have_item_actions`
+    /// template or via the new pouch-direct `crafting_actions` template
+    /// (which iterates the registry and emits one
+    /// `CraftAt<Station>(RecipeId)` action per pouch-satisfiable recipe).
+    CraftAtWorkshop(crate::components::recipe::RecipeId),
     /// 369 (parameterized in 463 commit 8): craft a recipe at a
-    /// Tanning Frame. Sibling to `CraftAtWorkshop(_)` with the same
-    /// `Some / None` semantics.
-    CraftAtTanningFrame(Option<crate::components::recipe::RecipeId>),
+    /// Tanning Frame. Sibling to `CraftAtWorkshop(_)` — 468 retired the
+    /// `Option` wrap for the same reason.
+    CraftAtTanningFrame(crate::components::recipe::RecipeId),
     /// 462: retrieve every `RecipeInput { kind, count }` of the named
     /// recipe from a `StoredItems` building into the cat's
     /// `Inventory`. Carries `RecipeId` rather than the input set
@@ -499,11 +497,9 @@ pub enum StatePredicate {
     HasFreeSlotThisPlan(bool),
     /// Ticket 463: search-state predicate. True iff the planner has
     /// simulated a `RetrieveCraftInputs(_)` step earlier in this A*
-    /// expansion. Paired with `HasMarker(HasCraftInputInInventory)` as
-    /// alternate preconditions on `CraftAtWorkshop` /
-    /// `CraftAtTanningFrame` — substrate branch covers cats already
-    /// carrying inputs; this branch covers in-plan Stores retrieval
-    /// for HaveItem-emitting aspirations.
+    /// expansion. Sole precondition on `CraftAtWorkshop` /
+    /// `CraftAtTanningFrame` after 468 retired the legacy substrate-
+    /// marker shortcut arm.
     HasCraftInputsThisPlan(bool),
 }
 

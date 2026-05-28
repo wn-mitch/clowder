@@ -525,38 +525,6 @@ pub fn tend_smoking_rack_actions() -> Vec<GoapActionDef> {
     }]
 }
 
-/// 457 / 463 commit 8: legacy fallback Crafting template. Emits
-/// `CraftAt<Station>(None)` so the resolver lex-picks an inventory-
-/// satisfied recipe at execute time (pre-463 behavior). The 463
-/// aspiration path uses `craft_have_item_actions` instead, emitting
-/// `CraftAt<Station>(Some(recipe.id))` — same action variants but
-/// pinned to the held HaveItem's specific recipe. The fallback is
-/// the ticket's explicit "belt-and-braces" allowance: every Crafting
-/// election without a held HaveItem still lands a craft via lex-pick,
-/// instead of failing `GoalUnreachable`.
-pub fn crafting_actions() -> Vec<GoapActionDef> {
-    vec![
-        GoapActionDef {
-            kind: GoapActionKind::CraftAtWorkshop(None),
-            cost: 2,
-            preconditions: vec![
-                StatePredicate::ZoneIs(PlannerZone::Workshop),
-                StatePredicate::HasMarker(markers::HasCraftInputInInventory::KEY),
-            ],
-            effects: vec![StateEffect::IncrementTrips],
-        },
-        GoapActionDef {
-            kind: GoapActionKind::CraftAtTanningFrame(None),
-            cost: 2,
-            preconditions: vec![
-                StatePredicate::ZoneIs(PlannerZone::TanningFrame),
-                StatePredicate::HasMarker(markers::HasCraftInputInInventory::KEY),
-            ],
-            effects: vec![StateEffect::IncrementTrips],
-        },
-    ]
-}
-
 /// 463: HaveItem plan template. Used when the cat holds
 /// `Intention::Goal(GoalKind::HaveItem(item))` and elected `Crafting`.
 /// Returns the action list that includes a `RetrieveCraftInputs(recipe.id)`
@@ -588,11 +556,11 @@ pub fn craft_have_item_actions(
     let (station_zone, craft_action) = match recipe.station {
         StationRequirement::Workshop => (
             PlannerZone::Workshop,
-            GoapActionKind::CraftAtWorkshop(Some(recipe.id)),
+            GoapActionKind::CraftAtWorkshop(recipe.id),
         ),
         StationRequirement::TanningFrame => (
             PlannerZone::TanningFrame,
-            GoapActionKind::CraftAtTanningFrame(Some(recipe.id)),
+            GoapActionKind::CraftAtTanningFrame(recipe.id),
         ),
         // Kitchen / DryingRack / SmokingRack / None have their own
         // dedicated dispositions (Cooking / DryingFood / SmokingMeat).
@@ -641,17 +609,15 @@ pub fn craft_have_item_actions(
     // recipe's inputs via `RetrieveCraftInputs(recipe.id)` earlier in
     // this A* expansion. Consumes `HasCraftInputsThisPlan(true)`.
     //
-    // The substrate-marker arm (gated on the generic
-    // `HasCraftInputInInventory` marker) is intentionally absent: the
-    // marker fires when the cat has *any* craft input, but the
-    // resolver checks the *specific* recipe's inputs. Without the
-    // per-recipe substrate marker, A* would prefer the cheaper
-    // substrate-marker path (cost 2 vs 6 for retrieve+craft) and
-    // emit a plan that the resolver then fails. Forcing the retrieve
-    // path guarantees the cat carries the exact inputs the held
+    // 468: a substrate-marker shortcut arm (cat already carries the
+    // recipe's inputs from a prior hunt/forage) is intentionally
+    // absent. A recipe-specific substrate gate would have to mirror
+    // `CanSatisfyAnyWorkshopRecipeFromPouch` at per-recipe resolution
+    // — currently we route those cats through the same retrieve arm
+    // and let the resolver no-op the retrieve when inputs are already
+    // in pouch (see `retrieve_craft_inputs.rs` line 96-98). Keeps the
     // HaveItem Intention names. Future ticket: per-recipe substrate
-    // marker (`HasInputsFor(recipe_id)`) lets A* skip the retrieve
-    // when the cat already has the right inputs.
+    // HaveItem chain shape uniform and the retrieve step idempotent.
     actions.push(GoapActionDef {
         kind: craft_action,
         cost: 2,
@@ -1540,9 +1506,17 @@ pub fn actions_for_disposition(
         // 450: Begging plan template — single action, no preconditions,
         // no state effect (Activity Intention, not Goal — §L2.10.5).
         DispositionKind::Begging => begging_actions(),
-        // 457: Workshop-craft plan template — single `CraftAtWorkshop`
-        // step over `ZoneIs(Workshop) ∧ HasCraftInputInInventory`.
-        DispositionKind::Crafting => crafting_actions(),
+        // 468: Crafting dispositions plan exclusively through the
+        // HaveItem-aspiration path (`craft_have_item_actions`, invoked
+        // by the L2 frame-pin when the cat holds a `HaveItem(_)`
+        // Intention). The legacy `crafting_actions()` template was
+        // retired — emitting a `CraftAt<Station>(None)` action over a
+        // recipe-agnostic marker caused 964 PlanFailures post-465 when
+        // no recipe was fully satisfied from pouch alone. Cats with
+        // pouch-satisfaction reach the resolver via the same HaveItem
+        // path (the aspiration picker's `recipe_inputs_reachable`
+        // over `inventory ∪ Stores` covers the pouch-subset case).
+        DispositionKind::Crafting => Vec::new(),
     };
     actions.extend(domain_actions);
     actions
@@ -2567,9 +2541,9 @@ mod tests {
     /// 3-leg plan: TravelTo(Stores) → RetrieveCraftInputs(recipe.id) →
     /// TravelTo(Workshop) → CraftAtWorkshop. The cat starts in Wilds
     /// carrying nothing; HasFreeSlot marker is set (substrate-path
-    /// retrieve arm). The plan must NOT call into the legacy
-    /// `crafting_actions` lex-pick path — the recipe identity is
-    /// pinned by the held HaveItem Intention.
+    /// retrieve arm). The recipe identity is pinned by the held
+    /// HaveItem Intention (468 retired the legacy `crafting_actions`
+    /// lex-pick path; HaveItem is the sole Crafting plan entry).
     #[test]
     fn craft_have_item_workshop_plan() {
         use crate::components::items::ItemKind;
@@ -2633,8 +2607,9 @@ mod tests {
         });
         let actions = craft_have_item_actions(ItemKind::BoneTipSpear, &recipes, &distances);
         // Markers: free slot present (so the substrate-path retrieve
-        // arm fires); HasCraftInputInInventory NOT set (so the legacy
-        // craft arm isn't picked — A* must sequence the retrieve).
+        // arm fires). 468: legacy `crafting_actions` lex-pick path is
+        // retired; HaveItem is the sole entry, no shortcut arm to
+        // compete with the retrieve sequence.
         let mut markers = empty_markers();
         markers.set_entity(markers::HasFreeSlot::KEY, test_entity(), true);
         let plan = plan!(start, &actions, &goal, 12, 1000, markers = markers)
@@ -2647,13 +2622,12 @@ mod tests {
             "plan must include the parameterized RetrieveCraftInputs(bone_tip_spear); got {kinds:?}"
         );
         assert!(
-            kinds.contains(&GoapActionKind::CraftAtWorkshop(Some(RecipeId(
-                "bone_tip_spear"
-            )))),
-            "plan must terminate with CraftAtWorkshop(Some(bone_tip_spear)); got {kinds:?}"
+            kinds.contains(&GoapActionKind::CraftAtWorkshop(RecipeId("bone_tip_spear"))),
+            "plan must terminate with CraftAtWorkshop(bone_tip_spear); got {kinds:?}"
         );
         // Ordering invariant: retrieve before craft, both pinned to the
-        // same RecipeId (HaveItem path emits Some(recipe.id), not None).
+        // same RecipeId (HaveItem path emits the recipe.id directly —
+        // 468 retired the `Option<RecipeId>` wrap).
         let retrieve_idx = kinds.iter().position(|k| {
             matches!(
                 k,
@@ -2663,7 +2637,7 @@ mod tests {
         let craft_idx = kinds.iter().position(|k| {
             matches!(
                 k,
-                GoapActionKind::CraftAtWorkshop(Some(RecipeId("bone_tip_spear")))
+                GoapActionKind::CraftAtWorkshop(RecipeId("bone_tip_spear"))
             )
         });
         assert!(retrieve_idx < craft_idx, "retrieve must precede craft");

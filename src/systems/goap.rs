@@ -587,12 +587,14 @@ pub struct TargetMarkerQueries<'w, 's> {
             Has<markers::HasFuelInInventory>,
             Has<markers::HasDryableInInventory>,
             Has<markers::HasSmokeableInInventory>,
-            // 457: Workshop-craft input marker (`Twig` / `Bristle` /
-            // `Fiber` / `Flower` / `Stone` / `Feather` / `PolishedStone`
-            // in inventory). Bundled here alongside the preservation
-            // inventory rows since the authoring system
-            // (`items::update_inventory_markers`) is the same.
-            Has<markers::HasCraftInputInInventory>,
+            // 468: recipe-aware craft eligibility markers — fire iff
+            // the cat's pouch satisfies the full input set of at least
+            // one recipe at the matching station. Authored by
+            // `items::update_inventory_markers`. Replaces the 457
+            // `HasCraftInputInInventory` (recipe-agnostic any-input
+            // gate) which over-fired the DSE.
+            Has<markers::CanSatisfyAnyWorkshopRecipeFromPouch>,
+            Has<markers::CanSatisfyAnyTanningFrameRecipeFromPouch>,
             // 457: Workshop-craft per-cat capability (`Adult ∧ ¬Injured`).
             // Bundled here alongside `CanDry` / `CanSmoke` since the
             // authoring system (`capabilities::update_capability_markers`)
@@ -1906,10 +1908,11 @@ pub fn evaluate_and_plan(
             has_fuel,
             has_dryable,
             has_smokeable,
-            has_craft_input,
+            can_satisfy_workshop,
+            can_satisfy_tanning,
             can_craft,
         ) = marker_qs.preservation_markers_q.get(entity).unwrap_or((
-            false, false, false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, false, false, false, false, false,
         ));
         if let Ok((
             injured,
@@ -2009,15 +2012,23 @@ pub fn evaluate_and_plan(
                 entity,
                 has_smokeable_accessible,
             );
-            // 457 — Workshop-craft per-cat markers. CanCraft mirrors
-            // CanCook/CanDry/CanSmoke (Adult ∧ ¬Injured);
-            // HasCraftInputInInventory fires when inventory contains
-            // any Phase 2 recipe input.
+            // 457 — Workshop-craft per-cat capability. CanCraft mirrors
+            // CanCook / CanDry / CanSmoke (Adult ∧ ¬Injured).
             markers.set_entity(markers::CanCraft::KEY, entity, can_craft);
+            // 468 — recipe-aware craft eligibility markers. Replaces
+            // the 457 `HasCraftInputInInventory` (recipe-agnostic any-
+            // input gate). Each marker fires iff the cat's pouch alone
+            // satisfies the full input set of at least one recipe at
+            // the matching station.
             markers.set_entity(
-                markers::HasCraftInputInInventory::KEY,
+                markers::CanSatisfyAnyWorkshopRecipeFromPouch::KEY,
                 entity,
-                has_craft_input,
+                can_satisfy_workshop,
+            );
+            markers.set_entity(
+                markers::CanSatisfyAnyTanningFrameRecipeFromPouch::KEY,
+                entity,
+                can_satisfy_tanning,
             );
         }
         // §4.2 State markers — InCombat / OnCorruptedTile /

@@ -66,10 +66,8 @@ const fn station_to_craft_action(
     recipe_id: crate::components::recipe::RecipeId,
 ) -> Option<GoapActionKind> {
     match station {
-        StationRequirement::Workshop => Some(GoapActionKind::CraftAtWorkshop(Some(recipe_id))),
-        StationRequirement::TanningFrame => {
-            Some(GoapActionKind::CraftAtTanningFrame(Some(recipe_id)))
-        }
+        StationRequirement::Workshop => Some(GoapActionKind::CraftAtWorkshop(recipe_id)),
+        StationRequirement::TanningFrame => Some(GoapActionKind::CraftAtTanningFrame(recipe_id)),
         StationRequirement::None
         | StationRequirement::Kitchen
         | StationRequirement::DryingRack
@@ -186,7 +184,7 @@ mod tests {
         );
         assert_eq!(
             plan[2],
-            GoapActionKind::CraftAtWorkshop(Some(RecipeId("bone_tip_spear"))),
+            GoapActionKind::CraftAtWorkshop(RecipeId("bone_tip_spear")),
             "third step executes the Workshop craft action parameterized \
              with the same RecipeId the retrieve step used",
         );
@@ -222,7 +220,7 @@ mod tests {
         assert_eq!(plan[1], GoapActionKind::TravelTo(PlannerZone::TanningFrame));
         assert_eq!(
             plan[2],
-            GoapActionKind::CraftAtTanningFrame(Some(RecipeId("hide_bracers")))
+            GoapActionKind::CraftAtTanningFrame(RecipeId("hide_bracers"))
         );
     }
 

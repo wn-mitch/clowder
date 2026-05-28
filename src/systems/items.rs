@@ -6,12 +6,14 @@ use crate::components::building::{StoredItems, Structure, StructureType};
 use crate::components::items::{item_display_name, Item};
 use crate::components::magic::{Inventory, ResourceKind};
 use crate::components::markers::{
-    HasCraftInputInInventory, HasCuriosInInventory, HasDryableInInventory, HasFreeSlot,
-    HasFuelInInventory, HasHerbsInInventory, HasLowWardReserve, HasMaterialsInInventory,
-    HasRawFishInInventory, HasRawMeatInInventory, HasRawOrganInInventory, HasRemedyHerbs,
-    HasSmokeableInInventory, HasWardHerbs,
+    CanSatisfyAnyTanningFrameRecipeFromPouch, CanSatisfyAnyWorkshopRecipeFromPouch,
+    HasCuriosInInventory, HasDryableInInventory, HasFreeSlot, HasFuelInInventory,
+    HasHerbsInInventory, HasLowWardReserve, HasMaterialsInInventory, HasRawFishInInventory,
+    HasRawMeatInInventory, HasRawOrganInInventory, HasRemedyHerbs, HasSmokeableInInventory,
+    HasWardHerbs,
 };
 use crate::components::physical::Dead;
+use crate::components::recipe::StationRequirement;
 use crate::resources::colony_reserves::ColonyReserves;
 use crate::resources::food::FoodStores;
 use crate::resources::narrative::{NarrativeLog, NarrativeTier};
@@ -43,6 +45,7 @@ use crate::resources::time::TimeState;
 #[allow(clippy::type_complexity)]
 pub fn update_inventory_markers(
     mut commands: Commands,
+    recipes: Res<crate::resources::recipe_registry::RecipeRegistry>,
     cats: Query<
         (
             Entity,
@@ -55,8 +58,7 @@ pub fn update_inventory_markers(
             Has<HasCuriosInInventory>,
             // 367: preservation inventory markers — bundled into a nested
             // tuple so the parent query stays under Bevy's 15-arity
-            // `QueryData` ceiling (457 added `HasCraftInputInInventory`
-            // and pushed the flat shape over).
+            // `QueryData` ceiling.
             (
                 Has<HasRawFishInInventory>,
                 Has<HasRawOrganInInventory>,
@@ -67,8 +69,10 @@ pub fn update_inventory_markers(
             ),
             // 450: generic food-in-inventory marker.
             Has<crate::components::markers::HasFoodInInventory>,
-            // 457: Workshop-craft input marker.
-            Has<HasCraftInputInInventory>,
+            // 468: recipe-aware craft eligibility markers — replaces the
+            // 457 recipe-agnostic `HasCraftInputInInventory` author.
+            Has<CanSatisfyAnyWorkshopRecipeFromPouch>,
+            Has<CanSatisfyAnyTanningFrameRecipeFromPouch>,
         ),
         Without<Dead>,
     >,
@@ -91,7 +95,8 @@ pub fn update_inventory_markers(
             has_smokeable_marker,
         ),
         has_food_marker,
-        has_craft_input_marker,
+        can_satisfy_workshop_marker,
+        can_satisfy_tanning_marker,
     ) in cats.iter()
     {
         let has_herbs = inventory.has_any_herb();
@@ -115,11 +120,22 @@ pub fn update_inventory_markers(
         // item to consume.
         let has_dryable = has_raw_fish || has_raw_organ;
         let has_smokeable = has_raw_meat && has_fuel;
-        // 457: Workshop-craft input presence — fires when inventory
-        // contains any Phase 2 recipe input (Twig / Bristle / Fiber /
-        // Flower / Stone / Feather / PolishedStone). Recipe-agnostic;
-        // the resolver picks the specific recipe at execute time.
-        let has_craft_input = inventory.has_craft_input();
+        // 468: recipe-aware craft eligibility — fires iff the pouch
+        // alone satisfies the full input set of at least one recipe
+        // at the matching station. Replaces 457's recipe-agnostic
+        // `has_craft_input` (now retired) which over-fired the DSE
+        // and surfaced 964 `recipe-not-satisfied` plan failures in
+        // the post-465 soak. Per-tick cost: O(recipes × inputs ×
+        // pouch); registry ≈20 entries, max inputs ≤4, pouch ≤5 —
+        // trivial under the 16-param "default to event-driven" pillar.
+        let can_satisfy_workshop = recipes
+            .iter()
+            .filter(|r| r.station == StationRequirement::Workshop)
+            .any(|r| inventory.satisfies_recipe(r));
+        let can_satisfy_tanning = recipes
+            .iter()
+            .filter(|r| r.station == StationRequirement::TanningFrame)
+            .any(|r| inventory.satisfies_recipe(r));
 
         match (has_herbs, has_herbs_marker) {
             (true, false) => {
@@ -232,13 +248,30 @@ pub fn update_inventory_markers(
             }
             _ => {}
         }
-        // 457: Workshop-craft input marker toggle.
-        match (has_craft_input, has_craft_input_marker) {
+        // 468: recipe-aware craft eligibility marker toggles.
+        match (can_satisfy_workshop, can_satisfy_workshop_marker) {
             (true, false) => {
-                commands.entity(entity).insert(HasCraftInputInInventory);
+                commands
+                    .entity(entity)
+                    .insert(CanSatisfyAnyWorkshopRecipeFromPouch);
             }
             (false, true) => {
-                commands.entity(entity).remove::<HasCraftInputInInventory>();
+                commands
+                    .entity(entity)
+                    .remove::<CanSatisfyAnyWorkshopRecipeFromPouch>();
+            }
+            _ => {}
+        }
+        match (can_satisfy_tanning, can_satisfy_tanning_marker) {
+            (true, false) => {
+                commands
+                    .entity(entity)
+                    .insert(CanSatisfyAnyTanningFrameRecipeFromPouch);
+            }
+            (false, true) => {
+                commands
+                    .entity(entity)
+                    .remove::<CanSatisfyAnyTanningFrameRecipeFromPouch>();
             }
             _ => {}
         }
@@ -810,7 +843,12 @@ mod tests {
     use crate::components::magic::{HerbKind, ItemSlot};
 
     fn setup_inventory_markers() -> (World, bevy_ecs::schedule::Schedule) {
-        let world = World::new();
+        let mut world = World::new();
+        // 468: marker author now reads `RecipeRegistry` for the recipe-
+        // aware `CanSatisfyAny{Workshop,TanningFrame}RecipeFromPouch`
+        // gates. Tests that don't care about craft markers can run with
+        // an empty registry — the markers stay off for empty pouches.
+        world.insert_resource(crate::resources::recipe_registry::RecipeRegistry::default());
         let mut schedule = bevy_ecs::schedule::Schedule::default();
         schedule.add_systems(update_inventory_markers);
         (world, schedule)
@@ -923,5 +961,92 @@ mod tests {
         // Run again — should not flap.
         schedule.run(&mut world);
         assert!(has_marker::<HasWardHerbs>(&world, cat));
+    }
+
+    /// 468: marker author fires `CanSatisfyAnyWorkshopRecipeFromPouch`
+    /// only when the pouch carries the FULL input set of at least one
+    /// Workshop recipe. A pouch with just one of two required inputs
+    /// must NOT fire the marker — the pre-468 over-firing surfaced
+    /// 964 plan failures.
+    #[test]
+    fn workshop_marker_requires_full_recipe_satisfaction() {
+        use crate::components::items::ItemKind;
+        use crate::components::recipe::{
+            DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeId, RecipeInput,
+            RecipeOutput,
+        };
+
+        // Build a world with a Workshop recipe that needs Bone+Sinew.
+        let mut world = World::new();
+        let mut registry = crate::resources::recipe_registry::RecipeRegistry::default();
+        registry.insert(Recipe {
+            id: RecipeId("bone_spear_test"),
+            discipline: DisciplineKind::BoneShellCraft,
+            inputs: vec![
+                RecipeInput {
+                    kind: ItemKind::Bone,
+                    count: 1,
+                },
+                RecipeInput {
+                    kind: ItemKind::Sinew,
+                    count: 1,
+                },
+            ],
+            station: StationRequirement::Workshop,
+            duration: RecipeDuration::Fixed { ticks: 10 },
+            output: RecipeOutput {
+                item_kind: ItemKind::BoneTipSpear,
+                destination: ItemDestination::Inventory,
+            },
+            skill_gate: None,
+            is_warriors_kit: true,
+            discipline_skill_affinity: None,
+        });
+        world.insert_resource(registry);
+        let mut schedule = bevy_ecs::schedule::Schedule::default();
+        schedule.add_systems(update_inventory_markers);
+
+        // Cat carrying only Bone (half the recipe) — marker should NOT fire.
+        let cat = world
+            .spawn(Inventory {
+                pouch: vec![ItemSlot::new(
+                    ItemKind::Bone,
+                    crate::components::items::ItemModifiers::default(),
+                )],
+                ..Default::default()
+            })
+            .id();
+        schedule.run(&mut world);
+        assert!(
+            !has_marker::<CanSatisfyAnyWorkshopRecipeFromPouch>(&world, cat),
+            "pouch with only Bone (no Sinew) must NOT fire the marker"
+        );
+
+        // Add Sinew — marker should now fire.
+        world
+            .get_mut::<Inventory>(cat)
+            .unwrap()
+            .pouch
+            .push(ItemSlot::new(
+                ItemKind::Sinew,
+                crate::components::items::ItemModifiers::default(),
+            ));
+        schedule.run(&mut world);
+        assert!(
+            has_marker::<CanSatisfyAnyWorkshopRecipeFromPouch>(&world, cat),
+            "pouch with Bone+Sinew satisfies the recipe — marker fires"
+        );
+
+        // Remove Bone — marker should clear (the toggle path).
+        world
+            .get_mut::<Inventory>(cat)
+            .unwrap()
+            .pouch
+            .retain(|s| s.kind != ItemKind::Bone);
+        schedule.run(&mut world);
+        assert!(
+            !has_marker::<CanSatisfyAnyWorkshopRecipeFromPouch>(&world, cat),
+            "removing Bone breaks recipe satisfaction — marker clears"
+        );
     }
 }

@@ -103,7 +103,7 @@ pub enum TargetHint {
     /// L2 frame-pin reads the `ItemKind` and routes the plan template
     /// through `craft_have_item_actions(item, …)` (the 463 HaveItem craft
     /// path) instead of `htn_primitive_actions`. Recipe identity stays
-    /// visible at the plan layer as `CraftAtWorkshop(Some(recipe_id))`.
+    /// visible at the plan layer as `CraftAtWorkshop(recipe_id)`.
     CraftItem(crate::components::items::ItemKind),
     /// 334 — primitive sub-goal binds the WearItem resolver's pouch scan.
     /// The resolver dons the first equippable item in the cat's pouch.

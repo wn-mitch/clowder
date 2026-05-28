@@ -37,11 +37,16 @@ use crate::steps::{StepOutcome, StepResult};
 /// `stored.remove` / `commands.entity(_).despawn()`. On inventory-
 /// full: `unwitnessed(Fail)` so the cat re-plans rather than
 /// silently destroying a real item entity. On no-target /
-/// Stores-not-found / no-matching-item-in-stores: returns
-/// `unwitnessed(Advance)` — the chain moves on (the substrate
-/// said the input was available but another cat may have
-/// claimed it; the downstream `CraftAt<station>` resolver will
-/// noop on missing inputs).
+/// Stores-not-found: returns `unwitnessed(Advance)` — the chain
+/// moves on (the target Stores went away mid-plan).
+///
+/// 468: at end-of-loop, if the pouch still doesn't satisfy the
+/// recipe (Stores ran out of an input between the aspiration
+/// picker's reachable-snapshot and this tick), returns
+/// `unwitnessed(Fail("stores missing recipe input"))` rather than
+/// `Advance`-ing into a downstream `CraftAt<station>` Fail. Forces
+/// a clean re-plan via the aspiration picker's fresh Stores
+/// snapshot.
 ///
 /// **Witness** — `StepOutcome<bool>`. `true` iff at least one
 /// item was actually transferred from Stores to inventory this
@@ -130,12 +135,23 @@ pub fn resolve_retrieve_craft_inputs(
         }
     }
 
+    // 468: surface partial-supply failures at this layer rather than
+    // letting them cascade into a guaranteed downstream
+    // `CraftAt<station>` Fail. If pouch still doesn't satisfy the
+    // recipe, the aspiration picker's reachable-snapshot drifted
+    // (another cat claimed the last Stones, item decayed, etc.) —
+    // fail cleanly so the planner re-evaluates.
+    if !inventory.satisfies_recipe(recipe) {
+        return StepOutcome::unwitnessed(StepResult::Fail(format!(
+            "stores missing recipe input for {}",
+            recipe_id.0
+        )));
+    }
     if transferred {
         StepOutcome::witnessed(StepResult::Advance)
     } else {
-        // Either every input was already carried, or stores were
-        // missing what we needed — let the chain advance to the
-        // craft resolver, which will noop if inputs aren't there.
+        // Pouch already satisfied the recipe at entry — retrieve had
+        // nothing to do but the chain is still valid.
         StepOutcome::unwitnessed(StepResult::Advance)
     }
 }

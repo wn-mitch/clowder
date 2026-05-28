@@ -24,36 +24,31 @@ use crate::steps::{StepOutcome, StepResult};
 /// `ItemDestination::Inventory` outputs land in the pouch;
 /// `ItemDestination::EquippedSlot` outputs auto-equip into the cat's
 /// `WearableSlots` (017), falling back to the pouch if the slot is
-/// occupied. Recipe selection is deterministic — lexicographic by
-/// `RecipeId.0`, first satisfied wins.
+/// occupied. Recipe identity is pinned upstream — no resolver-side
+/// selection.
 ///
 /// **Plan-level preconditions** — emitted under `StatePredicate::ZoneIs(
-/// PlannerZone::Workshop)` and `StatePredicate::HasMarker(
-/// HasCraftInputInInventory::KEY)` by `crafting_actions` in
+/// PlannerZone::Workshop)` by `craft_have_item_actions` in
 /// `src/ai/planner/actions.rs`. Cat eligibility + station availability
 /// are gated upstream at `CraftAtWorkshopDse` (`CanCraft` +
-/// `HasFunctionalWorkshop` + `HasCraftInputInInventory` + forbid
-/// `Incapacitated`).
+/// `HasFunctionalWorkshop` + `CanSatisfyAnyWorkshopRecipeFromPouch` +
+/// forbid `Incapacitated`).
 ///
 /// **Runtime preconditions** — re-checks that a Workshop exists within
 /// `proximity` tiles AND that the actor's inventory satisfies *the
-/// named recipe* in full. Both can drift between planning and
-/// execution (cat may have dropped an input en route, or never gathered
-/// the full set despite the `HasCraftInputInInventory` marker firing
-/// on a single matching input). On either drift, returns
-/// `unwitnessed(Fail)` — the planner re-picks.
+/// named recipe* in full. The pouch may have lost an input between
+/// `RetrieveCraftInputs` and `CraftAt<Station>` (dropped en route, or
+/// consumed by a sibling step). On drift, returns `unwitnessed(Fail)`
+/// — the planner re-picks.
 ///
 /// **Witness** — `StepOutcome<RecipeId>`. Carries the parameterized
-/// `recipe_id` on success (always equal to the `recipe_id` input —
-/// kept for narrative + canary parity with the pre-463 lex-pick
-/// witness shape). `unwitnessed(Fail)` paths return no witness — the
-/// real-world effect didn't happen.
+/// `recipe_id` on success.
 ///
 /// **Feature emission** — caller passes `Feature::ItemCrafted`
 /// (Positive, expected_to_fire_per_soak = true — the first-light gate
 /// for the 368 Phase 2 behavioral tools) to `record_if_witnessed`.
 pub fn resolve_craft_at_workshop(
-    recipe_id: Option<RecipeId>,
+    recipe_id: RecipeId,
     cat_pos: Position,
     inventory: &mut Inventory,
     wearables: &mut WearableSlots,
@@ -85,9 +80,14 @@ pub fn resolve_craft_at_workshop(
 /// is a defensive check that the named recipe's station matches the
 /// arm — a registration mistake (e.g. naming a Kitchen recipe on the
 /// Workshop arm) returns `Fail`.
+///
+/// 468 retired the legacy `Option<RecipeId>` shape and the matching
+/// `pick_satisfied_recipe` lex-pick fallback. Every CraftAt step
+/// entering this resolver carries a specific RecipeId pinned upstream
+/// by the HaveItem-aspiration template (`craft_have_item_actions`).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_craft_at_station(
-    recipe_id: Option<RecipeId>,
+    recipe_id: RecipeId,
     cat_pos: Position,
     inventory: &mut Inventory,
     wearables: &mut WearableSlots,
@@ -104,38 +104,29 @@ pub(crate) fn resolve_craft_at_station(
         return StepOutcome::unwitnessed(StepResult::Fail(format!("no {station_label} in range")));
     }
 
-    // 463 commit 8: `Some(id)` = HaveItem path (recipe pinned by the
-    // held Intention). `None` = legacy fallback path (no held HaveItem)
-    // — lex-pick the first inventory-satisfied recipe at this station.
-    let chosen_id = match recipe_id {
-        Some(id) => id,
-        None => match pick_satisfied_recipe(recipes, inventory, station_filter) {
-            Some(id) => id,
-            None => {
-                return StepOutcome::unwitnessed(StepResult::Fail(format!(
-                    "no {station_label} recipe fully satisfied by inventory"
-                )));
-            }
-        },
-    };
-    let Some(recipe) = recipes.get(chosen_id).cloned() else {
+    let Some(recipe) = recipes.get(recipe_id).cloned() else {
         return StepOutcome::unwitnessed(StepResult::Fail(format!(
             "{station_label}: recipe {} not in registry",
-            chosen_id.0
+            recipe_id.0
         )));
     };
     if recipe.station != station_filter {
         return StepOutcome::unwitnessed(StepResult::Fail(format!(
             "{station_label}: recipe {} targets a different station ({:?})",
-            chosen_id.0, recipe.station
+            recipe_id.0, recipe.station
         )));
     }
-    if !recipe_inputs_satisfied(&recipe, inventory) {
+    // Defensive re-check — `RetrieveCraftInputs` upstream guarantees
+    // the pouch carries the recipe's inputs at plan-emit time, but
+    // inputs may have been dropped or destroyed en route. On miss,
+    // re-plan rather than partially-craft.
+    if !inventory.satisfies_recipe(&recipe) {
         return StepOutcome::unwitnessed(StepResult::Fail(format!(
             "{station_label}: recipe {} inputs not satisfied by inventory",
-            chosen_id.0
+            recipe_id.0
         )));
     }
+    let chosen_id = recipe_id;
 
     for input in &recipe.inputs {
         for _ in 0..input.count {
@@ -143,7 +134,7 @@ pub(crate) fn resolve_craft_at_station(
                 .pouch
                 .iter()
                 .position(|s| s.kind == input.kind)
-                .expect("input verified present by recipe_inputs_satisfied");
+                .expect("input verified present by Inventory::satisfies_recipe");
             inventory.pouch.swap_remove(idx);
         }
     }
@@ -185,49 +176,6 @@ pub(crate) fn resolve_craft_at_station(
     }
 
     StepOutcome::witnessed_with(StepResult::Advance, chosen_id)
-}
-
-/// Lex-pick fallback for the legacy `CraftAt<Station>(None)` path —
-/// the cat elected Crafting without a held HaveItem Intention. Walks
-/// the recipe registry in lexicographic order (deterministic across
-/// seeds), filters to the named station, returns the first recipe
-/// whose inputs are all in inventory. Returns `None` when no recipe
-/// is fully satisfied — the caller emits `Fail`.
-fn pick_satisfied_recipe(
-    recipes: &RecipeRegistry,
-    inventory: &Inventory,
-    station: StationRequirement,
-) -> Option<RecipeId> {
-    let mut candidates: Vec<&crate::components::recipe::Recipe> =
-        recipes.iter().filter(|r| r.station == station).collect();
-    candidates.sort_by_key(|r| r.id.0);
-    candidates
-        .into_iter()
-        .find(|r| recipe_inputs_satisfied(r, inventory))
-        .map(|r| r.id)
-}
-
-/// Helper: returns `true` iff every `RecipeInput { kind, count }` is
-/// present in `inventory.pouch` at sufficient count. Kept after the
-/// 463 commit 8 lex-pick retirement because the resolver still
-/// defensively re-checks before draining — the held Intention's
-/// recipe may not match the inventory (inputs dropped en route, or
-/// inventory shifted between plan + execute).
-fn recipe_inputs_satisfied(
-    recipe: &crate::components::recipe::Recipe,
-    inventory: &Inventory,
-) -> bool {
-    for input in &recipe.inputs {
-        let have = inventory
-            .pouch
-            .iter()
-            .filter(|s| s.kind == input.kind)
-            .count() as u32;
-        if have < input.count {
-            return false;
-        }
-    }
-    true
 }
 
 #[cfg(test)]
@@ -274,7 +222,7 @@ mod tests {
         let stations = [Position::new(0, 0)];
 
         let outcome = resolve_craft_at_workshop(
-            Some(RecipeId("test_spear")),
+            RecipeId("test_spear"),
             Position::new(0, 0),
             &mut inv,
             &mut wearables,
@@ -308,7 +256,7 @@ mod tests {
         let stations = [Position::new(0, 0)];
 
         let outcome = resolve_craft_at_workshop(
-            Some(RecipeId("test_spear")),
+            RecipeId("test_spear"),
             Position::new(0, 0),
             &mut inv,
             &mut wearables,

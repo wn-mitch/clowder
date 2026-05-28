@@ -1,7 +1,7 @@
 ---
 id: 468
 title: CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-28
 ---
 
 ## Why
@@ -82,3 +82,4 @@ rows before drafting candidates.
 - 2026-05-25: opened from 465's verdict output flagging this as
   `new-high-rate`. Hypothesis: secondary effect of larger / better-fed
   population; needs investigation before next balance pass.
+- 2026-05-28: Rebind craft DSE eligibility to recipe-aware markers; retire CraftAt{Workshop,TanningFrame}(Option<RecipeId>) at the type level; sister-fix retrieve_craft_inputs to Fail on stores-empty. Soak seed-42: 0 recipe-not-satisfied events (down from 964), survival+continuity canaries pass.

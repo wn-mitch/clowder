@@ -521,36 +521,20 @@ impl Inventory {
         self.pouch.iter().any(|s| s.kind.is_fuel())
     }
 
-    /// 457: whether the inventory contains at least one Phase 2 Workshop
-    /// recipe input — Phase 2 (368): `Twig`, `Bristle`, `Fiber`,
-    /// `Flower`, `Stone`, `Feather`, `PolishedStone`; Phase 2b (369):
-    /// `Bone`, `Sinew`, `Whisker`, `Hide`. Reader:
-    /// `HasCraftInputInInventory` writer in
-    /// `items::update_inventory_markers`. Recipe-agnostic: the marker
-    /// fires when ANY craft input is present, and the resolver
-    /// (`resolve_craft_at_workshop` or `resolve_craft_at_tanning_frame`)
-    /// picks the specific recipe whose full input set is satisfied at
-    /// execute time.
-    pub fn has_craft_input(&self) -> bool {
-        use crate::components::items::ItemKind;
-        self.pouch.iter().any(|s| {
-            matches!(
-                s.kind,
-                // 368 Phase 2 inputs.
-                ItemKind::Twig
-                    | ItemKind::Bristle
-                    | ItemKind::Fiber
-                    | ItemKind::Flower
-                    | ItemKind::Stone
-                    | ItemKind::Feather
-                    | ItemKind::PolishedStone
-                    // 369 Phase 2b inputs (prey byproducts).
-                    | ItemKind::Bone
-                    | ItemKind::Sinew
-                    | ItemKind::Whisker
-                    | ItemKind::Hide,
-            )
-        })
+    /// 468: returns `true` iff every `RecipeInput { kind, count }` in
+    /// `recipe.inputs` is present in `self.pouch` at sufficient count.
+    /// Single source of truth shared by the resolver's defensive check
+    /// and the recipe-aware markers
+    /// (`CanSatisfyAnyWorkshopRecipeFromPouch` /
+    /// `CanSatisfyAnyTanningFrameRecipeFromPouch`).
+    pub fn satisfies_recipe(&self, recipe: &crate::components::recipe::Recipe) -> bool {
+        for input in &recipe.inputs {
+            let have = self.pouch.iter().filter(|s| s.kind == input.kind).count() as u32;
+            if have < input.count {
+                return false;
+            }
+        }
+        true
     }
 
     /// Whether the inventory holds a specific prepared remedy.
@@ -871,6 +855,81 @@ mod tests {
         assert!(!inv.has_remedy_herb()); // thornbriar is ward material
         inv.add_herb(HerbKind::HealingMoss);
         assert!(inv.has_remedy_herb());
+    }
+
+    #[test]
+    fn satisfies_recipe_partial_input_returns_false() {
+        // 468: pouch with one of two required input kinds does NOT
+        // satisfy the recipe. Pre-468 the recipe-agnostic gate fired
+        // on any single input — surfacing 964 plan failures when the
+        // resolver demanded the FULL set.
+        use crate::components::items::ItemKind;
+        use crate::components::recipe::{
+            DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeId, RecipeInput,
+            RecipeOutput, StationRequirement,
+        };
+        let recipe = Recipe {
+            id: RecipeId("test_two_input"),
+            discipline: DisciplineKind::BoneShellCraft,
+            inputs: vec![
+                RecipeInput {
+                    kind: ItemKind::Bone,
+                    count: 1,
+                },
+                RecipeInput {
+                    kind: ItemKind::Sinew,
+                    count: 1,
+                },
+            ],
+            station: StationRequirement::Workshop,
+            duration: RecipeDuration::Fixed { ticks: 10 },
+            output: RecipeOutput {
+                item_kind: ItemKind::BoneTipSpear,
+                destination: ItemDestination::Inventory,
+            },
+            skill_gate: None,
+            is_warriors_kit: true,
+            discipline_skill_affinity: None,
+        };
+        let mut inv = Inventory::default();
+        inv.add_item(ItemKind::Bone);
+        assert!(!inv.satisfies_recipe(&recipe), "only Bone, no Sinew");
+        inv.add_item(ItemKind::Sinew);
+        assert!(inv.satisfies_recipe(&recipe), "full set carried");
+    }
+
+    #[test]
+    fn satisfies_recipe_count_thresholded() {
+        // 468: count-of-kind matters. Two Stones doesn't satisfy a
+        // recipe that needs three.
+        use crate::components::items::ItemKind;
+        use crate::components::recipe::{
+            DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeId, RecipeInput,
+            RecipeOutput, StationRequirement,
+        };
+        let recipe = Recipe {
+            id: RecipeId("test_three_stones"),
+            discipline: DisciplineKind::StonecraftCairn,
+            inputs: vec![RecipeInput {
+                kind: ItemKind::Stone,
+                count: 3,
+            }],
+            station: StationRequirement::Workshop,
+            duration: RecipeDuration::Fixed { ticks: 10 },
+            output: RecipeOutput {
+                item_kind: ItemKind::PolishedStone,
+                destination: ItemDestination::Inventory,
+            },
+            skill_gate: None,
+            is_warriors_kit: false,
+            discipline_skill_affinity: None,
+        };
+        let mut inv = Inventory::default();
+        inv.add_item(ItemKind::Stone);
+        inv.add_item(ItemKind::Stone);
+        assert!(!inv.satisfies_recipe(&recipe), "two Stones, need three");
+        inv.add_item(ItemKind::Stone);
+        assert!(inv.satisfies_recipe(&recipe), "three Stones");
     }
 
     #[test]

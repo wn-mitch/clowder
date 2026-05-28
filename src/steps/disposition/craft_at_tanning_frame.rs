@@ -1,16 +1,16 @@
 //! `CraftAtTanningFrame` — ticket 369, Phase 2b hide-armor crafting.
 //!
-//! Sibling resolver to [`resolve_craft_at_workshop`]. Picks any
-//! `StationRequirement::TanningFrame` recipe (HideBracers,
-//! HidePlatedWrap) whose full input set is in inventory, drains
-//! the inputs, spawns the output. Delegates to the shared
-//! `resolve_craft_at_station` helper.
+//! Sibling resolver to [`resolve_craft_at_workshop`]. Crafts the
+//! `StationRequirement::TanningFrame` recipe pinned by the held
+//! HaveItem Intention (HideBracers / HidePlatedWrap) — drains the
+//! recipe's inputs from inventory, spawns the output. Delegates to
+//! the shared `resolve_craft_at_station` helper.
 //!
 //! The DSE eligibility filter (`CraftAtTanningFrameDse`) already
 //! gates on `HasFunctionalTanningFrame` (colony) +
-//! `HasCraftInputInInventory` (per-cat), so the resolver's runtime
-//! checks here are belt-and-braces: re-verify proximity and
-//! satisfaction at execute time.
+//! `CanSatisfyAnyTanningFrameRecipeFromPouch` (per-cat, 468), so the
+//! resolver's runtime checks here are belt-and-braces: re-verify
+//! proximity and recipe-specific satisfaction at execute time.
 
 use super::craft_at_workshop::resolve_craft_at_station;
 use crate::components::magic::Inventory;
@@ -21,34 +21,31 @@ use crate::steps::StepOutcome;
 
 /// # GOAP step resolver: `CraftAtTanningFrame`
 ///
-/// **Real-world effect** — consumes one TanningFrame recipe's full
-/// input set from the actor's `Inventory` and adds the output
+/// **Real-world effect** — consumes the named TanningFrame recipe's
+/// full input set from the actor's `Inventory` and adds the output
 /// `Item` (Phase 2b hide armor: HideBracers / HidePlatedWrap; both
-/// use `ItemDestination::Inventory`). Recipe selection is
-/// deterministic — lexicographic by `RecipeId.0`, first satisfied
-/// wins (same shape as `resolve_craft_at_workshop`).
+/// use `ItemDestination::Inventory`). Recipe identity pinned upstream
+/// by `craft_have_item_actions`.
 ///
 /// **Plan-level preconditions** — emitted under
-/// `StatePredicate::ZoneIs(PlannerZone::TanningFrame)` and
-/// `StatePredicate::HasMarker(HasCraftInputInInventory::KEY)` by
-/// `crafting_actions` in `src/ai/planner/actions.rs`. Cat
+/// `StatePredicate::ZoneIs(PlannerZone::TanningFrame)` by
+/// `craft_have_item_actions` in `src/ai/planner/actions.rs`. Cat
 /// eligibility + station availability are gated upstream at
 /// `CraftAtTanningFrameDse`.
 ///
 /// **Runtime preconditions** — re-checks that a TanningFrame exists
-/// within `proximity` tiles and that the cat's inventory satisfies
-/// at least one TanningFrame recipe in full. Both can drift between
-/// planning and execution — on either drift, returns
+/// within `proximity` tiles and that the cat's pouch satisfies *the
+/// named recipe* in full. On either drift, returns
 /// `unwitnessed(Fail)`.
 ///
-/// **Witness** — `StepOutcome<Option<RecipeId>>`. Carries the chosen
-/// recipe on success.
+/// **Witness** — `StepOutcome<Option<RecipeId>>`. Carries the recipe
+/// on success.
 ///
 /// **Feature emission** — caller passes `Feature::ItemCrafted` to
 /// `record_if_witnessed` (same feature variant as Workshop crafting
 /// — the canary is "any item got crafted," not per-station).
 pub fn resolve_craft_at_tanning_frame(
-    recipe_id: Option<RecipeId>,
+    recipe_id: RecipeId,
     cat_pos: Position,
     inventory: &mut Inventory,
     wearables: &mut crate::components::equipment::WearableSlots,

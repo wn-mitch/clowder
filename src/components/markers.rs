@@ -744,32 +744,43 @@ impl HasSmokeableAccessible {
     pub const KEY: &str = "HasSmokeableAccessible";
 }
 
-/// 457: per-cat — the cat carries ≥1 Phase 2 Workshop-recipe input
-/// (Twig / Bristle / Fiber / Flower / Stone / Feather / PolishedStone).
-/// Authored by `items::update_inventory_markers` mirroring the existing
-/// `HasRawFishInInventory` / `HasFuelInInventory` rows. Reader:
-/// `CraftAtWorkshopDse` eligibility filter.
+/// 468: per-cat — the cat's pouch alone satisfies the full input set
+/// of at least one Workshop recipe. Authored by
+/// `items::update_inventory_markers` by walking `RecipeRegistry`,
+/// filtering by `StationRequirement::Workshop`, and short-circuiting
+/// on the first recipe where `inventory.satisfies_recipe(recipe)` is
+/// true. Reader: `CraftAtWorkshopDse` eligibility filter +
+/// (legacy retired) `crafting_actions()` plan template.
 ///
-/// Recipe-agnostic by design — any single Workshop input present in
-/// inventory satisfies the marker; the resolver picks the specific
-/// recipe at execute time. Mirrors the 367 inventory-marker shape
-/// (`HasDryableInInventory` fires on any RawFish OR RawOrgan; the
-/// drying resolver picks the specific raw input). A cat with Twig but
-/// no Bristle still fires the marker — the L3 may elect Crafting, the
-/// resolver finds no full recipe satisfied, returns Fail, and the cat
-/// re-plans (substrate-honest: the per-recipe scoring lives at recipe-
-/// variety, deferred per ticket scope).
+/// Replaces the 457 `HasCraftInputInInventory` (recipe-agnostic any-
+/// input gate) which over-fired the DSE: cats carrying a single Twig
+/// elected Crafting and bailed at execute time with "no workshop
+/// recipe fully satisfied by inventory" (ticket 468). The new marker
+/// makes L2 eligibility truthful — `eligible ⇔ plan(executable)` from
+/// the pouch alone — and the type-level retire of
+/// `CraftAtWorkshop(None)` shapes the planner so unsatisfiable craft
+/// plans cannot be built.
 ///
-/// Stores-side retrieve is intentionally NOT in scope for first-light.
-/// Cats gather inputs via hunt (Bristle from `PreyByproductConstants`)
-/// plus forage (`resolve_forage` drops Twig / Fiber / Flower at
-/// `forage_ingredient_drop_chance = 0.10`) and craft when inputs are
-/// already in hand. The plan template is single-step
-/// `[CraftAtWorkshop]`, no `RetrieveCraftInput` leg.
+/// The HaveItem path (`craft_have_item_actions`) does NOT consult
+/// this marker — that arm pins a specific recipe upstream via
+/// `aspiration_picker::recipe_inputs_reachable` over the combined
+/// inventory + nearby Stores aggregate, and the planner sequences
+/// `RetrieveCraftInputs` to top up the pouch before Crafting.
 #[derive(Component, Debug, Clone, Copy)]
-pub struct HasCraftInputInInventory;
-impl HasCraftInputInInventory {
-    pub const KEY: &str = "HasCraftInputInInventory";
+pub struct CanSatisfyAnyWorkshopRecipeFromPouch;
+impl CanSatisfyAnyWorkshopRecipeFromPouch {
+    pub const KEY: &str = "CanSatisfyAnyWorkshopRecipeFromPouch";
+}
+
+/// 468: per-cat — the cat's pouch alone satisfies the full input set
+/// of at least one Tanning Frame recipe. Sibling of
+/// [`CanSatisfyAnyWorkshopRecipeFromPouch`] over
+/// `StationRequirement::TanningFrame`. Reader: `CraftAtTanningFrameDse`
+/// eligibility filter.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct CanSatisfyAnyTanningFrameRecipeFromPouch;
+impl CanSatisfyAnyTanningFrameRecipeFromPouch {
+    pub const KEY: &str = "CanSatisfyAnyTanningFrameRecipeFromPouch";
 }
 
 /// 367: colony — ≥1 loaded Smoking Rack exists in the colony AND its
@@ -1394,9 +1405,12 @@ mod tests {
         // 443 — smoking chain accessibility markers.
         assert_marker_queryable(HasSmokeableInStores);
         assert_marker_queryable(HasSmokeableAccessible);
-        // 457 — Workshop-craft station + input markers.
+        // 457 — Workshop-craft station marker.
         assert_marker_queryable(HasFunctionalWorkshop);
-        assert_marker_queryable(HasCraftInputInInventory);
+        // 468 — recipe-aware craft eligibility markers (retire of 457's
+        // recipe-agnostic `HasCraftInputInInventory`).
+        assert_marker_queryable(CanSatisfyAnyWorkshopRecipeFromPouch);
+        assert_marker_queryable(CanSatisfyAnyTanningFrameRecipeFromPouch);
     }
 
     #[test]

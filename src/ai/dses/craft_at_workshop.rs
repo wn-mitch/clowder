@@ -3,18 +3,23 @@
 //! The elect-side DSE for the 368 Workshop substrate. Generalised
 //! over every registered `StationRequirement::Workshop` recipe — the
 //! DSE asks "could this cat conceivably craft anything at a Workshop
-//! right now?" via the `HasCraftInputInInventory` marker, and the
-//! resolver (`resolve_craft_at_workshop`) picks the specific recipe at
-//! execute time. No per-recipe scoring (deferred per the ticket's
-//! "future refinement: recipe variety axis"); first-light just needs
-//! one craft to fire so the 368 substrate first-light gate passes.
+//! right now?" via the recipe-aware
+//! `CanSatisfyAnyWorkshopRecipeFromPouch` marker (468). The HaveItem-
+//! aspiration upstream pins the specific RecipeId; the resolver
+//! (`resolve_craft_at_workshop`) crafts exactly that recipe. No per-
+//! recipe scoring at this layer — recipe priority lives in the
+//! aspiration picker (`step2_craft_item_recipe_scoring`).
 //!
 //! **Eligibility shape** mirrors `SmokeMeatDse`:
 //! - `.require(CanCraft)` — per-cat `Adult ∧ ¬Injured` capability.
 //! - `.require(HasFunctionalWorkshop)` — colony-side station presence.
-//! - `.require(HasCraftInputInInventory)` — cat carries ≥1 Phase 2
-//!   recipe input. Keeps the DSE silent on cats with empty pockets so
-//!   the planner doesn't form a trip-to-Workshop-then-fail loop.
+//! - `.require(CanSatisfyAnyWorkshopRecipeFromPouch)` — cat's pouch
+//!   alone satisfies the full input set of at least one Workshop
+//!   recipe. 468 retire of 457's recipe-agnostic any-input gate
+//!   `HasCraftInputInInventory` (which over-fired the DSE and
+//!   surfaced 964 plan failures post-465). HaveItem-aspiration cats
+//!   reach the resolver via the pinned-recipe planner path; this
+//!   marker gates the legacy "I already carry everything" path.
 //! - `.forbid(Incapacitated)` — standard non-Eat/Sleep/Idle gate.
 //!
 //! **Scoring** — three scalar considerations, all Linear, summing to
@@ -79,7 +84,7 @@ impl CraftAtWorkshopDse {
             eligibility: EligibilityFilter::new()
                 .require(markers::CanCraft::KEY)
                 .require(markers::HasFunctionalWorkshop::KEY)
-                .require(markers::HasCraftInputInInventory::KEY)
+                .require(markers::CanSatisfyAnyWorkshopRecipeFromPouch::KEY)
                 .forbid(markers::Incapacitated::KEY),
         }
     }
@@ -156,7 +161,7 @@ mod tests {
             vec![
                 markers::CanCraft::KEY,
                 markers::HasFunctionalWorkshop::KEY,
-                markers::HasCraftInputInInventory::KEY,
+                markers::CanSatisfyAnyWorkshopRecipeFromPouch::KEY,
             ]
         );
         assert_eq!(
