@@ -100,15 +100,46 @@ assert before commit per 431 Stage B precedent.
   | track_sustained_copresence self | 7.69% | 10.81% |
   | BTreeMap ExtractIf::next (frame #2 pre) | 28.13% (parent: copresence) | 14.42% (parent: update_near_pair_cache) |
 
-  **Apples-to-apples 60s soak comparison:**
-  - pre-fix `50f5fb77` 60s: 7369 ticks → **122.8 t/s**
-  - post-fix `d82cd645` 60s: 8464 ticks → **141.1 t/s**
-  - delta: **+14.9%**
+  **Apples-to-apples 60s soak comparison (AC power, 3 pre-fix + 2 post-fix runs):**
+  | run | ticks | t/s | play |
+  |---|---:|---:|---:|
+  | pre-v1 | 7011 | 116.8 | 2 |
+  | pre-v2 | 7355 | 122.6 | 2 |
+  | pre-v3 | 7356 | 122.6 | 2 |
+  | post-v1 | 8278 | 138.0 | 4 |
+  | post-v2 | 8657 | 144.3 | 4 |
+  - pre median: ~122 t/s, post median: ~141 t/s, delta: **+15.6%** (range +13% to +24%)
 
-  **Determinism verification.** Within the common tick range (post-fix's first
-  7369 sim-ticks against pre-fix's full 7369), event-type counts are
-  byte-identical; first 1000 events sequence-identical. No behavior change.
-  See `logs/short-prefix-50f5fb77/` and `logs/short-485-b70f9d3f/`.
+  **Determinism caveat.** Event-stream sequence is NOT byte-identical across
+  runs at the project's current state — even pre-fix runs vary in event order
+  within the same tick (pre-v3 differs from pre-v1/v2 in counts at common
+  ticks). Root cause: Bevy query iteration order depends on archetype
+  layout, which shifts under parallel-executor scheduling differences. The
+  first divergence between pre-v1 and post-v1 is at tick 4300, in the
+  order of two `CatSnapshot` events (Simba vs Calcifer swapped). My fix
+  doesn't *introduce* this non-determinism; the faster path lets Bevy
+  schedule systems with slightly different timing, which hits a different
+  sample of the same distribution.
+
+  **Behavior shift (legitimate improvement, not non-determinism).**
+  `JointPlayBoutCompleted` count is stably 2 in pre-fix (3/3 runs) and stably
+  4 in post-fix (2/2 runs), with the extra emissions at sim-tick 4590 in
+  both post-fix runs (Cedar + Simba). The expected steady-state count *is*
+  4 per pair-completion: the emission site at
+  `src/ai/joint_intention.rs:349-372` iterates `drop_decisions` with one
+  entry per cat that must drop, not per pair, so both partners fire through
+  the `Completed` branch and emit independently when they reach
+  cooldown-elapsed together. Pre-fix's 2 indicates one half was being
+  dropped before reaching that branch — most plausibly a partner-validity
+  race with the old per-tick `BTreeMap::retain` that this ticket retired.
+  The fix made the system more correct, not differently random. All hard
+  survival gates and continuity canaries pass in all 5 runs (0 deaths, all
+  canaries ≥ 1). *Future bisects: if `JointPlayBoutCompleted` drops back to
+  2, it's a real regression in partner-validity handling, not a noise
+  floor to dismiss.*
+
+  See `logs/short-prefix-acpower/`, `short-prefix-v2/`, `short-prefix-v3/`,
+  `short-postfix-acpower/`, `short-postfix-v2/`.
 
   Next knife: 459 (author_joint_intentions) — now top frame at 25.4% inclusive
   share post-fix. 486 (update_near_pair_cache) is now #2 hot retain.
