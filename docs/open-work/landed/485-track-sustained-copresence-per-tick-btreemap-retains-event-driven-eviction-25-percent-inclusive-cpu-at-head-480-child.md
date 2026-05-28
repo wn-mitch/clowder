@@ -10,7 +10,7 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: pending
+landed-at: d82cd645
 landed-on: 2026-05-28
 ---
 
@@ -87,7 +87,7 @@ assert before commit per 431 Stage B precedent.
 - 2026-05-28: opened from 480 flamegraph-bisect Phase 1. HEAD profile
   `42-50f5fb77e342` ranks copresence at 25.37% inclusive, retains at 28.13%
   self. Recommended approach (1) — lazy + batched retain.
-- 2026-05-28: landed at `cc4d0ee3` via approach (1) — added `last_touched_tick`
+- 2026-05-28: landed at `d82cd645` via approach (1) — added `last_touched_tick`
   to `pair_ticks` values; main loop resets count to 1 on discontinuity (no
   per-tick retain). Periodic batched GC every 5 cooldowns (~1000 ticks).
   Debug-only invariant assert kept (last_touched == tick for every cache
@@ -102,7 +102,7 @@ assert before commit per 431 Stage B precedent.
 
   **Apples-to-apples 60s soak comparison:**
   - pre-fix `50f5fb77` 60s: 7369 ticks → **122.8 t/s**
-  - post-fix `cc4d0ee3` 60s: 8464 ticks → **141.1 t/s**
+  - post-fix `d82cd645` 60s: 8464 ticks → **141.1 t/s**
   - delta: **+14.9%**
 
   **Determinism verification.** Within the common tick range (post-fix's first
