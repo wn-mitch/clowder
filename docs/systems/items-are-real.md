@@ -43,7 +43,7 @@ Classified as of ticket 429 landing. **Status** is one of: `substrate-correct` (
 | `src/steps/disposition/wear_item.rs::resolve_wear_item` | Transfer | substrate-correct | function-shape | `ItemWorn` |
 | `src/steps/disposition/eat_at_stores.rs` | Sink | substrate-correct | function-shape | `FoodEaten` |
 | `src/steps/disposition/trash_at_midden.rs` | Transfer | substrate-correct | function-shape | `ItemTrashed` |
-| `src/steps/disposition/eat_from_own_inventory.rs::resolve_eat_from_own_inventory` | Sink | substrate-correct (new in 429) | function-shape | `EatFromOwnInventory` |
+| `src/steps/disposition/eat_from_own_inventory.rs::resolve_eat_from_own_inventory` | Sink | substrate-correct (new in 429) | function-shape (dispatched per-tick by `systems::needs::eat_from_inventory`; follow-on ticket will plumb a `StepKind::EatFromOwnInventory` GOAP step for adult-side L2/L3 election) | `EatFromOwnInventory` |
 | `src/components/item_gate/sources/den_raid_carcass.rs::DenRaidCarcassSource` | Source | substrate-correct (new in 429) | `ItemSource` trait | `ItemSourcedFromDenRaid` |
 | `src/components/item_gate/sources/hunt_catch.rs::HuntCatchSource` | Source | substrate-correct (new in 429) | `ItemSource` trait | `ItemSourcedFromHuntCatch` |
 | `src/components/item_gate/sources/hunt_byproduct.rs::HuntByproductSource` | Source | substrate-correct (new in 429) | `ItemSource` trait | `ByproductSpawned` (reused — 1:1 by construction) |

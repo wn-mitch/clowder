@@ -1,13 +1,13 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::identity::{Age, LifeStage, Orientation};
-use crate::components::items::ItemKind;
 use crate::components::magic::Inventory;
 use crate::components::markers::Injured;
 use crate::components::mental::{LocationPreferences, Mood, MoodModifier, MoodSource};
 use crate::components::personality::Personality;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::components::pregnancy::Pregnant;
+use crate::resources::system_activation::{Feature, SystemActivation};
 
 use crate::resources::sim_constants::SimConstants;
 use crate::resources::time::{Season, SimConfig, TimeScale, TimeState};
@@ -292,23 +292,29 @@ pub fn decay_grooming(
 }
 
 // ---------------------------------------------------------------------------
-// eat_from_inventory — hungry cats eat carried food
+// eat_from_inventory — autonomic dispatcher for the items-are-real Eat Sink
 // ---------------------------------------------------------------------------
 
 /// A hungry cat with food in its inventory eats directly rather than
-/// waiting to deposit at stores. Keeps cats alive during long hunts.
-/// Corruption penalty comes from the item's modifiers (stamped at catch
-/// time), not from the cat's current tile.
+/// waiting to deposit at stores. Per-tick autonomic reflex; the actual
+/// state transition (slot drain + hunger credit + organ mood bump) lives
+/// in the items-are-real Sink resolver [`resolve_eat_from_own_inventory`].
 ///
-/// 367 Commit 6 — adds an organ-mood bump. When the eaten item carries
-/// `modifiers.from_organ` AND its kind is one of the organ-derived
-/// variants (`RawOrgan` / `PreservedOrgan`), the cat receives a
-/// time-limited mood lift via `MoodModifier`. The dual gate (modifier
-/// plus kind) keeps the bump from spuriously firing on non-organ items
-/// that somehow accumulate `from_organ: true` (defensive — the only
-/// writer is the hunt path, but the cost of a stricter gate is zero).
+/// Ticket 429: extracted from a pre-substrate-era inline mutation. The
+/// dispatcher routes through the named Sink so every Inventory drain
+/// flows through one of the three gate contracts (Source / Transfer /
+/// Sink — see [`docs/systems/items-are-real.md`](../../docs/systems/items-are-real.md))
+/// and the `Feature::EatFromOwnInventory` canary is enrolled in the
+/// seed-42 never-fired tripwire.
+///
+/// A follow-on to 429 will lift this autonomic reflex into the L2/L3
+/// scoring layer for adults (via a `StepKind::EatFromOwnInventory`
+/// GOAP step gated on `HasFoodInInventory`); kittens may stay on the
+/// autonomic path because L3 election doesn't currently elect BegForFood
+/// in seed-42 (per 450's Log).
 pub fn eat_from_inventory(
     constants: Res<SimConstants>,
+    mut activation: Option<ResMut<SystemActivation>>,
     mut query: Query<
         (
             &mut Needs,
@@ -322,42 +328,17 @@ pub fn eat_from_inventory(
     let organ_mood_bonus = constants.crafting.organ_mood_bonus;
     for (mut needs, mut inventory, mood) in &mut query {
         if needs.hunger < c.eat_from_inventory_threshold {
-            if let Some((kind, modifiers)) = inventory.take_food() {
-                let freshness = 1.0 - modifiers.corruption * c.corruption_food_penalty;
-                needs.hunger = (needs.hunger + kind.food_value() * freshness).min(1.0);
-                // 367 Commit 6 — organ mood bump. Bounded modifier
-                // (`organ_mood_bonus_duration_ticks` ≈ one phase of
-                // day) so the lift is felt but doesn't dominate the
-                // mood-stack. `MoodSource::Physical` matches the
-                // existing convention for hunger-relief / contentment-
-                // style mood entries.
-                if modifiers.from_organ
-                    && matches!(kind, ItemKind::RawOrgan | ItemKind::PreservedOrgan)
-                {
-                    if let Some(mut mood) = mood {
-                        mood.modifiers.push_back(
-                            MoodModifier::new(
-                                organ_mood_bonus,
-                                ORGAN_MOOD_BONUS_DURATION_TICKS,
-                                "ate organ meat",
-                            )
-                            .with_kind(MoodSource::Physical),
-                        );
-                    }
-                }
-            }
+            let outcome = crate::steps::disposition::resolve_eat_from_own_inventory(
+                &mut needs,
+                &mut inventory,
+                c.corruption_food_penalty,
+                mood.map(|m| m.into_inner()),
+                organ_mood_bonus,
+            );
+            outcome.record_if_witnessed(activation.as_deref_mut(), Feature::EatFromOwnInventory);
         }
     }
 }
-
-/// 367 Commit 6 — wall-clock duration for the organ-mood bump.
-/// 400 ticks ≈ one day-phase at canonical SimConfig; long enough that
-/// the cat feels the lift across the immediate post-meal window, short
-/// enough that it doesn't bleed into the next sleep cycle. Picked as a
-/// local constant rather than a CraftingConstants knob because the
-/// duration is opinionated narrative pacing — the *amount*
-/// (`organ_mood_bonus`) is the load-bearing knob.
-const ORGAN_MOOD_BONUS_DURATION_TICKS: u64 = 400;
 
 // ---------------------------------------------------------------------------
 // bond_proximity_social — friends nearby restore social need
