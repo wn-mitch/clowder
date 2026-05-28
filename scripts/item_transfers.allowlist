@@ -30,10 +30,7 @@
 src/steps/disposition/eat_at_stores.rs 175  # cat eats food from Stores; the despawn IS the consumption
 src/systems/prey.rs 175                     # wild animal raids Stores; despawn is the food being eaten
 
-# 429 follow-on promotions — Source-shaped sites pending ItemSource
-# impls. 429's bounded scope covered the 8 sites named in the ticket
-# Log (eat-from-inventory Sink + 7 inline pushes). The sites below
-# carry the same items-are-real correctness story but await their own
-# follow-on ticket (TBD at land time):
-src/systems/preservation.rs 429   # drying/smoking rack output spawn → PreservationOutputSource
-src/systems/goap.rs 429           # HarvestCarcass add_item (~L7482); ForageIngredient Item::with_modifiers (~L10042)
+# 482 retired the 429-deferred entries — PreservationOutputSource /
+# HarvestCarcassSource / ForageIngredientSource now dispatch the three
+# previously-allowlisted call sites. No active 429 follow-on entries
+# remain.

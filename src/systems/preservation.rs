@@ -25,7 +25,9 @@ use bevy::prelude::*;
 use crate::components::building::{
     DryingLoad, DryingRackState, DryingRecipe, Structure, StructureType,
 };
-use crate::components::items::{Item, ItemKind, ItemLocation};
+use crate::components::item_gate::sources::PreservationOutputSource;
+use crate::components::item_gate::{ItemSource, SourceCtx, SourcePlacement};
+use crate::components::items::ItemKind;
 use crate::components::physical::Position;
 use crate::components::recipe::{CraftedItem, RecipeId};
 use crate::resources::sim_constants::SimConstants;
@@ -122,16 +124,25 @@ pub fn advance_preservation_drying(
     }
 
     // Spawn outputs + record Features after the iter_mut borrow drops.
+    // Each completion routes through `PreservationOutputSource` — an
+    // `AlwaysGround` items-are-real Source. No actor is in scope here
+    // (drying is sun-driven), so the SourceCtx carries `inventory: None`.
+    // The trait's default body always picks the ground arm; the
+    // `CraftedItem` provenance tag is attached to the spawned entity
+    // after the trait dispatch.
     for c in &completions {
-        commands.spawn((
-            Item::with_modifiers(
-                c.output_kind,
-                c.output_quality,
-                ItemLocation::OnGround,
-                c.output_modifiers,
-            ),
-            c.pos,
-            CraftedItem {
+        let outcome = PreservationOutputSource {
+            kind: c.output_kind,
+            modifiers: c.output_modifiers,
+            quality: c.output_quality,
+        }
+        .source(&mut SourceCtx {
+            inventory: None,
+            commands: &mut commands,
+            default_position: c.pos,
+        });
+        if let Some(SourcePlacement::Ground { entity, .. }) = outcome.witness {
+            commands.entity(entity).insert(CraftedItem {
                 recipe: c.recipe_id,
                 // No per-tick "crafter" — drying is sun-driven; the
                 // loader's identity rode through `crafter_skill` into
@@ -142,8 +153,14 @@ pub fn advance_preservation_drying(
                 // dried fish").
                 crafter: None,
                 crafted_at_tick: time.tick,
-            },
-        ));
+            });
+        }
+        outcome.record_if_witnessed(activation.as_deref_mut(), PreservationOutputSource::FEATURE);
+        // Drying-rack output is `AlwaysGround` by construction, so
+        // OverflowToGround would always fire here and inflate the
+        // signal — skip it. The Negative anomaly canary stays
+        // meaningful only on `InventoryFirst` Sources that overflow
+        // because an actor's pouch was full.
     }
     if let Some(act) = activation.as_deref_mut() {
         for c in &completions {
@@ -193,7 +210,7 @@ fn recipe_id_for(recipe: DryingRecipe) -> RecipeId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::items::ItemModifiers;
+    use crate::components::items::{Item, ItemModifiers};
     use crate::resources::sim_constants::SimConstants;
 
     fn test_app() -> App {

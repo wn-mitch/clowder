@@ -7479,12 +7479,40 @@ fn dispatch_step_action(
                         } else {
                             0.0
                         };
-                        inventory.add_item_with_modifiers(
-                            crate::components::items::ItemKind::ShadowBone,
-                            crate::components::items::ItemModifiers::with_corruption(
+                        // Ticket 482: the ShadowBone yield is now sourced
+                        // through the items-are-real gate. Pre-482, the
+                        // pre-substrate-era `inventory.add_item_with_modifiers`
+                        // call returned `false` on full pouch and the
+                        // return value was ignored — a silent drop. The
+                        // trait's default push-or-overflow body lands the
+                        // bone on the ground in that corner case and fires
+                        // `OverflowToGround` as the canary witness.
+                        use crate::components::item_gate::sources::HarvestCarcassSource;
+                        use crate::components::item_gate::{
+                            ItemSource, SourceCtx, SourcePlacement,
+                        };
+                        let harvest_pos = *pos;
+                        let outcome = HarvestCarcassSource {
+                            modifiers: crate::components::items::ItemModifiers::with_corruption(
                                 harvest_corruption,
                             ),
+                        }
+                        .source(&mut SourceCtx {
+                            inventory: Some(&mut *inventory),
+                            commands: &mut *commands,
+                            default_position: harvest_pos,
+                        });
+                        outcome.record_if_witnessed(
+                            narr.activation.as_deref_mut(),
+                            HarvestCarcassSource::FEATURE,
                         );
+                        if matches!(outcome.witness, Some(SourcePlacement::Ground { .. })) {
+                            if let Some(act) = narr.activation.as_deref_mut() {
+                                act.record(
+                                    crate::resources::system_activation::Feature::OverflowToGround,
+                                );
+                            }
+                        }
                         corruption.0 =
                             (corruption.0 + ec.constants.magic.harvest_corruption_gain).min(1.0);
                         skills.herbcraft +=
@@ -10038,15 +10066,32 @@ fn resolve_forage_item(
                 };
                 let ing_modifiers =
                     crate::components::items::ItemModifiers::with_corruption(forage_corruption);
-                commands.spawn((
-                    crate::components::items::Item::with_modifiers(
-                        ing,
-                        1.0,
-                        crate::components::items::ItemLocation::OnGround,
-                        ing_modifiers,
-                    ),
-                    *pos,
-                ));
+                // Ticket 482: herbcraft-ingredient drop sourced through
+                // the items-are-real gate. `AlwaysGround` policy — the
+                // cat is foraging the primary catch (already sourced
+                // above via ForageCatchSource); the ingredient is a
+                // tile-side world emission, not a pickup. Inventory
+                // stays `Some(&mut *inventory)` for consistency with
+                // sibling sites, but the policy bypasses it.
+                use crate::components::item_gate::sources::ForageIngredientSource;
+                use crate::components::item_gate::{ItemSource, SourceCtx};
+                let ingredient_pos = *pos;
+                let outcome = ForageIngredientSource {
+                    kind: ing,
+                    modifiers: ing_modifiers,
+                }
+                .source(&mut SourceCtx {
+                    inventory: Some(&mut *inventory),
+                    commands: &mut *commands,
+                    default_position: ingredient_pos,
+                });
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    ForageIngredientSource::FEATURE,
+                );
+                // No `OverflowToGround` emission — `AlwaysGround` by
+                // construction; the canary stays meaningful only on
+                // `InventoryFirst` sites that overflow under pouch-full.
             }
 
             let item_name = if consumed_in_place {
