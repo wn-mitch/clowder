@@ -53,6 +53,7 @@ pub mod hunt_acquisition;
 pub mod hunt_deposit_chain;
 pub mod intention_momentum_pickup_lock;
 pub mod inventory_full_no_pickup;
+pub mod items_eat_from_own_inventory;
 pub mod kitten_cry;
 pub mod kittenhood_stages;
 pub mod lone_burial;
@@ -334,6 +335,11 @@ pub const ALL: &[&Scenario] = &[
     // `KittenBegged` fires within the 12-tick window and verifies the
     // per-stage marker authoring via the module's unit tests.
     &kittenhood_stages::SCENARIO,
+    // 429 — items-are-real Sink contract. Adult preloaded with food
+    // in pouch + hunger below `eat_from_inventory_threshold`. Asserts
+    // the slot drains, hunger rises, and `Feature::EatFromOwnInventory`
+    // fires — locking in the dispatcher → resolver → Feature chain.
+    &items_eat_from_own_inventory::SCENARIO,
 ];
 
 /// Look up a scenario by its `name` field.

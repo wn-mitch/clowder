@@ -15,10 +15,10 @@ _Last generated: 2026-05-27._
 | Status | Count |
 |---|---|
 | In progress | 4 |
-| Ready | 122 |
+| Ready | 121 |
 | Parked | 12 |
 | Blocked | 30 |
-| **Open total** | **168** |
+| **Open total** | **167** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,9 +40,9 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · score 0.91_
-- **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · score 0.90_
-- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.90_
+- **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · score 0.89_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.89_
+- **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · score 0.89_
 
 ## Epic progress (5)
 
@@ -50,7 +50,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
-| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 29 | 12 | 17 (0 / 14 / 3 / 0) | `▰▰▰▰▱▱▱▱▱▱` 41% |
+| **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 29 | 13 | 16 (0 / 13 / 3 / 0) | `▰▰▰▰▱▱▱▱▱▱` 45% |
 | **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 8 | 25 (1 / 17 / 5 / 2) | `▰▰▱▱▱▱▱▱▱▱` 24% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
@@ -63,7 +63,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 
-## Ready by cluster (122)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -122,7 +122,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · added 2026-05-26_
 - **[475](docs/open-work/tickets/475-current-role-query-helper-derive-active-role-from-existing-capability-markers-recent-action-history.md)** — Current-role query helper (derive active role from existing capability markers + recent action history) — _[social-coordination] · added 2026-05-26_
 
-### items-crafting (14 ready, 4 blocked)
+### items-crafting (13 ready, 4 blocked)
 
 - **[186](docs/open-work/tickets/186-add-effective-bevy-command-buffer-race.md)** — add_effective Bevy command-buffer race silently drops capacity_bonus on just-spawned items — _[items-crafting] · added 2026-05-06_
 - **[191](docs/open-work/tickets/191-picking-up-scavenging-tune.md)** — Tune PickingUp scavenge_urgency curve + add scenario test (185 follow-on) — _[items-crafting] · added 2026-05-06_
@@ -133,7 +133,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
 - **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
 - **[421](docs/open-work/tickets/421-central-material-pile-smart-material-deposit-routing.md)** — Central material pile + smart material-deposit routing — _[items-crafting] · added 2026-05-19_
-- **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
 - **[468](docs/open-work/tickets/468-craftatworkshop-recipe-not-satisfied-new-plan-failure-surface-post-465.md)** — CraftAtWorkshop recipe-not-satisfied — new plan-failure surface post-465 — _[items-crafting] · added 2026-05-25_
 - **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
@@ -339,7 +338,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (122)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -443,7 +442,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[421](docs/open-work/tickets/421-central-material-pile-smart-material-deposit-routing.md)** — Central material pile + smart material-deposit routing — _[items-crafting] · added 2026-05-19_
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 - **[426](docs/open-work/tickets/426-update-mate-eligibility-markers-event-driven-haseligiblemate-via-matingeligibilitychanged-message.md)** — update_mate_eligibility_markers event-driven HasEligibleMate via MatingEligibilityChanged Message — _[ai-substrate] · added 2026-05-19_
-- **[429](docs/open-work/tickets/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts — _[items-crafting] · added 2026-05-20_
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · added 2026-05-21_
@@ -512,14 +510,15 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (341)
+## Landed archive (342)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (275)
+### 2026-05 (276)
 
 - **[477](docs/open-work/landed/477-equipment-modifier-aggregation-fetch-modifiers-for-a-cat-from-369-classifiers-resolver-wiring-l2-trace-hook.md)** — Equipment-modifier aggregation: fetch modifiers for a cat from 369 classifiers + resolver wiring + L2-trace hook _(2026-05-27)_
 - **[463](docs/open-work/landed/463-craftitemaspiration-per-recipe-goalhaveitem-emission-threat-cueskillanti-monotony-scoring-retire-resolver-lex-pick.md)** — CraftItemAspiration: per-recipe Goal(HaveItem) emission + threat-cue/skill/anti-monotony scoring + retire resolver lex pick _(2026-05-27)_
+- **[429](docs/open-work/landed/429-items-are-real-gate-item-state-transitions-through-sourcetransfersink-contracts.md)** — Items-are-real: gate item-state transitions through Source/Transfer/Sink contracts _(2026-05-27)_
 - **[334](docs/open-work/landed/334-stealth-cloak-crafting-recipe-wearitem-resolver.md)** — Stealth-cloak crafting recipe + WearItem resolver _(2026-05-27)_
 - **[325](docs/open-work/landed/325-aspiration-milestone-wrapper-hunting.md)** — Hunting aspiration_milestone_wrapper + emits tables _(2026-05-27)_
 - **[017](docs/open-work/landed/017-anatomical-slot-inventory.md)** — Anatomical slot inventory _(2026-05-27)_
