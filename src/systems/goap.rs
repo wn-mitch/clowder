@@ -22,7 +22,7 @@ use crate::components::goap_plan::{
 };
 use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
-use crate::components::items::{Item, ItemKind, ItemLocation};
+use crate::components::items::{Item, ItemKind};
 use crate::components::magic::{Harvestable, Herb, HerbKind, Inventory, Ward};
 use crate::components::markers;
 use crate::components::mental::Memory;
@@ -1421,8 +1421,12 @@ pub fn evaluate_and_plan(
         Has<markers::HasMaterialsInInventory>,
         Has<markers::HasCuriosInInventory>,
         // 450: generic food-in-inventory marker for the Eat method cascade
-        // ([BegForFood] requires `¬HasFoodInInventory`) and 429 Phase 2's
-        // `EatFromOwnInventoryDse` eligibility filter.
+        // ([BegForFood] requires `¬HasFoodInInventory`); a 429 follow-on
+        // will extend `EatDse`'s eligibility filter to ALSO accept this
+        // marker so the planner builds the 1-step `[EatFromOwnInventory]`
+        // chain when pocket food is present. 429 itself scopes the
+        // items-are-real Sink contract; the GOAP-side wiring is balance
+        // work that follows separately.
         Has<markers::HasFoodInInventory>,
     )>,
     // §4.2 State markers — split into a separate query so the per-cat
@@ -8810,7 +8814,8 @@ fn resolve_search_prey(
     // `resolve_hunt_target`.
     scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> crate::steps::StepResult {
-    use crate::components::magic::ItemSlot;
+    use crate::components::item_gate::sources::DenRaidCarcassSource;
+    use crate::components::item_gate::{ItemSource, SourceCtx, SourcePlacement};
 
     // Den discovery check.
     for (den_entity, den, den_pos) in den_query.iter() {
@@ -8833,21 +8838,31 @@ fn resolve_search_prey(
                 let den_mods =
                     crate::components::items::ItemModifiers::with_corruption(den_corruption);
                 for _ in 0..kills {
-                    if !inventory.is_full() {
-                        inventory.pouch.push(ItemSlot::new(drop_item, den_mods));
-                    } else {
-                        commands.spawn((
-                            crate::components::items::Item::with_modifiers(
-                                drop_item,
-                                d.den_dropped_item_quality,
-                                ItemLocation::OnGround,
-                                den_mods,
-                            ),
-                            Position::new(
-                                den_pos_copy.x + rng.rng.random_range(-1..=1i32),
-                                den_pos_copy.y + rng.rng.random_range(-1..=1i32),
-                            ),
-                        ));
+                    let ground_position = Position::new(
+                        den_pos_copy.x + rng.rng.random_range(-1..=1i32),
+                        den_pos_copy.y + rng.rng.random_range(-1..=1i32),
+                    );
+                    let outcome = DenRaidCarcassSource {
+                        kind: drop_item,
+                        modifiers: den_mods,
+                        ground_quality: d.den_dropped_item_quality,
+                        ground_position,
+                    }
+                    .source(&mut SourceCtx {
+                        inventory: &mut *inventory,
+                        commands: &mut *commands,
+                        default_position: ground_position,
+                    });
+                    outcome.record_if_witnessed(
+                        narr.activation.as_deref_mut(),
+                        DenRaidCarcassSource::FEATURE,
+                    );
+                    if matches!(outcome.witness, Some(SourcePlacement::Ground { .. })) {
+                        if let Some(act) = narr.activation.as_deref_mut() {
+                            act.record(
+                                crate::resources::system_activation::Feature::OverflowToGround,
+                            );
+                        }
                     }
                 }
 
@@ -9187,7 +9202,6 @@ fn resolve_engage_prey(
     combat: &crate::resources::sim_constants::CombatConstants,
     focal_sink: Option<&crate::resources::trace_log::FocalResolverSink>,
 ) -> crate::steps::StepResult {
-    use crate::components::magic::ItemSlot;
     use crate::components::prey::PreyAiState;
 
     let Some(target_entity) = state.target_entity else {
@@ -9432,32 +9446,30 @@ fn resolve_engage_prey(
                 if let Some(act) = narr.activation.as_deref_mut() {
                     act.record(crate::resources::system_activation::Feature::FoodEaten);
                 }
-            } else if !inventory.is_full() {
-                // Inventory has room — slot-push directly. Inventory
-                // slots are value-typed `(kind, modifiers)` so no
-                // entity is needed when the catch goes straight in.
-                inventory.pouch.push(ItemSlot::new(item_kind, modifiers));
             } else {
-                // 176: inventory full and not self-eating. Pre-fix,
-                // this arm silently dropped the catch (the prey
-                // entity was already despawned at line 5320 above
-                // and no replacement was created — items-are-real
-                // violation). Now spawn a real carcass `Item` entity
-                // at `prey_pos` so the catch persists in the world;
-                // a future cat can plan `Action::PickUp` to retrieve
-                // it (or wildlife can scavenge once the death-stamp
-                // surface lands).
-                commands.spawn((
-                    crate::components::items::Item::with_modifiers(
-                        item_kind,
-                        1.0,
-                        crate::components::items::ItemLocation::OnGround,
-                        modifiers,
-                    ),
-                    prey_pos,
-                ));
-                if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(crate::resources::system_activation::Feature::OverflowToGround);
+                // Ticket 429: items-are-real Source gate. The trait's
+                // default push-or-overflow body unifies the prior
+                // explicit if/else (inventory-push vs ground-spawn at
+                // `prey_pos`). `OverflowToGround` is emitted in
+                // addition to the gate's own Feature when the ground
+                // arm fires.
+                use crate::components::item_gate::sources::HuntCatchSource;
+                use crate::components::item_gate::{ItemSource, SourceCtx, SourcePlacement};
+                let outcome = HuntCatchSource {
+                    kind: item_kind,
+                    modifiers,
+                }
+                .source(&mut SourceCtx {
+                    inventory: &mut *inventory,
+                    commands: &mut *commands,
+                    default_position: prey_pos,
+                });
+                outcome
+                    .record_if_witnessed(narr.activation.as_deref_mut(), HuntCatchSource::FEATURE);
+                if matches!(outcome.witness, Some(SourcePlacement::Ground { .. })) {
+                    if let Some(act) = narr.activation.as_deref_mut() {
+                        act.record(crate::resources::system_activation::Feature::OverflowToGround);
+                    }
                 }
             }
 
@@ -9471,25 +9483,32 @@ fn resolve_engage_prey(
             // origin, so a corrupted catch yields corrupted byproducts.
             // Byproducts are non-food (`is_food() == false`), so the
             // self-eat branch is structurally inapplicable.
+            //
+            // Ticket 429: HuntByproductSource trait dispatch. Reuses
+            // the existing `ByproductSpawned` Positive canary (375) as
+            // its FEATURE so this site emits 1:1 with prior behavior;
+            // `OverflowToGround` fires additionally when the trait's
+            // overflow arm trips.
             for &byp_kind in prey_byproducts.for_kind(prey_kind) {
-                if !inventory.is_full() {
-                    inventory.pouch.push(ItemSlot::new(byp_kind, modifiers));
-                } else {
-                    commands.spawn((
-                        crate::components::items::Item::with_modifiers(
-                            byp_kind,
-                            1.0,
-                            crate::components::items::ItemLocation::OnGround,
-                            modifiers,
-                        ),
-                        prey_pos,
-                    ));
+                use crate::components::item_gate::sources::HuntByproductSource;
+                use crate::components::item_gate::{ItemSource, SourceCtx, SourcePlacement};
+                let outcome = HuntByproductSource {
+                    kind: byp_kind,
+                    modifiers,
+                }
+                .source(&mut SourceCtx {
+                    inventory: &mut *inventory,
+                    commands: &mut *commands,
+                    default_position: prey_pos,
+                });
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    HuntByproductSource::FEATURE,
+                );
+                if matches!(outcome.witness, Some(SourcePlacement::Ground { .. })) {
                     if let Some(act) = narr.activation.as_deref_mut() {
                         act.record(crate::resources::system_activation::Feature::OverflowToGround);
                     }
-                }
-                if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(crate::resources::system_activation::Feature::ByproductSpawned);
                 }
             }
 
@@ -9899,7 +9918,6 @@ fn resolve_forage_item(
     commands: &mut Commands,
 ) -> crate::steps::StepResult {
     use crate::components::items::ItemKind;
-    use crate::components::magic::ItemSlot;
 
     let (mut dx, mut dy) = state.patrol_dir;
     if dx == 0 && dy == 0 {
@@ -9960,27 +9978,30 @@ fn resolve_forage_item(
                 if let Some(act) = narr.activation.as_deref_mut() {
                     act.record(crate::resources::system_activation::Feature::FoodEaten);
                 }
-            } else if !inventory.is_full() {
-                inventory.pouch.push(ItemSlot::new(item_kind, modifiers));
             } else {
-                // 176: inventory full. Pre-fix, this arm silently
-                // skipped — no item was ever spawned, the foraged
-                // resource was lost. Now spawn a real `Item` entity
-                // at the forage location so the resource persists
-                // in the world; a future cat can plan `Action::PickUp`
-                // (or the existing forage path can revisit if the
-                // ground-item zone is plumbed in).
-                commands.spawn((
-                    crate::components::items::Item::with_modifiers(
-                        item_kind,
-                        1.0,
-                        crate::components::items::ItemLocation::OnGround,
-                        modifiers,
-                    ),
-                    *pos,
-                ));
-                if let Some(act) = narr.activation.as_deref_mut() {
-                    act.record(crate::resources::system_activation::Feature::OverflowToGround);
+                // Ticket 429: items-are-real Source gate. The trait's
+                // default push-or-overflow body unifies the prior
+                // inventory-push vs ground-spawn arms.
+                use crate::components::item_gate::sources::ForageCatchSource;
+                use crate::components::item_gate::{ItemSource, SourceCtx, SourcePlacement};
+                let forage_pos = *pos;
+                let outcome = ForageCatchSource {
+                    kind: item_kind,
+                    modifiers,
+                }
+                .source(&mut SourceCtx {
+                    inventory: &mut *inventory,
+                    commands: &mut *commands,
+                    default_position: forage_pos,
+                });
+                outcome.record_if_witnessed(
+                    narr.activation.as_deref_mut(),
+                    ForageCatchSource::FEATURE,
+                );
+                if matches!(outcome.witness, Some(SourcePlacement::Ground { .. })) {
+                    if let Some(act) = narr.activation.as_deref_mut() {
+                        act.record(crate::resources::system_activation::Feature::OverflowToGround);
+                    }
                 }
             }
             skills.foraging += skills.growth_rate() * d.forage_skill_growth;

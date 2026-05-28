@@ -402,14 +402,18 @@ impl HasHerbsInInventory {
 /// `items::update_inventory_markers`. Read by:
 /// - the HTN method `[BegForFood]`'s `ApplicableWhen::Kitten ∧
 ///   ¬HasFoodInInventory` (a kitten with food doesn't beg);
-/// - 429 Phase 2's `EatFromOwnInventoryDse` eligibility filter
-///   (`.require(HasFoodInInventory::KEY).forbid(Incapacitated::KEY)`).
+/// - a follow-on to 429 will extend `EatDse`'s eligibility filter via
+///   a new `require_any` API so the planner builds the 1-step
+///   `[EatFromOwnInventory]` chain when pocket food is present
+///   (rather than the 2-step `[TravelTo(Stores), EatAtStores]`).
+///   429's scope is the items-are-real substrate contract; the
+///   GOAP-side wiring is a separate balance change.
 ///
 /// Distinct from the existing slot-kind markers (`HasRawFishInInventory`,
 /// `HasRawMeatInInventory`, …) which gate preservation-chain DSEs on
 /// specific raw inputs — this marker fires on *any* food, the way
 /// "cat carries something it could eat" is the right perceptual axis
-/// for the Eat-aspiration's method cascade and the eat-Sink DSE.
+/// for the Eat-aspiration's method cascade and the eat-Sink resolver.
 #[derive(Component, Debug, Clone, Copy)]
 pub struct HasFoodInInventory;
 impl HasFoodInInventory {

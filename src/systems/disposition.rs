@@ -3205,7 +3205,8 @@ pub fn resolve_disposition_chains(
         // before taking the mutable step borrow below.
         if let Some(step_ref) = chain.steps.get(chain.current_step) {
             if matches!(step_ref.kind, StepKind::HuntPrey { .. }) {
-                use crate::components::magic::ItemSlot;
+                use crate::components::item_gate::sources::DenRaidCarcassSource;
+                use crate::components::item_gate::{ItemSource, SourceCtx, SourcePlacement};
                 let mut found_den = false;
                 for (den_entity, den, den_pos) in den_query.iter() {
                     if pos.manhattan_distance(den_pos) <= d.den_discovery_range {
@@ -3230,21 +3231,31 @@ pub fn resolve_disposition_chains(
                                 den_corruption,
                             );
                             for _ in 0..kills {
-                                if !inventory.is_full() {
-                                    inventory.pouch.push(ItemSlot::new(drop_item, den_mods));
-                                } else {
-                                    commands.spawn((
-                                        crate::components::items::Item::with_modifiers(
-                                            drop_item,
-                                            d.den_dropped_item_quality,
-                                            crate::components::items::ItemLocation::OnGround,
-                                            den_mods,
-                                        ),
-                                        Position::new(
-                                            den_pos_copy.x + rng.rng.random_range(-1..=1i32),
-                                            den_pos_copy.y + rng.rng.random_range(-1..=1i32),
-                                        ),
-                                    ));
+                                let ground_position = Position::new(
+                                    den_pos_copy.x + rng.rng.random_range(-1..=1i32),
+                                    den_pos_copy.y + rng.rng.random_range(-1..=1i32),
+                                );
+                                let source = DenRaidCarcassSource {
+                                    kind: drop_item,
+                                    modifiers: den_mods,
+                                    ground_quality: d.den_dropped_item_quality,
+                                    ground_position,
+                                };
+                                let outcome = source.source(&mut SourceCtx {
+                                    inventory: &mut inventory,
+                                    commands: &mut commands,
+                                    default_position: ground_position,
+                                });
+                                outcome.record_if_witnessed(
+                                    narr.activation.as_deref_mut(),
+                                    DenRaidCarcassSource::FEATURE,
+                                );
+                                if matches!(outcome.witness, Some(SourcePlacement::Ground { .. })) {
+                                    if let Some(act) = narr.activation.as_deref_mut() {
+                                        act.record(
+                                            crate::resources::system_activation::Feature::OverflowToGround,
+                                        );
+                                    }
                                 }
                             }
 
@@ -3674,7 +3685,6 @@ fn dispatch_chain_step(
             // Phase is implicit from step.target_entity:
             //   None = Search (scent-based) or Approach (scent locked)
             //   Some = Stalk/Pounce (prey visible)
-            use crate::components::magic::ItemSlot;
             use crate::components::prey::PreyAiState;
 
             if let Some(target_entity) = step.target_entity {
@@ -3745,6 +3755,13 @@ fn dispatch_chain_step(
                         * density_bonus;
 
                     if rng.rng.random::<f32>() < success_chance {
+                        use crate::components::item_gate::sources::{
+                            HuntByproductSource, HuntCatchSource,
+                        };
+                        use crate::components::item_gate::{
+                            ItemSource, SourceCtx, SourcePlacement,
+                        };
+
                         // Catch!
                         commands.entity(target_entity).despawn();
                         let catch_corruption = if map.in_bounds(prey_pos.x, prey_pos.y) {
@@ -3752,14 +3769,34 @@ fn dispatch_chain_step(
                         } else {
                             0.0
                         };
+                        let modifiers = crate::components::items::ItemModifiers::with_corruption(
+                            catch_corruption,
+                        );
 
-                        if !inventory.is_full() {
-                            inventory.pouch.push(ItemSlot::new(
-                                item_kind,
-                                crate::components::items::ItemModifiers::with_corruption(
-                                    catch_corruption,
-                                ),
-                            ));
+                        // Ticket 429: items-are-real Source gate. Pre-429
+                        // this site silently dropped on inventory-full;
+                        // the trait's default push-or-overflow body now
+                        // spawns a ground carcass at `prey_pos`,
+                        // matching the canonical goap.rs catch path.
+                        let outcome = HuntCatchSource {
+                            kind: item_kind,
+                            modifiers,
+                        }
+                        .source(&mut SourceCtx {
+                            inventory: &mut *inventory,
+                            commands: &mut *commands,
+                            default_position: prey_pos,
+                        });
+                        outcome.record_if_witnessed(
+                            narr.activation.as_deref_mut(),
+                            HuntCatchSource::FEATURE,
+                        );
+                        if matches!(outcome.witness, Some(SourcePlacement::Ground { .. })) {
+                            if let Some(act) = narr.activation.as_deref_mut() {
+                                act.record(
+                                    crate::resources::system_activation::Feature::OverflowToGround,
+                                );
+                            }
                         }
 
                         // 367 Commit 6 — organ-drop substrate. After
@@ -3791,9 +3828,25 @@ fn dispatch_chain_step(
                                     catch_corruption,
                                 );
                             organ_modifiers.from_organ = true;
-                            inventory
-                                .pouch
-                                .push(ItemSlot::new(ItemKind::RawOrgan, organ_modifiers));
+                            // 367 design preserved: organ Source fires
+                            // only when inventory has room (the guard
+                            // above), so the trait's overflow arm
+                            // never trips here. `ByproductSpawned`
+                            // (HuntByproductSource::FEATURE) fires
+                            // for the items-are-real witness.
+                            let outcome = HuntByproductSource {
+                                kind: ItemKind::RawOrgan,
+                                modifiers: organ_modifiers,
+                            }
+                            .source(&mut SourceCtx {
+                                inventory: &mut *inventory,
+                                commands: &mut *commands,
+                                default_position: prey_pos,
+                            });
+                            outcome.record_if_witnessed(
+                                narr.activation.as_deref_mut(),
+                                HuntByproductSource::FEATURE,
+                            );
                         }
 
                         skills.hunting += skills.growth_rate() * d.hunt_catch_skill_growth;
@@ -4162,8 +4215,9 @@ fn dispatch_chain_step(
                 if forage_yield > 0.0
                     && rng.rng.random::<f32>() < forage_yield * d.forage_yield_scale
                 {
+                    use crate::components::item_gate::sources::ForageCatchSource;
+                    use crate::components::item_gate::{ItemSource, SourceCtx, SourcePlacement};
                     use crate::components::items::ItemKind;
-                    use crate::components::magic::ItemSlot;
                     let item_kind = match tile.terrain {
                         Terrain::DenseForest => {
                             if rng.rng.random::<bool>() {
@@ -4192,13 +4246,32 @@ fn dispatch_chain_step(
                     } else {
                         0.0
                     };
-                    if !inventory.is_full() {
-                        inventory.pouch.push(ItemSlot::new(
-                            item_kind,
-                            crate::components::items::ItemModifiers::with_corruption(
-                                forage_corruption,
-                            ),
-                        ));
+                    // Ticket 429: items-are-real Source gate. Pre-429
+                    // this site silently dropped on inventory-full;
+                    // trait push-or-overflow now spawns a ground item
+                    // at the forage tile.
+                    let forage_pos = *pos;
+                    let outcome = ForageCatchSource {
+                        kind: item_kind,
+                        modifiers: crate::components::items::ItemModifiers::with_corruption(
+                            forage_corruption,
+                        ),
+                    }
+                    .source(&mut SourceCtx {
+                        inventory: &mut *inventory,
+                        commands: &mut *commands,
+                        default_position: forage_pos,
+                    });
+                    outcome.record_if_witnessed(
+                        narr.activation.as_deref_mut(),
+                        ForageCatchSource::FEATURE,
+                    );
+                    if matches!(outcome.witness, Some(SourcePlacement::Ground { .. })) {
+                        if let Some(act) = narr.activation.as_deref_mut() {
+                            act.record(
+                                crate::resources::system_activation::Feature::OverflowToGround,
+                            );
+                        }
                     }
                     skills.foraging += skills.growth_rate() * d.forage_skill_growth;
                     {
