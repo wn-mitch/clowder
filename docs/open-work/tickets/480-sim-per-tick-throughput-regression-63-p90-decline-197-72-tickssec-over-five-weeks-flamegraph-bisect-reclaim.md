@@ -124,12 +124,15 @@ allocation hotspots — scratch-buffer reuse).
   Lazy / event-driven eviction is the dominant lever.
 
 ## Children (open)
-- **485** — track_sustained_copresence per-tick BTreeMap retains (25.4% inclusive)
 - **486** — update_near_pair_cache death-retain via CatDied (13.3% inclusive)
 - **459** — retire author_joint_intentions per-tick hot path (22.8% inclusive,
-  down from 40% on 05-23 — partial taming already)
+  down from 40% on 05-23 — partial taming already; now top knife at 25.4%
+  share post-485)
 - **205** — social_status_distress O(N²) (4.2% inclusive at HEAD — smaller
   than originally reported; reconfirm methodology before fixing)
 
 ## Children (landed against this epic)
-- _(none yet)_
+- **485** — track_sustained_copresence lazy + `last_touched_tick`
+  (landed-at `d82cd645`, 2026-05-28). Inclusive 25.37% → 12.44%; 60s
+  throughput 122.8 → 141.1 t/s (+14.9%). Behavior-preserving (byte-identical
+  event stream in common tick range).
