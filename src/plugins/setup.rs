@@ -475,7 +475,11 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
         };
 
         let needs = Needs::staggered(i, cat_count);
-        let fulfillment = Fulfillment::staggered(i, cat_count);
+        // Ticket 488 — founder Fulfillment uses the warm-floor variant
+        // (social_warmth [0.85, 1.0]) so the day-1 GroomOther SELF
+        // driver doesn't fire on a fictitious 30-50% spawn deficit.
+        // Mirrors b24d333b's warm-floor Relationships init pattern.
+        let fulfillment = Fulfillment::founder(i, cat_count);
         let position = Position::new(spawn_x, spawn_y);
         let entity = spawn_cat_from_blueprint(world, cat, position, needs, fulfillment);
         entity_ids.push(entity);

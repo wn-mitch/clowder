@@ -8,7 +8,7 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-05-29._
+_Last generated: 2026-05-30._
 
 ## Summary
 
@@ -39,10 +39,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.91_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.90_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
@@ -514,12 +514,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (348)
+## Landed archive (349)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (282)
+### 2026-05 (283)
 
+- **[488](docs/open-work/landed/488-warm-floor-founder-fulfillment-init-lift-social-warmth-spawn-floor-to-extinguish-day-1-groomother-driver.md)** — warm-floor founder Fulfillment init — lift social_warmth spawn floor to extinguish day-1 GroomOther driver _(2026-05-30)_
 - **[487](docs/open-work/landed/487-groomother-cuddle-puddle-gate-hassocialtarget-on-hasgroomcandidate-target-peer-predicate.md)** — GroomOther cuddle puddle — gate HasSocialTarget on HasGroomCandidate target-peer predicate _(2026-05-29)_
 - **[485](docs/open-work/landed/485-track-sustained-copresence-per-tick-btreemap-retains-event-driven-eviction-25-percent-inclusive-cpu-at-head-480-child.md)** — track_sustained_copresence per-tick BTreeMap retains — event-driven eviction (25 percent inclusive CPU at HEAD, 480 child) _(2026-05-28)_
 - **[482](docs/open-work/landed/482-promote-remaining-source-shaped-inline-pushes-harvestcarcass-forageingredient-preservation-rack-output.md)** — Promote remaining Source-shaped inline pushes — HarvestCarcass / ForageIngredient / Preservation rack output _(2026-05-28)_

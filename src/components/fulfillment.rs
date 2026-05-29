@@ -80,6 +80,38 @@ impl Fulfillment {
             body_condition: 1.0,
         }
     }
+
+    /// Ticket 488 — founder spawn value. Mirrors `newborn()`'s
+    /// architectural reasoning: founders arrive at the colony site
+    /// from a prior established social context, not from isolation,
+    /// so their `social_warmth` bank should reflect that history.
+    /// Without this, founders spawn 30-50% socially-warmth-deficient
+    /// via the `staggered` [0.5, 0.7] range — and the
+    /// `GroomOtherDse.social_warmth_deficit` axis honestly responds by
+    /// driving day-1 chain-grooming dominance (the "cuddle puddle"
+    /// that ticket 487 narrowed at the eligibility/resolver layer
+    /// without touching the SELF need driver). Pairs with b24d333b's
+    /// warm-floor founder `Relationships` init — same architectural
+    /// fiction ("not strangers, came from somewhere"), applied to
+    /// the second substrate bank that encodes that fiction.
+    ///
+    /// `[0.85, 1.0]` staggered the same shape as `staggered()` so
+    /// per-cat phase offset is preserved (avoids same-tick mass-
+    /// threshold-crossings — the original `staggered` rationale).
+    /// Single-cat group falls back to 0.95 (mid-range), mirroring
+    /// `staggered`'s `default()` fallback shape.
+    pub fn founder(index: usize, group_size: usize) -> Self {
+        let social_warmth = if group_size > 1 {
+            let t = index as f32 / (group_size - 1) as f32;
+            1.0 - t * 0.15 // [1.0, 0.85]
+        } else {
+            0.95
+        };
+        Self {
+            social_warmth,
+            body_condition: 1.0,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +172,53 @@ mod tests {
         let f = Fulfillment::newborn();
         assert!((f.social_warmth - 0.9).abs() < f32::EPSILON);
         assert!((f.body_condition - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn founder_spawns_with_low_social_warmth_deficit() {
+        // Ticket 488 — every founder in a typical clowder must spawn
+        // with `social_warmth_deficit <= 0.15` so the
+        // `GroomOtherDse.social_warmth_deficit` consideration
+        // contributes at floor (Linear(1.0, 0.1) → ~0.25), not as a
+        // moderate-driver (~0.5 under the pre-488 staggered
+        // [0.3, 0.5] deficit range). Below the floor, the day-1
+        // GroomOther chain-grooming pressure has no SELF-state push.
+        for n in [1usize, 5, 10] {
+            for i in 0..n {
+                let f = Fulfillment::founder(i, n);
+                assert!(
+                    f.social_warmth_deficit() <= 0.15,
+                    "founder(i={i}, n={n}) deficit={} > 0.15",
+                    f.social_warmth_deficit()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn founder_staggers_across_group() {
+        // Stagger preserved (avoids same-tick mass-threshold-crossings
+        // — the original `staggered` rationale). First and last cat
+        // in a 5-cat clowder must differ.
+        let first = Fulfillment::founder(0, 5);
+        let last = Fulfillment::founder(4, 5);
+        assert!(
+            first.social_warmth > last.social_warmth,
+            "founder stagger lost: first={} last={}",
+            first.social_warmth,
+            last.social_warmth
+        );
+        assert!((first.social_warmth - 1.0).abs() < f32::EPSILON);
+        assert!((last.social_warmth - 0.85).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn founder_single_cat_uses_midpoint() {
+        // Mirror the `staggered_single_cat_uses_default` shape:
+        // single-cat group has no spread, so use a mid-range value
+        // rather than the boundary.
+        let f = Fulfillment::founder(0, 1);
+        assert!((f.social_warmth - 0.95).abs() < f32::EPSILON);
     }
 
     #[test]
