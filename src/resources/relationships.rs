@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
+use crate::resources::sim_constants::RelationshipsConstants;
+
 // ---------------------------------------------------------------------------
 // BondType
 // ---------------------------------------------------------------------------
@@ -149,12 +151,24 @@ impl Relationships {
         self.data.insert(normalize_key(a, b), rel);
     }
 
-    /// Initialize a relationship between two cats with randomized starting values
-    /// appropriate for a newly-formed colony.
-    pub fn init_pair(&mut self, a: Entity, b: Entity, rng: &mut impl Rng) {
+    /// Initialize a relationship between two cats with randomized starting
+    /// values from `RelationshipsConstants`. Founder graphs straddle the
+    /// Friends-graduation gate (`SocialConstants::friends_familiarity_threshold`)
+    /// so a fraction of pairs graduate to BondType::Friends on the first
+    /// `bond_check_interval` firing — encoding founder heterogeneity through
+    /// the existing bond-check flow rather than setup-time bond magic.
+    pub fn init_pair(
+        &mut self,
+        a: Entity,
+        b: Entity,
+        rng: &mut impl Rng,
+        constants: &RelationshipsConstants,
+    ) {
         let rel = Relationship {
-            fondness: rng.random_range(-0.2f32..0.3f32),
-            familiarity: rng.random_range(0.1f32..0.3f32),
+            fondness: rng
+                .random_range(constants.founder_fondness_min..constants.founder_fondness_max),
+            familiarity: rng
+                .random_range(constants.founder_familiarity_min..constants.founder_familiarity_max),
             romantic: 0.0,
             bond: None,
             last_interaction: 0,
@@ -189,7 +203,7 @@ mod tests {
     fn get_returns_same_for_either_order() {
         let (a, b) = test_entities();
         let mut rels = Relationships::default();
-        rels.init_pair(a, b, &mut rand::rng());
+        rels.init_pair(a, b, &mut rand::rng(), &RelationshipsConstants::default());
 
         let fondness_ab = rels.get(a, b).unwrap().fondness;
         let fondness_ba = rels.get(b, a).unwrap().fondness;
@@ -242,10 +256,11 @@ mod tests {
         let b = world.spawn_empty().id();
         let c = world.spawn_empty().id();
 
+        let constants = RelationshipsConstants::default();
         let mut rels = Relationships::default();
-        rels.init_pair(a, b, &mut rand::rng());
-        rels.init_pair(a, c, &mut rand::rng());
-        rels.init_pair(b, c, &mut rand::rng());
+        rels.init_pair(a, b, &mut rand::rng(), &constants);
+        rels.init_pair(a, c, &mut rand::rng(), &constants);
+        rels.init_pair(b, c, &mut rand::rng(), &constants);
 
         let a_rels = rels.all_for(a);
         assert_eq!(a_rels.len(), 2, "entity a should have 2 relationships");
@@ -264,22 +279,25 @@ mod tests {
 
         let mut world = World::new();
         let mut rng = ChaCha8Rng::seed_from_u64(42);
+        let constants = RelationshipsConstants::default();
 
         for _ in 0..100 {
             let a = world.spawn_empty().id();
             let b = world.spawn_empty().id();
 
             let mut rels = Relationships::default();
-            rels.init_pair(a, b, &mut rng);
+            rels.init_pair(a, b, &mut rng, &constants);
 
             let rel = rels.get(a, b).unwrap();
             assert!(
-                (-0.2..0.3).contains(&rel.fondness),
+                (constants.founder_fondness_min..constants.founder_fondness_max)
+                    .contains(&rel.fondness),
                 "fondness {} out of range",
                 rel.fondness,
             );
             assert!(
-                (0.1..0.3).contains(&rel.familiarity),
+                (constants.founder_familiarity_min..constants.founder_familiarity_max)
+                    .contains(&rel.familiarity),
                 "familiarity {} out of range",
                 rel.familiarity,
             );

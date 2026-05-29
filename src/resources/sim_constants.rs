@@ -128,6 +128,13 @@ pub struct SimConstants {
     /// deserialize cleanly.
     #[serde(default)]
     pub play_cue_emission: PlayCueEmissionConstants,
+    /// Founder relationship init — fondness / familiarity floors authored
+    /// by `Relationships::init_pair` at world setup. Lifted off cold-strangers
+    /// random `[-0.2, 0.3)` × `[0.1, 0.3)` to encode the design intent that
+    /// founders share history. `#[serde(default)]` so pre-existing event-log
+    /// headers deserialize cleanly.
+    #[serde(default)]
+    pub relationships: RelationshipsConstants,
 }
 
 // ---------- NeedsConstants ----------
@@ -1221,6 +1228,43 @@ impl Default for SocialConstants {
             // it is the same gate as befriending it.
             befriend_familiarity_threshold: 0.6,
             befriend_familiarity_hysteresis: 0.1,
+        }
+    }
+}
+
+// ---------- RelationshipsConstants ----------
+
+/// Founder-pair init distribution for `Relationships::init_pair`. Authored
+/// at world setup; not consulted after. Floors are chosen so that familiarity
+/// straddles `SocialConstants::friends_familiarity_threshold` (0.4) — the
+/// natural bond_check graduation gate — so some founder pairs land Friends on
+/// the first 50-tick check while others remain unbonded, encoding founder
+/// heterogeneity without setup-time bond magic.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RelationshipsConstants {
+    pub founder_fondness_min: f32,
+    pub founder_fondness_max: f32,
+    pub founder_familiarity_min: f32,
+    pub founder_familiarity_max: f32,
+}
+
+impl Default for RelationshipsConstants {
+    fn default() -> Self {
+        Self {
+            // Lift fondness off the random `[-0.2, 0.3)` distribution — the
+            // negative tail (~30% of pairs spawning mildly hostile) encodes
+            // a "stranger gathering" world that the design rejects.
+            founder_fondness_min: 0.1,
+            founder_fondness_max: 0.4,
+            // Lift familiarity off `[0.1, 0.3)` to straddle the Friends
+            // graduation gate (0.4): pairs with familiarity ≥ 0.4 AND
+            // fondness ≥ 0.3 graduate to BondType::Friends at the next
+            // bond_check_interval (50 ticks). This collapses the
+            // socialize_target novelty axis (1 - familiarity) from
+            // [0.7, 0.9) to [0.4, 0.6), removing the spawn-time
+            // "everyone is maximally novel" cuddle-puddle attractor.
+            founder_familiarity_min: 0.4,
+            founder_familiarity_max: 0.6,
         }
     }
 }

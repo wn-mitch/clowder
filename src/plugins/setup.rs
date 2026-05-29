@@ -483,11 +483,15 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
 
     // Initialize relationships between all pairs.
     {
+        let rel_consts = world
+            .resource::<crate::resources::SimConstants>()
+            .relationships
+            .clone();
         let mut relationships = Relationships::default();
         let mut rng = world.resource_mut::<SimRng>();
         for i in 0..entity_ids.len() {
             for j in (i + 1)..entity_ids.len() {
-                relationships.init_pair(entity_ids[i], entity_ids[j], &mut rng.rng);
+                relationships.init_pair(entity_ids[i], entity_ids[j], &mut rng.rng, &rel_consts);
             }
         }
         world.insert_resource(relationships);

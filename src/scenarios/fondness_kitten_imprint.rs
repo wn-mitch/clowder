@@ -62,9 +62,10 @@ fn setup(world: &mut World, seed: u64) {
     let mut rels = world.remove_resource::<Relationships>().unwrap_or_default();
     {
         let mut rng = world.resource_mut::<crate::resources::SimRng>();
-        rels.init_pair(mother, father, &mut rng.rng);
-        rels.init_pair(mother, kitten, &mut rng.rng);
-        rels.init_pair(father, kitten, &mut rng.rng);
+        let rel_consts = crate::resources::sim_constants::RelationshipsConstants::default();
+        rels.init_pair(mother, father, &mut rng.rng, &rel_consts);
+        rels.init_pair(mother, kitten, &mut rng.rng, &rel_consts);
+        rels.init_pair(father, kitten, &mut rng.rng, &rel_consts);
     }
     world.insert_resource(rels);
 }

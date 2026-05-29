@@ -90,7 +90,12 @@ fn setup(world: &mut World, seed: u64) {
     let mut rels = world.remove_resource::<Relationships>().unwrap_or_default();
     {
         let mut rng = world.resource_mut::<crate::resources::SimRng>();
-        rels.init_pair(affie, bondi, &mut rng.rng);
+        rels.init_pair(
+            affie,
+            bondi,
+            &mut rng.rng,
+            &crate::resources::sim_constants::RelationshipsConstants::default(),
+        );
     }
     world.insert_resource(rels);
 }
