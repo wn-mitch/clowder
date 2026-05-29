@@ -271,6 +271,17 @@ pub struct WorldStateQueries<'w, 's> {
     /// (e.g. door-slam), the Hide DSE's recency axis reads from this
     /// path instead of `PredatorBeliefs`.
     pub context_beliefs: Query<'w, 's, &'static crate::components::beliefs::ContextBeliefs>,
+    /// 487 — read-only `CurrentAction` lookup for cats with an active
+    /// `GoapPlan`, so `evaluate_and_plan` can identify "currently being
+    /// groomed" peers before authoring `HasGroomCandidate`. Disjoint
+    /// from the per-cat iteration query (which is `Without<GoapPlan>`)
+    /// and from the `held_intentions` / `held_goal_stacks` queries
+    /// (different components). Read-only; `resolve_goap_plans` writes
+    /// `CurrentAction` later in the schedule, so the values seen here
+    /// reflect last tick's executor resolution — appropriate for the
+    /// "who is being groomed right now" predicate.
+    pub groom_actor_query:
+        Query<'w, 's, (Entity, &'static CurrentAction), (With<GoapPlan>, Without<Dead>)>,
 }
 
 /// Bundles resources for evaluate_and_plan.
@@ -1703,6 +1714,32 @@ pub fn evaluate_and_plan(
         )
         .collect();
 
+    // 487 — peers mid-`GroomOther` (both the actor and the actor's
+    // `target_entity` last tick). Consumed by
+    // `viable_groom_candidate_for` below to mask chain-grooming
+    // participants out of every other cat's candidate set so a new
+    // cat doesn't join the pile while the chain is in flight. Both
+    // groomer AND groomee land in the set: the groomee is unavailable
+    // (receiving care), the groomer is unavailable (delivering it) —
+    // without both exclusions the pile survives by chain-extension,
+    // because a groomer-A is still a viable target for cat-C while
+    // A is busy grooming B. Read from `CurrentAction` (set last tick
+    // by `resolve_goap_plans`) over only cats `With<GoapPlan>`; cats
+    // currently planning (in this query) haven't started executing
+    // yet, so they can't be active groomers.
+    let currently_groomed: std::collections::HashSet<Entity> = {
+        let mut set = std::collections::HashSet::new();
+        for (actor, ca) in world_state.groom_actor_query.iter() {
+            if matches!(ca.action, Action::GroomOther) {
+                set.insert(actor);
+                if let Some(target) = ca.target_entity {
+                    set.insert(target);
+                }
+            }
+        }
+        set
+    };
+
     // Ticket 014 Mentoring batch — `has_mentoring_target_fn` closure
     // retired. The predicate now lives in
     // `aspirations::update_mentoring_target_markers`, the snapshot
@@ -2063,6 +2100,16 @@ pub fn evaluate_and_plan(
             entity,
             stores_reachable,
         );
+        // 487 — `HasGroomCandidate` author. Mirrors the structural
+        // shape of `HasFoodStorageAccessible` (484 precedent): a
+        // per-cat reachability marker authored from a colony-wide
+        // scan, required on the `GroomOtherDse` eligibility filter.
+        // See `viable_groom_candidate_for` for the predicate.
+        markers.set_entity(
+            markers::HasGroomCandidate::KEY,
+            entity,
+            viable_groom_candidate_for(entity, pos, &cat_positions, &currently_groomed),
+        );
         // Ticket 027 Bug 2 — HasEligibleMate authored by
         // `mating::update_mate_eligibility_markers`. Ticket 103 —
         // second tuple element is `Has<PairingActivity>`; carried out
@@ -2241,9 +2288,17 @@ pub fn evaluate_and_plan(
             });
         let (active_directive_action_ordinal, active_directive_bonus) =
             if let Ok(directive) = world_state.active_directive_query.get(entity) {
-                let fondness_factor = res
-                    .relationships
-                    .get(entity, directive.coordinator)
+                // 487 — colony-self directives carry `coordinator: None`.
+                // The fondness factor falls through to `fondness_default`
+                // (the same neutral midpoint a coordinator with no recorded
+                // relationship would yield); the social-weight multiplier
+                // already reflects the colony-self constant because
+                // `assess_colony_needs` writes
+                // `colony_self_directive_weight` into
+                // `coordinator_social_weight` at delivery time.
+                let fondness_factor = directive
+                    .coordinator
+                    .and_then(|c| res.relationships.get(entity, c))
                     .map_or(d.fondness_default, |r| (r.fondness + 1.0) / 2.0);
                 let bonus = directive.priority
                     * directive.coordinator_social_weight
@@ -3621,6 +3676,16 @@ struct StepSnapshots {
     season_mod: f32,
     builders_per_site: HashMap<Entity, usize>,
     cat_positions: Vec<(Entity, Position)>,
+    /// 487 follow-on — peers mid-`GroomOther` (both actor and that
+    /// actor's `target_entity`) at the start of this tick's
+    /// step-dispatch pass. Built once from `cats.iter()` so the
+    /// `resolve_groom_other_target` call at the GroomOther dispatch
+    /// arm can exclude in-flight pile participants symmetrically with
+    /// the `HasGroomCandidate` marker author at line 1734 — without
+    /// this, the marker gates eligibility on a non-groomed peer
+    /// existing, but the resolver could still pick a mid-groom peer
+    /// as the new target and extend the chain.
+    currently_groomed: std::collections::HashSet<Entity>,
     injured_cat_positions: Vec<(Entity, Position)>,
     cat_skills: HashMap<Entity, Skills>,
     cat_temperature: HashMap<Entity, f32>,
@@ -4087,6 +4152,30 @@ pub fn resolve_goap_plans(
     // haul→deliver→construct compose case where the marker still reads
     // false at plan entry.
     let herb_stash_radius = ec.constants.disposition.herb_stash_reachable_radius;
+    // 487 — planner-markers parity with `evaluate_and_plan`'s
+    // `HasGroomCandidate` author. Build `currently_groomed` and the
+    // colony-wide cat position snapshot from `cats` itself rather than
+    // a new SystemParam query. The position snapshot is identical to
+    // what `cats` iterates below; pre-collecting once avoids paying
+    // the query overhead per-cat in the marker loop.
+    let groom_cat_positions: Vec<(Entity, Position)> = cats
+        .iter()
+        .map(|((entity, _, _, pos, _, _, _, _, _, _), _)| (entity, *pos))
+        .collect();
+    // 487 — both groomer and groomee enter the set; see
+    // `evaluate_and_plan`'s analogous block for the reasoning.
+    let groom_currently_groomed: std::collections::HashSet<Entity> = {
+        let mut set = std::collections::HashSet::new();
+        for ((actor, _, current, _, _, _, _, _, _, _), _) in &cats {
+            if matches!(current.action, Action::GroomOther) {
+                set.insert(actor);
+                if let Some(target) = current.target_entity {
+                    set.insert(target);
+                }
+            }
+        }
+        set
+    };
     for ((entity, _, _, pos, _, _, inventory, _, _, _), _) in &cats {
         planner_markers.set_entity(
             markers::MaterialsAvailable::KEY,
@@ -4118,6 +4207,16 @@ pub fn resolve_goap_plans(
             markers::HasFoodStorageAccessible::KEY,
             entity,
             stores_reachable,
+        );
+        // 487 — `HasGroomCandidate` planner-markers parity with the
+        // `evaluate_and_plan` author site. Same predicate (see
+        // `viable_groom_candidate_for`) so the planner-replay path
+        // gates `GroomOtherDse` eligibility identically to the L2
+        // scoring path.
+        planner_markers.set_entity(
+            markers::HasGroomCandidate::KEY,
+            entity,
+            viable_groom_candidate_for(entity, pos, &groom_cat_positions, &groom_currently_groomed),
         );
     }
 
@@ -4213,6 +4312,22 @@ pub fn resolve_goap_plans(
             .iter()
             .map(|((e, _, _, pos, _, _, _, _, _, _), _)| (e, *pos))
             .collect(),
+        // 487 follow-on — pre-build the in-flight GroomOther set so the
+        // dispatch arm's `resolve_groom_other_target` call can exclude
+        // mid-groom peers symmetrically with the marker author. See
+        // `StepSnapshots::currently_groomed` doc-comment.
+        currently_groomed: {
+            let mut set = std::collections::HashSet::new();
+            for ((actor, _, current, _, _, _, _, _, _, _), _) in &cats {
+                if matches!(current.action, Action::GroomOther) {
+                    set.insert(actor);
+                    if let Some(target) = current.target_entity {
+                        set.insert(target);
+                    }
+                }
+            }
+            set
+        },
         injured_cat_positions: cats
             .iter()
             .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _, _, _))| {
@@ -5775,9 +5890,19 @@ fn dispatch_step_action(
     );
     if !skip_alive_gate {
         if let Some(target) = plan.step_state[step_idx].target_entity {
-            if let Err(reason) =
-                crate::systems::plan_substrate::validate_target(target, &ec.target_validity)
-            {
+            // 487 follow-on — `FeedKitten` targets newborn kittens
+            // who are themselves `Incapacitated` by design
+            // (incapacitation.rs ORs `Has<NewbornKitten>` into the
+            // marker). Without this carve-out the generic alive-gate
+            // rejects the very target the step exists to serve and
+            // surfaces 100+ false-positive `PlanStepFailed` events
+            // per 5-min soak.
+            let permit_incapacitated_newborn = matches!(action_kind, GoapActionKind::FeedKitten);
+            if let Err(reason) = crate::systems::plan_substrate::validate_target_for_step(
+                target,
+                permit_incapacitated_newborn,
+                &ec.target_validity,
+            ) {
                 // Failure name encodes the invalidity flavor for the
                 // narrative trace; the existing `PlanFailureReason::TargetDespawned`
                 // path consumes the failure regardless of subkind.
@@ -6269,6 +6394,7 @@ fn dispatch_step_action(
                             .target_failure_cooldown_ticks,
                         narr.activation.as_deref_mut(),
                         &mut ec.dse_scratchpad,
+                        Some(&snaps.currently_groomed),
                     );
             }
             // §7.W: construct a temporary Fulfillment for cats without the
@@ -10688,6 +10814,46 @@ fn herb_stash_accessible_for(pos: &Position, stores_positions: &[Position], radi
     stores_positions
         .iter()
         .any(|sp| pos.manhattan_distance(sp) <= radius)
+}
+
+/// 487 substrate authoring: returns whether at least one peer is a
+/// viable allogrooming target for `entity` at `pos`. Authors the per-
+/// cat `HasGroomCandidate` marker, which gates `GroomOtherDse`
+/// eligibility so the broad-phase `has_social_target` admission can't
+/// collapse the founder cohort into chain-grooming dominance (the
+/// "cuddle puddle" 484 unmasked).
+///
+/// Predicate mirrors the candidate-pool slice of
+/// `resolve_groom_other_target` (within
+/// `GROOM_OTHER_TARGET_RANGE` Manhattan tiles, excluding self) plus a
+/// narrowing the resolver doesn't apply at target-pick time:
+/// `currently_groomed` excludes peers who are themselves the target of
+/// another cat's in-flight `GroomOther` step. That makes the marker
+/// strictly stricter than the resolver — a cat won't *start* allo-
+/// grooming if every in-range peer is already mid-pile; existing
+/// chains still complete. Predicate stays cheap (one O(neighbors)
+/// HashSet probe per cat) so authoring is O(N²) worst-case across the
+/// colony, same as the existing `update_target_existence_markers`
+/// neighbor scan.
+///
+/// Does NOT filter `Incapacitated` peers here — the actor-side
+/// `forbid(Incapacitated)` on `GroomOtherDse` already handles the
+/// self-incapacitated case, and the target-side `temperature_lookup`
+/// in `resolve_groom_other_target` skips peers without `Needs`
+/// (dead / incapacitated → skipped at resolver time). Tightening the
+/// marker further is a follow-on if a verdict gate ever wants it.
+fn viable_groom_candidate_for(
+    entity: Entity,
+    pos: &Position,
+    cat_positions: &[(Entity, Position)],
+    currently_groomed: &std::collections::HashSet<Entity>,
+) -> bool {
+    let range = crate::ai::dses::groom_other_target::GROOM_OTHER_TARGET_RANGE as i32;
+    cat_positions.iter().any(|(other, other_pos)| {
+        *other != entity
+            && !currently_groomed.contains(other)
+            && pos.manhattan_distance(other_pos) <= range
+    })
 }
 
 #[allow(clippy::too_many_arguments)]

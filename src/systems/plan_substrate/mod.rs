@@ -54,7 +54,7 @@ pub use sensors::{
 pub use target::{
     carry_target_forward, expire_reservations, release_target, require_alive_and_unreserved_filter,
     require_alive_filter, require_unreserved_filter, reserve_target, validate_target,
-    TargetInvalidReason,
+    validate_target_for_step, TargetInvalidReason,
 };
 
 // ---------------------------------------------------------------------------

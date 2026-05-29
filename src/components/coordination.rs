@@ -96,11 +96,25 @@ pub struct DirectiveQueue {
     pub directives: Vec<Directive>,
 }
 
+/// 487 — Colony-self directive queue. Populated by `assess_colony_needs`
+/// when no `Coordinator`-tagged cat exists yet (the day-1 founder phase),
+/// so directives like Forage / Build / Cook can fire from the colony
+/// itself before an emergent coordinator is elected. Drained by
+/// `dispatch_urgent_directives` alongside per-coordinator queues. Cleared
+/// at the start of every assess cycle so the queue reflects the latest
+/// colony state — the colony-self path is fundamentally ephemeral
+/// (no in-flight memory across cycles, unlike a coordinator's queue
+/// which threads through `Coordinate` deliveries).
+#[derive(Resource, Debug, Clone, Default)]
+pub struct ColonySelfDirectiveQueue {
+    pub directives: Vec<Directive>,
+}
+
 // ---------------------------------------------------------------------------
 // Directive delivery
 // ---------------------------------------------------------------------------
 
-/// Component placed on a target cat when a coordinator delivers a directive.
+/// Component placed on a target cat when a directive is delivered.
 /// Provides a score bonus to the directed action at next evaluation.
 #[derive(Component, Debug, Clone)]
 pub struct ActiveDirective {
@@ -108,9 +122,22 @@ pub struct ActiveDirective {
     pub kind: DirectiveKind,
     /// Priority of the directive.
     pub priority: f32,
-    /// Entity of the coordinator who issued this.
-    pub coordinator: Entity,
-    /// Coordinator's social weight at time of delivery.
+    /// 487 — Issuer of the directive. `Some(coordinator_entity)` for a
+    /// normally-delivered directive from an elected coordinator;
+    /// `None` for a colony-self directive (day-1 founder phase, no
+    /// coordinator exists yet). The directive-bonus formula in
+    /// `goap.rs::evaluate_and_plan` substitutes
+    /// `CoordinationConstants::colony_self_directive_weight` for
+    /// `coordinator_social_weight` and `disposition.fondness_default`
+    /// for the fondness factor when this is `None`, so the directive
+    /// still applies a (softer) pull on action scoring even without
+    /// an issuer cat.
+    pub coordinator: Option<Entity>,
+    /// Coordinator's social weight at time of delivery. Reads as
+    /// `CoordinationConstants::colony_self_directive_weight` for a
+    /// colony-self directive (the field is left as the substituted
+    /// value at delivery so downstream readers don't need to know
+    /// about the colony-self special case).
     pub coordinator_social_weight: f32,
     /// Tick when this directive was delivered. Expires after ~200 ticks.
     pub delivered_tick: u64,
@@ -132,6 +159,36 @@ pub struct PendingDelivery(pub Directive);
 /// Inserted when a coordinator dies, triggering immediate re-evaluation.
 #[derive(Resource, Default)]
 pub struct CoordinatorDied;
+
+// ---------------------------------------------------------------------------
+// 487 — emergent-coordinator support
+// ---------------------------------------------------------------------------
+
+/// 487 — EWMA of how often this cat's `CurrentAction` has been a
+/// "colony-aligned" action (Forage / Build / Cook / Hunt / Herbcraft
+/// kinds — the same set the `assess_colony_needs` directive vocabulary
+/// covers). Updated once per tick by `update_colony_alignment_scores`:
+/// multiplicative decay by `CoordinationConstants::alignment_decay_per_tick`
+/// every tick, plus an additive `alignment_match_increment` when the
+/// cat's current action is colony-aligned. The fixpoint for a cat who
+/// spends every tick on aligned work is exactly 1.0 at the default
+/// tuning.
+///
+/// Read by `evaluate_coordinators` as a multiplicative term wrapped in
+/// `(1 + score * alignment_skill_weight)` so the cat who *does* the
+/// most colony work naturally accumulates election credit. This is the
+/// emergent half of the day-1 cuddle-puddle fix (487): we don't pre-
+/// elect a coordinator; the colony recognises one from observed
+/// behaviour. See `update_colony_alignment_scores` + the score formula
+/// in `evaluate_coordinators`.
+#[derive(Component, Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+pub struct ColonyAlignmentScore {
+    /// EWMA of "ticks spent on colony-aligned work" — bounded [0, 1+]
+    /// in steady state at the default tuning (a slightly-above-1.0 peak
+    /// is possible during transient compounding when the cat is freshly
+    /// inserted with no prior decay).
+    pub recent_aligned_actions: f32,
+}
 
 // ---------------------------------------------------------------------------
 // Build pressure

@@ -267,6 +267,14 @@ pub fn resolve_groom_other_target(
     activation: Option<&mut SystemActivation>,
     // Ticket 427 Step 1 — pre-allocated scratch buffers.
     scratch: &mut crate::resources::DseTargetScratchpad,
+    // 487 follow-on — peers currently mid-`GroomOther` (groomer and
+    // groomee). `Some(&set)` filters them out at the candidate-loop
+    // head so the resolver agrees with the `HasGroomCandidate` marker
+    // author about what counts as a valid target. `None` (test paths,
+    // chain pre-pick) preserves the legacy any-in-range behavior; the
+    // dispatch site at `goap.rs::resolve_goap_plans` always passes
+    // `Some(...)` so chain extension cannot survive the eligibility gate.
+    currently_groomed: Option<&std::collections::HashSet<Entity>>,
 ) -> Option<Entity> {
     let dse = registry
         .target_taking_dses
@@ -278,6 +286,9 @@ pub fn resolve_groom_other_target(
     scratch.map_f32_a.clear();
     for (other, other_pos) in cat_positions {
         if *other == cat {
+            continue;
+        }
+        if currently_groomed.is_some_and(|set| set.contains(other)) {
             continue;
         }
         let dist = cat_pos.manhattan_distance(other_pos) as f32;
@@ -454,6 +465,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert!(out.is_none());
     }
@@ -483,6 +495,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert!(out.is_none());
     }
@@ -511,6 +524,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert!(out.is_none());
     }
@@ -543,6 +557,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert!(out.is_none());
     }
@@ -589,6 +604,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert_eq!(out, Some(cold));
     }
@@ -625,6 +641,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert_eq!(out, Some(kin));
     }
@@ -667,6 +684,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert_eq!(out, Some(near_acquaintance));
     }
@@ -704,6 +722,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert_eq!(out, Some(friend));
     }
@@ -755,6 +774,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert_eq!(out, Some(freezing));
     }
@@ -806,6 +826,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert_eq!(out, Some(dirty));
     }
@@ -862,6 +883,7 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert_eq!(out, Some(with_groom));
     }
@@ -905,7 +927,86 @@ mod tests {
             8000,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
+            None,
         );
         assert_eq!(out, Some(adjacent));
+    }
+
+    #[test]
+    fn currently_groomed_peers_excluded_from_candidate_pool() {
+        // 487 follow-on — without the `currently_groomed` filter the
+        // resolver would happily pick a mid-groom peer and extend the
+        // pile chain. The `Some(&set)` argument is the symmetric
+        // partner of `viable_groom_candidate_for` (goap.rs:10788) — the
+        // marker author and the resolver must agree on what counts as
+        // a valid candidate, otherwise the marker gates eligibility on
+        // a non-groomed peer existing while the resolver still picks
+        // the in-flight one.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(groom_other_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let mid_groom = Entity::from_raw_u32(2).unwrap();
+        let free_peer = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        // Stack the deck so the mid-groom peer would win on every axis
+        // if the filter didn't exclude them: closer (dist 1 vs 2),
+        // higher fondness, lower temperature (severe need).
+        relationships.get_or_insert(cat, mid_groom).fondness = 0.95;
+        relationships.get_or_insert(cat, free_peer).fondness = 0.3;
+        let temperature_lookup = move |e: Entity| -> Option<f32> {
+            if e == mid_groom {
+                Some(0.05) // deficit 0.95 — desperate
+            } else {
+                Some(0.9) // deficit 0.1
+            }
+        };
+        let is_kin = |_: Entity, _: Entity| -> bool { false };
+        let cat_positions = vec![
+            (mid_groom, Position::new(1, 0)),
+            (free_peer, Position::new(2, 0)),
+        ];
+
+        // Without the filter, mid_groom wins decisively.
+        let baseline = resolve_groom_other_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
+            &is_kin,
+            &relationships,
+            0,
+            None,
+            None,
+            8000,
+            None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+            None,
+        );
+        assert_eq!(baseline, Some(mid_groom));
+
+        // With mid_groom in `currently_groomed`, the resolver falls
+        // back to free_peer even though every axis prefers mid_groom.
+        let mut in_flight = std::collections::HashSet::new();
+        in_flight.insert(mid_groom);
+        let filtered = resolve_groom_other_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
+            &is_kin,
+            &relationships,
+            0,
+            None,
+            None,
+            8000,
+            None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+            Some(&in_flight),
+        );
+        assert_eq!(filtered, Some(free_peer));
     }
 }

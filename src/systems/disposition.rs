@@ -879,8 +879,13 @@ pub fn evaluate_dispositions(
             });
         let (presence_directive_action_ordinal, presence_directive_bonus) =
             if let Ok(directive) = active_directive_query.get(entity) {
-                let fondness_factor = relationships
-                    .get(entity, directive.coordinator)
+                // 487 — colony-self directive (`coordinator: None`)
+                // falls through to `fondness_default`; mirrors
+                // `goap.rs::evaluate_and_plan`'s directive-bonus
+                // computation.
+                let fondness_factor = directive
+                    .coordinator
+                    .and_then(|c| relationships.get(entity, c))
                     .map_or(d.fondness_default, |r| (r.fondness + 1.0) / 2.0);
                 let bonus = directive.priority
                     * directive.coordinator_social_weight
@@ -1602,6 +1607,13 @@ pub fn disposition_to_chain(
             0,
             None,
             &mut res.dse_scratchpad,
+            // 487 follow-on — chain pre-pick doesn't have the
+            // dispatch-time `currently_groomed` set available. The
+            // marker author at `goap.rs::evaluate_and_plan` re-checks
+            // eligibility before the chain runs, and the dispatch
+            // arm's resolver call below passes `Some(...)`, so a bad
+            // chain pre-pick is overridden at execution time.
+            None,
         );
         // §6.5.7: resolve patient for ApplyRemedy. Replaces the
         // `injured_cats.min_by_key(distance)` legacy pick with the
@@ -4693,7 +4705,7 @@ fn dispatch_chain_step(
                     commands.entity(target).insert(ActiveDirective {
                         kind,
                         priority,
-                        coordinator: cat_entity,
+                        coordinator: Some(cat_entity),
                         coordinator_social_weight: needs.respect,
                         delivered_tick: time.tick,
                         target_position: directive_target,

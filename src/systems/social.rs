@@ -26,12 +26,16 @@ use crate::resources::time::{SimConfig, TimeScale, TimeState};
 /// The cache is rebuilt incrementally on each `CatMoved` event: the
 /// moving cat's existing pairings are dropped, then re-inserted by
 /// re-scanning live cat positions for distances within
-/// `passive_familiarity_range`. Despawned cats are pruned by
-/// intersecting against the current cats query each tick. Newborn cats
-/// (in the current live set but not in `last_seen`) are added to the
-/// re-scan set so they enter the cache on their first tick — without
-/// this, a cat spawned post-bootstrap wouldn't get passive familiarity
-/// until it first moved.
+/// `passive_familiarity_range`. Departed entities are pruned by
+/// diffing the live set against `cache.last_seen` (ticket 486 —
+/// retires the pre-486 unconditional `BTreeMap::retain` that walked
+/// the full pair map every tick for 13.27% inclusive CPU at HEAD).
+/// The diff catches all departure paths uniformly (cat death via
+/// `check_death`, wildlife / item / prey despawn via direct
+/// `commands.entity(_).despawn()`). Newborn cats (in the current live
+/// set but not in `last_seen`) are added to the re-scan set so they
+/// enter the cache on their first tick — without this, a cat spawned
+/// post-bootstrap wouldn't get passive familiarity until it first moved.
 ///
 /// First-tick bootstrap: when the cache is empty AND no `CatMoved`
 /// events arrived (e.g. tick 1 after world setup), every live cat is
@@ -42,7 +46,7 @@ use crate::resources::time::{SimConfig, TimeScale, TimeState};
 #[allow(clippy::type_complexity)]
 pub fn update_near_pair_cache(
     mut cache: ResMut<NearPairCache>,
-    mut reader: MessageReader<CatMoved>,
+    mut moved_reader: MessageReader<CatMoved>,
     cats: Query<(Entity, &Position), (Without<Dead>, Without<Structure>)>,
     constants: Res<SimConstants>,
 ) {
@@ -58,17 +62,30 @@ pub fn update_near_pair_cache(
     let cats_vec: Vec<(Entity, Position)> = cats.iter().map(|(e, p)| (e, *p)).collect();
     let live: BTreeSet<Entity> = cats_vec.iter().map(|(e, _)| *e).collect();
 
-    // Drop entries whose either endpoint is no longer live. Cheap O(pairs)
-    // walk — pairs is bounded by O(N²) but typically much smaller (only
-    // entries within range survive).
-    cache
-        .pairs
-        .retain(|&(a, b), _| live.contains(&a) && live.contains(&b));
+    // 486 — departure-set eviction. Pre-486 this system ran an
+    // unconditional `BTreeMap::retain` over the full pair map every
+    // tick (13.27% inclusive CPU). The retain only does work when an
+    // entity was removed from the live set — which we can detect by
+    // diffing `live` against `cache.last_seen`.
+    //
+    // We diff (not the `CatDied` stream the ticket proposed) because
+    // the cats query is permissive — `(Without<Dead>, Without<Structure>)`
+    // also admits wildlife / items / prey that carry `Position`, and
+    // those depart via direct `commands.entity(_).despawn()` calls
+    // (prey kills, herb pickup, etc.), not via `Dead` insertion. The
+    // diff catches all departures uniformly; using only `CatDied`
+    // would leak entries for non-cat entities and trip
+    // `passive_familiarity`'s debug divergence assert.
+    //
+    // Steady-state (no departures, no moves): both `gone` and `moved`
+    // are empty, both conditional blocks are skipped, and the system's
+    // work is just the cats-query snapshot + the two set builds.
+    let gone: BTreeSet<Entity> = cache.last_seen.difference(&live).copied().collect();
 
     // Drain `CatMoved` and collect the set of moved entities. Filter out
-    // events for cats that died this tick — their entries were already
-    // pruned by the retain above.
-    let moved: BTreeSet<Entity> = reader
+    // events for cats that already departed (their entries are evicted
+    // by the `gone` path below regardless).
+    let moved: BTreeSet<Entity> = moved_reader
         .read()
         .map(|m| m.entity)
         .filter(|e| live.contains(e))
@@ -83,12 +100,21 @@ pub fn update_near_pair_cache(
     // newborns must materialize fresh entries (no prior state to drop).
     let to_rescan: BTreeSet<Entity> = moved.union(&newborns).copied().collect();
 
-    // Drop existing entries for moved cats. (Newborns by definition have
-    // none, so the retain skips them implicitly.)
-    if !moved.is_empty() {
-        cache
+    // Targeted pair removal for every departed or moved entity. One linear
+    // pass of `cache.pairs` collects matching keys (O(P)), then targeted
+    // `remove` per key. Skipped entirely when both sets are empty — the
+    // steady-state case.
+    let to_evict: BTreeSet<Entity> = gone.union(&moved).copied().collect();
+    if !to_evict.is_empty() {
+        let to_remove: Vec<(Entity, Entity)> = cache
             .pairs
-            .retain(|&(a, b), _| !moved.contains(&a) && !moved.contains(&b));
+            .keys()
+            .filter(|(a, b)| to_evict.contains(a) || to_evict.contains(b))
+            .copied()
+            .collect();
+        for key in to_remove {
+            cache.pairs.remove(&key);
+        }
     }
 
     // Re-insert pairs for cats needing a re-scan. The position lookup is

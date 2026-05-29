@@ -11,7 +11,7 @@ use bevy_ecs::system::SystemParam;
 
 use crate::ai::dse::EligibilityFilter;
 use crate::components::goap_plan::StepExecutionState;
-use crate::components::markers::{Banished, Incapacitated};
+use crate::components::markers::{Banished, Incapacitated, NewbornKitten};
 use crate::components::physical::Dead;
 use crate::components::reserved::Reserved;
 use crate::components::RecentTargetFailures;
@@ -50,6 +50,18 @@ pub enum TargetInvalidReason {
 pub trait TargetValidity {
     fn check(&self, target: Entity) -> Result<(), TargetInvalidReason>;
 
+    /// 487 follow-on — newborn (eyes-closed Stage 1) kittens are
+    /// `Incapacitated` by design (`incapacitation.rs` ORs the marker
+    /// over `Has<NewbornKitten>`), and they are also the *intended*
+    /// target of `FeedKitten`. The generic validity check still
+    /// rejects them as Incapacitated; the per-step entry path consults
+    /// this predicate to permit the carve-out without weakening the
+    /// blanket rule for any other step. Default `false` so the
+    /// in-memory test path preserves legacy behaviour without opt-in.
+    fn is_newborn(&self, _target: Entity) -> bool {
+        false
+    }
+
     fn is_alive(&self, target: Entity) -> bool {
         self.check(target).is_ok()
     }
@@ -66,6 +78,13 @@ pub trait TargetValidity {
 #[derive(SystemParam)]
 pub struct TargetValidityQuery<'w, 's> {
     pub query: Query<'w, 's, (Has<Dead>, Has<Banished>, Has<Incapacitated>)>,
+    /// 487 follow-on — sidecar query for the `NewbornKitten` ZST so
+    /// the per-step `FeedKitten` carve-out in
+    /// [`validate_target_for_step`] can distinguish a newborn (whose
+    /// `Incapacitated` is by design) from a downed adult. Disjoint
+    /// from `query` — both are read-only Has-filters over the same
+    /// archetype.
+    pub newborn: Query<'w, 's, (), With<NewbornKitten>>,
 }
 
 impl<'w, 's> TargetValidity for TargetValidityQuery<'w, 's> {
@@ -78,6 +97,10 @@ impl<'w, 's> TargetValidity for TargetValidityQuery<'w, 's> {
             Ok((_, _, incapacitated)) if incapacitated => Err(TargetInvalidReason::Incapacitated),
             Ok(_) => Ok(()),
         }
+    }
+
+    fn is_newborn(&self, target: Entity) -> bool {
+        self.newborn.get(target).is_ok()
     }
 }
 
@@ -131,6 +154,35 @@ pub fn validate_target<V: TargetValidity + ?Sized>(
     validity: &V,
 ) -> Result<(), TargetInvalidReason> {
     validity.check(target)
+}
+
+/// 487 follow-on — step-aware validity check. Identical to
+/// [`validate_target`] except that when `permit_incapacitated_newborn`
+/// is true, an `Incapacitated` target also bearing `NewbornKitten` is
+/// admitted. The runtime guard at `goap.rs::resolve_goap_plan_inner`
+/// sets the flag for `GoapActionKind::FeedKitten` (the one step whose
+/// entire purpose is to feed eyes-closed kittens — which are
+/// `Incapacitated` by design via `incapacitation.rs`'s
+/// `OR Has<NewbornKitten>` predicate). Every other step continues to
+/// reject Incapacitated targets verbatim.
+///
+/// The blanket-rule + carve-out shape mirrors the `Bury` exception in
+/// `goap.rs::resolve_goap_plan_inner`'s `skip_alive_gate`: per-step
+/// semantics override the generic structural gate at exactly the sites
+/// where the step's design requires the otherwise-rejected state.
+pub fn validate_target_for_step<V: TargetValidity + ?Sized>(
+    target: Entity,
+    permit_incapacitated_newborn: bool,
+    validity: &V,
+) -> Result<(), TargetInvalidReason> {
+    match validity.check(target) {
+        Err(TargetInvalidReason::Incapacitated)
+            if permit_incapacitated_newborn && validity.is_newborn(target) =>
+        {
+            Ok(())
+        }
+        other => other,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -285,5 +337,121 @@ pub fn expire_reservations(
         if r.is_expired(now) {
             commands.entity(entity).remove::<Reserved>();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    /// In-memory validity that also tracks which entities are newborns.
+    /// 487 follow-on — needed to test [`validate_target_for_step`]'s
+    /// carve-out without spinning up an ECS world.
+    struct NewbornAwareValidity {
+        invalid: std::collections::HashMap<Entity, TargetInvalidReason>,
+        newborns: HashSet<Entity>,
+    }
+
+    impl TargetValidity for NewbornAwareValidity {
+        fn check(&self, target: Entity) -> Result<(), TargetInvalidReason> {
+            match self.invalid.get(&target) {
+                Some(reason) => Err(*reason),
+                None => Ok(()),
+            }
+        }
+
+        fn is_newborn(&self, target: Entity) -> bool {
+            self.newborns.contains(&target)
+        }
+    }
+
+    fn entity(id: u32) -> Entity {
+        Entity::from_raw_u32(id).unwrap()
+    }
+
+    #[test]
+    fn validate_target_for_step_admits_incapacitated_newborn_when_permitted() {
+        let kitten = entity(1);
+        let mut v = NewbornAwareValidity {
+            invalid: std::collections::HashMap::new(),
+            newborns: HashSet::new(),
+        };
+        v.invalid.insert(kitten, TargetInvalidReason::Incapacitated);
+        v.newborns.insert(kitten);
+
+        assert_eq!(validate_target_for_step(kitten, true, &v), Ok(()));
+    }
+
+    #[test]
+    fn validate_target_for_step_rejects_incapacitated_newborn_when_not_permitted() {
+        let kitten = entity(1);
+        let mut v = NewbornAwareValidity {
+            invalid: std::collections::HashMap::new(),
+            newborns: HashSet::new(),
+        };
+        v.invalid.insert(kitten, TargetInvalidReason::Incapacitated);
+        v.newborns.insert(kitten);
+
+        assert_eq!(
+            validate_target_for_step(kitten, false, &v),
+            Err(TargetInvalidReason::Incapacitated)
+        );
+    }
+
+    #[test]
+    fn validate_target_for_step_rejects_incapacitated_adult_even_when_permitted() {
+        let adult = entity(1);
+        let mut v = NewbornAwareValidity {
+            invalid: std::collections::HashMap::new(),
+            newborns: HashSet::new(),
+        };
+        v.invalid.insert(adult, TargetInvalidReason::Incapacitated);
+        // Not a newborn — carve-out should not fire.
+
+        assert_eq!(
+            validate_target_for_step(adult, true, &v),
+            Err(TargetInvalidReason::Incapacitated)
+        );
+    }
+
+    #[test]
+    fn validate_target_for_step_carve_out_does_not_relax_other_reasons() {
+        // Even with `permit_incapacitated_newborn = true`, Dead /
+        // Banished / Despawned must still reject — the carve-out is
+        // surgically Incapacitated-only.
+        let kitten = entity(1);
+        for reason in [
+            TargetInvalidReason::Dead,
+            TargetInvalidReason::Banished,
+            TargetInvalidReason::Despawned,
+        ] {
+            let mut v = NewbornAwareValidity {
+                invalid: std::collections::HashMap::new(),
+                newborns: HashSet::new(),
+            };
+            v.invalid.insert(kitten, reason);
+            v.newborns.insert(kitten);
+            assert_eq!(validate_target_for_step(kitten, true, &v), Err(reason));
+        }
+    }
+
+    #[test]
+    fn validate_target_for_step_passes_through_valid_targets() {
+        let kitten = entity(1);
+        let v = NewbornAwareValidity {
+            invalid: std::collections::HashMap::new(),
+            newborns: HashSet::new(),
+        };
+        assert_eq!(validate_target_for_step(kitten, true, &v), Ok(()));
+        assert_eq!(validate_target_for_step(kitten, false, &v), Ok(()));
+    }
+
+    #[test]
+    fn target_validity_default_is_newborn_returns_false() {
+        // Tests that an opt-in default — InMemoryValidity inherits this,
+        // so the test path stays at legacy behaviour.
+        let v = InMemoryValidity::new();
+        assert!(!v.is_newborn(entity(1)));
     }
 }

@@ -4,8 +4,8 @@ use rand::SeedableRng;
 
 use crate::components::building::StructureType;
 use crate::components::coordination::{
-    ActiveDirective, BuildPressure, Coordinator, CoordinatorDied, Directive, DirectiveKind,
-    DirectiveQueue, PendingDelivery,
+    ActiveDirective, BuildPressure, ColonyAlignmentScore, Coordinator, CoordinatorDied, Directive,
+    DirectiveKind, DirectiveQueue, PendingDelivery,
 };
 use crate::components::identity::Name;
 use crate::components::mental::{Memory, MemoryType};
@@ -68,19 +68,39 @@ pub fn social_weight(
 /// Identify the top 1–2 cats as coordinators based on social weight, diligence,
 /// and sociability. Runs once per in-game day or immediately when a coordinator
 /// dies (cadence governed by `CoordinationConstants::evaluate_interval`).
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn evaluate_coordinators(
     mut commands: Commands,
     time: Res<TimeState>,
     time_scale: Res<TimeScale>,
     coordinator_died: Option<Res<CoordinatorDied>>,
-    query: Query<(Entity, &Personality, &Memory, &Name), Without<Dead>>,
+    // 487 — exclude Incapacitated from the candidate pool. A downed
+    // cat can't fulfill the Coordinator role (every coordination-
+    // affordance DSE forbids `Incapacitated`); electing them would
+    // immediately recreate the phantom-leader bug
+    // `flag_coordinator_incapacitated` exists to fix.
+    query: Query<
+        (Entity, &Personality, &Memory, &Name),
+        (
+            Without<Dead>,
+            Without<crate::components::markers::Incapacitated>,
+        ),
+    >,
     existing_coordinators: Query<Entity, With<Coordinator>>,
     relationships: Res<Relationships>,
     mut log: ResMut<NarrativeLog>,
     event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     constants: Res<SimConstants>,
     mut activation: ResMut<SystemActivation>,
+    // 487 — emergent-leader feedback. Cats whose recent action history
+    // is dominated by colony-aligned work (Forage / Build / Cook /
+    // Hunt / etc.) accumulate `ColonyAlignmentScore` via
+    // `update_colony_alignment_scores`; that score multiplies the
+    // election score below so the colony recognises a coordinator
+    // from observed behaviour rather than imposing one on personality
+    // alone. Disjoint from the main query: read-only `&` access on a
+    // distinct Component, no aliasing conflict.
+    alignment_q: Query<&ColonyAlignmentScore>,
 ) {
     let c = &constants.coordination;
     let should_run =
@@ -102,10 +122,20 @@ pub fn evaluate_coordinators(
         .iter()
         .map(|(entity, personality, memory, name)| {
             let sw = social_weight(entity, &relationships, memory, c);
+            // 487 — multiplicative alignment factor. Wraps the existing
+            // social-weight × personality score so alignment compounds
+            // with the legacy pillars (cats with both strong personality
+            // AND aligned action history win cleanly); a cat with no
+            // alignment history (default `recent_aligned_actions = 0.0`)
+            // hits factor 1.0 and rides the legacy score unchanged.
+            let alignment_factor = alignment_q.get(entity).map_or(1.0, |s| {
+                1.0 + s.recent_aligned_actions * c.alignment_skill_weight
+            });
             let score = sw
                 * personality.diligence
                 * personality.sociability
-                * (1.0 + personality.ambition * c.ambition_bonus);
+                * (1.0 + personality.ambition * c.ambition_bonus)
+                * alignment_factor;
             (entity, score, name.0.clone())
         })
         .filter(|(_, score, _)| *score >= threshold)
@@ -227,6 +257,18 @@ pub struct WardPlacementSignals<'w> {
 /// For each coordinator, evaluate colony state and fill their directive queue.
 /// Runs every 20 ticks. The coordinator's own skills shift assessment thresholds
 /// (domain specialization).
+///
+/// 487 — when no coordinator-tagged cat exists (the day-1 founder phase), a
+/// subset of directives (Forage / Build / Herbcraft — the headline day-1
+/// drivers) is emitted into the `ColonySelfDirectiveQueue` resource instead.
+/// `dispatch_urgent_directives` drains both sources, so colony-self
+/// directives still reach cats; the directive-bonus formula in
+/// `goap.rs::evaluate_and_plan` substitutes
+/// `colony_self_directive_weight` when `coordinator.is_none()`, so they
+/// apply a softer pull than a charismatic coordinator's orders would.
+/// More directive kinds (Cleanse / SetWard / Posse) stay coordinator-only
+/// — those address mid/late-game ecology that day-1 founders haven't yet
+/// surfaced.
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn assess_colony_needs(
     time: Res<TimeState>,
@@ -252,6 +294,7 @@ pub fn assess_colony_needs(
     constants: Res<SimConstants>,
     colony_center: Res<crate::resources::ColonyCenter>,
     mut activation: ResMut<SystemActivation>,
+    mut self_queue: ResMut<crate::components::coordination::ColonySelfDirectiveQueue>,
 ) {
     let map = &placement_signals.tile_map;
     let fox_scent = &placement_signals.fox_scent;
@@ -616,6 +659,89 @@ pub fn assess_colony_needs(
             }
         }
     }
+
+    // 487 — colony-self directives. Day-1 founder phase has no
+    // coordinator-tagged cat yet, so the per-coordinator loop above
+    // emits nothing and founder behavior collapses to whatever wins
+    // L2 scoring with no colony-level signal — historically the
+    // "cuddle puddle" of GroomOther chain-grooming. This block fills
+    // the gap: when no coordinator exists AND the colony has work to
+    // do, emit a small set of directives directly into the
+    // `ColonySelfDirectiveQueue`. `dispatch_urgent_directives` drains
+    // that queue alongside per-coordinator queues; the receiving cat
+    // gets `ActiveDirective { coordinator: None, ... }` and scoring
+    // substitutes `colony_self_directive_weight` for the missing
+    // `social_weight`. Only Forage / Build / Herbcraft fire here —
+    // the headline day-1 drivers. Coordinator-only directives
+    // (Cleanse / SetWard / Posse / Cook) gate on mid/late-game
+    // ecology a founder cohort hasn't yet surfaced.
+    self_queue.directives.clear();
+    if coordinators.iter().next().is_none() {
+        // No coordinator-tagged cat exists — emit colony-self
+        // directives. Skill-based threshold tuning is skipped (use
+        // base thresholds and base priorities).
+        let food_threshold = cc.food_threshold_base;
+        if food_fraction < food_threshold {
+            let priority = (1.0 - food_fraction).min(1.0);
+            self_queue.directives.push(Directive {
+                kind: DirectiveKind::Forage,
+                priority,
+                target_entity: None,
+                target_position: None,
+                blueprint: None,
+                placement_failure_count: 0,
+            });
+        }
+        // Repair the worst-damaged finished building if any are
+        // below the base threshold. Mirrors the per-coordinator
+        // "worst_building" pick at the base threshold (no
+        // skill-tuned scaling).
+        let building_threshold = cc.building_threshold_base;
+        let worst_building = building_query
+            .iter()
+            .filter(|(_, s, _, site)| site.is_none() && s.condition < building_threshold)
+            .min_by(|(_, a, _, _), (_, b, _, _)| {
+                a.condition
+                    .partial_cmp(&b.condition)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        if let Some((build_entity, _, build_pos, _)) = worst_building {
+            self_queue.directives.push(Directive {
+                kind: DirectiveKind::Build,
+                priority: cc.build_repair_priority_base.min(1.0),
+                target_entity: Some(build_entity),
+                target_position: Some(*build_pos),
+                blueprint: None,
+                placement_failure_count: 0,
+            });
+        }
+        if colony_injury_count > 0 {
+            let priority = (colony_injury_count as f32 * cc.injury_priority_per_cat).min(1.0);
+            self_queue.directives.push(Directive {
+                kind: DirectiveKind::Herbcraft,
+                priority,
+                target_entity: None,
+                target_position: None,
+                blueprint: None,
+                placement_failure_count: 0,
+            });
+        }
+        self_queue.directives.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        if !self_queue.directives.is_empty() {
+            activation.record(Feature::DirectiveIssued);
+        }
+        // Note: we DO NOT thread event_log here because the
+        // `event_log` Option was consumed above by the per-
+        // coordinator loop. Colony-self directive emission is
+        // observable via `DirectiveDelivered` (recorded when
+        // `dispatch_urgent_directives` actually places an
+        // `ActiveDirective` on a cat); the dispatch path is the
+        // ground-truth observable for this code path.
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -659,6 +785,8 @@ pub fn dispatch_urgent_directives(
         ),
     >,
     mut activation: ResMut<SystemActivation>,
+    mut self_queue: ResMut<crate::components::coordination::ColonySelfDirectiveQueue>,
+    colony_center: Res<crate::resources::ColonyCenter>,
 ) {
     let cc = &constants.coordination;
     let critical_hunger = constants.disposition.critical_hunger_interrupt_threshold;
@@ -754,7 +882,7 @@ pub fn dispatch_urgent_directives(
                 commands.entity(*target_entity).insert(ActiveDirective {
                     kind: directive.kind,
                     priority: directive.priority,
-                    coordinator: coord_entity,
+                    coordinator: Some(coord_entity),
                     coordinator_social_weight: coord_needs.respect,
                     delivered_tick: time.tick,
                     target_position: directive.target_position,
@@ -779,10 +907,195 @@ pub fn dispatch_urgent_directives(
             queue.directives.remove(idx);
         }
     }
+
+    // 487 — colony-self directive dispatch. Same shape as the per-
+    // coordinator loop, with three substitutions: anchor position is
+    // `colony_center` (no issuer cat to anchor on), the receiving cat
+    // gets `coordinator: None`, and `coordinator_social_weight` reads
+    // from `cc.colony_self_directive_weight` (softer than a real
+    // coordinator's `Needs.respect`). No urgent-priority gate — every
+    // colony-self directive is eligible for dispatch since the
+    // founder phase needs the nudge even at moderate priority. Posse-
+    // and-Fight slot-tracking is skipped because the colony-self
+    // emission path doesn't produce Fight directives.
+    if !self_queue.directives.is_empty() {
+        let center_pos = colony_center.0;
+        let cands: Vec<(Entity, Position, Skills, f32)> = candidates
+            .iter()
+            .map(|(e, p, s, n)| (e, *p, s.clone(), n.hunger))
+            .collect();
+        let mut dispatched_indices: Vec<usize> = Vec::new();
+        let mut already_dispatched: Vec<Entity> = Vec::new();
+        let mut urgent_slots_remaining: u32 = 1;
+        for (idx, directive) in self_queue.directives.iter().enumerate() {
+            if urgent_slots_remaining == 0 {
+                break;
+            }
+            let skill_of = |s: &Skills| -> f32 {
+                match directive.kind {
+                    DirectiveKind::Hunt => s.hunting,
+                    DirectiveKind::Forage => s.foraging,
+                    DirectiveKind::Build => s.building,
+                    DirectiveKind::Fight | DirectiveKind::Patrol => s.combat,
+                    DirectiveKind::Herbcraft | DirectiveKind::SetWard => s.herbcraft,
+                    DirectiveKind::Cleanse => s.magic,
+                    DirectiveKind::HarvestCarcass => s.herbcraft,
+                    DirectiveKind::Cook => 0.0,
+                }
+            };
+            let best = cands
+                .iter()
+                .filter(|(e, p, _, _)| {
+                    center_pos.manhattan_distance(p) <= cc.urgent_dispatch_range
+                        && !already_dispatched.contains(e)
+                })
+                .max_by(|(_, pa, sa, _), (_, pb, sb, _)| {
+                    let va = skill_of(sa) - center_pos.manhattan_distance(pa) as f32 * 0.01;
+                    let vb = skill_of(sb) - center_pos.manhattan_distance(pb) as f32 * 0.01;
+                    va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
+                });
+            if let Some((target_entity, _, _, hunger)) = best {
+                // Day-1 critical-hunger gate: skip cats below the
+                // starvation floor on a Forage directive — they
+                // need to Eat from existing reserves first, not
+                // chase outside food and starve mid-trip. Other
+                // kinds (Build / Herbcraft) don't carry that
+                // mortality risk.
+                if matches!(directive.kind, DirectiveKind::Forage) && *hunger < critical_hunger {
+                    continue;
+                }
+                commands.entity(*target_entity).insert(ActiveDirective {
+                    kind: directive.kind,
+                    priority: directive.priority,
+                    coordinator: None,
+                    coordinator_social_weight: cc.colony_self_directive_weight,
+                    delivered_tick: time.tick,
+                    target_position: directive.target_position,
+                    target_entity: directive.target_entity,
+                });
+                activation.record(Feature::DirectiveDelivered);
+                dispatched_indices.push(idx);
+                already_dispatched.push(*target_entity);
+                urgent_slots_remaining -= 1;
+            }
+        }
+        for idx in dispatched_indices.into_iter().rev() {
+            self_queue.directives.remove(idx);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
-// flag_coordinator_death
+// 487 — colony-alignment scoring
+// ---------------------------------------------------------------------------
+
+/// Whether an action counts as colony-aligned work for the
+/// `ColonyAlignmentScore` EWMA. Read by `update_colony_alignment_scores`.
+///
+/// The set is deliberately the "visible work the colony needs done":
+/// food economy (Forage / Hunt / Cook + the preservation chain),
+/// infrastructure (Build / Craft / Farm), defence (Patrol / Fight),
+/// herb chains (HerbcraftGather / HerbcraftRemedy / HerbcraftSetWard),
+/// magic (MagicCleanse / MagicColonyCleanse / MagicHarvest /
+/// MagicDurableWard / MagicScry), care (Mentor / Caretake / Bury), and
+/// item management (PickUp / Drop / Trash / Handoff). Coordinate
+/// itself counts so an in-flight coordinator's leadership self-
+/// reinforces.
+///
+/// NOT aligned: self-maintenance (Eat / Sleep / GroomSelf / Idle /
+/// Wander / Explore), interpersonal-but-not-work (Socialize /
+/// GroomOther / Mate), threat-response (Flee / Hide), Stalk / Pounce
+/// (sub-modes of Hunt; the parent Hunt counts), and the dormant
+/// stubs (WearItem / PetitionCoordinator / Vigil / GriefSit /
+/// ReleaseGrief / Wean / Teach / Release).
+///
+/// GroomOther excluded by design — that's the cuddle-pile action 487
+/// fixes; cats who burn time on the puddle should NOT accumulate
+/// election credit.
+pub(crate) fn is_colony_aligned(action: crate::ai::Action) -> bool {
+    use crate::ai::Action;
+    matches!(
+        action,
+        Action::Forage
+            | Action::Hunt
+            | Action::Build
+            | Action::Cook
+            | Action::Farm
+            | Action::Craft
+            | Action::Coordinate
+            | Action::Patrol
+            | Action::Fight
+            | Action::HerbcraftGather
+            | Action::HerbcraftRemedy
+            | Action::HerbcraftSetWard
+            | Action::MagicScry
+            | Action::MagicDurableWard
+            | Action::MagicCleanse
+            | Action::MagicColonyCleanse
+            | Action::MagicHarvest
+            | Action::MagicCommune
+            | Action::Mentor
+            | Action::Caretake
+            | Action::Bury
+            | Action::DryFood
+            | Action::SmokeMeat
+            | Action::TendSmokingRack
+            | Action::PickUp
+            | Action::Drop
+            | Action::Trash
+            | Action::Handoff
+    )
+}
+
+/// 487 — per-tick decay + accumulate update for `ColonyAlignmentScore`.
+///
+/// Every tick, every cat's score decays by
+/// `alignment_decay_per_tick`. If the cat's `CurrentAction` is a
+/// colony-aligned action this tick, the score gains
+/// `alignment_match_increment` after decay. The fixpoint for a cat
+/// who spends every tick on aligned work is exactly 1.0 at the
+/// default tuning; a cat who splits time 30/70 between aligned and
+/// non-aligned settles at ≈0.3.
+///
+/// Cats without the component yet (newly spawned / save-loaded pre-
+/// 487) are lazily inserted with an initial score reflecting this
+/// tick's alignment — same cheap O(N_cats_missing) commands-buffer
+/// pattern as `RecentTargetFailures` (ticket 073).
+#[allow(clippy::type_complexity)]
+pub fn update_colony_alignment_scores(
+    mut commands: Commands,
+    constants: Res<SimConstants>,
+    mut cats_with: Query<(&crate::ai::CurrentAction, &mut ColonyAlignmentScore), Without<Dead>>,
+    cats_without: Query<
+        (Entity, &crate::ai::CurrentAction),
+        (
+            Without<ColonyAlignmentScore>,
+            Without<Dead>,
+            With<crate::components::identity::Species>,
+        ),
+    >,
+) {
+    let cc = &constants.coordination;
+    for (current, mut score) in &mut cats_with {
+        score.recent_aligned_actions *= cc.alignment_decay_per_tick;
+        if is_colony_aligned(current.action) {
+            score.recent_aligned_actions += cc.alignment_match_increment;
+        }
+    }
+    for (entity, current) in &cats_without {
+        let initial = if is_colony_aligned(current.action) {
+            cc.alignment_match_increment
+        } else {
+            0.0
+        };
+        commands.entity(entity).insert(ColonyAlignmentScore {
+            recent_aligned_actions: initial,
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// flag_coordinator_death + flag_coordinator_incapacitated
 // ---------------------------------------------------------------------------
 
 /// If any dead entity has the Coordinator marker, insert the CoordinatorDied
@@ -792,6 +1105,47 @@ pub fn flag_coordinator_death(
     query: Query<(), (With<Dead>, With<Coordinator>)>,
 ) {
     if !query.is_empty() {
+        commands.insert_resource(CoordinatorDied);
+    }
+}
+
+/// 487 — if a Coordinator becomes Incapacitated, strip the role and
+/// trigger immediate re-evaluation. An incapacitated cat literally
+/// cannot perform `Action::Coordinate` (the `EligibilityFilter` on
+/// every coordination-affordance DSE forbids `Incapacitated`), so a
+/// Coordinator who's downed by a shadowfox ambush becomes a phantom
+/// leader: their `DirectiveQueue` accumulates but never gets walked
+/// to cats. Holding the role also blocks the colony-self path in
+/// `assess_colony_needs` (which fires only when no Coordinator
+/// exists), so the colony loses both the elected and the fallback
+/// signal at the moment it most needs one. Dropping the marker
+/// re-opens the election (`CoordinatorDied`-driven re-eval picks the
+/// best able cat) and re-enables colony-self emissions until a real
+/// successor takes over.
+///
+/// The existing `flag_coordinator_death` is the death equivalent;
+/// shared `CoordinatorDied` resource because evaluate_coordinators
+/// only needs the "vacate + re-elect" signal, not the cause.
+/// Re-using avoids a parallel resource for the same response.
+pub fn flag_coordinator_incapacitated(
+    mut commands: Commands,
+    query: Query<
+        Entity,
+        (
+            With<crate::components::markers::Incapacitated>,
+            With<Coordinator>,
+        ),
+    >,
+) {
+    let mut any = false;
+    for entity in &query {
+        commands.entity(entity).remove::<Coordinator>();
+        commands.entity(entity).remove::<DirectiveQueue>();
+        commands.entity(entity).remove::<BuildPressure>();
+        commands.entity(entity).remove::<PendingDelivery>();
+        any = true;
+    }
+    if any {
         commands.insert_resource(CoordinatorDied);
     }
 }
@@ -813,7 +1167,14 @@ pub fn expire_directives(
 ) {
     let expiry_ticks = constants.coordination.directive_expiry_ticks;
     for (entity, directive) in &active_query {
-        let coordinator_dead = alive_check.get(directive.coordinator).is_err();
+        // 487 — colony-self directives carry `coordinator: None`; they
+        // expire purely on `delivered_tick + expiry_ticks` since there
+        // is no issuer to check for liveness. Coordinator-issued
+        // directives still drop when their issuer dies, preserving
+        // the existing fast-path expiry for orphaned orders.
+        let coordinator_dead = directive
+            .coordinator
+            .is_some_and(|c| alive_check.get(c).is_err());
         let expired = time.tick.saturating_sub(directive.delivered_tick) > expiry_ticks;
         if coordinator_dead || expired {
             commands.entity(entity).remove::<ActiveDirective>();
@@ -3881,6 +4242,9 @@ mod tests {
         ));
         // Food stores at 10% capacity.
         world.insert_resource(crate::resources::food::FoodStores::new(5.0, 50.0, 0.0));
+        // 487 — colony-self queue is initialized in production by
+        // SimulationPlugin; tests need to insert it manually.
+        world.insert_resource(crate::components::coordination::ColonySelfDirectiveQueue::default());
 
         let entity = world
             .spawn((
@@ -3936,6 +4300,9 @@ mod tests {
         // Food at 45% — above default 0.5 threshold but below shifted threshold
         // for a non-hunter coordinator.
         world.insert_resource(crate::resources::food::FoodStores::new(22.5, 50.0, 0.0));
+        // 487 — colony-self queue is initialized in production by
+        // SimulationPlugin; tests need to insert it manually.
+        world.insert_resource(crate::components::coordination::ColonySelfDirectiveQueue::default());
 
         // Skilled hunter: threshold = 0.5 - 0.9*0.1 = 0.41. 45% > 41%, no directive.
         let mut hunter_skills = Skills::default();

@@ -1186,6 +1186,11 @@ impl Plugin for SimulationPlugin {
         // capacity persists across cat-ticks (~355 MB/soak saved at the
         // 500-cat projection).
         app.init_resource::<crate::resources::DseTargetScratchpad>();
+        // 487 — colony-self directive queue, populated by
+        // `assess_colony_needs` when no coordinator-tagged cat exists
+        // (day-1 founder phase). Drained by `dispatch_urgent_directives`
+        // alongside per-coordinator queues.
+        app.init_resource::<crate::components::coordination::ColonySelfDirectiveQueue>();
         app.add_systems(
             Startup,
             register_dses_at_startup.after(crate::plugins::setup::setup_world_exclusive),
@@ -1688,6 +1693,10 @@ impl Plugin for SimulationPlugin {
                         // after `integrate_beliefs` so the marker
                         // reflects same-tick belief state.
                         systems::items::update_low_ward_reserve_markers,
+                        // 487 — alignment EWMA runs BEFORE
+                        // evaluate_coordinators so the election score
+                        // reads this tick's freshly-decayed scores.
+                        systems::coordination::update_colony_alignment_scores,
                         systems::coordination::evaluate_coordinators,
                         systems::coordination::assess_colony_needs,
                         systems::coordination::dispatch_urgent_directives,
@@ -1779,7 +1788,20 @@ impl Plugin for SimulationPlugin {
                         systems::death::check_death,
                     )
                         .chain(),
-                    systems::coordination::flag_coordinator_death,
+                    // 487 — `flag_coordinator_death` +
+                    // `flag_coordinator_incapacitated` bundled as a sub-
+                    // chain to stay under Bevy's 20-element outer-chain
+                    // arity limit. Both write into the same
+                    // `CoordinatorDied` resource (re-eval trigger); the
+                    // incapacitated path also strips the Coordinator
+                    // marker since holding the role while downed would
+                    // keep `assess_colony_needs`'s no-coordinator gate
+                    // false.
+                    (
+                        systems::coordination::flag_coordinator_death,
+                        systems::coordination::flag_coordinator_incapacitated,
+                    )
+                        .chain(),
                     systems::coordination::expire_directives,
                     systems::death::cleanup_dead,
                     // 035: rebuild the grave-aura InfluenceMap from

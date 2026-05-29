@@ -96,14 +96,20 @@ impl GroomOtherDse {
             // `social_deficit` axis was dropped).
             composition: Composition::compensated_product(vec![1.0, 1.0, 0.6]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
-            // Note: 209 originally required `HasGroomingCandidate`
-            // here as a substrate gate, but `score_actions` already
-            // gates `groom_other` scoring on `has_social_target`
-            // (broad-phase target-existence marker), so the parallel
-            // marker was redundant. The marker writer + ECS-component
-            // wiring stays for trace observability + future direct
-            // ScoringContext consumption.
-            eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
+            // 487: require `HasGroomCandidate` — a per-cat marker
+            // authored each tick from a peer scan that excludes cats
+            // already being groomed by someone else. The broad-phase
+            // `has_social_target` gate in `score_actions` admits any
+            // in-range peer, which (combined with the
+            // `HasFoodStorageAccessible` gating ca5d59c4 unmasked) let
+            // the founder cohort collapse into chain-grooming
+            // dominance — the "cuddle puddle". Unlike the retired
+            // ticket-209 `HasGroomingCandidate` (which was never
+            // authored, so requiring it silenced every score), this
+            // marker IS authored. See `markers::HasGroomCandidate`.
+            eligibility: EligibilityFilter::new()
+                .forbid(markers::Incapacitated::KEY)
+                .require(markers::HasGroomCandidate::KEY),
         }
     }
 }
@@ -180,16 +186,14 @@ mod tests {
     }
 
     #[test]
-    fn groom_other_eligibility_only_forbids_incapacitated() {
-        // 209: `score_actions` gates `groom_other` scoring on
-        // `has_social_target`, so the DSE-level eligibility filter
-        // only adds the §13.1 Incapacitated forbid. Adding a
-        // parallel `HasGroomingCandidate::require` was redundant —
-        // it would silently suppress all `groom_other` scoring
-        // because the new marker isn't an authored equivalent of
-        // the existing `HasSocialTarget` substrate.
+    fn groom_other_eligibility_gates_on_groom_candidate() {
+        // 487: the eligibility filter now requires
+        // `HasGroomCandidate` (an authored per-cat marker — distinct
+        // from the never-wired 209-era `HasGroomingCandidate` whose
+        // require was retired) and still forbids `Incapacitated`
+        // per §13.1.
         let filter = GroomOtherDse::new().eligibility().clone();
-        assert!(filter.required.is_empty());
+        assert!(filter.required.contains(&markers::HasGroomCandidate::KEY));
         assert!(filter.forbidden.contains(&markers::Incapacitated::KEY));
     }
 

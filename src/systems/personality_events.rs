@@ -54,15 +54,21 @@ pub fn emit_personality_events(
         }
 
         // --- DirectiveRefused ---
-        // Stubborn cat with active directive may refuse it.
+        // Stubborn cat with active directive may refuse it. 487 —
+        // colony-self directives (no coordinator entity) skip the
+        // refusal cascade: a "snub" requires someone to snub at, and
+        // the mood/fondness/bystander effects all key on the
+        // coordinator entity. The directive still expires normally.
         if let Some(dir) = directive {
-            if personality.stubbornness > 0.7 {
-                let chance = (personality.stubbornness - 0.5) * 0.6;
-                if rng.rng.random::<f32>() < chance {
-                    commands.trigger(DirectiveRefused {
-                        cat: entity,
-                        coordinator: dir.coordinator,
-                    });
+            if let Some(coordinator) = dir.coordinator {
+                if personality.stubbornness > 0.7 {
+                    let chance = (personality.stubbornness - 0.5) * 0.6;
+                    if rng.rng.random::<f32>() < chance {
+                        commands.trigger(DirectiveRefused {
+                            cat: entity,
+                            coordinator,
+                        });
+                    }
                 }
             }
         }

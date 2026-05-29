@@ -275,7 +275,7 @@ mod tests {
                 Position::new(6, 5),
                 independent,
                 ActiveDirective {
-                    coordinator,
+                    coordinator: Some(coordinator),
                     kind: crate::components::coordination::DirectiveKind::Hunt,
                     priority: 0.5,
                     coordinator_social_weight: 0.5,

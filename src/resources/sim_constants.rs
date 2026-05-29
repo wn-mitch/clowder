@@ -6517,6 +6517,35 @@ pub struct CoordinationConstants {
     /// cats drop ward duty to engage the threat.
     #[serde(default = "default_posse_priority")]
     pub posse_priority: f32,
+    /// 487 — magnitude applied to a colony-self directive in place of the
+    /// elected coordinator's `social_weight` (which would multiply the
+    /// per-cat bonus in `goap.rs`'s directive-bonus formula). Tuned softer
+    /// than a real coordinator's social weight so colony-self directives
+    /// nudge day-1 founders toward Forage / Build / Cook without
+    /// overwhelming individual scoring. The same multiplicative shape
+    /// preserves how personality (diligence, independence, stubbornness)
+    /// continues to modulate compliance.
+    #[serde(default = "default_colony_self_directive_weight")]
+    pub colony_self_directive_weight: f32,
+    /// 487 — multiplicative bonus on `evaluate_coordinators` for cats whose
+    /// `ColonyAlignmentScore.recent_aligned_actions` is high. Wraps the
+    /// existing score in `(1 + alignment_score * weight)` so it stacks
+    /// with personality rather than overwhelming the social-weight × trait
+    /// pillars. Set to 0.0 to disable the emergent-leader feedback loop.
+    #[serde(default = "default_alignment_skill_weight")]
+    pub alignment_skill_weight: f32,
+    /// 487 — per-tick EWMA decay applied to `ColonyAlignmentScore`. Tuned
+    /// for a half-life of roughly one season so emergent leadership is
+    /// responsive to a colony's current era without locking in a first-
+    /// mover whose alignment was earned long ago.
+    #[serde(default = "default_alignment_decay_per_tick")]
+    pub alignment_decay_per_tick: f32,
+    /// 487 — increment added to `ColonyAlignmentScore.recent_aligned_actions`
+    /// when a cat completes an Action that matches a pressing need in the
+    /// current `ColonyAssessment`. Combined with the per-tick decay, this
+    /// sets the steady-state score for a consistently-aligned cat.
+    #[serde(default = "default_alignment_match_increment")]
+    pub alignment_match_increment: f32,
 }
 
 fn default_corruption_search_radius() -> i32 {
@@ -6566,6 +6595,43 @@ fn default_posse_size() -> usize {
 
 fn default_posse_priority() -> f32 {
     0.9
+}
+
+fn default_colony_self_directive_weight() -> f32 {
+    // Softer than a typical coordinator's social weight (~0.6–1.5 in
+    // mid-game). 0.5 nudges day-1 founders toward colony-needed work
+    // without the level of pull a charismatic elected coordinator
+    // would apply once one emerges.
+    0.5
+}
+
+fn default_alignment_skill_weight() -> f32 {
+    // Multiplicative wrap: `score × (1 + alignment × 0.5)` lets a
+    // consistently-aligned cat (steady-state alignment ≈ 1.0) bump
+    // their election score by up to 1.5× — meaningful but not
+    // overwhelming the social-weight × diligence × sociability
+    // pillars.
+    0.5
+}
+
+fn default_alignment_decay_per_tick() -> f32 {
+    // Per-tick multiplicative decay. With a 20k-tick season this
+    // gives a half-life of one season: `0.99965^20000 ≈ 0.10`. So a
+    // cat who stops aligning loses most of their election credit
+    // within a season, while sustained aligned behavior accumulates.
+    0.99965
+}
+
+fn default_alignment_match_increment() -> f32 {
+    // Per-tick boost applied while a cat's `CurrentAction` is a
+    // colony-aligned action (Forage / Build / Cook / Hunt /
+    // HerbcraftGather / etc). EWMA fixpoint with the matching decay
+    // (0.99965) at this increment is 1.0 for a cat who spends every
+    // tick on colony work — the saturating reference value that the
+    // election bonus scales against. Cats who split time between
+    // alignment-positive and alignment-neutral work settle at the
+    // proportional steady-state (e.g. 30% aligned → score ≈ 0.3).
+    0.00035
 }
 
 fn default_cooking_pressure_multiplier() -> f32 {
@@ -6810,6 +6876,10 @@ impl Default for CoordinationConstants {
             posse_alarm_range: default_posse_alarm_range(),
             posse_size: default_posse_size(),
             posse_priority: default_posse_priority(),
+            colony_self_directive_weight: default_colony_self_directive_weight(),
+            alignment_skill_weight: default_alignment_skill_weight(),
+            alignment_decay_per_tick: default_alignment_decay_per_tick(),
+            alignment_match_increment: default_alignment_match_increment(),
         }
     }
 }

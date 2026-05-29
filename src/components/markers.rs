@@ -612,6 +612,33 @@ impl HasFoodStorageAccessible {
     pub const KEY: &str = "HasFoodStorageAccessible";
 }
 
+/// 487: per-cat marker — ≥1 peer is a viable allogrooming target right
+/// now. Authored each tick in `goap.rs::evaluate_and_plan` and its
+/// `resolve_goap_plans` planner-markers parity site by
+/// `viable_groom_candidate_for`, which scans cats within
+/// `GROOM_OTHER_TARGET_RANGE` Manhattan tiles and excludes those who
+/// are themselves currently mid-`GoapActionKind::GroomOther` (i.e. the
+/// chain-grooming target of another cat this tick — the "cuddle puddle"
+/// failure mode 484 unmasked).
+///
+/// Required on `GroomOtherDse`'s eligibility filter. Without this, the
+/// broad-phase `score_actions` gate (`has_social_target`) admits any
+/// in-range peer, so a founder cohort where every cat is everyone's
+/// social target collapses into chain-grooming dominance — the
+/// post-`ca5d59c4` puddle 487 fixes. The marker is additive: a peer
+/// gated out as "already being groomed" can still receive other social
+/// actions; this only stops a NEW cat from joining the pile.
+///
+/// Same shape as [`HasFoodStorageAccessible`] (the 484 precedent): a
+/// per-cat reachability marker authored from a colony-wide scan, gating
+/// a DSE eligibility filter that previously fired on broad-phase
+/// presence alone.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasGroomCandidate;
+impl HasGroomCandidate {
+    pub const KEY: &str = "HasGroomCandidate";
+}
+
 // ---------------------------------------------------------------------------
 // Colony singleton
 // ---------------------------------------------------------------------------
