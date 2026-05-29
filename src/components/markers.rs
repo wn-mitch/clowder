@@ -588,6 +588,30 @@ impl HasHerbStashAccessible {
     pub const KEY: &str = "HasHerbStashAccessible";
 }
 
+/// Per-cat marker — at least one `Stores` building is within
+/// `DispositionConstants::herb_stash_reachable_radius` Manhattan tiles
+/// of this cat's position (the same geometric check as
+/// `HasHerbStashAccessible`, kept as a distinct marker so PickingUp
+/// eligibility reads as "needs food storage" rather than "needs herb
+/// stash" at the call site). Authored by `goap.rs::stores_accessible_for`
+/// in the per-cat MarkerSnapshot loop (twin call sites:
+/// `evaluate_and_plan` and `build_planner_markers`, both required for
+/// snapshot/planner-replay parity).
+///
+/// Required on `PickingUpDse` eligibility — without a reachable Stores
+/// there is no deposit destination, and picking food off the ground
+/// only feeds the visual shuffle (`resolve_deposit_at_stores`'s
+/// no-store fallback used to drop food back at the cat's tile,
+/// re-latching `HasGroundCarcass` and re-eligibilizing pickup; with
+/// this gate the loop never starts). When this is `false`, scoring
+/// pressure should route to `Build` to construct one — see the
+/// follow-on construction-pressure work referenced in the bugfix plan.
+#[derive(Component, Debug, Clone, Copy)]
+pub struct HasFoodStorageAccessible;
+impl HasFoodStorageAccessible {
+    pub const KEY: &str = "HasFoodStorageAccessible";
+}
+
 // ---------------------------------------------------------------------------
 // Colony singleton
 // ---------------------------------------------------------------------------

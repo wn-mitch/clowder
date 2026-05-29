@@ -114,4 +114,44 @@ mod tests {
              expected diverse activity. winner_counts: {counts:?}",
         );
     }
+
+    /// Post-shuffle-fix invariant: with no Stores reachable, PickingUp's
+    /// `HasFoodStorageAccessible` eligibility must reject every cat and
+    /// PickUp must win L3 zero times across the scenario. This directly
+    /// guards against a regression that re-opens the early-game shuffle
+    /// (no destination → no point picking food off the ground).
+    #[test]
+    fn no_stores_no_pickup_elections() {
+        let report = run(&SCENARIO, None, Some(60), 42);
+        let counts = report.winner_counts();
+        let pickup_wins = counts.get("PickUp").copied().unwrap_or(0);
+        assert_eq!(
+            pickup_wins, 0,
+            "PickUp must not elect when no Stores is reachable \
+             (HasFoodStorageAccessible eligibility gate). \
+             winner_counts: {counts:?}",
+        );
+    }
+
+    /// Companion to `no_stores_no_pickup_elections`: with no Stores,
+    /// PickUp must not even enter the L2 eligible pool (the eligibility
+    /// filter rejects upstream of scoring). Catches regressions where
+    /// the marker authoring drifts but PickUp's score is suppressed
+    /// some other way (e.g. via a score modifier instead of the gate).
+    #[test]
+    fn no_stores_pickup_is_ineligible_at_l2() {
+        let report = run(&SCENARIO, None, Some(60), 42);
+        let any_eligible = report
+            .ticks
+            .iter()
+            .flat_map(|t| t.l2.iter())
+            .any(|row| row.dse == "pick_up" && row.eligible);
+        assert!(
+            !any_eligible,
+            "pick_up must be ineligible at L2 across every tick when no \
+             Stores is reachable (HasFoodStorageAccessible gate). \
+             A regression here means the eligibility check moved out \
+             of the filter and back into score-shaping.",
+        );
+    }
 }

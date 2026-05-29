@@ -1,7 +1,7 @@
 use bevy_ecs::prelude::*;
 
 use crate::components::building::{StoredItems, StructureType};
-use crate::components::items::{Item, ItemKind, ItemLocation};
+use crate::components::items::{Item, ItemLocation};
 use crate::components::magic::Inventory;
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
@@ -15,7 +15,12 @@ pub struct DepositResult {
     pub storage_upgraded: bool,
     /// At least one item couldn't be deposited because the store was full.
     pub rejected: bool,
-    /// No Stores building exists; food was dropped on the ground.
+    /// No Stores building exists. Food is retained in inventory; this
+    /// flag drives the `DepositFailedNoStore` feature for telemetry.
+    /// Post-shuffle-fix this branch should be unreachable from the
+    /// PickingUp DSE path (eligibility-gated on
+    /// `HasFoodStorageAccessible`); a `debug_assert!` in the resolver
+    /// surfaces any regression that re-introduces the call site.
     pub no_store: bool,
 }
 
@@ -23,8 +28,12 @@ pub struct DepositResult {
 ///
 /// **Real-world effect** — transfers food items from the actor's
 /// `Inventory` into the target `StoredItems`. When no Stores
-/// exists, drops food on the ground at the actor's position (a
-/// fallback so cats aren't forced to carry indefinitely). Tracks
+/// exists, retains the food in inventory and sets the `no_store`
+/// flag for telemetry (pre-shuffle-fix this branch dropped food
+/// at the cat's tile, which re-latched `HasGroundCarcass` and
+/// kicked off the early-game pickup-shuffle loop; the
+/// `HasFoodStorageAccessible` eligibility gate on PickingUpDse
+/// should keep us out of this branch in production). Tracks
 /// three side-signals via `DepositResult`: a storage-upgrade item
 /// landed, some items were rejected for capacity, or no-store
 /// fallback fired.
@@ -59,7 +68,11 @@ pub fn resolve_deposit_at_stores(
     target_entity: Option<Entity>,
     inventory: &mut Inventory,
     skills: &Skills,
-    cat_pos: &Position,
+    // Retained in the signature for symmetry with other deposit
+    // resolvers and so a future "drop-at-specific-spot" no-store
+    // strategy doesn't have to thread it back through the callers.
+    // Unused since the shuffle fix removed the at-cat-tile drop.
+    _cat_pos: &Position,
     stores_query: &mut Query<&mut StoredItems>,
     items_query: &Query<
         &Item,
@@ -71,39 +84,28 @@ pub fn resolve_deposit_at_stores(
     let mut storage_upgraded = false;
     let mut rejected = false;
 
-    // No store exists — drop food on the ground at the cat's position.
+    // No store exists — retain food in inventory and surface the
+    // condition via `no_store` (drives `Feature::DepositFailedNoStore`
+    // for telemetry; the coordinator's `pressure.no_store` is colony-
+    // level and runs independently). Pre-shuffle-fix this branch
+    // dropped food back at the cat's tile, which re-latched
+    // `HasGroundCarcass`, re-eligibilized `PickingUpDse`, and produced
+    // the early-game visual shuffle. With the `HasFoodStorageAccessible`
+    // eligibility gate, the only way the planner reaches this branch
+    // is a DSE that hauls food without that gate — none exist today.
     if target_entity.is_none() {
-        let food_items: Vec<(ItemKind, crate::components::items::ItemModifiers)> = inventory
-            .pouch
-            .iter()
-            .filter(|slot| slot.kind.is_food())
-            .map(|slot| (slot.kind, slot.modifiers))
-            .collect();
-
-        if food_items.is_empty() {
-            return DepositResult {
-                step: StepResult::Advance,
-                storage_upgraded: false,
-                rejected: false,
-                no_store: false,
-            };
-        }
-
-        inventory.pouch.retain(|slot| !slot.kind.is_food());
-
-        let quality = (d.deposit_quality_base + skills.hunting * d.deposit_quality_skill_scale)
-            .clamp(0.0, 1.0);
-        for (kind, mods) in food_items {
-            commands.spawn((
-                Item::with_modifiers(kind, quality, ItemLocation::OnGround, mods),
-                *cat_pos,
-            ));
-        }
+        let has_food = inventory.pouch.iter().any(|slot| slot.kind.is_food());
+        debug_assert!(
+            !has_food,
+            "resolve_deposit_at_stores reached the no-store branch with food in inventory. \
+             The HasFoodStorageAccessible gate on PickingUpDse should make this unreachable; \
+             a regression or a new DSE has wired food into the deposit path without the gate."
+        );
         return DepositResult {
             step: StepResult::Advance,
             storage_upgraded: false,
             rejected: false,
-            no_store: true,
+            no_store: has_food,
         };
     }
 

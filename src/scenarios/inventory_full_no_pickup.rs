@@ -64,6 +64,20 @@ fn set_focal_hungry(world: &mut World, focal_name: &str) {
     needs.hunger = 0.2;
 }
 
+/// Spawn a Stores building so PickingUp's `HasFoodStorageAccessible`
+/// eligibility gate passes (early-game shuffle fix). All three sister
+/// scenarios in this file isolate the inventory-full vs substrate-path
+/// election shape; they don't exercise deposit, so the Stores is
+/// purely a precondition for the L3 election test.
+fn spawn_stores_west(world: &mut World) {
+    use crate::components::building::{StoredItems, Structure, StructureType};
+    world.spawn((
+        Structure::new(StructureType::Stores),
+        StoredItems::default(),
+        Position::new(16, 20),
+    ));
+}
+
 fn fill_focal_inventory(world: &mut World, focal_name: &str, kind: ItemKind, count: usize) {
     use crate::components::identity::Name;
     let mut q = world.query::<(bevy_ecs::entity::Entity, &Name)>();
@@ -93,6 +107,7 @@ fn setup_full_curios(world: &mut World, seed: u64) {
     fill_focal_inventory(world, "Cinder", ItemKind::ShinyPebble, 5);
     spawn_ground_food(world, ItemKind::RawMouse, Position::new(21, 20));
     spawn_ground_food(world, ItemKind::RawMouse, Position::new(20, 21));
+    spawn_stores_west(world);
     assert_has_ground_carcass(world);
 }
 
@@ -118,6 +133,7 @@ fn setup_full_herbs(world: &mut World, seed: u64) {
     fill_focal_inventory(world, "Cinder", ItemKind::HerbHealingMoss, 5);
     spawn_ground_food(world, ItemKind::RawMouse, Position::new(21, 20));
     spawn_ground_food(world, ItemKind::RawMouse, Position::new(20, 21));
+    spawn_stores_west(world);
     assert_has_ground_carcass(world);
 }
 
@@ -143,6 +159,7 @@ fn setup_empty_pickup(world: &mut World, seed: u64) {
     set_focal_hungry(world, "Cinder");
     spawn_ground_food(world, ItemKind::RawMouse, Position::new(21, 20));
     spawn_ground_food(world, ItemKind::RawMouse, Position::new(20, 21));
+    spawn_stores_west(world);
     assert_has_ground_carcass(world);
 }
 
@@ -166,7 +183,7 @@ mod tests {
     /// the dropped pebble must appear as a new ground item.
     #[test]
     fn full_curios_inventory_drops_then_picks_up() {
-        let report = run(&SCENARIO_FULL_CURIOS, None, Some(16), 42);
+        let report = run(&SCENARIO_FULL_CURIOS, None, Some(60), 42);
         let counts = report.winner_counts();
         let pickup_wins = counts.get("PickUp").copied().unwrap_or(0);
         assert!(
@@ -204,7 +221,7 @@ mod tests {
     /// herb droppable when nothing else competes.
     #[test]
     fn full_herbs_inventory_drops_then_picks_up() {
-        let report = run(&SCENARIO_FULL_HERBS, None, Some(16), 42);
+        let report = run(&SCENARIO_FULL_HERBS, None, Some(60), 42);
         let counts = report.winner_counts();
         let pickup_wins = counts.get("PickUp").copied().unwrap_or(0);
         assert!(
@@ -244,7 +261,7 @@ mod tests {
     /// 2). A* picks the cheap path — no `ItemDropped` feature fires.
     #[test]
     fn empty_inventory_takes_substrate_path() {
-        let report = run(&SCENARIO_EMPTY_PICKUP, None, Some(16), 42);
+        let report = run(&SCENARIO_EMPTY_PICKUP, None, Some(60), 42);
         let item_dropped = report
             .feature_counts
             .get("ItemDropped")

@@ -3,14 +3,26 @@
 //! kill→item-on-ground→pick-up flow.
 //!
 //! **Eligibility.** `forbid(Incapacitated)` AND
-//! `require(HasGroundCarcass)`. The colony-scoped marker is authored
-//! by `update_colony_building_markers` from any `Item` with
-//! `location == OnGround` and `kind.is_food()` (ticket 193 re-wire of
-//! the 185 author; pre-193 the marker latched on `Carcass` component
-//! entities, which the resolver cannot consume — the planner routed
-//! through `MaterialPile` and failed 1367/10kt on the seed-42
-//! canonical soak). When no ground food-Item exists, eligibility
-//! rejects every cat and PickingUp stays out of the L3 softmax pool.
+//! `require(HasGroundCarcass)` AND `require(HasFoodStorageAccessible)`.
+//! `HasGroundCarcass` is authored by `update_colony_building_markers`
+//! from any `Item` with `location == OnGround` and `kind.is_food()`
+//! (ticket 193 re-wire of the 185 author; pre-193 the marker latched on
+//! `Carcass` component entities, which the resolver cannot consume —
+//! the planner routed through `MaterialPile` and failed 1367/10kt on
+//! the seed-42 canonical soak). When no ground food-Item exists,
+//! eligibility rejects every cat and PickingUp stays out of the L3
+//! softmax pool.
+//!
+//! `HasFoodStorageAccessible` is the per-cat reachable-Stores marker
+//! authored alongside `HasHerbStashAccessible` in
+//! `goap.rs::evaluate_and_plan`. Without it, electing PickUp in the
+//! early game (35 founding food items + no Stores yet — see
+//! `world_gen/colony.rs::spawn_starting_buildings`) produced a 5-minute
+//! visual shuffle: cats picked food, hit `resolve_deposit_at_stores`'s
+//! no-store fallback, the food was dropped back at the cat's tile, the
+//! marker re-latched, and the loop closed. With the gate, no cat
+//! elects PickUp without a destination; scoring pressure routes
+//! elsewhere (Build, Explore, idle) and the shuffle never starts.
 //!
 //! **Composition.** Two axes via pure product (CompensatedProduct
 //! with `compensation_strength = 0`):
@@ -90,7 +102,8 @@ impl PickingUpDse {
             composition: Composition::compensated_product(vec![1.0, 1.0]).with_compensation(0.0),
             eligibility: EligibilityFilter::new()
                 .forbid(markers::Incapacitated::KEY)
-                .require(markers::HasGroundCarcass::KEY),
+                .require(markers::HasGroundCarcass::KEY)
+                .require(markers::HasFoodStorageAccessible::KEY),
         }
     }
 }
@@ -197,6 +210,19 @@ mod tests {
             .eligibility()
             .required
             .contains(&markers::HasGroundCarcass::KEY));
+    }
+
+    /// Early-game shuffle fix: PickUp must not elect when no Stores is
+    /// reachable. Without the destination gate, the no-store deposit
+    /// fallback drops food back on the ground and the visual shuffle
+    /// loops until a Stores is built.
+    #[test]
+    fn picking_up_eligibility_requires_food_storage_accessible() {
+        let dse = PickingUpDse::new();
+        assert!(dse
+            .eligibility()
+            .required
+            .contains(&markers::HasFoodStorageAccessible::KEY));
     }
 
     #[test]

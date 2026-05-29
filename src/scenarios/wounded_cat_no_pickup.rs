@@ -63,6 +63,16 @@ fn setup_wounded(world: &mut World, seed: u64) {
     wound_focal(world, "Calcifer", 0.49);
     spawn_ground_food(world, ItemKind::RawMouse, Position::new(21, 20));
     spawn_ground_food(world, ItemKind::RawMouse, Position::new(20, 21));
+    // Stores building near the cat — PickingUp's eligibility requires
+    // `HasFoodStorageAccessible` (early-game shuffle fix). This scenario
+    // is about score-damping, not destination-gating; the Stores is
+    // purely a precondition so the L2 record exists for the assertion.
+    use crate::components::building::{StoredItems, Structure, StructureType};
+    world.spawn((
+        Structure::new(StructureType::Stores),
+        StoredItems::default(),
+        Position::new(18, 20),
+    ));
     assert_has_ground_carcass(world);
 }
 

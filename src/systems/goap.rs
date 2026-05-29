@@ -2042,6 +2042,27 @@ pub fn evaluate_and_plan(
             markers.set_entity(markers::OnCorruptedTile::KEY, entity, on_corrupted_marker);
             markers.set_entity(markers::OnSpecialTerrain::KEY, entity, on_special_marker);
         }
+        // Per-cat stores-reachability. Authored here (pre-`score_actions`)
+        // because `HasFoodStorageAccessible` is required by `PickingUpDse`
+        // eligibility — checked inside `score_actions`, so a later
+        // author site would miss the L2 pass. `HasHerbStashAccessible`
+        // shares the same geometry (food and herbs deposit to the same
+        // `Stores` building) and is consumed downstream by the plan-
+        // template's `HasMarker` predicate; co-authoring keeps the two
+        // markers in lockstep. See `herb_stash_accessible_for` for the
+        // reachability math.
+        let stores_reachable =
+            herb_stash_accessible_for(pos, &stores_positions, d.herb_stash_reachable_radius);
+        markers.set_entity(
+            markers::HasHerbStashAccessible::KEY,
+            entity,
+            stores_reachable,
+        );
+        markers.set_entity(
+            markers::HasFoodStorageAccessible::KEY,
+            entity,
+            stores_reachable,
+        );
         // Ticket 027 Bug 2 — HasEligibleMate authored by
         // `mating::update_mate_eligibility_markers`. Ticket 103 —
         // second tuple element is `Has<PairingActivity>`; carried out
@@ -2989,15 +3010,14 @@ pub fn evaluate_and_plan(
         // variant composes via DropItem-as-prefix
         // (`HasFreeSlotThisPlan(true)`, search-state).
         markers.set_entity(markers::HasFreeSlot::KEY, entity, !inventory.is_full());
-        // Ticket 235: author the per-cat `HasHerbStashAccessible`
-        // substrate marker. Gates the deposit-prefix branch of pickup-
-        // class plan templates so far-from-stash cats don't route
-        // through the stash on cost-marginal detours.
-        markers.set_entity(
-            markers::HasHerbStashAccessible::KEY,
-            entity,
-            herb_stash_accessible_for(pos, &stores_positions, d.herb_stash_reachable_radius),
-        );
+        // Ticket 235 / shuffle-fix: per-cat stores-reachability marker
+        // authoring moved up to the pre-`score_actions` block (see the
+        // sibling site near `MarkerSnapshot::set_entity(Incapacitated…)`).
+        // Keeping these here would set the marker AFTER score_actions
+        // has already consulted eligibility — fine for `HasHerbStash-
+        // Accessible` (consumed by the planner, runs later) but breaks
+        // `HasFoodStorageAccessible` (consumed by PickingUp eligibility,
+        // checked inside `score_actions`).
         let planner_state = build_planner_state(
             pos,
             needs,
@@ -4085,10 +4105,19 @@ pub fn resolve_goap_plans(
         // MaterialsAvailable). Snapshot parity with the
         // `evaluate_and_plan` author site is required for the
         // planner-replay path.
+        let stores_reachable = herb_stash_accessible_for(pos, &stores_positions, herb_stash_radius);
         planner_markers.set_entity(
             markers::HasHerbStashAccessible::KEY,
             entity,
-            herb_stash_accessible_for(pos, &stores_positions, herb_stash_radius),
+            stores_reachable,
+        );
+        // PickingUp eligibility gate — sibling of HasHerbStashAccessible
+        // with identical geometry; planner-replay parity with the
+        // `evaluate_and_plan` author site above.
+        planner_markers.set_entity(
+            markers::HasFoodStorageAccessible::KEY,
+            entity,
+            stores_reachable,
         );
     }
 
