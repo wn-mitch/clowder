@@ -15,10 +15,10 @@ _Last generated: 2026-05-30._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 120 |
+| Ready | 121 |
 | Parked | 12 |
 | Blocked | 30 |
-| **Open total** | **167** |
+| **Open total** | **168** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -65,11 +65,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (120)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (32 ready, 6 blocked)
+### ai-substrate (33 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -103,6 +103,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[466](docs/open-work/tickets/466-travelto-greedy-step-pathing-lift-a-fallback-into-catpathplannext-step.md)** — TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step — _[ai-substrate] · added 2026-05-25_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
 - **[486](docs/open-work/tickets/486-update-near-pair-cache-death-retain-drive-eviction-off-catdied-message-13-percent-inclusive-cpu-at-head-480-child.md)** — update_near_pair_cache death-retain — drive eviction off CatDied Message (13 percent inclusive CPU at HEAD, 480 child) — _[ai-substrate] · added 2026-05-28_
+- **[489](docs/open-work/tickets/489-dse-score-collapse-contract-audit-pattern-b-personality-in-cp-floored-need-across-the-cat-action-dse-corpus.md)** — DSE score-collapse contract — audit Pattern B (personality-in-CP + floored need) across the cat-action DSE corpus — _[ai-substrate] · added 2026-05-30_
 
 ### social-coordination (18 ready, 4 blocked)
 
@@ -343,7 +344,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (120)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -465,6 +466,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
 - **[484](docs/open-work/tickets/484-refresh-seed-42-verdict-baseline-post-017463470472260-substrate-landings.md)** — Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings — _[diagnostics-and-tooling] · added 2026-05-27_
 - **[486](docs/open-work/tickets/486-update-near-pair-cache-death-retain-drive-eviction-off-catdied-message-13-percent-inclusive-cpu-at-head-480-child.md)** — update_near_pair_cache death-retain — drive eviction off CatDied Message (13 percent inclusive CPU at HEAD, 480 child) — _[ai-substrate] · added 2026-05-28_
+- **[489](docs/open-work/tickets/489-dse-score-collapse-contract-audit-pattern-b-personality-in-cp-floored-need-across-the-cat-action-dse-corpus.md)** — DSE score-collapse contract — audit Pattern B (personality-in-CP + floored need) across the cat-action DSE corpus — _[ai-substrate] · added 2026-05-30_
 
 ## Parked (12)
 
