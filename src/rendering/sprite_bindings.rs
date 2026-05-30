@@ -891,15 +891,16 @@ mod tests {
 
     #[test]
     fn bindings_match_legacy_match_statements() {
-        // Spot-check several entries against the values that were hardcoded
-        // in entity_sprites.rs before this migration. If this test ever
-        // fails, the manifest has drifted from the legacy bindings and
-        // the visual change should be intentional + verified.
+        // Spot-check several entries against their expected indices. If this
+        // test ever fails, the manifest has drifted and the visual change
+        // should be intentional + verified. These four items were migrated to
+        // the `materials` atlas (Materials Asset 16x16); see
+        // docs/reference/materials-asset-catalog.md.
         let bindings = load_bindings_for_test();
-        assert_eq!(bindings.item_atlas_index(ItemKind::RawMouse), 0);
-        assert_eq!(bindings.item_atlas_index(ItemKind::Berries), 82);
-        assert_eq!(bindings.item_atlas_index(ItemKind::HerbCatnip), 69);
-        assert_eq!(bindings.item_atlas_index(ItemKind::Tallow), 30);
+        assert_eq!(bindings.item_atlas_index(ItemKind::RawMouse), 177);
+        assert_eq!(bindings.item_atlas_index(ItemKind::Berries), 166);
+        assert_eq!(bindings.item_atlas_index(ItemKind::HerbCatnip), 75);
+        assert_eq!(bindings.item_atlas_index(ItemKind::Tallow), 131);
 
         assert_eq!(
             bindings.herb_index(HerbKind::Moonpetal, GrowthStage::Blossom),

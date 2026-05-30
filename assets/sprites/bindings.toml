@@ -152,135 +152,142 @@ rows = 24
 tile = 48
 note = "Character animation sheet (48px tiles). Cats use this via SpriteAssets.character_texture; registered here for #/catalog inspection."
 
+[atlases.materials]
+texture = "sprites/materials_sheet.png"
+cols = 10
+rows = 25
+tile = 16
+note = "Materials Asset (16x16) — crafting materials: bones/skull (r0), ores/stones/nuggets (r1-4), ingots (r3-4), torch/logs/firewood (r5), mortar/spoons/bowls/cauldrons (r6-7), tools/blades (r7,r12), flowers/gems (r8-9), potions (r10,r11), breads/dough (r10-11), buckets/knives (r11), rings/necklaces (r13-15), produce/mushrooms/roots (r16-19), raw+cooked meats/fish/eggs (r17-22), horns/orbs/gifts (r23-24). 244 frames; indices 244-249 blank. Catalog: docs/reference/materials-asset-catalog.md"
+
 [items.RawMouse]
-atlas = "items"
-index = 0
-note = "drumstick"
+atlas = "materials"
+index = 177
+note = "small raw meat slice (mouse carcass)"
 
 [items.RawRat]
-atlas = "food"
-index = 44
-note = "meat cut"
+atlas = "materials"
+index = 176
+note = "raw meat chunk"
 
 [items.RawRabbit]
-atlas = "food"
-index = 50
-note = "meat cut"
+atlas = "materials"
+index = 208
+note = "raw ham leg (larger prey carcass)"
 
 [items.RawFish]
-atlas = "items"
-index = 66
-note = "PEAR (closest fish shape in this pack)"
+atlas = "materials"
+index = 223
+note = "whole fish"
 
 [items.RawBird]
-atlas = "food"
-index = 25
-note = "drumstick (poultry)"
+atlas = "materials"
+index = 212
+note = "bone-in poultry drumstick"
 
 [items.Berries]
-atlas = "items"
-index = 82
-note = "STRAWBERRY"
+atlas = "materials"
+index = 166
+note = "red berry cluster"
 
 [items.Nuts]
-atlas = "food"
-index = 30
-note = "APPLE (round food, nut stand-in)"
+atlas = "materials"
+index = 29
+note = "nuts / seeds"
 
 [items.Roots]
-atlas = "items"
-index = 81
-note = "TURNIP"
+atlas = "materials"
+index = 190
+note = "tan roots / parsnips"
 
 [items.WildOnion]
-atlas = "items"
-index = 97
-note = "RADISH (bulb vegetable)"
+atlas = "materials"
+index = 161
+note = "onion / garlic bulbs"
 
 [items.Mushroom]
-atlas = "items"
-index = 7
-note = "mushroom"
+atlas = "materials"
+index = 165
+note = "mushroom cluster"
 
 [items.Moss]
-atlas = "items"
-index = 57
-note = "leaf"
+atlas = "materials"
+index = 235
+note = "green leafy clump"
 
 [items.DriedGrass]
-atlas = "items"
-index = 11
-note = "GRASS"
+atlas = "materials"
+index = 74
+note = "dried grass / reed bundle"
 
 [items.Feather]
-atlas = "solaria_icons"
-index = 528
-note = "leaf shape"
+atlas = "materials"
+index = 96
+note = "feather"
 
 [items.HerbHealingMoss]
-atlas = "items"
-index = 20
-note = "WHITEBOTTLE (row 3, col 4)"
+atlas = "materials"
+index = 94
+note = "green healing sprig"
 
 [items.HerbMoonpetal]
-atlas = "items"
-index = 68
-note = "PINKBOTTLE (row 9, col 4)"
+atlas = "materials"
+index = 80
+note = "white moon-flower (daisy)"
 
 [items.HerbCalmroot]
-atlas = "items"
-index = 84
-note = "GREENBOTTLE (row 11, col 4)"
+atlas = "materials"
+index = 169
+note = "calming root with green tops"
 
 [items.HerbThornbriar]
-atlas = "items"
-index = 36
-note = "BROWNBOTTLE (row 5, col 4)"
+atlas = "materials"
+index = 92
+note = "thorned red rose"
 
 [items.HerbDreamroot]
-atlas = "items"
-index = 52
-note = "PURPLEBOTTLE (row 7, col 4)"
+atlas = "materials"
+index = 83
+note = "dream lavender sprig"
 
 [items.HerbCatnip]
-atlas = "items"
-index = 69
-note = "PINKBOTTLESPECIAL (row 9, col 5)"
+atlas = "materials"
+index = 75
+note = "leafy catnip greens"
 
 [items.HerbSlumbershade]
-atlas = "items"
-index = 37
-note = "BROWNBOTTLESPECIAL (row 5, col 5)"
+atlas = "materials"
+index = 89
+note = "blue night-flowers"
 
 [items.HerbOracleOrchid]
-atlas = "items"
-index = 53
-note = "PURPLEBOTTLESPECIAL (row 7, col 5)"
+atlas = "materials"
+index = 84
+note = "purple oracle orchid"
 
 [items.ShinyPebble]
-atlas = "items"
-index = 42
-note = "STONE"
+atlas = "materials"
+index = 8
+note = "glinting blue crystal shard"
 
 [items.GlassShard]
-atlas = "solaria_icons"
-index = 363
-note = "ROCK"
+atlas = "materials"
+index = 81
+note = "clear white crystal (glass)"
 
 [items.ColorfulShell]
-atlas = "items"
-index = 93
-note = "PINKEGG (colorful rounded shape)"
+atlas = "materials"
+index = 232
+note = "iridescent pearl / shell"
 
 [items.ShadowBone]
-atlas = "solaria_icons"
-index = 531
-note = "ROCK (dark bone-like)"
+atlas = "materials"
+index = 3
+note = "skull (shadow relic)"
 
 [items.Barrel]
-atlas = "items"
-index = 30
-note = "LARGEBROWNJAR"
+atlas = "materials"
+index = 116
+note = "wooden bucket / barrel"
 
 [items.Crate]
 atlas = "items"
@@ -288,89 +295,89 @@ index = 35
 note = "STONEBRICK"
 
 [items.Shelf]
-atlas = "items"
-index = 34
-note = "PLANK"
+atlas = "materials"
+index = 54
+note = "wooden plank"
 
 [items.Wood]
-atlas = "solaria_objects"
-index = 27
-note = "PLANK"
+atlas = "materials"
+index = 52
+note = "wood log"
 
 [items.Stone]
-atlas = "items"
-index = 35
-note = "STONEBRICK"
+atlas = "materials"
+index = 26
+note = "stone block"
 
 [items.RemedyHealingPoultice]
-atlas = "items"
-index = 20
-note = "WHITEBOTTLE"
+atlas = "materials"
+index = 114
+note = "honey-jar salve (poultice)"
 
 [items.RemedyEnergyTonic]
-atlas = "items"
-index = 68
-note = "PINKBOTTLE"
+atlas = "materials"
+index = 100
+note = "blue energy flask"
 
 [items.RemedyMoodTonic]
-atlas = "items"
-index = 84
-note = "GREENBOTTLE"
+atlas = "materials"
+index = 10
+note = "red mood vial"
 
 [items.RawOrgan]
-atlas = "food"
-index = 45
-note = "meat cut"
+atlas = "materials"
+index = 180
+note = "raw organ / offal"
 
 [items.DriedFish]
-atlas = "food"
-index = 23
-note = "PEAR (fish shape; signals fish-origin)"
+atlas = "materials"
+index = 218
+note = "dried / cured fish strip"
 
 [items.SmokedMeat]
-atlas = "food"
-index = 41
-note = "meat cut"
+atlas = "materials"
+index = 198
+note = "smoked / cured brown meat"
 
 [items.PreservedOrgan]
-atlas = "food"
-index = 45
-note = "meat cut"
+atlas = "materials"
+index = 205
+note = "cured ham steak"
 
 [items.Bone]
-atlas = "items"
-index = 43
-note = "ROCK (bone-like)"
+atlas = "materials"
+index = 0
+note = "bone"
 
 [items.Sinew]
-atlas = "solaria_icons"
-index = 1072
-note = "GRASS (fibrous strand)"
+atlas = "materials"
+index = 65
+note = "sinew strand"
 
 [items.Whisker]
-atlas = "items"
-index = 11
-note = "GRASS (thin filament)"
+atlas = "materials"
+index = 66
+note = "thin curved filament (whisker)"
 
 [items.Hide]
-atlas = "items"
-index = 34
-note = "PLANK (flat sheet)"
+atlas = "materials"
+index = 7
+note = "folded hide / leather"
 
 [items.FishScale]
-atlas = "solaria_objects"
-index = 431
-note = "STONE (small flat fragments)"
+atlas = "materials"
+index = 18
+note = "shiny silver flakes (scales)"
 
 [items.Tallow]
-atlas = "items"
-index = 30
-note = "LARGEBROWNJAR (rendered fat in container)"
+atlas = "materials"
+index = 131
+note = "rendered fat / tallow"
 
 [items.Twig]
-atlas = "solaria_icons"
-index = 31
-note = "Solaria Stick row, col 2 (row 19 × 42 + 2) — labelled \"Stick\" in the Solaria guide"
+atlas = "materials"
+index = 28
+note = "crossed twigs / sticks"
 
 [items.Bristle]
 atlas = "solaria_icons"
@@ -383,14 +390,14 @@ index = 66
 note = "Solaria String row, col 2 (row 3 × 42 + 2) — labelled \"String\" in the Solaria guide"
 
 [items.Flower]
-atlas = "herbs"
-index = 24
-note = "flower row of Mushrooms/Flowers/Stones (herbs atlas row 2 col 0)"
+atlas = "materials"
+index = 86
+note = "red tulip flower"
 
 [items.PolishedStone]
-atlas = "solaria_icons"
-index = 405
-note = "stone tile (tools_n_materials row 2 col 1) — refined/shaped stone"
+atlas = "materials"
+index = 25
+note = "smooth polished stone"
 
 [items.GroomingBrush]
 atlas = "solaria_objects"
@@ -403,53 +410,52 @@ index = 11
 note = "bundle tile (tools_n_materials row 2 col 3) — bound-stack identity"
 
 [items.CourtshipGift]
-atlas = "fruit_berries"
-index = 0
-note = "fruit (fruit_berries row 0 col 0) — gift-curio identity"
+atlas = "materials"
+index = 241
+note = "golden treasure amulet (courtship gift)"
 
-# 369 Phase 2b warrior's kit — placeholder bindings reusing the
-# Phase 2 tool atlas. Visual polish (distinct spear / blade / cloak
-# sprites) is a follow-on; substrate-first means the items render
-# as a recognisable-but-generic tool icon at first-light.
+# 369 Phase 2b warrior's kit — bound to the Materials Asset weapon/armor
+# cells. Best-effort visual matches from a crafting-materials pack (it has
+# no dedicated armor art); fine-tune cell choices in the sprite editor.
 [items.BoneTipSpear]
-atlas = "solaria_objects"
-index = 622
-note = "placeholder — 369 substrate-first; rebind for visual polish"
+atlas = "materials"
+index = 133
+note = "bone-tipped spear shaft"
 
 [items.BoneStiletto]
-atlas = "solaria_objects"
-index = 622
-note = "placeholder — 369 substrate-first; rebind for visual polish"
+atlas = "materials"
+index = 120
+note = "thin dagger / stiletto"
 
 [items.FlintBlade]
-atlas = "solaria_objects"
-index = 622
-note = "placeholder — 369 substrate-first; rebind for visual polish"
+atlas = "materials"
+index = 121
+note = "flint blade / cleaver"
 
 [items.HideBracers]
-atlas = "solaria_objects"
-index = 622
-note = "placeholder — 369 substrate-first; rebind for visual polish"
+atlas = "materials"
+index = 230
+note = "curved hide strap (bracer)"
 
 [items.HidePlatedWrap]
-atlas = "solaria_objects"
-index = 622
-note = "placeholder — 369 substrate-first; rebind for visual polish"
+atlas = "materials"
+index = 239
+note = "layered hide strips (plated wrap)"
 
 [items.Sling]
-atlas = "solaria_objects"
-index = 622
-note = "placeholder — 369 substrate-first; rebind for visual polish"
+atlas = "materials"
+index = 229
+note = "looped strap (sling)"
 
 [items.WovenReedCloak]
-atlas = "solaria_objects"
-index = 622
-note = "placeholder — 369 substrate-first; rebind for visual polish"
+atlas = "materials"
+index = 48
+note = "woven folded cloak"
 
 [items.ToothNotchedClub]
-atlas = "solaria_objects"
-index = 622
-note = "placeholder — 369 substrate-first; rebind for visual polish"
+atlas = "materials"
+index = 47
+note = "notched wooden club"
 
 [buildings.Den]
 textures = [ "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_1.png", "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_2.png", "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/House_Hay_3.png" ]
@@ -603,31 +609,31 @@ indices_by_stage = [ 44, 44, 44, 44 ]
 note = "Row 3, col 8: rose (single sprite, all stages same)"
 
 [flavor_plants.Pebble]
-atlas = "herbs"
-indices_by_stage = [ 12, 12, 12, 12 ]
-note = "static rock"
+atlas = "materials"
+indices_by_stage = [ 23, 23, 23, 23 ]
+note = "static rock — tan pebbles"
 
 [flavor_plants.Rock]
-atlas = "herbs"
-indices_by_stage = [ 13, 13, 13, 13 ]
-note = "static rock"
+atlas = "materials"
+indices_by_stage = [ 14, 14, 14, 14 ]
+note = "static rock — gray rock"
 
 [flavor_plants.Stone]
-atlas = "herbs"
-indices_by_stage = [ 14, 14, 14, 14 ]
-note = "static rock"
+atlas = "materials"
+indices_by_stage = [ 15, 15, 15, 15 ]
+note = "static rock — gray stone"
 
 [flavor_plants.StoneChunk]
-atlas = "herbs"
-indices_by_stage = [ 15, 15, 15, 15 ]
-note = "static rock"
+atlas = "materials"
+indices_by_stage = [ 42, 42, 42, 42 ]
+note = "static rock — stone chunk"
 
 [flavor_plants.StoneFlat]
-atlas = "herbs"
-indices_by_stage = [ 16, 16, 16, 16 ]
-note = "static rock"
+atlas = "materials"
+indices_by_stage = [ 37, 37, 37, 37 ]
+note = "static rock — flat stone"
 
 [flavor_plants.Boulder]
-atlas = "herbs"
-indices_by_stage = [ 17, 17, 17, 17 ]
-note = "static rock"
+atlas = "materials"
+indices_by_stage = [ 36, 36, 36, 36 ]
+note = "static rock — gray boulder"
