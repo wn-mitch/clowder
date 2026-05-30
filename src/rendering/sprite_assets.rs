@@ -216,7 +216,7 @@ pub fn load_sprite_assets(
     ));
 
     let well_texture = asset_server.load(
-        "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/Well_Hay_1.png",
+        "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/Well_Hay_1.png",
     );
 
     // Wildlife sprites
@@ -231,7 +231,7 @@ pub fn load_sprite_assets(
 
     // Hawk → Bald Eagle (4-frame 16x16 animation strip)
     let hawk_texture = asset_server
-        .load("new_sprites/Premium Asset Pack/Premium Animal Animations/Bald Eagle/BaldEagle.png");
+        .load("sprites/Premium Asset Pack/Premium Animal Animations/Bald Eagle/BaldEagle.png");
     let hawk_layout = layouts.add(TextureAtlasLayout::from_grid(
         UVec2::splat(16),
         4,
@@ -240,8 +240,8 @@ pub fn load_sprite_assets(
         None,
     ));
 
-    // Snake → new_sprites version (better directional art)
-    let snake_texture = asset_server.load("new_sprites/Snake_Sprites.png");
+    // Snake → directional art sheet (10x20 16x16 grid)
+    let snake_texture = asset_server.load("sprites/Snake_Sprites.png");
     let snake_layout = layouts.add(TextureAtlasLayout::from_grid(
         UVec2::splat(16),
         10,
@@ -252,7 +252,7 @@ pub fn load_sprite_assets(
 
     // ShadowFox → Arctic Wolf (4-frame 16x16 animation strip)
     let shadow_fox_texture = asset_server.load(
-        "new_sprites/Supporter Asset Pack/Supporter Animal Animations/Arctic Wolf/ArcticWolf.png",
+        "sprites/Supporter Asset Pack/Supporter Animal Animations/Arctic Wolf/ArcticWolf.png",
     );
     let shadow_fox_layout = layouts.add(TextureAtlasLayout::from_grid(
         UVec2::splat(16),
@@ -264,8 +264,8 @@ pub fn load_sprite_assets(
 
     // Prey sprites
 
-    // Rat/Mouse → new_sprites version (better art, same 10x16 grid)
-    let rat_texture = asset_server.load("new_sprites/Rat_Sprites.png");
+    // Rat/Mouse → 10x16 16x16 grid sheet
+    let rat_texture = asset_server.load("sprites/Rat_Sprites.png");
     let rat_layout = layouts.add(TextureAtlasLayout::from_grid(
         UVec2::splat(16),
         10,
@@ -275,7 +275,7 @@ pub fn load_sprite_assets(
     ));
 
     let rabbit_texture =
-        asset_server.load("new_sprites/MinifolksForestAnimals/Without outline/MiniBunny.png");
+        asset_server.load("sprites/MinifolksForestAnimals/Without outline/MiniBunny.png");
     let rabbit_layout = layouts.add(TextureAtlasLayout::from_grid(
         UVec2::splat(32),
         4,
@@ -294,20 +294,20 @@ pub fn load_sprite_assets(
     ));
     let bird_textures = vec![
         asset_server.load(
-            "new_sprites/Supporter Asset Pack/Supporter Animal Animations/Chirping Bird/ChirpingBird.png",
+            "sprites/Supporter Asset Pack/Supporter Animal Animations/Chirping Bird/ChirpingBird.png",
         ),
         asset_server.load(
-            "new_sprites/Supporter Asset Pack/Supporter Animal Animations/Blue Jay/BlueJay.png",
+            "sprites/Supporter Asset Pack/Supporter Animal Animations/Blue Jay/BlueJay.png",
         ),
         asset_server.load(
-            "new_sprites/Premium Asset Pack/Premium Animal Animations/Wise Owl/WiseOwl.png",
+            "sprites/Premium Asset Pack/Premium Animal Animations/Wise Owl/WiseOwl.png",
         ),
     ];
 
     // Fish — two single-frame color variants
     let fish_textures = vec![
-        asset_server.load("new_sprites/Fish 0021.png"),
-        asset_server.load("new_sprites/Fish Png1.png"),
+        asset_server.load("sprites/Fish 0021.png"),
+        asset_server.load("sprites/Fish Png1.png"),
     ];
 
     // Ancient-ruin rune atlas — built by tools/build_rune_atlas.py from the
@@ -325,9 +325,9 @@ pub fn load_sprite_assets(
     // Building sprites — Fan-tasy Tileset
     // -----------------------------------------------------------------------
 
-    let seasons = "new_sprites/The Fan-tasy Tileset - Turning of the Seasons/Art";
-    let premium = "new_sprites/The Fan-tasy Tileset (Premium)/Art";
-    let snow_pack = "new_sprites/The Fan-tasy Tileset - Snow Adventures/Art";
+    let seasons = "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art";
+    let premium = "sprites/The Fan-tasy Tileset (Premium)/Art";
+    let snow_pack = "sprites/The Fan-tasy Tileset - Snow Adventures/Art";
 
     // Den — 3 small hay house variants (89x91 each)
     let den_textures = [
@@ -370,7 +370,7 @@ pub fn load_sprite_assets(
     // Weather VFX — Pixel Art Atmospheric spritesheets
     // -----------------------------------------------------------------------
 
-    let atmo = "new_sprites/Pixel Art Atmospheric/Pixel Art Atmospheric/SpriteSheet";
+    let atmo = "sprites/Pixel Art Atmospheric/SpriteSheet";
 
     let weather_rain_texture = asset_server.load(format!("{atmo}/clima_lluvia_estetica.png"));
     let weather_snow_texture = asset_server.load(format!("{atmo}/clima_nieve_cozy.png"));
@@ -451,9 +451,9 @@ pub fn load_sprite_assets(
 // Tree sprite pool loader
 // ---------------------------------------------------------------------------
 
-const FANTASY_TREES: &str = "new_sprites/The Fan-tasy Tileset (Premium)/Art/Trees and Bushes";
-const FANTASY_SHADOWS: &str = "new_sprites/The Fan-tasy Tileset (Premium)/Art/Shadows";
-const FANTASY_PROPS: &str = "new_sprites/The Fan-tasy Tileset (Premium)/Art/Props";
+const FANTASY_TREES: &str = "sprites/The Fan-tasy Tileset (Premium)/Art/Trees and Bushes";
+const FANTASY_SHADOWS: &str = "sprites/The Fan-tasy Tileset (Premium)/Art/Shadows";
+const FANTASY_PROPS: &str = "sprites/The Fan-tasy Tileset (Premium)/Art/Props";
 
 /// Startup system: pre-load varied tree, shadow, and scatter sprites.
 ///
