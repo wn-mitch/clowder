@@ -1,7 +1,7 @@
 ---
 id: 486
 title: update_near_pair_cache death-retain — drive eviction off CatDied Message (13 percent inclusive CPU at HEAD, 480 child)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 9a05a29c
+landed-on: 2026-05-30
 ---
 
 ## Why
@@ -87,3 +87,4 @@ to emit it.
 - 2026-05-28: opened from 480 flamegraph-bisect Phase 1. HEAD profile
   `42-50f5fb77e342` ranks `update_near_pair_cache` at 13.27% inclusive,
   with the retains dominating. Coupling with 485 noted.
+- 2026-05-30: Implementation rode in on commit 9a05a29ca438 (feat: 487). The live-set diff against last_seen replaces the ticket-proposed CatDied reader — the cats query is permissive (admits wildlife/items via Without<Dead>, Without<Structure>) and those entities despawn directly rather than via Dead insertion. CatDied would leak entries and trip passive_familiarity's debug divergence guard; rationale documented at social.rs:71-78.

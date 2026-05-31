@@ -15,17 +15,17 @@ _Last generated: 2026-05-30._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 122 |
+| Ready | 121 |
 | Parked | 12 |
 | Blocked | 30 |
-| **Open total** | **169** |
+| **Open total** | **168** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (5 in-progress · 0 ready blockers · 0 next-recommended)
+## Active focus (5 in-progress · 0 ready blockers · 5 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
@@ -36,6 +36,14 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
+
+### Next-recommended (from `just next`)
+
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
+- **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · score 0.92_
+- **[138](docs/open-work/tickets/138-movement-budget-and-mobility-term.md)** — Phase 1 — MovementBudget per entity + escape_viability mobility term — _[ai-substrate] · score 0.91_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.90_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (5)
 
@@ -57,11 +65,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (122)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (33 ready, 6 blocked)
+### ai-substrate (32 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -94,7 +102,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[441](docs/open-work/tickets/441-decompose-systemsgoaprs-into-a-goap-submodule-per-section-seam.md)** — Decompose systems/goap.rs into a goap/ submodule per section seam — _[ai-substrate] · added 2026-05-21_
 - **[466](docs/open-work/tickets/466-travelto-greedy-step-pathing-lift-a-fallback-into-catpathplannext-step.md)** — TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step — _[ai-substrate] · added 2026-05-25_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
-- **[486](docs/open-work/tickets/486-update-near-pair-cache-death-retain-drive-eviction-off-catdied-message-13-percent-inclusive-cpu-at-head-480-child.md)** — update_near_pair_cache death-retain — drive eviction off CatDied Message (13 percent inclusive CPU at HEAD, 480 child) — _[ai-substrate] · added 2026-05-28_
 - **[489](docs/open-work/tickets/489-dse-score-collapse-contract-audit-pattern-b-personality-in-cp-floored-need-across-the-cat-action-dse-corpus.md)** — DSE score-collapse contract — audit Pattern B (personality-in-CP + floored need) across the cat-action DSE corpus — _[ai-substrate] · added 2026-05-30_
 
 ### social-coordination (19 ready, 4 blocked)
@@ -337,7 +344,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (122)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -458,7 +465,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
 - **[484](docs/open-work/tickets/484-refresh-seed-42-verdict-baseline-post-017463470472260-substrate-landings.md)** — Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings — _[diagnostics-and-tooling] · added 2026-05-27_
-- **[486](docs/open-work/tickets/486-update-near-pair-cache-death-retain-drive-eviction-off-catdied-message-13-percent-inclusive-cpu-at-head-480-child.md)** — update_near_pair_cache death-retain — drive eviction off CatDied Message (13 percent inclusive CPU at HEAD, 480 child) — _[ai-substrate] · added 2026-05-28_
 - **[489](docs/open-work/tickets/489-dse-score-collapse-contract-audit-pattern-b-personality-in-cp-floored-need-across-the-cat-action-dse-corpus.md)** — DSE score-collapse contract — audit Pattern B (personality-in-CP + floored need) across the cat-action DSE corpus — _[ai-substrate] · added 2026-05-30_
 - **[490](docs/open-work/tickets/490-warm-floor-founder-familiarity-collapses-early-game-spatial-dispersion-cuddle-puddle.md)** — warm-floor founder familiarity collapses early-game spatial dispersion (cuddle puddle) — _[social-coordination] · added 2026-05-30_
 
@@ -510,13 +516,14 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (349)
+## Landed archive (350)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-05 (283)
+### 2026-05 (284)
 
 - **[488](docs/open-work/landed/488-warm-floor-founder-fulfillment-init-lift-social-warmth-spawn-floor-to-extinguish-day-1-groomother-driver.md)** — warm-floor founder Fulfillment init — lift social_warmth spawn floor to extinguish day-1 GroomOther driver _(2026-05-30)_
+- **[486](docs/open-work/landed/486-update-near-pair-cache-death-retain-drive-eviction-off-catdied-message-13-percent-inclusive-cpu-at-head-480-child.md)** — update_near_pair_cache death-retain — drive eviction off CatDied Message (13 percent inclusive CPU at HEAD, 480 child) _(2026-05-30)_
 - **[487](docs/open-work/landed/487-groomother-cuddle-puddle-gate-hassocialtarget-on-hasgroomcandidate-target-peer-predicate.md)** — GroomOther cuddle puddle — gate HasSocialTarget on HasGroomCandidate target-peer predicate _(2026-05-29)_
 - **[485](docs/open-work/landed/485-track-sustained-copresence-per-tick-btreemap-retains-event-driven-eviction-25-percent-inclusive-cpu-at-head-480-child.md)** — track_sustained_copresence per-tick BTreeMap retains — event-driven eviction (25 percent inclusive CPU at HEAD, 480 child) _(2026-05-28)_
 - **[482](docs/open-work/landed/482-promote-remaining-source-shaped-inline-pushes-harvestcarcass-forageingredient-preservation-rack-output.md)** — Promote remaining Source-shaped inline pushes — HarvestCarcass / ForageIngredient / Preservation rack output _(2026-05-28)_
