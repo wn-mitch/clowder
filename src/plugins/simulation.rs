@@ -1075,6 +1075,13 @@ impl Plugin for SimulationPlugin {
         // Register personality event observers (cascade handlers).
         systems::personality_events::register_observers(app);
 
+        // Ticket 138 — author MovementBudget on freshly-spawned
+        // wildlife (cats are authored in `cat_bundle`). See
+        // `crate::systems::movement_budget` for the per-tick
+        // accumulator + the lazy-insert fallback for save-loaded
+        // entities.
+        app.add_observer(systems::movement_budget::on_wild_animal_added);
+
         // Register messages.
         app.add_message::<crate::components::prey::PreyKilled>();
         app.add_message::<crate::components::prey::DenRaided>();
@@ -1294,31 +1301,50 @@ impl Plugin for SimulationPlugin {
                     systems::magic::update_corruption_landmarks,
                     systems::magic::spawn_shadow_fox_from_corruption,
                     (
-                        // Ticket 023 Phase A — coherence tick must run
-                        // before `wildlife_ai` so a dissolving shadow-fox
-                        // gets despawned (well, queued) before downstream
-                        // shadowfox-bearing systems take decisions. Lives
-                        // inside the existing wildlife `.chain()` block
-                        // to avoid creating a new top-level schedule edge
-                        // (ticket 061 precedent).
-                        systems::wildlife::shadowfox_coherence_tick,
-                        // Ticket 023 Phase B — motivation tick re-elects
-                        // each shadow-fox's WildlifeAiState every
-                        // `shadow_fox_motivation_tick_cadence` ticks
-                        // (default 16). Runs after coherence so a
-                        // shadow-fox that dissolves this tick won't be
-                        // assigned a state it can't act on, and before
-                        // `wildlife_ai` so the new state takes effect
-                        // immediately.
-                        systems::wildlife::shadowfox_motivation_tick,
-                        // Ticket 023 Phase C — haunting-drain runs every
-                        // tick to apply per-tick mood/safety drain on
-                        // nearby cats and to tick the haunting-to-stalk
-                        // escalation counter. Runs after motivation_tick
-                        // (which writes the Haunting state) and before
-                        // wildlife_ai (which executes the orbit-at-edge
-                        // movement).
-                        systems::wildlife::shadowfox_haunting_drain,
+                        // Ticket 138 — per-tick accumulator pass for
+                        // every entity's `MovementBudget`. Sits before
+                        // every wildlife / cat step-site so consumers
+                        // spend a freshly-ticked budget within the
+                        // same tick. Per-tick discipline justified
+                        // under `docs/systems/ecs-rules.md`'s "decay"
+                        // carve-out — continuous accumulator, not an
+                        // event-driven transition. Also serves as the
+                        // lazy-insert path for save-loaded entities
+                        // missing the component (pre-138 saves).
+                        systems::movement_budget::accumulate_movement_budget,
+                        // Ticket 023 shadow-fox decision sub-chain —
+                        // grouped to keep the wildlife `.chain()` under
+                        // Bevy's 20-element limit while preserving
+                        // strict order: coherence → motivation →
+                        // haunting drain.
+                        (
+                            // Ticket 023 Phase A — coherence tick must run
+                            // before `wildlife_ai` so a dissolving shadow-fox
+                            // gets despawned (well, queued) before downstream
+                            // shadowfox-bearing systems take decisions. Lives
+                            // inside the existing wildlife `.chain()` block
+                            // to avoid creating a new top-level schedule edge
+                            // (ticket 061 precedent).
+                            systems::wildlife::shadowfox_coherence_tick,
+                            // Ticket 023 Phase B — motivation tick re-elects
+                            // each shadow-fox's WildlifeAiState every
+                            // `shadow_fox_motivation_tick_cadence` ticks
+                            // (default 16). Runs after coherence so a
+                            // shadow-fox that dissolves this tick won't be
+                            // assigned a state it can't act on, and before
+                            // `wildlife_ai` so the new state takes effect
+                            // immediately.
+                            systems::wildlife::shadowfox_motivation_tick,
+                            // Ticket 023 Phase C — haunting-drain runs every
+                            // tick to apply per-tick mood/safety drain on
+                            // nearby cats and to tick the haunting-to-stalk
+                            // escalation counter. Runs after motivation_tick
+                            // (which writes the Haunting state) and before
+                            // wildlife_ai (which executes the orbit-at-edge
+                            // movement).
+                            systems::wildlife::shadowfox_haunting_drain,
+                        )
+                            .chain(),
                         systems::wildlife::spawn_wildlife,
                         systems::wildlife::wildlife_ai,
                         systems::wildlife::fox_movement,

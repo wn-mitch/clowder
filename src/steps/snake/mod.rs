@@ -12,6 +12,7 @@
 
 use bevy_ecs::prelude::Entity;
 
+use crate::components::movement_budget::MovementBudget;
 use crate::components::physical::Position;
 use crate::components::snake_goap_plan::SnakeStepState;
 use crate::resources::map::TileMap;
@@ -22,9 +23,23 @@ use crate::steps::{StepOutcome, StepResult};
 // ---------------------------------------------------------------------------
 
 /// Diagonal step toward `target`. Returns `true` once within `arrival_dist`.
-fn step_slithering(pos: &mut Position, target: Position, arrival_dist: i32) -> bool {
+///
+/// Ticket 138 — the step is gated on `budget.try_spend_step()`. A snake
+/// at `per_tick = 0.5` only successfully steps on every other tick; on
+/// other ticks the function returns "not arrived yet" without writing
+/// `pos`. A blocked step retains the accumulated budget — budget models
+/// physical translation capacity, not intent.
+fn step_slithering(
+    pos: &mut Position,
+    budget: &mut MovementBudget,
+    target: Position,
+    arrival_dist: i32,
+) -> bool {
     if pos.manhattan_distance(&target) <= arrival_dist {
         return true;
+    }
+    if !budget.try_spend_step() {
+        return false;
     }
     let dx = (target.x - pos.x).signum();
     let dy = (target.y - pos.y).signum();
@@ -70,13 +85,14 @@ fn nearest_edge_target(pos: Position, map_width: i32, map_height: i32) -> Positi
 /// **Feature emission** — none.
 pub fn resolve_slide_to(
     pos: &mut Position,
+    budget: &mut MovementBudget,
     step_state: &mut SnakeStepState,
     _map: &TileMap,
 ) -> StepOutcome<()> {
     let Some(target) = step_state.target_position else {
         return StepOutcome::bare(StepResult::Fail("no target position for SlideTo".into()));
     };
-    if step_slithering(pos, target, 1) {
+    if step_slithering(pos, budget, target, 1) {
         return StepOutcome::bare(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -144,6 +160,7 @@ pub fn resolve_set_ambush(
 /// (Positive) to `record_if_witnessed`.
 pub fn resolve_strike(
     pos: &mut Position,
+    budget: &mut MovementBudget,
     step_state: &mut SnakeStepState,
     prey: &[(Entity, Position)],
     strike_range: i32,
@@ -155,7 +172,7 @@ pub fn resolve_strike(
     else {
         return StepOutcome::unwitnessed(StepResult::Fail("no prey for strike".into()));
     };
-    if step_slithering(pos, target_pos, strike_range) {
+    if step_slithering(pos, budget, target_pos, strike_range) {
         return StepOutcome::witnessed_with(StepResult::Advance, target_entity);
     }
     step_state.ticks_elapsed += 1;
@@ -217,11 +234,12 @@ pub fn resolve_bask(step_state: &mut SnakeStepState, ticks_to_bask: u64) -> Step
 /// (Positive) to `record_if_witnessed`.
 pub fn resolve_retreat(
     pos: &mut Position,
+    budget: &mut MovementBudget,
     step_state: &mut SnakeStepState,
     map: &TileMap,
 ) -> StepOutcome<bool> {
     let target = nearest_edge_target(*pos, map.width, map.height);
-    if step_slithering(pos, target, 2) {
+    if step_slithering(pos, budget, target, 2) {
         return StepOutcome::witnessed(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -238,17 +256,29 @@ pub fn resolve_retreat(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::wildlife::WildSpecies;
     use crate::resources::map::Terrain;
+
+    fn snake_budget() -> MovementBudget {
+        // Primed at 1.0 so tests that only step once exercise the
+        // "step succeeds when budget is full" path without needing to
+        // accumulate first.
+        MovementBudget {
+            accumulator: 1.0,
+            per_tick: WildSpecies::Snake.default_movement_budget(),
+        }
+    }
 
     #[test]
     fn slide_advances_at_target() {
         let map = TileMap::new(20, 20, Terrain::Grass);
         let mut pos = Position::new(5, 5);
+        let mut budget = snake_budget();
         let mut state = SnakeStepState {
             target_position: Some(Position::new(5, 5)),
             ..SnakeStepState::default()
         };
-        let outcome = resolve_slide_to(&mut pos, &mut state, &map);
+        let outcome = resolve_slide_to(&mut pos, &mut budget, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Advance));
     }
 
@@ -256,9 +286,64 @@ mod tests {
     fn slide_fails_without_target() {
         let map = TileMap::new(20, 20, Terrain::Grass);
         let mut pos = Position::new(5, 5);
+        let mut budget = snake_budget();
         let mut state = SnakeStepState::default();
-        let outcome = resolve_slide_to(&mut pos, &mut state, &map);
+        let outcome = resolve_slide_to(&mut pos, &mut budget, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Fail(_)));
+    }
+
+    #[test]
+    fn slide_blocked_when_budget_underfull_retains_budget() {
+        // Snake at half-cadence with an empty accumulator can't step.
+        // The "blocked step retains budget" invariant: accumulator
+        // stays put, no position write.
+        let map = TileMap::new(20, 20, Terrain::Grass);
+        let mut pos = Position::new(5, 5);
+        let start_pos = pos;
+        let mut budget = MovementBudget {
+            accumulator: 0.5,
+            per_tick: 0.5,
+        };
+        let mut state = SnakeStepState {
+            target_position: Some(Position::new(15, 15)),
+            ..SnakeStepState::default()
+        };
+        let outcome = resolve_slide_to(&mut pos, &mut budget, &mut state, &map);
+        assert!(matches!(outcome.result, StepResult::Continue));
+        assert_eq!(pos, start_pos, "blocked step must not write Position");
+        assert!(
+            (budget.accumulator - 0.5).abs() < f32::EPSILON,
+            "blocked step must retain budget"
+        );
+    }
+
+    #[test]
+    fn half_cadence_steps_every_other_tick() {
+        // Snake at per_tick = 0.5 needs TWO accumulations per step
+        // (0.5 + 0.5 = 1.0). With one accumulate-then-resolve pair
+        // per tick, the position should advance on alternate ticks.
+        let map = TileMap::new(20, 20, Terrain::Grass);
+        let mut pos = Position::new(0, 0);
+        let target = Position::new(10, 0);
+        let mut budget = MovementBudget::for_species(WildSpecies::Snake);
+        let mut state = SnakeStepState {
+            target_position: Some(target),
+            ..SnakeStepState::default()
+        };
+        let mut step_ticks = Vec::new();
+        for tick in 0..6 {
+            let before = pos;
+            budget.accumulate();
+            let _ = resolve_slide_to(&mut pos, &mut budget, &mut state, &map);
+            if pos != before {
+                step_ticks.push(tick);
+            }
+        }
+        // Snake should step on alternate ticks (1, 3, 5) — the first
+        // accumulate brings the primed 0.5 to 1.0 (saturating cap),
+        // the resolve spends it; next tick accumulator climbs from
+        // 0.0 to 0.5 (no step); the tick after climbs to 1.0 (step).
+        assert_eq!(step_ticks, vec![0, 2, 4], "every-other-tick step pattern");
     }
 
     #[test]
@@ -276,9 +361,10 @@ mod tests {
     #[test]
     fn strike_witnesses_in_range() {
         let mut pos = Position::new(5, 5);
+        let mut budget = snake_budget();
         let prey = vec![(Entity::from_bits(11), Position::new(5, 6))];
         let mut state = SnakeStepState::default();
-        let outcome = resolve_strike(&mut pos, &mut state, &prey, 1);
+        let outcome = resolve_strike(&mut pos, &mut budget, &mut state, &prey, 1);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert_eq!(outcome.witness, Some(Entity::from_bits(11)));
     }
@@ -286,8 +372,9 @@ mod tests {
     #[test]
     fn strike_fails_without_prey() {
         let mut pos = Position::new(5, 5);
+        let mut budget = snake_budget();
         let mut state = SnakeStepState::default();
-        let outcome = resolve_strike(&mut pos, &mut state, &[], 1);
+        let outcome = resolve_strike(&mut pos, &mut budget, &mut state, &[], 1);
         assert!(matches!(outcome.result, StepResult::Fail(_)));
     }
 
@@ -306,8 +393,9 @@ mod tests {
     fn retreat_witnesses_at_edge() {
         let map = TileMap::new(20, 20, Terrain::Grass);
         let mut pos = Position::new(1, 10);
+        let mut budget = snake_budget();
         let mut state = SnakeStepState::default();
-        let outcome = resolve_retreat(&mut pos, &mut state, &map);
+        let outcome = resolve_retreat(&mut pos, &mut budget, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert!(outcome.witness);
     }

@@ -152,6 +152,12 @@ pub fn cat_bundle(
             // co-resident with Health during Stage A; sole source of
             // truth after Stage B cutover.
             crate::components::CatBodyModel::default(),
+            // Ticket 138 — per-cat step-opportunity accumulator. Cats
+            // default to `per_tick = 1.0` (every-tick cadence); the
+            // gate at each `step_toward`-style call-site is a no-op
+            // behaviorally today, but the substrate is in place so
+            // future per-cat-cadence tuning is parameter-only.
+            crate::components::MovementBudget::cat(),
         ),
     )
 }

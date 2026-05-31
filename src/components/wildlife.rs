@@ -87,6 +87,20 @@ impl WildSpecies {
             Self::ShadowFox => 0.0, // corruption-spawned only, not edge-spawned
         }
     }
+
+    /// Default `MovementBudget.per_tick` for this species (ticket 138).
+    /// Snakes are sluggish ambushers (`0.5` — every other tick); the rest
+    /// move at full cadence. Burst abilities (hawk dive, shadow-fox lurch)
+    /// will land as their own DSE/per-ability tickets per the 138 "out of
+    /// scope" list — this knob is the steady-state cadence only.
+    pub fn default_movement_budget(self) -> f32 {
+        match self {
+            Self::Fox => 1.0,
+            Self::Hawk => 1.0,
+            Self::ShadowFox => 1.0,
+            Self::Snake => 0.5,
+        }
+    }
 }
 
 /// How a wild animal moves and hunts.

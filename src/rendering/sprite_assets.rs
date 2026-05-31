@@ -215,9 +215,8 @@ pub fn load_sprite_assets(
         None,
     ));
 
-    let well_texture = asset_server.load(
-        "sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/Well_Hay_1.png",
-    );
+    let well_texture = asset_server
+        .load("sprites/The Fan-tasy Tileset - Turning of the Seasons/Art/Buildings/Well_Hay_1.png");
 
     // Wildlife sprites
     let fox_texture = asset_server.load("sprites/wildlife/fox.png");
