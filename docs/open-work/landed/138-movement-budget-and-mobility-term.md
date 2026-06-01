@@ -1,7 +1,7 @@
 ---
 id: 138
 title: Phase 1 — MovementBudget per entity + escape_viability mobility term
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: [135]
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-05-31
 ---
 
 ## Why
@@ -93,3 +93,4 @@ Independent of Phase 0 (#137) and Phase 2 (#139); ships when ready. **This phase
 
 - 2026-05-02: Opened as Phase 1 of the 135 continuous-position-migration epic. Re-enables the mobility term punted at ticket 103 landing.
 - 2026-05-19: accuracy audit pass — ready status correct; blocked-by [135] correct (epic not yet landed); MovementBudget symbol exists in src/components/.
+- 2026-05-31: Phase 1 landed: MovementBudget substrate + escape_viability mobility-differential term (terrain 0.7->0.6, mobility 0.2 new, dependent 0.3->0.2). Snake at per_tick=0.5 (every-other-tick step); cats/foxes/hawks/shadowfox at 1.0. Single-seed verification soak passes survival + continuity gates; verdict-concern matches the documented schedule-edge perturbation pattern (cf. learning_bevy_schedule_edge_perturbation). just hypothesize sweep deferred.
