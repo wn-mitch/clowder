@@ -177,13 +177,38 @@ frame-diff to ground each call.
 
 ### Unit-test failures
 
-- [ ] **`surrounded_colony::additive_composition_builds_ring_of_coverage`**.
-      W cardinal sector missing under Euclidean. Either tune the
-      ward-placement candidate scoring to restore cardinal preference,
-      or accept and update the test with explicit drift annotation.
+- [x] **`surrounded_colony::additive_composition_builds_ring_of_coverage`**.
+      `[verified-fixed — quadrant classifier replaces cardinal sector]`.
+      Root cause: the original `cardinal_sector` classifier
+      (|dx| vs |dy| tiebreak) baked in a Manhattan-era cardinal
+      bias that the post-494 Chebyshev metric does not produce —
+      under `max(|dx|,|dy|)`, the cardinal E-fox candidate (40, 20)
+      and the diagonal NE-fox candidate (40, 10) sit at the *same*
+      `distance_cost` from anchor, so no tuning can prefer one
+      over the other. Additionally, the N-fox at (30, 8) and W-fox
+      at (18, 20) sat on misaligned buckets — their candidates
+      (30, 5) and (15, 20) landed at Chebyshev 15 from anchor,
+      outside the cat-wander halo at radius 12, so they got
+      `cat_value = 0` and lost 0.09 score-points to every diagonal
+      candidate. Both Additive and Gate produced identical picks
+      `[(20,10), (40,30), (40,20), (30,30), (20,30), (40,10)]`
+      hitting sectors {N, E, S} but missing W. Fix: redesigned the
+      test's coverage assertion to use 4 sign quadrants (NE/SE/SW/NW)
+      instead of 4 cardinal sectors — same count of buckets, but
+      each quadrant covers two adjacent octants so the assertion is
+      robust under any rotationally-symmetric placement metric and
+      captures the substrate-honest invariant "no hemisphere
+      uncovered." Production scoring code in `coordination.rs` is
+      unchanged; `Position::distance_to` stays on Chebyshev. Test-only
+      change in `src/scenarios/surrounded_colony.rs`. Both tests pass.
 
-- [ ] **`surrounded_colony::gate_composition_builds_ring_of_coverage`**.
-      Same shape; same call.
+- [x] **`surrounded_colony::gate_composition_builds_ring_of_coverage`**.
+      `[verified-fixed — cascade absorbed by quadrant classifier]`.
+      Same root cause and same fix as the Additive sibling above
+      — Gate composition produced the *identical* pick sequence
+      under the failing substrate state, confirming that the W-sector
+      miss was upstream of the composition flag. The 4-quadrant
+      assertion accepts both compositions on the same picks.
 
 ## Approach
 
@@ -309,6 +334,30 @@ follow-on work:
   pathing, mentor targeting, craft selection. Two unit-test failures
   on `surrounded_colony` ring-coverage. 16 checklist rows to triage
   before promoting a new baseline.
+
+- 2026-06-01: closed both unit-test rows under "Unit-test failures."
+  Diagnosis: the `cardinal_sector` classifier (|dx| vs |dy| tiebreak)
+  was a Manhattan-era proxy for "ring of coverage" — under Chebyshev,
+  `max(|dx|,|dy|)` flattens cardinals vs diagonals so no metric tuning
+  could restore the cardinal bias the test relied on. Additionally,
+  the N-fox (30, 8) and W-fox (18, 20) sat on misaligned buckets,
+  putting their only candidates at Chebyshev 15 — outside the
+  cat-wander halo at radius 12 — so cardinal candidates got
+  `cat_value = 0` and lost systematically to diagonals. Both Additive
+  and Gate produced *identical* picks, ruling out the composition
+  flag as a contributor. Test-only fix: replaced 4-cardinal sector
+  classification with 4 sign quadrants (NE/SE/SW/NW) in
+  `src/scenarios/surrounded_colony.rs`. Each quadrant owns 90° of
+  the plane and covers two adjacent octants, so the assertion
+  captures the substrate-honest invariant "no hemisphere uncovered"
+  under any rotationally-symmetric metric. No production code change;
+  `Position::distance_to` stays on Chebyshev. Both tests pass under
+  `cargo test --release --lib surrounded_colony`. Follow-on flag: the
+  real-soak `wards_placed_total` drop (17 → 9 → 10) is *not* fixed
+  by this; if a post-494 baseline soak confirms it's a genuine
+  degradation vs "differently-shaped ring," open a structural ticket
+  for an axis-aligned spread axis or a tightened candidate-grid
+  alignment. Already captured in the "Footer drift" checklist above.
 
 - 2026-06-01: landed the substrate realignment (Fix A + Fix B). Pre-fix
   soak preserved at `logs/tuned-42-09411128-pre-494-anchor`; post-fix

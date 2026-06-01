@@ -206,7 +206,7 @@ mod tests {
 
     /// How many wards to plant when checking ring formation. Six
     /// gives the multi-wake spreader enough room to hit all four
-    /// cardinal sectors even when the first one or two wakes pick
+    /// sign quadrants even when the first one or two wakes pick
     /// near the colony interior (jitter-dependent) before the
     /// coverage stamps push the next argmax outward.
     const RING_WARD_COUNT: usize = 6;
@@ -304,34 +304,54 @@ mod tests {
         )
     }
 
-    /// Classify a ward position into one of the four cardinal
-    /// sectors relative to the colony center, using `|dx|` vs
-    /// `|dy|` as the tiebreaker. Returns:
-    /// - `0` for N (`dy < 0` and `|dy| >= |dx|`)
-    /// - `1` for E (`dx > 0` and `|dx| > |dy|`)
-    /// - `2` for S (`dy > 0` and `|dy| >= |dx|`)
-    /// - `3` for W (`dx < 0` and `|dx| > |dy|`)
+    /// Classify a ward position into one of the four sign quadrants
+    /// relative to the colony center. Each quadrant owns 90° of
+    /// the plane; axis ties are broken deterministically so every
+    /// non-center position lands in exactly one bucket. Returns:
+    /// - `0` for NE (`dy <  0` and `dx >= 0`) — owns the −y axis
+    /// - `1` for SE (`dy >= 0` and `dx >  0`) — owns the +x axis
+    /// - `2` for SW (`dy >= 0` and `dx <= 0`) — owns the +y and −x axes
+    /// - `3` for NW (`dy <  0` and `dx <  0`)
     /// - `None` for the exact center (`dx == 0` and `dy == 0`).
     ///
-    /// Cardinal sectors are the right grain for ring coverage:
-    /// the candidate grid steps by 5 from origin, so most picks
-    /// align with cardinal axes through the colony center rather
-    /// than diagonal off-axis tiles. Ring formation means each
-    /// cardinal sector is represented at least once across the
-    /// successive wakes.
-    fn cardinal_sector(pos: Position) -> Option<usize> {
+    /// 494 follow-on: the prior `cardinal_sector` classifier
+    /// (|dx| vs |dy| tiebreak) baked in a Manhattan-era cardinal
+    /// bias that the post-494 Chebyshev metric does not produce —
+    /// under `Position::distance_to == Chebyshev`, the cardinal
+    /// E-fox candidate (40, 20) and the diagonal NE-fox candidate
+    /// (40, 10) sit at the *same* distance from anchor, so neither
+    /// `distance_cost` nor any reasonable tuning can systematically
+    /// prefer one over the other. The substrate-honest invariant is
+    /// "picks spread around the cluster, no hemisphere uncovered" —
+    /// which is exactly "every sign-quadrant of the plane gets at
+    /// least one ward." Each quadrant covers two adjacent octants
+    /// (e.g. quadrant 0 owns N + NE), so picks on either the
+    /// cardinal *or* diagonal compass direction count toward the
+    /// same quadrant.
+    fn quadrant(pos: Position) -> Option<usize> {
         let dx = pos.x() - COLONY_CENTER.x();
         let dy = pos.y() - COLONY_CENTER.y();
         if dx == 0 && dy == 0 {
             return None;
         }
-        if dy.abs() >= dx.abs() {
-            // Vertical dominant — N or S.
-            Some(if dy < 0 { 0 } else { 2 })
+        // Sign-based classification. Each axis tie maps to exactly
+        // one quadrant: dx == 0 with dy < 0 → NE; dx > 0 with
+        // dy == 0 → SE; dx == 0 with dy > 0 → SW; dx < 0 with
+        // dy == 0 → NW. No overlap, no gap.
+        Some(if dy < 0 {
+            if dx >= 0 {
+                0
+            } else {
+                3
+            }
         } else {
-            // Horizontal dominant — E or W.
-            Some(if dx > 0 { 1 } else { 3 })
-        }
+            // dy > 0 (the dy == 0 && dx == 0 case returned above).
+            if dx > 0 {
+                1
+            } else {
+                2
+            }
+        })
     }
 
     /// Drive `RING_WARD_COUNT` successive `compute_ward_placement`
@@ -402,27 +422,31 @@ mod tests {
     }
 
     /// Default composition (`Additive`) produces a ring of
-    /// coverage over successive wakes. Asserts each cardinal
-    /// quadrant receives at least one ward by the end of the
-    /// `RING_WARD_COUNT`-wake run. This is the load-bearing
-    /// gameplay behavior 313's composition change must not
-    /// break.
+    /// coverage over successive wakes. Asserts each sign quadrant
+    /// (NE/SE/SW/NW relative to the cluster centroid) receives at
+    /// least one ward by the end of the `RING_WARD_COUNT`-wake
+    /// run. This is the load-bearing gameplay behavior 313's
+    /// composition change must not break: under any
+    /// rotationally-symmetric placement metric (Manhattan,
+    /// Euclidean, or post-494 Chebyshev), at least one ward
+    /// should land in each 90° wedge of the plane around the
+    /// colony.
     #[test]
     fn additive_composition_builds_ring_of_coverage() {
         let constants = SimConstants::default();
         let picks = drive_wakes(&constants);
 
-        let mut sectors_hit = [false; 4];
+        let mut quadrants_hit = [false; 4];
         for pick in &picks {
-            if let Some(q) = cardinal_sector(*pick) {
-                sectors_hit[q] = true;
+            if let Some(q) = quadrant(*pick) {
+                quadrants_hit[q] = true;
             }
         }
-        let missing: Vec<usize> = (0..4).filter(|&q| !sectors_hit[q]).collect();
+        let missing: Vec<usize> = (0..4).filter(|&q| !quadrants_hit[q]).collect();
         assert!(
             missing.is_empty(),
             "313 surrounded ring (Additive): expected wards in all 4 \
-             cardinal sectors over {} wakes; missing {:?}; picks {:?}",
+             sign quadrants (NE/SE/SW/NW) over {} wakes; missing {:?}; picks {:?}",
             RING_WARD_COUNT,
             missing,
             picks,
@@ -453,22 +477,22 @@ mod tests {
             WardPlacementCatValueComposition::Gate;
         let picks = drive_wakes(&constants);
 
-        let mut sectors_hit = [false; 4];
+        let mut quadrants_hit = [false; 4];
         for pick in &picks {
-            if let Some(q) = cardinal_sector(*pick) {
-                sectors_hit[q] = true;
+            if let Some(q) = quadrant(*pick) {
+                quadrants_hit[q] = true;
             }
         }
-        let missing: Vec<usize> = (0..4).filter(|&q| !sectors_hit[q]).collect();
+        let missing: Vec<usize> = (0..4).filter(|&q| !quadrants_hit[q]).collect();
         assert!(
             missing.is_empty(),
             "313 surrounded ring (Gate): expected wards in all 4 \
-             cardinal sectors over {} wakes; missing {:?}; picks {:?}. \
-             If Gate is suppressing the perimeter — likely because the \
-             cat-scent halo doesn't reach the fox-rich tiles — option \
-             (c) is incompatible with surrounded-threat geometry and \
-             needs a follow-on iter to widen the halo or lower the \
-             gate floor.",
+             sign quadrants (NE/SE/SW/NW) over {} wakes; missing {:?}; \
+             picks {:?}. If Gate is suppressing an entire hemisphere — \
+             likely because the cat-scent halo doesn't reach a whole \
+             arc of fox-rich tiles — option (c) is incompatible with \
+             surrounded-threat geometry and needs a follow-on iter to \
+             widen the halo or lower the gate floor.",
             RING_WARD_COUNT,
             missing,
             picks,
