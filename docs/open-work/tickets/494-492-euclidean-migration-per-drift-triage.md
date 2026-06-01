@@ -224,17 +224,18 @@ movement cost. This shift retires the four plan-failure regressions
 above but surfaces a different downstream shape that needs
 follow-on work:
 
-1. **`TravelTo(CarcassPile): no path and stuck` 0 → 1099 (new
-   high-rate)**. Distinct from Fix B's PatrolZone shape — CarcassPile's
-   `resolve_zone_position` branch returns the carcass tile directly
-   without offset construction, so the perimeter-passability gate
-   doesn't apply. The carcass position itself is reportedly unreachable
-   1099× per soak. Likely cause: the carcass-position snapshot is
-   built from `Dead`-tagged cats whose final position may sit on
-   tiles that have since become impassable (waterlogged, walled-in by
-   construction), or carcasses are being targeted by cats outside the
-   reachable connected component. Needs a sibling ticket — same
-   structural shape as Fix B but at a different snapshot layer.
+1. **`TravelTo(CarcassPile): no path and stuck` 0 → 1099 → 0**.
+   `[landed — ticket 495 at d6d76811]`. Root cause: Fish carcasses
+   spawn at `prey_pos` per `disposition.rs:3841`, but Fish's habitat
+   is `Terrain::Water` per `species/fish.rs:30` — so the catch tile is
+   unwalkable. Fix R1 filters `food_pile_positions` to passable
+   in-bounds tiles in the `CarcassPile` picker (and parallel
+   `MaterialPile` + `compute_zone_distances` symmetry). Post-fix soak
+   `tuned-42-d6d76811`: 1099 → 0 (gone from the failures table). Hunt
+   stack shifted slightly (SearchPrey 9→38, EngagePrey no-prey 10→50)
+   but well below the pre-494 anchor; lost-during-approach actually
+   improved 126→32. Submerged-item state and shore-adjacent Fish
+   spawn (R4/R5) deferred as substrate follow-ons under 495.
 
 2. **`HoldUntilSafe: global step timeout` 0 → 670 (new)**. New mode.
    Cats sit in `HoldUntilSafe` (post-wildlife-threat hold) past the

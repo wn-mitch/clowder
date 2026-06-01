@@ -1,7 +1,7 @@
 ---
 id: 495
 title: CarcassPile picker filters unreachable tiles (Fish carcasses on water)
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 added: 2026-06-01
@@ -10,8 +10,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: d6d76811
+landed-on: 2026-06-01
 ---
 
 ## Why
@@ -139,3 +139,4 @@ variant.
 
 - 2026-06-01: opened post-494 soak. Failure rate 1099/soak. Fish
   carcass-on-water root cause confirmed via layer-walk; R1 picked.
+- 2026-06-01: post-494 soak: CarcassPile no-path-and-stuck retired 1099 -> 0. Hunt failures shifted slightly (SearchPrey 9->38, EngagePrey no-prey 10->50, lost-during-approach 126->32). Colony seasons survived 4 (unchanged). Frame-diff: modest DSE shifts (build -29%, hunt +39%, others within +/-15%). HoldUntilSafe remains 670->742 -- next follow-on.
