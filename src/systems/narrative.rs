@@ -102,8 +102,8 @@ pub fn generate_narrative(
             .and_then(|e| names.get(e).ok())
             .map(|n| n.0.clone());
 
-        let terrain = if map.in_bounds(pos.x, pos.y) {
-            map.get(pos.x, pos.y).terrain
+        let terrain = if map.in_bounds(pos.x(), pos.y()) {
+            map.get(pos.x(), pos.y()).terrain
         } else {
             crate::resources::map::Terrain::Grass
         };

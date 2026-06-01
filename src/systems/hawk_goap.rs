@@ -203,16 +203,16 @@ fn resolve_zone_position(
             .min_by_key(|p| hawk_pos.manhattan_distance(p))
             .copied(),
         HawkZone::Perch => Some(Position::new(
-            (hawk_pos.x + 5).min(map.width - 1),
-            (hawk_pos.y + 5).min(map.height - 1),
+            (hawk_pos.x() + 5).min(map.width - 1),
+            (hawk_pos.y() + 5).min(map.height - 1),
         )),
         HawkZone::MapEdge => {
-            let edge_x = if hawk_pos.x < map.width / 2 {
+            let edge_x = if hawk_pos.x() < map.width / 2 {
                 0
             } else {
                 map.width - 1
             };
-            let edge_y = if hawk_pos.y < map.height / 2 {
+            let edge_y = if hawk_pos.y() < map.height / 2 {
                 0
             } else {
                 map.height - 1

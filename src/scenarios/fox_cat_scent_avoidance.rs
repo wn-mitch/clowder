@@ -21,8 +21,8 @@ use super::env::{init_scenario_world, spawn_cat};
 use super::preset::{CatPreset, MarkerKind};
 use super::Scenario;
 
-const CAT_CLUSTER: Position = Position { x: 10, y: 20 };
-const FOX_START: Position = Position { x: 35, y: 20 };
+const CAT_CLUSTER: Position = Position::new(10, 20);
+const FOX_START: Position = Position::new(35, 20);
 
 pub static SCENARIO: Scenario = Scenario {
     name: "fox_cat_scent_avoidance",

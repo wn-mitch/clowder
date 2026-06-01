@@ -393,7 +393,7 @@ pub fn update_food_location_map(
             continue;
         }
         let center = structure.center(anchor);
-        map.stamp(center.x, center.y, eff, sense_range);
+        map.stamp(center.x(), center.y(), eff, sense_range);
     }
 }
 
@@ -419,7 +419,7 @@ pub fn update_garden_location_map(
             continue;
         }
         let center = structure.center(anchor);
-        map.stamp(center.x, center.y, eff, sense_range);
+        map.stamp(center.x(), center.y(), eff, sense_range);
     }
 }
 
@@ -446,7 +446,7 @@ pub fn update_construction_site_map(
         if urgency <= 0.0 {
             continue;
         }
-        map.stamp(pos.x, pos.y, urgency, sense_range);
+        map.stamp(pos.x(), pos.y(), urgency, sense_range);
     }
     for (structure, anchor) in &structures {
         if structure.condition >= cfg.damaged_threshold {
@@ -457,7 +457,7 @@ pub fn update_construction_site_map(
             continue;
         }
         let center = structure.center(anchor);
-        map.stamp(center.x, center.y, urgency, sense_range);
+        map.stamp(center.x(), center.y(), urgency, sense_range);
     }
 }
 

@@ -54,7 +54,7 @@ use super::preset::{CatPreset, MarkerKind};
 use super::Scenario;
 
 pub const FOCAL_NAME: &str = "Watcher";
-pub const FOCAL_START: Position = Position { x: 30, y: 30 };
+pub const FOCAL_START: Position = Position::new(30, 30);
 
 pub static SCENARIO: Scenario = Scenario {
     name: "guarding_morale_break_releases",

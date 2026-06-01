@@ -18,8 +18,8 @@ use crate::components::wildlife::{WildAnimal, WildSpecies, WildlifeAiState};
 use super::env::init_scenario_world;
 use super::Scenario;
 
-const WARD_POS: Position = Position { x: 15, y: 20 };
-const FOX_START: Position = Position { x: 35, y: 20 };
+const WARD_POS: Position = Position::new(15, 20);
+const FOX_START: Position = Position::new(35, 20);
 
 pub static SCENARIO: Scenario = Scenario {
     name: "fox_ward_only_avoidance",

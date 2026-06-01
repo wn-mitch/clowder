@@ -283,8 +283,8 @@ pub fn resolve_combat(
                 let text = format!("The {species_name} breaks away, outnumbered.");
                 log.push(time.tick, text, NarrativeTier::Action);
                 // Set wildlife to flee toward nearest edge.
-                let flee_dx = if wildlife_pos.x < 40 { -1 } else { 1 };
-                let flee_dy = if wildlife_pos.y < 30 { -1 } else { 1 };
+                let flee_dx = if wildlife_pos.x() < 40 { -1 } else { 1 };
+                let flee_dy = if wildlife_pos.y() < 30 { -1 } else { 1 };
                 *ai_state = WildlifeAiState::Fleeing {
                     dx: flee_dx,
                     dy: flee_dy,
@@ -582,7 +582,7 @@ pub fn resolve_combat(
                 time.tick,
                 crate::resources::event_log::EventKind::ShadowFoxBanished {
                     posse: posse_names,
-                    location: (target_pos.x, target_pos.y),
+                    location: (target_pos.x(), target_pos.y()),
                 },
             );
         }

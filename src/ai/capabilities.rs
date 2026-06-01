@@ -207,8 +207,8 @@ fn has_nearby_tile(
             if dx == 0 && dy == 0 {
                 continue;
             }
-            let x = from.x + dx;
-            let y = from.y + dy;
+            let x = from.x() + dx;
+            let y = from.y() + dy;
             if map.in_bounds(x, y) && predicate(map.get(x, y).terrain) {
                 return true;
             }
@@ -231,8 +231,8 @@ pub fn nearest_matching_tile(
     let mut best: Option<(Position, i32)> = None;
     for dy in -radius..=radius {
         for dx in -radius..=radius {
-            let x = from.x + dx;
-            let y = from.y + dy;
+            let x = from.x() + dx;
+            let y = from.y() + dy;
             if !map.in_bounds(x, y) {
                 continue;
             }

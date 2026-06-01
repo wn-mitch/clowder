@@ -89,12 +89,12 @@ impl HuntingPriors {
 
     /// A successful catch strongly increases belief at `pos`.
     pub fn record_catch(&mut self, pos: &Position) {
-        self.update(pos.x, pos.y, 0.15);
+        self.update(pos.x(), pos.y(), 0.15);
     }
 
     /// Detecting scent weakly increases belief at `pos`.
     pub fn record_scent(&mut self, pos: &Position) {
-        self.update(pos.x, pos.y, 0.05);
+        self.update(pos.x(), pos.y(), 0.05);
     }
 
     /// A fruitless search decreases belief proportional to effort (tiles covered).
@@ -102,7 +102,7 @@ impl HuntingPriors {
     /// The penalty is `tiles_searched / 2000.0`, so 2000 searched tiles produce
     /// a full −1.0 delta (clamped at `MIN_BELIEF`).
     pub fn record_failed_search(&mut self, pos: &Position, tiles_searched: u64) {
-        self.update(pos.x, pos.y, -(tiles_searched as f32 / 2000.0));
+        self.update(pos.x(), pos.y(), -(tiles_searched as f32 / 2000.0));
     }
 
     /// Find the highest-belief bucket within `radius` buckets of `pos` that
@@ -111,8 +111,8 @@ impl HuntingPriors {
     /// Returns a unit step `(dx.signum(), dy.signum())` toward the centre of
     /// that bucket, or `None` if no bucket beats the default prior.
     pub fn best_direction(&self, pos: &Position, radius: i32) -> Option<(i32, i32)> {
-        let origin_bx = pos.x / self.bucket_size;
-        let origin_by = pos.y / self.bucket_size;
+        let origin_bx = pos.x() / self.bucket_size;
+        let origin_by = pos.y() / self.bucket_size;
 
         let mut best_belief = DEFAULT_PRIOR;
         let mut best_bucket: Option<(i32, i32)> = None;
@@ -136,8 +136,8 @@ impl HuntingPriors {
         best_bucket.map(|(bx, by)| {
             let center_x = bx * self.bucket_size + self.bucket_size / 2;
             let center_y = by * self.bucket_size + self.bucket_size / 2;
-            let dx = center_x - pos.x;
-            let dy = center_y - pos.y;
+            let dx = center_x - pos.x();
+            let dy = center_y - pos.y();
             (dx.signum(), dy.signum())
         })
     }

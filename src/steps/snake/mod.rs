@@ -41,27 +41,26 @@ fn step_slithering(
     if !budget.try_spend_step() {
         return false;
     }
-    let dx = (target.x - pos.x).signum();
-    let dy = (target.y - pos.y).signum();
-    pos.x += dx;
-    pos.y += dy;
+    let dx = (target.x() - pos.x()).signum();
+    let dy = (target.y() - pos.y()).signum();
+    pos.set_tile(pos.x() + dx, pos.y() + dy);
     pos.manhattan_distance(&target) <= arrival_dist
 }
 
 fn nearest_edge_target(pos: Position, map_width: i32, map_height: i32) -> Position {
-    let d_left = pos.x;
-    let d_right = map_width - 1 - pos.x;
-    let d_top = pos.y;
-    let d_bottom = map_height - 1 - pos.y;
+    let d_left = pos.x();
+    let d_right = map_width - 1 - pos.x();
+    let d_top = pos.y();
+    let d_bottom = map_height - 1 - pos.y();
     let min = d_left.min(d_right).min(d_top).min(d_bottom);
     if min == d_left {
-        Position::new(0, pos.y)
+        Position::new(0, pos.y())
     } else if min == d_right {
-        Position::new(map_width - 1, pos.y)
+        Position::new(map_width - 1, pos.y())
     } else if min == d_top {
-        Position::new(pos.x, 0)
+        Position::new(pos.x(), 0)
     } else {
-        Position::new(pos.x, map_height - 1)
+        Position::new(pos.x(), map_height - 1)
     }
 }
 

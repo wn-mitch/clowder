@@ -94,15 +94,15 @@ pub fn update_env_quality_maps(
             StructureType::Den => {
                 stamp(
                     &mut comfort.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.comfort_building_den_peak * condition,
                     c.comfort_building_den_radius,
                 );
                 stamp(
                     &mut beauty.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.beauty_building_den_peak * condition,
                     c.beauty_building_den_radius,
                 );
@@ -110,15 +110,15 @@ pub fn update_env_quality_maps(
             StructureType::Hearth => {
                 stamp(
                     &mut comfort.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.comfort_building_hearth_peak * condition,
                     c.comfort_building_hearth_radius,
                 );
                 stamp(
                     &mut beauty.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.beauty_building_hearth_peak * condition,
                     c.beauty_building_hearth_radius,
                 );
@@ -126,8 +126,8 @@ pub fn update_env_quality_maps(
             StructureType::Stores => {
                 stamp(
                     &mut comfort.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.comfort_building_stores_peak * condition,
                     c.comfort_building_stores_radius,
                 );
@@ -135,8 +135,8 @@ pub fn update_env_quality_maps(
             StructureType::Workshop => {
                 stamp(
                     &mut comfort.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.comfort_building_workshop_peak * condition,
                     c.comfort_building_workshop_radius,
                 );
@@ -144,15 +144,15 @@ pub fn update_env_quality_maps(
             StructureType::Garden => {
                 stamp(
                     &mut comfort.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.comfort_building_garden_peak * condition,
                     c.comfort_building_garden_radius,
                 );
                 stamp(
                     &mut beauty.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.beauty_building_garden_peak * condition,
                     c.beauty_building_garden_radius,
                 );
@@ -160,8 +160,8 @@ pub fn update_env_quality_maps(
             StructureType::WardPost => {
                 stamp(
                     &mut comfort.field,
-                    pos.x,
-                    pos.y,
+                    pos.x(),
+                    pos.y(),
                     c.comfort_building_ward_post_peak * condition,
                     c.comfort_building_ward_post_radius,
                 );
@@ -186,8 +186,8 @@ pub fn update_env_quality_maps(
             let dirty_factor = (1.0 - structure.cleanliness).clamp(0.0, 1.0);
             stamp(
                 &mut cleanliness.field,
-                pos.x,
-                pos.y,
+                pos.x(),
+                pos.y(),
                 c.cleanliness_dirty_building_peak * dirty_factor,
                 c.cleanliness_dirty_building_radius,
             );
@@ -198,8 +198,8 @@ pub fn update_env_quality_maps(
     for pos in &dead {
         stamp(
             &mut cleanliness.field,
-            pos.x,
-            pos.y,
+            pos.x(),
+            pos.y(),
             c.cleanliness_corpse_peak,
             c.cleanliness_corpse_radius,
         );
@@ -322,10 +322,10 @@ pub fn emit_env_quality_features(
     let mut saw_negative = false;
     for (pos, personality) in &cats {
         let value = combined_env_quality(
-            comfort.get(pos.x, pos.y),
-            cleanliness.get(pos.x, pos.y),
-            beauty.get(pos.x, pos.y),
-            mystery.get(pos.x, pos.y),
+            comfort.get(pos.x(), pos.y()),
+            cleanliness.get(pos.x(), pos.y()),
+            beauty.get(pos.x(), pos.y()),
+            mystery.get(pos.x(), pos.y()),
             personality,
             c,
         );

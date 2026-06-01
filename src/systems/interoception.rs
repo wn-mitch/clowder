@@ -167,8 +167,8 @@ fn count_walkable_tiles_in_box(center: Position, radius: i32, map: &TileMap) -> 
     let mut count: u32 = 0;
     for dy in -r..=r {
         for dx in -r..=r {
-            let x = center.x + dx;
-            let y = center.y + dy;
+            let x = center.x() + dx;
+            let y = center.y() + dy;
             if map.in_bounds(x, y) && map.get(x, y).terrain.is_passable() {
                 count += 1;
             }

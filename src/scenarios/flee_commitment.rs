@@ -56,8 +56,8 @@ pub static SCENARIO: Scenario = Scenario {
     expected_features: &["FleeTargetPicked"],
 };
 
-pub const FOCAL_START: Position = Position { x: 20, y: 20 };
-pub const FOX_POS: Position = Position { x: 22, y: 20 };
+pub const FOCAL_START: Position = Position::new(20, 20);
+pub const FOX_POS: Position = Position::new(22, 20);
 /// Substrate-blind naive vector-projection picker (the pre-230 code
 /// path) would project the cat away from the fox along (-2, 0)
 /// scaled by `flee_distance = 8`, landing near (12, 20). Saturating

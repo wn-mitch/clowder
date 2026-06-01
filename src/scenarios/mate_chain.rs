@@ -47,8 +47,8 @@ use super::Scenario;
 
 pub const QUEEN_NAME: &str = "Marigold";
 pub const TOM_NAME: &str = "Tamsin";
-pub const QUEEN_START: Position = Position { x: 20, y: 20 };
-pub const TOM_START: Position = Position { x: 21, y: 20 };
+pub const QUEEN_START: Position = Position::new(20, 20);
+pub const TOM_START: Position = Position::new(21, 20);
 
 pub static SCENARIO: Scenario = Scenario {
     name: "mate_chain",

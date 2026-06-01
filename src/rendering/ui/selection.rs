@@ -88,8 +88,8 @@ pub fn handle_world_click(
     // Find nearest cat within 1.5-tile radius.
     let mut nearest_cat: Option<(Entity, f32)> = None;
     for (entity, pos) in &cats {
-        let dx = (pos.x - gx) as f32;
-        let dy = (pos.y - gy) as f32;
+        let dx = (pos.x() - gx) as f32;
+        let dy = (pos.y() - gy) as f32;
         let dist = (dx * dx + dy * dy).sqrt();
         if dist <= 1.5 && nearest_cat.is_none_or(|(_, d)| dist < d) {
             nearest_cat = Some((entity, dist));
@@ -105,8 +105,8 @@ pub fn handle_world_click(
     // Fallback: find nearest wildlife or prey within 1.5-tile radius.
     let mut nearest_wild: Option<(Entity, f32)> = None;
     for (entity, pos) in wildlife.iter().chain(prey_q.iter()) {
-        let dx = (pos.x - gx) as f32;
-        let dy = (pos.y - gy) as f32;
+        let dx = (pos.x() - gx) as f32;
+        let dy = (pos.y() - gy) as f32;
         let dist = (dx * dx + dy * dy).sqrt();
         if dist <= 1.5 && nearest_wild.is_none_or(|(_, d)| dist < d) {
             nearest_wild = Some((entity, dist));

@@ -105,7 +105,7 @@ impl<'a> FoxScentOverlay<'a> {
 
 impl TileCostOverlay for FoxScentOverlay<'_> {
     fn cost_at(&self, pos: Position) -> u32 {
-        let scent = self.map.get(pos.x, pos.y).clamp(0.0, 1.0);
+        let scent = self.map.get(pos.x(), pos.y()).clamp(0.0, 1.0);
         (scent * self.max_cost as f32).round() as u32
     }
 }
@@ -138,10 +138,14 @@ impl<'a> CorruptionOverlay<'a> {
 
 impl TileCostOverlay for CorruptionOverlay<'_> {
     fn cost_at(&self, pos: Position) -> u32 {
-        if !self.tile_map.in_bounds(pos.x, pos.y) {
+        if !self.tile_map.in_bounds(pos.x(), pos.y()) {
             return 0;
         }
-        let corr = self.tile_map.get(pos.x, pos.y).corruption.clamp(0.0, 1.0);
+        let corr = self
+            .tile_map
+            .get(pos.x(), pos.y())
+            .corruption
+            .clamp(0.0, 1.0);
         (corr * self.max_cost as f32).round() as u32
     }
 }
@@ -176,7 +180,7 @@ impl<'a> CatPatrolDeterrentOverlay<'a> {
 
 impl TileCostOverlay for CatPatrolDeterrentOverlay<'_> {
     fn cost_at(&self, pos: Position) -> u32 {
-        let v = self.map.get(pos.x, pos.y).clamp(0.0, 1.0);
+        let v = self.map.get(pos.x(), pos.y()).clamp(0.0, 1.0);
         (v * self.max_cost as f32).round() as u32
     }
 }
@@ -227,8 +231,8 @@ const NEIGHBORS: [(i32, i32); 8] = [
 /// Chebyshev distance — admissible heuristic for 8-directional movement
 /// with minimum edge cost 1.
 fn heuristic(a: &Position, b: &Position) -> u32 {
-    let dx = (a.x - b.x).unsigned_abs();
-    let dy = (a.y - b.y).unsigned_abs();
+    let dx = (a.x() - b.x()).unsigned_abs();
+    let dy = (a.y() - b.y()).unsigned_abs();
     dx.max(dy)
 }
 
@@ -261,16 +265,16 @@ pub fn find_path(
     // safe semantic: an unrouteable request is indistinguishable
     // from "from-position invalid," and downstream callers already
     // handle the `None` return.
-    if !map.in_bounds(from.x, from.y) {
+    if !map.in_bounds(from.x(), from.y()) {
         return None;
     }
-    if !map.in_bounds(to.x, to.y) || !map.get(to.x, to.y).terrain.is_passable() {
+    if !map.in_bounds(to.x(), to.y()) || !map.get(to.x(), to.y()).terrain.is_passable() {
         return None;
     }
 
     let w = map.width as usize;
     let h = map.height as usize;
-    let idx = |p: &Position| (p.y as usize) * w + (p.x as usize);
+    let idx = |p: &Position| (p.y() as usize) * w + (p.x() as usize);
 
     // g_score: cheapest known cost from `from` to each tile. u32::MAX = unvisited.
     let mut g_score = vec![u32::MAX; w * h];
@@ -308,8 +312,8 @@ pub fn find_path(
         }
 
         for &(dx, dy) in &NEIGHBORS {
-            let nx = current.pos.x + dx;
-            let ny = current.pos.y + dy;
+            let nx = current.pos.x() + dx;
+            let ny = current.pos.y() + dy;
             if !map.in_bounds(nx, ny) {
                 continue;
             }
@@ -372,15 +376,15 @@ pub fn step_toward(
         return None;
     }
 
-    let dx = (to.x - from.x).signum();
-    let dy = (to.y - from.y).signum();
+    let dx = (to.x() - from.x()).signum();
+    let dy = (to.y() - from.y()).signum();
 
     let candidates = [
         // Diagonal first
-        (from.x + dx, from.y + dy),
+        (from.x() + dx, from.y() + dy),
         // Then cardinal
-        (from.x + dx, from.y),
-        (from.x, from.y + dy),
+        (from.x() + dx, from.y()),
+        (from.x(), from.y() + dy),
     ];
 
     if overlays.is_empty() {
@@ -388,7 +392,7 @@ pub fn step_toward(
         for (nx, ny) in candidates {
             // Skip degenerate candidates that equal the current position
             // (happens when dx or dy is 0).
-            if nx == from.x && ny == from.y {
+            if nx == from.x() && ny == from.y() {
                 continue;
             }
             if map.in_bounds(nx, ny) && map.get(nx, ny).terrain.is_passable() {
@@ -401,7 +405,7 @@ pub fn step_toward(
     // Non-empty overlays: pick lowest-cost passable candidate.
     let mut best: Option<(Position, u32)> = None;
     for (nx, ny) in candidates {
-        if nx == from.x && ny == from.y {
+        if nx == from.x() && ny == from.y() {
             continue;
         }
         if !map.in_bounds(nx, ny) {
@@ -440,8 +444,8 @@ pub fn find_free_adjacent(
     occupied: &HashSet<Position>,
 ) -> Option<Position> {
     // Fast path: target itself is fine.
-    if map.in_bounds(target.x, target.y)
-        && map.get(target.x, target.y).terrain.is_passable()
+    if map.in_bounds(target.x(), target.y())
+        && map.get(target.x(), target.y()).terrain.is_passable()
         && !occupied.contains(&target)
     {
         return Some(target);
@@ -450,8 +454,8 @@ pub fn find_free_adjacent(
     // Check 8 neighbors, pick the one closest to hint.
     let mut best: Option<(Position, u32)> = None;
     for &(dx, dy) in &NEIGHBORS {
-        let nx = target.x + dx;
-        let ny = target.y + dy;
+        let nx = target.x() + dx;
+        let ny = target.y() + dy;
         if !map.in_bounds(nx, ny) {
             continue;
         }
@@ -589,11 +593,11 @@ mod tests {
         // Path must not cross any water tile.
         for p in &path {
             assert_ne!(
-                map.get(p.x, p.y).terrain,
+                map.get(p.x(), p.y()).terrain,
                 Terrain::Water,
                 "path crossed water at ({}, {})",
-                p.x,
-                p.y
+                p.x(),
+                p.y()
             );
         }
     }
@@ -629,7 +633,7 @@ mod tests {
         // Count how many DenseForest tiles the path crosses.
         let forest_tiles = path
             .iter()
-            .filter(|p| map.get(p.x, p.y).terrain == Terrain::DenseForest)
+            .filter(|p| map.get(p.x(), p.y()).terrain == Terrain::DenseForest)
             .count();
         // The optimal path should mostly avoid the forest corridor.
         assert!(
@@ -802,7 +806,7 @@ mod tests {
         );
         // Must be adjacent to target.
         assert!(
-            (p.x - 5).abs() <= 1 && (p.y - 5).abs() <= 1,
+            (p.x() - 5).abs() <= 1 && (p.y() - 5).abs() <= 1,
             "result {p:?} should be adjacent to (5,5)"
         );
     }

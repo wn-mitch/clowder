@@ -1696,8 +1696,8 @@ pub fn evaluate_and_plan(
         let mc = &res.constants.magic;
         let inner = mc.territory_corruption_inner_radius;
         let outer = mc.territory_corruption_outer_radius;
-        let cx = res.colony_center.0.x;
-        let cy = res.colony_center.0.y;
+        let cx = res.colony_center.0.x();
+        let cy = res.colony_center.0.y();
         let mut max_c = 0.0f32;
         for y in (cy - outer)..=(cy + outer) {
             for x in (cx - outer)..=(cx + outer) {
@@ -2213,8 +2213,8 @@ pub fn evaluate_and_plan(
         let has_social_target = markers.has(markers::HasSocialTarget::KEY, entity);
 
         let (on_corrupted_tile, tile_corruption, on_special_terrain) =
-            if res.map.in_bounds(pos.x, pos.y) {
-                let tile = res.map.get(pos.x, pos.y);
+            if res.map.in_bounds(pos.x(), pos.y()) {
+                let tile = res.map.get(pos.x(), pos.y());
                 (
                     tile.corruption > d.corrupted_tile_threshold,
                     tile.corruption,
@@ -2242,8 +2242,8 @@ pub fn evaluate_and_plan(
                     if dx.abs() + dy.abs() > r {
                         continue; // Manhattan radius
                     }
-                    let nx = pos.x + dx;
-                    let ny = pos.y + dy;
+                    let nx = pos.x() + dx;
+                    let ny = pos.y() + dy;
                     if res.map.in_bounds(nx, ny) {
                         let c = res.map.get(nx, ny).corruption;
                         if c > max_c {
@@ -2382,7 +2382,7 @@ pub fn evaluate_and_plan(
         // replan-cadence as the field flood.
         let cat_nearest_prey = colony
             .prey_scent_maps
-            .highest_nearby_any(pos.x, pos.y, d.scent_search_radius)
+            .highest_nearby_any(pos.x(), pos.y(), d.scent_search_radius)
             .map(|(x, y)| Position::new(x, y));
         let cat_wander_target = {
             let radius = (8.0 + personality.curiosity.clamp(0.0, 1.0) * 12.0) as i32;
@@ -2390,9 +2390,9 @@ pub fn evaluate_and_plan(
             let seed = (res.time.tick / recandidate) ^ entity.to_bits();
             let dx = (seed as i32).rem_euclid(2 * radius + 1) - radius;
             let dy = ((seed >> 16) as i32).rem_euclid(2 * radius + 1) - radius;
-            let candidate = Position::new(pos.x + dx, pos.y + dy);
+            let candidate = Position::new(pos.x() + dx, pos.y() + dy);
             res.map
-                .in_bounds(candidate.x, candidate.y)
+                .in_bounds(candidate.x(), candidate.y())
                 .then_some(candidate)
         };
 
@@ -2510,31 +2510,31 @@ pub fn evaluate_and_plan(
             hungry_kitten_urgency: caretake_resolution.urgency,
             is_parent_of_hungry_kitten: caretake_resolution.is_parent,
             parenting: colony.parenting_scalars.get(entity),
-            kitten_cry_perceived: colony.kitten_cry_map.get(pos.x, pos.y),
+            kitten_cry_perceived: colony.kitten_cry_map.get(pos.x(), pos.y()),
             caretake_compassion_bond_scale: caretake_bond_scale,
             unexplored_nearby: colony.exploration_map.unexplored_fraction_nearby(
-                pos.x,
-                pos.y,
+                pos.x(),
+                pos.y(),
                 d.explore_perception_radius,
                 0.5,
             ),
-            fox_scent_level: colony.fox_scent_map.get(pos.x, pos.y),
-            recent_ambush_at_position: colony.recent_ambush_map.get(pos.x, pos.y),
-            carcass_scent_at_position: colony.carcass_scent_map.get(pos.x, pos.y),
+            fox_scent_level: colony.fox_scent_map.get(pos.x(), pos.y()),
+            recent_ambush_at_position: colony.recent_ambush_map.get(pos.x(), pos.y()),
+            carcass_scent_at_position: colony.carcass_scent_map.get(pos.x(), pos.y()),
             // 301: coordinator-stamped ward-placement intent at cat's
             // position. Dormant at default — the resource is allocated
             // but unwritten because the populator short-circuits under
             // `ward_placement_semantics == SingleShotArgmax`.
-            ward_intent_at_position: colony.ward_intent_map.get(pos.x, pos.y),
+            ward_intent_at_position: colony.ward_intent_map.get(pos.x(), pos.y()),
             // 101: env-quality influence-map samples at the cat's tile.
             // The four mood-relevant maps feed
             // `EnvironmentalQualityModifier`; `local_corruption` is
             // surfaced as a perception scalar for future DSE consumers.
-            local_comfort: colony.comfort_map.get(pos.x, pos.y),
-            local_cleanliness: colony.cleanliness_map.get(pos.x, pos.y),
-            local_beauty: colony.beauty_map.get(pos.x, pos.y),
-            local_mystery: colony.mystery_map.get(pos.x, pos.y),
-            local_corruption: colony.corruption_influence_map.get(pos.x, pos.y),
+            local_comfort: colony.comfort_map.get(pos.x(), pos.y()),
+            local_cleanliness: colony.cleanliness_map.get(pos.x(), pos.y()),
+            local_beauty: colony.beauty_map.get(pos.x(), pos.y()),
+            local_mystery: colony.mystery_map.get(pos.x(), pos.y()),
+            local_corruption: colony.corruption_influence_map.get(pos.x(), pos.y()),
             // 209: per-cat proxy for colony-tension. `(1 - safety)` is
             // the cat's current threat-deficit; consumed by the
             // `TensionDefusionGroomLift` modifier (dormant at 0.0).
@@ -2567,11 +2567,11 @@ pub fn evaluate_and_plan(
                         )
                         .unwrap_or_else(|| {
                             crate::components::physical::Position::new(
-                                res.colony_center.0.x + d.patrol_perimeter_offset,
-                                res.colony_center.0.y,
+                                res.colony_center.0.x() + d.patrol_perimeter_offset,
+                                res.colony_center.0.y(),
                             )
                         });
-                    let key = crate::components::beliefs::bucket_position(anchor.x, anchor.y);
+                    let key = crate::components::beliefs::bucket_position(anchor.x(), anchor.y());
                     lb.models.get(&key).map(|m| m.recency_of_threat_cue.value)
                 })
                 .unwrap_or(0.0),
@@ -2684,8 +2684,8 @@ pub fn evaluate_and_plan(
                 // ticket-256 patrol anchor below; HerbcraftWard's
                 // anchor stays geometrically simple for now.)
                 nearest_perimeter_tile: Some(crate::components::physical::Position::new(
-                    res.colony_center.0.x + d.patrol_perimeter_offset,
-                    res.colony_center.0.y,
+                    res.colony_center.0.x() + d.patrol_perimeter_offset,
+                    res.colony_center.0.y(),
                 )),
                 // 256 R3: per-replan ward-sector centroid. The cat's
                 // patrol beat rotates through ward-protected sectors
@@ -2707,8 +2707,8 @@ pub fn evaluate_and_plan(
                     )
                     .or_else(|| {
                         Some(crate::components::physical::Position::new(
-                            res.colony_center.0.x + d.patrol_perimeter_offset,
-                            res.colony_center.0.y,
+                            res.colony_center.0.x() + d.patrol_perimeter_offset,
+                            res.colony_center.0.y(),
                         ))
                     }),
                 // §L2.10.7 Flee anchor: position of the nearest
@@ -4506,8 +4506,8 @@ pub fn resolve_goap_plans(
         // §7.2 commitment gate — evaluate whether to drop the held intention.
         let strategy = crate::ai::commitment::strategy_for_disposition(plan.kind);
         let unexplored_nearby = prey_params.exploration_map.unexplored_fraction_nearby(
-            pos.x,
-            pos.y,
+            pos.x(),
+            pos.y(),
             d.explore_perception_radius,
             0.5,
         );
@@ -4945,16 +4945,18 @@ pub fn resolve_goap_plans(
                             // inline body so the fix is API-owned.
                             let preempt_kind = if urgent.kind == UrgencyKind::ThreatNearby {
                                 if let Some(threat_pos) = urgent.threat_pos {
-                                    let dx = pos.x - threat_pos.x;
-                                    let dy = pos.y - threat_pos.y;
+                                    let dx = pos.x() - threat_pos.x();
+                                    let dy = pos.y() - threat_pos.y();
                                     let len = ((dx * dx + dy * dy) as f32).sqrt().max(1.0);
                                     let fd = d.flee_distance;
                                     let mut target = Position::new(
-                                        pos.x + (dx as f32 / len * fd) as i32,
-                                        pos.y + (dy as f32 / len * fd) as i32,
+                                        pos.x() + (dx as f32 / len * fd) as i32,
+                                        pos.y() + (dy as f32 / len * fd) as i32,
                                     );
-                                    target.x = target.x.clamp(0, ec.map.width - 1);
-                                    target.y = target.y.clamp(0, ec.map.height - 1);
+                                    target.set_tile(
+                                        target.x().clamp(0, ec.map.width - 1),
+                                        target.y().clamp(0, ec.map.height - 1),
+                                    );
                                     crate::systems::plan_substrate::PreemptKind::ThreatFlee {
                                         flee_target: target,
                                     }
@@ -6171,8 +6173,8 @@ fn dispatch_step_action(
             let duration = d.sleep_duration_base
                 + ((1.0 - needs.energy) * d.sleep_duration_deficit_multiplier) as u64;
             // Corruption degrades rest quality.
-            let tile_corruption = if ec.map.in_bounds(pos.x, pos.y) {
-                ec.map.get(pos.x, pos.y).corruption
+            let tile_corruption = if ec.map.in_bounds(pos.x(), pos.y()) {
+                ec.map.get(pos.x(), pos.y()).corruption
             } else {
                 0.0
             };
@@ -7024,7 +7026,7 @@ fn dispatch_step_action(
                         EventKind::MatingOccurred {
                             partner_a: name.0.clone(),
                             partner_b: format!("{partner:?}"),
-                            location: (pos.x, pos.y),
+                            location: (pos.x(), pos.y()),
                         },
                     );
                 }
@@ -7666,8 +7668,8 @@ fn dispatch_step_action(
                         magic_params.carcass_query.get_mut(carcass_entity)
                     {
                         carcass.harvested = true;
-                        let harvest_corruption = if ec.map.in_bounds(pos.x, pos.y) {
-                            ec.map.get(pos.x, pos.y).corruption
+                        let harvest_corruption = if ec.map.in_bounds(pos.x(), pos.y()) {
+                            ec.map.get(pos.x(), pos.y()).corruption
                         } else {
                             0.0
                         };
@@ -7763,7 +7765,7 @@ fn dispatch_step_action(
                         ec.time.tick,
                         EventKind::BuildingConstructed {
                             kind: "structure".into(),
-                            location: (pos.x, pos.y),
+                            location: (pos.x(), pos.y()),
                         },
                     );
                 }
@@ -8809,8 +8811,8 @@ pub fn emit_plan_narrative(
             PlanEvent::Abandoned => "plan_abandoned",
         };
 
-        let terrain = if map.in_bounds(pos.x, pos.y) {
-            map.get(pos.x, pos.y).terrain
+        let terrain = if map.in_bounds(pos.x(), pos.y()) {
+            map.get(pos.x(), pos.y()).terrain
         } else {
             Terrain::Grass
         };
@@ -9050,8 +9052,8 @@ fn resolve_search_prey(
                 let den_name = den.den_name;
                 let den_pos_copy = *den_pos;
 
-                let den_corruption = if map.in_bounds(den_pos_copy.x, den_pos_copy.y) {
-                    map.get(den_pos_copy.x, den_pos_copy.y).corruption
+                let den_corruption = if map.in_bounds(den_pos_copy.x(), den_pos_copy.y()) {
+                    map.get(den_pos_copy.x(), den_pos_copy.y()).corruption
                 } else {
                     0.0
                 };
@@ -9059,8 +9061,8 @@ fn resolve_search_prey(
                     crate::components::items::ItemModifiers::with_corruption(den_corruption);
                 for _ in 0..kills {
                     let ground_position = Position::new(
-                        den_pos_copy.x + rng.rng.random_range(-1..=1i32),
-                        den_pos_copy.y + rng.rng.random_range(-1..=1i32),
+                        den_pos_copy.x() + rng.rng.random_range(-1..=1i32),
+                        den_pos_copy.y() + rng.rng.random_range(-1..=1i32),
                     );
                     let outcome = DenRaidCarcassSource {
                         kind: drop_item,
@@ -9237,7 +9239,7 @@ fn resolve_search_prey(
     let scent_source =
         prey_params
             .prey_scent_maps
-            .highest_nearby_any(pos.x, pos.y, d.scent_search_radius);
+            .highest_nearby_any(pos.x(), pos.y(), d.scent_search_radius);
     let scent_above_threshold = scent_source
         .map(|(sx, sy)| prey_params.prey_scent_maps.get_any(sx, sy) >= d.scent_detect_threshold)
         .unwrap_or(false);
@@ -9327,7 +9329,7 @@ fn record_hunt_attempt(
             EventKind::HuntAttempt {
                 cat: cat_name.to_string(),
                 prey_species: species.to_string(),
-                location: (prey_pos.x, prey_pos.y),
+                location: (prey_pos.x(), prey_pos.y()),
                 outcome,
                 start_tick,
                 end_tick: time_tick,
@@ -9529,11 +9531,11 @@ fn resolve_engage_prey(
     // at non-trivial patience (the `× patience` scaling), so bold cats
     // skip the read by construction.
     let species_sens = crate::systems::sensing::prey_tremor_sensitivity(prey_kind, sensory);
-    let tremor_at_prey = prey_params.tremor_map.get(prey_pos.x, prey_pos.y);
+    let tremor_at_prey = prey_params.tremor_map.get(prey_pos.x(), prey_pos.y());
     let scent_settle = prey_params
         .prey_scent_maps
         .for_kind(prey_kind)
-        .get(prey_pos.x, prey_pos.y);
+        .get(prey_pos.x(), prey_pos.y());
     let raw_stalk_distance = (d.stalk_start_minimum as f32)
         + (d.stalk_start_buffer as f32) * personality.patience
         + d.alertness_push * prey_state.alertness
@@ -9642,8 +9644,8 @@ fn resolve_engage_prey(
         if rng.rng.random::<f32>() < success_chance {
             // Catch!
             commands.entity(target_entity).despawn();
-            let catch_corruption = if map.in_bounds(prey_pos.x, prey_pos.y) {
-                map.get(prey_pos.x, prey_pos.y).corruption
+            let catch_corruption = if map.in_bounds(prey_pos.x(), prey_pos.y()) {
+                map.get(prey_pos.x(), prey_pos.y()).corruption
             } else {
                 0.0
             };
@@ -9744,7 +9746,7 @@ fn resolve_engage_prey(
                     EventKind::PreyKilled {
                         cat: name.0.clone(),
                         species: species_name.to_string(),
-                        location: (prey_pos.x, prey_pos.y),
+                        location: (prey_pos.x(), prey_pos.y()),
                     },
                 );
             }
@@ -10152,8 +10154,8 @@ fn resolve_forage_item(
     }
     *pos = patrol_move(pos, dx, dy, map);
 
-    if map.in_bounds(pos.x, pos.y) {
-        let tile = map.get(pos.x, pos.y);
+    if map.in_bounds(pos.x(), pos.y()) {
+        let tile = map.get(pos.x(), pos.y());
         let forage_yield = tile.terrain.foraging_yield() * (1.0 - tile.corruption).max(0.0);
         if forage_yield > 0.0 && rng.rng.random::<f32>() < forage_yield * d.forage_yield_scale {
             let item_kind = match tile.terrain {
@@ -10179,8 +10181,8 @@ fn resolve_forage_item(
                     }
                 }
             };
-            let forage_corruption = if map.in_bounds(pos.x, pos.y) {
-                map.get(pos.x, pos.y).corruption
+            let forage_corruption = if map.in_bounds(pos.x(), pos.y()) {
+                map.get(pos.x(), pos.y()).corruption
             } else {
                 0.0
             };
@@ -10297,8 +10299,8 @@ fn resolve_forage_item(
             } else {
                 item_kind.name().to_string()
             };
-            let terrain = if map.in_bounds(pos.x, pos.y) {
-                map.get(pos.x, pos.y).terrain
+            let terrain = if map.in_bounds(pos.x(), pos.y()) {
+                map.get(pos.x(), pos.y()).terrain
             } else {
                 Terrain::Grass
             };
@@ -10384,8 +10386,8 @@ fn emit_hunt_narrative(
     prey: Option<&str>,
     item: Option<&str>,
 ) {
-    let terrain = if map.in_bounds(pos.x, pos.y) {
-        map.get(pos.x, pos.y).terrain
+    let terrain = if map.in_bounds(pos.x(), pos.y()) {
+        map.get(pos.x(), pos.y()).terrain
     } else {
         Terrain::Grass
     };
@@ -10440,16 +10442,18 @@ fn emit_hunt_narrative(
 // ===========================================================================
 
 fn patrol_move(pos: &Position, dx: i32, dy: i32, map: &TileMap) -> Position {
-    let primary = Position::new(pos.x + dx, pos.y + dy);
-    if map.in_bounds(primary.x, primary.y) && map.get(primary.x, primary.y).terrain.is_passable() {
+    let primary = Position::new(pos.x() + dx, pos.y() + dy);
+    if map.in_bounds(primary.x(), primary.y())
+        && map.get(primary.x(), primary.y()).terrain.is_passable()
+    {
         return primary;
     }
-    let perp = Position::new(pos.x + dy, pos.y + dx);
-    if map.in_bounds(perp.x, perp.y) && map.get(perp.x, perp.y).terrain.is_passable() {
+    let perp = Position::new(pos.x() + dy, pos.y() + dx);
+    if map.in_bounds(perp.x(), perp.y()) && map.get(perp.x(), perp.y()).terrain.is_passable() {
         return perp;
     }
-    let rev = Position::new(pos.x - dx, pos.y - dy);
-    if map.in_bounds(rev.x, rev.y) && map.get(rev.x, rev.y).terrain.is_passable() {
+    let rev = Position::new(pos.x() - dx, pos.y() - dy);
+    if map.in_bounds(rev.x(), rev.y()) && map.get(rev.x(), rev.y()).terrain.is_passable() {
         return rev;
     }
     *pos
@@ -10490,11 +10494,11 @@ fn find_nearest_tile(
     let mut best: Option<(Position, i32, u64)> = None;
     for dy in -radius..=radius {
         for dx in -radius..=radius {
-            let p = Position::new(from.x + dx, from.y + dy);
-            if !map.in_bounds(p.x, p.y) {
+            let p = Position::new(from.x() + dx, from.y() + dy);
+            if !map.in_bounds(p.x(), p.y()) {
                 continue;
             }
-            let tile = map.get(p.x, p.y);
+            let tile = map.get(p.x(), p.y());
             if !predicate(tile.terrain) {
                 continue;
             }
@@ -10502,7 +10506,7 @@ fn find_nearest_tile(
             if dist == 0 {
                 continue;
             }
-            let tie = mix_hash(from.x, from.y, p.x, p.y);
+            let tie = mix_hash(from.x(), from.y(), p.x(), p.y());
             let replace = match best {
                 None => true,
                 Some((_, d, _)) if dist < d => true,
@@ -10527,9 +10531,9 @@ fn find_random_nearby_tile(
     let mut candidates: Vec<(Position, f32)> = Vec::new();
     for dy in -radius..=radius {
         for dx in -radius..=radius {
-            let p = Position::new(from.x + dx, from.y + dy);
-            if map.in_bounds(p.x, p.y) {
-                let tile = map.get(p.x, p.y);
+            let p = Position::new(from.x() + dx, from.y() + dy);
+            if map.in_bounds(p.x(), p.y()) {
+                let tile = map.get(p.x(), p.y());
                 if predicate(tile.terrain) {
                     let dist = from.manhattan_distance(&p);
                     if dist > 0 {
@@ -10638,7 +10642,7 @@ fn resolve_zone_position(
         PlannerZone::RestingSpot => stores_positions
             .iter()
             .min_by_key(|sp| pos.manhattan_distance(sp))
-            .map(|sp| Position::new(sp.x + 1, sp.y))
+            .map(|sp| Position::new(sp.x() + 1, sp.y()))
             .or(Some(*pos)),
         PlannerZone::SocialTarget => cat_positions
             .iter()
@@ -10647,12 +10651,12 @@ fn resolve_zone_position(
             .map(|(_, p)| *p),
         PlannerZone::Wilds => exploration_map
             .frontier_centroid()
-            .filter(|p| map.in_bounds(p.x, p.y) && map.get(p.x, p.y).terrain.is_passable())
+            .filter(|p| map.in_bounds(p.x(), p.y()) && map.get(p.x(), p.y()).terrain.is_passable())
             .or_else(|| find_nearest_tile(pos, map, 20, |t| t.is_passable())),
         PlannerZone::PatrolZone => stores_positions
             .iter()
             .min_by_key(|sp| pos.manhattan_distance(sp))
-            .map(|sp| Position::new(sp.x + d.guard_patrol_radius as i32, sp.y))
+            .map(|sp| Position::new(sp.x() + d.guard_patrol_radius as i32, sp.y()))
             .or(Some(*pos)),
         PlannerZone::MaterialPile => material_pile_positions
             .iter()
@@ -10710,11 +10714,11 @@ fn nearest_corrupted_tile(origin: &Position, map: &TileMap, radius: i32) -> Opti
             if dx.abs() + dy.abs() > radius {
                 continue;
             }
-            let p = Position::new(origin.x + dx, origin.y + dy);
-            if !map.in_bounds(p.x, p.y) {
+            let p = Position::new(origin.x() + dx, origin.y() + dy);
+            if !map.in_bounds(p.x(), p.y()) {
                 continue;
             }
-            let c = map.get(p.x, p.y).corruption;
+            let c = map.get(p.x(), p.y()).corruption;
             if c > 0.05 && best.as_ref().is_none_or(|(_, bc)| c > *bc) {
                 best = Some((p, c));
             }
@@ -10938,8 +10942,8 @@ fn classify_zone(
     {
         return PlannerZone::HerbPatch;
     }
-    if map.in_bounds(pos.x, pos.y) {
-        let terrain = map.get(pos.x, pos.y).terrain;
+    if map.in_bounds(pos.x(), pos.y()) {
+        let terrain = map.get(pos.x(), pos.y()).terrain;
         if matches!(terrain, Terrain::DenseForest | Terrain::LightForest) {
             return PlannerZone::HuntingGround;
         }
@@ -11025,7 +11029,7 @@ fn build_zone_distances(
             stores_positions
                 .iter()
                 .min_by_key(|sp| pos.manhattan_distance(sp))
-                .map(|sp| Position::new(sp.x + 1, sp.y)),
+                .map(|sp| Position::new(sp.x() + 1, sp.y())),
         ),
         (
             PlannerZone::SocialTarget,
@@ -11041,7 +11045,7 @@ fn build_zone_distances(
             stores_positions
                 .iter()
                 .min_by_key(|sp| pos.manhattan_distance(sp))
-                .map(|sp| Position::new(sp.x + d.guard_patrol_radius as i32, sp.y)),
+                .map(|sp| Position::new(sp.x() + d.guard_patrol_radius as i32, sp.y())),
         ),
         (
             PlannerZone::MaterialPile,
@@ -11135,7 +11139,7 @@ mod tests {
     use super::*;
 
     /// Regression: on an open map with a permissive predicate, the old
-    /// `find_nearest_tile` always returned `(from.x, from.y - 1)` because
+    /// `find_nearest_tile` always returned `(from.x(), from.y() - 1)` because
     /// the row-major scan visits -y neighbors first and the strict `<`
     /// comparison never replaced them. The deterministic tiebreak must
     /// pick a different tile for at least the canonical center origin.
@@ -11147,7 +11151,7 @@ mod tests {
             .expect("open map must have a passable neighbor");
         assert_ne!(
             result,
-            Position::new(center.x, center.y - 1),
+            Position::new(center.x(), center.y() - 1),
             "tiebreak regressed: still returning the -y neighbor"
         );
     }
@@ -11169,7 +11173,7 @@ mod tests {
                 let Some(p) = find_nearest_tile(&from, &map, 20, |t| t.is_passable()) else {
                     continue;
                 };
-                let key = ((p.x - from.x).signum(), (p.y - from.y).signum());
+                let key = ((p.x() - from.x()).signum(), (p.y() - from.y()).signum());
                 *buckets.entry(key).or_default() += 1;
                 total += 1;
             }
@@ -11244,7 +11248,7 @@ mod tests {
         let result =
             find_nearest_tile(&from, &map, 10, |t| t.is_passable()).expect("ring is populated");
         assert_eq!(from.manhattan_distance(&result), 3);
-        assert!(ring.contains(&(result.x, result.y)));
+        assert!(ring.contains(&(result.x(), result.y())));
     }
 
     /// The mixing hash must avalanche well enough that small input
@@ -11323,7 +11327,7 @@ mod tests {
         let centroid = exploration
             .frontier_centroid()
             .expect("right half is unexplored");
-        assert!(centroid.x >= 20, "centroid sits in the unexplored half");
+        assert!(centroid.x() >= 20, "centroid sits in the unexplored half");
 
         let cat = Position::new(5, 5);
         let resolved = resolve_wilds(cat, &map, &exploration);

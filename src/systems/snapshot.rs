@@ -226,7 +226,7 @@ pub fn emit_cat_snapshots(
             time.tick,
             EventKind::CatSnapshot {
                 cat: name.0.clone(),
-                position: (pos.x, pos.y),
+                position: (pos.x(), pos.y()),
                 personality: personality.clone(),
                 needs: needs.clone(),
                 skills: Box::new(skills.clone()),
@@ -280,7 +280,7 @@ pub fn emit_position_traces(
             time.tick,
             EventKind::PositionTrace {
                 cat: name.0.clone(),
-                position: (pos.x, pos.y),
+                position: (pos.x(), pos.y()),
                 action: current.action,
             },
         );
@@ -317,8 +317,8 @@ pub fn emit_spatial_snapshots(
             .iter()
             .map(|(w, p)| crate::resources::event_log::WildlifePosRow {
                 species: format!("{:?}", w.species),
-                x: p.x,
-                y: p.y,
+                x: p.x(),
+                y: p.y(),
             })
             .collect();
         log.push(tick, EventKind::WildlifePositions { positions });
@@ -327,8 +327,8 @@ pub fn emit_spatial_snapshots(
             .iter()
             .map(|(cfg, p)| crate::resources::event_log::PreyPosRow {
                 species: format!("{:?}", cfg.kind),
-                x: p.x,
-                y: p.y,
+                x: p.x(),
+                y: p.y(),
             })
             .collect();
         log.push(
@@ -344,8 +344,8 @@ pub fn emit_spatial_snapshots(
             .iter()
             .map(|(den, pos)| crate::resources::event_log::PreyDenRow {
                 species: format!("{:?}", den.kind),
-                x: pos.x,
-                y: pos.y,
+                x: pos.x(),
+                y: pos.y(),
                 spawns_remaining: den.spawns_remaining,
                 capacity: den.capacity,
                 predation_pressure: den.predation_pressure,
@@ -354,8 +354,8 @@ pub fn emit_spatial_snapshots(
         let fox_den_rows: Vec<crate::resources::event_log::FoxDenRow> = fox_dens
             .iter()
             .map(|(den, pos)| crate::resources::event_log::FoxDenRow {
-                x: pos.x,
-                y: pos.y,
+                x: pos.x(),
+                y: pos.y(),
                 cubs_present: den.cubs_present,
                 territory_radius: den.territory_radius,
                 scent_strength: den.scent_strength,

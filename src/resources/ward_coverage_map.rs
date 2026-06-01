@@ -313,11 +313,11 @@ mod tests {
         let sid = 5;
         let centroid = map.sector_centroid(sid, 4, 3).expect("non-empty");
         assert!(
-            centroid.x >= 30 && centroid.x < 60,
+            centroid.x() >= 30 && centroid.x() < 60,
             "x in sector: {centroid:?}"
         );
         assert!(
-            centroid.y >= 30 && centroid.y < 60,
+            centroid.y() >= 30 && centroid.y() < 60,
             "y in sector: {centroid:?}"
         );
         // Other sectors stay empty.
@@ -338,11 +338,11 @@ mod tests {
         map.stamp_ward(25, 25, 1.0, 7.0);
         let centroid = map.sector_centroid(0, 4, 3).expect("non-empty");
         assert!(
-            centroid.x > 5 && centroid.x < 25,
+            centroid.x() > 5 && centroid.x() < 25,
             "between wards: {centroid:?}"
         );
         assert!(
-            centroid.y > 5 && centroid.y < 25,
+            centroid.y() > 5 && centroid.y() < 25,
             "between wards: {centroid:?}"
         );
     }

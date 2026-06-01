@@ -70,7 +70,7 @@ pub fn flood_dijkstra(
     let height = map.height.max(0) as u32;
     let mut field = RouteCostField::empty(width, height, from, origin_tick);
 
-    if !map.in_bounds(from.x, from.y) {
+    if !map.in_bounds(from.x(), from.y()) {
         return field;
     }
 
@@ -86,7 +86,7 @@ pub fn flood_dijkstra(
         b.clear();
     }
 
-    let from_idx = (from.y as u32 * width + from.x as u32) as usize;
+    let from_idx = (from.y() as u32 * width + from.x() as u32) as usize;
     field.costs[from_idx] = 0;
     buckets[0].push(from);
 
@@ -101,15 +101,15 @@ pub fn flood_dijkstra(
         // flood calls — `take` would replace with a brand-new empty Vec.
         std::mem::swap(&mut current_bucket, &mut buckets[current_cost]);
         while let Some(pos) = current_bucket.pop() {
-            let pos_idx = (pos.y as u32 * width + pos.x as u32) as usize;
+            let pos_idx = (pos.y() as u32 * width + pos.x() as u32) as usize;
             // Stale entry — a cheaper relaxation already settled this
             // tile, skip.
             if field.costs[pos_idx] != current_cost as u32 {
                 continue;
             }
             for &(dx, dy) in &NEIGHBORS {
-                let nx = pos.x + dx;
-                let ny = pos.y + dy;
+                let nx = pos.x() + dx;
+                let ny = pos.y() + dy;
                 if !map.in_bounds(nx, ny) {
                     continue;
                 }
@@ -169,8 +169,8 @@ pub fn step_along_field(
     }
     let mut best: Option<(Position, (u64, u32))> = None;
     for &(dx, dy) in &NEIGHBORS {
-        let nx = from.x + dx;
-        let ny = from.y + dy;
+        let nx = from.x() + dx;
+        let ny = from.y() + dy;
         if !map.in_bounds(nx, ny) {
             continue;
         }
@@ -182,8 +182,8 @@ pub fn step_along_field(
         if cost >= MAX_COST_BUDGET {
             continue;
         }
-        let cdx = (neighbor.x - to.x).unsigned_abs() as u64;
-        let cdy = (neighbor.y - to.y).unsigned_abs() as u64;
+        let cdx = (neighbor.x() - to.x()).unsigned_abs() as u64;
+        let cdy = (neighbor.y() - to.y()).unsigned_abs() as u64;
         let h = cdx.max(cdy);
         // Lex order: (chebyshev_to_destination, route_cost). Strict-`<`
         // so first candidate in `NEIGHBORS` order wins true ties —

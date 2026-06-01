@@ -83,14 +83,14 @@ impl FoxHuntingBeliefs {
 
     /// Reinforce belief after a successful hunt.
     pub fn reinforce(&mut self, pos: Position, amount: f32) {
-        if let Some(i) = self.bucket_index(pos.x, pos.y) {
+        if let Some(i) = self.bucket_index(pos.x(), pos.y()) {
             self.beliefs[i] = (self.beliefs[i] + amount).min(HUNTING_MAX_BELIEF);
         }
     }
 
     /// Weaken belief after an unsuccessful search.
     pub fn decay(&mut self, pos: Position, amount: f32) {
-        if let Some(i) = self.bucket_index(pos.x, pos.y) {
+        if let Some(i) = self.bucket_index(pos.x(), pos.y()) {
             self.beliefs[i] = (self.beliefs[i] - amount).max(HUNTING_MIN_BELIEF);
         }
     }
@@ -152,7 +152,7 @@ impl FoxThreatMemory {
 
     /// Record a dangerous encounter at this location.
     pub fn record_threat(&mut self, pos: Position, amount: f32) {
-        if let Some(i) = self.bucket_index(pos.x, pos.y) {
+        if let Some(i) = self.bucket_index(pos.x(), pos.y()) {
             self.threats[i] = (self.threats[i] + amount).min(THREAT_MAX);
         }
     }
@@ -218,7 +218,7 @@ impl FoxExplorationMap {
 
     /// Mark the current position as visited.
     pub fn visit(&mut self, pos: Position) {
-        if let Some(i) = self.bucket_index(pos.x, pos.y) {
+        if let Some(i) = self.bucket_index(pos.x(), pos.y()) {
             self.coverage[i] = (self.coverage[i] + 0.05).min(1.0);
         }
     }

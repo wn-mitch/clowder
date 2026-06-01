@@ -18,7 +18,7 @@
 //!
 //! **Cell semantic.** `1.0` if any tile within Chebyshev distance
 //! `sprint_radius` is `Terrain::is_low_cover()`; `0.0` otherwise. The
-//! HideEligible author reads `map.get(pos.x, pos.y) > threshold` where
+//! HideEligible author reads `map.get(pos.x(), pos.y()) > threshold` where
 //! threshold defaults to 0.5 (the boolean midpoint). v1 ships boolean;
 //! a distance-gradient variant is owned by the 170 balance follow-on.
 

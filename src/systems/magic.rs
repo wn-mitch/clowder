@@ -152,8 +152,8 @@ pub fn ward_decay(
     let c = &constants.wildlife;
     let mut any_decayed = false;
     for (entity, mut ward, pos) in &mut wards {
-        let on_ward_post =
-            map.in_bounds(pos.x, pos.y) && map.get(pos.x, pos.y).terrain == Terrain::WardPost;
+        let on_ward_post = map.in_bounds(pos.x(), pos.y())
+            && map.get(pos.x(), pos.y()).terrain == Terrain::WardPost;
 
         let mut effective_decay = if on_ward_post {
             ward.decay_rate * m.ward_post_decay_multiplier
@@ -172,7 +172,7 @@ pub fn ward_decay(
             .iter()
             .filter(|(ai, _)| {
                 matches!(ai, WildlifeAiState::EncirclingWard { ward_x, ward_y, .. }
-                if *ward_x == pos.x && *ward_y == pos.y)
+                if *ward_x == pos.x() && *ward_y == pos.y())
             })
             .count();
         let siege_pressure = (siege_count as f32).sqrt();
@@ -195,7 +195,7 @@ pub fn ward_decay(
                     time.tick,
                     crate::resources::event_log::EventKind::WardDespawned {
                         ward_kind: format!("{:?}", ward.kind),
-                        location: (pos.x, pos.y),
+                        location: (pos.x(), pos.y()),
                         sieged: siege_count > 0,
                     },
                 );
@@ -233,7 +233,7 @@ pub fn update_ward_coverage_map(
         if ward.inverted {
             continue;
         }
-        coverage.stamp_ward(pos.x, pos.y, ward.strength, ward.repel_radius());
+        coverage.stamp_ward(pos.x(), pos.y(), ward.strength, ward.repel_radius());
     }
 }
 
@@ -352,10 +352,10 @@ pub fn corruption_tile_effects(
     let corruption_health_drain = m.corruption_health_drain.per_tick(&time_scale);
     let corruption_tile_mood_ticks = m.corruption_tile_mood_duration.ticks(&time_scale);
     for (pos, mut mood, mut health) in &mut cats {
-        if !map.in_bounds(pos.x, pos.y) {
+        if !map.in_bounds(pos.x(), pos.y()) {
             continue;
         }
-        let corruption = map.get(pos.x, pos.y).corruption;
+        let corruption = map.get(pos.x(), pos.y()).corruption;
         if corruption > m.corruption_tile_mood_threshold {
             let already_has = mood
                 .modifiers
@@ -381,10 +381,10 @@ pub fn corruption_tile_effects(
     }
 
     for (entity, pos, mut herb, harvestable) in &mut herbs {
-        if !map.in_bounds(pos.x, pos.y) {
+        if !map.in_bounds(pos.x(), pos.y()) {
             continue;
         }
-        let corruption = map.get(pos.x, pos.y).corruption;
+        let corruption = map.get(pos.x(), pos.y()).corruption;
         if corruption > m.corruption_twisted_herb_threshold {
             herb.twisted = true;
         }
@@ -449,7 +449,7 @@ pub fn update_corrupted_tile_markers(
     let threshold = constants.disposition.corrupted_tile_threshold;
     for (entity, pos, has_marker) in cats.iter() {
         let on_corrupted =
-            map.in_bounds(pos.x, pos.y) && map.get(pos.x, pos.y).corruption > threshold;
+            map.in_bounds(pos.x(), pos.y()) && map.get(pos.x(), pos.y()).corruption > threshold;
         match (on_corrupted, has_marker) {
             (true, false) => {
                 commands.entity(entity).insert(OnCorruptedTile);
@@ -573,7 +573,7 @@ pub fn update_herb_location_map(
             continue;
         }
         let strength = crate::resources::growth_stage_strength(herb.growth_stage);
-        map.stamp(herb.kind, pos.x, pos.y, strength, sense_range);
+        map.stamp(herb.kind, pos.x(), pos.y(), strength, sense_range);
     }
 }
 
@@ -860,8 +860,8 @@ pub fn resolve_magic_task_chains(
         };
 
         // Workshop proximity check via terrain.
-        let at_workshop =
-            map.in_bounds(pos.x, pos.y) && map.get(pos.x, pos.y).terrain == Terrain::Workshop;
+        let at_workshop = map.in_bounds(pos.x(), pos.y())
+            && map.get(pos.x(), pos.y()).terrain == Terrain::Workshop;
         let _ = workshop_tiles_exist;
 
         // Extract step data before the match to avoid borrow conflicts
@@ -1213,7 +1213,7 @@ pub fn apply_misfire(
             // The inverted ward spawned at the caster's location acts as a beacon.
             commands.spawn((
                 Ward::inverted_at(WardKind::Thornward),
-                Position::new(pos.x, pos.y),
+                Position::new(pos.x(), pos.y()),
             ));
         }
     }
@@ -1266,8 +1266,8 @@ pub fn apply_corruption_pushback(
                 if dx.abs() + dy.abs() > msg.radius {
                     continue; // Manhattan distance
                 }
-                let tx = msg.position.x + dx;
-                let ty = msg.position.y + dy;
+                let tx = msg.position.x() + dx;
+                let ty = msg.position.y() + dy;
                 if map.in_bounds(tx, ty) {
                     let tile = map.get_mut(tx, ty);
                     tile.corruption = (tile.corruption - msg.amount).max(0.0);
@@ -1918,7 +1918,7 @@ mod tests {
     fn corruption_above_threshold_inserts_marker() {
         let (mut world, mut schedule, threshold) = corrupted_tile_setup();
         set_corruption(&mut world, 5, 5, threshold + 0.05);
-        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        let cat = world.spawn(Position::new(5, 5)).id();
         schedule.run(&mut world);
         assert!(
             has_on_corrupted_tile(&world, cat),
@@ -1930,7 +1930,7 @@ mod tests {
     fn corruption_below_threshold_no_marker() {
         let (mut world, mut schedule, threshold) = corrupted_tile_setup();
         set_corruption(&mut world, 5, 5, threshold - 0.01);
-        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        let cat = world.spawn(Position::new(5, 5)).id();
         schedule.run(&mut world);
         assert!(
             !has_on_corrupted_tile(&world, cat),
@@ -1944,7 +1944,7 @@ mod tests {
         // in disposition.rs and goap.rs.
         let (mut world, mut schedule, threshold) = corrupted_tile_setup();
         set_corruption(&mut world, 5, 5, threshold);
-        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        let cat = world.spawn(Position::new(5, 5)).id();
         schedule.run(&mut world);
         assert!(
             !has_on_corrupted_tile(&world, cat),
@@ -1956,20 +1956,18 @@ mod tests {
     fn position_change_crosses_threshold_boundary() {
         let (mut world, mut schedule, threshold) = corrupted_tile_setup();
         set_corruption(&mut world, 5, 5, threshold + 0.1);
-        let cat = world.spawn(Position { x: 1, y: 1 }).id();
+        let cat = world.spawn(Position::new(1, 1)).id();
         schedule.run(&mut world);
         assert!(!has_on_corrupted_tile(&world, cat));
 
-        world.get_mut::<Position>(cat).unwrap().x = 5;
-        world.get_mut::<Position>(cat).unwrap().y = 5;
+        world.get_mut::<Position>(cat).unwrap().set_tile(5, 5);
         schedule.run(&mut world);
         assert!(
             has_on_corrupted_tile(&world, cat),
             "moving onto a corrupted tile should insert marker"
         );
 
-        world.get_mut::<Position>(cat).unwrap().x = 1;
-        world.get_mut::<Position>(cat).unwrap().y = 1;
+        world.get_mut::<Position>(cat).unwrap().set_tile(1, 1);
         schedule.run(&mut world);
         assert!(
             !has_on_corrupted_tile(&world, cat),
@@ -1980,7 +1978,7 @@ mod tests {
     #[test]
     fn corruption_mutation_crosses_threshold_boundary() {
         let (mut world, mut schedule, threshold) = corrupted_tile_setup();
-        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        let cat = world.spawn(Position::new(5, 5)).id();
         schedule.run(&mut world);
         assert!(!has_on_corrupted_tile(&world, cat));
 
@@ -2006,7 +2004,7 @@ mod tests {
         set_corruption(&mut world, 5, 5, threshold + 0.1);
         let cat = world
             .spawn((
-                Position { x: 5, y: 5 },
+                Position::new(5, 5),
                 Dead {
                     tick: 0,
                     cause: DeathCause::Injury,
@@ -2024,8 +2022,8 @@ mod tests {
     fn multiple_cats_at_different_tiles_independent() {
         let (mut world, mut schedule, threshold) = corrupted_tile_setup();
         set_corruption(&mut world, 5, 5, threshold + 0.1);
-        let on_corrupt = world.spawn(Position { x: 5, y: 5 }).id();
-        let off_corrupt = world.spawn(Position { x: 1, y: 1 }).id();
+        let on_corrupt = world.spawn(Position::new(5, 5)).id();
+        let off_corrupt = world.spawn(Position::new(1, 1)).id();
         schedule.run(&mut world);
         assert!(has_on_corrupted_tile(&world, on_corrupt));
         assert!(!has_on_corrupted_tile(&world, off_corrupt));

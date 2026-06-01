@@ -71,12 +71,12 @@ use super::Scenario;
 /// 312 (FO-2) corked: with the fixture-level corridor weight active,
 /// `tests/scenarios.rs::chokepoint_defense_isthmus_corks_corridor`
 /// asserts at least one `WardPlaced` event lands with
-/// `location.x ∈ [28, 32]` (the 5-tile band centered on the isthmus
+/// `location.x() ∈ [28, 32]` (the 5-tile band centered on the isthmus
 /// at x=30).
 pub const EXPECTED_ISTHMUS_CORKED: bool = true;
 
 /// 312 (FO-2) corridor-band check: the 5-tile band centered on the
-/// 7-wide isthmus at x=30. A `WardPlaced.location.x` in this range
+/// 7-wide isthmus at x=30. A `WardPlaced.location.x()` in this range
 /// constitutes corking the chokepoint; outside it the ward landed on
 /// the cat-cluster interior (the 297 iter-2 saturation pathology).
 pub const ISTHMUS_BAND_X_MIN: i32 = 28;
@@ -446,7 +446,7 @@ mod tests {
             None,
         );
 
-        let in_band = (ISTHMUS_BAND_X_MIN..=ISTHMUS_BAND_X_MAX).contains(&pick.x);
+        let in_band = (ISTHMUS_BAND_X_MIN..=ISTHMUS_BAND_X_MAX).contains(&pick.x());
         if EXPECTED_ISTHMUS_CORKED {
             assert!(
                 in_band,
@@ -540,7 +540,7 @@ mod tests {
             None,
         );
 
-        let in_band = (ISTHMUS_BAND_X_MIN..=ISTHMUS_BAND_X_MAX).contains(&pick.x);
+        let in_band = (ISTHMUS_BAND_X_MIN..=ISTHMUS_BAND_X_MAX).contains(&pick.x());
         assert!(
             !in_band,
             "Dormant control violated: with corridor weight 0.0, scorer \

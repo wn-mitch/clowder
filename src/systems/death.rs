@@ -165,7 +165,7 @@ pub fn check_death(
                     cat: dead_name.clone(),
                     cause: format!("{cause:?}"),
                     injury_source: injury_source.clone(),
-                    location: (dead_pos.x, dead_pos.y),
+                    location: (dead_pos.x(), dead_pos.y()),
                 },
             );
         }
@@ -317,7 +317,7 @@ pub fn update_grave_aura_map(
         return;
     }
     for pos in &graves {
-        aura.stamp_grave(pos.x, pos.y, strength, radius);
+        aura.stamp_grave(pos.x(), pos.y(), strength, radius);
     }
 }
 

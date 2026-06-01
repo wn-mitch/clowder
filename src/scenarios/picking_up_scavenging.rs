@@ -40,7 +40,7 @@ use super::env::{init_scenario_world, spawn_cat};
 use super::preset::{CatPreset, MarkerKind};
 use super::Scenario;
 
-const COLONY_CENTER: Position = Position { x: 20, y: 20 };
+const COLONY_CENTER: Position = Position::new(20, 20);
 
 /// Spawn a single OnGround food `Item` at `pos`. Mirrors the
 /// engage_prey-overflow spawn at `goap.rs::resolve_engage_prey`

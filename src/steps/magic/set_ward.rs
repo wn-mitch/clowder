@@ -118,7 +118,7 @@ pub fn resolve_set_ward(
                     // narrative layer.
                     commands.spawn((
                         Ward::inverted_at(kind),
-                        Position::new(pos.x, pos.y),
+                        Position::new(pos.x(), pos.y()),
                         CraftedItem {
                             recipe: ward_recipe_id(kind),
                             crafter,
@@ -141,7 +141,7 @@ pub fn resolve_set_ward(
         let spawn_strength = ward.strength;
         commands.spawn((
             ward,
-            Position::new(pos.x, pos.y),
+            Position::new(pos.x(), pos.y()),
             CraftedItem {
                 recipe: ward_recipe_id(kind),
                 crafter,
@@ -154,7 +154,7 @@ pub fn resolve_set_ward(
                 EventKind::WardPlaced {
                     cat: cat_name.to_string(),
                     ward_kind: format!("{kind:?}"),
-                    location: (pos.x, pos.y),
+                    location: (pos.x(), pos.y()),
                     strength: spawn_strength,
                     via_directive,
                 },
@@ -278,8 +278,8 @@ mod tests {
         let mut q = world.query::<(&Ward, &Position, &CraftedItem)>();
         for (ward, ward_pos, ci) in q.iter(&world) {
             assert_eq!(ward.kind, WardKind::Thornward);
-            assert_eq!(ward_pos.x, pos.x);
-            assert_eq!(ward_pos.y, pos.y);
+            assert_eq!(ward_pos.x(), pos.x());
+            assert_eq!(ward_pos.y(), pos.y());
             assert_eq!(ci.recipe, ward_recipe_id(WardKind::Thornward));
             assert_eq!(ci.crafter, Some(crafter));
             assert_eq!(ci.crafted_at_tick, 500);

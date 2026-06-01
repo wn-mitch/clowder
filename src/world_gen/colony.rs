@@ -380,8 +380,8 @@ fn apply_black_bias(p: &mut Personality, rng: &mut impl Rng) {
 fn stamp_footprint(map: &mut TileMap, anchor: Position, terrain: Terrain, size: (i32, i32)) {
     for dy in 0..size.1 {
         for dx in 0..size.0 {
-            let x = anchor.x + dx;
-            let y = anchor.y + dy;
+            let x = anchor.x() + dx;
+            let y = anchor.y() + dy;
             if map.in_bounds(x, y) {
                 map.set(x, y, terrain);
             }
@@ -403,7 +403,7 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
     let den_size = StructureType::Den.default_size();
     let hearth_size = StructureType::Hearth.default_size();
     // Space buildings so there's a 1-tile walkable gap between footprints.
-    let den_pos = Position::new((colony_site.x - den_size.0 - 1).max(0), colony_site.y);
+    let den_pos = Position::new((colony_site.x() - den_size.0 - 1).max(0), colony_site.y());
 
     // Stamp full footprints for rendering.
     stamp_footprint(map, hearth_pos, Terrain::Hearth, hearth_size);
@@ -433,8 +433,8 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
     // surfaces.
     let midden_size = StructureType::Midden.default_size();
     let midden_pos = Position::new(
-        den_pos.x,
-        (hearth_pos.y + hearth_size.1 + 2).min(map.height - midden_size.1),
+        den_pos.x(),
+        (hearth_pos.y() + hearth_size.1 + 2).min(map.height - midden_size.1),
     );
     stamp_footprint(
         map,
@@ -494,8 +494,8 @@ pub fn spawn_starting_buildings(world: &mut World, colony_site: Position, map: &
     ];
 
     // Scatter items in the walkable gap between den and hearth.
-    let gap_x = den_pos.x + den_size.0; // The 1-tile gap column.
-    let scatter_y_base = colony_site.y;
+    let gap_x = den_pos.x() + den_size.0; // The 1-tile gap column.
+    let scatter_y_base = colony_site.y();
     for (i, &kind) in starting_food.iter().enumerate() {
         // Distribute items across a small area near the colony center.
         let dx = (i as i32) % 3;
@@ -531,7 +531,7 @@ fn spawn_founding_construction_site(world: &mut World, map: &mut TileMap, colony
 
     // Place the site north of the colony center, leaving a 1-tile gap so
     // the south edge is reachable by cats spawned at colony_site.
-    let site_anchor = Position::new(colony_site.x, (colony_site.y - site_size.1 - 1).max(0));
+    let site_anchor = Position::new(colony_site.x(), (colony_site.y() - site_size.1 - 1).max(0));
 
     // Stamp footprint terrain so the site renders correctly.
     stamp_footprint(map, site_anchor, blueprint.terrain(), site_size);
@@ -561,8 +561,8 @@ fn spawn_founding_construction_site(world: &mut World, map: &mut TileMap, colony
     // the path to the site). Each unit becomes one Item entity — the
     // single-unit-per-pickup invariant keeps the cat→pile→site dance
     // physically honest.
-    let pile_origin_x = site_anchor.x;
-    let pile_origin_y = (site_anchor.y + site_size.1).min(map.height - 1);
+    let pile_origin_x = site_anchor.x();
+    let pile_origin_y = (site_anchor.y() + site_size.1).min(map.height - 1);
     let mut spawned: i32 = 0;
     for (mat, count) in &materials_needed {
         let item_kind = match mat {
@@ -610,10 +610,10 @@ mod tests {
         let map = grass_map(100, 100);
         let pos = find_colony_site(&map, &mut rng(1));
         assert!(
-            map.get(pos.x, pos.y).terrain.is_passable(),
+            map.get(pos.x(), pos.y()).terrain.is_passable(),
             "colony site ({}, {}) is not passable",
-            pos.x,
-            pos.y
+            pos.x(),
+            pos.y()
         );
     }
 
@@ -868,17 +868,17 @@ mod tests {
 
         // Derive positions the same way spawn_starting_buildings does.
         let hearth_pos = center;
-        let den_pos = Position::new(center.x - den_size.0 - 1, center.y);
+        let den_pos = Position::new(center.x() - den_size.0 - 1, center.y());
 
         // Hearth at center.
         for dy in 0..hearth_size.1 {
             for dx in 0..hearth_size.0 {
                 assert_eq!(
-                    map.get(hearth_pos.x + dx, hearth_pos.y + dy).terrain,
+                    map.get(hearth_pos.x() + dx, hearth_pos.y() + dy).terrain,
                     Terrain::Hearth,
                     "Hearth tile at ({}, {}) not set",
-                    hearth_pos.x + dx,
-                    hearth_pos.y + dy,
+                    hearth_pos.x() + dx,
+                    hearth_pos.y() + dy,
                 );
             }
         }
@@ -887,11 +887,11 @@ mod tests {
         for dy in 0..den_size.1 {
             for dx in 0..den_size.0 {
                 assert_eq!(
-                    map.get(den_pos.x + dx, den_pos.y + dy).terrain,
+                    map.get(den_pos.x() + dx, den_pos.y() + dy).terrain,
                     Terrain::Den,
                     "Den tile at ({}, {}) not set",
-                    den_pos.x + dx,
-                    den_pos.y + dy,
+                    den_pos.x() + dx,
+                    den_pos.y() + dy,
                 );
             }
         }
@@ -900,11 +900,11 @@ mod tests {
         // construction project. Verify its footprint is NOT stamped.
         let stores_size = StructureType::Stores.default_size();
         let stores_pos = Position::new(
-            (center.x + hearth_size.0 + 1).min(map.width - stores_size.0),
-            center.y,
+            (center.x() + hearth_size.0 + 1).min(map.width - stores_size.0),
+            center.y(),
         );
         assert_eq!(
-            map.get(stores_pos.x, stores_pos.y).terrain,
+            map.get(stores_pos.x(), stores_pos.y()).terrain,
             Terrain::Grass,
             "Stores should not be auto-spawned",
         );

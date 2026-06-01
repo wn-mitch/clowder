@@ -40,9 +40,9 @@ use super::env::{init_scenario_world, spawn_cat};
 use super::preset::{CatPreset, MarkerKind};
 use super::Scenario;
 
-const COLONY_CENTER: Position = Position { x: 20, y: 20 };
-const RACK_POS: Position = Position { x: 21, y: 20 };
-const STORES_POS: Position = Position { x: 19, y: 20 };
+const COLONY_CENTER: Position = Position::new(20, 20);
+const RACK_POS: Position = Position::new(21, 20);
+const STORES_POS: Position = Position::new(19, 20);
 
 /// Tick budget: covers the 1-tile travel, the single-tick load, three
 /// tend cycles spaced `smoking_tend_cooldown_ticks=416` apart (~1248

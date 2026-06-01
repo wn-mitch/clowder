@@ -94,7 +94,7 @@ pub static SCENARIO: Scenario = Scenario {
 
 const MAP_WIDTH: i32 = 60;
 const MAP_HEIGHT: i32 = 40;
-const COLONY_CENTER: Position = Position { x: 30, y: 20 };
+const COLONY_CENTER: Position = Position::new(30, 20);
 
 /// Eight compass-direction fox spawn tiles at radius ~12 from
 /// `COLONY_CENTER`. Chosen so every fox sits on an even multiple
@@ -102,14 +102,14 @@ const COLONY_CENTER: Position = Position { x: 30, y: 20 };
 /// deposit aligned with placement-candidate buckets without
 /// cherry-picking individual fox positions.
 const FOX_POSITIONS: [Position; 8] = [
-    Position { x: 30, y: 8 },  // N
-    Position { x: 40, y: 10 }, // NE
-    Position { x: 42, y: 20 }, // E
-    Position { x: 40, y: 30 }, // SE
-    Position { x: 30, y: 32 }, // S
-    Position { x: 20, y: 30 }, // SW
-    Position { x: 18, y: 20 }, // W
-    Position { x: 20, y: 10 }, // NW
+    Position::new(30, 8),  // N
+    Position::new(40, 10), // NE
+    Position::new(42, 20), // E
+    Position::new(40, 30), // SE
+    Position::new(30, 32), // S
+    Position::new(20, 30), // SW
+    Position::new(18, 20), // W
+    Position::new(20, 10), // NW
 ];
 
 /// Five cats clustered within a 6-tile radius of `COLONY_CENTER`.
@@ -149,7 +149,7 @@ fn setup(world: &mut World, seed: u64) {
 /// personality doesn't drive the assertions in `mod tests`.
 fn spawn_cluster(world: &mut World) {
     for ((dx, dy), name) in CAT_OFFSETS.iter().zip(CAT_NAMES.iter()) {
-        let pos = Position::new(COLONY_CENTER.x + dx, COLONY_CENTER.y + dy);
+        let pos = Position::new(COLONY_CENTER.x() + dx, COLONY_CENTER.y() + dy);
         spawn_cat(
             world,
             CatPreset::adult(*name, pos)
@@ -215,7 +215,7 @@ mod tests {
     /// short-circuits to the anchor when `ward_positions.is_empty()`
     /// (`coordination.rs:1463`); seeding one existing ward forces
     /// the scoring loop to run on the first wake.
-    const SEED_WARD: Position = Position { x: 25, y: 25 };
+    const SEED_WARD: Position = Position::new(25, 25);
 
     /// Radius of the cat-wandering halo deposited into
     /// `CatScentMap`. The 5-cat cluster centered on (30, 20) only
@@ -261,13 +261,13 @@ mod tests {
         // its bucket, and adjacent buckets get nothing — exactly
         // the eight-arc-of-threat shape the scenario wants.
         for fp in FOX_POSITIONS {
-            fox_scent.deposit(fp.x, fp.y, 1.0);
+            fox_scent.deposit(fp.x(), fp.y(), 1.0);
         }
 
         let mut cat_scent = CatScentMap::default();
         // Saturate cat-scent at each cat's own tile.
         for (dx, dy) in CAT_OFFSETS {
-            cat_scent.deposit(COLONY_CENTER.x + dx, COLONY_CENTER.y + dy, 1.0);
+            cat_scent.deposit(COLONY_CENTER.x() + dx, COLONY_CENTER.y() + dy, 1.0);
         }
         // Wandering halo. Cats don't sit on their cluster tiles
         // for the whole run; in any real soak, cat-scent decays
@@ -278,8 +278,8 @@ mod tests {
         // candidates (where foxes deposit).
         for dy in -CAT_WANDER_RADIUS..=CAT_WANDER_RADIUS {
             for dx in -CAT_WANDER_RADIUS..=CAT_WANDER_RADIUS {
-                let x = COLONY_CENTER.x + dx;
-                let y = COLONY_CENTER.y + dy;
+                let x = COLONY_CENTER.x() + dx;
+                let y = COLONY_CENTER.y() + dy;
                 if x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT {
                     continue;
                 }
@@ -320,8 +320,8 @@ mod tests {
     /// cardinal sector is represented at least once across the
     /// successive wakes.
     fn cardinal_sector(pos: Position) -> Option<usize> {
-        let dx = pos.x - COLONY_CENTER.x;
-        let dy = pos.y - COLONY_CENTER.y;
+        let dx = pos.x() - COLONY_CENTER.x();
+        let dy = pos.y() - COLONY_CENTER.y();
         if dx == 0 && dy == 0 {
             return None;
         }
@@ -355,8 +355,8 @@ mod tests {
         // first new pick away from `SEED_WARD`'s neighborhood.
         let mut wards: Vec<(Position, f32)> = vec![(SEED_WARD, THORNWARD_REPEL_RADIUS)];
         ward_coverage.stamp_ward(
-            SEED_WARD.x,
-            SEED_WARD.y,
+            SEED_WARD.x(),
+            SEED_WARD.y(),
             THORNWARD_STRENGTH,
             THORNWARD_REPEL_RADIUS,
         );
@@ -391,7 +391,12 @@ mod tests {
             );
             picks.push(pick);
             wards.push((pick, THORNWARD_REPEL_RADIUS));
-            ward_coverage.stamp_ward(pick.x, pick.y, THORNWARD_STRENGTH, THORNWARD_REPEL_RADIUS);
+            ward_coverage.stamp_ward(
+                pick.x(),
+                pick.y(),
+                THORNWARD_STRENGTH,
+                THORNWARD_REPEL_RADIUS,
+            );
         }
         picks
     }

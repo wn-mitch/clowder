@@ -81,7 +81,7 @@ pub fn compute_item_layout(mut commands: Commands, items: Query<(Entity, &Positi
     let mut by_pos: HashMap<(i32, i32), Vec<(Entity, ItemKind)>> = HashMap::new();
     for (entity, pos, item) in &items {
         by_pos
-            .entry((pos.x, pos.y))
+            .entry((pos.x(), pos.y()))
             .or_default()
             .push((entity, item.kind));
     }
@@ -211,7 +211,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 20.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
         commands.entity(entity).add_children(&[label]);
@@ -228,7 +228,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 19.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
     }
@@ -259,7 +259,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 21.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
         if frame_count > 1 {
@@ -298,7 +298,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 18.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
         if frame_count > 1 {
@@ -348,7 +348,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 16.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
         commands.entity(entity).add_children(&[label]);
@@ -377,7 +377,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 16.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
         commands.entity(entity).add_children(&[label]);
@@ -406,7 +406,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 16.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
         commands.entity(entity).add_children(&[label]);
@@ -434,7 +434,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 17.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
     }
@@ -457,7 +457,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 16.5),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
     }
@@ -482,7 +482,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 22.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
 
@@ -539,7 +539,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 15.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
     }
@@ -557,7 +557,7 @@ pub fn attach_entity_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 14.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
     }
@@ -597,7 +597,7 @@ pub fn attach_building_sprites(
                 ..Default::default()
             },
             Transform::from_xyz(x, y, 13.0),
-            PreviousPosition { x: pos.x, y: pos.y },
+            PreviousPosition(pos.world()),
             EntitySpriteMarker,
         ));
     }
@@ -674,8 +674,7 @@ pub fn swap_seasonal_building_sprites(
 /// advances positions. Runs in FixedUpdate before all simulation systems.
 pub fn snapshot_previous_positions(mut query: Query<(&Position, &mut PreviousPosition)>) {
     for (pos, mut prev) in &mut query {
-        prev.x = pos.x;
-        prev.y = pos.y;
+        prev.set_tile(pos.x(), pos.y());
     }
 }
 
@@ -758,12 +757,12 @@ pub fn sync_entity_positions(
         // interpolation. Threshold of 5 grid cells matches pre-129
         // behavior; sub-tile interpolation only makes sense for
         // tick-by-tick step movement.
-        let dist = (pos.x - prev.x).unsigned_abs() + (pos.y - prev.y).unsigned_abs();
+        let dist = (pos.x() - prev.x()).unsigned_abs() + (pos.y() - prev.y()).unsigned_abs();
         let (x, y) = if dist > 5 {
             (curr_x, curr_y)
         } else {
-            let prev_x = prev.x as f32 * world_px;
-            let prev_y = (map_h - 1.0 - prev.y as f32) * world_px;
+            let prev_x = prev.x() as f32 * world_px;
+            let prev_y = (map_h - 1.0 - prev.y() as f32) * world_px;
             (
                 prev_x + (curr_x - prev_x) * smoothed,
                 prev_y + (curr_y - prev_y) * smoothed,
@@ -798,8 +797,8 @@ pub fn sync_entity_positions(
 }
 
 fn grid_to_world(pos: &Position, map_height: f32, world_px: f32) -> (f32, f32) {
-    let x = pos.x as f32 * world_px;
-    let y = (map_height - 1.0 - pos.y as f32) * world_px;
+    let x = pos.x() as f32 * world_px;
+    let y = (map_height - 1.0 - pos.y() as f32) * world_px;
     (x, y)
 }
 

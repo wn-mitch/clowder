@@ -108,8 +108,8 @@ pub fn wildlife_ai(
                 // roll, scent only reverses (cat scent isn't a thing
                 // to siege).
                 if is_shadow_fox {
-                    let next = Position::new(pos.x + dx, pos.y + dy);
-                    if ward_coverage.get(next.x, next.y) >= ward_avoid_threshold {
+                    let next = Position::new(pos.x() + dx, pos.y() + dy);
+                    if ward_coverage.get(next.x(), next.y()) >= ward_avoid_threshold {
                         // For siege geometry we still need the ward's
                         // entity-level (x, y); pull the nearest from
                         // the snapshot so the EncirclingWard branch
@@ -120,8 +120,8 @@ pub fn wildlife_ai(
                         if let Some((wp, _radius)) = siege_anchor {
                             if rng.rng.random::<f32>() < c.ward_siege_chance {
                                 *ai_state = WildlifeAiState::EncirclingWard {
-                                    ward_x: wp.x,
-                                    ward_y: wp.y,
+                                    ward_x: wp.x(),
+                                    ward_y: wp.y(),
                                     angle: 0.0,
                                     ticks: 0,
                                 };
@@ -133,16 +133,16 @@ pub fn wildlife_ai(
                             continue;
                         }
                     }
-                    if cat_scent.get(next.x, next.y) >= cat_scent_avoid_threshold {
+                    if cat_scent.get(next.x(), next.y()) >= cat_scent_avoid_threshold {
                         *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
                         activation.record(Feature::ShadowFoxAvoidedCatScent);
                         continue;
                     }
                 }
 
-                let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y)
-                    && is_patrol_terrain(map.get(next.x, next.y).terrain, animal.species)
+                let next = Position::new(pos.x() + dx, pos.y() + dy);
+                if map.in_bounds(next.x(), next.y())
+                    && is_patrol_terrain(map.get(next.x(), next.y()).terrain, animal.species)
                 {
                     // Ticket 138 — gate every step on MovementBudget.
                     // At per_tick=1.0 (current default for all
@@ -155,8 +155,8 @@ pub fn wildlife_ai(
                     }
                 } else {
                     // Reverse direction and try the other way.
-                    let rev = Position::new(pos.x - dx, pos.y - dy);
-                    if map.in_bounds(rev.x, rev.y) {
+                    let rev = Position::new(pos.x() - dx, pos.y() - dy);
+                    if map.in_bounds(rev.x(), rev.y()) {
                         *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
                         if budget.try_spend_step() {
                             *pos = rev;
@@ -179,11 +179,11 @@ pub fn wildlife_ai(
                 let target_y = center_y + (angle.sin() * radius) as i32;
 
                 // Move one step toward the circle target.
-                let dx = (target_x - pos.x).signum();
-                let dy = (target_y - pos.y).signum();
-                let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y)
-                    && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                let dx = (target_x - pos.x()).signum();
+                let dy = (target_y - pos.y()).signum();
+                let next = Position::new(pos.x() + dx, pos.y() + dy);
+                if map.in_bounds(next.x(), next.y())
+                    && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                     && budget.try_spend_step()
                 {
                     *pos = next;
@@ -193,8 +193,8 @@ pub fn wildlife_ai(
                 // Ambush: don't move.
             }
             WildlifeAiState::Fleeing { dx, dy } => {
-                let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y) && budget.try_spend_step() {
+                let next = Position::new(pos.x() + dx, pos.y() + dy);
+                if map.in_bounds(next.x(), next.y()) && budget.try_spend_step() {
                     *pos = next;
                 }
                 // If we'd go off-map, despawn is handled by cleanup_wildlife.
@@ -210,7 +210,7 @@ pub fn wildlife_ai(
                 // Check if ward still exists (not destroyed).
                 let ward_alive = ward_positions
                     .iter()
-                    .any(|(wp, _)| wp.x == ward_x && wp.y == ward_y);
+                    .any(|(wp, _)| wp.x() == ward_x && wp.y() == ward_y);
 
                 // Break siege if cat approaches or ward destroyed or timed out.
                 // Phase 5a: shadow-fox sight channel with LoS check.
@@ -231,11 +231,11 @@ pub fn wildlife_ai(
                     // Aggression: siege provokes confrontation.
                     if let Some(cat_pos) = cat_positions
                         .iter()
-                        .min_by_key(|cp| (cp.x - pos.x).abs() + (cp.y - pos.y).abs())
+                        .min_by_key(|cp| (cp.x() - pos.x()).abs() + (cp.y() - pos.y()).abs())
                     {
                         *ai_state = WildlifeAiState::Stalking {
-                            target_x: cat_pos.x,
-                            target_y: cat_pos.y,
+                            target_x: cat_pos.x(),
+                            target_y: cat_pos.y(),
                         };
                     }
                 } else {
@@ -246,24 +246,24 @@ pub fn wildlife_ai(
                     }
                     let orbit_radius = ward_positions
                         .iter()
-                        .find(|(wp, _)| wp.x == ward_x && wp.y == ward_y)
+                        .find(|(wp, _)| wp.x() == ward_x && wp.y() == ward_y)
                         .map(|(_, r)| *r + 1.0)
                         .unwrap_or(4.0);
                     let tx = ward_x + (angle.cos() * orbit_radius) as i32;
                     let ty = ward_y + (angle.sin() * orbit_radius) as i32;
-                    let dx = (tx - pos.x).signum();
-                    let dy = (ty - pos.y).signum();
-                    let next = Position::new(pos.x + dx, pos.y + dy);
-                    if map.in_bounds(next.x, next.y)
-                        && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                    let dx = (tx - pos.x()).signum();
+                    let dy = (ty - pos.y()).signum();
+                    let next = Position::new(pos.x() + dx, pos.y() + dy);
+                    if map.in_bounds(next.x(), next.y())
+                        && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                         && budget.try_spend_step()
                     {
                         *pos = next;
                     }
 
                     // Deposit siege corruption at 3x normal rate.
-                    if map.in_bounds(pos.x, pos.y) {
-                        let tile = map.get_mut(pos.x, pos.y);
+                    if map.in_bounds(pos.x(), pos.y()) {
+                        let tile = map.get_mut(pos.x(), pos.y());
                         tile.corruption = (tile.corruption + c.ward_siege_corruption_rate).min(1.0);
                     }
                 }
@@ -275,10 +275,10 @@ pub fn wildlife_ai(
                 // `ward_positions` distance check; now reads the same
                 // `WardCoverageMap` threshold as the patrol-step branch).
                 if is_shadow_fox {
-                    let dx = (target_x - pos.x).signum();
-                    let dy = (target_y - pos.y).signum();
-                    let next = Position::new(pos.x + dx, pos.y + dy);
-                    if ward_coverage.get(next.x, next.y) >= ward_avoid_threshold {
+                    let dx = (target_x - pos.x()).signum();
+                    let dy = (target_y - pos.y()).signum();
+                    let next = Position::new(pos.x() + dx, pos.y() + dy);
+                    if ward_coverage.get(next.x(), next.y()) >= ward_avoid_threshold {
                         *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
                         activation.record(Feature::ShadowFoxAvoidedWard);
                         continue;
@@ -286,11 +286,11 @@ pub fn wildlife_ai(
                 }
 
                 // Move one step toward the target cat.
-                let dx = (target_x - pos.x).signum();
-                let dy = (target_y - pos.y).signum();
-                let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y)
-                    && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                let dx = (target_x - pos.x()).signum();
+                let dy = (target_y - pos.y()).signum();
+                let next = Position::new(pos.x() + dx, pos.y() + dy);
+                if map.in_bounds(next.x(), next.y())
+                    && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                 {
                     if budget.try_spend_step() {
                         *pos = next;
@@ -308,14 +308,14 @@ pub fn wildlife_ai(
                 // stay put once on it. Coherence recovery continues to
                 // run through `shadowfox_coherence_tick`, which already
                 // gives a multiplier for `tile_corruption > recovery_threshold`.
-                if pos.x == tile_x && pos.y == tile_y {
+                if pos.x() == tile_x && pos.y() == tile_y {
                     // Already on target — hold position.
                 } else {
-                    let dx = (tile_x - pos.x).signum();
-                    let dy = (tile_y - pos.y).signum();
-                    let next = Position::new(pos.x + dx, pos.y + dy);
-                    if map.in_bounds(next.x, next.y)
-                        && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                    let dx = (tile_x - pos.x()).signum();
+                    let dy = (tile_y - pos.y()).signum();
+                    let next = Position::new(pos.x() + dx, pos.y() + dy);
+                    if map.in_bounds(next.x(), next.y())
+                        && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                         && budget.try_spend_step()
                     {
                         *pos = next;
@@ -338,16 +338,16 @@ pub fn wildlife_ai(
                 }
                 let orbit_radius = ward_positions
                     .iter()
-                    .find(|(wp, _)| wp.x == ward_x && wp.y == ward_y)
+                    .find(|(wp, _)| wp.x() == ward_x && wp.y() == ward_y)
                     .map(|(_, r)| *r + 1.0)
                     .unwrap_or(4.0);
                 let tx = ward_x + (angle.cos() * orbit_radius) as i32;
                 let ty = ward_y + (angle.sin() * orbit_radius) as i32;
-                let dx = (tx - pos.x).signum();
-                let dy = (ty - pos.y).signum();
-                let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y)
-                    && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                let dx = (tx - pos.x()).signum();
+                let dy = (ty - pos.y()).signum();
+                let next = Position::new(pos.x() + dx, pos.y() + dy);
+                if map.in_bounds(next.x(), next.y())
+                    && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                     && budget.try_spend_step()
                 {
                     *pos = next;
@@ -367,8 +367,8 @@ pub fn wildlife_ai(
                 // farther, step toward. Phase B is detection-only;
                 // Phase C wires the safety/mood drain when within
                 // haunting_drain_radius.
-                let dx_t = target_x - pos.x;
-                let dy_t = target_y - pos.y;
+                let dx_t = target_x - pos.x();
+                let dy_t = target_y - pos.y();
                 let dist = dx_t.abs() + dy_t.abs();
                 let (step_dx, step_dy) = if dist < edge_distance {
                     // Too close — step directly away.
@@ -385,9 +385,9 @@ pub fn wildlife_ai(
                         (1, 0)
                     }
                 };
-                let next = Position::new(pos.x + step_dx, pos.y + step_dy);
-                if map.in_bounds(next.x, next.y)
-                    && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                let next = Position::new(pos.x() + step_dx, pos.y() + step_dy);
+                if map.in_bounds(next.x(), next.y())
+                    && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                     && budget.try_spend_step()
                 {
                     *pos = next;
@@ -399,11 +399,11 @@ pub fn wildlife_ai(
             } => {
                 // Move one step toward the frontier tile, depositing
                 // corruption via the existing shadow-fox-step deposit.
-                let dx = (frontier_x - pos.x).signum();
-                let dy = (frontier_y - pos.y).signum();
-                let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y)
-                    && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                let dx = (frontier_x - pos.x()).signum();
+                let dy = (frontier_y - pos.y()).signum();
+                let next = Position::new(pos.x() + dx, pos.y() + dy);
+                if map.in_bounds(next.x(), next.y())
+                    && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                     && budget.try_spend_step()
                 {
                     *pos = next;
@@ -412,8 +412,8 @@ pub fn wildlife_ai(
         }
 
         // ShadowFox spreads corruption to tiles it crosses.
-        if is_shadow_fox && map.in_bounds(pos.x, pos.y) {
-            let tile = map.get_mut(pos.x, pos.y);
+        if is_shadow_fox && map.in_bounds(pos.x(), pos.y()) {
+            let tile = map.get_mut(pos.x(), pos.y());
             tile.corruption = (tile.corruption + c.shadow_fox_corruption_deposit).min(1.0);
         }
 
@@ -502,8 +502,8 @@ pub fn spawn_wildlife(
                         crate::components::SensorySignature::WILDLIFE,
                         HawkState::new_adult(),
                         HawkAiPhase::Soaring {
-                            center_x: spawn_pos.x,
-                            center_y: spawn_pos.y,
+                            center_x: spawn_pos.x(),
+                            center_y: spawn_pos.y(),
                             angle: 0.0,
                         },
                         HawkNeeds::default(),
@@ -612,18 +612,18 @@ fn initial_ai_state(
     match species.default_behavior() {
         BehaviorType::Patrol => {
             // Pick a random direction along the edge.
-            let dx = if pos.x == 0 {
+            let dx = if pos.x() == 0 {
                 1
-            } else if pos.x == map.width - 1 {
+            } else if pos.x() == map.width - 1 {
                 -1
             } else if rng.random() {
                 1
             } else {
                 -1
             };
-            let dy = if pos.y == 0 {
+            let dy = if pos.y() == 0 {
                 1
-            } else if pos.y == map.height - 1 {
+            } else if pos.y() == map.height - 1 {
                 -1
             } else {
                 0
@@ -632,8 +632,10 @@ fn initial_ai_state(
         }
         BehaviorType::Circle => {
             // Circle around a point ~8 tiles inward from spawn.
-            let center_x = (pos.x + (map.width / 2 - pos.x).signum() * 8).clamp(0, map.width - 1);
-            let center_y = (pos.y + (map.height / 2 - pos.y).signum() * 8).clamp(0, map.height - 1);
+            let center_x =
+                (pos.x() + (map.width / 2 - pos.x()).signum() * 8).clamp(0, map.width - 1);
+            let center_y =
+                (pos.y() + (map.height / 2 - pos.y()).signum() * 8).clamp(0, map.height - 1);
             WildlifeAiState::Circling {
                 center_x,
                 center_y,
@@ -707,8 +709,8 @@ pub fn detect_threats(
 
         let detection_range = {
             let mut range = c.base_detection_range;
-            if map.in_bounds(cat_pos.x, cat_pos.y) {
-                let terrain = map.get(cat_pos.x, cat_pos.y).terrain;
+            if map.in_bounds(cat_pos.x(), cat_pos.y()) {
+                let terrain = map.get(cat_pos.x(), cat_pos.y()).terrain;
                 if matches!(terrain, Terrain::DenseForest | Terrain::LightForest) {
                     range -= c.forest_range_penalty;
                 }
@@ -1019,8 +1021,8 @@ pub fn carcass_decay(
         carcass.age_ticks += 1;
 
         // Emit corruption unless cleansed.
-        if !carcass.cleansed && map.in_bounds(pos.x, pos.y) {
-            let tile = map.get_mut(pos.x, pos.y);
+        if !carcass.cleansed && map.in_bounds(pos.x(), pos.y()) {
+            let tile = map.get_mut(pos.x(), pos.y());
             tile.corruption = (tile.corruption + carcass.corruption_rate).min(1.0);
         }
 
@@ -1069,7 +1071,7 @@ pub fn carcass_scent_tick(
     scent_map.decay_all(c.carcass_scent_decay_rate.per_tick(&time_scale));
     for (carcass, pos) in &carcasses {
         if !carcass.cleansed || !carcass.harvested {
-            scent_map.deposit(pos.x, pos.y, c.carcass_scent_deposit_per_tick);
+            scent_map.deposit(pos.x(), pos.y(), c.carcass_scent_deposit_per_tick);
         }
     }
 }
@@ -1104,8 +1106,8 @@ pub fn shadowfox_coherence_tick(
     for (entity, pos, _animal, mut drives) in &mut query {
         drives.age_ticks = drives.age_ticks.saturating_add(1);
 
-        let tile_corruption = if map.in_bounds(pos.x, pos.y) {
-            map.get(pos.x, pos.y).corruption
+        let tile_corruption = if map.in_bounds(pos.x(), pos.y()) {
+            map.get(pos.x(), pos.y()).corruption
         } else {
             // Off-map shadow-foxes are about to be despawned by
             // `cleanup_wildlife`; treat as clean ground so coherence
@@ -1136,7 +1138,7 @@ pub fn shadowfox_coherence_tick(
                 elog.push(
                     time.tick,
                     crate::resources::event_log::EventKind::ShadowFoxDissolved {
-                        location: (pos.x, pos.y),
+                        location: (pos.x(), pos.y()),
                         age_ticks: drives.age_ticks,
                         final_corruption: tile_corruption,
                     },
@@ -1262,8 +1264,8 @@ pub fn shadowfox_motivation_tick(
         let mut best_corruption_value: f32 = -1.0;
         for dy in -scan_radius..=scan_radius {
             for dx in -scan_radius..=scan_radius {
-                let tx = pos.x + dx;
-                let ty = pos.y + dy;
+                let tx = pos.x() + dx;
+                let ty = pos.y() + dy;
                 if !map.in_bounds(tx, ty) {
                     continue;
                 }
@@ -1402,8 +1404,8 @@ pub fn shadowfox_motivation_tick(
         // ---- Apply winning state if it actually changes ----
         let next_state: Option<WildlifeAiState> = match winner {
             0 => best_corruption_tile.map(|t| WildlifeAiState::Reconstituting {
-                tile_x: t.x,
-                tile_y: t.y,
+                tile_x: t.x(),
+                tile_y: t.y(),
             }),
             1 => nearest_threatened
                 .zip(ward_anchors.iter().min_by_key(|(wp, _)| {
@@ -1413,20 +1415,20 @@ pub fn shadowfox_motivation_tick(
                 }))
                 .map(
                     |(_threatened_tile, (ward_pos, _))| WildlifeAiState::Tending {
-                        ward_x: ward_pos.x,
-                        ward_y: ward_pos.y,
+                        ward_x: ward_pos.x(),
+                        ward_y: ward_pos.y(),
                         angle: 0.0,
                     },
                 ),
             2 => nearest_cat.map(|cp| WildlifeAiState::Haunting {
-                target_x: cp.x,
-                target_y: cp.y,
+                target_x: cp.x(),
+                target_y: cp.y(),
                 edge_distance: haunt_edge,
                 ticks: 0,
             }),
             3 => nearest_frontier.map(|fp| WildlifeAiState::Seeding {
-                frontier_x: fp.x,
-                frontier_y: fp.y,
+                frontier_x: fp.x(),
+                frontier_y: fp.y(),
             }),
             _ => None,
         };
@@ -1453,25 +1455,25 @@ pub fn shadowfox_motivation_tick(
                     let kind = match new_state {
                         WildlifeAiState::Reconstituting { .. } => {
                             Some(crate::resources::event_log::EventKind::ShadowFoxReconstitutingEntered {
-                                location: (pos.x, pos.y),
+                                location: (pos.x(), pos.y()),
                                 coherence: drives.coherence,
                             })
                         }
                         WildlifeAiState::Tending { ward_x, ward_y, .. } => {
                             Some(crate::resources::event_log::EventKind::ShadowFoxTendingEntered {
-                                location: (pos.x, pos.y),
+                                location: (pos.x(), pos.y()),
                                 ward_location: (ward_x, ward_y),
                             })
                         }
                         WildlifeAiState::Haunting { target_x, target_y, .. } => {
                             Some(crate::resources::event_log::EventKind::ShadowFoxHauntingEntered {
-                                location: (pos.x, pos.y),
+                                location: (pos.x(), pos.y()),
                                 target: (target_x, target_y),
                             })
                         }
                         WildlifeAiState::Seeding { frontier_x, frontier_y } => {
                             Some(crate::resources::event_log::EventKind::ShadowFoxSeedingEntered {
-                                location: (pos.x, pos.y),
+                                location: (pos.x(), pos.y()),
                                 frontier: (frontier_x, frontier_y),
                             })
                         }
@@ -1700,8 +1702,8 @@ pub fn predator_stalk_cats(
                 .iter()
                 .min_by_key(|(wp, _)| wl_pos.manhattan_distance(wp))
             {
-                let away_dx = (wl_pos.x - ward_pos.x).signum();
-                let away_dy = (wl_pos.y - ward_pos.y).signum();
+                let away_dx = (wl_pos.x() - ward_pos.x()).signum();
+                let away_dy = (wl_pos.y() - ward_pos.y()).signum();
                 let dx = if away_dx != 0 { away_dx } else { 1 };
                 let dy = if away_dy != 0 { away_dy } else { 0 };
                 *ai_state = WildlifeAiState::Patrolling { dx, dy };
@@ -1743,8 +1745,8 @@ pub fn predator_stalk_cats(
                     // 5% chance per tick to begin stalking.
                     if rng.rng.random::<f32>() < 0.05 {
                         *ai_state = WildlifeAiState::Stalking {
-                            target_x: cat_pos.x,
-                            target_y: cat_pos.y,
+                            target_x: cat_pos.x(),
+                            target_y: cat_pos.y(),
                         };
                     }
                 }
@@ -1761,7 +1763,7 @@ pub fn predator_stalk_cats(
                     continue;
                 }
 
-                let dist = (wl_pos.x - target_x).abs() + (wl_pos.y - target_y).abs();
+                let dist = (wl_pos.x() - target_x).abs() + (wl_pos.y() - target_y).abs();
 
                 if dist <= 1 {
                     // Ambush! Find the nearest cat at the target position.
@@ -1783,8 +1785,8 @@ pub fn predator_stalk_cats(
                             wearables,
                         )) = cats.get_mut(*cat_entity)
                         {
-                            let tile_corruption = if map.in_bounds(wl_pos.x, wl_pos.y) {
-                                map.get(wl_pos.x, wl_pos.y).corruption
+                            let tile_corruption = if map.in_bounds(wl_pos.x(), wl_pos.y()) {
+                                map.get(wl_pos.x(), wl_pos.y()).corruption
                             } else {
                                 0.0
                             };
@@ -1841,7 +1843,7 @@ pub fn predator_stalk_cats(
                                     crate::resources::event_log::EventKind::Ambush {
                                         cat: name.0.clone(),
                                         predator_species: format!("{:?}", animal.species),
-                                        location: (wl_pos.x, wl_pos.y),
+                                        location: (wl_pos.x(), wl_pos.y()),
                                         damage,
                                     },
                                 );
@@ -1853,7 +1855,7 @@ pub fn predator_stalk_cats(
                             // `update_recent_ambush_map`; future tickets 220
                             // (ward-placement) and 221 (caretake-relocate)
                             // consume the resulting hotspot signal.
-                            recent_ambush_map.deposit(wl_pos.x, wl_pos.y, 1.0);
+                            recent_ambush_map.deposit(wl_pos.x(), wl_pos.y(), 1.0);
 
                             mood.modifiers.push_back(
                                 MoodModifier::new(
@@ -1901,8 +1903,8 @@ pub fn predator_stalk_cats(
                         .min_by_key(|(_, cp)| wl_pos.manhattan_distance(cp))
                     {
                         *ai_state = WildlifeAiState::Stalking {
-                            target_x: cat_pos.x,
-                            target_y: cat_pos.y,
+                            target_x: cat_pos.x(),
+                            target_y: cat_pos.y(),
                         };
                     }
                 }
@@ -1921,7 +1923,7 @@ pub fn cleanup_wildlife(
     mut log: ResMut<NarrativeLog>,
 ) {
     for (entity, pos, health, animal) in &query {
-        let off_map = !map.in_bounds(pos.x, pos.y);
+        let off_map = !map.in_bounds(pos.x(), pos.y());
         let dead = health.current <= 0.0;
 
         if off_map || dead {
@@ -1992,18 +1994,18 @@ pub fn spawn_initial_wildlife(world: &mut World, colony_center: Position) {
          -> WildlifeAiState {
             match species.default_behavior() {
                 BehaviorType::Patrol => {
-                    let dx = if pos.x == 0 {
+                    let dx = if pos.x() == 0 {
                         1
-                    } else if pos.x == map_width - 1 {
+                    } else if pos.x() == map_width - 1 {
                         -1
                     } else if rng.random() {
                         1
                     } else {
                         -1
                     };
-                    let dy = if pos.y == 0 {
+                    let dy = if pos.y() == 0 {
                         1
-                    } else if pos.y == map_height - 1 {
+                    } else if pos.y() == map_height - 1 {
                         -1
                     } else {
                         0
@@ -2012,9 +2014,9 @@ pub fn spawn_initial_wildlife(world: &mut World, colony_center: Position) {
                 }
                 BehaviorType::Circle => {
                     let center_x =
-                        (pos.x + (map_width / 2 - pos.x).signum() * 8).clamp(0, map_width - 1);
-                    let center_y =
-                        (pos.y + (map_height / 2 - pos.y).signum() * 8).clamp(0, map_height - 1);
+                        (pos.x() + (map_width / 2 - pos.x()).signum() * 8).clamp(0, map_width - 1);
+                    let center_y = (pos.y() + (map_height / 2 - pos.y()).signum() * 8)
+                        .clamp(0, map_height - 1);
                     WildlifeAiState::Circling {
                         center_x,
                         center_y,
@@ -2067,8 +2069,8 @@ pub fn spawn_initial_wildlife(world: &mut World, colony_center: Position) {
                     crate::components::SensorySignature::WILDLIFE,
                     HawkState::new_adult(),
                     HawkAiPhase::Soaring {
-                        center_x: pos.x,
-                        center_y: pos.y,
+                        center_x: pos.x(),
+                        center_y: pos.y(),
                         angle: 0.0,
                     },
                     HawkNeeds::default(),
@@ -2611,8 +2613,8 @@ pub fn fox_ai_decision(
 
             // Check if juvenile can establish a new den.
             if dens.iter().count() < fc.max_dens {
-                let terrain = if map.in_bounds(pos.x, pos.y) {
-                    map.get(pos.x, pos.y).terrain
+                let terrain = if map.in_bounds(pos.x(), pos.y()) {
+                    map.get(pos.x(), pos.y()).terrain
                 } else {
                     Terrain::Grass
                 };
@@ -2620,7 +2622,7 @@ pub fn fox_ai_decision(
                 let far_from_dens = dens
                     .iter()
                     .all(|(_, _, dp)| pos.manhattan_distance(dp) >= fc.min_den_spacing);
-                let low_scent = scent_map.get(pos.x, pos.y) < 0.1;
+                let low_scent = scent_map.get(pos.x(), pos.y()) < 0.1;
 
                 if is_forest && far_from_dens && low_scent {
                     // Small chance per tick to settle.
@@ -2656,11 +2658,12 @@ pub fn fox_ai_decision(
         // --- Don't re-evaluate during active fleeing ---
         if matches!(*phase, FoxAiPhase::Fleeing { .. }) {
             // Check if off-map (cleanup_wildlife handles despawn).
-            if !map.in_bounds(pos.x, pos.y) {
+            if !map.in_bounds(pos.x(), pos.y()) {
                 continue;
             }
             // After reaching map edge area, revert to patrol.
-            if pos.x <= 1 || pos.x >= map.width - 2 || pos.y <= 1 || pos.y >= map.height - 2 {
+            if pos.x() <= 1 || pos.x() >= map.width - 2 || pos.y() <= 1 || pos.y() >= map.height - 2
+            {
                 let dx = if rng.rng.random() { 1 } else { -1 };
                 *phase = FoxAiPhase::PatrolTerritory { dx, dy: 0 };
                 *ai_state = WildlifeAiState::Patrolling { dx, dy: 0 };
@@ -2680,8 +2683,8 @@ pub fn fox_ai_decision(
         // --- Health check: flee if badly hurt ---
         let hp_frac = health.current / health.max;
         if hp_frac < fc.flee_health_threshold && hp_frac > 0.0 {
-            let flee_dx = if pos.x < map.width / 2 { -1 } else { 1 };
-            let flee_dy = if pos.y < map.height / 2 { -1 } else { 1 };
+            let flee_dx = if pos.x() < map.width / 2 { -1 } else { 1 };
+            let flee_dy = if pos.y() < map.height / 2 { -1 } else { 1 };
             *phase = FoxAiPhase::Fleeing {
                 dx: flee_dx,
                 dy: flee_dy,
@@ -2710,8 +2713,8 @@ pub fn fox_ai_decision(
             })
             .count();
         if cats_nearby >= fc.outnumbered_flee_count {
-            let flee_dx = if pos.x < map.width / 2 { -1 } else { 1 };
-            let flee_dy = if pos.y < map.height / 2 { -1 } else { 1 };
+            let flee_dx = if pos.x() < map.width / 2 { -1 } else { 1 };
+            let flee_dy = if pos.y() < map.height / 2 { -1 } else { 1 };
             *phase = FoxAiPhase::Fleeing {
                 dx: flee_dx,
                 dy: flee_dy,
@@ -2737,8 +2740,8 @@ pub fn fox_ai_decision(
                             ticks_remaining: standoff_max_ticks,
                         };
                         *ai_state = WildlifeAiState::Stalking {
-                            target_x: cat_pos.x,
-                            target_y: cat_pos.y,
+                            target_x: cat_pos.x(),
+                            target_y: cat_pos.y(),
                         };
                         activation.record(Feature::FoxDenDefense);
                         activation.record(Feature::FoxStandoff);
@@ -2769,8 +2772,8 @@ pub fn fox_ai_decision(
                     ticks_remaining: standoff_max_ticks,
                 };
                 *ai_state = WildlifeAiState::Stalking {
-                    target_x: cat_pos.x,
-                    target_y: cat_pos.y,
+                    target_x: cat_pos.x(),
+                    target_y: cat_pos.y(),
                 };
                 activation.record(Feature::FoxStandoff);
                 continue;
@@ -2796,12 +2799,12 @@ pub fn fox_ai_decision(
             });
             if let Some(sp) = store_pos {
                 *phase = FoxAiPhase::Raiding {
-                    target_x: sp.x,
-                    target_y: sp.y,
+                    target_x: sp.x(),
+                    target_y: sp.y(),
                 };
                 *ai_state = WildlifeAiState::Stalking {
-                    target_x: sp.x,
-                    target_y: sp.y,
+                    target_x: sp.x(),
+                    target_y: sp.y(),
                 };
                 continue;
             }
@@ -2830,8 +2833,8 @@ pub fn fox_ai_decision(
                     target: Some(prey_e.to_bits()),
                 };
                 *ai_state = WildlifeAiState::Stalking {
-                    target_x: prey_pos.x,
-                    target_y: prey_pos.y,
+                    target_x: prey_pos.x(),
+                    target_y: prey_pos.y(),
                 };
                 continue;
             }
@@ -2849,12 +2852,12 @@ pub fn fox_ai_decision(
                     } else {
                         // Return to den.
                         *phase = FoxAiPhase::Returning {
-                            x: den_pos.x,
-                            y: den_pos.y,
+                            x: den_pos.x(),
+                            y: den_pos.y(),
                         };
                         *ai_state = WildlifeAiState::Stalking {
-                            target_x: den_pos.x,
-                            target_y: den_pos.y,
+                            target_x: den_pos.x(),
+                            target_y: den_pos.y(),
                         };
                         continue;
                     }
@@ -2868,13 +2871,13 @@ pub fn fox_ai_decision(
                 if den.scent_strength < 0.3 {
                     *phase = FoxAiPhase::ScentMarking;
                     // Move toward territory edge.
-                    let edge_x = den_pos.x
-                        + if pos.x > den_pos.x {
+                    let edge_x = den_pos.x()
+                        + if pos.x() > den_pos.x() {
                             den.territory_radius
                         } else {
                             -den.territory_radius
                         };
-                    let edge_y = den_pos.y;
+                    let edge_y = den_pos.y();
                     *ai_state = WildlifeAiState::Stalking {
                         target_x: edge_x.clamp(0, map.width - 1),
                         target_y: edge_y.clamp(0, map.height - 1),
@@ -2891,8 +2894,8 @@ pub fn fox_ai_decision(
                 .filter(|(wp, radius)| (pos.manhattan_distance(wp) as f32) <= *radius)
                 .min_by_key(|(wp, _)| pos.manhattan_distance(wp));
             if let Some((ward_pos, _)) = nearest_ward {
-                let away_dx = (pos.x - ward_pos.x).signum();
-                let away_dy = (pos.y - ward_pos.y).signum();
+                let away_dx = (pos.x() - ward_pos.x()).signum();
+                let away_dy = (pos.y() - ward_pos.y()).signum();
                 let dx = if away_dx != 0 {
                     away_dx
                 } else if rng.rng.random() {
@@ -2910,7 +2913,7 @@ pub fn fox_ai_decision(
 
         // --- Cat presence deterrent: avoid high cat-presence zones ---
         if fox.hunger < fc.ward_hunger_override_threshold {
-            let presence = cat_scent.get(pos.x, pos.y);
+            let presence = cat_scent.get(pos.x(), pos.y());
             if presence >= fc.cat_scent_avoidance_threshold {
                 // Move toward the lowest-presence adjacent bucket.
                 let bs = cat_scent.bucket_size;
@@ -2918,8 +2921,8 @@ pub fn fox_ai_decision(
                 let mut best_dy: i32 = 0;
                 let mut best_val = presence;
                 for (ddx, ddy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-                    let nx = pos.x + ddx * bs;
-                    let ny = pos.y + ddy * bs;
+                    let nx = pos.x() + ddx * bs;
+                    let ny = pos.y() + ddy * bs;
                     let v = cat_scent.get(nx, ny);
                     if v < best_val {
                         best_val = v;
@@ -2951,8 +2954,8 @@ pub fn fox_ai_decision(
             .min_by_key(|(_, cp, _)| pos.manhattan_distance(cp));
         if let Some((_, cat_pos, _)) = closest_cat {
             // Move in the opposite direction from the cat.
-            let away_dx = (pos.x - cat_pos.x).signum();
-            let away_dy = (pos.y - cat_pos.y).signum();
+            let away_dx = (pos.x() - cat_pos.x()).signum();
+            let away_dy = (pos.y() - cat_pos.y()).signum();
             let dx = if away_dx != 0 {
                 away_dx
             } else if rng.rng.random() {
@@ -2971,7 +2974,7 @@ pub fn fox_ai_decision(
         if let Some(den_entity) = fox.home_den {
             if let Ok((_, den, den_pos)) = dens.get(den_entity) {
                 // 3.16: Cat presence near den contracts effective patrol radius.
-                let den_presence = cat_scent.get(den_pos.x, den_pos.y);
+                let den_presence = cat_scent.get(den_pos.x(), den_pos.y());
                 let effective_radius = if den_presence > 0.1 {
                     // Contract by up to 50% based on cat scent intensity.
                     let contraction = (den_presence * 0.5).min(0.5);
@@ -2984,12 +2987,12 @@ pub fn fox_ai_decision(
                 let dist = pos.manhattan_distance(den_pos);
                 if dist > effective_radius {
                     *phase = FoxAiPhase::Returning {
-                        x: den_pos.x,
-                        y: den_pos.y,
+                        x: den_pos.x(),
+                        y: den_pos.y(),
                     };
                     *ai_state = WildlifeAiState::Stalking {
-                        target_x: den_pos.x,
-                        target_y: den_pos.y,
+                        target_x: den_pos.x(),
+                        target_y: den_pos.y(),
                     };
                     continue;
                 }
@@ -3002,8 +3005,8 @@ pub fn fox_ai_decision(
                         .min_by_key(|(_, pp)| pos.manhattan_distance(pp))
                         .map(|(_, pp)| *pp);
                     if let Some(prey_pos) = nearest_prey_pos {
-                        let dx = (prey_pos.x - pos.x).signum();
-                        let dy = (prey_pos.y - pos.y).signum();
+                        let dx = (prey_pos.x() - pos.x()).signum();
+                        let dy = (prey_pos.y() - pos.y()).signum();
                         let dx = if dx != 0 {
                             dx
                         } else if rng.rng.random() {
@@ -3055,9 +3058,9 @@ pub fn fox_movement(
                 // Don't move.
             }
             FoxAiPhase::PatrolTerritory { dx, dy } | FoxAiPhase::Dispersing { dx, dy } => {
-                let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y)
-                    && is_patrol_terrain(map.get(next.x, next.y).terrain, WildSpecies::Fox)
+                let next = Position::new(pos.x() + dx, pos.y() + dy);
+                if map.in_bounds(next.x(), next.y())
+                    && is_patrol_terrain(map.get(next.x(), next.y()).terrain, WildSpecies::Fox)
                 {
                     // Ticket 138 — gate on MovementBudget. Foxes are
                     // at per_tick=1.0 today, so a no-op behaviorally;
@@ -3068,8 +3071,8 @@ pub fn fox_movement(
                     }
                 } else {
                     // Reverse and try.
-                    let rev = Position::new(pos.x - dx, pos.y - dy);
-                    if map.in_bounds(rev.x, rev.y) {
+                    let rev = Position::new(pos.x() - dx, pos.y() - dy);
+                    if map.in_bounds(rev.x(), rev.y()) {
                         if budget.try_spend_step() {
                             *pos = rev;
                         }
@@ -3096,11 +3099,11 @@ pub fn fox_movement(
                 // These all use WildlifeAiState::Stalking for movement.
                 // The stalking movement is: move one step toward target.
                 if let WildlifeAiState::Stalking { target_x, target_y } = *ai_state {
-                    let dx = (target_x - pos.x).signum();
-                    let dy = (target_y - pos.y).signum();
-                    let next = Position::new(pos.x + dx, pos.y + dy);
-                    if map.in_bounds(next.x, next.y)
-                        && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                    let dx = (target_x - pos.x()).signum();
+                    let dy = (target_y - pos.y()).signum();
+                    let next = Position::new(pos.x() + dx, pos.y() + dy);
+                    if map.in_bounds(next.x(), next.y())
+                        && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                         && budget.try_spend_step()
                     {
                         *pos = next;
@@ -3108,8 +3111,8 @@ pub fn fox_movement(
                 }
             }
             FoxAiPhase::Fleeing { dx, dy } => {
-                let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y) && budget.try_spend_step() {
+                let next = Position::new(pos.x() + dx, pos.y() + dy);
+                if map.in_bounds(next.x(), next.y()) && budget.try_spend_step() {
                     *pos = next;
                 }
             }
@@ -3177,8 +3180,8 @@ pub fn fox_confrontation_tick(
         if *ticks_remaining == 0 {
             // Standoff expired — fox retreats.
             if rng.rng.random::<f32>() < fc.standoff_fox_retreat_chance {
-                let flee_dx = if pos.x < map.width / 2 { -1 } else { 1 };
-                let flee_dy = if pos.y < map.height / 2 { -1 } else { 1 };
+                let flee_dx = if pos.x() < map.width / 2 { -1 } else { 1 };
+                let flee_dy = if pos.y() < map.height / 2 { -1 } else { 1 };
                 *phase = FoxAiPhase::Fleeing {
                     dx: flee_dx,
                     dy: flee_dy,
@@ -3282,8 +3285,8 @@ pub fn fox_confrontation_tick(
             activation.record(Feature::FoxStandoffEscalated);
 
             // After escalation, fox retreats.
-            let flee_dx = if pos.x < map.width / 2 { -1 } else { 1 };
-            let flee_dy = if pos.y < map.height / 2 { -1 } else { 1 };
+            let flee_dx = if pos.x() < map.width / 2 { -1 } else { 1 };
+            let flee_dy = if pos.y() < map.height / 2 { -1 } else { 1 };
             *phase = FoxAiPhase::Fleeing {
                 dx: flee_dx,
                 dy: flee_dy,
@@ -3331,7 +3334,7 @@ pub fn fox_store_raid_tick(
             _ => continue,
         };
 
-        let dist = (pos.x - target_x).abs() + (pos.y - target_y).abs();
+        let dist = (pos.x() - target_x).abs() + (pos.y() - target_y).abs();
 
         // Check if a cat appeared near the stores — abort if so.
         let guarded = cat_positions.iter().any(|cp| {
@@ -3341,8 +3344,8 @@ pub fn fox_store_raid_tick(
 
         if guarded {
             // Abort raid — flee.
-            let flee_dx = if pos.x < map.width / 2 { -1 } else { 1 };
-            let flee_dy = if pos.y < map.height / 2 { -1 } else { 1 };
+            let flee_dx = if pos.x() < map.width / 2 { -1 } else { 1 };
+            let flee_dy = if pos.y() < map.height / 2 { -1 } else { 1 };
             *phase = FoxAiPhase::Fleeing {
                 dx: flee_dx,
                 dy: flee_dy,
@@ -3372,7 +3375,7 @@ pub fn fox_store_raid_tick(
             }
 
             // After raiding, return to den or patrol.
-            let dx = if rng_dx(pos.x, map.width) { 1 } else { -1 };
+            let dx = if rng_dx(pos.x(), map.width) { 1 } else { -1 };
             *phase = FoxAiPhase::PatrolTerritory { dx, dy: 0 };
             *ai_state = WildlifeAiState::Patrolling { dx, dy: 0 };
         }
@@ -3408,7 +3411,7 @@ pub fn fox_scent_tick(
         }
         match phase {
             FoxAiPhase::ScentMarking | FoxAiPhase::PatrolTerritory { .. } => {
-                scent_map.deposit(pos.x, pos.y, fc.scent_deposit);
+                scent_map.deposit(pos.x(), pos.y(), fc.scent_deposit);
                 if matches!(phase, FoxAiPhase::ScentMarking) {
                     activation.record(Feature::FoxScentMarked);
                 }
@@ -3459,7 +3462,7 @@ pub fn update_fox_approach_corridor_map(
             continue;
         }
         if matches!(phase, FoxAiPhase::PatrolTerritory { .. }) {
-            corridor.deposit(pos.x, pos.y, deposit);
+            corridor.deposit(pos.x(), pos.y(), deposit);
         }
     }
 }
@@ -3539,7 +3542,7 @@ mod tests {
         let pos = *world.get::<Position>(entity).unwrap();
         // Fox should have moved (either forward or jittered).
         assert!(
-            pos.x != 5 || pos.y != 15,
+            pos.x() != 5 || pos.y() != 15,
             "fox should have moved from (5, 15)"
         );
     }
@@ -3579,7 +3582,7 @@ mod tests {
         let pos = *world.get::<Position>(entity).unwrap();
         // Hawk should have moved from start (circling).
         assert!(
-            pos.x != 20 || pos.y != 15,
+            pos.x() != 20 || pos.y() != 15,
             "hawk should have moved from (20, 15)"
         );
     }
@@ -3656,10 +3659,10 @@ mod tests {
             assert!(
                 pos.manhattan_distance(&colony) >= 7,
                 "wildlife at ({}, {}) is too close to colony at ({}, {})",
-                pos.x,
-                pos.y,
-                colony.x,
-                colony.y
+                pos.x(),
+                pos.y(),
+                colony.x(),
+                colony.y()
             );
         }
     }

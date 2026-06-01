@@ -257,7 +257,7 @@ impl crate::systems::influence_map::InfluenceMap for TremorMap {
     }
 
     fn base_sample(&self, pos: crate::components::physical::Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 

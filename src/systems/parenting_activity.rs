@@ -323,8 +323,8 @@ pub fn tick_parental_engagement(
             // target-taking = grief).
             let in_range = match target_positions.get(rel.target) {
                 Ok(target_pos) => {
-                    let dx = (target_pos.x - owner_pos.x) as f32;
-                    let dy = (target_pos.y - owner_pos.y) as f32;
+                    let dx = (target_pos.x() - owner_pos.x()) as f32;
+                    let dy = (target_pos.y() - owner_pos.y()) as f32;
                     dx * dx + dy * dy <= range_sq
                 }
                 Err(_) => false,

@@ -171,7 +171,7 @@ pub fn resolve_herbcraft_target(
         scratch.positions.push(c.position);
         scratch
             .map_f32_a
-            .insert(c.entity, map.total(c.position.x, c.position.y));
+            .insert(c.entity, map.total(c.position.x(), c.position.y()));
         scratch
             .map_f32_b
             .insert(c.entity, growth_stage_strength(c.growth_stage));
@@ -364,8 +364,14 @@ mod tests {
         let far = herb(3, 15, 0, HerbKind::HealingMoss, GrowthStage::Bloom);
         // Both stamped equally (single isolated herb each) — density
         // axis ties.
-        map.stamp(close.kind, close.position.x, close.position.y, 0.75, 15.0);
-        map.stamp(far.kind, far.position.x, far.position.y, 0.75, 15.0);
+        map.stamp(
+            close.kind,
+            close.position.x(),
+            close.position.y(),
+            0.75,
+            15.0,
+        );
+        map.stamp(far.kind, far.position.x(), far.position.y(), 0.75, 15.0);
         let out = resolve_herbcraft_target(
             &registry,
             cat,
@@ -422,15 +428,15 @@ mod tests {
         // (each contributes ~0.43 at the bucket center; three stamps
         // cap at 1.0).
         for _ in 0..3 {
-            map.stamp(dense.kind, dense.position.x, dense.position.y, 1.0, 5.0);
+            map.stamp(dense.kind, dense.position.x(), dense.position.y(), 1.0, 5.0);
         }
-        map.stamp(lone.kind, lone.position.x, lone.position.y, 0.5, 5.0);
+        map.stamp(lone.kind, lone.position.x(), lone.position.y(), 0.5, 5.0);
         assert!(
-            map.total(dense.position.x, dense.position.y)
-                > map.total(lone.position.x, lone.position.y) + 0.2,
+            map.total(dense.position.x(), dense.position.y())
+                > map.total(lone.position.x(), lone.position.y()) + 0.2,
             "test setup must produce a density gap; got {} vs {}",
-            map.total(dense.position.x, dense.position.y),
-            map.total(lone.position.x, lone.position.y),
+            map.total(dense.position.x(), dense.position.y()),
+            map.total(lone.position.x(), lone.position.y()),
         );
         let out = resolve_herbcraft_target(
             &registry,

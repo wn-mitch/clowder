@@ -40,7 +40,7 @@ pub struct ColonyKnowledge {
 impl ColonyKnowledge {
     /// Bucket a position to a ~5-tile grid for approximate matching.
     pub fn bucket_position(pos: &Position) -> Position {
-        Position::new((pos.x / 5) * 5 + 2, (pos.y / 5) * 5 + 2)
+        Position::new((pos.x() / 5) * 5 + 2, (pos.y() / 5) * 5 + 2)
     }
 
     /// Check whether an entry matching this (event_type, bucketed_location) exists.
@@ -61,7 +61,7 @@ impl ColonyKnowledge {
 /// Check whether two bucketed locations are approximately the same.
 fn approx_location_match(a: &Option<Position>, b: &Option<Position>) -> bool {
     match (a, b) {
-        (Some(pa), Some(pb)) => pa.x == pb.x && pa.y == pb.y,
+        (Some(pa), Some(pb)) => pa.x() == pb.x() && pa.y() == pb.y(),
         (None, None) => true,
         _ => false,
     }
@@ -71,8 +71,8 @@ fn approx_location_match(a: &Option<Position>, b: &Option<Position>) -> bool {
 pub fn knowledge_description(entry: &KnowledgeEntry) -> String {
     let location_desc = match &entry.location {
         Some(pos) => {
-            let compass = if pos.x > 40 { "eastern" } else { "western" };
-            let terrain = if pos.y < 20 { "ridge" } else { "lowlands" };
+            let compass = if pos.x() > 40 { "eastern" } else { "western" };
+            let terrain = if pos.y() < 20 { "ridge" } else { "lowlands" };
             format!("the {compass} {terrain}")
         }
         None => "the colony's surroundings".to_string(),

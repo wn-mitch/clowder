@@ -46,9 +46,9 @@ pub static SCENARIO: Scenario = Scenario {
 };
 
 /// World coordinates the assertion test reads back.
-pub const BOLD_START: Position = Position { x: 5, y: 20 };
-pub const TIMID_START: Position = Position { x: 5, y: 22 };
-pub const PREY_POS: Position = Position { x: 35, y: 20 };
+pub const BOLD_START: Position = Position::new(5, 20);
+pub const TIMID_START: Position = Position::new(5, 22);
+pub const PREY_POS: Position = Position::new(35, 20);
 /// Fox-scent corridor — one bucket column. With the default
 /// `bucket_size = 5`, depositing at any tile in the bucket fills the
 /// whole 5×5 region. We saturate every bucket along x ∈ [15, 19] so

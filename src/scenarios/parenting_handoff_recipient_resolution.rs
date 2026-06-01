@@ -105,8 +105,8 @@ pub static SCENARIO: Scenario = Scenario {
 
 const PARENT_NAME: &str = "Magnolia";
 const KITTEN_NAME: &str = "Crumb";
-const PARENT_POS: Position = Position { x: 20, y: 20 };
-const KITTEN_POS: Position = Position { x: 20, y: 20 };
+const PARENT_POS: Position = Position::new(20, 20);
+const KITTEN_POS: Position = Position::new(20, 20);
 
 fn setup(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);

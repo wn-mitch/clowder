@@ -208,7 +208,7 @@ fn event_position(ev: &WitnessableEvent) -> Position {
 }
 
 fn within_range(a: &Position, b: &Position) -> bool {
-    (a.x - b.x).abs() + (a.y - b.y).abs() <= WITNESS_RANGE
+    (a.x() - b.x()).abs() + (a.y() - b.y()).abs() <= WITNESS_RANGE
 }
 
 fn species_violence_prior(priors: &SpeciesViolencePriors, species: WildSpecies) -> f32 {
@@ -282,7 +282,7 @@ fn apply_observation(
                 target_model.last_updated_tick = tick;
                 target_model.evidence_count = target_model.evidence_count.saturating_add(1);
             }
-            let loc_key = bucket_position(position.x, position.y);
+            let loc_key = bucket_position(position.x(), position.y());
             let loc_model = locs.models.entry(loc_key).or_default();
             update_facet(
                 &mut loc_model.recency_of_threat_cue,

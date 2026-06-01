@@ -246,7 +246,7 @@ impl InfluenceMap for crate::resources::FoxScentMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -280,7 +280,7 @@ impl InfluenceMap for PerSpeciesScentRef<'_> {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.0.get(pos.x, pos.y)
+        self.0.get(pos.x(), pos.y())
     }
 }
 
@@ -297,7 +297,7 @@ impl InfluenceMap for crate::resources::CarcassScentMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -316,7 +316,7 @@ impl InfluenceMap for crate::resources::CoverAvailabilityMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -337,7 +337,7 @@ impl InfluenceMap for crate::resources::FoxApproachCorridorMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -360,7 +360,7 @@ impl InfluenceMap for crate::resources::RecentAmbushMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -382,7 +382,7 @@ impl InfluenceMap for crate::resources::CatScentMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -400,7 +400,7 @@ impl InfluenceMap for crate::resources::CatPatrolDeterrentMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -419,7 +419,7 @@ impl InfluenceMap for crate::resources::ExplorationMap {
     /// exposing the raw grid keeps the `InfluenceMap` semantics
     /// uniform (§5.6.5 lists ExplorationMap as a positive-sense map).
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -437,7 +437,7 @@ impl InfluenceMap for crate::resources::WardCoverageMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -462,7 +462,7 @@ impl InfluenceMap for crate::resources::WardSiegeFearMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -480,7 +480,7 @@ impl InfluenceMap for crate::resources::WardIntentMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -497,7 +497,7 @@ impl InfluenceMap for crate::resources::GraveAuraMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -517,7 +517,7 @@ impl InfluenceMap for crate::resources::ColonyDistrictMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.composite(pos.x, pos.y)
+        self.composite(pos.x(), pos.y())
     }
 }
 
@@ -535,7 +535,7 @@ impl InfluenceMap for crate::resources::FoodLocationMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -552,7 +552,7 @@ impl InfluenceMap for crate::resources::GardenLocationMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -570,7 +570,7 @@ impl InfluenceMap for crate::resources::ConstructionSiteMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -589,7 +589,7 @@ impl InfluenceMap for crate::resources::KittenCryMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -609,7 +609,7 @@ impl InfluenceMap for crate::resources::HerbLocationMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.total(pos.x, pos.y)
+        self.total(pos.x(), pos.y())
     }
 }
 
@@ -638,10 +638,10 @@ impl InfluenceMap for CorruptionLens<'_> {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        if !self.0.in_bounds(pos.x, pos.y) {
+        if !self.0.in_bounds(pos.x(), pos.y()) {
             return 0.0;
         }
-        self.0.get(pos.x, pos.y).corruption
+        self.0.get(pos.x(), pos.y()).corruption
     }
 }
 
@@ -663,7 +663,7 @@ impl InfluenceMap for crate::resources::ComfortMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -677,7 +677,7 @@ impl InfluenceMap for crate::resources::CleanlinessMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -691,7 +691,7 @@ impl InfluenceMap for crate::resources::BeautyMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -705,7 +705,7 @@ impl InfluenceMap for crate::resources::MysteryMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -724,7 +724,7 @@ impl InfluenceMap for crate::resources::CorruptionInfluenceMap {
     }
 
     fn base_sample(&self, pos: Position) -> f32 {
-        self.get(pos.x, pos.y)
+        self.get(pos.x(), pos.y())
     }
 }
 
@@ -948,7 +948,7 @@ mod tests {
         }
         // Base sample agrees with direct .get() call.
         let pos = Position::new(10, 10);
-        assert_eq!(map.base_sample(pos), map.get(pos.x, pos.y));
+        assert_eq!(map.base_sample(pos), map.get(pos.x(), pos.y()));
 
         // Deposit a value and verify it surfaces via the trait.
         if let Some(i) = map.bucket_index(10, 10) {
@@ -968,7 +968,7 @@ mod tests {
 
         // Sample agrees with direct .get() and surfaces a deposit.
         let pos = Position::new(10, 10);
-        assert_eq!(map.base_sample(pos), map.get(pos.x, pos.y));
+        assert_eq!(map.base_sample(pos), map.get(pos.x(), pos.y()));
         map.deposit(10, 10, 1.0);
         assert!((map.base_sample(pos) - 1.0).abs() < 1e-6);
     }

@@ -417,7 +417,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     world.insert_resource(crate::resources::ColonyCenter(colony_site));
     world.spawn((
         crate::components::building::ColonyWell,
-        Position::new(colony_site.x, colony_site.y),
+        Position::new(colony_site.x(), colony_site.y()),
     ));
 
     // Colony-singleton entity — host for colony-scoped substrate markers
@@ -475,8 +475,8 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
         let (spawn_x, spawn_y) = {
             let map_ref = world.resource::<crate::resources::TileMap>();
             (
-                (colony_site.x + offset_x).clamp(0, map_ref.width - 1),
-                (colony_site.y + offset_y).clamp(0, map_ref.height - 1),
+                (colony_site.x() + offset_x).clamp(0, map_ref.width - 1),
+                (colony_site.y() + offset_y).clamp(0, map_ref.height - 1),
             )
         };
 

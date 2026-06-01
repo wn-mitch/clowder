@@ -1,53 +1,130 @@
 use bevy::math::Vec2;
 use bevy_ecs::prelude::*;
+use std::hash::{Hash, Hasher};
 
 // ---------------------------------------------------------------------------
 // Position
 // ---------------------------------------------------------------------------
 
-/// World-space grid position.
-#[derive(
-    Component, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-)]
-pub struct Position {
-    pub x: i32,
-    pub y: i32,
+/// World-space position. Ticket 491 (Phase 2a of the 135 continuous-position
+/// epic) made this a `Vec2<f32>`-backed newtype. For sub-phase 2a, all
+/// existing call sites continue to interact with tile-integer coordinates
+/// via `Position::new(x: i32, y: i32)` (which snaps to the tile center) and
+/// the `x()` / `y()` / `tile()` accessors. Direct Euclidean reads
+/// (`pos.world()`) become first-class in sibling sub-phases 2b/2c.
+///
+/// Wire format: `serde(transparent)` over `Vec2`, so new code paths
+/// serialize as a 2-element float array. Save format keeps the legacy
+/// `{x:i32, y:i32}` shape via `SavedPosition` in `persistence.rs`.
+///
+/// `PartialEq` / `Eq` / `Hash` are keyed on `tile()` — the containing
+/// integer grid cell — to preserve the pre-491 `HashMap<Position, _>`
+/// invariants without forcing call sites to migrate this sub-phase.
+/// Every `Position::new(i32, i32)` snaps to a tile center, so for
+/// sub-phase 2a this is equivalent to byte-level Vec2 equality. When
+/// sub-phase 2b/2c introduces continuous (sub-tile) positions, the
+/// `HashMap<Position, _>` sites will switch to `HashMap<(i32, i32), _>`
+/// and the manual `Hash` impl can be revisited.
+#[derive(Component, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub struct Position(pub Vec2);
+
+impl PartialEq for Position {
+    fn eq(&self, other: &Self) -> bool {
+        self.tile() == other.tile()
+    }
 }
 
-/// Snapshot of an entity's grid position at the start of the current tick.
+impl Eq for Position {}
+
+impl Hash for Position {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.tile().hash(state);
+    }
+}
+
+/// Snapshot of an entity's position at the start of the current tick.
 /// Used by the rendering layer to interpolate smooth movement between ticks.
 #[derive(Component, Clone, Copy)]
-pub struct PreviousPosition {
-    pub x: i32,
-    pub y: i32,
+pub struct PreviousPosition(pub Vec2);
+
+impl PreviousPosition {
+    pub fn x(&self) -> i32 {
+        self.0.x.floor() as i32
+    }
+    pub fn y(&self) -> i32 {
+        self.0.y.floor() as i32
+    }
+    pub fn set_tile(&mut self, x: i32, y: i32) {
+        self.0 = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
+    }
 }
 
 /// Ticket 129 — Phase 0 of the continuous-position migration epic
 /// (#135). World-space smooth position in pixels, computed each render
 /// frame from `Position` + `PreviousPosition` + `RenderTickProgress`
-/// using a smoothstep ease-in/out curve. Sim state (containing tile,
-/// pathfinding, perception) still reads `Position` (i32 grid); only
-/// the render path consumes this. By Phase 2 (#139), `Position` itself
-/// becomes `Vec2<f32>` and this component remains as the per-frame
-/// interpolation target without changing its public shape.
+/// using a smoothstep ease-in/out curve.
 #[derive(Component, Clone, Copy, Default, Debug)]
 pub struct RenderPosition(pub Vec2);
 
 impl Position {
-    pub fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
+    /// Construct from integer tile coordinates. Snaps to the tile center
+    /// (`tx + 0.5`, `ty + 0.5`) — preserves containing-tile semantics for
+    /// every pre-491 call site (`Position::new(5, 5)` still puts the
+    /// entity in tile (5, 5)).
+    pub const fn new(x: i32, y: i32) -> Self {
+        Position(Vec2::new(x as f32 + 0.5, y as f32 + 0.5))
     }
 
-    /// Euclidean distance to another position.
+    /// Construct from a continuous world-space point. Used by future
+    /// Euclidean call paths (491b/c); current callers stay on `new`.
+    pub const fn from_world(world: Vec2) -> Self {
+        Position(world)
+    }
+
+    /// Continuous world-space position.
+    pub fn world(&self) -> Vec2 {
+        self.0
+    }
+
+    /// Containing-tile coordinates `(x, y)` — the i32 grid cell this
+    /// position falls into. Floor of the inner Vec2.
+    pub fn tile(&self) -> (i32, i32) {
+        (self.0.x.floor() as i32, self.0.y.floor() as i32)
+    }
+
+    /// Containing-tile X coord. Replaces the former `pub x: i32` field
+    /// for every read-site in `src/`.
+    pub fn x(&self) -> i32 {
+        self.0.x.floor() as i32
+    }
+
+    /// Containing-tile Y coord. Replaces the former `pub y: i32` field
+    /// for every read-site in `src/`.
+    pub fn y(&self) -> i32 {
+        self.0.y.floor() as i32
+    }
+
+    /// In-place tile snap to (x, y). Replaces field-style writes like
+    /// `pos.x = nx; pos.y = ny;` in wildlife / prey / snake / hawk
+    /// steppers.
+    pub fn set_tile(&mut self, x: i32, y: i32) {
+        self.0 = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
+    }
+
+    /// Euclidean distance to another position. Read at the world-space
+    /// level — sibling 491b retires `manhattan_distance` in favor of
+    /// this for perception/pursuit reads.
     pub fn distance_to(&self, other: &Position) -> f32 {
-        let dx = (self.x - other.x) as f32;
-        let dy = (self.y - other.y) as f32;
-        (dx * dx + dy * dy).sqrt()
+        self.0.distance(other.0)
     }
 
-    /// Manhattan (grid-step) distance to another position.
+    /// Manhattan (grid-step) distance via containing tiles. Preserved
+    /// for sub-phase 2a behavior parity; sibling 491b retires it.
     pub fn manhattan_distance(&self, other: &Position) -> i32 {
-        (self.x - other.x).abs() + (self.y - other.y).abs()
+        let (sx, sy) = self.tile();
+        let (ox, oy) = other.tile();
+        (sx - ox).abs() + (sy - oy).abs()
     }
 }
 

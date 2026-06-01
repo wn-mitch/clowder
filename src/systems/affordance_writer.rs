@@ -200,7 +200,7 @@ pub fn affordance_writer(
 // ---------------------------------------------------------------------------
 
 fn manhattan(a: &Position, b: &Position) -> i32 {
-    (a.x - b.x).abs() + (a.y - b.y).abs()
+    (a.x() - b.x()).abs() + (a.y() - b.y()).abs()
 }
 
 /// Distance-proximity feature: 1.0 at adjacent, linearly decaying to 0.0
@@ -217,7 +217,7 @@ fn proximity_feature(perceiver: &Position, target: &Position, sensing: i32) -> f
 /// shape. Consumer tickets can refine with terrain-specific cover when
 /// the tile-cover substrate lands.
 fn cover_at(pos: &Position, ward: &WardCoverageMap) -> f32 {
-    ward.get(pos.x, pos.y)
+    ward.get(pos.x(), pos.y())
 }
 
 /// Read a facet from an optional MentalModel ref, defaulting to 0.0.
@@ -469,7 +469,7 @@ fn write_cat_vs_wildlife(
     let recency = facet(belief, |m| m.recency_of_threat_cue.value);
     let my_health = perceiver.health_fraction;
     let target_health = target.health_fraction;
-    let scent_at_self = fox_scent.get(perceiver.position.x, perceiver.position.y);
+    let scent_at_self = fox_scent.get(perceiver.position.x(), perceiver.position.y());
 
     // Predation — cats can Stalk / Chase / Pounce wildlife (the universal trio).
     let pred = &cfg.predation;

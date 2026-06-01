@@ -252,8 +252,8 @@ pub fn spawn_garden_at(world: &mut World, pos: Position) -> Entity {
 /// ward.
 pub fn mark_tile_corrupted(world: &mut World, pos: Position, level: f32) {
     let mut map = world.resource_mut::<TileMap>();
-    if map.in_bounds(pos.x, pos.y) {
-        let tile = map.get_mut(pos.x, pos.y);
+    if map.in_bounds(pos.x(), pos.y()) {
+        let tile = map.get_mut(pos.x(), pos.y());
         tile.corruption = level.clamp(0.0, 1.0);
     }
 }
@@ -293,8 +293,8 @@ pub fn spawn_hawk_at(world: &mut World, pos: Position) -> Entity {
     use crate::components::wildlife::{WildAnimal, WildSpecies, WildlifeAiState};
     let animal = WildAnimal::new(WildSpecies::Hawk);
     let ai = WildlifeAiState::Circling {
-        center_x: pos.x,
-        center_y: pos.y,
+        center_x: pos.x(),
+        center_y: pos.y(),
         angle: 0.0,
     };
     world

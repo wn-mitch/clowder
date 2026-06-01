@@ -33,9 +33,9 @@ use super::preset::{CatPreset, MarkerKind};
 use super::Scenario;
 
 pub const FOCAL_NAME: &str = "Sentinel";
-pub const FOCAL_START: Position = Position { x: 30, y: 30 };
-pub const WARD_POS: Position = Position { x: 36, y: 30 };
-pub const FOX_START: Position = Position { x: 5, y: 30 };
+pub const FOCAL_START: Position = Position::new(30, 30);
+pub const WARD_POS: Position = Position::new(36, 30);
+pub const FOX_START: Position = Position::new(5, 30);
 
 // ---------------------------------------------------------------------------
 // Variant — warded demesne with a patrolling sentinel and a distant fox.
@@ -123,7 +123,7 @@ mod tests {
         // bucket_size=5, the bucket is at (7, 6). With sector_grid
         // 4×3 over the 24×18 bucket grid, that bucket is in sector
         // (1, 1) → sector_id = 5.
-        map.stamp_ward(WARD_POS.x, WARD_POS.y, 1.0, 9.0);
+        map.stamp_ward(WARD_POS.x(), WARD_POS.y(), 1.0, 9.0);
         let centroid = map.sector_centroid(5, 4, 3);
         assert!(
             centroid.is_some(),
@@ -133,11 +133,11 @@ mod tests {
         // Centroid lands inside sector (1,1) which spans tiles
         // (30..60, 30..60).
         assert!(
-            p.x >= 30 && p.x < 60,
+            p.x() >= 30 && p.x() < 60,
             "centroid x in sector (1,1): got {p:?}"
         );
         assert!(
-            p.y >= 30 && p.y < 60,
+            p.y() >= 30 && p.y() < 60,
             "centroid y in sector (1,1): got {p:?}"
         );
     }
@@ -151,8 +151,8 @@ mod tests {
         // single-tick deposit + decay; the substrate test doesn't
         // need to invoke Bevy's scheduler).
         let mut deterrent = CatPatrolDeterrentMap::default_map();
-        deterrent.deposit(FOCAL_START.x, FOCAL_START.y, 0.05);
-        let v = deterrent.get(FOCAL_START.x, FOCAL_START.y);
+        deterrent.deposit(FOCAL_START.x(), FOCAL_START.y(), 0.05);
+        let v = deterrent.get(FOCAL_START.x(), FOCAL_START.y());
         assert!(v > 0.0, "deterrent should be non-zero post-deposit: {v}");
         assert!(v <= 1.0, "deterrent clamped to 1.0: {v}");
     }

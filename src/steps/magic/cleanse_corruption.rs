@@ -81,8 +81,8 @@ pub fn resolve_cleanse_corruption(
     let cleanse_personal_corruption_rate = m.cleanse_personal_corruption_rate.per_tick(time_scale);
 
     // Per-tick: reduce tile corruption.
-    if map.in_bounds(pos.x, pos.y) {
-        let tile = map.get_mut(pos.x, pos.y);
+    if map.in_bounds(pos.x(), pos.y()) {
+        let tile = map.get_mut(pos.x(), pos.y());
         tile.corruption = (tile.corruption - skills.magic * cleanse_corruption_rate).max(0.0);
     }
     // Occupational hazard: personal corruption increases.
@@ -90,8 +90,8 @@ pub fn resolve_cleanse_corruption(
     skills.magic += skills.growth_rate() * m.cleanse_magic_skill_growth;
 
     // Advance when tile is cleansed or after max ticks.
-    let done = if map.in_bounds(pos.x, pos.y) {
-        map.get(pos.x, pos.y).corruption < m.cleanse_done_threshold
+    let done = if map.in_bounds(pos.x(), pos.y()) {
+        map.get(pos.x(), pos.y()).corruption < m.cleanse_done_threshold
     } else {
         true
     };

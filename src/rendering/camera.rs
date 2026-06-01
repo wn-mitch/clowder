@@ -376,8 +376,8 @@ fn is_interesting_action(action: &Action) -> bool {
 
 fn grid_to_world_vec2(pos: &Position, map_height: f32, world_px: f32) -> Vec2 {
     Vec2::new(
-        pos.x as f32 * world_px,
-        (map_height - 1.0 - pos.y as f32) * world_px,
+        pos.x() as f32 * world_px,
+        (map_height - 1.0 - pos.y() as f32) * world_px,
     )
 }
 

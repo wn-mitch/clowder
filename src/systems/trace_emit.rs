@@ -594,7 +594,7 @@ fn emit_l1_record(
             map: name.to_string(),
             faction: faction_slug(&faction),
             channel: channel_label(channel).to_string(),
-            pos: (pos.x, pos.y),
+            pos: (pos.x(), pos.y()),
             base_sample,
             attenuation: AttenuationBreakdown {
                 species_sens: attenuation.species_sens,

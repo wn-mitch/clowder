@@ -34,7 +34,7 @@ use super::env::{init_scenario_world, spawn_cat};
 use super::preset::{CatPreset, MarkerKind};
 use super::Scenario;
 
-const COLONY_CENTER: Position = Position { x: 20, y: 20 };
+const COLONY_CENTER: Position = Position::new(20, 20);
 
 fn spawn_ground_food(world: &mut World, kind: ItemKind, pos: Position) {
     world.spawn((Item::new(kind, 1.0, ItemLocation::OnGround), pos));

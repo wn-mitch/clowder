@@ -50,9 +50,9 @@ use super::env::{init_scenario_world, spawn_cat};
 use super::preset::{CatPreset, MarkerKind};
 use super::Scenario;
 
-const COLONY_CENTER: Position = Position { x: 20, y: 20 };
-const RACK_POS: Position = Position { x: 21, y: 20 };
-const STORES_POS: Position = Position { x: 19, y: 20 };
+const COLONY_CENTER: Position = Position::new(20, 20);
+const RACK_POS: Position = Position::new(21, 20);
+const STORES_POS: Position = Position::new(19, 20);
 
 /// Common tick budget. We only need eligibility to settle, which takes
 /// 1–2 ticks (one for the colony-marker writer to fire, one for
@@ -96,8 +96,8 @@ pub static SCENARIO_EMPTY_STORES: Scenario = Scenario {
 // Drying takes 15_000 ticks (`drying_dried_fish_total_ticks`), so we
 // only assert `FoodLoadedOnDryingRack` (the load step's witness), not
 // `FoodDried`.
-const FAR_CAT_POS: Position = Position { x: 5, y: 5 };
-const FAR_RACK_POS: Position = Position { x: 35, y: 35 };
+const FAR_CAT_POS: Position = Position::new(5, 5);
+const FAR_RACK_POS: Position = Position::new(35, 35);
 
 /// Resolver budget: enough ticks for the cat to elect DryFood, plan,
 /// TravelTo the 1-tile-away rack, and execute the DryFood load step.

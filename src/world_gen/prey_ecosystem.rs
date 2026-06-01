@@ -150,8 +150,8 @@ pub fn seed_prey_ecosystem(world: &mut World) {
                     attempts += 1;
                     let dx = rng.random_range(-8..=8i32);
                     let dy = rng.random_range(-8..=8i32);
-                    let x = (den_pos.x + dx).clamp(0, map_width - 1);
-                    let y = (den_pos.y + dy).clamp(0, map_height - 1);
+                    let x = (den_pos.x() + dx).clamp(0, map_width - 1);
+                    let y = (den_pos.y() + dy).clamp(0, map_height - 1);
                     let terrain = terrain_at(x, y);
                     if seed.prey_habitat.contains(&terrain) {
                         prey_spawns.push((seed.kind, Position::new(x, y), den_start_idx + i));

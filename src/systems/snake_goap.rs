@@ -59,8 +59,8 @@ pub fn snake_needs_tick(
         }
         snake.post_action_cooldown = snake.post_action_cooldown.saturating_sub(1);
 
-        if map.in_bounds(pos.x, pos.y) {
-            let terrain = map.get(pos.x, pos.y).terrain;
+        if map.in_bounds(pos.x(), pos.y()) {
+            let terrain = map.get(pos.x(), pos.y()).terrain;
             if !is_warm(terrain) {
                 snake.warmth = (snake.warmth - warmth_per_tick).max(0.0);
             }
@@ -133,8 +133,8 @@ pub fn snake_evaluate_and_plan(
         let prey_nearby = prey_positions
             .iter()
             .any(|p| p.manhattan_distance(snake_pos) <= sc.detection_range);
-        let on_warm_terrain = if map.in_bounds(snake_pos.x, snake_pos.y) {
-            is_warm(map.get(snake_pos.x, snake_pos.y).terrain)
+        let on_warm_terrain = if map.in_bounds(snake_pos.x(), snake_pos.y()) {
+            is_warm(map.get(snake_pos.x(), snake_pos.y()).terrain)
         } else {
             false
         };
@@ -224,12 +224,12 @@ fn resolve_zone_position(
             .copied(),
         SnakeZone::BaskingSpot => find_nearest_warm_tile(snake_pos, map),
         SnakeZone::MapEdge => {
-            let edge_x = if snake_pos.x < map.width / 2 {
+            let edge_x = if snake_pos.x() < map.width / 2 {
                 0
             } else {
                 map.width - 1
             };
-            let edge_y = if snake_pos.y < map.height / 2 {
+            let edge_y = if snake_pos.y() < map.height / 2 {
                 0
             } else {
                 map.height - 1
@@ -245,8 +245,8 @@ fn find_nearest_warm_tile(pos: Position, map: &TileMap) -> Option<Position> {
     let mut best: Option<(i32, Position)> = None;
     for dy in -radius..=radius {
         for dx in -radius..=radius {
-            let nx = pos.x + dx;
-            let ny = pos.y + dy;
+            let nx = pos.x() + dx;
+            let ny = pos.y() + dy;
             if !map.in_bounds(nx, ny) {
                 continue;
             }

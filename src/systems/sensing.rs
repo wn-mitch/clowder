@@ -403,10 +403,10 @@ pub fn line_of_sight_clear(
         return true;
     }
     // Standard Bresenham over integer grid.
-    let mut x0 = from.x;
-    let mut y0 = from.y;
-    let x1 = to.x;
-    let y1 = to.y;
+    let mut x0 = from.x();
+    let mut y0 = from.y();
+    let x1 = to.x();
+    let y1 = to.y();
     let dx = (x1 - x0).abs();
     let dy = -(y1 - y0).abs();
     let sx = if x0 < x1 { 1 } else { -1 };
@@ -681,11 +681,11 @@ pub fn trace_detect(
         w,
         r#"{{"tick":{},"o":[{},{}],"os":"{}","t":[{},{}],"r":[{},{},{},{}]}}"#,
         tick,
-        observer_pos.x,
-        observer_pos.y,
+        observer_pos.x(),
+        observer_pos.y(),
         species_tag(observer_species),
-        target_pos.x,
-        target_pos.y,
+        target_pos.x(),
+        target_pos.y(),
         result.sight,
         result.hearing,
         result.scent,
@@ -753,9 +753,9 @@ pub fn update_terrain_markers(
 ) {
     use crate::components::markers::OnSpecialTerrain;
     for (entity, pos, has_marker) in cats.iter() {
-        let on_special = map.in_bounds(pos.x, pos.y)
+        let on_special = map.in_bounds(pos.x(), pos.y())
             && matches!(
-                map.get(pos.x, pos.y).terrain,
+                map.get(pos.x(), pos.y()).terrain,
                 Terrain::FairyRing | Terrain::StandingStone
             );
         match (on_special, has_marker) {
@@ -986,7 +986,7 @@ pub fn update_target_existence_markers(
 
         // Ticket 064 (§5.6.3 #6 cutover) — sample CarcassScentMap at the
         // cat's own tile. Replaces per-pair `observer_smells_at` scan.
-        let want_carcass = carcass_scent_map.get(pos.x, pos.y) > 0.0;
+        let want_carcass = carcass_scent_map.get(pos.x(), pos.y()) > 0.0;
 
         // 035: HasUnburiedCorpse — any unburied dead colony cat within
         // burial_sense_range Manhattan tiles. Plain Manhattan rather
@@ -1079,7 +1079,7 @@ pub fn update_hide_eligible_markers(
 ) {
     let threshold = constants.escape_viability.cover_availability_threshold;
     for (entity, pos, has_hide, has_threat) in cats.iter() {
-        let want = has_threat && cover_map.get(pos.x, pos.y) > threshold;
+        let want = has_threat && cover_map.get(pos.x(), pos.y()) > threshold;
         toggle_target_marker(&mut commands, entity, want, has_hide, markers::HideEligible);
     }
 }
@@ -1117,7 +1117,7 @@ pub fn tremor_tick(
         let mul = crate::resources::action_tremor_mul(current.action, &constants.tremor);
         let amount = sig.tremor_baseline * mul * constants.tremor.deposit_per_tick;
         if amount > 0.0 {
-            tremor_map.deposit(pos.x, pos.y, amount);
+            tremor_map.deposit(pos.x(), pos.y(), amount);
         }
     }
 }
@@ -1750,7 +1750,7 @@ mod tests {
     fn fairy_ring_inserts_marker() {
         let (mut world, mut schedule) = terrain_marker_setup();
         set_terrain(&mut world, 5, 5, Terrain::FairyRing);
-        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        let cat = world.spawn(Position::new(5, 5)).id();
         schedule.run(&mut world);
         assert!(
             has_on_special_terrain(&world, cat),
@@ -1762,7 +1762,7 @@ mod tests {
     fn standing_stone_inserts_marker() {
         let (mut world, mut schedule) = terrain_marker_setup();
         set_terrain(&mut world, 5, 5, Terrain::StandingStone);
-        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        let cat = world.spawn(Position::new(5, 5)).id();
         schedule.run(&mut world);
         assert!(
             has_on_special_terrain(&world, cat),
@@ -1773,11 +1773,11 @@ mod tests {
     #[test]
     fn ordinary_terrain_no_marker() {
         let (mut world, mut schedule) = terrain_marker_setup();
-        let cat_grass = world.spawn(Position { x: 1, y: 1 }).id();
+        let cat_grass = world.spawn(Position::new(1, 1)).id();
         set_terrain(&mut world, 2, 1, Terrain::LightForest);
-        let cat_forest = world.spawn(Position { x: 2, y: 1 }).id();
+        let cat_forest = world.spawn(Position::new(2, 1)).id();
         set_terrain(&mut world, 3, 1, Terrain::WardPost);
-        let cat_wardpost = world.spawn(Position { x: 3, y: 1 }).id();
+        let cat_wardpost = world.spawn(Position::new(3, 1)).id();
         schedule.run(&mut world);
         assert!(!has_on_special_terrain(&world, cat_grass));
         assert!(!has_on_special_terrain(&world, cat_forest));
@@ -1788,20 +1788,18 @@ mod tests {
     fn position_change_crosses_terrain_boundary() {
         let (mut world, mut schedule) = terrain_marker_setup();
         set_terrain(&mut world, 5, 5, Terrain::FairyRing);
-        let cat = world.spawn(Position { x: 1, y: 1 }).id();
+        let cat = world.spawn(Position::new(1, 1)).id();
         schedule.run(&mut world);
         assert!(!has_on_special_terrain(&world, cat));
 
-        world.get_mut::<Position>(cat).unwrap().x = 5;
-        world.get_mut::<Position>(cat).unwrap().y = 5;
+        world.get_mut::<Position>(cat).unwrap().set_tile(5, 5);
         schedule.run(&mut world);
         assert!(
             has_on_special_terrain(&world, cat),
             "moving onto FairyRing should insert marker"
         );
 
-        world.get_mut::<Position>(cat).unwrap().x = 1;
-        world.get_mut::<Position>(cat).unwrap().y = 1;
+        world.get_mut::<Position>(cat).unwrap().set_tile(1, 1);
         schedule.run(&mut world);
         assert!(
             !has_on_special_terrain(&world, cat),
@@ -1816,7 +1814,7 @@ mod tests {
         set_terrain(&mut world, 5, 5, Terrain::FairyRing);
         let cat = world
             .spawn((
-                Position { x: 5, y: 5 },
+                Position::new(5, 5),
                 Dead {
                     tick: 0,
                     cause: DeathCause::Starvation,
@@ -1835,9 +1833,9 @@ mod tests {
         let (mut world, mut schedule) = terrain_marker_setup();
         set_terrain(&mut world, 5, 5, Terrain::FairyRing);
         set_terrain(&mut world, 6, 6, Terrain::StandingStone);
-        let on_ring = world.spawn(Position { x: 5, y: 5 }).id();
-        let on_stone = world.spawn(Position { x: 6, y: 6 }).id();
-        let on_grass = world.spawn(Position { x: 1, y: 1 }).id();
+        let on_ring = world.spawn(Position::new(5, 5)).id();
+        let on_stone = world.spawn(Position::new(6, 6)).id();
+        let on_grass = world.spawn(Position::new(1, 1)).id();
         schedule.run(&mut world);
         assert!(has_on_special_terrain(&world, on_ring));
         assert!(has_on_special_terrain(&world, on_stone));
@@ -1848,7 +1846,7 @@ mod tests {
     fn idempotent_no_flap_terrain() {
         let (mut world, mut schedule) = terrain_marker_setup();
         set_terrain(&mut world, 5, 5, Terrain::FairyRing);
-        let cat = world.spawn(Position { x: 5, y: 5 }).id();
+        let cat = world.spawn(Position::new(5, 5)).id();
         schedule.run(&mut world);
         assert!(has_on_special_terrain(&world, cat));
         schedule.run(&mut world);

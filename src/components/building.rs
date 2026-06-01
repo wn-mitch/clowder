@@ -265,7 +265,7 @@ impl Structure {
 
     /// Center tile position given the building's anchor (top-left) position.
     pub fn center(&self, anchor: &Position) -> Position {
-        Position::new(anchor.x + self.size.0 / 2, anchor.y + self.size.1 / 2)
+        Position::new(anchor.x() + self.size.0 / 2, anchor.y() + self.size.1 / 2)
     }
 
     /// Effectiveness multiplier based on condition.

@@ -61,8 +61,8 @@ fn find_nearby_habitat_tile(
     for _ in 0..30 {
         let dx = rng.rng.random_range(-radius..=radius);
         let dy = rng.rng.random_range(-radius..=radius);
-        let x = center.x + dx;
-        let y = center.y + dy;
+        let x = center.x() + dx;
+        let y = center.y() + dy;
         if map.in_bounds(x, y) && habitat.contains(&map.get(x, y).terrain) {
             return Some(Position::new(x, y));
         }
@@ -196,11 +196,10 @@ fn bird_teleport(
     for _ in 0..20 {
         let range = rng.rng.random_range(min_range..=max_range);
         let angle: f32 = rng.rng.random::<f32>() * std::f32::consts::TAU;
-        let nx = threat_pos.x + (angle.cos() * range as f32) as i32;
-        let ny = threat_pos.y + (angle.sin() * range as f32) as i32;
+        let nx = threat_pos.x() + (angle.cos() * range as f32) as i32;
+        let ny = threat_pos.y() + (angle.sin() * range as f32) as i32;
         if can_move_to(nx, ny, habitat, map) {
-            pos.x = nx;
-            pos.y = ny;
+            pos.set_tile(nx, ny);
             return;
         }
     }
@@ -212,25 +211,25 @@ fn find_cover_direction(
     threat_pos: &Position,
     map: &TileMap,
 ) -> Option<(i32, i32)> {
-    let flee_dx = (pos.x - threat_pos.x).signum();
-    let flee_dy = (pos.y - threat_pos.y).signum();
+    let flee_dx = (pos.x() - threat_pos.x()).signum();
+    let flee_dy = (pos.y() - threat_pos.y()).signum();
 
     let mut best: Option<(i32, i32, i32)> = None; // (dx, dy, distance)
 
     // Scan a 5-tile cone in the flee direction.
     for scan_dx in -2..=2i32 {
         for scan_dy in -2..=2i32 {
-            let tx = pos.x + flee_dx + scan_dx;
-            let ty = pos.y + flee_dy + scan_dy;
+            let tx = pos.x() + flee_dx + scan_dx;
+            let ty = pos.y() + flee_dy + scan_dy;
             if !map.in_bounds(tx, ty) {
                 continue;
             }
             let terrain = map.get(tx, ty).terrain;
             if matches!(terrain, Terrain::LightForest | Terrain::DenseForest) {
-                let dist = (tx - pos.x).abs() + (ty - pos.y).abs();
+                let dist = (tx - pos.x()).abs() + (ty - pos.y()).abs();
                 if best.is_none() || dist < best.unwrap().2 {
-                    let dx = (tx - pos.x).signum();
-                    let dy = (ty - pos.y).signum();
+                    let dx = (tx - pos.x()).signum();
+                    let dy = (ty - pos.y()).signum();
                     if dx != 0 || dy != 0 {
                         best = Some((dx, dy, dist));
                     }
@@ -419,27 +418,25 @@ pub fn prey_ai(
                         p.grazing_max_roam_normal
                     };
                     if den_dist > max_roam {
-                        dx = (den_pos.x - pos.x).signum();
-                        dy = (den_pos.y - pos.y).signum();
+                        dx = (den_pos.x() - pos.x()).signum();
+                        dy = (den_pos.y() - pos.y()).signum();
                     }
                 }
 
                 if new_ticks % config.graze_cadence == 0 {
-                    let nx = pos.x + dx;
-                    let ny = pos.y + dy;
+                    let nx = pos.x() + dx;
+                    let ny = pos.y() + dy;
                     let corr_thresh = p.prey_corruption_avoidance;
 
                     if can_move_to_prey(nx, ny, config.habitat, &map, corr_thresh) {
-                        pos.x = nx;
-                        pos.y = ny;
+                        pos.set_tile(nx, ny);
                     } else {
                         dx = -dx;
                         dy = -dy;
-                        let rx = pos.x + dx;
-                        let ry = pos.y + dy;
+                        let rx = pos.x() + dx;
+                        let ry = pos.y() + dy;
                         if can_move_to_prey(rx, ry, config.habitat, &map, corr_thresh) {
-                            pos.x = rx;
-                            pos.y = ry;
+                            pos.set_tile(rx, ry);
                         }
                     }
                 }
@@ -471,8 +468,8 @@ pub fn prey_ai(
                     state.ai_state = PreyAiState::Idle;
                 } else if new_ticks >= config.freeze_ticks {
                     // Compute flee direction toward home den (if any).
-                    let toward =
-                        home_den_pos.map(|dp| ((dp.x - pos.x).signum(), (dp.y - pos.y).signum()));
+                    let toward = home_den_pos
+                        .map(|dp| ((dp.x() - pos.x()).signum(), (dp.y() - pos.y()).signum()));
                     state.ai_state = PreyAiState::Fleeing {
                         from: threat,
                         toward,
@@ -518,11 +515,10 @@ pub fn prey_ai(
                         for _ in 0..config.flee_speed {
                             if let Some((dx, dy)) = toward {
                                 // Flee toward home den.
-                                let nx = pos.x + dx;
-                                let ny = pos.y + dy;
+                                let nx = pos.x() + dx;
+                                let ny = pos.y() + dy;
                                 if can_move_to(nx, ny, config.habitat, &map) {
-                                    pos.x = nx;
-                                    pos.y = ny;
+                                    pos.set_tile(nx, ny);
                                 } else {
                                     flee_step(&mut pos, tp, config.habitat, &map);
                                 }
@@ -534,17 +530,15 @@ pub fn prey_ai(
                     FleeStrategy::SeekCover => {
                         // Prefer den direction, then forest cover, then away-from-threat.
                         if let Some((dx, dy)) = toward {
-                            let nx = pos.x + dx;
-                            let ny = pos.y + dy;
+                            let nx = pos.x() + dx;
+                            let ny = pos.y() + dy;
                             if can_move_to(nx, ny, config.habitat, &map) {
-                                pos.x = nx;
-                                pos.y = ny;
+                                pos.set_tile(nx, ny);
                             } else if let Some((cdx, cdy)) = find_cover_direction(&pos, tp, &map) {
-                                let nx = pos.x + cdx;
-                                let ny = pos.y + cdy;
+                                let nx = pos.x() + cdx;
+                                let ny = pos.y() + cdy;
                                 if can_move_to(nx, ny, config.habitat, &map) {
-                                    pos.x = nx;
-                                    pos.y = ny;
+                                    pos.set_tile(nx, ny);
                                 } else {
                                     flee_step(&mut pos, tp, config.habitat, &map);
                                 }
@@ -552,11 +546,10 @@ pub fn prey_ai(
                                 flee_step(&mut pos, tp, config.habitat, &map);
                             }
                         } else if let Some((dx, dy)) = find_cover_direction(&pos, tp, &map) {
-                            let nx = pos.x + dx;
-                            let ny = pos.y + dy;
+                            let nx = pos.x() + dx;
+                            let ny = pos.y() + dy;
                             if can_move_to(nx, ny, config.habitat, &map) {
-                                pos.x = nx;
-                                pos.y = ny;
+                                pos.set_tile(nx, ny);
                             } else {
                                 flee_step(&mut pos, tp, config.habitat, &map);
                             }
@@ -571,11 +564,10 @@ pub fn prey_ai(
                                 p.bird_teleport_min_range..=p.bird_teleport_max_range,
                             );
                             let angle: f32 = rng.rng.random::<f32>() * std::f32::consts::TAU;
-                            let nx = tp.x + (angle.cos() * range as f32) as i32;
-                            let ny = tp.y + (angle.sin() * range as f32) as i32;
+                            let nx = tp.x() + (angle.cos() * range as f32) as i32;
+                            let ny = tp.y() + (angle.sin() * range as f32) as i32;
                             if can_move_to(nx, ny, config.habitat, &map) {
-                                pos.x = nx;
-                                pos.y = ny;
+                                pos.set_tile(nx, ny);
                                 landed = true;
                                 break;
                             }
@@ -605,17 +597,16 @@ pub fn prey_ai(
 
 /// Move one tile away from threat, trying diagonal then cardinals.
 fn flee_step(pos: &mut Mut<Position>, threat: &Position, habitat: &[Terrain], map: &TileMap) {
-    let dx = (pos.x - threat.x).signum();
-    let dy = (pos.y - threat.y).signum();
+    let dx = (pos.x() - threat.x()).signum();
+    let dy = (pos.y() - threat.y()).signum();
     let candidates = [
-        (pos.x + dx, pos.y + dy),
-        (pos.x + dx, pos.y),
-        (pos.x, pos.y + dy),
+        (pos.x() + dx, pos.y() + dy),
+        (pos.x() + dx, pos.y()),
+        (pos.x(), pos.y() + dy),
     ];
     for (nx, ny) in candidates {
         if can_move_to(nx, ny, habitat, map) {
-            pos.x = nx;
-            pos.y = ny;
+            pos.set_tile(nx, ny);
             return;
         }
     }
@@ -656,8 +647,8 @@ pub fn prey_scent_tick(
     for (config, pos) in &prey {
         scent_maps.deposit_for_kind(
             config.kind,
-            pos.x,
-            pos.y,
+            pos.x(),
+            pos.y(),
             p.scent_deposit_per_tick,
             &constants.sensory,
             p.scent_deposit_normalizer,
@@ -729,8 +720,8 @@ pub fn prey_population(
         let fear_breeding_mod = 1.0 - den.predation_pressure * p.den_fear_breeding_suppression;
 
         // Corruption near the den further suppresses breeding.
-        let den_corruption = if map.in_bounds(den_pos.x, den_pos.y) {
-            map.get(den_pos.x, den_pos.y).corruption
+        let den_corruption = if map.in_bounds(den_pos.x(), den_pos.y()) {
+            map.get(den_pos.x(), den_pos.y()).corruption
         } else {
             0.0
         };
@@ -828,8 +819,8 @@ pub fn prey_den_lifecycle(
         den.predation_pressure *= p.den_predation_pressure_decay;
 
         // Corruption on the den tile counts as additional stress.
-        let tile_corruption = if map.in_bounds(den_pos.x, den_pos.y) {
-            map.get(den_pos.x, den_pos.y).corruption
+        let tile_corruption = if map.in_bounds(den_pos.x(), den_pos.y()) {
+            map.get(den_pos.x(), den_pos.y()).corruption
         } else {
             0.0
         };
@@ -962,7 +953,7 @@ pub fn orphan_prey_adopt_or_found(
         let profile = registry.find(config.kind);
         if !profile
             .den_habitat()
-            .contains(&map.get(pos.x, pos.y).terrain)
+            .contains(&map.get(pos.x(), pos.y()).terrain)
         {
             continue;
         }
@@ -986,13 +977,13 @@ pub fn orphan_prey_adopt_or_found(
         // Direction from map center for narrative flavor.
         let cx = map.width / 2;
         let cy = map.height / 2;
-        let dir = if (pos.x - cx).abs() > (pos.y - cy).abs() {
-            if pos.x > cx {
+        let dir = if (pos.x() - cx).abs() > (pos.y() - cy).abs() {
+            if pos.x() > cx {
                 "eastern"
             } else {
                 "western"
             }
-        } else if pos.y > cy {
+        } else if pos.y() > cy {
             "southern"
         } else {
             "northern"
@@ -1241,8 +1232,8 @@ pub fn spawn_initial_prey(world: &mut World) {
                     let den_pos = den_positions[den_idx];
                     let dx = rng.random_range(-10..=10i32);
                     let dy = rng.random_range(-10..=10i32);
-                    let x = (den_pos.x + dx).clamp(0, map_width - 1);
-                    let y = (den_pos.y + dy).clamp(0, map_height - 1);
+                    let x = (den_pos.x() + dx).clamp(0, map_width - 1);
+                    let y = (den_pos.y() + dy).clamp(0, map_height - 1);
                     let terrain = terrain_snapshot[(y * map_width + x) as usize];
                     if prey_habitat.contains(&terrain) {
                         prey_spawns.push((info.kind, Position::new(x, y)));
@@ -1414,7 +1405,7 @@ mod tests {
         let final_pos = *world
             .query::<&Position>()
             .iter(&world)
-            .find(|p| p.x != 0 || p.y != 0) // skip any zero-pos entities
+            .find(|p| p.x() != 0 || p.y() != 0) // skip any zero-pos entities
             .unwrap_or(&start);
         assert!(
             final_pos != start,

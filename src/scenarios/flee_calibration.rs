@@ -84,19 +84,19 @@ use super::Scenario;
 pub const FOCAL_NAME: &str = "Probe";
 /// Focal start position — center of the 40×40 default map. Variants
 /// that wall off the corner override this.
-pub const FOCAL_START: Position = Position { x: 20, y: 20 };
+pub const FOCAL_START: Position = Position::new(20, 20);
 /// Wildlife threat position — adjacent to the focal so detection is
 /// guaranteed without scent buildup. Distance 2 keeps the cat outside
 /// the wildlife's combat range while inside the threat-proximity
 /// detection radius.
-pub const THREAT_POS: Position = Position { x: 22, y: 20 };
+pub const THREAT_POS: Position = Position::new(22, 20);
 /// Cornered-variant focal start — a (1, 1) tile inside a walled box
 /// whose only walkable footprint is the (0..=2, 0..=2) 3×3 grass
 /// patch. Mirrors the `escape_viability_low_in_corner` unit test in
 /// `interoception.rs:1246`. Sprint-radius 3 → 7×7 = 49-tile sample;
 /// 9 walkable / 49 ≈ 0.184; viability = 0.7 × 0.184 ≈ 0.13. Below
 /// the 0.4 Flee gate; 102's Fight branch fires instead.
-pub const CORNERED_FOCAL: Position = Position { x: 1, y: 1 };
+pub const CORNERED_FOCAL: Position = Position::new(1, 1);
 /// Cornered-variant threat — *inside* the 3×3 grass patch so it
 /// remains perceivable. Outside-the-patch positions become wall tiles
 /// and the wildlife query stops returning them as `nearest_threat`,
@@ -105,7 +105,7 @@ pub const CORNERED_FOCAL: Position = Position { x: 1, y: 1 };
 /// Placing the threat at (2, 1) keeps the fox on a walkable tile,
 /// distance 1 from the focal at (1, 1), so perception holds and the
 /// openness term still reads the cornered 9-walkable / 49-area sample.
-pub const CORNERED_THREAT: Position = Position { x: 2, y: 1 };
+pub const CORNERED_THREAT: Position = Position::new(2, 1);
 
 // ---------------------------------------------------------------------------
 // Variant 1 — low-threat baseline. Flee should NOT win.

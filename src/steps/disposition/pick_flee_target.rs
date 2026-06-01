@@ -5,7 +5,7 @@ use crate::steps::{StepOutcome, StepResult};
 
 #[inline]
 fn passable(map: &TileMap, p: Position) -> bool {
-    map.in_bounds(p.x, p.y) && map.get(p.x, p.y).terrain.is_passable()
+    map.in_bounds(p.x(), p.y()) && map.get(p.x(), p.y()).terrain.is_passable()
 }
 
 /// # GOAP step resolver: `PickFleeTarget` (ticket 230, witness rebind 254)
@@ -82,7 +82,7 @@ pub fn resolve_pick_flee_target(
     let mut best: Option<(Position, i32, u32)> = None;
     for dy in -radius..=radius {
         for dx in -radius..=radius {
-            let candidate = Position::new(self_pos.x + dx, self_pos.y + dy);
+            let candidate = Position::new(self_pos.x() + dx, self_pos.y() + dy);
             if candidate == self_pos {
                 continue;
             }
@@ -122,7 +122,7 @@ pub fn resolve_pick_flee_target(
 /// shape (the picker sweeps a square of side `2 * radius + 1`).
 #[inline]
 fn chebyshev(a: Position, b: Position) -> i32 {
-    (a.x - b.x).abs().max((a.y - b.y).abs())
+    (a.x() - b.x()).abs().max((a.y() - b.y()).abs())
 }
 
 #[cfg(test)]

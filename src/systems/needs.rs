@@ -410,7 +410,7 @@ pub fn stamp_passive_exploration(
 ) {
     let radius = constants.disposition.passive_explore_radius;
     for pos in &cats {
-        exploration_map.explore_area(pos.x, pos.y, radius);
+        exploration_map.explore_area(pos.x(), pos.y(), radius);
     }
 }
 

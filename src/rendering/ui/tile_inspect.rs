@@ -218,7 +218,7 @@ pub fn update_tile_inspect(
 
     // Building info
     for (bpos, structure, construction, crop, gate) in &buildings {
-        if bpos.x == x && bpos.y == y {
+        if bpos.x() == x && bpos.y() == y {
             children.push(spawn_spacer(&mut commands));
             children.push(spawn_text(
                 &mut commands,
@@ -268,7 +268,7 @@ pub fn update_tile_inspect(
     // Occupants
     let occupants: Vec<&str> = cats
         .iter()
-        .filter(|(pos, _)| pos.x == x && pos.y == y)
+        .filter(|(pos, _)| pos.x() == x && pos.y() == y)
         .map(|(_, name)| name.as_str())
         .collect();
     if !occupants.is_empty() {

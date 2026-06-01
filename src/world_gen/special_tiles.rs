@@ -306,8 +306,8 @@ mod tests {
         let effective_min = c.special_min_spacing - 3; // account for footprint width
         for i in 0..all_positions.len() {
             for j in (i + 1)..all_positions.len() {
-                let ti = map.get(all_positions[i].x, all_positions[i].y).terrain;
-                let tj = map.get(all_positions[j].x, all_positions[j].y).terrain;
+                let ti = map.get(all_positions[i].x(), all_positions[i].y()).terrain;
+                let tj = map.get(all_positions[j].x(), all_positions[j].y()).terrain;
                 if ti != tj {
                     let dist = all_positions[i].manhattan_distance(&all_positions[j]);
                     assert!(
@@ -367,7 +367,7 @@ mod tests {
         );
         for pos in &pools {
             assert!(
-                has_water_neighbor(&map, pos.x, pos.y),
+                has_water_neighbor(&map, pos.x(), pos.y()),
                 "DeepPool at {:?} has no Water neighbor",
                 pos,
             );
@@ -396,7 +396,7 @@ mod tests {
         // of a 3×3 ring: all 8 perimeter tiles are FairyRing, center is not.
         let mut found_hollow = false;
         for pos in &ring_tiles {
-            let (ax, ay) = (pos.x, pos.y);
+            let (ax, ay) = (pos.x(), pos.y());
             if ax + 2 >= map.width || ay + 2 >= map.height {
                 continue;
             }

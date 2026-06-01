@@ -149,7 +149,7 @@ fn build_scoring_context<'a>(
     // in lockstep.
 
     let local_prey_belief = hunting_beliefs
-        .map(|hb| hb.get(fox_pos.x, fox_pos.y))
+        .map(|hb| hb.get(fox_pos.x(), fox_pos.y()))
         .unwrap_or(0.5);
 
     let ticks_since_patrol = now.saturating_sub(fox_state.last_patrol_tick);
@@ -170,7 +170,7 @@ fn build_scoring_context<'a>(
         .min_by_key(|p| fox_pos.manhattan_distance(p))
         .copied();
     let nearest_map_edge = nearest_map_edge_for(fox_pos, map_extent);
-    let territory_perimeter_anchor = den_pos.map(|d| Position::new(d.x + 10, d.y + 10));
+    let territory_perimeter_anchor = den_pos.map(|d| Position::new(d.x() + 10, d.y() + 10));
 
     FoxScoringContext {
         needs,
@@ -206,8 +206,8 @@ fn mean_position(iter: impl IntoIterator<Item = Position>) -> Option<Position> {
     let mut sum_y: i64 = 0;
     let mut count: i64 = 0;
     for p in iter {
-        sum_x += p.x as i64;
-        sum_y += p.y as i64;
+        sum_x += p.x() as i64;
+        sum_y += p.y() as i64;
         count += 1;
     }
     (count > 0).then(|| Position::new((sum_x / count) as i32, (sum_y / count) as i32))
@@ -280,8 +280,8 @@ fn nearest_map_edge_for(pos: Position, (width, height): (i32, i32)) -> Option<Po
     if width <= 0 || height <= 0 {
         return None;
     }
-    let edge_x = if pos.x < width / 2 { 0 } else { width - 1 };
-    let edge_y = if pos.y < height / 2 { 0 } else { height - 1 };
+    let edge_x = if pos.x() < width / 2 { 0 } else { width - 1 };
+    let edge_y = if pos.y() < height / 2 { 0 } else { height - 1 };
     Some(Position::new(edge_x, edge_y))
 }
 
@@ -335,15 +335,15 @@ fn resolve_zone_position(
             .iter()
             .min_by_key(|p| fox_pos.manhattan_distance(p))
             .copied(),
-        FoxZone::TerritoryEdge => den_pos.map(|d| Position::new(d.x + 10, d.y + 10)),
+        FoxZone::TerritoryEdge => den_pos.map(|d| Position::new(d.x() + 10, d.y() + 10)),
         FoxZone::MapEdge => {
             // Closest map edge.
-            let edge_x = if fox_pos.x < map.width / 2 {
+            let edge_x = if fox_pos.x() < map.width / 2 {
                 0
             } else {
                 map.width - 1
             };
-            let edge_y = if fox_pos.y < map.height / 2 {
+            let edge_y = if fox_pos.y() < map.height / 2 {
                 0
             } else {
                 map.height - 1
@@ -544,7 +544,7 @@ pub fn fox_evaluate_and_plan(
                     hunger: needs.hunger,
                     territory_scent: needs.territory_scent,
                     cub_satiation: needs.cub_satiation,
-                    position: (fox_pos.x, fox_pos.y),
+                    position: (fox_pos.x(), fox_pos.y()),
                     day_phase: day_phase.label().to_string(),
                 },
             );
@@ -659,8 +659,8 @@ pub fn fox_resolve_goap_plans(
                 *phase = phase_for_action(current_step.action);
                 if let Some(target) = plan.current_state().and_then(|s| s.target_position) {
                     *ai_state = WildlifeAiState::Stalking {
-                        target_x: target.x,
-                        target_y: target.y,
+                        target_x: target.x(),
+                        target_y: target.y(),
                     };
                 }
                 let step_state = plan.current_state_mut().unwrap();
@@ -747,8 +747,8 @@ pub fn fox_resolve_goap_plans(
             FoxGoapActionKind::StealFood => {
                 // Hand off to existing store raid logic by setting the Raiding phase.
                 *phase = FoxAiPhase::Raiding {
-                    target_x: pos.x,
-                    target_y: pos.y,
+                    target_x: pos.x(),
+                    target_y: pos.y(),
                 };
                 if fox_state.hunger > 0.6 {
                     StepResult::Advance
@@ -1065,12 +1065,12 @@ fn target_for_action(
             .min_by_key(|p| fox_pos.manhattan_distance(p))
             .copied(),
         FoxGoapActionKind::FleeArea => {
-            let edge_x = if fox_pos.x < map.width / 2 {
+            let edge_x = if fox_pos.x() < map.width / 2 {
                 0
             } else {
                 map.width - 1
             };
-            let edge_y = if fox_pos.y < map.height / 2 {
+            let edge_y = if fox_pos.y() < map.height / 2 {
                 0
             } else {
                 map.height - 1

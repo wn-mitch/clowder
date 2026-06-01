@@ -367,8 +367,8 @@ pub fn assess_colony_needs(
     // and any actionable carcass within colony reach.
     // Cheap scan — sample every few tiles, not every pixel.
     let corruption_hotspot: Option<(Position, f32)> = {
-        let cx = colony_center.0.x;
-        let cy = colony_center.0.y;
+        let cx = colony_center.0.x();
+        let cy = colony_center.0.y();
         let search_r: i32 = cc.corruption_search_radius;
         let step: i32 = cc.corruption_search_step.max(1);
         let mut best: Option<(Position, f32)> = None;
@@ -472,8 +472,8 @@ pub fn assess_colony_needs(
         // Preemptive patrol: fox scent detected near colony without active sightings.
         if nearby_threats.is_empty() {
             if let Some((sx, sy)) = fox_scent.highest_nearby(
-                colony_center.0.x,
-                colony_center.0.y,
+                colony_center.0.x(),
+                colony_center.0.y(),
                 cc.preemptive_patrol_scent_radius,
             ) {
                 let scent_level = fox_scent.get(sx, sy);
@@ -1809,8 +1809,8 @@ pub fn spawn_construction_sites(
         let terrain = blueprint.terrain();
         for dy in 0..size.1 {
             for dx in 0..size.0 {
-                let x = anchor.x + dx;
-                let y = anchor.y + dy;
+                let x = anchor.x() + dx;
+                let y = anchor.y() + dy;
                 if map.in_bounds(x, y) {
                     map.set(x, y, terrain);
                 }
@@ -1878,7 +1878,7 @@ fn find_building_placement_spiral(
                 if dx.abs() + dy.abs() != radius {
                     continue;
                 }
-                let anchor = Position::new(center.x + dx, center.y + dy);
+                let anchor = Position::new(center.x() + dx, center.y() + dy);
                 if footprint_valid(map, anchor, size, occupied) {
                     return Some(anchor);
                 }
@@ -2139,8 +2139,8 @@ fn footprint_valid(
     // All tiles in footprint must be passable natural terrain.
     for dy in 0..size.1 {
         for dx in 0..size.0 {
-            let x = anchor.x + dx;
-            let y = anchor.y + dy;
+            let x = anchor.x() + dx;
+            let y = anchor.y() + dy;
             if !map.in_bounds(x, y) {
                 return false;
             }
@@ -2169,15 +2169,15 @@ fn footprints_overlap_with_gap(
     b_size: (i32, i32),
     gap: i32,
 ) -> bool {
-    let a_left = a_pos.x - gap;
-    let a_right = a_pos.x + a_size.0 + gap;
-    let a_top = a_pos.y - gap;
-    let a_bottom = a_pos.y + a_size.1 + gap;
+    let a_left = a_pos.x() - gap;
+    let a_right = a_pos.x() + a_size.0 + gap;
+    let a_top = a_pos.y() - gap;
+    let a_bottom = a_pos.y() + a_size.1 + gap;
 
-    let b_left = b_pos.x;
-    let b_right = b_pos.x + b_size.0;
-    let b_top = b_pos.y;
-    let b_bottom = b_pos.y + b_size.1;
+    let b_left = b_pos.x();
+    let b_right = b_pos.x() + b_size.0;
+    let b_top = b_pos.y();
+    let b_bottom = b_pos.y() + b_size.1;
 
     a_left < b_right && a_right > b_left && a_top < b_bottom && a_bottom > b_top
 }
@@ -2290,7 +2290,7 @@ pub(crate) fn compute_ward_placement(
         colony_center
     } else {
         let (sx, sy) = building_positions.iter().fold((0i64, 0i64), |(ax, ay), p| {
-            (ax + p.x as i64, ay + p.y as i64)
+            (ax + p.x() as i64, ay + p.y() as i64)
         });
         let n = building_positions.len() as i64;
         Position::new((sx / n) as i32, (sy / n) as i32)
@@ -2402,17 +2402,17 @@ pub(crate) fn compute_ward_placement(
     let mut scored: Vec<CandidateScore> = Vec::with_capacity(candidates.len());
 
     for candidate in &candidates {
-        let fox_scent = maps.fox_scent.get(candidate.x, candidate.y);
-        let corruption = maps.corruption_at(candidate.x, candidate.y);
-        let coverage = maps.ward_coverage.get(candidate.x, candidate.y);
-        let cat_value = maps.cat_scent.get(candidate.x, candidate.y);
+        let fox_scent = maps.fox_scent.get(candidate.x(), candidate.y());
+        let corruption = maps.corruption_at(candidate.x(), candidate.y());
+        let coverage = maps.ward_coverage.get(candidate.x(), candidate.y());
+        let cat_value = maps.cat_scent.get(candidate.x(), candidate.y());
 
         // 220 lift terms. Skip the sigmoid evaluation entirely when the
         // weight is zero so dormant runs incur no extra arithmetic.
         let ambush_lift = if w_ambush > 0.0 {
             w_ambush
                 * logistic_threat_lift(
-                    maps.recent_ambush.get(candidate.x, candidate.y),
+                    maps.recent_ambush.get(candidate.x(), candidate.y()),
                     curve_k,
                     curve_m,
                 )
@@ -2422,7 +2422,7 @@ pub(crate) fn compute_ward_placement(
         let carcass_lift = if w_carcass > 0.0 {
             w_carcass
                 * logistic_threat_lift(
-                    maps.carcass_scent.get(candidate.x, candidate.y),
+                    maps.carcass_scent.get(candidate.x(), candidate.y()),
                     curve_k,
                     curve_m,
                 )
@@ -2459,7 +2459,7 @@ pub(crate) fn compute_ward_placement(
         let corridor_lift = if w_corridor > 0.0 {
             w_corridor
                 * logistic_threat_lift(
-                    maps.fox_approach_corridor.get(candidate.x, candidate.y),
+                    maps.fox_approach_corridor.get(candidate.x(), candidate.y()),
                     curve_k,
                     curve_m,
                 )
@@ -2511,8 +2511,8 @@ pub(crate) fn compute_ward_placement(
                 const INTENT_STAMP_STRENGTH: f32 = 1.0;
                 for round_pick in &round_picks {
                     intent.stamp_intent(
-                        round_pick.x,
-                        round_pick.y,
+                        round_pick.x(),
+                        round_pick.y(),
                         INTENT_STAMP_STRENGTH,
                         INTENT_STAMP_RADIUS,
                     );
@@ -2696,8 +2696,8 @@ fn select_descending_residual(
         if round + 1 < k {
             let pick = scored[best_idx].pos;
             for (i, cs) in scored.iter().enumerate() {
-                let dx = (cs.pos.x - pick.x) as f32;
-                let dy = (cs.pos.y - pick.y) as f32;
+                let dx = (cs.pos.x() - pick.x()) as f32;
+                let dy = (cs.pos.y() - pick.y()) as f32;
                 let dist = (dx * dx + dy * dy).sqrt();
                 if dist > THORNWARD_VIRTUAL_RADIUS {
                     continue;
@@ -2765,13 +2765,13 @@ fn compute_fox_spawn_vicinity(
     let radius_f = radius_tiles as f32;
     let mut best: f32 = 0.0;
     for dy in -radius_tiles..=radius_tiles {
-        let y = candidate.y + dy;
+        let y = candidate.y() + dy;
         for dx in -radius_tiles..=radius_tiles {
             let manhattan = dx.unsigned_abs() + dy.unsigned_abs();
             if manhattan as i32 > radius_tiles {
                 continue;
             }
-            let x = candidate.x + dx;
+            let x = candidate.x() + dx;
             if !tile_map.in_bounds(x, y) {
                 continue;
             }
@@ -2889,8 +2889,8 @@ pub fn update_colony_center(
     let mut sx: i64 = 0;
     let mut sy: i64 = 0;
     for p in &cats {
-        sx += p.x as i64;
-        sy += p.y as i64;
+        sx += p.x() as i64;
+        sy += p.y() as i64;
         count += 1;
     }
     if count == 0 {
@@ -2968,11 +2968,17 @@ pub fn update_colony_district_map(
     // once.
     for (structure, anchor) in &structures {
         let center = structure.center(anchor);
-        district.stamp(DistrictAxis::Frontier, center.x, center.y, 0.6, halo_radius);
+        district.stamp(
+            DistrictAxis::Frontier,
+            center.x(),
+            center.y(),
+            0.6,
+            halo_radius,
+        );
         district.stamp(
             DistrictAxis::Crowding,
-            center.x,
-            center.y,
+            center.x(),
+            center.y(),
             1.0,
             crowding_radius,
         );
@@ -3254,8 +3260,8 @@ mod tests {
             &mut rng,
             None,
         );
-        let dx = (pos.x - 67).abs();
-        let dy = (pos.y - 45).abs();
+        let dx = (pos.x() - 67).abs();
+        let dy = (pos.y() - 45).abs();
         assert!(
             dx <= 5 && dy <= 5,
             "expected placement near fox-scent peak (67, 45), got {pos:?}"
@@ -3461,7 +3467,7 @@ mod tests {
         // even untouched tiles get *some* lift, so the test asserts a
         // directional preference rather than an exact tile match.
         assert!(
-            pos.y >= 45,
+            pos.y() >= 45,
             "expected placement biased toward ambush hotspot at (60, 52); \
              got {pos:?}",
         );
@@ -3506,7 +3512,7 @@ mod tests {
             None,
         );
         assert!(
-            pos.y >= 45,
+            pos.y() >= 45,
             "expected placement biased toward carcass hotspot at (60, 52); \
              got {pos:?}",
         );
@@ -3773,7 +3779,7 @@ mod tests {
         // ceiling — without it, the symmetric fox-scent peaks would
         // decide on jitter alone.
         assert!(
-            pos.y >= 45,
+            pos.y() >= 45,
             "312: expected placement biased toward corridor hotspot at +y; \
              got {pos:?}",
         );
@@ -3859,7 +3865,8 @@ mod tests {
         // additive reward is live. If picks were identical the
         // additive bias would be silently inert — a regression.
         assert_ne!(
-            pos_a.x, pos_b.x,
+            pos_a.x(),
+            pos_b.x(),
             "313 dormancy: Additive composition must still respond to \
              cat_value; mirrored cat-scent should mirror the pick, \
              got a={pos_a:?}, b={pos_b:?}",
@@ -3923,7 +3930,7 @@ mod tests {
         // therefore lands on -x or near the warm peak. Asserting
         // x <= 60 admits any tile in the warm half-plane.
         assert!(
-            pos.x <= 60,
+            pos.x() <= 60,
             "313 gate: expected placement in the cat-warm half-plane \
              (x <= 60); got {pos:?}",
         );
@@ -4667,7 +4674,7 @@ mod tests {
         // Argmax should land within the frontier-lifted disc, allowing
         // for the coarse 5-tile candidate step.
         assert!(
-            (pos.x - 60).abs() <= 10 && (pos.y - 45).abs() <= 10,
+            (pos.x() - 60).abs() <= 10 && (pos.y() - 45).abs() <= 10,
             "placement {pos:?} should sit near the lifted frontier center"
         );
     }
@@ -4701,7 +4708,7 @@ mod tests {
         )
         .expect("placement must succeed");
         assert!(
-            pos.x > 60,
+            pos.x() > 60,
             "Stores should pick the food-rich side; got {pos:?}"
         );
     }

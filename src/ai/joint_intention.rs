@@ -606,8 +606,8 @@ pub fn cascade_play_bout_bouting(
         // there is no solo branch).
         let day_phase = DayPhase::from_tick(msg.tick, &config);
         let season = Season::from_tick(msg.tick, &config);
-        let terrain = if map.in_bounds(actor_pos.x, actor_pos.y) {
-            map.get(actor_pos.x, actor_pos.y).terrain
+        let terrain = if map.in_bounds(actor_pos.x(), actor_pos.y()) {
+            map.get(actor_pos.x(), actor_pos.y()).terrain
         } else {
             crate::resources::map::Terrain::Grass
         };
@@ -729,7 +729,7 @@ fn pick_courtship_partner(
             continue;
         }
         let manhattan =
-            (self_position.x - other_pos.x).abs() + (self_position.y - other_pos.y).abs();
+            (self_position.x() - other_pos.x()).abs() + (self_position.y() - other_pos.y()).abs();
         if manhattan > range {
             continue;
         }
@@ -852,7 +852,7 @@ fn pick_playbout_partner(
             continue;
         }
         let manhattan =
-            (self_position.x - other_pos.x).abs() + (self_position.y - other_pos.y).abs();
+            (self_position.x() - other_pos.x()).abs() + (self_position.y() - other_pos.y()).abs();
         if manhattan > range {
             continue;
         }

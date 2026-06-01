@@ -183,7 +183,7 @@ pub fn update_kitten_cry_map(
             }
             let strength = ((threshold - needs.hunger) / threshold).clamp(0.0, 1.0);
             if strength > 0.0 {
-                map.stamp(pos.x, pos.y, strength, sense_range);
+                map.stamp(pos.x(), pos.y(), strength, sense_range);
             }
             if let Some(m) = dep.mother {
                 parents_with_hungry_kitten.insert(m);
@@ -978,7 +978,7 @@ mod tests {
                     hunger,
                     ..Needs::default()
                 },
-                Position { x: 0, y: 0 },
+                Position::new(0, 0),
             ))
             .id()
     }

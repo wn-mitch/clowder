@@ -158,7 +158,7 @@ pub fn tick_pregnancy(
                     crate::resources::event_log::EventKind::KittenBorn {
                         mother: birth.mother_name.clone(),
                         kitten: format!("{kitten_entity:?}"),
-                        location: (birth.pos.x, birth.pos.y),
+                        location: (birth.pos.x(), birth.pos.y()),
                     },
                 );
             }
@@ -214,10 +214,10 @@ fn build_kitten_blueprint(
             tick / ticks_per_season,
             rng,
         ),
-        position: Position::new(birth.pos.x, birth.pos.y),
+        position: Position::new(birth.pos.x(), birth.pos.y()),
         born_tick: tick,
     };
-    let position = Position::new(birth.pos.x, birth.pos.y);
+    let position = Position::new(birth.pos.x(), birth.pos.y());
     let needs = Needs {
         hunger: 0.5,
         energy: 0.8,

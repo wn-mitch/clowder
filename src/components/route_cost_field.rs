@@ -70,10 +70,10 @@ impl RouteCostField {
     /// `p` is out of bounds or was not reached by the flood.
     #[inline]
     pub fn cost_at(&self, p: Position) -> u32 {
-        if p.x < 0 || p.y < 0 {
+        if p.x() < 0 || p.y() < 0 {
             return MAX_COST_BUDGET;
         }
-        let (xu, yu) = (p.x as u32, p.y as u32);
+        let (xu, yu) = (p.x() as u32, p.y() as u32);
         if xu >= self.width || yu >= self.height {
             return MAX_COST_BUDGET;
         }

@@ -33,7 +33,7 @@ use super::env::{init_scenario_world, spawn_cat};
 use super::preset::{CatPreset, MarkerKind};
 use super::Scenario;
 
-const COLONY_CENTER: Position = Position { x: 20, y: 20 };
+const COLONY_CENTER: Position = Position::new(20, 20);
 
 /// Stuff `count` `RawMouse` items into the focal cat's inventory.
 /// Goes through `Inventory::add_item` (preserves the production

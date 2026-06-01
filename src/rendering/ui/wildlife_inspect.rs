@@ -138,7 +138,7 @@ pub fn update_wildlife_inspect(
         children.push(spawn_prop(
             &mut commands,
             "Position",
-            &format!("({}, {})", pos.x, pos.y),
+            &format!("({}, {})", pos.x(), pos.y()),
         ));
     } else if let Ok((pos, config, state)) = prey.get(entity) {
         children.push(spawn_text(
@@ -165,7 +165,7 @@ pub fn update_wildlife_inspect(
         children.push(spawn_prop(
             &mut commands,
             "Position",
-            &format!("({}, {})", pos.x, pos.y),
+            &format!("({}, {})", pos.x(), pos.y()),
         ));
     } else {
         children.push(spawn_text(

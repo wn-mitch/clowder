@@ -60,8 +60,8 @@ pub static SCENARIO: Scenario = Scenario {
     expected_features: &[],
 };
 
-pub const FOCAL_START: Position = Position { x: 20, y: 20 };
-pub const FOX_POS: Position = Position { x: 22, y: 20 };
+pub const FOCAL_START: Position = Position::new(20, 20);
+pub const FOX_POS: Position = Position::new(22, 20);
 
 fn setup(world: &mut World, seed: u64) {
     init_scenario_world(world, seed);
