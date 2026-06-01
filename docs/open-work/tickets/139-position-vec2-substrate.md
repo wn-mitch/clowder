@@ -1,6 +1,7 @@
 ---
 id: 139
 title: Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration)
+epic: true
 status: ready
 cluster: ai-substrate
 initiative: []
@@ -115,3 +116,7 @@ This phase is the substrate change that unblocks Phase 3 (#140) steering / smoot
 
 - 2026-05-02: Opened as Phase 2 of the 135 continuous-position-migration epic.
 - 2026-05-19: accuracy audit pass — ready status correct; blocked-by [135] correct; scope items comprehensive (Position newtype, memory entries, pathfinding, save migration, test churn all detailed).
+- 2026-06-01: sliced into 491 (substrate switch — landed 7ba5a40d) +
+  492 (Euclidean perception) + 493 (pathfinding cleanup). 139 is now
+  the parent tracking ticket for that trio; `epic: true` keeps it out
+  of `just next` recommendations.
