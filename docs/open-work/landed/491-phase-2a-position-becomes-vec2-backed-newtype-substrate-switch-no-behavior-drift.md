@@ -1,7 +1,7 @@
 ---
 id: 491
 title: Phase 2a — Position becomes Vec2-backed newtype (substrate switch, no behavior drift)
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 7ba5a40d
+landed-on: 2026-06-01
 ---
 
 ## Why

@@ -1,13 +1,13 @@
 ---
 id: 492
 title: Phase 2b — Euclidean perception + radius constants i32→f32
-status: blocked
+status: ready
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-31
 parked: null
-blocked-by: [491]
+blocked-by: []
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
