@@ -167,6 +167,8 @@ def chunk_ticket_or_landed(
     initiative = meta.get("initiative") or []
     landed_on = meta.get("landed-on")
     title = meta.get("title", "")
+    epic_raw = meta.get("epic")
+    epic = epic_raw is True or str(epic_raw).lower() == "true"
 
     header_bits = [
         f"ticket {ticket_id}",
@@ -197,6 +199,7 @@ def chunk_ticket_or_landed(
                     "cluster": cluster,
                     "initiative": initiative,
                     "landed_on": landed_on,
+                    "epic": epic,
                 },
             )
 

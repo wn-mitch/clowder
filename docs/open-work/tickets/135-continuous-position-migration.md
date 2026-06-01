@@ -1,6 +1,7 @@
 ---
 id: 135
 title: Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed)
+epic: true
 status: ready
 cluster: ai-substrate
 initiative: []

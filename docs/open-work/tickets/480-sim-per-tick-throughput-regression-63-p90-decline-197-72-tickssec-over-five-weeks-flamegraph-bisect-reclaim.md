@@ -1,6 +1,7 @@
 ---
 id: 480
 title: Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor)
+epic: true
 status: in-progress
 cluster: ai-substrate
 orchestration: substrate-sensitive

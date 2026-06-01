@@ -76,6 +76,9 @@ class TicketView:
     landed_on: str | None
     row_indices: list[int]      # rows in idx.vectors / idx.chunks
     centroid: np.ndarray        # unit-normalized
+    epic: bool = False          # `epic: true` in frontmatter — tracking
+                                # dashboards, not workable tickets;
+                                # filtered out of candidate set
 
 
 # ── entry point ─────────────────────────────────────────────────────────────
@@ -139,6 +142,7 @@ def main() -> int:
         if t.source_kind == "tickets"
         and t.status in statuses
         and (t.source_kind, t.ticket_id) not in excluded
+        and (args.include_epics or not t.epic)
     ]
     if args.initiative:
         candidates = [t for t in candidates if args.initiative in t.initiative]
@@ -173,6 +177,7 @@ def main() -> int:
             "top_k": args.top,
             "landed_window": args.landed_window,
             "include_blocked": args.include_blocked,
+            "include_epics": args.include_epics,
             "weights": (
                 {"momentum": args.w_momentum,
                  "wip": args.w_wip,
@@ -187,7 +192,7 @@ def main() -> int:
             "candidates": len(candidates),
             "query_sources": len(query_sources),
             "returned": len(top),
-            "narrow_by": ["mode", "top", "include-blocked", "landed-window"],
+            "narrow_by": ["mode", "top", "include-blocked", "include-epics", "landed-window"],
             "index_stale_files": len(stale),
             "mode_breakdown": breakdown,
         },
@@ -229,6 +234,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-blocked", action="store_true",
         help="Also surface tickets with status=blocked (default: ready only).",
+    )
+    parser.add_argument(
+        "--include-epics", action="store_true",
+        help=("Also surface tickets with `epic: true` in frontmatter "
+              "(default: epics filtered out as non-workable trackers)."),
     )
     parser.add_argument("--w-momentum", type=float,
                         default=DEFAULT_WEIGHTS["momentum"])
@@ -333,6 +343,8 @@ def _build_ticket_views(idx: Index) -> list[TicketView]:
         raw_initiative = md.get("initiative") or []
         if isinstance(raw_initiative, str):
             raw_initiative = [raw_initiative]
+        epic_raw = md.get("epic")
+        is_epic = epic_raw is True or str(epic_raw).lower() == "true"
         out.append(TicketView(
             ticket_id=ticket_id,
             source_kind=source_kind,
@@ -344,6 +356,7 @@ def _build_ticket_views(idx: Index) -> list[TicketView]:
             landed_on=md.get("landed_on") or None,
             row_indices=rows,
             centroid=centroid.astype(np.float32, copy=False),
+            epic=is_epic,
         ))
     return out
 

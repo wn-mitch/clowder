@@ -16,6 +16,7 @@ just next --mode seed --seed 256       # ticket-id seed
 just next --mode seed --seed "scent"   # free-text seed (use direct python for multi-word)
 just next --top 10                     # widen to top-10
 just next --include-blocked            # also surface status: blocked tickets
+just next --include-epics              # also surface `epic: true` trackers
 just next --text                       # render text envelope instead of JSON
 ```
 
@@ -141,6 +142,9 @@ just next --w-momentum 0.2 --w-substrate 0.5
 # Include status: blocked candidates (default: ready only).
 just next --include-blocked
 
+# Include `epic: true` trackers (default: epics filtered as non-workable).
+just next --include-epics
+
 # Strict read-only — skip the auto-rebuild and warn on stale index.
 just next --no-auto-rebuild
 ```
@@ -156,6 +160,7 @@ Pass `--no-auto-rebuild` to skip the rebuild and reproduce the older read-only b
 - **Ticket vectors are section-weighted.** Each ticket's centroid is a weighted mean over its chunks (`Why` 3.0, `Scope` 2.0, `Approach` 1.5, `Current state` 1.0, `Out of scope` / `Verification` 0.5, `Log` 0.3, everything else 1.0). Pre-2026-05-11 the centroid was an unweighted mean, which collapsed top-K spreads below the tiebreak threshold — boilerplate sections smudged tickets toward each other. See `scripts/similar/retrieve.py::SECTION_WEIGHTS`.
 - **Tiebreaks are intentional but small.** When two candidates score within 0.005 (cosine), the candidate matching the dominant cluster of the highest-weighted query component gets a +0.0025 nudge. This keeps the list themed when scores are flat. Larger differences are never overridden.
 - **Source exclusion is symmetric.** A ticket that contributed to the query vector is excluded from the candidate set. So `--mode wip` excludes in-progress tickets from the output (you wouldn't recommend yourself), and `--mode seed --seed 256` excludes 256 itself.
+- **Epics are filtered by default.** Tickets with `epic: true` in frontmatter are tracking dashboards, not workable tickets — they're dropped from the candidate set even when their semantic similarity is high. They can still feed the source sets (momentum / wip / substrate) because they're useful as query signal. Use `--include-epics` to override.
 - **`landed_on` is a string sort.** Recent landings are ranked by `YYYY-MM-DD` lexicographic order — works correctly for ISO dates but fails silently if a ticket's frontmatter has a non-ISO `landed-on` value. None observed at time of writing.
 - **Substrate-mode cluster filter is exact.** Only tickets with `cluster: A`, `B`, `C`, `D`, or `E` (uppercase single letters — the AI substrate refactor phases) feed the substrate vector. Named clusters like `ai-substrate` and `substrate-migration` are NOT folded in — they're surfaced indirectly via the spec centroid, not as their own component.
 - **Free-text seed via `just`.** `just next --mode seed --seed "multi word"` loses the quotes due to `just`'s `{{ARGS}}` expansion (same limitation as `just similar`). Invoke `uv run scripts/similar/next.py --mode seed --seed "multi word"` directly to preserve quoting.

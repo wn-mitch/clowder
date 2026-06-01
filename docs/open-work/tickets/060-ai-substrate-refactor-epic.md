@@ -1,6 +1,7 @@
 ---
 id: 060
 title: AI substrate refactor — program epic
+epic: true
 status: in-progress
 cluster: ai-substrate
 orchestration: substrate-sensitive
