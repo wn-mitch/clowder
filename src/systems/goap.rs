@@ -10708,12 +10708,37 @@ fn resolve_zone_position(
             .min_by_key(|(sp, _)| pos.tile_distance_squared(*sp))
             .map(|(_, p)| p)
             .or(Some(*pos)),
+        // Ticket 495 — filter to passable in-bounds tiles before the
+        // nearest-pick. Material piles can sit at construction or
+        // demolition sites; if a site spans an impassable cell (water-
+        // adjacent build, wall under construction) the pile entity may
+        // outlive the source tile's passability. Parallel symmetry
+        // with the CarcassPile fix below; no documented failure rate
+        // for MaterialPile yet.
         PlannerZone::MaterialPile => material_pile_positions
             .iter()
+            .filter(|(_, mp, _)| {
+                map.in_bounds(mp.x(), mp.y())
+                    && map.get(mp.x(), mp.y()).terrain.is_passable()
+            })
             .min_by_key(|(_, mp, _)| pos.tile_distance_squared(mp))
             .map(|(_, p, _)| *p),
+        // Ticket 495 — filter to passable in-bounds tiles. Fish
+        // carcasses spawn at `prey_pos` which is `Terrain::Water` per
+        // `Fish::habitat` (`species/fish.rs:30`). Pre-495 the picker
+        // returned the water tile unconditionally; A* refused
+        // (`pathfinding.rs:268-273` rejects impassable destinations)
+        // and the resolver burned 1099 "no path and stuck" failures
+        // per soak. Filter at the picker so the next-nearest
+        // *reachable* carcass wins. Submerged-item state and a
+        // shore-adjacent Fish spawn site are R4/R5 substrate
+        // follow-ons.
         PlannerZone::CarcassPile => food_pile_positions
             .iter()
+            .filter(|(_, fp, _)| {
+                map.in_bounds(fp.x(), fp.y())
+                    && map.get(fp.x(), fp.y()).terrain.is_passable()
+            })
             .min_by_key(|(_, fp, _)| pos.tile_distance_squared(fp))
             .map(|(_, p, _)| *p),
         // 035: nearest unburied colony-mate corpse. The dead-cat
@@ -11097,10 +11122,19 @@ fn build_zone_distances(
                 .min_by_key(|sp| pos.tile_distance_squared(sp))
                 .map(|sp| Position::new(sp.x() + d.guard_patrol_radius as i32, sp.y())),
         ),
+        // Ticket 495 — parallel passability filter to keep the
+        // DSE-scoring distance in agreement with what
+        // `resolve_zone_position` will actually pick. Without this,
+        // a Fish carcass on water lifts the CarcassPile nearness
+        // axis even though the planner can't reach it.
         (
             PlannerZone::MaterialPile,
             material_pile_positions
                 .iter()
+                .filter(|(_, mp, _)| {
+                    map.in_bounds(mp.x(), mp.y())
+                        && map.get(mp.x(), mp.y()).terrain.is_passable()
+                })
                 .min_by_key(|(_, mp, _)| pos.tile_distance_squared(mp))
                 .map(|(_, p, _)| *p),
         ),
@@ -11108,6 +11142,10 @@ fn build_zone_distances(
             PlannerZone::CarcassPile,
             food_pile_positions
                 .iter()
+                .filter(|(_, fp, _)| {
+                    map.in_bounds(fp.x(), fp.y())
+                        && map.get(fp.x(), fp.y()).terrain.is_passable()
+                })
                 .min_by_key(|(_, fp, _)| pos.tile_distance_squared(fp))
                 .map(|(_, p, _)| *p),
         ),
@@ -11442,6 +11480,71 @@ mod tests {
             None,
             "no frontier + no reachable passable neighbor → fail visibly"
         );
+    }
+
+    /// Ticket 495 — `CarcassPile` picker must skip food piles sitting
+    /// on impassable terrain (Fish carcasses spawn on `Terrain::Water`
+    /// per `Fish::habitat`). Without this filter, A* refuses the
+    /// destination and the resolver bleeds "no path and stuck" cycles.
+    #[test]
+    fn carcasspile_picker_skips_impassable_tile() {
+        use crate::components::items::ItemKind;
+        let mut map = TileMap::new(20, 20, Terrain::Grass);
+        // Make tile (5, 5) water — this is the "Fish-carcass-on-water"
+        // shape. The further passable pile at (12, 5) must win.
+        map.set(5, 5, Terrain::Water);
+
+        let near_water = Entity::from_raw_u32(1).unwrap();
+        let far_grass = Entity::from_raw_u32(2).unwrap();
+        let food_piles = vec![
+            (near_water, Position::new(5, 5), ItemKind::RawFish),
+            (far_grass, Position::new(12, 5), ItemKind::RawMouse),
+        ];
+
+        // Cat at (3, 5). Near (5, 5) is Chebyshev 2; far (12, 5) is
+        // Chebyshev 9. Pre-495 picker returns (5, 5) and A* fails.
+        // Post-495 picker filters water and returns (12, 5).
+        let cat_pos = Position::new(3, 5);
+        let picked = food_piles
+            .iter()
+            .filter(|(_, fp, _)| {
+                map.in_bounds(fp.x(), fp.y())
+                    && map.get(fp.x(), fp.y()).terrain.is_passable()
+            })
+            .min_by_key(|(_, fp, _)| cat_pos.tile_distance_squared(fp))
+            .map(|(_, p, _)| *p);
+        assert_eq!(picked, Some(Position::new(12, 5)));
+    }
+
+    /// Ticket 495 — when *every* food pile sits on impassable terrain,
+    /// the picker must return None so the resolver surfaces
+    /// "no reachable zone target" cleanly (the planner then drops the
+    /// PickingUp disposition and replans) rather than stamping an
+    /// unreachable target.
+    #[test]
+    fn carcasspile_picker_returns_none_when_all_impassable() {
+        use crate::components::items::ItemKind;
+        let mut map = TileMap::new(20, 20, Terrain::Grass);
+        map.set(5, 5, Terrain::Water);
+        map.set(10, 10, Terrain::Water);
+
+        let entity_a = Entity::from_raw_u32(1).unwrap();
+        let entity_b = Entity::from_raw_u32(2).unwrap();
+        let food_piles = vec![
+            (entity_a, Position::new(5, 5), ItemKind::RawFish),
+            (entity_b, Position::new(10, 10), ItemKind::RawFish),
+        ];
+
+        let cat_pos = Position::new(3, 5);
+        let picked = food_piles
+            .iter()
+            .filter(|(_, fp, _)| {
+                map.in_bounds(fp.x(), fp.y())
+                    && map.get(fp.x(), fp.y()).terrain.is_passable()
+            })
+            .min_by_key(|(_, fp, _)| cat_pos.tile_distance_squared(fp))
+            .map(|(_, p, _)| *p);
+        assert_eq!(picked, None);
     }
 
     // ----- 364: htn_advance_or_pop / htn_abandon_or_pop -------------------

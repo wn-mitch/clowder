@@ -15,10 +15,10 @@ _Last generated: 2026-06-01._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 122 |
+| Ready | 123 |
 | Parked | 12 |
 | Blocked | 31 |
-| **Open total** | **170** |
+| **Open total** | **171** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,11 +68,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (122)
+## Ready by cluster (123)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (33 ready, 6 blocked)
+### ai-substrate (34 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -107,6 +107,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[489](docs/open-work/tickets/489-dse-score-collapse-contract-audit-pattern-b-personality-in-cp-floored-need-across-the-cat-action-dse-corpus.md)** — DSE score-collapse contract — audit Pattern B (personality-in-CP + floored need) across the cat-action DSE corpus — _[ai-substrate] · added 2026-05-30_
 - **[492](docs/open-work/tickets/492-phase-2b-euclidean-perception-radius-constants-i32f32.md)** — Phase 2b — Euclidean perception + radius constants i32→f32 — _[ai-substrate] · added 2026-05-31_
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
+- **[495](docs/open-work/tickets/495-carcasspile-picker-filters-unreachable-tiles-fish-carcasses-on-water.md)** — CarcassPile picker filters unreachable tiles (Fish carcasses on water) — _[ai-substrate] · added 2026-06-01_
 
 ### social-coordination (19 ready, 4 blocked)
 
@@ -348,7 +349,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (122)
+## Ready (123)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -472,6 +473,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[490](docs/open-work/tickets/490-warm-floor-founder-familiarity-collapses-early-game-spatial-dispersion-cuddle-puddle.md)** — warm-floor founder familiarity collapses early-game spatial dispersion (cuddle puddle) — _[social-coordination] · added 2026-05-30_
 - **[492](docs/open-work/tickets/492-phase-2b-euclidean-perception-radius-constants-i32f32.md)** — Phase 2b — Euclidean perception + radius constants i32→f32 — _[ai-substrate] · added 2026-05-31_
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
+- **[495](docs/open-work/tickets/495-carcasspile-picker-filters-unreachable-tiles-fish-carcasses-on-water.md)** — CarcassPile picker filters unreachable tiles (Fish carcasses on water) — _[ai-substrate] · added 2026-06-01_
 
 ## Parked (12)
 
