@@ -62,13 +62,13 @@ pub fn resolve_tend_smoking_rack(
     cat_pos: Position,
     current_tick: u64,
     racks: &mut Query<(Entity, &Position, &Structure, &mut SmokingRackState)>,
-    proximity: i32,
+    proximity: f32,
     crafting: &CraftingConstants,
     commands: &mut Commands,
 ) -> StepOutcome<Option<bool>> {
     // Find the nearest loaded smoking rack that's off-cooldown.
     let cooldown = crafting.smoking_tend_cooldown_ticks;
-    let mut best: Option<(Entity, i32)> = None;
+    let mut best: Option<(Entity, f32)> = None;
     for (entity, pos, structure, state) in racks.iter() {
         if structure.kind != crate::components::building::StructureType::SmokingRack {
             continue;
@@ -81,7 +81,7 @@ pub fn resolve_tend_smoking_rack(
         if !off_cooldown {
             continue;
         }
-        let d = cat_pos.manhattan_distance(pos);
+        let d = cat_pos.distance_to(pos);
         if d > proximity {
             continue;
         }

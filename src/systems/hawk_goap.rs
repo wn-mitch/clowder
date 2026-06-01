@@ -120,11 +120,11 @@ pub fn hawk_evaluate_and_plan(
         let _ = hawk_state; // reserved for §L2.10.7 anchors when wired
         let cats_nearby = cat_positions
             .iter()
-            .filter(|p| p.manhattan_distance(hawk_pos) <= hc.cat_avoidance_range)
+            .filter(|p| p.distance_to(hawk_pos) <= hc.cat_avoidance_range)
             .count();
         let prey_nearby = prey_positions
             .iter()
-            .any(|p| p.manhattan_distance(hawk_pos) <= hc.detection_range);
+            .any(|p| p.distance_to(hawk_pos) <= hc.detection_range);
 
         let ctx = HawkScoringContext {
             needs,
@@ -177,11 +177,11 @@ fn build_planner_state(
     hawk_state: &HawkState,
     hawk_pos: &Position,
     prey_positions: &[Position],
-    detection_range: i32,
+    detection_range: f32,
 ) -> HawkPlannerState {
     let prey_visible = prey_positions
         .iter()
-        .any(|p| p.manhattan_distance(hawk_pos) <= detection_range);
+        .any(|p| p.distance_to(hawk_pos) <= detection_range);
     HawkPlannerState {
         zone: HawkZone::Sky,
         prey_spotted: prey_visible,
@@ -200,7 +200,7 @@ fn resolve_zone_position(
         HawkZone::Sky => Some(Position::new(map.width / 2, map.height / 2)),
         HawkZone::HuntingGround => prey_positions
             .iter()
-            .min_by_key(|p| hawk_pos.manhattan_distance(p))
+            .min_by_key(|p| hawk_pos.tile_distance_squared(p))
             .copied(),
         HawkZone::Perch => Some(Position::new(
             (hawk_pos.x() + 5).min(map.width - 1),

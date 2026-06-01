@@ -8,7 +8,7 @@
 //! Phase 4c.8 scope:
 //!
 //! - `goap.rs::resolve_goap_plans::EngageThreat`'s
-//!   `wildlife.iter().min_by_key(|wp| pos.manhattan_distance(wp))`
+//!   `wildlife.iter().min_by_key(|wp| pos.tile_distance_squared(wp))`
 //!   picker retires for the un-directed branch. The coordinator-
 //!   directive path (`fight_directive_target` in `evaluate_and_plan`)
 //!   continues to override the DSE-picked target — a coordinated
@@ -104,10 +104,12 @@ pub const FIGHT_TARGET_RANGE: f32 = 10.0;
 /// species without re-tuning the shape.
 pub const THREAT_POWER_NORMALIZER: f32 = 0.25;
 
-/// Radius (Manhattan tiles) inside which allied cats contribute to the
-/// `ally_proximity` count. Per §6.5.9: "Count of ally cats within 4
-/// tiles."
-pub const ALLY_COUNT_RADIUS: i32 = 4;
+/// Tile-domain Euclidean radius inside which allied cats contribute to
+/// the `ally_proximity` count. Per §6.5.9: "Count of ally cats within
+/// 4 tiles." Switched from Manhattan to Euclidean in ticket 492; the
+/// nominal value (4.0) preserves cardinal-direction reach while
+/// extending diagonal coverage from ~2.8 to 4.0 tiles.
+pub const ALLY_COUNT_RADIUS: f32 = 4.0;
 
 /// Cap on the ally-proximity raw count before normalization. Per
 /// §6.5.9: "Linear with cap: first 3 allies boost confidence linearly;
@@ -271,7 +273,7 @@ pub fn combat_advantage_normalized(
 pub fn ally_proximity_normalized(cat_pos: Position, ally_positions: &[Position]) -> f32 {
     let count = ally_positions
         .iter()
-        .filter(|p| cat_pos.manhattan_distance(p) <= ALLY_COUNT_RADIUS)
+        .filter(|p| cat_pos.distance_to(p) <= ALLY_COUNT_RADIUS)
         .count() as u32;
     let capped = count.min(ALLY_COUNT_CAP);
     capped as f32 / ALLY_COUNT_CAP as f32
@@ -336,7 +338,7 @@ pub fn resolve_fight_target(
     scratch.positions.clear();
     scratch.map_f32_a.clear();
     for c in candidates {
-        let dist = cat_pos.manhattan_distance(&c.position) as f32;
+        let dist = cat_pos.distance_to(&c.position);
         if dist > FIGHT_TARGET_RANGE {
             continue;
         }

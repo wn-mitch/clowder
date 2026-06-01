@@ -230,7 +230,7 @@ pub fn resolve_caretake_target(
         if kitten.hunger >= KITTEN_HUNGER_THRESHOLD {
             continue;
         }
-        let dist = adult_pos.manhattan_distance(&kitten.pos) as f32;
+        let dist = adult_pos.distance_to(&kitten.pos);
         if dist > CARETAKE_TARGET_RANGE {
             continue;
         }
@@ -261,7 +261,7 @@ pub fn resolve_caretake_target(
                 k.hunger < KITTEN_HUNGER_THRESHOLD
                     && (k.mother == Some(adult) || k.father == Some(adult))
             })
-            .min_by_key(|k| adult_pos.manhattan_distance(&k.pos));
+            .min_by_key(|k| adult_pos.tile_distance_squared(&k.pos));
         if let Some(k) = closest_own {
             scratch.entities.push(k.entity);
             scratch.positions.push(k.pos);
@@ -396,14 +396,14 @@ fn is_kitten_isolated(
         let shares_mother = kitten.mother.zip(other.mother).is_some_and(|(a, b)| a == b);
         let shares_father = kitten.father.zip(other.father).is_some_and(|(a, b)| a == b);
         if (shares_mother || shares_father)
-            && kitten.pos.manhattan_distance(&other.pos) as f32 <= ISOLATION_RADIUS
+            && kitten.pos.distance_to(&other.pos) <= ISOLATION_RADIUS
         {
             return false;
         }
     }
     for (entity, pos) in cat_positions {
         let is_parent = kitten.mother == Some(*entity) || kitten.father == Some(*entity);
-        if is_parent && kitten.pos.manhattan_distance(pos) as f32 <= ISOLATION_RADIUS {
+        if is_parent && kitten.pos.distance_to(pos) <= ISOLATION_RADIUS {
             return false;
         }
     }
@@ -700,16 +700,25 @@ mod tests {
         // Two kittens tied on distance + hunger + kinship (both
         // strangers to the adult). One has a sibling beside it; the
         // other is alone. Isolation axis (weight 0.15) breaks the tie.
+        //
+        // Ticket 494 — positions bumped from radius 3 to radius 4 so
+        // the isolation predicate (Chebyshev `distance_to` against
+        // `ISOLATION_RADIUS = 3.0`) still separates the lonely kitten
+        // from the co-located pair under the realigned metric. Pre-494
+        // Euclidean: (3,0)↔(0,3) reads as √18 ≈ 4.24 (isolated).
+        // Post-494 Chebyshev: (3,0)↔(0,3) reads as 3 (co-located!) —
+        // would collapse the test premise. (4,0) and (0,4)/(1,4) keep
+        // Chebyshev parity for the lonely-vs-sibling distinction.
         let mut registry = DseRegistry::new();
         registry.target_taking_dses.push(caretake_target_dse());
         let adult = Entity::from_raw_u32(1).unwrap();
         let shared_mother = Entity::from_raw_u32(99).unwrap();
         let kittens = vec![
             // Lonely: has a mother, but no sibling or parent within 3.
-            kitten_with_parents(10, 3, 0, 0.2, Some(shared_mother), None),
+            kitten_with_parents(10, 4, 0, 0.2, Some(shared_mother), None),
             // Co-located pair: kittens 11 + 12 share a mother and sit adjacent.
-            kitten_with_parents(11, 0, 3, 0.2, Some(shared_mother), None),
-            kitten_with_parents(12, 1, 3, 0.5, Some(shared_mother), None),
+            kitten_with_parents(11, 0, 4, 0.2, Some(shared_mother), None),
+            kitten_with_parents(12, 1, 4, 0.5, Some(shared_mother), None),
         ];
         let out = resolve_caretake_target(
             &registry,

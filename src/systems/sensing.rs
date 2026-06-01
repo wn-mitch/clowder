@@ -254,7 +254,7 @@ impl EnvCtx {
 /// action-based tremor amplifier — each gated behind a verisimilitude
 /// hypothesis per the Balance Methodology rule in `CLAUDE.md`.
 pub fn detect(observer: ObserverCtx<'_>, target: TargetCtx, env: EnvCtx) -> SensoryResult {
-    let dist = observer.position.manhattan_distance(&target.position) as f32;
+    let dist = observer.position.distance_to(&target.position);
 
     let sight_range = effective_range(
         observer.profile.sight,
@@ -543,12 +543,12 @@ pub fn prey_cat_proximity(
     prey_kind: crate::components::prey::PreyKind,
     prey_profile: &SensoryProfile,
     cat_pos: Position,
-    alert_radius: i32,
+    alert_radius: f32,
     cat_action_tremor_mul: f32,
     cat_visual_mask: f32,
 ) -> f32 {
-    let dist = prey_pos.manhattan_distance(&cat_pos);
-    if dist == 0 {
+    let dist = prey_pos.distance_to(&cat_pos);
+    if dist == 0.0 {
         return 0.0;
     }
     let target_ctx = TargetCtx {
@@ -569,7 +569,7 @@ pub fn prey_cat_proximity(
         let raw_sight = detect(
             observer_ctx,
             target_ctx,
-            EnvCtx::identity().with_max_range(alert_radius as f32 + 1.0),
+            EnvCtx::identity().with_max_range(alert_radius + 1.0),
         )
         .sight;
         // 477 — cloak masks the visual channel only.
@@ -888,8 +888,8 @@ pub fn update_target_existence_markers(
     let dead_cat_positions: Vec<Position> = dead_cats_q.iter().copied().collect();
 
     let threat_range = d.wildlife_threat_range;
-    let herb_range = d.herb_detection_range as f32;
-    let prey_range = d.prey_detection_range as f32;
+    let herb_range = d.herb_detection_range;
+    let prey_range = d.prey_detection_range;
     let burial_range = d.burial_sense_range;
 
     for (entity, pos, cur_threat, cur_social, cur_herbs, cur_prey, cur_carcass, cur_unburied) in
@@ -913,7 +913,7 @@ pub fn update_target_existence_markers(
                 cat_profile,
                 *wp,
                 crate::components::SensorySignature::WILDLIFE,
-                threat_range as f32,
+                threat_range,
             )
         });
 
@@ -995,7 +995,7 @@ pub fn update_target_existence_markers(
         // within range; no sensory-channel attenuation.
         let want_unburied = dead_cat_positions
             .iter()
-            .any(|dp| pos.manhattan_distance(dp) <= burial_range);
+            .any(|dp| pos.distance_to(dp) <= burial_range);
 
         toggle_target_marker(
             &mut commands,
@@ -1305,7 +1305,7 @@ mod tests {
         let profile = rabbit_profile();
         let prey_pos = Position::new(0, 0);
         let cat_pos = Position::new(11, 0); // beyond sight (Cliff at 6+alert_window), inside tremor (12)
-        let alert_radius = 6; // rabbit's natural sight-based alert_radius
+        let alert_radius = 6.0; // rabbit's natural sight-based alert_radius
         let running_mul = 1.8;
         let p = prey_cat_proximity(
             prey_pos,
@@ -1331,7 +1331,7 @@ mod tests {
         let profile = rabbit_profile();
         let prey_pos = Position::new(0, 0);
         let cat_pos = Position::new(11, 0);
-        let alert_radius = 6;
+        let alert_radius = 6.0;
         let stalk_mul = 0.0;
         let p = prey_cat_proximity(
             prey_pos,
@@ -1553,8 +1553,8 @@ mod tests {
             for dx in -(range * 2)..=(range * 2) {
                 for dy in -(range * 2)..=(range * 2) {
                     let target = Position::new(dx, dy);
-                    let dist = center.manhattan_distance(&target);
-                    let old_detected = dist <= range;
+                    let dist = center.distance_to(&target);
+                    let old_detected = dist <= range as f32;
                     let new_detected = observer_sees_at(
                         SensorySpecies::Cat,
                         center,
@@ -1584,8 +1584,8 @@ mod tests {
         for dx in -(range * 2)..=(range * 2) {
             for dy in -(range * 2)..=(range * 2) {
                 let target = Position::new(dx, dy);
-                let dist = center.manhattan_distance(&target);
-                let old_detected = dist <= range;
+                let dist = center.distance_to(&target);
+                let old_detected = dist <= range as f32;
                 let new_detected = observer_smells_at(
                     SensorySpecies::Cat,
                     center,
@@ -1619,16 +1619,17 @@ mod tests {
         ];
         let prey_pos = Position::new(0, 0);
         // Test a range of alert_radius values covering all species.
-        for alert_radius in 1..=10 {
+        for alert_radius_i in 1..=10 {
+            let alert_radius = alert_radius_i as f32;
             for (kind, profile) in &prey_cases {
-                for dx in -(alert_radius * 2)..=(alert_radius * 2) {
-                    for dy in -(alert_radius * 2)..=(alert_radius * 2) {
+                for dx in -(alert_radius_i * 2)..=(alert_radius_i * 2) {
+                    for dy in -(alert_radius_i * 2)..=(alert_radius_i * 2) {
                         let cat_pos = Position::new(dx, dy);
-                        let dist = prey_pos.manhattan_distance(&cat_pos);
-                        let old_proximity = if dist > alert_radius || dist == 0 {
+                        let dist = prey_pos.distance_to(&cat_pos);
+                        let old_proximity = if dist > alert_radius || dist == 0.0 {
                             0.0
                         } else {
-                            1.0 - (dist as f32 / (alert_radius as f32 + 1.0))
+                            1.0 - (dist / (alert_radius + 1.0))
                         };
                         // 100: pass `0.0` for cat_action_tremor_mul so
                         // the tremor channel contributes nothing — this
@@ -1659,7 +1660,7 @@ mod tests {
     #[test]
     fn cat_sees_threat_matches_old_manhattan_check() {
         // Exhaustive equivalence proof for the Phase 2 migration:
-        // old code computed `pos.manhattan_distance(wp) <= d.threat_awareness_range`
+        // old code computed `pos.distance_to(wp) <= d.threat_awareness_range`
         // with threat_awareness_range = 10. The new path uses the cat's
         // sight channel only (not multi-channel detect()) because the
         // original call was explicitly visual. Every tile in a 2×-range
@@ -1667,12 +1668,13 @@ mod tests {
         use crate::resources::sim_constants::SensoryConstants;
         let sensory = SensoryConstants::default();
         let cat_profile = &sensory.cat;
-        let old_range: i32 = 10; // legacy threat_awareness_range default
+        let old_range: f32 = 10.0; // legacy threat_awareness_range default
+        let old_range_i = old_range as i32;
         let center = Position::new(0, 0);
-        for dx in -(old_range * 2)..=(old_range * 2) {
-            for dy in -(old_range * 2)..=(old_range * 2) {
+        for dx in -(old_range_i * 2)..=(old_range_i * 2) {
+            for dy in -(old_range_i * 2)..=(old_range_i * 2) {
                 let wp = Position::new(dx, dy);
-                let dist = center.manhattan_distance(&wp);
+                let dist = center.distance_to(&wp);
                 let old_detected = dist <= old_range;
                 let new_detected = cat_sees_threat_at(center, cat_profile, wp);
                 assert_eq!(

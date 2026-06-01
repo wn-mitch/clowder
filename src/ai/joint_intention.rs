@@ -579,7 +579,7 @@ pub fn cascade_play_bout_bouting(
             if other == msg.actor {
                 continue;
             }
-            if actor_pos.manhattan_distance(other_pos) > 4 {
+            if actor_pos.distance_to(other_pos) > 4.0 {
                 continue;
             }
             nearby.push((other, other_pers.patience));
@@ -728,9 +728,7 @@ fn pick_courtship_partner(
         if *other == self_entity {
             continue;
         }
-        let manhattan =
-            (self_position.x() - other_pos.x()).abs() + (self_position.y() - other_pos.y()).abs();
-        if manhattan > range {
+        if self_position.distance_to(other_pos) > range {
             continue;
         }
         let Some(other_fit) = fitness.get(other) else {
@@ -851,9 +849,7 @@ fn pick_playbout_partner(
         if claimed_this_tick.contains(other) {
             continue;
         }
-        let manhattan =
-            (self_position.x() - other_pos.x()).abs() + (self_position.y() - other_pos.y()).abs();
-        if manhattan > range {
+        if self_position.distance_to(other_pos) > range {
             continue;
         }
         let Some(&(other_play, other_mood, other_action)) = cache.get(other) else {

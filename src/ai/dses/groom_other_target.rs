@@ -291,7 +291,7 @@ pub fn resolve_groom_other_target(
         if currently_groomed.is_some_and(|set| set.contains(other)) {
             continue;
         }
-        let dist = cat_pos.manhattan_distance(other_pos) as f32;
+        let dist = cat_pos.distance_to(other_pos);
         if dist > GROOM_OTHER_TARGET_RANGE {
             continue;
         }

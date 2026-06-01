@@ -87,7 +87,7 @@ pub fn resolve_pickup_material(
     };
 
     // Walk to the pile if not adjacent yet.
-    if pos.manhattan_distance(&item_pos) > 1 {
+    if pos.distance_to(&item_pos) > 1.0 {
         if cached_path.is_none() {
             *cached_path = path_plan.find_full_path(*pos, item_pos, map);
         }

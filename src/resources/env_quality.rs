@@ -107,17 +107,17 @@ impl Default for EnvField {
 /// Contributions are **additive** — two overlapping stamps sum. Cells
 /// are clamped to `[-1.0, 1.0]` at write time so intermediate values
 /// never overflow during a multi-source sweep.
-pub fn stamp(field: &mut EnvField, cx: i32, cy: i32, peak: f32, radius: i32) {
+pub fn stamp(field: &mut EnvField, cx: i32, cy: i32, peak: f32, radius: f32) {
     if peak == 0.0 {
         return;
     }
-    if radius <= 0 {
+    if radius <= 0.0 {
         if let Some(i) = field.index(cx, cy) {
             field.marks[i] = (field.marks[i] + peak).clamp(-1.0, 1.0);
         }
         return;
     }
-    let r = radius;
+    let r = radius.round() as i32;
     for dy in -r..=r {
         for dx in -r..=r {
             let dist = dx.abs() + dy.abs();
@@ -293,14 +293,14 @@ mod tests {
     #[test]
     fn stamp_at_source_uses_peak() {
         let mut f = EnvField::new(30, 30);
-        stamp(&mut f, 10, 10, 0.6, 3);
+        stamp(&mut f, 10, 10, 0.6, 3.0);
         assert!((f.get(10, 10) - 0.6).abs() < 1e-6);
     }
 
     #[test]
     fn stamp_linear_falloff() {
         let mut f = EnvField::new(30, 30);
-        stamp(&mut f, 10, 10, 1.0, 4);
+        stamp(&mut f, 10, 10, 1.0, 4.0);
         // Manhattan distance 0 → 1.0
         assert!((f.get(10, 10) - 1.0).abs() < 1e-6);
         // Manhattan distance 1 → 0.75
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn stamp_zero_radius_is_single_cell() {
         let mut f = EnvField::new(30, 30);
-        stamp(&mut f, 5, 5, 0.4, 0);
+        stamp(&mut f, 5, 5, 0.4, 0.0);
         assert!((f.get(5, 5) - 0.4).abs() < 1e-6);
         assert_eq!(f.get(6, 5), 0.0);
         assert_eq!(f.get(4, 5), 0.0);
@@ -326,8 +326,8 @@ mod tests {
     #[test]
     fn stamp_additive_overlap_sums() {
         let mut f = EnvField::new(30, 30);
-        stamp(&mut f, 10, 10, 0.3, 2);
-        stamp(&mut f, 11, 10, 0.3, 2);
+        stamp(&mut f, 10, 10, 0.3, 2.0);
+        stamp(&mut f, 11, 10, 0.3, 2.0);
         // Both stamps contribute at (10,10): 0.3 (peak from first) +
         // 0.3 * 0.5 (one step away in second) = 0.45.
         assert!((f.get(10, 10) - 0.45).abs() < 1e-6);
@@ -338,7 +338,7 @@ mod tests {
     #[test]
     fn stamp_signed_negative_peak_stamps_negative() {
         let mut f = EnvField::new(30, 30);
-        stamp(&mut f, 5, 5, -0.4, 2);
+        stamp(&mut f, 5, 5, -0.4, 2.0);
         assert!((f.get(5, 5) + 0.4).abs() < 1e-6);
         assert!((f.get(6, 5) + 0.2).abs() < 1e-6);
     }
@@ -346,16 +346,16 @@ mod tests {
     #[test]
     fn stamp_clamps_at_one() {
         let mut f = EnvField::new(30, 30);
-        stamp(&mut f, 5, 5, 0.8, 0);
-        stamp(&mut f, 5, 5, 0.8, 0);
+        stamp(&mut f, 5, 5, 0.8, 0.0);
+        stamp(&mut f, 5, 5, 0.8, 0.0);
         assert!((f.get(5, 5) - 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn stamp_clamps_at_negative_one() {
         let mut f = EnvField::new(30, 30);
-        stamp(&mut f, 5, 5, -0.8, 0);
-        stamp(&mut f, 5, 5, -0.8, 0);
+        stamp(&mut f, 5, 5, -0.8, 0.0);
+        stamp(&mut f, 5, 5, -0.8, 0.0);
         assert!((f.get(5, 5) + 1.0).abs() < 1e-6);
     }
 
@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn clear_zeroes_every_cell() {
         let mut f = EnvField::new(10, 10);
-        stamp(&mut f, 5, 5, 0.5, 3);
+        stamp(&mut f, 5, 5, 0.5, 3.0);
         f.clear();
         for v in &f.marks {
             assert_eq!(*v, 0.0);
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn add_global_shifts_every_cell_uniformly() {
         let mut f = EnvField::new(10, 10);
-        stamp(&mut f, 5, 5, 0.2, 0);
+        stamp(&mut f, 5, 5, 0.2, 0.0);
         f.add_global(0.1);
         // The stamped cell shifted from 0.2 to 0.3.
         assert!((f.get(5, 5) - 0.3).abs() < 1e-6);
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     fn add_global_clamps() {
         let mut f = EnvField::new(10, 10);
-        stamp(&mut f, 5, 5, 0.95, 0);
+        stamp(&mut f, 5, 5, 0.95, 0.0);
         f.add_global(0.5);
         // Clamped to 1.0
         assert!((f.get(5, 5) - 1.0).abs() < 1e-6);

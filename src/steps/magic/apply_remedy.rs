@@ -64,7 +64,7 @@ pub fn resolve_apply_remedy(
 ) -> (StepResult, Option<(Entity, Entity, f32)>) {
     // Move to patient if not adjacent.
     if let Some(target_pos) = target_position {
-        if pos.manhattan_distance(&target_pos) > 1 {
+        if pos.distance_to(&target_pos) > 1.0 {
             if cached_path.is_none() {
                 match path_plan.find_full_path(*pos, target_pos, map) {
                     Some(path) => *cached_path = Some(path),

@@ -199,11 +199,12 @@ fn toggle<M: Component + Copy>(
 fn has_nearby_tile(
     from: &Position,
     map: &TileMap,
-    radius: i32,
+    radius: f32,
     predicate: impl Fn(Terrain) -> bool,
 ) -> bool {
-    for dy in -radius..=radius {
-        for dx in -radius..=radius {
+    let radius_i = radius.max(0.0).round() as i32;
+    for dy in -radius_i..=radius_i {
+        for dx in -radius_i..=radius_i {
             if dx == 0 && dy == 0 {
                 continue;
             }
@@ -225,12 +226,15 @@ fn has_nearby_tile(
 pub fn nearest_matching_tile(
     from: &Position,
     map: &TileMap,
-    radius: i32,
+    radius: f32,
     mut predicate: impl FnMut(Terrain) -> bool,
 ) -> Option<Position> {
+    let radius_i = radius.max(0.0).round() as i32;
+    // Ordering by squared Euclidean is identical to ordering by Euclidean
+    // for any pair of tile-snapped positions; keeps the picker on `i32`.
     let mut best: Option<(Position, i32)> = None;
-    for dy in -radius..=radius {
-        for dx in -radius..=radius {
+    for dy in -radius_i..=radius_i {
+        for dx in -radius_i..=radius_i {
             let x = from.x() + dx;
             let y = from.y() + dy;
             if !map.in_bounds(x, y) {
@@ -240,7 +244,7 @@ pub fn nearest_matching_tile(
                 continue;
             }
             let pos = Position::new(x, y);
-            let d = from.manhattan_distance(&pos);
+            let d = from.tile_distance_squared(&pos);
             if best.is_none_or(|(_, cur)| d < cur) {
                 best = Some((pos, d));
             }

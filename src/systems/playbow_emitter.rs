@@ -89,8 +89,7 @@ pub fn emit_play_bows(
         // Candidate range: at least one peer within range. Skip emit if the
         // cat is alone — a play-bow signal with no audience is wasted RNG.
         let has_candidate = peers.iter().any(|(other, other_pos)| {
-            other != entity
-                && pos.manhattan_distance(other_pos) <= cfg.playbow_candidate_range_tiles
+            other != entity && pos.distance_to(other_pos) <= cfg.playbow_candidate_range_tiles
         });
         if !has_candidate {
             continue;
@@ -145,7 +144,7 @@ pub fn emit_reciprocal_advances(
             if target == actor {
                 continue;
             }
-            if actor_pos.manhattan_distance(target_pos) > range {
+            if actor_pos.distance_to(target_pos) > range {
                 continue;
             }
             // Target must have recently emitted PlayBow or ReciprocalAdvance.

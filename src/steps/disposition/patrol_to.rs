@@ -44,7 +44,7 @@ pub fn resolve_patrol_to(
     let Some(target) = target_position else {
         return StepOutcome::bare(StepResult::Fail("no patrol target".into()));
     };
-    if pos.manhattan_distance(&target) == 0 {
+    if pos.distance_to(&target) == 0.0 {
         jitter_if_stacked(pos, map, cat_tile_counts);
         needs.safety = (needs.safety + d.patrol_arrival_safety_gain).min(1.0);
         return StepOutcome::bare(StepResult::Advance);

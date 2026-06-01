@@ -112,15 +112,80 @@ impl Position {
         self.0 = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
     }
 
-    /// Euclidean distance to another position. Read at the world-space
-    /// level — sibling 491b retires `manhattan_distance` in favor of
-    /// this for perception/pursuit reads.
+    /// Default "how close" read — perception, pursuit, social spacing,
+    /// any consideration shaped like "how many steps until I get there."
+    /// Returns Chebyshev (king-move) distance as f32 so it composes with
+    /// `range` constants and curve evaluators.
+    ///
+    /// Cats move 8-directionally with edge cost 1 (see
+    /// `ai/pathfinding.rs::heuristic`), so the substrate-correct
+    /// "distance" — the one that aligns *perception* with *movement* —
+    /// is Chebyshev. A diagonal-of-1 reads as 1, matching the single
+    /// step it costs to traverse. Pre-494, this returned Euclidean
+    /// (diagonal=1.41) which produced a proprioceptive mismatch: cats
+    /// scored targets by a metric they couldn't actually travel under.
+    ///
+    /// Sites that genuinely want radial Euclidean — scent diffusion
+    /// gradients, ward-glow falloff, visual-amplitude reads — should
+    /// call [`Position::euclidean_distance`] explicitly.
     pub fn distance_to(&self, other: &Position) -> f32 {
-        self.0.distance(other.0)
+        self.chebyshev_distance(other) as f32
     }
 
-    /// Manhattan (grid-step) distance via containing tiles. Preserved
-    /// for sub-phase 2a behavior parity; sibling 491b retires it.
+    /// Squared "pick nearest" metric via containing tiles. Returns
+    /// `chebyshev_distance² (=max(|dx|,|dy|)²)` so it composes with
+    /// `min_by_key`, `sort_by_key`, and `Ord::cmp` while staying
+    /// order-equivalent to `distance_to`.
+    ///
+    /// Pre-494 this returned `dx² + dy²` (Euclidean squared) and was
+    /// order-equivalent to the then-Euclidean `distance_to`. Now that
+    /// `distance_to` is Chebyshev, this stays order-equivalent by
+    /// squaring Chebyshev — preserves the "pick nearest" semantic for
+    /// every existing call site without re-introducing the Euclidean
+    /// perception/movement mismatch.
+    pub fn tile_distance_squared(&self, other: &Position) -> i32 {
+        let c = self.chebyshev_distance(other);
+        c * c
+    }
+
+    /// Chebyshev (king-move) distance via containing tiles —
+    /// `max(|dx|, |dy|)`. The 8-direction movement metric: "how many
+    /// steps until I'm there?" — both *navigational* (path cost) and
+    /// *perceptual* (after ticket 494's substrate realignment). Use
+    /// directly when the i32 return is preferred over `distance_to`'s
+    /// f32.
+    pub fn chebyshev_distance(&self, other: &Position) -> i32 {
+        let (sx, sy) = self.tile();
+        let (ox, oy) = other.tile();
+        (sx - ox).abs().max((sy - oy).abs())
+    }
+
+    /// Radial Euclidean distance — √(Δx² + Δy²) via containing tiles.
+    ///
+    /// **Escape hatch.** The default "how close" read is
+    /// [`Position::distance_to`] (Chebyshev), which matches 8-direction
+    /// movement cost. Use *this* method only when the consideration
+    /// genuinely measures radial physical space: scent diffusion
+    /// gradients, ward-glow / wardlight falloff, sound amplitude,
+    /// visual perception that falls off with line-of-sight distance.
+    ///
+    /// Most consumers should *not* call this — if you're asking "how
+    /// far," you almost certainly want `distance_to`.
+    pub fn euclidean_distance(&self, other: &Position) -> f32 {
+        let (sx, sy) = self.tile();
+        let (ox, oy) = other.tile();
+        let dx = (sx - ox) as f32;
+        let dy = (sy - oy) as f32;
+        (dx * dx + dy * dy).sqrt()
+    }
+
+    /// Manhattan (grid-step) distance via containing tiles. Retained
+    /// for test parity and external tooling; sim-code call sites
+    /// retired in ticket 492 in favor of `distance_to` (Euclidean) or
+    /// `chebyshev_distance` (tactical reach).
+    #[deprecated(
+        note = "retired by ticket 492; use distance_to (Euclidean) or chebyshev_distance (tactical reach)"
+    )]
     pub fn manhattan_distance(&self, other: &Position) -> i32 {
         let (sx, sy) = self.tile();
         let (ox, oy) = other.tile();
@@ -361,17 +426,47 @@ mod tests {
 
     #[test]
     fn position_distance() {
+        // Ticket 494 — `distance_to` is now Chebyshev (king-move) so
+        // perception aligns with 8-direction movement cost: the (3, 4)
+        // offset reads as 4 ("max leg"), matching the 4 diagonal steps
+        // it actually takes a cat to traverse. Pre-494 this asserted
+        // 5.0 (Euclidean √(9+16)) — that overstated diagonal traversal
+        // cost and decoupled scoring from pathfinding.
         let a = Position::new(0, 0);
         let b = Position::new(3, 4);
         let dist = a.distance_to(&b);
+        assert!((dist - 4.0).abs() < 1e-5, "expected 4.0, got {dist}");
+    }
+
+    #[test]
+    fn position_euclidean_distance_keeps_radial_semantics() {
+        // The escape hatch for genuinely radial reads (scent diffusion,
+        // ward-glow falloff). Still computes √(Δx² + Δy²).
+        let a = Position::new(0, 0);
+        let b = Position::new(3, 4);
+        let dist = a.euclidean_distance(&b);
         assert!((dist - 5.0).abs() < 1e-5, "expected 5.0, got {dist}");
     }
 
     #[test]
+    #[allow(deprecated)]
     fn position_manhattan() {
         let a = Position::new(1, 2);
         let b = Position::new(4, 6);
         assert_eq!(a.manhattan_distance(&b), 7);
+    }
+
+    #[test]
+    fn position_chebyshev_cardinal_and_diagonal() {
+        let origin = Position::new(0, 0);
+        // Cardinal: Chebyshev == Manhattan.
+        assert_eq!(origin.chebyshev_distance(&Position::new(3, 0)), 3);
+        assert_eq!(origin.chebyshev_distance(&Position::new(0, 4)), 4);
+        // Diagonal: Chebyshev picks the larger leg, not their sum.
+        assert_eq!(origin.chebyshev_distance(&Position::new(3, 4)), 4);
+        assert_eq!(origin.chebyshev_distance(&Position::new(-2, 5)), 5);
+        // Self: zero.
+        assert_eq!(origin.chebyshev_distance(&origin), 0);
     }
 
     #[test]

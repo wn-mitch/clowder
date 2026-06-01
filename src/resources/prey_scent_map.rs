@@ -87,13 +87,19 @@ impl PreyScentMap {
         }
     }
 
-    /// Find the highest-scent bucket within manhattan `radius` of a
-    /// world position. Returns the world-tile center of that bucket,
-    /// or `None` if all nearby buckets are zero. Mirrors
-    /// `FoxScentMap::highest_nearby` so hunt-target selection can
-    /// route to "where is scent strongest" rather than
-    /// iterating-entities + filtering.
-    pub fn highest_nearby(&self, x: i32, y: i32, radius: i32) -> Option<(i32, i32)> {
+    /// Find the highest-scent bucket within Chebyshev `radius` of a
+    /// world position — i.e. within `radius` 8-directional steps.
+    /// Returns the world-tile center of that bucket, or `None` if all
+    /// nearby buckets are zero. Mirrors `FoxScentMap::highest_nearby`
+    /// so hunt-target selection can route to "where is scent strongest"
+    /// rather than iterating-entities + filtering.
+    ///
+    /// Ticket 494 flipped the internal gate from Manhattan to Chebyshev
+    /// so `radius` reads as "within N steps a cat could traverse,"
+    /// matching the substrate-correct `Position::distance_to` (also
+    /// Chebyshev post-494).
+    pub fn highest_nearby(&self, x: i32, y: i32, radius: f32) -> Option<(i32, i32)> {
+        let radius = radius.max(0.0).round() as i32;
         let mut best_val = 0.0f32;
         let mut best_pos = None;
         let bx_center = x / self.bucket_size;
@@ -113,7 +119,7 @@ impl PreyScentMap {
                 let val = self.marks[idx];
                 let wx = bx * self.bucket_size + self.bucket_size / 2;
                 let wy = by * self.bucket_size + self.bucket_size / 2;
-                let dist = (wx - x).abs() + (wy - y).abs();
+                let dist = (wx - x).abs().max((wy - y).abs());
                 if dist <= radius && val > best_val {
                     best_val = val;
                     best_pos = Some((wx, wy));
@@ -198,7 +204,8 @@ impl PreyScentMaps {
     /// Aggregate spatial scan: same neighborhood walk as
     /// `PreyScentMap::highest_nearby`, but the bucket value at each
     /// candidate position is taken as `get_any` (max across species).
-    pub fn highest_nearby_any(&self, x: i32, y: i32, radius: i32) -> Option<(i32, i32)> {
+    pub fn highest_nearby_any(&self, x: i32, y: i32, radius: f32) -> Option<(i32, i32)> {
+        let radius = radius.max(0.0).round() as i32;
         let first = &self.maps[0];
         let mut best_val = 0.0_f32;
         let mut best_pos: Option<(i32, i32)> = None;
@@ -217,7 +224,7 @@ impl PreyScentMaps {
                 }
                 let wx = bx * first.bucket_size + first.bucket_size / 2;
                 let wy = by * first.bucket_size + first.bucket_size / 2;
-                let dist = (wx - x).abs() + (wy - y).abs();
+                let dist = (wx - x).abs().max((wy - y).abs());
                 if dist > radius {
                     continue;
                 }
@@ -240,7 +247,7 @@ impl PreyScentMaps {
         kind: PreyKind,
         x: i32,
         y: i32,
-        radius: i32,
+        radius: f32,
     ) -> Option<(i32, i32)> {
         self.for_kind(kind).highest_nearby(x, y, radius)
     }
@@ -331,7 +338,7 @@ mod tests {
         map.deposit(0, 0, 0.3);
         // Searching from (8, 8) within radius 5 should surface the
         // (10, 10) bucket.
-        let best = map.highest_nearby(8, 8, 5);
+        let best = map.highest_nearby(8, 8, 5.0);
         assert!(best.is_some());
         let (wx, wy) = best.unwrap();
         // Bucket (3, 3) with bucket_size 3 → center (9, 10) or (10, 10)-ish.
@@ -343,7 +350,7 @@ mod tests {
     #[test]
     fn highest_nearby_returns_none_when_all_zero() {
         let map = PreyScentMap::new(30, 30, 3);
-        assert!(map.highest_nearby(15, 15, 10).is_none());
+        assert!(map.highest_nearby(15, 15, 10.0).is_none());
     }
 
     // ----------------------------------------------------------------
@@ -405,7 +412,7 @@ mod tests {
         maps.for_kind_mut(PreyKind::Mouse).deposit(3, 3, 0.3);
         maps.for_kind_mut(PreyKind::Fish).deposit(15, 15, 0.9);
         // Search from (9, 9) within radius wide enough to see both.
-        let best = maps.highest_nearby_any(9, 9, 20);
+        let best = maps.highest_nearby_any(9, 9, 20.0);
         assert!(best.is_some());
         let (wx, wy) = best.unwrap();
         // Bucket center of (15, 15) — bucket_size 3 → center (16, 16).
@@ -420,13 +427,13 @@ mod tests {
         maps.for_kind_mut(PreyKind::Mouse).deposit(3, 3, 0.3);
         maps.for_kind_mut(PreyKind::Fish).deposit(15, 15, 0.9);
         // Mouse-discriminating scan from (9, 9) should pick A, not B.
-        let best_mouse = maps.highest_nearby_for(PreyKind::Mouse, 9, 9, 20);
+        let best_mouse = maps.highest_nearby_for(PreyKind::Mouse, 9, 9, 20.0);
         assert!(best_mouse.is_some());
         let (mx, my) = best_mouse.unwrap();
         assert!((mx - 3).abs() <= 3);
         assert!((my - 3).abs() <= 3);
         // Fish-discriminating scan from same origin picks B.
-        let best_fish = maps.highest_nearby_for(PreyKind::Fish, 9, 9, 20);
+        let best_fish = maps.highest_nearby_for(PreyKind::Fish, 9, 9, 20.0);
         assert!(best_fish.is_some());
         let (fx, fy) = best_fish.unwrap();
         assert!((fx - 15).abs() <= 3);

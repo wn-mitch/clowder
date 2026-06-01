@@ -60,11 +60,12 @@ impl ExplorationMap {
     /// Mark all tiles within `radius` of (cx, cy) as explored.
     /// Returns the mean discovery value across the area (for need
     /// bonuses). High return = mostly new territory; low = re-tread.
-    pub fn explore_area(&mut self, cx: i32, cy: i32, radius: i32) -> f32 {
+    pub fn explore_area(&mut self, cx: i32, cy: i32, radius: f32) -> f32 {
+        let radius_i = radius.max(0.0).round() as i32;
         let mut total = 0u32;
         let mut discovery_sum = 0.0f32;
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
+        for dy in -radius_i..=radius_i {
+            for dx in -radius_i..=radius_i {
                 if let Some(idx) = self.index(cx + dx, cy + dy) {
                     let prev = self.tiles[idx];
                     self.tiles[idx] = 1.0;
@@ -94,11 +95,12 @@ impl ExplorationMap {
 
     /// Fraction of tiles within a radius that are unexplored (< threshold).
     /// Used to gate the explore action score.
-    pub fn unexplored_fraction_nearby(&self, cx: i32, cy: i32, radius: i32, threshold: f32) -> f32 {
+    pub fn unexplored_fraction_nearby(&self, cx: i32, cy: i32, radius: f32, threshold: f32) -> f32 {
+        let radius_i = radius.max(0.0).round() as i32;
         let mut total = 0u32;
         let mut unexplored = 0u32;
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
+        for dy in -radius_i..=radius_i {
+            for dx in -radius_i..=radius_i {
                 let x = cx + dx;
                 let y = cy + dy;
                 if let Some(idx) = self.index(x, y) {
@@ -203,7 +205,7 @@ mod tests {
     #[test]
     fn unexplored_fraction_starts_at_one() {
         let map = ExplorationMap::new(10, 10);
-        let frac = map.unexplored_fraction_nearby(5, 5, 3, 0.5);
+        let frac = map.unexplored_fraction_nearby(5, 5, 3.0, 0.5);
         assert!((frac - 1.0).abs() < 1e-5, "all tiles should be unexplored");
     }
 
@@ -216,14 +218,14 @@ mod tests {
                 map.explore_tile(5 + dx, 5 + dy);
             }
         }
-        let frac = map.unexplored_fraction_nearby(5, 5, 1, 0.5);
+        let frac = map.unexplored_fraction_nearby(5, 5, 1.0, 0.5);
         assert!(frac.abs() < 1e-5, "all nearby tiles explored; got {frac}");
     }
 
     #[test]
     fn explore_area_marks_disc() {
         let mut map = ExplorationMap::new(20, 20);
-        map.explore_area(10, 10, 2);
+        map.explore_area(10, 10, 2.0);
         // All tiles in 5×5 disc centered at (10,10) should be explored.
         for dy in -2..=2 {
             for dx in -2..=2 {
@@ -254,7 +256,7 @@ mod tests {
         }
         // 5×5 = 25 tiles total. Top 3 rows (15 tiles) already explored,
         // bottom 2 rows (10 tiles) are new. Mean discovery = 10/25 = 0.4.
-        let discovery = map.explore_area(10, 10, 2);
+        let discovery = map.explore_area(10, 10, 2.0);
         assert!(
             (discovery - 0.4).abs() < 1e-5,
             "expected mean discovery ~0.4; got {discovery}"

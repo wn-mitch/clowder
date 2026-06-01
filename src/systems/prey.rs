@@ -84,7 +84,7 @@ fn try_detect_cat(
     pos: &Position,
     prey_kind: PreyKind,
     prey_profile: &crate::systems::sensing::SensoryProfile,
-    alert_radius: i32,
+    alert_radius: f32,
     alertness: f32,
     vigilance_mod: f32,
     detection_base_chance: f32,
@@ -127,7 +127,7 @@ fn try_detect_cat(
         // 477 — focal-trace rows for the two reads, gated to the focal
         // cat + the sight band where the cloak mask actually bites.
         if let Some(sink) = focal_sink {
-            let dist = pos.manhattan_distance(cat_pos);
+            let dist = pos.distance_to(cat_pos);
             if em.detection_visual_mask > 0.0 && dist <= alert_radius {
                 sink.record(
                     entity,
@@ -190,14 +190,14 @@ fn bird_teleport(
     habitat: &[Terrain],
     map: &TileMap,
     rng: &mut SimRng,
-    min_range: i32,
-    max_range: i32,
+    min_range: f32,
+    max_range: f32,
 ) {
     for _ in 0..20 {
         let range = rng.rng.random_range(min_range..=max_range);
         let angle: f32 = rng.rng.random::<f32>() * std::f32::consts::TAU;
-        let nx = threat_pos.x() + (angle.cos() * range as f32) as i32;
-        let ny = threat_pos.y() + (angle.sin() * range as f32) as i32;
+        let nx = threat_pos.x() + (angle.cos() * range) as i32;
+        let ny = threat_pos.y() + (angle.sin() * range) as i32;
         if can_move_to(nx, ny, habitat, map) {
             pos.set_tile(nx, ny);
             return;
@@ -411,7 +411,7 @@ pub fn prey_ai(
 
                 // Roaming limit: under pressure, stay close to home den.
                 if let Some(den_pos) = home_den_pos {
-                    let den_dist = pos.manhattan_distance(&den_pos);
+                    let den_dist = pos.distance_to(&den_pos);
                     let max_roam = if pressure > p.grazing_pressure_roam_threshold {
                         p.grazing_max_roam_pressured
                     } else {
@@ -461,8 +461,8 @@ pub fn prey_ai(
                     .or_else(|_| positions.get(threat))
                     .ok();
 
-                let still_near = threat_pos
-                    .is_some_and(|tp| pos.manhattan_distance(tp) <= config.alert_radius + 2);
+                let still_near =
+                    threat_pos.is_some_and(|tp| pos.distance_to(tp) <= config.alert_radius + 2.0);
 
                 if !still_near {
                     state.ai_state = PreyAiState::Idle;
@@ -499,7 +499,7 @@ pub fn prey_ai(
                 let should_stop = new_ticks >= config.flee_duration
                     || threat_pos.is_none()
                     || threat_pos
-                        .map(|tp| pos.manhattan_distance(tp) > p.flee_stop_distance)
+                        .map(|tp| pos.distance_to(tp) > p.flee_stop_distance)
                         .unwrap_or(true);
 
                 if should_stop {
@@ -564,8 +564,8 @@ pub fn prey_ai(
                                 p.bird_teleport_min_range..=p.bird_teleport_max_range,
                             );
                             let angle: f32 = rng.rng.random::<f32>() * std::f32::consts::TAU;
-                            let nx = tp.x() + (angle.cos() * range as f32) as i32;
-                            let ny = tp.y() + (angle.sin() * range as f32) as i32;
+                            let nx = tp.x() + (angle.cos() * range) as i32;
+                            let ny = tp.y() + (angle.sin() * range) as i32;
                             if can_move_to(nx, ny, config.habitat, &map) {
                                 pos.set_tile(nx, ny);
                                 landed = true;
@@ -870,7 +870,7 @@ pub fn update_den_pressure(
     for kill in kills.read() {
         for (mut den, den_pos) in &mut dens {
             if den.kind == kill.kind
-                && kill.position.manhattan_distance(den_pos) <= p.den_kill_pressure_range
+                && kill.position.distance_to(den_pos) <= p.den_kill_pressure_range
             {
                 den.predation_pressure =
                     (den.predation_pressure + p.den_kill_pressure_increment).min(1.0);
@@ -933,11 +933,11 @@ pub fn orphan_prey_adopt_or_found(
             .iter()
             .filter(|(_, d, dp)| {
                 d.kind == config.kind
-                    && pos.manhattan_distance(dp) <= p.den_orphan_adopt_range
+                    && pos.distance_to(dp) <= p.den_orphan_adopt_range
                     && (d.spawns_remaining as f32)
                         < d.capacity as f32 * p.den_orphan_adopt_capacity_threshold
             })
-            .min_by_key(|(_, _, dp)| pos.manhattan_distance(dp));
+            .min_by_key(|(_, _, dp)| pos.tile_distance_squared(dp));
 
         if let Some((den_entity, _, _)) = adoptable {
             state.home_den = Some(den_entity);
@@ -960,7 +960,7 @@ pub fn orphan_prey_adopt_or_found(
 
         // Must be far from any same-species den.
         let too_close = dens.iter().any(|(_, d, dp)| {
-            d.kind == config.kind && pos.manhattan_distance(dp) < p.den_orphan_min_spacing
+            d.kind == config.kind && pos.distance_to(dp) < p.den_orphan_min_spacing
         });
         if too_close {
             continue;
@@ -1044,7 +1044,7 @@ pub fn prey_hunger(
         .iter()
         .filter(|(_, s, _, _)| s.kind == StructureType::Stores)
         .map(|(e, _, p, _)| {
-            let guarded = cat_positions.iter().any(|cp| cp.manhattan_distance(p) <= 4);
+            let guarded = cat_positions.iter().any(|cp| cp.distance_to(p) <= 4.0);
             (e, *p, guarded)
         })
         .collect();
@@ -1068,7 +1068,7 @@ pub fn prey_hunger(
             && rng.rng.random::<f32>() < p.store_raid_chance
         {
             for &(store_entity, store_pos, guarded) in &store_positions {
-                if guarded || pos.manhattan_distance(&store_pos) > p.store_raid_range {
+                if guarded || pos.distance_to(&store_pos) > p.store_raid_range {
                     continue;
                 }
                 if let Ok((_, mut structure, _, mut stored)) = stores_query.get_mut(store_entity) {
@@ -1200,9 +1200,7 @@ pub fn spawn_initial_prey(world: &mut World) {
                     }
                     let pos = Position::new(x, y);
                     // Ensure spacing between dens of the same species.
-                    let too_close = den_positions
-                        .iter()
-                        .any(|dp| pos.manhattan_distance(dp) < 15);
+                    let too_close = den_positions.iter().any(|dp| pos.distance_to(dp) < 15.0);
                     if too_close {
                         continue;
                     }
@@ -1442,8 +1440,8 @@ mod tests {
             .unwrap();
 
         let threat_pos = Position::new(5, 5);
-        let start_dist = start.manhattan_distance(&threat_pos);
-        let end_dist = final_pos.manhattan_distance(&threat_pos);
+        let start_dist = start.distance_to(&threat_pos);
+        let end_dist = final_pos.distance_to(&threat_pos);
         assert!(
             end_dist > start_dist,
             "prey should flee away from threat: start_dist={start_dist}, end_dist={end_dist}, final_pos={final_pos:?}"

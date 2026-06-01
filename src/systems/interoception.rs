@@ -162,8 +162,8 @@ pub fn esteem_distress(needs: &Needs) -> f32 {
 ///
 /// `radius == 0` returns `1` if `center` is in-bounds and passable,
 /// else `0`. Negative radius is treated as `0`.
-fn count_walkable_tiles_in_box(center: Position, radius: i32, map: &TileMap) -> u32 {
-    let r = radius.max(0);
+fn count_walkable_tiles_in_box(center: Position, radius: f32, map: &TileMap) -> u32 {
+    let r = radius.max(0.0).round() as i32;
     let mut count: u32 = 0;
     for dy in -r..=r {
         for dx in -r..=r {
@@ -179,8 +179,8 @@ fn count_walkable_tiles_in_box(center: Position, radius: i32, map: &TileMap) -> 
 
 /// Box-area helper for `(2 * radius + 1)²`. Negative radius treated
 /// as `0` (single tile). Used as the openness denominator.
-fn sprint_box_area(radius: i32) -> u32 {
-    let r = radius.max(0) as u32;
+fn sprint_box_area(radius: f32) -> u32 {
+    let r = radius.max(0.0).round() as u32;
     let side = 2 * r + 1;
     side * side
 }
@@ -263,10 +263,10 @@ pub fn escape_viability(
 ///
 /// Suppression: a Sleep memory at L is rejected if any
 /// ThreatSeen/Death memory exists at L' with
-/// `L.manhattan_distance(L') <= suppression_radius`. The "I
+/// `L.distance_to(L') <= suppression_radius`. The "I
 /// remember resting here, but I also remember a hawk here last
 /// week" gate. Ticket 089.
-pub fn own_safe_rest_spot(memory: &Memory, suppression_radius: i32) -> Option<Position> {
+pub fn own_safe_rest_spot(memory: &Memory, suppression_radius: f32) -> Option<Position> {
     let suppressors: Vec<Position> = memory
         .events
         .iter()
@@ -282,7 +282,7 @@ pub fn own_safe_rest_spot(memory: &Memory, suppression_radius: i32) -> Option<Po
         .filter(|(loc, _)| {
             !suppressors
                 .iter()
-                .any(|s| loc.manhattan_distance(s) <= suppression_radius)
+                .any(|s| loc.distance_to(s) <= suppression_radius)
         })
         .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(loc, _)| loc)
@@ -360,30 +360,30 @@ pub fn social_status_distress(
     respect_lookup: impl Fn(Entity) -> Option<f32>,
     relationships: &crate::resources::relationships::Relationships,
     current_tick: u64,
-    perception_radius: i32,
+    perception_radius: f32,
     age_normalization_ticks: u64,
     respect_weight: f32,
     age_weight: f32,
     bond_weight: f32,
 ) -> f32 {
-    if perception_radius <= 0 {
+    if perception_radius <= 0.0 {
         return 0.0;
     }
 
     let Some((other_entity, other_pos, distance)) = cat_positions
         .iter()
         .filter(|(e, _)| *e != focal_entity)
-        .map(|(e, p)| (*e, *p, focal_pos.manhattan_distance(p)))
+        .map(|(e, p)| (*e, *p, focal_pos.distance_to(p)))
         .filter(|(_, _, d)| *d <= perception_radius)
-        .min_by_key(|(_, _, d)| *d)
+        .min_by(|(_, _, a), (_, _, b)| a.total_cmp(b))
     else {
         return 0.0;
     };
 
     let _ = other_pos; // proximity uses distance; pos kept for future caller debug.
 
-    let radius = perception_radius as f32;
-    let proximity_factor = (1.0 - distance as f32 / radius).clamp(0.0, 1.0);
+    let radius = perception_radius;
+    let proximity_factor = (1.0 - distance / radius).clamp(0.0, 1.0);
     if proximity_factor == 0.0 {
         return 0.0;
     }
@@ -1131,7 +1131,7 @@ mod tests {
     #[test]
     fn own_safe_rest_spot_none_with_empty_memory() {
         let memory = Memory::default();
-        assert_eq!(own_safe_rest_spot(&memory, 5), None);
+        assert_eq!(own_safe_rest_spot(&memory, 5.0), None);
     }
 
     #[test]
@@ -1140,7 +1140,7 @@ mod tests {
         memory.remember(sleep_memory(Position::new(1, 1), 0.3, 10));
         memory.remember(sleep_memory(Position::new(2, 2), 0.5, 20));
         memory.remember(sleep_memory(Position::new(3, 3), 0.4, 30));
-        assert_eq!(own_safe_rest_spot(&memory, 5), Some(Position::new(2, 2)));
+        assert_eq!(own_safe_rest_spot(&memory, 5.0), Some(Position::new(2, 2)));
     }
 
     #[test]
@@ -1150,7 +1150,7 @@ mod tests {
         memory.remember(threat_memory(Position::new(12, 10), 6));
         // ThreatSeen at Manhattan distance 2 — within radius 5 → Sleep
         // memory suppressed; no other Sleep memories → None.
-        assert_eq!(own_safe_rest_spot(&memory, 5), None);
+        assert_eq!(own_safe_rest_spot(&memory, 5.0), None);
     }
 
     #[test]
@@ -1158,7 +1158,10 @@ mod tests {
         let mut memory = Memory::default();
         memory.remember(sleep_memory(Position::new(10, 10), 0.6, 5));
         memory.remember(threat_memory(Position::new(50, 50), 6));
-        assert_eq!(own_safe_rest_spot(&memory, 5), Some(Position::new(10, 10)));
+        assert_eq!(
+            own_safe_rest_spot(&memory, 5.0),
+            Some(Position::new(10, 10))
+        );
     }
 
     #[test]
@@ -1166,8 +1169,8 @@ mod tests {
         let mut memory = Memory::default();
         memory.remember(sleep_memory(Position::new(1, 1), 0.5, 10));
         memory.remember(sleep_memory(Position::new(2, 2), 0.5, 20));
-        let first = own_safe_rest_spot(&memory, 5);
-        let second = own_safe_rest_spot(&memory, 5);
+        let first = own_safe_rest_spot(&memory, 5.0);
+        let second = own_safe_rest_spot(&memory, 5.0);
         assert_eq!(first, second, "resolver must be deterministic");
     }
 
@@ -1303,7 +1306,7 @@ mod tests {
         // (terrain + mobility). Should still clamp at 0.0, not go
         // negative.
         let constants = EscapeViabilityConstants {
-            sprint_radius: 3,
+            sprint_radius: 3.0,
             terrain_weight: 0.5,
             mobility_weight: 0.0,
             mobility_normalization: 1.0,
@@ -1466,10 +1469,13 @@ mod tests {
     fn count_walkable_tiles_in_box_handles_radius_zero() {
         let map = open_grass_map(5, 5);
         // Single passable tile at center.
-        assert_eq!(count_walkable_tiles_in_box(Position::new(2, 2), 0, &map), 1);
+        assert_eq!(
+            count_walkable_tiles_in_box(Position::new(2, 2), 0.0, &map),
+            1
+        );
         // Negative radius treated as 0 — still single tile.
         assert_eq!(
-            count_walkable_tiles_in_box(Position::new(2, 2), -3, &map),
+            count_walkable_tiles_in_box(Position::new(2, 2), -3.0, &map),
             1
         );
     }
@@ -1480,7 +1486,10 @@ mod tests {
         let map = open_grass_map(5, 5);
         // Center at (0, 0), radius 1 → 3×3 box from (-1,-1) to (1,1).
         // Only (0,0), (1,0), (0,1), (1,1) are in-bounds → 4 walkable.
-        assert_eq!(count_walkable_tiles_in_box(Position::new(0, 0), 1, &map), 4);
+        assert_eq!(
+            count_walkable_tiles_in_box(Position::new(0, 0), 1.0, &map),
+            4
+        );
     }
 
     // -----------------------------------------------------------------
@@ -1506,7 +1515,7 @@ mod tests {
             |_| None,
             &rels,
             1_200_000,
-            8,
+            8.0,
             1_200_000,
             1.0 / 3.0,
             1.0 / 3.0,
@@ -1540,7 +1549,7 @@ mod tests {
             },
             &rels,
             1_200_000,
-            8,
+            8.0,
             1_200_000,
             1.0 / 3.0,
             1.0 / 3.0,
@@ -1575,7 +1584,7 @@ mod tests {
             },
             &rels,
             1_200_000,
-            8,
+            8.0,
             1_200_000,
             1.0,
             0.0,
@@ -1614,7 +1623,7 @@ mod tests {
             // tick = focal's age + 1 year. Elder is 2 years old.
             // age_diff = (2yr - 1yr) / 1yr = 1.0.
             2_400_000,
-            8,
+            8.0,
             1_200_000,
             0.0,
             1.0,
@@ -1643,7 +1652,7 @@ mod tests {
             |_| Some(10.0), // pathological large positive respect
             &rels,
             0,
-            8,
+            8.0,
             1_200_000,
             1.0 / 3.0,
             1.0 / 3.0,

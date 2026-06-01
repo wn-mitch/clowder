@@ -167,7 +167,7 @@ pub fn tick_pregnancy(
         // New life pushes back darkness.
         pushback.write(crate::systems::magic::CorruptionPushback {
             position: birth.pos,
-            radius: 5,
+            radius: 5.0,
             amount: 0.10,
         });
     }

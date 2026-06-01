@@ -187,7 +187,7 @@ pub fn resolve_apply_remedy_target(
     scratch.positions.clear();
     scratch.map_f32_a.clear();
     for c in candidates {
-        let dist = cat_pos.manhattan_distance(&c.position) as f32;
+        let dist = cat_pos.distance_to(&c.position);
         if dist > APPLY_REMEDY_TARGET_RANGE {
             continue;
         }

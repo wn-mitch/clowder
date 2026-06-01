@@ -8,7 +8,7 @@
 //! Phase 4c.7 scope — yield-aware prey targeting:
 //!
 //! - `goap.rs::resolve_search_prey`'s `visible_prey.min_by_key(|...|
-//!   pos.manhattan_distance(...))` picker retires for the visible-prey
+//!   pos.distance_to(...))` picker retires for the visible-prey
 //!   path. §6.1 Partial fix: the resolver today "picks `min_distance`
 //!   regardless of yield," so a Mouse at range 5 is chosen over a
 //!   Rabbit at range 7 even though the Rabbit delivers 1.3× food

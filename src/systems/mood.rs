@@ -147,8 +147,8 @@ pub fn mood_contagion(
             if entity == other_entity {
                 continue;
             }
-            let dist = pos.manhattan_distance(&other_pos);
-            if dist == 0 || dist > c.contagion_range {
+            let dist = pos.distance_to(&other_pos);
+            if dist == 0.0 || dist > c.contagion_range {
                 continue;
             }
 
@@ -156,7 +156,7 @@ pub fn mood_contagion(
                 .get(entity, other_entity)
                 .map_or(0.0, |r| r.fondness);
             let fondness_weight = (fondness + 1.0) / 2.0; // map -1..1 to 0..1
-            let weight = (1.0 / dist as f32) * fondness_weight * other_valence.abs();
+            let weight = (1.0 / dist) * fondness_weight * other_valence.abs();
             // Stubborn cats resist mood contagion.
             let influence = other_valence
                 * weight
@@ -200,8 +200,8 @@ pub fn bond_proximity_mood(
             if other == entity {
                 return false;
             }
-            let dist = pos.manhattan_distance(&other_pos);
-            if dist == 0 || dist > c.bond_proximity_range {
+            let dist = pos.distance_to(&other_pos);
+            if dist == 0.0 || dist > c.bond_proximity_range {
                 return false;
             }
             relationships

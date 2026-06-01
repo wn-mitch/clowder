@@ -66,7 +66,7 @@ pub fn is_any_ward_under_siege<'a>(
 #[derive(Message, Debug, Clone)]
 pub struct CorruptionPushback {
     pub position: Position,
-    pub radius: i32,
+    pub radius: f32,
     pub amount: f32,
 }
 
@@ -1261,10 +1261,11 @@ pub fn apply_corruption_pushback(
 ) {
     for msg in messages.read() {
         activation.record(Feature::CorruptionPushback);
-        for dy in -msg.radius..=msg.radius {
-            for dx in -msg.radius..=msg.radius {
-                if dx.abs() + dy.abs() > msg.radius {
-                    continue; // Manhattan distance
+        let r = msg.radius.round() as i32;
+        for dy in -r..=r {
+            for dx in -r..=r {
+                if dx.abs() + dy.abs() > r {
+                    continue; // tile-domain disc (former Manhattan)
                 }
                 let tx = msg.position.x() + dx;
                 let ty = msg.position.y() + dy;

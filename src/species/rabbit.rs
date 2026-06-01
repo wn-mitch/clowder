@@ -47,8 +47,8 @@ impl PreyProfile for Rabbit {
     fn graze_cadence(&self) -> u64 {
         20
     }
-    fn alert_radius(&self) -> i32 {
-        6
+    fn alert_radius(&self) -> f32 {
+        6.0
     }
     fn freeze_ticks(&self) -> u64 {
         10
@@ -78,8 +78,8 @@ impl PreyProfile for Rabbit {
     fn den_raid_drop(&self) -> u32 {
         4
     }
-    fn den_spacing(&self) -> i32 {
-        20
+    fn den_spacing(&self) -> f32 {
+        20.0
     }
     fn den_density(&self) -> usize {
         250

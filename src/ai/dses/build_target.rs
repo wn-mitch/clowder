@@ -208,7 +208,7 @@ pub fn resolve_build_target(
     scratch.map_f32_a.clear();
     scratch.map_f32_b.clear();
     for c in candidates {
-        let dist = cat_pos.manhattan_distance(&c.position) as f32;
+        let dist = cat_pos.distance_to(&c.position);
         if dist > BUILD_TARGET_RANGE {
             continue;
         }

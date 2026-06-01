@@ -129,7 +129,7 @@ pub fn update_near_pair_cache(
             if *other == *rescan_entity {
                 continue;
             }
-            let dist = other_pos.manhattan_distance(&rescan_pos);
+            let dist = other_pos.distance_to(&rescan_pos);
             if dist <= range {
                 let key = normalize_pair(*rescan_entity, *other);
                 cache.pairs.insert(key, dist);
@@ -173,7 +173,7 @@ pub fn passive_familiarity(
         let mut brute: BTreeSet<(Entity, Entity)> = BTreeSet::new();
         for i in 0..cats_vec.len() {
             for j in (i + 1)..cats_vec.len() {
-                if cats_vec[i].1.manhattan_distance(&cats_vec[j].1) <= range {
+                if cats_vec[i].1.distance_to(&cats_vec[j].1) <= range {
                     brute.insert(normalize_pair(cats_vec[i].0, cats_vec[j].0));
                 }
             }
@@ -601,7 +601,7 @@ pub fn check_bonds(
             if let Ok(pos) = positions.get(a) {
                 pushback.write(crate::systems::magic::CorruptionPushback {
                     position: *pos,
-                    radius: 3,
+                    radius: 3.0,
                     amount: 0.05,
                 });
             }

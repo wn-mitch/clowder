@@ -896,7 +896,7 @@ pub fn update_mentoring_target_markers(
 ) {
     let d = &constants.disposition;
     let cat_profile = &constants.sensory.cat;
-    let detection_range = d.mentoring_detection_range as f32;
+    let detection_range = d.mentoring_detection_range;
     let high = d.mentor_skill_threshold_high;
     let low = d.mentor_skill_threshold_low;
 

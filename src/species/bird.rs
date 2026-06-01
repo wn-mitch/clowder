@@ -47,8 +47,8 @@ impl PreyProfile for Bird {
     fn graze_cadence(&self) -> u64 {
         35
     }
-    fn alert_radius(&self) -> i32 {
-        8
+    fn alert_radius(&self) -> f32 {
+        8.0
     }
     fn freeze_ticks(&self) -> u64 {
         1
@@ -78,8 +78,8 @@ impl PreyProfile for Bird {
     fn den_raid_drop(&self) -> u32 {
         3
     }
-    fn den_spacing(&self) -> i32 {
-        15
+    fn den_spacing(&self) -> f32 {
+        15.0
     }
     fn den_density(&self) -> usize {
         250

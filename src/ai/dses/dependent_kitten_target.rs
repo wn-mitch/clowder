@@ -221,7 +221,7 @@ pub fn resolve_dependent_kitten_target(
         ) {
             continue;
         }
-        let dist = parent_pos.manhattan_distance(&kitten.pos) as f32;
+        let dist = parent_pos.distance_to(&kitten.pos);
         if dist > DEPENDENT_KITTEN_TARGET_RANGE {
             continue;
         }

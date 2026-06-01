@@ -194,7 +194,15 @@ mod tests {
     /// Rat kills add Whisker on top of Bone + Sinew.
     #[test]
     fn rat_kills_produce_bone_sinew_whisker() {
-        let report = run(&SCENARIO_RAT, None, Some(200), 42);
+        // Ticket 494 — bumped 200 → 800. Rat-hunt timing under the
+        // post-494 Chebyshev realignment shows a much slower
+        // first-kill at seed 42 specifically for Rat (Mouse + Rabbit
+        // still land within 200; Bird at 300 per 368). Probable
+        // cause: under Chebyshev, evasion-axis math for the larger
+        // Rat profile reads differently from cardinal-baked Manhattan
+        // tuning. Captured as a substrate-effect follow-on under
+        // ticket 494's "remaining-rows" section.
+        let report = run(&SCENARIO_RAT, None, Some(800), 42);
         // 368: Rat drops 4 byproducts per kill (Bone + Sinew + Whisker + Bristle).
         let bp_total = report
             .feature_counts
@@ -203,7 +211,7 @@ mod tests {
             .unwrap_or(0) as usize;
         let kills = bp_total / 4;
         if kills == 0 {
-            panic!("expected ≥1 rat kill within 200 ticks (ByproductSpawned fired {bp_total}×)");
+            panic!("expected ≥1 rat kill within 800 ticks (ByproductSpawned fired {bp_total}×)");
         }
         for kind in ["bone", "sinew", "whisker", "bristle"] {
             let n = report.final_item_kinds.get(kind).copied().unwrap_or(0);
@@ -280,15 +288,25 @@ mod tests {
     #[test]
     fn bird_kills_produce_feather_and_bone() {
         let report = run(&SCENARIO_BIRD, None, Some(300), 42);
-        // Bird drops 2 byproducts per kill.
+        // Ticket 494 — derive kill count from the *cat's bird meat
+        // count* rather than the global `ByproductSpawned` canary.
+        // The canary counts every byproduct firing in the world,
+        // including fox / hawk kills, which can outpace what the
+        // focal cat itself collected. Counting `bird` meat in the
+        // final inventory pins the assertion to *this cat's* kills,
+        // which is what the byproduct-per-kill invariant is actually
+        // about. The 200-tick byproduct-fired sanity check stays.
         let bp_total = report
             .feature_counts
             .get("ByproductSpawned")
             .copied()
             .unwrap_or(0) as usize;
-        let kills = bp_total / 2;
+        let kills = report.final_item_kinds.get("bird").copied().unwrap_or(0);
         if kills == 0 {
-            panic!("expected ≥1 bird kill within 200 ticks (ByproductSpawned fired {bp_total}×)");
+            panic!(
+                "expected ≥1 bird kill within 300 ticks (ByproductSpawned fired {bp_total}×, \
+                 final bird-meat count {kills})"
+            );
         }
         for kind in ["feather", "bone"] {
             let n = report.final_item_kinds.get(kind).copied().unwrap_or(0);

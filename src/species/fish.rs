@@ -48,8 +48,8 @@ impl PreyProfile for Fish {
     fn graze_cadence(&self) -> u64 {
         50
     }
-    fn alert_radius(&self) -> i32 {
-        2
+    fn alert_radius(&self) -> f32 {
+        2.0
     }
     fn freeze_ticks(&self) -> u64 {
         0
@@ -79,8 +79,8 @@ impl PreyProfile for Fish {
     fn den_raid_drop(&self) -> u32 {
         3
     }
-    fn den_spacing(&self) -> i32 {
-        20
+    fn den_spacing(&self) -> f32 {
+        20.0
     }
     fn den_density(&self) -> usize {
         250

@@ -184,7 +184,7 @@ pub fn resolve_combat(
                 let ce = skills.combat + skills.hunting * c.combat_effective_hunting_weight;
                 let hp = health.current / health.max.max(0.01);
                 (
-                    pos.manhattan_distance(&wildlife_pos),
+                    pos.distance_to(&wildlife_pos),
                     personality.boldness,
                     personality.temper,
                     personality.loyalty,
@@ -197,8 +197,10 @@ pub fn resolve_combat(
             }
         };
 
-        // Must be adjacent (within 1 tile) to fight.
-        if cat_pos > 1 {
+        // Must be adjacent (within 1 tile) to fight. Euclidean 1.0
+        // preserves the pre-492 Manhattan==1 invariant — orthogonal-
+        // adjacent passes (1.0), diagonal-adjacent (~1.414) skips.
+        if cat_pos > 1.0 {
             continue;
         }
 
@@ -454,7 +456,7 @@ pub fn resolve_combat(
         let witnesses: Vec<Entity> = cats
             .iter()
             .filter(|(e, _, _, _, _, _, pos, _, _, _, _, _)| {
-                !posse.contains(e) && pos.manhattan_distance(target_pos) <= c.legend_witness_range
+                !posse.contains(e) && pos.distance_to(target_pos) <= c.legend_witness_range
             })
             .map(|(e, _, _, _, _, _, _, _, _, _, _, _)| e)
             .collect();

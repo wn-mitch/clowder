@@ -174,15 +174,14 @@ pub fn place_special_tiles(
             // Spacing check: far enough from all previously placed anchors.
             let spaced = placed_anchors
                 .iter()
-                .all(|p| anchor.manhattan_distance(p) >= constants.special_min_spacing);
+                .all(|p| anchor.distance_to(p) >= constants.special_min_spacing);
             if !spaced {
                 continue;
             }
 
             // Colony distance check for corruption sources.
             if kind.requires_colony_distance
-                && anchor.manhattan_distance(&colony_site)
-                    < constants.corruption_colony_min_distance
+                && anchor.distance_to(&colony_site) < constants.corruption_colony_min_distance
             {
                 continue;
             }
@@ -303,13 +302,13 @@ mod tests {
         // different terrain types are closer than spacing - max_footprint_size.
         // A simpler assertion: no two different-terrain special tiles within 12
         // (15 - 3 for max footprint width).
-        let effective_min = c.special_min_spacing - 3; // account for footprint width
+        let effective_min = c.special_min_spacing - 3.0; // account for footprint width
         for i in 0..all_positions.len() {
             for j in (i + 1)..all_positions.len() {
                 let ti = map.get(all_positions[i].x(), all_positions[i].y()).terrain;
                 let tj = map.get(all_positions[j].x(), all_positions[j].y()).terrain;
                 if ti != tj {
-                    let dist = all_positions[i].manhattan_distance(&all_positions[j]);
+                    let dist = all_positions[i].distance_to(&all_positions[j]);
                     assert!(
                         dist >= effective_min,
                         "different-type special tiles too close: {:?}@{:?} and {:?}@{:?}, dist={dist}",
@@ -334,7 +333,7 @@ mod tests {
         place_special_tiles(&mut map, colony, &mut rng.rng, &c);
 
         for pos in find_special_positions(&map, Terrain::AncientRuin) {
-            let dist = pos.manhattan_distance(&colony);
+            let dist = pos.distance_to(&colony);
             assert!(
                 dist >= c.corruption_colony_min_distance,
                 "AncientRuin at {:?} is only {dist} from colony",

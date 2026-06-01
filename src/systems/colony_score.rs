@@ -20,7 +20,7 @@ use crate::resources::time::{SimConfig, TimeState};
 fn compute_shelter(
     cats: &[(Position,)],
     dens: &[(Position, &Structure)],
-    den_shelter_radius: i32,
+    den_shelter_radius: f32,
 ) -> f32 {
     if cats.is_empty() {
         return 0.0;
@@ -31,7 +31,7 @@ fn compute_shelter(
             dens.iter().any(|(den_anchor, structure)| {
                 let center = structure.center(den_anchor);
                 let eff = structure.effectiveness();
-                eff > 0.0 && cat_pos.manhattan_distance(&center) <= den_shelter_radius
+                eff > 0.0 && cat_pos.distance_to(&center) <= den_shelter_radius
             })
         })
         .count();
@@ -274,7 +274,7 @@ mod tests {
 
     use crate::resources::sim_constants::ColonyScoreConstants;
 
-    fn test_shelter_radius() -> i32 {
+    fn test_shelter_radius() -> f32 {
         ColonyScoreConstants::default().den_shelter_radius
     }
 

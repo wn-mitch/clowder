@@ -1289,7 +1289,7 @@ fn evaluate_threat_context(
     let nearest = wildlife_positions
         .iter()
         .filter(|(wp, _)| crate::systems::sensing::cat_sees_threat_at(*pos, cat_profile, *wp))
-        .min_by_key(|(wp, _)| pos.manhattan_distance(wp));
+        .min_by_key(|(wp, _)| pos.tile_distance_squared(wp));
 
     let (threat_pos, _) = nearest?;
     let dist = pos.manhattan_distance(threat_pos) as f32;
@@ -1313,7 +1313,7 @@ fn evaluate_threat_context(
     // Colony proximity: near buildings or colony center dampens threat.
     let near_buildings = building_positions
         .iter()
-        .any(|bp| pos.manhattan_distance(bp) <= d.threat_building_safety_range);
+        .any(|bp| pos.distance_to(bp) <= d.threat_building_safety_range);
     let colony_factor = if near_buildings {
         d.threat_colony_building_dampening
     } else {
@@ -1325,7 +1325,7 @@ fn evaluate_threat_context(
     // Allies: each nearby cat reduces perceived threat (diminishing returns).
     let ally_count = cat_positions
         .iter()
-        .filter(|(e, cp)| *e != entity && pos.manhattan_distance(cp) <= d.threat_ally_range)
+        .filter(|(e, cp)| *e != entity && pos.distance_to(cp) <= d.threat_ally_range)
         .count()
         .min(d.allies_fighting_cap);
     let ally_factor = 1.0 / (1.0 + ally_count as f32 * d.threat_ally_dampening_per_cat);
@@ -1694,8 +1694,8 @@ pub fn evaluate_and_plan(
     // Territory corruption — max corruption in the ring around colony center.
     let territory_max_corruption = {
         let mc = &res.constants.magic;
-        let inner = mc.territory_corruption_inner_radius;
-        let outer = mc.territory_corruption_outer_radius;
+        let inner = mc.territory_corruption_inner_radius as i32;
+        let outer = mc.territory_corruption_outer_radius as i32;
         let cx = res.colony_center.0.x();
         let cy = res.colony_center.0.y();
         let mut max_c = 0.0f32;
@@ -1906,8 +1906,8 @@ pub fn evaluate_and_plan(
         // author uses internally.
         let nearest_threat = wildlife_positions
             .iter()
-            .filter(|(_, wp, _)| pos.manhattan_distance(wp) <= d.wildlife_threat_range)
-            .min_by_key(|(_, wp, _)| pos.manhattan_distance(wp));
+            .filter(|(_, wp, _)| pos.distance_to(wp) <= d.wildlife_threat_range)
+            .min_by_key(|(_, wp, _)| pos.tile_distance_squared(wp));
 
         let allies_fighting_threat = if let Some(&(_, threat_pos, _)) = nearest_threat {
             action_snapshot
@@ -1915,7 +1915,7 @@ pub fn evaluate_and_plan(
                 .filter(|(e, ally_pos, action)| {
                     *e != entity
                         && *action == Action::Fight
-                        && ally_pos.manhattan_distance(&threat_pos) <= d.allies_fighting_range
+                        && ally_pos.distance_to(&threat_pos) <= d.allies_fighting_range
                 })
                 .count()
                 .min(d.allies_fighting_cap)
@@ -2234,7 +2234,7 @@ pub fn evaluate_and_plan(
         // the corrupted_tile_threshold — the consideration scores 0
         // and the CP gate suppresses the DSE.
         let (nearby_corruption_level, nearest_corrupted_tile) = {
-            let r = sc.corruption_smell_range;
+            let r = sc.corruption_smell_range as i32;
             let mut max_c: f32 = 0.0;
             let mut max_pos: Option<crate::components::physical::Position> = None;
             for dy in -r..=r {
@@ -2646,11 +2646,11 @@ pub fn evaluate_and_plan(
                 // `tend_smoking_rack.rs:78`.
                 nearest_drying_rack: drying_rack_positions
                     .iter()
-                    .min_by_key(|p| pos.manhattan_distance(p))
+                    .min_by_key(|p| pos.tile_distance_squared(p))
                     .copied(),
                 nearest_smoking_rack: smoking_rack_positions
                     .iter()
-                    .min_by_key(|p| pos.manhattan_distance(p))
+                    .min_by_key(|p| pos.tile_distance_squared(p))
                     .copied(),
                 // §L2.10.7 Sleep anchor: cats sleep where they are
                 // (no per-cat assigned sleeping spot exists today —
@@ -2678,7 +2678,7 @@ pub fn evaluate_and_plan(
                     .herb_query
                     .iter()
                     .map(|(_, _, p)| *p)
-                    .min_by_key(|p| pos.manhattan_distance(p)),
+                    .min_by_key(|p| pos.tile_distance_squared(p)),
                 // §L2.10.7 HerbcraftWard anchor: a perimeter anchor
                 // offset from the colony center. (Distinct from the
                 // ticket-256 patrol anchor below; HerbcraftWard's
@@ -6097,7 +6097,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .stores_entities
                     .iter()
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let deposit = crate::steps::disposition::resolve_deposit_at_stores(
@@ -6151,7 +6151,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .stores_entities
                     .iter()
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_eat_at_stores(
@@ -6368,7 +6368,7 @@ fn dispatch_step_action(
                     .pushback_writer
                     .write(crate::systems::magic::CorruptionPushback {
                         position: *pos,
-                        radius: 2,
+                        radius: 2.0,
                         amount: 0.01,
                     });
             }
@@ -7034,7 +7034,7 @@ fn dispatch_step_action(
                     .pushback_writer
                     .write(crate::systems::magic::CorruptionPushback {
                         position: *pos,
-                        radius: 2,
+                        radius: 2.0,
                         amount: 0.03,
                     });
             }
@@ -7120,7 +7120,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .stores_entities
                     .iter()
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_retrieve_any_food_from_stores(
@@ -7147,7 +7147,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .stores_entities
                     .iter()
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let capacity = ec.constants.scoring.stores_herb_capacity_per_kind;
@@ -7176,7 +7176,7 @@ fn dispatch_step_action(
                             .get(*e)
                             .is_ok_and(|sh| sh.count(kind) > 0)
                     })
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_retrieve_herbs_from_stores(
@@ -7202,7 +7202,7 @@ fn dispatch_step_action(
                     .herb_positions
                     .iter()
                     .filter(|(_, _, kind)| !wants_thornbriar || *kind == HerbKind::Thornbriar)
-                    .min_by_key(|(_, hp, _)| pos.manhattan_distance(hp))
+                    .min_by_key(|(_, hp, _)| pos.tile_distance_squared(hp))
                     .map(|(e, _, _)| *e);
             }
             // 308: capture the target herb kind BEFORE the resolver runs —
@@ -7421,7 +7421,7 @@ fn dispatch_step_action(
                     .injured_cat_positions
                     .iter()
                     .filter(|(e, _)| *e != cat_entity)
-                    .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+                    .min_by_key(|(_, cp)| pos.tile_distance_squared(cp))
                 {
                     plan.step_state[step_idx].target_entity = Some(*patient_e);
                     plan.step_state[step_idx].target_position = Some(*patient_pos);
@@ -7516,7 +7516,7 @@ fn dispatch_step_action(
                     .pushback_writer
                     .write(crate::systems::magic::CorruptionPushback {
                         position: *pos,
-                        radius: 4,
+                        radius: 4.0,
                         amount: 0.08,
                     });
             }
@@ -7620,14 +7620,14 @@ fn dispatch_step_action(
                         .carcass_query
                         .iter()
                         .filter(|(_, c, _)| !c.harvested)
-                        .min_by_key(|(_, _, cp)| cp.manhattan_distance(&target_pos))
+                        .min_by_key(|(_, _, cp)| cp.tile_distance_squared(&target_pos))
                         .map(|(e, _, _)| e);
                 } else {
                     plan.step_state[step_idx].target_entity = magic_params
                         .carcass_query
                         .iter()
                         .filter(|(_, c, _)| !c.harvested)
-                        .min_by_key(|(_, _, cp)| pos.manhattan_distance(cp))
+                        .min_by_key(|(_, _, cp)| pos.tile_distance_squared(cp))
                         .map(|(e, _, _)| e);
                 }
                 // Cache the carcass position for pathfinding.
@@ -7729,7 +7729,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .construction_positions
                     .iter()
-                    .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+                    .min_by_key(|(_, cp)| pos.tile_distance_squared(cp))
                     .map(|(e, _)| *e);
             }
             // Ticket 228 — destination for the cat_path_plan! reachability
@@ -7784,7 +7784,7 @@ fn dispatch_step_action(
                     .building_snapshot
                     .iter()
                     .filter(|(_, kind, _, _, has_crop)| *kind == StructureType::Garden && *has_crop)
-                    .min_by_key(|(_, _, gp, _, _)| pos.manhattan_distance(gp))
+                    .min_by_key(|(_, _, gp, _, _)| pos.tile_distance_squared(gp))
                     .map(|(e, _, _, _, _)| *e);
             }
             let target_pos = plan.step_state[step_idx]
@@ -7827,7 +7827,7 @@ fn dispatch_step_action(
                     .building_snapshot
                     .iter()
                     .filter(|(_, kind, _, _, has_crop)| *kind == StructureType::Garden && *has_crop)
-                    .min_by_key(|(_, _, gp, _, _)| pos.manhattan_distance(gp))
+                    .min_by_key(|(_, _, gp, _, _)| pos.tile_distance_squared(gp))
                     .map(|(e, _, _, _, _)| *e);
             }
             let outcome = crate::steps::building::resolve_harvest(
@@ -7858,7 +7858,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .material_pile_positions
                     .iter()
-                    .min_by_key(|(_, mp, _)| pos.manhattan_distance(mp))
+                    .min_by_key(|(_, mp, _)| pos.tile_distance_squared(mp))
                     .map(|(e, _, _)| *e);
             }
             let target = plan.step_state[step_idx].target_entity;
@@ -7898,7 +7898,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .construction_positions
                     .iter()
-                    .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+                    .min_by_key(|(_, cp)| pos.tile_distance_squared(cp))
                     .map(|(e, _)| *e);
             }
             let material_carried = inventory.pouch.iter().find_map(|s| s.kind.material());
@@ -7932,7 +7932,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .stores_entities
                     .iter()
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_retrieve_raw_food_from_stores(
@@ -7956,7 +7956,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .stores_entities
                     .iter()
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_retrieve_dryable_from_stores(
@@ -7981,7 +7981,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .stores_entities
                     .iter()
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_retrieve_smokeable_from_stores(
@@ -8011,7 +8011,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .stores_entities
                     .iter()
-                    .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                    .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                     .map(|(e, _)| *e);
             }
             let outcome = crate::steps::disposition::resolve_retrieve_craft_inputs(
@@ -8122,7 +8122,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .midden_entities
                     .iter()
-                    .min_by_key(|(_, mp)| pos.manhattan_distance(mp))
+                    .min_by_key(|(_, mp)| pos.tile_distance_squared(mp))
                     .map(|(e, _)| *e);
             }
             let target = plan.step_state[step_idx].target_entity;
@@ -8175,7 +8175,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity = snaps
                     .food_pile_positions
                     .iter()
-                    .min_by_key(|(_, fp, _)| pos.manhattan_distance(fp))
+                    .min_by_key(|(_, fp, _)| pos.tile_distance_squared(fp))
                     .map(|(e, _, _)| *e);
             }
             let target = plan.step_state[step_idx].target_entity;
@@ -8215,8 +8215,8 @@ fn dispatch_step_action(
                             .partial_cmp(&b.hunger)
                             .unwrap_or(std::cmp::Ordering::Equal)
                             .then_with(|| {
-                                pos.manhattan_distance(&a.pos)
-                                    .cmp(&pos.manhattan_distance(&b.pos))
+                                pos.tile_distance_squared(&a.pos)
+                                    .cmp(&pos.tile_distance_squared(&b.pos))
                             })
                     })
                     .map(|k| k.entity);
@@ -8250,7 +8250,7 @@ fn dispatch_step_action(
                 .wildlife
                 .iter()
                 .map(|(_, tp)| *tp)
-                .min_by_key(|tp| pos.manhattan_distance(tp));
+                .min_by_key(|tp| pos.tile_distance_squared(tp));
             let outcome = crate::steps::disposition::resolve_pick_flee_target(
                 *pos,
                 route_cost_field,
@@ -8296,7 +8296,7 @@ fn dispatch_step_action(
             let threat = ec
                 .wildlife
                 .iter()
-                .min_by_key(|(_, tp)| pos.manhattan_distance(tp))
+                .min_by_key(|(_, tp)| pos.tile_distance_squared(tp))
                 .map(|(e, _)| e);
             let outcome = crate::steps::disposition::resolve_flee_travel(
                 pos,
@@ -8408,7 +8408,7 @@ fn dispatch_step_action(
                 skills,
                 &ec.constants.crafting,
                 &mut building_params.drying_racks,
-                3,
+                3.0,
             );
             outcome.record_if_witnessed(
                 narr.activation.as_deref_mut(),
@@ -8422,7 +8422,7 @@ fn dispatch_step_action(
                 inventory,
                 skills,
                 &mut building_params.smoking_racks,
-                3,
+                3.0,
                 &ec.constants.crafting,
             );
             outcome.record_if_witnessed(
@@ -8443,7 +8443,7 @@ fn dispatch_step_action(
                 *pos,
                 ec.time.tick,
                 &mut building_params.smoking_racks,
-                3,
+                3.0,
                 &ec.constants.crafting,
                 commands,
             );
@@ -8491,7 +8491,7 @@ fn dispatch_step_action(
                 wearables,
                 &ec.recipes,
                 &snaps.workshop_positions,
-                3,
+                3.0,
             );
             // Ticket 463 — on a witnessed craft, append the actual
             // recipe id to the cat's ring buffer so
@@ -8524,7 +8524,7 @@ fn dispatch_step_action(
                 wearables,
                 &ec.recipes,
                 &snaps.tanning_frame_positions,
-                3,
+                3.0,
             );
             if let Some(recipe_id) = outcome.witness.as_ref() {
                 record_recent_craft(
@@ -9041,7 +9041,7 @@ fn resolve_search_prey(
 
     // Den discovery check.
     for (den_entity, den, den_pos) in den_query.iter() {
-        if pos.manhattan_distance(den_pos) <= d.den_discovery_range {
+        if pos.distance_to(den_pos) <= d.den_discovery_range {
             let discovery_chance =
                 d.den_discovery_base_chance + skills.hunting * d.den_discovery_skill_scale;
             if rng.rng.random::<f32>() < discovery_chance && den.spawns_remaining > 0 {
@@ -9161,7 +9161,7 @@ fn resolve_search_prey(
     }
 
     // Visual detection → §6.5.5 hunt-target DSE. Replaces the
-    // pre-refactor `min_by_key(manhattan_distance)` pick — the legacy
+    // pre-refactor `min_by_key(tile_distance_squared)` pick — the legacy
     // path picked the nearest prey regardless of yield, so a Mouse at
     // range 5 was always chosen over a Rabbit at range 7 even though
     // the Rabbit delivers 1.3× food value. §6.1 Partial fix: the DSE
@@ -9248,7 +9248,7 @@ fn resolve_search_prey(
         let source = Position::new(sx, sy);
         prey_query
             .iter()
-            .min_by_key(|(_, pp, _, _)| source.manhattan_distance(pp))
+            .min_by_key(|(_, pp, _, _)| source.tile_distance_squared(pp))
     } else {
         None
     };
@@ -9491,7 +9491,7 @@ fn resolve_engage_prey(
         crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
     ];
     let flee_strategy = prey_cfg.flee_strategy;
-    let dist = pos.manhattan_distance(&prey_pos);
+    let dist = pos.chebyshev_distance(&prey_pos);
 
     // Ticket 149 — capture start_distance on the first tick this attempt
     // executes. Stays Some for the lifetime of this StepExecutionState; the
@@ -9576,11 +9576,11 @@ fn resolve_engage_prey(
         }
     };
     let pounce_range: i32 = if personality.patience > 0.7 {
-        d.pounce_range_patient
+        d.pounce_range_patient as i32
     } else if personality.patience < 0.3 {
-        d.pounce_range_impatient
+        d.pounce_range_impatient as i32
     } else {
-        d.pounce_range_default
+        d.pounce_range_default as i32
     };
 
     if dist <= pounce_range {
@@ -10081,8 +10081,8 @@ fn resolve_engage_prey(
         } else {
             state.no_move_ticks += 1;
         }
-        if dist > d.approach_give_up_distance || state.no_move_ticks > d.chase_stuck_ticks {
-            let reason = if dist > d.approach_give_up_distance {
+        if dist > d.approach_give_up_distance as i32 || state.no_move_ticks > d.chase_stuck_ticks {
+            let reason = if dist > d.approach_give_up_distance as i32 {
                 "lost prey during approach"
             } else {
                 "stuck during approach"
@@ -10577,6 +10577,36 @@ fn respect_for_disposition(kind: DispositionKind, d: &DispositionConstants) -> f
 /// `ExplorationMap::frontier_centroid` the IAUS `Explore` DSE scores
 /// against (`LandmarkAnchor::UnexploredFrontierCentroid` →
 /// `src/ai/scoring.rs`). Closes the L2↔L3 feasibility-language drift
+/// Pick a passable perimeter tile at Chebyshev `offset` from `anchor`,
+/// trying cardinal directions in `[+x, -x, +y, -y]` order. Returns the
+/// first in-bounds passable candidate, or `None` if all four are
+/// blocked.
+///
+/// Ticket 494 — used by the [`PlannerZone::PatrolZone`] and
+/// [`PlannerZone::RestingSpot`] branches of [`resolve_zone_position`].
+/// Pre-494 those branches did a blind `Position::new(sp.x() + offset,
+/// sp.y())` that landed on water / wall / out-of-bounds whenever the
+/// store hugged the map edge or sat against a wall, stamping
+/// unreachable plan targets and surfacing 500+ "no path and stuck"
+/// `PlanStepFailed` events per 15-min soak under the patrol DSE's
+/// post-492 elevation.
+///
+/// Direction priority preserves the pre-494 "+x preferred" bias so
+/// stores along the colony's east edge still draw cats to their west
+/// side rather than rotating placement; only when +x is blocked do we
+/// rotate. If all four cardinals are blocked the caller filters this
+/// store out of the iterator and the picker falls through to the next
+/// nearest store with a usable perimeter.
+fn perimeter_offset_position(anchor: &Position, offset: i32, map: &TileMap) -> Option<Position> {
+    for (dx, dy) in [(offset, 0), (-offset, 0), (0, offset), (0, -offset)] {
+        let p = Position::new(anchor.x() + dx, anchor.y() + dy);
+        if map.in_bounds(p.x(), p.y()) && map.get(p.x(), p.y()).terrain.is_passable() {
+            return Some(p);
+        }
+    }
+    None
+}
+
 /// `find_nearest_tile(...).or(Some(*pos))` previously authored: when no
 /// frontier and no nearby passable tile resolves, returns `None` so the
 /// planner surfaces `no_plan_found` instead of stamping a degenerate
@@ -10611,60 +10641,80 @@ fn resolve_zone_position(
     match zone {
         PlannerZone::Stores => stores_positions
             .iter()
-            .min_by_key(|sp| pos.manhattan_distance(sp))
+            .min_by_key(|sp| pos.tile_distance_squared(sp))
             .copied(),
         PlannerZone::HuntingGround => {
-            find_nearest_tile(pos, map, d.hunt_terrain_search_radius, |t| {
+            find_nearest_tile(pos, map, d.hunt_terrain_search_radius as i32, |t| {
                 matches!(t, Terrain::DenseForest | Terrain::LightForest)
             })
         }
         PlannerZone::ForagingGround => {
-            find_nearest_tile(pos, map, d.forage_terrain_search_radius, |t| {
+            find_nearest_tile(pos, map, d.forage_terrain_search_radius as i32, |t| {
                 t.foraging_yield() > 0.0
             })
         }
         PlannerZone::Farm => farm_positions
             .iter()
-            .min_by_key(|fp| pos.manhattan_distance(fp))
+            .min_by_key(|fp| pos.tile_distance_squared(fp))
             .copied(),
         PlannerZone::ConstructionSite => construction_positions
             .iter()
-            .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+            .min_by_key(|(_, cp)| pos.tile_distance_squared(cp))
             .map(|(_, p)| *p),
         PlannerZone::HerbPatch => herb_positions
             .iter()
-            .min_by_key(|(_, hp, _)| pos.manhattan_distance(hp))
+            .min_by_key(|(_, hp, _)| pos.tile_distance_squared(hp))
             .map(|(_, p, _)| *p),
         PlannerZone::Kitchen => kitchen_positions
             .iter()
-            .min_by_key(|kp| pos.manhattan_distance(kp))
+            .min_by_key(|kp| pos.tile_distance_squared(kp))
             .copied(),
+        // Ticket 494 — pre-494 picked the nearest store, then blindly
+        // offset +x by 1 to land "next to" it. If that +x tile was
+        // water / wall / out-of-bounds, the planner stamped an
+        // unreachable target and the resolver burned through cycles
+        // failing pathfinding. Now filter to stores whose perimeter
+        // has at least one passable cardinal tile and return that
+        // tile, preserving the "next to the store" semantic without
+        // the blind-offset reachability hazard.
         PlannerZone::RestingSpot => stores_positions
             .iter()
-            .min_by_key(|sp| pos.manhattan_distance(sp))
-            .map(|sp| Position::new(sp.x() + 1, sp.y()))
+            .filter_map(|sp| perimeter_offset_position(sp, 1, map).map(|p| (sp, p)))
+            .min_by_key(|(sp, _)| pos.tile_distance_squared(*sp))
+            .map(|(_, p)| p)
             .or(Some(*pos)),
         PlannerZone::SocialTarget => cat_positions
             .iter()
             .filter(|(other, _)| *other != cat_entity)
-            .min_by_key(|(_, op)| pos.manhattan_distance(op))
+            .min_by_key(|(_, op)| pos.tile_distance_squared(op))
             .map(|(_, p)| *p),
         PlannerZone::Wilds => exploration_map
             .frontier_centroid()
             .filter(|p| map.in_bounds(p.x(), p.y()) && map.get(p.x(), p.y()).terrain.is_passable())
             .or_else(|| find_nearest_tile(pos, map, 20, |t| t.is_passable())),
+        // Ticket 494 — same shape as RestingSpot. Pre-494 the nearest
+        // store's `+guard_patrol_radius` x-offset was the patrol
+        // anchor; with the patrol DSE rebalanced under the Chebyshev
+        // realignment (and any future system that elevates patrol),
+        // an unreachable +x offset surfaces 500+ "no path and stuck"
+        // failures per soak when the store hugs the map edge or sits
+        // against a wall.
         PlannerZone::PatrolZone => stores_positions
             .iter()
-            .min_by_key(|sp| pos.manhattan_distance(sp))
-            .map(|sp| Position::new(sp.x() + d.guard_patrol_radius as i32, sp.y()))
+            .filter_map(|sp| {
+                perimeter_offset_position(sp, d.guard_patrol_radius as i32, map)
+                    .map(|p| (sp, p))
+            })
+            .min_by_key(|(sp, _)| pos.tile_distance_squared(*sp))
+            .map(|(_, p)| p)
             .or(Some(*pos)),
         PlannerZone::MaterialPile => material_pile_positions
             .iter()
-            .min_by_key(|(_, mp, _)| pos.manhattan_distance(mp))
+            .min_by_key(|(_, mp, _)| pos.tile_distance_squared(mp))
             .map(|(_, p, _)| *p),
         PlannerZone::CarcassPile => food_pile_positions
             .iter()
-            .min_by_key(|(_, fp, _)| pos.manhattan_distance(fp))
+            .min_by_key(|(_, fp, _)| pos.tile_distance_squared(fp))
             .map(|(_, p, _)| *p),
         // 035: nearest unburied colony-mate corpse. The dead-cat
         // snapshot is built upstream in `ScoringSnapshots`. Excludes
@@ -10672,7 +10722,7 @@ fn resolve_zone_position(
         PlannerZone::CorpseTarget => dead_cat_positions
             .iter()
             .filter(|(other, _)| *other != cat_entity)
-            .min_by_key(|(_, dp)| pos.manhattan_distance(dp))
+            .min_by_key(|(_, dp)| pos.tile_distance_squared(dp))
             .map(|(_, p)| *p),
         // 367: nearest preservation-station tile. Built-once-per-tick
         // snapshots filter to completed structures only. Load /
@@ -10683,24 +10733,24 @@ fn resolve_zone_position(
         // mid-plan the resolver fails cleanly and the planner re-picks.
         PlannerZone::DryingRack => drying_rack_positions
             .iter()
-            .min_by_key(|dp| pos.manhattan_distance(dp))
+            .min_by_key(|dp| pos.tile_distance_squared(dp))
             .copied(),
         PlannerZone::SmokingRack => smoking_rack_positions
             .iter()
-            .min_by_key(|sp| pos.manhattan_distance(sp))
+            .min_by_key(|sp| pos.tile_distance_squared(sp))
             .copied(),
         // 457: nearest Workshop. Same shape as DryingRack/SmokingRack;
         // recipe selection happens at resolver-time, not zone-resolve-time.
         PlannerZone::Workshop => workshop_positions
             .iter()
-            .min_by_key(|wp| pos.manhattan_distance(wp))
+            .min_by_key(|wp| pos.tile_distance_squared(wp))
             .copied(),
         // 369: nearest TanningFrame. Same shape as Workshop — recipe
         // selection (HideBracers vs HidePlatedWrap) happens at
         // resolver-time, not zone-resolve-time.
         PlannerZone::TanningFrame => tanning_frame_positions
             .iter()
-            .min_by_key(|tp| pos.manhattan_distance(tp))
+            .min_by_key(|tp| pos.tile_distance_squared(tp))
             .copied(),
     }
 }
@@ -10816,7 +10866,7 @@ fn materials_available_for(
 ) -> bool {
     construction_positions
         .iter()
-        .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+        .min_by_key(|(_, cp)| pos.tile_distance_squared(cp))
         .map(|(entity, _)| {
             construction_materials_complete
                 .get(entity)
@@ -10840,10 +10890,10 @@ fn materials_available_for(
 /// Mirrors the per-cat geometric shape of `materials_available_for`.
 /// Pathfinding is left to the resolver at execution time; Manhattan is
 /// the right grain for plan-template gating.
-fn herb_stash_accessible_for(pos: &Position, stores_positions: &[Position], radius: i32) -> bool {
+fn herb_stash_accessible_for(pos: &Position, stores_positions: &[Position], radius: f32) -> bool {
     stores_positions
         .iter()
-        .any(|sp| pos.manhattan_distance(sp) <= radius)
+        .any(|sp| pos.distance_to(sp) <= radius)
 }
 
 /// 487 substrate authoring: returns whether at least one peer is a
@@ -10981,18 +11031,18 @@ fn build_zone_distances(
             PlannerZone::Stores,
             stores_positions
                 .iter()
-                .min_by_key(|sp| pos.manhattan_distance(sp))
+                .min_by_key(|sp| pos.tile_distance_squared(sp))
                 .copied(),
         ),
         (
             PlannerZone::HuntingGround,
-            find_nearest_tile(pos, map, d.hunt_terrain_search_radius, |t| {
+            find_nearest_tile(pos, map, d.hunt_terrain_search_radius as i32, |t| {
                 matches!(t, Terrain::DenseForest | Terrain::LightForest)
             }),
         ),
         (
             PlannerZone::ForagingGround,
-            find_nearest_tile(pos, map, d.forage_terrain_search_radius, |t| {
+            find_nearest_tile(pos, map, d.forage_terrain_search_radius as i32, |t| {
                 t.foraging_yield() > 0.0
             }),
         ),
@@ -11000,35 +11050,35 @@ fn build_zone_distances(
             PlannerZone::Farm,
             farm_positions
                 .iter()
-                .min_by_key(|fp| pos.manhattan_distance(fp))
+                .min_by_key(|fp| pos.tile_distance_squared(fp))
                 .copied(),
         ),
         (
             PlannerZone::ConstructionSite,
             construction_positions
                 .iter()
-                .min_by_key(|(_, cp)| pos.manhattan_distance(cp))
+                .min_by_key(|(_, cp)| pos.tile_distance_squared(cp))
                 .map(|(_, p)| *p),
         ),
         (
             PlannerZone::HerbPatch,
             herb_positions
                 .iter()
-                .min_by_key(|(_, hp, _)| pos.manhattan_distance(hp))
+                .min_by_key(|(_, hp, _)| pos.tile_distance_squared(hp))
                 .map(|(_, p, _)| *p),
         ),
         (
             PlannerZone::Kitchen,
             kitchen_positions
                 .iter()
-                .min_by_key(|kp| pos.manhattan_distance(kp))
+                .min_by_key(|kp| pos.tile_distance_squared(kp))
                 .copied(),
         ),
         (
             PlannerZone::RestingSpot,
             stores_positions
                 .iter()
-                .min_by_key(|sp| pos.manhattan_distance(sp))
+                .min_by_key(|sp| pos.tile_distance_squared(sp))
                 .map(|sp| Position::new(sp.x() + 1, sp.y())),
         ),
         (
@@ -11036,7 +11086,7 @@ fn build_zone_distances(
             cat_positions
                 .iter()
                 .filter(|(other, _)| *other != cat_entity)
-                .min_by_key(|(_, op)| pos.manhattan_distance(op))
+                .min_by_key(|(_, op)| pos.tile_distance_squared(op))
                 .map(|(_, p)| *p),
         ),
         (PlannerZone::Wilds, Some(*pos)),
@@ -11044,21 +11094,21 @@ fn build_zone_distances(
             PlannerZone::PatrolZone,
             stores_positions
                 .iter()
-                .min_by_key(|sp| pos.manhattan_distance(sp))
+                .min_by_key(|sp| pos.tile_distance_squared(sp))
                 .map(|sp| Position::new(sp.x() + d.guard_patrol_radius as i32, sp.y())),
         ),
         (
             PlannerZone::MaterialPile,
             material_pile_positions
                 .iter()
-                .min_by_key(|(_, mp, _)| pos.manhattan_distance(mp))
+                .min_by_key(|(_, mp, _)| pos.tile_distance_squared(mp))
                 .map(|(_, p, _)| *p),
         ),
         (
             PlannerZone::CarcassPile,
             food_pile_positions
                 .iter()
-                .min_by_key(|(_, fp, _)| pos.manhattan_distance(fp))
+                .min_by_key(|(_, fp, _)| pos.tile_distance_squared(fp))
                 .map(|(_, p, _)| *p),
         ),
         // 035: nearest unburied colony-mate corpse, excluding self.
@@ -11071,7 +11121,7 @@ fn build_zone_distances(
             dead_cat_positions
                 .iter()
                 .filter(|(other, _)| *other != cat_entity)
-                .min_by_key(|(_, dp)| pos.manhattan_distance(dp))
+                .min_by_key(|(_, dp)| pos.tile_distance_squared(dp))
                 .map(|(_, p)| *p),
         ),
         // 367: nearest preservation stations. Resolves to None when
@@ -11083,14 +11133,14 @@ fn build_zone_distances(
             PlannerZone::DryingRack,
             drying_rack_positions
                 .iter()
-                .min_by_key(|p| pos.manhattan_distance(p))
+                .min_by_key(|p| pos.tile_distance_squared(p))
                 .copied(),
         ),
         (
             PlannerZone::SmokingRack,
             smoking_rack_positions
                 .iter()
-                .min_by_key(|p| pos.manhattan_distance(p))
+                .min_by_key(|p| pos.tile_distance_squared(p))
                 .copied(),
         ),
         // 457: nearest Workshop. Same Resolves-to-None semantics as the
@@ -11100,7 +11150,7 @@ fn build_zone_distances(
             PlannerZone::Workshop,
             workshop_positions
                 .iter()
-                .min_by_key(|p| pos.manhattan_distance(p))
+                .min_by_key(|p| pos.tile_distance_squared(p))
                 .copied(),
         ),
         // 369: nearest TanningFrame. Same semantics as Workshop.
@@ -11108,7 +11158,7 @@ fn build_zone_distances(
             PlannerZone::TanningFrame,
             tanning_frame_positions
                 .iter()
-                .min_by_key(|p| pos.manhattan_distance(p))
+                .min_by_key(|p| pos.tile_distance_squared(p))
                 .copied(),
         ),
     ];

@@ -55,11 +55,11 @@ pub fn resolve_load_smoking_rack(
     inventory: &mut Inventory,
     skills: &Skills,
     racks: &mut Query<(Entity, &Position, &Structure, &mut SmokingRackState)>,
-    proximity: i32,
+    proximity: f32,
     crafting: &CraftingConstants,
 ) -> StepOutcome<bool> {
     // Find the nearest idle smoking rack within proximity.
-    let mut best: Option<(Entity, i32)> = None;
+    let mut best: Option<(Entity, f32)> = None;
     for (entity, pos, structure, state) in racks.iter() {
         if structure.kind != crate::components::building::StructureType::SmokingRack {
             continue;
@@ -67,7 +67,7 @@ pub fn resolve_load_smoking_rack(
         if structure.effectiveness() == 0.0 || state.loaded.is_some() {
             continue;
         }
-        let d = cat_pos.manhattan_distance(pos);
+        let d = cat_pos.distance_to(pos);
         if d > proximity {
             continue;
         }

@@ -750,7 +750,7 @@ fn score_consideration_with_trace(
                     }
                 },
             };
-            let distance = ctx.self_position.manhattan_distance(&landmark_pos) as f32;
+            let distance = ctx.self_position.distance_to(&landmark_pos);
             let score = s.score(distance);
             let row = capture.then(|| {
                 (

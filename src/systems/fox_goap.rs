@@ -134,11 +134,11 @@ fn build_scoring_context<'a>(
 ) -> FoxScoringContext<'a> {
     let cats_nearby = cat_positions
         .iter()
-        .filter(|p| p.manhattan_distance(&fox_pos) <= 6)
+        .filter(|p| p.distance_to(&fox_pos) <= 6.0)
         .count();
     let prey_nearby = prey_positions
         .iter()
-        .any(|p| p.manhattan_distance(&fox_pos) <= 9);
+        .any(|p| p.distance_to(&fox_pos) <= 9.0);
     // Ticket 051: every fox DSE boolean field (`store_visible`,
     // `store_guarded`, `cat_threatening_den`, `has_cubs`,
     // `cubs_hungry`, `is_dispersing_juvenile`, `has_den`) migrated
@@ -159,15 +159,15 @@ fn build_scoring_context<'a>(
     let cat_cluster_centroid = mean_position(
         cat_positions
             .iter()
-            .filter(|p| p.manhattan_distance(&fox_pos) <= 6)
+            .filter(|p| p.distance_to(&fox_pos) <= 6.0)
             .copied(),
     );
     let prey_belief_centroid = hunting_beliefs.and_then(prey_belief_centroid_from);
     let frontier_centroid = exploration.and_then(exploration_frontier_centroid);
     let nearest_visible_store = store_positions
         .iter()
-        .filter(|p| p.manhattan_distance(&fox_pos) <= 12)
-        .min_by_key(|p| fox_pos.manhattan_distance(p))
+        .filter(|p| p.distance_to(&fox_pos) <= 12.0)
+        .min_by_key(|p| fox_pos.tile_distance_squared(p))
         .copied();
     let nearest_map_edge = nearest_map_edge_for(fox_pos, map_extent);
     let territory_perimeter_anchor = den_pos.map(|d| Position::new(d.x() + 10, d.y() + 10));
@@ -292,9 +292,9 @@ fn build_planner_state(
     den_pos: Option<Position>,
 ) -> FoxPlannerState {
     let zone = if let Some(dp) = den_pos {
-        if fox_pos.manhattan_distance(&dp) <= 2 {
+        if fox_pos.distance_to(&dp) <= 2.0 {
             FoxZone::Den
-        } else if fox_pos.manhattan_distance(&dp) <= 18 {
+        } else if fox_pos.distance_to(&dp) <= 18.0 {
             FoxZone::TerritoryEdge
         } else {
             FoxZone::Wilds
@@ -329,11 +329,11 @@ fn resolve_zone_position(
         FoxZone::Den => den_pos,
         FoxZone::HuntingGround => prey_positions
             .iter()
-            .min_by_key(|p| fox_pos.manhattan_distance(p))
+            .min_by_key(|p| fox_pos.tile_distance_squared(p))
             .copied(),
         FoxZone::NearColony => store_positions
             .iter()
-            .min_by_key(|p| fox_pos.manhattan_distance(p))
+            .min_by_key(|p| fox_pos.tile_distance_squared(p))
             .copied(),
         FoxZone::TerritoryEdge => den_pos.map(|d| Position::new(d.x() + 10, d.y() + 10)),
         FoxZone::MapEdge => {
@@ -675,10 +675,7 @@ pub fn fox_resolve_goap_plans(
 
             FoxGoapActionKind::SearchPrey => {
                 // Simple completion: if prey is within detection range, advance.
-                if prey_positions
-                    .iter()
-                    .any(|p| p.manhattan_distance(&pos) <= 9)
-                {
+                if prey_positions.iter().any(|p| p.distance_to(&pos) <= 9.0) {
                     StepResult::Advance
                 } else {
                     let step_state = plan.current_state_mut().unwrap();
@@ -720,7 +717,7 @@ pub fn fox_resolve_goap_plans(
             FoxGoapActionKind::FeedCubs => {
                 // Stamp the den so `feed_cubs_at_dens` can refresh cub hunger.
                 if let (Some(dp), Some(de)) = (den_pos, den_entity) {
-                    if pos.manhattan_distance(&dp) <= 2 {
+                    if pos.distance_to(&dp) <= 2.0 {
                         if let Ok((_, mut den, _)) = dens.get_mut(de) {
                             den.last_fed_tick = time.tick;
                         }
@@ -779,8 +776,8 @@ pub fn fox_resolve_goap_plans(
                     // Initiate: find nearest cat within den-defense range.
                     let target = cat_entities
                         .iter()
-                        .filter(|(_, cp)| cp.manhattan_distance(&dp) <= 5)
-                        .min_by_key(|(_, cp)| cp.manhattan_distance(&pos))
+                        .filter(|(_, cp)| cp.distance_to(&dp) <= 5.0)
+                        .min_by_key(|(_, cp)| cp.tile_distance_squared(&pos))
                         .copied();
                     if let Some((cat_e, _)) = target {
                         commands.entity(fox_entity).insert(ActiveConfrontation {
@@ -1058,11 +1055,11 @@ fn target_for_action(
         FoxGoapActionKind::ReturnToDen => den_pos,
         FoxGoapActionKind::StalkPrey => prey_positions
             .iter()
-            .min_by_key(|p| fox_pos.manhattan_distance(p))
+            .min_by_key(|p| fox_pos.tile_distance_squared(p))
             .copied(),
         FoxGoapActionKind::ApproachStore => store_positions
             .iter()
-            .min_by_key(|p| fox_pos.manhattan_distance(p))
+            .min_by_key(|p| fox_pos.tile_distance_squared(p))
             .copied(),
         FoxGoapActionKind::FleeArea => {
             let edge_x = if fox_pos.x() < map.width / 2 {

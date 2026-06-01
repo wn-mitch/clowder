@@ -261,7 +261,7 @@ pub fn decay_needs(
         if let Some(prefs) = loc_prefs {
             if let Some((fam_x, fam_y)) = prefs.most_frequented() {
                 let fam_pos = Position::new(fam_x, fam_y);
-                let dist = pos.manhattan_distance(&fam_pos);
+                let dist = pos.distance_to(&fam_pos);
                 if dist <= c.tradition_familiar_distance {
                     needs.safety =
                         (needs.safety + personality.tradition * tradition_safety_boost).min(1.0);
@@ -364,8 +364,8 @@ pub fn bond_proximity_social(
             if other == entity {
                 return false;
             }
-            let dist = pos.manhattan_distance(&other_pos);
-            if dist == 0 || dist > c.bond_proximity_range {
+            let dist = pos.distance_to(&other_pos);
+            if dist == 0.0 || dist > c.bond_proximity_range {
                 return false;
             }
             relationships

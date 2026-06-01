@@ -79,7 +79,7 @@ pub struct PreyConfig {
     pub item_kind: ItemKind,
     pub flee_speed: u32,
     pub graze_cadence: u64,
-    pub alert_radius: i32,
+    pub alert_radius: f32,
     pub freeze_ticks: u64,
     pub catch_difficulty: f32,
     pub flee_strategy: FleeStrategy,

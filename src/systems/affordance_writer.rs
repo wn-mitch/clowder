@@ -106,7 +106,7 @@ pub fn affordance_writer(
 ) {
     affordances.clear();
     let cfg = &constants.affordances;
-    let sensing = cfg.sensing_range.max(1);
+    let sensing = cfg.sensing_range.max(1.0);
 
     // Collect cat snapshots + side-table belief refs so the pair loop can
     // read the perceiver's belief Components without re-querying.
@@ -152,7 +152,7 @@ pub fn affordance_writer(
             if target.entity == perceiver.entity {
                 continue;
             }
-            if manhattan(&perceiver.position, &target.position) > sensing {
+            if perceiver.position.distance_to(&target.position) > sensing {
                 continue;
             }
             let target_belief = perceiver_cat_b.models.get(&target.entity);
@@ -168,7 +168,7 @@ pub fn affordance_writer(
 
         // vs wildlife targets
         for target in &wild_snaps {
-            if manhattan(&perceiver.position, &target.position) > sensing {
+            if perceiver.position.distance_to(&target.position) > sensing {
                 continue;
             }
             let target_belief = perceiver_pred_b.models.get(&target.entity);
@@ -187,7 +187,7 @@ pub fn affordance_writer(
     // ---- Wildlife perceivers -----------------------------------------------
     for perceiver in &wild_snaps {
         for target in &cat_snaps {
-            if manhattan(&perceiver.position, &target.position) > sensing {
+            if perceiver.position.distance_to(&target.position) > sensing {
                 continue;
             }
             write_wildlife_vs_cat(perceiver, target, cfg, &ward_coverage, &mut affordances);
@@ -199,16 +199,13 @@ pub fn affordance_writer(
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn manhattan(a: &Position, b: &Position) -> i32 {
-    (a.x() - b.x()).abs() + (a.y() - b.y()).abs()
-}
-
 /// Distance-proximity feature: 1.0 at adjacent, linearly decaying to 0.0
 /// at `sensing_range`. Common slot-1 input for most heuristics — closeness
-/// is the universally-relevant spatial signal.
-fn proximity_feature(perceiver: &Position, target: &Position, sensing: i32) -> f32 {
-    let d = manhattan(perceiver, target) as f32;
-    let s = sensing.max(1) as f32;
+/// is the universally-relevant spatial signal. Ticket 492 switched from
+/// inline Manhattan to `Position::distance_to` (Euclidean).
+fn proximity_feature(perceiver: &Position, target: &Position, sensing: f32) -> f32 {
+    let d = perceiver.distance_to(target);
+    let s = sensing.max(1.0);
     (1.0 - (d / s)).clamp(0.0, 1.0)
 }
 
@@ -647,7 +644,7 @@ fn write_wildlife_vs_cat(
         }
         WildSpecies::Snake => {
             // Strike — adjacency-gated; only meaningful within ~1 tile.
-            let strike_prox = if manhattan(&perceiver.position, &target.position) <= 1 {
+            let strike_prox = if perceiver.position.chebyshev_distance(&target.position) <= 1 {
                 1.0
             } else {
                 0.0

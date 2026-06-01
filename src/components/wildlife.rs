@@ -203,7 +203,7 @@ pub enum WildlifeAiState {
     Haunting {
         target_x: i32,
         target_y: i32,
-        edge_distance: i32,
+        edge_distance: f32,
         ticks: u64,
     },
     /// Seeding: move toward and extend the corruption frontier
@@ -410,7 +410,7 @@ impl FoxState {
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FoxDen {
     /// How far the territory extends from this den.
-    pub territory_radius: i32,
+    pub territory_radius: f32,
     /// Number of living cubs at this den.
     pub cubs_present: u32,
     /// Scent strength at this den (0.0–1.0). Refreshed by patrolling adults.
@@ -423,7 +423,7 @@ pub struct FoxDen {
 }
 
 impl FoxDen {
-    pub fn new(territory_radius: i32, tick: u64) -> Self {
+    pub fn new(territory_radius: f32, tick: u64) -> Self {
         Self {
             territory_radius,
             cubs_present: 0,
@@ -723,8 +723,8 @@ mod tests {
 
     #[test]
     fn fox_den_defaults() {
-        let den = FoxDen::new(18, 100);
-        assert_eq!(den.territory_radius, 18);
+        let den = FoxDen::new(18.0, 100);
+        assert_eq!(den.territory_radius, 18.0);
         assert_eq!(den.cubs_present, 0);
         assert!(den.scent_strength > 0.0);
     }

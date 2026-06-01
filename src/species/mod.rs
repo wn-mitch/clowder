@@ -45,7 +45,7 @@ pub trait PreyProfile: Send + Sync + 'static {
     // --- Behavior ---
     fn flee_speed(&self) -> u32;
     fn graze_cadence(&self) -> u64;
-    fn alert_radius(&self) -> i32;
+    fn alert_radius(&self) -> f32;
     fn freeze_ticks(&self) -> u64;
     fn catch_difficulty(&self) -> f32;
     fn flee_strategy(&self) -> FleeStrategy;
@@ -58,7 +58,7 @@ pub trait PreyProfile: Send + Sync + 'static {
     fn den_habitat(&self) -> &'static [Terrain];
     fn den_raid_drop(&self) -> u32;
     /// Minimum manhattan distance between dens of this species during world gen.
-    fn den_spacing(&self) -> i32;
+    fn den_spacing(&self) -> f32;
     /// Target habitat tiles per den (lower = more dens).
     fn den_density(&self) -> usize;
 

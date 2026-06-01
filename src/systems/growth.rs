@@ -79,7 +79,7 @@ pub fn kitten_mood_aura(
         // Collect bonuses from nearby kittens.
         let mut bonuses: Vec<f32> = kitten_data
             .iter()
-            .filter(|(_, kpos)| adult_pos.manhattan_distance(kpos) <= 5)
+            .filter(|(_, kpos)| adult_pos.distance_to(kpos) <= 5.0)
             .map(|(maturity, _)| 0.15 * (1.0 - maturity))
             .filter(|b| *b > 0.0)
             .collect();

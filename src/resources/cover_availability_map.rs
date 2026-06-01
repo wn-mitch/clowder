@@ -90,7 +90,7 @@ impl CoverAvailabilityMap {
     /// `TileMap`'s dimensions if they've drifted (scenarios use smaller
     /// maps than the canonical 120×90 default). Clears the `dirty`
     /// flag. Cost: O(low_cover_tile_count × sprint_radius²).
-    pub fn rebuild(&mut self, map: &TileMap, sprint_radius: i32) {
+    pub fn rebuild(&mut self, map: &TileMap, sprint_radius: f32) {
         let w = map.width;
         let h = map.height;
         let len = (w as usize) * (h as usize);
@@ -101,10 +101,13 @@ impl CoverAvailabilityMap {
         } else {
             self.marks.fill(0.0);
         }
-        if sprint_radius < 0 {
+        if sprint_radius < 0.0 {
             self.dirty = false;
             return;
         }
+        // Tile-domain Chebyshev disc; the f32 radius rounds to the integer
+        // Chebyshev box the v1 disc scan used per-cat.
+        let sprint_radius_i = sprint_radius.round() as i32;
         for ty in 0..h {
             for tx in 0..w {
                 if !map.get(tx, ty).terrain.is_low_cover() {
@@ -115,10 +118,10 @@ impl CoverAvailabilityMap {
                 // the v1 disc scan computed per-cat — a cat at
                 // (tx + dx, ty + dy) sees this tile within sprint_radius
                 // iff |dx| ≤ R AND |dy| ≤ R.
-                let xmin = (tx - sprint_radius).max(0);
-                let xmax = (tx + sprint_radius).min(w - 1);
-                let ymin = (ty - sprint_radius).max(0);
-                let ymax = (ty + sprint_radius).min(h - 1);
+                let xmin = (tx - sprint_radius_i).max(0);
+                let xmax = (tx + sprint_radius_i).min(w - 1);
+                let ymin = (ty - sprint_radius_i).max(0);
+                let ymax = (ty + sprint_radius_i).min(h - 1);
                 for sy in ymin..=ymax {
                     for sx in xmin..=xmax {
                         self.marks[(sy * w + sx) as usize] = 1.0;
@@ -182,7 +185,7 @@ mod tests {
     fn rebuild_clears_dirty_flag() {
         let mut cover = CoverAvailabilityMap::new(10, 10);
         let map = make_map(10, 10, Terrain::Grass);
-        cover.rebuild(&map, 3);
+        cover.rebuild(&map, 3.0);
         assert!(!cover.is_dirty());
     }
 
@@ -190,7 +193,7 @@ mod tests {
     fn mark_dirty_re_enables_rebuild() {
         let mut cover = CoverAvailabilityMap::new(10, 10);
         let map = make_map(10, 10, Terrain::Grass);
-        cover.rebuild(&map, 3);
+        cover.rebuild(&map, 3.0);
         assert!(!cover.is_dirty());
         cover.mark_dirty();
         assert!(cover.is_dirty());
@@ -209,7 +212,7 @@ mod tests {
     fn no_low_cover_yields_zero_everywhere() {
         let mut cover = CoverAvailabilityMap::new(10, 10);
         let map = make_map(10, 10, Terrain::Grass);
-        cover.rebuild(&map, 3);
+        cover.rebuild(&map, 3.0);
         for y in 0..10 {
             for x in 0..10 {
                 assert_eq!(cover.get(x, y), 0.0, "expected 0.0 at ({x},{y})");
@@ -222,7 +225,7 @@ mod tests {
         let mut map = make_map(10, 10, Terrain::Grass);
         map.set(5, 5, Terrain::LightForest);
         let mut cover = CoverAvailabilityMap::new(10, 10);
-        cover.rebuild(&map, 3);
+        cover.rebuild(&map, 3.0);
 
         // Cell at (5, 5) itself sees cover.
         assert_eq!(cover.get(5, 5), 1.0);
@@ -242,7 +245,7 @@ mod tests {
         // Low-cover tile at (0, 0) — stamp would underflow if not clamped.
         map.set(0, 0, Terrain::LightForest);
         let mut cover = CoverAvailabilityMap::new(10, 10);
-        cover.rebuild(&map, 5);
+        cover.rebuild(&map, 5.0);
         assert_eq!(cover.get(0, 0), 1.0);
         assert_eq!(cover.get(5, 5), 1.0); // edge of disc
         assert_eq!(cover.get(6, 6), 0.0);
@@ -266,7 +269,7 @@ mod tests {
             let mut map = make_map(10, 10, Terrain::Grass);
             map.set(5, 5, terrain);
             let mut cover = CoverAvailabilityMap::new(10, 10);
-            cover.rebuild(&map, 1);
+            cover.rebuild(&map, 1.0);
             assert_eq!(
                 cover.get(5, 5),
                 1.0,
@@ -284,7 +287,7 @@ mod tests {
         let mut map = make_map(10, 10, Terrain::Grass);
         map.set(5, 5, Terrain::DenseForest);
         let mut cover = CoverAvailabilityMap::new(10, 10);
-        cover.rebuild(&map, 3);
+        cover.rebuild(&map, 3.0);
         assert_eq!(cover.get(5, 5), 0.0);
     }
 }

@@ -242,7 +242,7 @@ pub fn awaken_fated_connections(
         let Ok(partner_pos) = positions.get(love.partner) else {
             continue;
         };
-        if pos.manhattan_distance(partner_pos) <= c.love_awaken_distance {
+        if pos.distance_to(partner_pos) <= c.love_awaken_distance {
             let pair = if entity < love.partner {
                 (entity, love.partner)
             } else {
@@ -284,7 +284,7 @@ pub fn awaken_fated_connections(
         let Ok(rival_pos) = positions.get(rival.rival) else {
             continue;
         };
-        if pos.manhattan_distance(rival_pos) > c.rival_awaken_distance {
+        if pos.distance_to(rival_pos) > c.rival_awaken_distance {
             continue;
         }
         let Ok(rival_action) = actions.get(rival.rival) else {

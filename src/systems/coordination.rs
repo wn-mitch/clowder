@@ -325,7 +325,7 @@ pub fn assess_colony_needs(
         .filter(|(_, wp, _)| {
             building_positions
                 .iter()
-                .any(|bp| bp.manhattan_distance(wp) <= cc.threat_proximity_range)
+                .any(|bp| bp.distance_to(wp) <= cc.threat_proximity_range)
         })
         .map(|(e, p, _)| (e, *p))
         .collect();
@@ -336,7 +336,7 @@ pub fn assess_colony_needs(
         .filter(|(_, wp)| {
             building_positions
                 .iter()
-                .any(|bp| bp.manhattan_distance(wp) <= cc.colony_breach_range)
+                .any(|bp| bp.distance_to(wp) <= cc.colony_breach_range)
         })
         .cloned()
         .collect();
@@ -369,7 +369,7 @@ pub fn assess_colony_needs(
     let corruption_hotspot: Option<(Position, f32)> = {
         let cx = colony_center.0.x();
         let cy = colony_center.0.y();
-        let search_r: i32 = cc.corruption_search_radius;
+        let search_r: i32 = cc.corruption_search_radius.round() as i32;
         let step: i32 = cc.corruption_search_step.max(1);
         let mut best: Option<(Position, f32)> = None;
         let mut y = -search_r;
@@ -397,7 +397,7 @@ pub fn assess_colony_needs(
         .filter(|(_, p, c)| {
             !c.cleansed
                 && !c.harvested
-                && p.manhattan_distance(&colony_center.0) <= cc.corruption_search_radius
+                && p.distance_to(&colony_center.0) <= cc.corruption_search_radius
         })
         .map(|(e, p, _)| (e, *p))
         .collect();
@@ -455,7 +455,7 @@ pub fn assess_colony_needs(
             let closest_threat = nearby_threats.iter().min_by_key(|(_, wp)| {
                 building_positions
                     .iter()
-                    .map(|bp| bp.manhattan_distance(wp))
+                    .map(|bp| bp.tile_distance_squared(wp))
                     .min()
                     .unwrap_or(i32::MAX)
             });
@@ -540,7 +540,7 @@ pub fn assess_colony_needs(
             if animal.species != crate::components::wildlife::WildSpecies::ShadowFox {
                 continue;
             }
-            if colony_center.0.manhattan_distance(wpos) > cc.posse_alarm_range {
+            if colony_center.0.distance_to(wpos) > cc.posse_alarm_range {
                 continue;
             }
             for _ in 0..cc.posse_size {
@@ -857,7 +857,7 @@ pub fn dispatch_urgent_directives(
             // risk (and hunting/foraging directives actively help the cat).
             if is_fight {
                 for (e, p, _, hunger) in &cands {
-                    if coord_pos.manhattan_distance(p) <= cc.urgent_dispatch_range
+                    if coord_pos.distance_to(p) <= cc.urgent_dispatch_range
                         && !already_dispatched.contains(e)
                         && *hunger < critical_hunger
                     {
@@ -868,13 +868,13 @@ pub fn dispatch_urgent_directives(
             let best = cands
                 .iter()
                 .filter(|(e, p, _, hunger)| {
-                    coord_pos.manhattan_distance(p) <= cc.urgent_dispatch_range
+                    coord_pos.distance_to(p) <= cc.urgent_dispatch_range
                         && !already_dispatched.contains(e)
                         && !(is_fight && *hunger < critical_hunger)
                 })
                 .max_by(|(_, pa, sa, _), (_, pb, sb, _)| {
-                    let va = skill_of(sa) - coord_pos.manhattan_distance(pa) as f32 * 0.01;
-                    let vb = skill_of(sb) - coord_pos.manhattan_distance(pb) as f32 * 0.01;
+                    let va = skill_of(sa) - coord_pos.distance_to(pa) * 0.01;
+                    let vb = skill_of(sb) - coord_pos.distance_to(pb) * 0.01;
                     va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
                 });
 
@@ -946,12 +946,12 @@ pub fn dispatch_urgent_directives(
             let best = cands
                 .iter()
                 .filter(|(e, p, _, _)| {
-                    center_pos.manhattan_distance(p) <= cc.urgent_dispatch_range
+                    center_pos.distance_to(p) <= cc.urgent_dispatch_range
                         && !already_dispatched.contains(e)
                 })
                 .max_by(|(_, pa, sa, _), (_, pb, sb, _)| {
-                    let va = skill_of(sa) - center_pos.manhattan_distance(pa) as f32 * 0.01;
-                    let vb = skill_of(sb) - center_pos.manhattan_distance(pb) as f32 * 0.01;
+                    let va = skill_of(sa) - center_pos.distance_to(pa) * 0.01;
+                    let vb = skill_of(sb) - center_pos.distance_to(pb) * 0.01;
                     va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
                 });
             if let Some((target_entity, _, _, hunger)) = best {
@@ -1287,7 +1287,7 @@ pub fn accumulate_build_pressure(
         .filter(|(cat_pos, action, _inv)| {
             action.action == crate::ai::Action::Sleep
                 && !buildings.iter().any(|(s, bpos)| {
-                    s.kind == StructureType::Den && cat_pos.manhattan_distance(&s.center(bpos)) <= 4
+                    s.kind == StructureType::Den && cat_pos.distance_to(&s.center(bpos)) <= 4.0
                 })
         })
         .count();
@@ -1388,7 +1388,7 @@ pub fn accumulate_build_pressure(
     let wildlife_breach = wildlife.iter().any(|wpos| {
         buildings
             .iter()
-            .any(|(s, bpos)| wpos.manhattan_distance(&s.center(bpos)) <= cc.wildlife_breach_range)
+            .any(|(s, bpos)| wpos.distance_to(&s.center(bpos)) <= cc.wildlife_breach_range)
     });
 
     for (_entity, name, personality, skills, mut pressure, mut queue) in &mut coordinators {
@@ -1978,14 +1978,14 @@ fn same_kind_proximity_lift(
     candidate: Position,
     kind: StructureType,
     buildings_of_kind: &[Position],
-    range: i32,
+    range: f32,
 ) -> f32 {
-    if buildings_of_kind.is_empty() || range <= 0 {
+    if buildings_of_kind.is_empty() || range <= 0.0 {
         return 0.0;
     }
-    let mut best_dist = i32::MAX;
+    let mut best_dist = f32::MAX;
     for p in buildings_of_kind {
-        let d = candidate.manhattan_distance(p);
+        let d = candidate.distance_to(p);
         if d < best_dist {
             best_dist = d;
         }
@@ -1994,7 +1994,7 @@ fn same_kind_proximity_lift(
     if best_dist >= range {
         0.0
     } else {
-        1.0 - (best_dist as f32 / range as f32)
+        1.0 - (best_dist / range)
     }
 }
 
@@ -2100,7 +2100,7 @@ pub(crate) fn compute_building_placement(
                 0.0
             };
 
-            let dist = anchor.manhattan_distance(&candidate) as f32;
+            let dist = anchor.distance_to(&candidate);
             let distance_cost = dist_cost * dist;
 
             let jitter = if jitter_range > 0.0 {
@@ -2315,7 +2315,7 @@ pub(crate) fn compute_ward_placement(
     // interpolation. For the default 120×90 map and step=5 this yields
     // ~430 candidates; cheap to score.
     let candidate_step = constants.scoring.ward_placement_candidate_step.max(1) as usize;
-    const HARD_EXCLUDE_MANHATTAN: i32 = 3;
+    const HARD_EXCLUDE_DISTANCE: f32 = 3.0;
     /// Travel-cost penalty per Manhattan tile from the anchor. Tuned so
     /// a 100-tile detour costs 0.5 score — a saturated threat far away
     /// still beats a half-saturated threat nearby, but only by a real
@@ -2330,7 +2330,7 @@ pub(crate) fn compute_ward_placement(
             let candidate = Position::new(cx, cy);
             if ward_positions
                 .iter()
-                .any(|(wp, _)| candidate.manhattan_distance(wp) <= HARD_EXCLUDE_MANHATTAN)
+                .any(|(wp, _)| candidate.distance_to(wp) <= HARD_EXCLUDE_DISTANCE)
             {
                 continue;
             }
@@ -2467,7 +2467,7 @@ pub(crate) fn compute_ward_placement(
             0.0
         };
 
-        let dist = anchor.manhattan_distance(candidate) as f32;
+        let dist = anchor.distance_to(candidate);
         let distance_cost = DIST_PENALTY_PER_TILE * dist;
 
         // Small jitter ([0, 0.05)) breaks ties deterministically without
@@ -3189,9 +3189,9 @@ mod tests {
             "round-1 pick must differ from round-0 pick on a map with \
              two disjoint clusters; got {round_0_pick:?} both rounds"
         );
-        let spread = round_0_pick.manhattan_distance(&round_1_pick);
+        let spread = round_0_pick.distance_to(&round_1_pick);
         assert!(
-            spread >= 6,
+            spread >= 6.0,
             "round-1 pick {round_1_pick:?} must be ≥ 6 Manhattan from \
              round-0 pick {round_0_pick:?} (THORNWARD_VIRTUAL_RADIUS); \
              got spread = {spread}"
@@ -3269,7 +3269,7 @@ mod tests {
         // Anti-clustering hard-exclusion (Manhattan-3) keeps the new
         // ward off the existing one.
         assert!(
-            pos.manhattan_distance(&Position::new(60, 45)) > 3,
+            pos.distance_to(&Position::new(60, 45)) > 3.0,
             "placement {pos:?} too close to existing ward",
         );
     }
@@ -3306,7 +3306,7 @@ mod tests {
             None,
         );
         assert!(
-            pos.manhattan_distance(&Position::new(60, 45)) > 3,
+            pos.distance_to(&Position::new(60, 45)) > 3.0,
             "placement {pos:?} violates Manhattan-3 hard-exclusion",
         );
     }
@@ -3341,8 +3341,8 @@ mod tests {
             &mut rng,
             None,
         );
-        let dist_near = pos.manhattan_distance(&Position::new(67, 45));
-        let dist_far = pos.manhattan_distance(&Position::new(67, 85));
+        let dist_near = pos.distance_to(&Position::new(67, 45));
+        let dist_far = pos.distance_to(&Position::new(67, 85));
         assert!(
             dist_near < dist_far,
             "expected placement closer to the nearer peak; got pos={pos:?} \
@@ -3563,9 +3563,9 @@ mod tests {
         // should be much closer to (60, 60) than to the anchor — the
         // saturated lift (0.96+) inside the halo dominates the
         // distance_cost penalty of 0.005/tile.
-        let manhattan_to_corruption = pos.manhattan_distance(&Position::new(60, 60));
+        let manhattan_to_corruption = pos.distance_to(&Position::new(60, 60));
         assert!(
-            manhattan_to_corruption <= 25,
+            manhattan_to_corruption <= 25.0,
             "expected placement inside fox-intercept halo around (60, 60), \
              distance ≤ ~25 tiles; got {pos:?} at distance {manhattan_to_corruption}",
         );

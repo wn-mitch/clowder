@@ -84,12 +84,10 @@ pub fn update_store_awareness_markers(
     for (entity, fox_pos, cur_visible, cur_guarded) in foxes.iter() {
         let want_visible = store_positions
             .iter()
-            .any(|p| p.manhattan_distance(fox_pos) <= 12);
-        let want_guarded = store_positions.iter().any(|sp| {
-            cat_positions
-                .iter()
-                .any(|cp| cp.manhattan_distance(sp) <= 5)
-        });
+            .any(|p| p.distance_to(fox_pos) <= 12.0);
+        let want_guarded = store_positions
+            .iter()
+            .any(|sp| cat_positions.iter().any(|cp| cp.distance_to(sp) <= 5.0));
         toggle(
             &mut commands,
             entity,
@@ -111,7 +109,7 @@ pub fn update_store_awareness_markers(
 ///
 /// **Predicate** — bit-for-bit mirror of
 /// `fox_goap.rs::build_scoring_context::cat_threatening_den`:
-/// `cubs_present > 0 ∧ ∃ cat : cat.manhattan_distance(den) ≤ 5`.
+/// `cubs_present > 0 ∧ ∃ cat : cat.distance_to(den) ≤ 5`.
 /// A fox without a `home_den` or with no cubs at it never gets the
 /// marker.
 #[allow(clippy::type_complexity)]
@@ -142,7 +140,7 @@ pub fn update_den_threat_markers(
         let want = match den_info {
             Some((den_pos, cubs_present)) if cubs_present > 0 => cat_positions
                 .iter()
-                .any(|cp| cp.manhattan_distance(&den_pos) <= 5),
+                .any(|cp| cp.distance_to(&den_pos) <= 5.0),
             _ => false,
         };
         toggle(
@@ -317,18 +315,18 @@ pub fn update_ward_detection_markers(
         (Without<WildAnimal>, Without<FoxState>),
     >,
 ) {
-    // Snapshot ward positions + per-ward effective radii (Manhattan
-    // tiles, rounded up so a ward with a 0.8-strength durable kind
-    // still asserts on the integer boundary).
-    let ward_snapshot: Vec<(Position, i32)> = wards
+    // Snapshot ward positions + per-ward effective radii (tile-domain
+    // Euclidean tiles; the per-fox `distance_to` compare reads f32 so
+    // the snapshot tracks f32 too).
+    let ward_snapshot: Vec<(Position, f32)> = wards
         .iter()
-        .map(|(w, p)| (*p, w.repel_radius().ceil() as i32))
+        .map(|(w, p)| (*p, w.repel_radius().ceil()))
         .collect();
 
     for (entity, fox_pos, has_marker) in foxes.iter() {
         let want = ward_snapshot
             .iter()
-            .any(|(wp, radius)| fox_pos.manhattan_distance(wp) <= *radius);
+            .any(|(wp, radius)| fox_pos.distance_to(wp) <= *radius);
         toggle(
             &mut commands,
             entity,
@@ -452,7 +450,7 @@ mod tests {
     }
 
     fn spawn_den(world: &mut World, x: i32, y: i32, cubs_present: u32) -> Entity {
-        let mut den = FoxDen::new(20, 0);
+        let mut den = FoxDen::new(20.0, 0);
         den.cubs_present = cubs_present;
         world.spawn((den, Position::new(x, y))).id()
     }

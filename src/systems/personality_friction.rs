@@ -39,7 +39,7 @@ pub fn personality_friction(
             let (ea, pa, a) = &snapshot[i];
             let (eb, pb, b) = &snapshot[j];
 
-            let dist = pa.manhattan_distance(pb);
+            let dist = pa.distance_to(pb);
             if dist > c.friction_range {
                 continue;
             }

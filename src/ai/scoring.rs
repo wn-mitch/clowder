@@ -2137,7 +2137,7 @@ pub fn compute_cascade_counts(
     action_snapshot: &[(Entity, Position, Action)],
     self_entity: Entity,
     self_pos: &Position,
-    range: i32,
+    range: f32,
 ) -> [f32; CASCADE_COUNTS_LEN] {
     let mut counts = [0.0_f32; CASCADE_COUNTS_LEN];
     for &(other_entity, other_pos, other_action) in action_snapshot {
@@ -2147,7 +2147,7 @@ pub fn compute_cascade_counts(
         if other_action == Action::Fight {
             continue;
         }
-        if self_pos.manhattan_distance(&other_pos) > range {
+        if self_pos.distance_to(&other_pos) > range {
             continue;
         }
         let idx = other_action as usize;
@@ -3815,7 +3815,7 @@ mod tests {
                 Action::Hunt,
             ),
         ];
-        let counts = compute_cascade_counts(&snapshot, self_entity, &Position::new(5, 5), 5);
+        let counts = compute_cascade_counts(&snapshot, self_entity, &Position::new(5, 5), 5.0);
         assert_eq!(
             counts[Action::Hunt as usize],
             2.0,

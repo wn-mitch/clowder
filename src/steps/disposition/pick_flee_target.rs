@@ -15,7 +15,7 @@ fn passable(map: &TileMap, p: Position) -> bool {
 /// the per-cat `RouteCostField` (the per-replan substrate built at
 /// `goap.rs::evaluate_and_plan` lines 1648-1698, with boldness-scaled
 /// fox-scent + corruption overlays). "Best" minimizes
-/// `effective_cost = field.cost_at(candidate) as i32 - chebyshev(candidate, threat)`,
+/// `effective_cost = field.cost_at(candidate) as i32 - candidate.chebyshev_distance(&threat)`,
 /// rewarding tiles that are simultaneously cheap-to-reach AND
 /// far-from-threat. Returns the picked tile via the
 /// `Option<Position>` witness so the caller can write it to the GOAP
@@ -96,7 +96,7 @@ pub fn resolve_pick_flee_target(
             // effective_cost = cheap-to-reach AND far-from-threat.
             // No threat visible → behave as a pure cheap-tile picker.
             let effective_cost = match threat_pos {
-                Some(tp) => cost as i32 - chebyshev(candidate, tp),
+                Some(tp) => cost as i32 - candidate.chebyshev_distance(&tp),
                 None => cost as i32,
             };
             match best {
@@ -116,13 +116,6 @@ pub fn resolve_pick_flee_target(
         Some((target, _, _)) => StepOutcome::witnessed_with(StepResult::Advance, target),
         None => StepOutcome::unwitnessed(StepResult::Advance),
     }
-}
-
-/// Chebyshev distance — `max(|dx|, |dy|)`. Matches the disc-iteration
-/// shape (the picker sweeps a square of side `2 * radius + 1`).
-#[inline]
-fn chebyshev(a: Position, b: Position) -> i32 {
-    (a.x() - b.x()).abs().max((a.y() - b.y()).abs())
 }
 
 #[cfg(test)]

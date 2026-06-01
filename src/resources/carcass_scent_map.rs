@@ -84,13 +84,16 @@ impl CarcassScentMap {
         }
     }
 
-    /// Find the highest-scent bucket within manhattan `radius` of a
-    /// world position. Returns the world-tile center of that bucket,
-    /// or `None` if all nearby buckets are zero. Mirrors
-    /// `PreyScentMap::highest_nearby` so harvest-target selection can
-    /// route to "where is scent strongest" rather than iterating all
-    /// carcass entities.
-    pub fn highest_nearby(&self, x: i32, y: i32, radius: i32) -> Option<(i32, i32)> {
+    /// Find the highest-scent bucket within Chebyshev `radius` of a
+    /// world position — i.e. within `radius` 8-directional steps.
+    /// Returns the world-tile center of that bucket, or `None` if all
+    /// nearby buckets are zero. Mirrors `PreyScentMap::highest_nearby`
+    /// so harvest-target selection can route to "where is scent
+    /// strongest" rather than iterating all carcass entities. Ticket
+    /// 494 flipped the internal gate from Manhattan to Chebyshev to
+    /// align with the post-realignment `Position::distance_to`.
+    pub fn highest_nearby(&self, x: i32, y: i32, radius: f32) -> Option<(i32, i32)> {
+        let radius = radius.max(0.0).round() as i32;
         let mut best_val = 0.0f32;
         let mut best_pos = None;
         let bx_center = x / self.bucket_size;
@@ -110,7 +113,7 @@ impl CarcassScentMap {
                 let val = self.marks[idx];
                 let wx = bx * self.bucket_size + self.bucket_size / 2;
                 let wy = by * self.bucket_size + self.bucket_size / 2;
-                let dist = (wx - x).abs() + (wy - y).abs();
+                let dist = (wx - x).abs().max((wy - y).abs());
                 if dist <= radius && val > best_val {
                     best_val = val;
                     best_pos = Some((wx, wy));
@@ -160,7 +163,7 @@ mod tests {
         let mut map = CarcassScentMap::new(30, 30, 3);
         map.deposit(10, 10, 0.9);
         map.deposit(0, 0, 0.3);
-        let best = map.highest_nearby(8, 8, 5);
+        let best = map.highest_nearby(8, 8, 5.0);
         assert!(best.is_some());
         let (wx, wy) = best.unwrap();
         assert!((wx - 10).abs() <= 3);
@@ -170,7 +173,7 @@ mod tests {
     #[test]
     fn highest_nearby_returns_none_when_all_zero() {
         let map = CarcassScentMap::new(30, 30, 3);
-        assert!(map.highest_nearby(15, 15, 10).is_none());
+        assert!(map.highest_nearby(15, 15, 10.0).is_none());
     }
 
     #[test]

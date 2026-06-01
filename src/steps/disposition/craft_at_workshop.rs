@@ -54,7 +54,7 @@ pub fn resolve_craft_at_workshop(
     wearables: &mut WearableSlots,
     recipes: &RecipeRegistry,
     workshop_positions: &[Position],
-    proximity: i32,
+    proximity: f32,
 ) -> StepOutcome<Option<RecipeId>> {
     resolve_craft_at_station(
         recipe_id,
@@ -95,11 +95,11 @@ pub(crate) fn resolve_craft_at_station(
     station_positions: &[Position],
     station_filter: StationRequirement,
     station_label: &'static str,
-    proximity: i32,
+    proximity: f32,
 ) -> StepOutcome<Option<RecipeId>> {
     let near_station = station_positions
         .iter()
-        .any(|sp| cat_pos.manhattan_distance(sp) <= proximity);
+        .any(|sp| cat_pos.distance_to(sp) <= proximity);
     if !near_station {
         return StepOutcome::unwitnessed(StepResult::Fail(format!("no {station_label} in range")));
     }
@@ -228,7 +228,7 @@ mod tests {
             &mut wearables,
             &registry_with(spear_recipe()),
             &stations,
-            3,
+            3.0,
         );
 
         assert!(matches!(outcome.result, StepResult::Advance));
@@ -262,7 +262,7 @@ mod tests {
             &mut wearables,
             &registry_with(spear_recipe()),
             &stations,
-            3,
+            3.0,
         );
 
         assert!(matches!(outcome.result, StepResult::Advance));

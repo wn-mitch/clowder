@@ -662,8 +662,8 @@ pub fn evaluate_dispositions(
         // the author uses internally.
         let nearest_threat = wildlife_positions
             .iter()
-            .filter(|(_, wp, _)| pos.manhattan_distance(wp) <= d.wildlife_threat_range)
-            .min_by_key(|(_, wp, _)| pos.manhattan_distance(wp));
+            .filter(|(_, wp, _)| pos.distance_to(wp) <= d.wildlife_threat_range)
+            .min_by_key(|(_, wp, _)| pos.tile_distance_squared(wp));
 
         let allies_fighting_threat = if let Some(&(_, threat_pos, _)) = nearest_threat {
             action_snapshot
@@ -671,7 +671,7 @@ pub fn evaluate_dispositions(
                 .filter(|(e, ally_pos, action)| {
                     *e != entity
                         && *action == Action::Fight
-                        && ally_pos.manhattan_distance(&threat_pos) <= d.allies_fighting_range
+                        && ally_pos.distance_to(&threat_pos) <= d.allies_fighting_range
                 })
                 .count()
                 .min(d.allies_fighting_cap)
@@ -825,7 +825,7 @@ pub fn evaluate_dispositions(
         // DurableWard). Mirrors the goap.rs path that authors the
         // same anchor.
         let nearest_corrupted_tile: Option<crate::components::physical::Position> = {
-            let r = sc.corruption_smell_range;
+            let r = sc.corruption_smell_range.round() as i32;
             let mut max_c: f32 = 0.0;
             let mut max_pos: Option<crate::components::physical::Position> = None;
             for dy in -r..=r {
@@ -880,7 +880,7 @@ pub fn evaluate_dispositions(
                     &constants.sensory.cat,
                     *pp,
                     crate::components::SensorySignature::CAT,
-                    d.fated_love_detection_range as f32,
+                    d.fated_love_detection_range,
                 )
             });
         let presence_rival_nearby = fated_rival
@@ -893,7 +893,7 @@ pub fn evaluate_dispositions(
                     &constants.sensory.cat,
                     *rp,
                     crate::components::SensorySignature::CAT,
-                    d.fated_rival_detection_range as f32,
+                    d.fated_rival_detection_range,
                 )
             });
         let (presence_directive_action_ordinal, presence_directive_bonus) =
@@ -1104,7 +1104,7 @@ pub fn evaluate_dispositions(
                             && site.is_none()
                     })
                     .map(|(_, _, p, _, _)| *p)
-                    .min_by_key(|p| pos.manhattan_distance(p)),
+                    .min_by_key(|p| pos.tile_distance_squared(p)),
                 nearest_smoking_rack: building_query
                     .iter()
                     .filter(|(_, s, _, site, _)| {
@@ -1112,7 +1112,7 @@ pub fn evaluate_dispositions(
                             && site.is_none()
                     })
                     .map(|(_, _, p, _, _)| *p)
-                    .min_by_key(|p| pos.manhattan_distance(p)),
+                    .min_by_key(|p| pos.tile_distance_squared(p)),
                 // §L2.10.7 Sleep anchor: cats sleep where they are
                 // (no per-cat sleeping-spot component yet).
                 own_sleeping_spot: Some(*pos),
@@ -1128,7 +1128,7 @@ pub fn evaluate_dispositions(
                 nearest_herb_patch: herb_query
                     .iter()
                     .map(|(_, _, p)| *p)
-                    .min_by_key(|p| pos.manhattan_distance(p)),
+                    .min_by_key(|p| pos.tile_distance_squared(p)),
                 // §L2.10.7 HerbcraftWard anchor — single perimeter
                 // point offset from colony center. (Distinct from the
                 // ticket-256 patrol anchor below; HerbcraftWard's
@@ -1504,7 +1504,7 @@ pub fn disposition_to_chain(
         let nearest_store = building_query
             .iter()
             .filter(|(_, s, _, site, _)| s.kind == StructureType::Stores && site.is_none())
-            .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
+            .min_by_key(|(_, _, bp, _, _)| pos.tile_distance_squared(bp))
             .map(|(e, _, bp, _, _)| (e, *bp));
 
         // §6.5.6 target-taking DSE: argmax kitten flows into
@@ -1945,7 +1945,7 @@ pub fn count_witnesses_within_radius(
     actor_entity: Entity,
     actor_pos: &Position,
     positions: &[(Entity, Position)],
-    radius: i32,
+    radius: f32,
     cap: u32,
 ) -> u32 {
     let mut count: u32 = 0;
@@ -1953,7 +1953,7 @@ pub fn count_witnesses_within_radius(
         if *e == actor_entity {
             continue;
         }
-        if actor_pos.manhattan_distance(p) <= radius {
+        if actor_pos.distance_to(p) <= radius {
             count += 1;
             if count >= cap {
                 return cap;
@@ -1976,7 +1976,7 @@ mod respect_witness_tests {
         let mut world = bevy_ecs::world::World::new();
         let actor = world.spawn_empty().id();
         assert_eq!(
-            count_witnesses_within_radius(actor, &pos(5, 5), &[], 5, 4),
+            count_witnesses_within_radius(actor, &pos(5, 5), &[], 5.0, 4),
             0
         );
     }
@@ -1987,7 +1987,7 @@ mod respect_witness_tests {
         let actor = world.spawn_empty().id();
         let positions = vec![(actor, pos(5, 5))];
         assert_eq!(
-            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5, 4),
+            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5.0, 4),
             0
         );
     }
@@ -2005,7 +2005,7 @@ mod respect_witness_tests {
             (far, pos(20, 20)), // distance 30
         ];
         assert_eq!(
-            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5, 4),
+            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5.0, 4),
             2
         );
     }
@@ -2019,7 +2019,7 @@ mod respect_witness_tests {
             .collect();
         // All 10 are within radius 5, but cap=4 must apply.
         assert_eq!(
-            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5, 4),
+            count_witnesses_within_radius(actor, &pos(5, 5), &positions, 5.0, 4),
             4
         );
     }
@@ -2072,7 +2072,7 @@ fn build_resting_chain(
         let nearest_store = building_query
             .iter()
             .filter(|(_, s, _, site, _)| s.kind == StructureType::Stores && site.is_none())
-            .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
+            .min_by_key(|(_, _, bp, _, _)| pos.tile_distance_squared(bp))
             .map(|(e, _, bp, _, _)| (e, *bp));
 
         if let Some((store_entity, store_pos)) = nearest_store {
@@ -2133,7 +2133,7 @@ fn build_eating_chain(
         building_query
             .iter()
             .filter(|(_, s, _, site, _)| s.kind == StructureType::Stores && site.is_none())
-            .min_by_key(|(_, _, bp, _, _)| pos.manhattan_distance(bp))
+            .min_by_key(|(_, _, bp, _, _)| pos.tile_distance_squared(bp))
             .map(|(e, _, bp, _, _)| (e, *bp))
     });
     let (store_entity, store_pos) = store?;
@@ -2215,10 +2215,10 @@ fn build_guarding_chain(
                 cat_profile,
                 **wp,
                 crate::components::SensorySignature::WILDLIFE,
-                d.guard_threat_detection_range as f32,
+                d.guard_threat_detection_range,
             )
         })
-        .min_by_key(|(_, wp)| pos.manhattan_distance(wp));
+        .min_by_key(|(_, wp)| pos.tile_distance_squared(wp));
 
     if let Some((threat_entity, threat_pos)) = nearest_threat {
         // If the threat is in high fox-scent territory (boundary encounter),
@@ -2265,8 +2265,7 @@ fn build_guarding_chain(
 
     // Patrol toward the nearest fox scent boundary if detectable.
     let patrol_radius = d.guard_patrol_radius;
-    let scent_target =
-        fox_scent.and_then(|fs| fs.highest_nearby(pos.x(), pos.y(), patrol_radius as i32));
+    let scent_target = fox_scent.and_then(|fs| fs.highest_nearby(pos.x(), pos.y(), patrol_radius));
     let target = if let Some((sx, sy)) = scent_target {
         // Patrol toward the fox scent hotspot.
         Position::new(sx.clamp(0, map.width - 1), sy.clamp(0, map.height - 1))
@@ -2414,11 +2413,11 @@ fn build_building_chain(
     let legacy_target = building_query
         .iter()
         .filter(|(_, _, bpos, site, _)| {
-            site.is_some() || pos.manhattan_distance(bpos) <= d.building_search_range
+            site.is_some() || pos.distance_to(bpos) <= d.building_search_range
         })
         .min_by_key(|(_, _s, bpos, site, _)| {
             let priority = if site.is_some() { 0 } else { 1 };
-            let dist = pos.manhattan_distance(bpos);
+            let dist = pos.tile_distance_squared(bpos);
             (priority, dist)
         });
     let target = dse_target.or(legacy_target);
@@ -2456,7 +2455,7 @@ fn build_farming_chain(
     let garden = building_query
         .iter()
         .filter(|(_, s, _, site, _)| s.kind == StructureType::Garden && site.is_none())
-        .min_by_key(|(_, _, bpos, _, _)| pos.manhattan_distance(bpos));
+        .min_by_key(|(_, _, bpos, _, _)| pos.tile_distance_squared(bpos));
 
     let (garden_entity, _, garden_pos, _, _) = garden?;
     let chain = StructureType::farm_chain(*garden_pos, garden_entity);
@@ -2611,7 +2610,7 @@ fn try_crafting_sub_mode(
         Action::HerbcraftGather => {
             let has_herbs_nearby = herb_query
                 .iter()
-                .any(|(_, _, hp)| pos.manhattan_distance(hp) <= d.crafting_herb_detection_range);
+                .any(|(_, _, hp)| pos.distance_to(hp) <= d.crafting_herb_detection_range);
 
             if !has_herbs_nearby || skills.herbcraft <= d.crafting_herbcraft_skill_threshold {
                 return None;
@@ -2619,8 +2618,8 @@ fn try_crafting_sub_mode(
 
             let nearest_herb = herb_query
                 .iter()
-                .filter(|(_, _, hp)| pos.manhattan_distance(hp) <= d.crafting_herb_detection_range)
-                .min_by_key(|(_, _, hp)| pos.manhattan_distance(hp));
+                .filter(|(_, _, hp)| pos.distance_to(hp) <= d.crafting_herb_detection_range)
+                .min_by_key(|(_, _, hp)| pos.tile_distance_squared(hp));
 
             let (herb_entity, _, herb_pos) = nearest_herb?;
             let chain = TaskChain::new(
@@ -2652,7 +2651,7 @@ fn try_crafting_sub_mode(
                 .iter()
                 .filter(|(_, s, _, site, _)| s.kind == StructureType::Workshop && site.is_none())
                 .map(|(_, _, bpos, _, _)| *bpos)
-                .min_by_key(|bpos| pos.manhattan_distance(bpos));
+                .min_by_key(|bpos| pos.tile_distance_squared(bpos));
 
             let mut steps = Vec::new();
             if let Some(wp) = workshop_pos {
@@ -2675,7 +2674,7 @@ fn try_crafting_sub_mode(
                 .or_else(|| {
                     injured_cats
                         .iter()
-                        .min_by_key(|(_, ip)| pos.manhattan_distance(ip))
+                        .min_by_key(|(_, ip)| pos.tile_distance_squared(ip))
                 });
             if let Some((patient_entity, patient_pos)) = patient {
                 steps.push(
@@ -2795,7 +2794,7 @@ fn build_coordinating_chain(
         .iter()
         .filter(|(e, _)| *e != entity)
         .filter(|(e, _)| active_directive_query.get(*e).is_err())
-        .filter(|(_, p)| pos.manhattan_distance(p) <= d.coordinating_target_range)
+        .filter(|(_, p)| pos.distance_to(p) <= d.coordinating_target_range)
         .max_by(|(e_a, p_a), (e_b, p_b)| {
             let skill_a = skills_query
                 .get(*e_a)
@@ -2821,10 +2820,8 @@ fn build_coordinating_chain(
                     DirectiveKind::HarvestCarcass => s.herbcraft,
                     DirectiveKind::Cook => 0.0,
                 });
-            let rank_a =
-                skill_a - pos.manhattan_distance(p_a) as f32 * d.coordinating_distance_penalty;
-            let rank_b =
-                skill_b - pos.manhattan_distance(p_b) as f32 * d.coordinating_distance_penalty;
+            let rank_a = skill_a - pos.distance_to(p_a) * d.coordinating_distance_penalty;
+            let rank_b = skill_b - pos.distance_to(p_b) * d.coordinating_distance_penalty;
             rank_a
                 .partial_cmp(&rank_b)
                 .unwrap_or(std::cmp::Ordering::Equal)
@@ -2856,8 +2853,9 @@ fn build_exploring_chain(
     d: &DispositionConstants,
     rng: &mut impl Rng,
 ) -> Option<(TaskChain, Action)> {
-    let dx: i32 = rng.random_range(-d.explore_range..=d.explore_range);
-    let dy: i32 = rng.random_range(-d.explore_range..=d.explore_range);
+    let explore_r = d.explore_range.round() as i32;
+    let dx: i32 = rng.random_range(-explore_r..=explore_r);
+    let dy: i32 = rng.random_range(-explore_r..=explore_r);
     let mut target = Position::new(pos.x() + dx, pos.y() + dy);
     target.set_tile(
         target.x().clamp(0, map.width - 1),
@@ -3257,7 +3255,7 @@ pub fn resolve_disposition_chains(
                 use crate::components::item_gate::{ItemSource, SourceCtx, SourcePlacement};
                 let mut found_den = false;
                 for (den_entity, den, den_pos) in den_query.iter() {
-                    if pos.manhattan_distance(den_pos) <= d.den_discovery_range {
+                    if pos.distance_to(den_pos) <= d.den_discovery_range {
                         let discovery_chance = d.den_discovery_base_chance
                             + skills.hunting * d.den_discovery_skill_scale;
                         if rng.rng.random::<f32>() < discovery_chance && den.spawns_remaining > 0 {
@@ -3749,7 +3747,11 @@ fn dispatch_chain_step(
                 let item_kind = prey_cfg.item_kind;
                 let species_name = prey_cfg.name;
                 let flee_strategy = prey_cfg.flee_strategy;
-                let dist = pos.manhattan_distance(&prey_pos);
+                // Tile-domain Chebyshev: the pounce/stalk arms below match
+                // on i32 ranges (0..=1 / 2 / _) for tactical-reach gating.
+                // Ticket 492 routes this site to Chebyshev rather than the
+                // default Euclidean.
+                let dist = pos.chebyshev_distance(&prey_pos);
 
                 // Bird-specific: if prey teleported away, give up immediately.
                 if prey_is_fleeing
@@ -3760,16 +3762,18 @@ fn dispatch_chain_step(
                 }
 
                 // Dynamic stalk-start: slow down before entering detection zone.
-                let stalk_start =
-                    (prey_cfg.alert_radius + d.stalk_start_buffer).max(d.stalk_start_minimum);
+                // Cast to i32 to match Chebyshev `dist` and the i32 match arms below.
+                let stalk_start = (prey_cfg.alert_radius + d.stalk_start_buffer)
+                    .max(d.stalk_start_minimum)
+                    .round() as i32;
 
                 // Determine pounce range from patience.
                 let pounce_range: i32 = if personality.patience > 0.7 {
-                    d.pounce_range_patient
+                    d.pounce_range_patient.round() as i32
                 } else if personality.patience < 0.3 {
-                    d.pounce_range_impatient
+                    d.pounce_range_impatient.round() as i32
                 } else {
-                    d.pounce_range_default
+                    d.pounce_range_default.round() as i32
                 };
 
                 if dist <= pounce_range {
@@ -4093,7 +4097,7 @@ fn dispatch_chain_step(
                             moved = true;
                         }
                     }
-                    if dist > d.approach_give_up_distance || (!moved && ticks > 10) {
+                    if dist > d.approach_give_up_distance.round() as i32 || (!moved && ticks > 10) {
                         step.target_entity = None;
                     }
                 }
@@ -4140,10 +4144,10 @@ fn dispatch_chain_step(
                             &constants.sensory.cat,
                             **pp,
                             crate::components::SensorySignature::PREY,
-                            d.search_visual_detection_range as f32,
+                            d.search_visual_detection_range,
                         )
                     })
-                    .min_by_key(|(_, pp, _, _)| pos.manhattan_distance(pp));
+                    .min_by_key(|(_, pp, _, _)| pos.tile_distance_squared(pp));
 
                 if let Some((prey_entity, _prey_pos_ref, _, _)) = visible_prey {
                     step.target_entity = Some(prey_entity);
@@ -4169,7 +4173,7 @@ fn dispatch_chain_step(
                         let source = Position::new(sx, sy);
                         prey_query
                             .iter()
-                            .min_by_key(|(_, pp, _, _)| source.manhattan_distance(pp))
+                            .min_by_key(|(_, pp, _, _)| source.tile_distance_squared(pp))
                     } else {
                         None
                     };

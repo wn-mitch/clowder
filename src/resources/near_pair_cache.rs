@@ -60,8 +60,9 @@ pub fn normalize_pair(a: Entity, b: Entity) -> (Entity, Entity) {
 /// passive familiarity for their first few ticks.
 #[derive(Resource, Debug, Default)]
 pub struct NearPairCache {
-    /// Normalized `(min, max)` pair keys → cached Manhattan distance.
-    pub pairs: BTreeMap<(Entity, Entity), i32>,
+    /// Normalized `(min, max)` pair keys → cached Euclidean distance
+    /// (tile-domain f32). Ticket 492 switched from Manhattan.
+    pub pairs: BTreeMap<(Entity, Entity), f32>,
     /// Set of live cat entities observed in the previous tick. Used by
     /// `update_near_pair_cache` to detect newborns (entities in the
     /// current `live` set but absent from `last_seen`).

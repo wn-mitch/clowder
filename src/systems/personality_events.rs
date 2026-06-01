@@ -139,13 +139,13 @@ fn on_temper_flared(
     let cat_name = cat_name.0.clone();
 
     // Find nearest other cat within 3 tiles.
-    let mut nearest: Option<(Entity, i32, String)> = None;
+    let mut nearest: Option<(Entity, f32, String)> = None;
     for (other, other_pos, other_name) in &cats {
         if other == event.cat {
             continue;
         }
-        let dist = cat_pos.manhattan_distance(other_pos);
-        if dist > 0 && dist <= 3 && (nearest.is_none() || dist < nearest.as_ref().unwrap().1) {
+        let dist = cat_pos.distance_to(other_pos);
+        if dist > 0.0 && dist <= 3.0 && (nearest.is_none() || dist < nearest.as_ref().unwrap().1) {
             nearest = Some((other, dist, other_name.0.clone()));
         }
     }
@@ -202,7 +202,7 @@ fn on_directive_refused(
         if other == event.cat || other == event.coordinator {
             continue;
         }
-        if cat_pos.manhattan_distance(other_pos) > 5 {
+        if cat_pos.distance_to(other_pos) > 5.0 {
             continue;
         }
         if other_pers.loyalty > 0.5 {

@@ -80,9 +80,13 @@ impl CatScentMap {
         }
     }
 
-    /// Find the highest-scent bucket position within manhattan distance of
-    /// a world position. Returns the world-tile center of that bucket.
-    pub fn highest_nearby(&self, x: i32, y: i32, radius: i32) -> Option<(i32, i32)> {
+    /// Find the highest-scent bucket position within Chebyshev distance
+    /// of a world position — i.e. within `radius` 8-directional steps.
+    /// Returns the world-tile center of that bucket. Ticket 494 flipped
+    /// the internal gate from Manhattan to Chebyshev to align with the
+    /// post-realignment `Position::distance_to`.
+    pub fn highest_nearby(&self, x: i32, y: i32, radius: f32) -> Option<(i32, i32)> {
+        let radius = radius.max(0.0).round() as i32;
         let mut best_val = 0.0f32;
         let mut best_pos = None;
         let bx_center = x / self.bucket_size;
@@ -102,7 +106,7 @@ impl CatScentMap {
                 let val = self.marks[idx];
                 let wx = bx * self.bucket_size + self.bucket_size / 2;
                 let wy = by * self.bucket_size + self.bucket_size / 2;
-                let dist = (wx - x).abs() + (wy - y).abs();
+                let dist = (wx - x).abs().max((wy - y).abs());
                 if dist <= radius && val > best_val {
                     best_val = val;
                     best_pos = Some((wx, wy));

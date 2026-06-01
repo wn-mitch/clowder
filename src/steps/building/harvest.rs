@@ -75,7 +75,7 @@ pub fn resolve_harvest(
         CropKind::FoodCrops => {
             let Some(store_entity) = stores_list
                 .iter()
-                .min_by_key(|(_, sp)| pos.manhattan_distance(sp))
+                .min_by_key(|(_, sp)| pos.tile_distance_squared(sp))
                 .map(|(e, _)| *e)
             else {
                 // No Stores exist — don't reset growth; fail so the

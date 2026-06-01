@@ -110,15 +110,16 @@ impl HuntingPriors {
     ///
     /// Returns a unit step `(dx.signum(), dy.signum())` toward the centre of
     /// that bucket, or `None` if no bucket beats the default prior.
-    pub fn best_direction(&self, pos: &Position, radius: i32) -> Option<(i32, i32)> {
+    pub fn best_direction(&self, pos: &Position, radius: f32) -> Option<(i32, i32)> {
         let origin_bx = pos.x() / self.bucket_size;
         let origin_by = pos.y() / self.bucket_size;
 
         let mut best_belief = DEFAULT_PRIOR;
         let mut best_bucket: Option<(i32, i32)> = None;
 
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
+        let radius_i = radius.max(0.0).round() as i32;
+        for dy in -radius_i..=radius_i {
+            for dx in -radius_i..=radius_i {
                 let bx = origin_bx + dx;
                 let by = origin_by + dy;
                 if bx < 0 || by < 0 || bx >= self.grid_w as i32 || by >= self.grid_h as i32 {
@@ -251,7 +252,7 @@ mod tests {
         for _ in 0..3 {
             p.record_catch(&pos(50, 30));
         }
-        let dir = p.best_direction(&pos(30, 30), 10);
+        let dir = p.best_direction(&pos(30, 30), 10.0);
         assert!(
             dir.is_some(),
             "should find a direction toward high-belief area"
@@ -264,7 +265,7 @@ mod tests {
     fn best_direction_returns_none_when_flat() {
         let p = HuntingPriors::default_map();
         assert!(
-            p.best_direction(&pos(60, 45), 5).is_none(),
+            p.best_direction(&pos(60, 45), 5.0).is_none(),
             "flat grid should return no direction"
         );
     }

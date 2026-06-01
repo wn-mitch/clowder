@@ -130,7 +130,7 @@ pub fn resolve_task_chains(
 
         let workshop_bonus = if workshop_positions
             .iter()
-            .any(|wp| pos.manhattan_distance(wp) <= 2)
+            .any(|wp| pos.distance_to(wp) <= 2.0)
         {
             1.5
         } else {
@@ -356,7 +356,7 @@ mod tests {
 
         let pos = *world.get::<Position>(cat).unwrap();
         assert!(
-            pos.manhattan_distance(&Position::new(0, 0)) > 0,
+            pos.distance_to(&Position::new(0, 0)) > 0.0,
             "cat should have moved from origin"
         );
     }

@@ -263,8 +263,8 @@ pub struct NeedsConstants {
     pub starvation_attribution_threshold: f32,
     // --- Counts / distances ---
     pub starvation_mood_ticks: u64,
-    pub tradition_familiar_distance: i32,
-    pub bond_proximity_range: i32,
+    pub tradition_familiar_distance: f32,
+    pub bond_proximity_range: f32,
 }
 
 impl Default for NeedsConstants {
@@ -322,8 +322,8 @@ impl Default for NeedsConstants {
             starvation_attribution_threshold: 0.1,
             // Counts / distances
             starvation_mood_ticks: 5,
-            tradition_familiar_distance: 5,
-            bond_proximity_range: 3,
+            tradition_familiar_distance: 5.0,
+            bond_proximity_range: 3.0,
         }
     }
 }
@@ -353,10 +353,10 @@ pub struct BuildingConstants {
     pub gate_tired_diligence_scale: f32,
     pub gate_close_diligence_threshold: f32,
     // --- Radii ---
-    pub den_effect_radius: i32,
-    pub hearth_effect_radius: i32,
-    pub dirty_discomfort_radius: i32,
-    pub tidy_radius: i32,
+    pub den_effect_radius: f32,
+    pub hearth_effect_radius: f32,
+    pub dirty_discomfort_radius: f32,
+    pub tidy_radius: f32,
 }
 
 impl Default for BuildingConstants {
@@ -383,10 +383,10 @@ impl Default for BuildingConstants {
             gate_tired_diligence_scale: 0.6,
             gate_close_diligence_threshold: 0.5,
             // Radii
-            den_effect_radius: 5,
-            hearth_effect_radius: 6,
-            dirty_discomfort_radius: 3,
-            tidy_radius: 3,
+            den_effect_radius: 5.0,
+            hearth_effect_radius: 6.0,
+            dirty_discomfort_radius: 3.0,
+            tidy_radius: 3.0,
         }
     }
 }
@@ -411,7 +411,7 @@ pub struct CombatConstants {
     pub shadow_fox_banish_threshold: f32,
     /// Tiles within which cats can "witness" a banishment and receive the
     /// secondhand memory + mood boost.
-    pub legend_witness_range: i32,
+    pub legend_witness_range: f32,
     /// Combat skill delta applied to each posse participant at banishment.
     pub banishment_combat_skill_grow: f32,
     /// Diminishing-returns factor on repeat banishments. Effective gain is
@@ -428,7 +428,7 @@ pub struct CombatConstants {
     /// Safety floor for witnesses — they saw the darkness defeated.
     pub banishment_witness_safety_floor: f32,
     /// Corruption pushback radius from banishment site.
-    pub banishment_pushback_radius: i32,
+    pub banishment_pushback_radius: f32,
     /// Corruption pushback amount.
     pub banishment_pushback_amount: f32,
     pub temper_damage_bonus: f32,
@@ -736,13 +736,13 @@ impl Default for CombatConstants {
             // the dissolution. Keeps above `wildlife_flee_health_threshold`
             // (0.3) so the fox doesn't run before the cat can finish it.
             shadow_fox_banish_threshold: 0.8,
-            legend_witness_range: 12,
+            legend_witness_range: 12.0,
             banishment_combat_skill_grow: 0.25,
             banishment_skill_gain_diminish_factor: 0.25,
             banishment_valor_mood: 0.35,
             banishment_witness_mood: 0.20,
             banishment_witness_safety_floor: 0.8,
-            banishment_pushback_radius: 20,
+            banishment_pushback_radius: 20.0,
             banishment_pushback_amount: 0.5,
             temper_damage_bonus: 0.15,
             narrative_attack_chance: 0.15,
@@ -1002,10 +1002,10 @@ pub struct MagicConstants {
     pub thornbriar_regrowth_cap: u32,
     /// Inner radius (manhattan) of the territory corruption ring query.
     /// Tiles closer than this to colony center are ignored (safe core).
-    pub territory_corruption_inner_radius: i32,
+    pub territory_corruption_inner_radius: f32,
     /// Outer radius (manhattan) of the territory corruption ring query.
     /// Tiles farther than this from colony center are ignored (too distant).
-    pub territory_corruption_outer_radius: i32,
+    pub territory_corruption_outer_radius: f32,
 }
 
 impl Default for MagicConstants {
@@ -1107,8 +1107,8 @@ impl Default for MagicConstants {
             // work that the upcoming baseline dataset is meant to anchor.
             shadow_fox_population_cap: 2,
             thornbriar_regrowth_cap: 30,
-            territory_corruption_inner_radius: 15,
-            territory_corruption_outer_radius: 35,
+            territory_corruption_inner_radius: 15.0,
+            territory_corruption_outer_radius: 35.0,
         }
     }
 }
@@ -1130,7 +1130,7 @@ pub struct SocialConstants {
     /// per-tick × 1000 mechanical scale, not the per-day-accumulated total.
     pub courtship_romantic_rate: RatePerDay,
     // --- Counts / radii ---
-    pub passive_familiarity_range: i32,
+    pub passive_familiarity_range: f32,
     pub bond_check_interval: u64,
     // --- Bond thresholds ---
     pub mates_romantic_threshold: f32,
@@ -1188,7 +1188,7 @@ impl Default for SocialConstants {
             // fondness / familiarity were already gate-passing.
             courtship_romantic_rate: RatePerDay::new(3.5),
             // Counts / radii
-            passive_familiarity_range: 2,
+            passive_familiarity_range: 2.0,
             bond_check_interval: 50,
             // Bond thresholds
             mates_romantic_threshold: 0.7,
@@ -1310,8 +1310,8 @@ pub struct MoodConstants {
     pub grief_anxiety_amp_weight: f32,
 
     // --- Counts / radii ---
-    pub contagion_range: i32,
-    pub bond_proximity_range: i32,
+    pub contagion_range: f32,
+    pub bond_proximity_range: f32,
 }
 
 impl Default for MoodConstants {
@@ -1343,8 +1343,8 @@ impl Default for MoodConstants {
             grief_anxiety_amp_weight: 0.3,
 
             // Counts / radii
-            contagion_range: 3,
-            bond_proximity_range: 3,
+            contagion_range: 3.0,
+            bond_proximity_range: 3.0,
         }
     }
 }
@@ -1358,7 +1358,7 @@ pub struct DeathConstants {
     pub chance_per_excess_season: f64,
     pub grief_mood_penalty: f32,
     pub grief_mood_ticks: u64,
-    pub grief_detection_range: i32,
+    pub grief_detection_range: f32,
     pub grief_memory_strength: f32,
     pub cleanup_grace_period: u64,
 
@@ -1383,7 +1383,7 @@ pub struct DeathConstants {
     pub grave_anti_corruption_strength: f32,
     /// Per-grave aura radius in tiles.
     #[serde(default = "default_grave_anti_corruption_radius")]
-    pub grave_anti_corruption_radius: i32,
+    pub grave_anti_corruption_radius: f32,
 }
 
 impl Default for DeathConstants {
@@ -1402,7 +1402,7 @@ impl Default for DeathConstants {
             chance_per_excess_season: 0.0002,
             grief_mood_penalty: -0.3,
             grief_mood_ticks: 50,
-            grief_detection_range: 5,
+            grief_detection_range: 5.0,
             grief_memory_strength: 1.0,
             cleanup_grace_period: 500,
 
@@ -1471,23 +1471,23 @@ pub struct PreyConstants {
     pub vigilance_steepness: f32,
     pub vigilance_baseline: f32,
     pub vigilance_amplitude: f32,
-    pub bird_teleport_min_range: i32,
-    pub bird_teleport_max_range: i32,
+    pub bird_teleport_min_range: f32,
+    pub bird_teleport_max_range: f32,
     pub grazing_wander_chance: f32,
     pub grazing_jitter_chance: f32,
     /// Maximum duration of a grazing bout before the prey returns to Idle.
     /// (ticket 033 Phase 4)
     #[serde(alias = "grazing_max_ticks")]
     pub grazing_max_duration: DurationDays,
-    pub grazing_max_roam_normal: i32,
-    pub grazing_max_roam_pressured: i32,
+    pub grazing_max_roam_normal: f32,
+    pub grazing_max_roam_pressured: f32,
     pub grazing_pressure_roam_threshold: f32,
-    pub flee_stop_distance: i32,
+    pub flee_stop_distance: f32,
     pub hunger_base_rate: RatePerDay,
     pub overcrowding_threshold: f32,
     pub overcrowding_hunger_extra: f32,
     pub store_raid_chance: f32,
-    pub store_raid_range: i32,
+    pub store_raid_range: f32,
     pub store_raid_hunger_relief: f32,
     pub store_raid_cleanliness_drain: RatePerDay,
     pub store_raid_narrative_chance: f32,
@@ -1512,12 +1512,12 @@ pub struct PreyConstants {
     #[serde(alias = "den_abandon_stress_ticks")]
     pub den_abandon_stress_duration: DurationDays,
     pub den_kill_pressure_increment: f32,
-    pub den_kill_pressure_range: i32,
+    pub den_kill_pressure_range: f32,
     pub den_raid_pressure_increment: f32,
-    pub den_orphan_adopt_range: i32,
+    pub den_orphan_adopt_range: f32,
     pub den_orphan_adopt_capacity_threshold: f32,
     pub den_orphan_found_chance: f32,
-    pub den_orphan_min_spacing: i32,
+    pub den_orphan_min_spacing: f32,
     /// Prey reject movement tiles with corruption above this threshold.
     pub prey_corruption_avoidance: f32,
     /// Den breeding suppressed when tile corruption exceeds this.
@@ -1596,21 +1596,21 @@ impl Default for PreyConstants {
             vigilance_steepness: 3.5,
             vigilance_baseline: 0.4,
             vigilance_amplitude: 1.2,
-            bird_teleport_min_range: 5,
-            bird_teleport_max_range: 8,
+            bird_teleport_min_range: 5.0,
+            bird_teleport_max_range: 8.0,
             grazing_wander_chance: 0.05,
             grazing_jitter_chance: 0.1,
             // 200 ticks ÷ 1000 ticks/day = 0.2 days (Phase 4).
             grazing_max_duration: DurationDays::new(0.2),
-            grazing_max_roam_normal: 15,
-            grazing_max_roam_pressured: 8,
+            grazing_max_roam_normal: 15.0,
+            grazing_max_roam_pressured: 8.0,
             grazing_pressure_roam_threshold: 0.5,
-            flee_stop_distance: 10,
+            flee_stop_distance: 10.0,
             hunger_base_rate: RatePerDay::new(0.2),
             overcrowding_threshold: 0.8,
             overcrowding_hunger_extra: 0.0001,
             store_raid_chance: 0.05,
-            store_raid_range: 2,
+            store_raid_range: 2.0,
             store_raid_hunger_relief: 0.015,
             store_raid_cleanliness_drain: RatePerDay::new(1.0),
             store_raid_narrative_chance: 0.02,
@@ -1627,12 +1627,12 @@ impl Default for PreyConstants {
             // 3000 ticks ÷ 1000 ticks/day = 3 days (Phase 4).
             den_abandon_stress_duration: DurationDays::new(3.0),
             den_kill_pressure_increment: 0.1,
-            den_kill_pressure_range: 15,
+            den_kill_pressure_range: 15.0,
             den_raid_pressure_increment: 0.3,
-            den_orphan_adopt_range: 15,
+            den_orphan_adopt_range: 15.0,
             den_orphan_adopt_capacity_threshold: 0.5,
             den_orphan_found_chance: 0.001,
-            den_orphan_min_spacing: 25,
+            den_orphan_min_spacing: 25.0,
             prey_corruption_avoidance: 1.0,
             den_corruption_threshold: 0.4,
             initial_den_count_mouse: 4,
@@ -1659,14 +1659,14 @@ pub struct SpeciesProfile {
     pub seasonal_breed_winter: f32,
     pub flee_speed: u32,
     pub graze_cadence: u64,
-    pub alert_radius: i32,
+    pub alert_radius: f32,
     pub freeze_ticks: u64,
     pub catch_difficulty: f32,
     pub flee_duration: u64,
     pub den_capacity: u32,
     pub den_spawn_rate: f32,
     pub den_raid_drop: u32,
-    pub den_spacing: i32,
+    pub den_spacing: f32,
     pub den_density: usize,
 }
 
@@ -1691,14 +1691,14 @@ impl Default for SpeciesConstants {
                 seasonal_breed_winter: 0.1,
                 flee_speed: 1,
                 graze_cadence: 40,
-                alert_radius: 3,
+                alert_radius: 3.0,
                 freeze_ticks: 1,
                 catch_difficulty: 0.9,
                 flee_duration: 50,
                 den_capacity: 80,
                 den_spawn_rate: 0.01,
                 den_raid_drop: 6,
-                den_spacing: 10,
+                den_spacing: 10.0,
                 den_density: 100,
             },
             rat: SpeciesProfile {
@@ -1710,14 +1710,14 @@ impl Default for SpeciesConstants {
                 seasonal_breed_winter: 0.2,
                 flee_speed: 1,
                 graze_cadence: 25,
-                alert_radius: 4,
+                alert_radius: 4.0,
                 freeze_ticks: 2,
                 catch_difficulty: 1.0,
                 flee_duration: 75,
                 den_capacity: 60,
                 den_spawn_rate: 0.012,
                 den_raid_drop: 5,
-                den_spacing: 10,
+                den_spacing: 10.0,
                 den_density: 100,
             },
             rabbit: SpeciesProfile {
@@ -1729,14 +1729,14 @@ impl Default for SpeciesConstants {
                 seasonal_breed_winter: 0.0,
                 flee_speed: 1,
                 graze_cadence: 20,
-                alert_radius: 6,
+                alert_radius: 6.0,
                 freeze_ticks: 10,
                 catch_difficulty: 0.85,
                 flee_duration: 60,
                 den_capacity: 60,
                 den_spawn_rate: 0.01,
                 den_raid_drop: 4,
-                den_spacing: 20,
+                den_spacing: 20.0,
                 den_density: 250,
             },
             fish: SpeciesProfile {
@@ -1748,14 +1748,14 @@ impl Default for SpeciesConstants {
                 seasonal_breed_winter: 0.1,
                 flee_speed: 0,
                 graze_cadence: 50,
-                alert_radius: 2,
+                alert_radius: 2.0,
                 freeze_ticks: 0,
                 catch_difficulty: 0.6,
                 flee_duration: 0,
                 den_capacity: 50,
                 den_spawn_rate: 0.006,
                 den_raid_drop: 3,
-                den_spacing: 20,
+                den_spacing: 20.0,
                 den_density: 250,
             },
             bird: SpeciesProfile {
@@ -1767,14 +1767,14 @@ impl Default for SpeciesConstants {
                 seasonal_breed_winter: 0.0,
                 flee_speed: 3,
                 graze_cadence: 35,
-                alert_radius: 8,
+                alert_radius: 8.0,
                 freeze_ticks: 1,
                 catch_difficulty: 0.5,
                 flee_duration: 30,
                 den_capacity: 40,
                 den_spawn_rate: 0.004,
                 den_raid_drop: 3,
-                den_spacing: 15,
+                den_spacing: 15.0,
                 den_density: 250,
             },
         }
@@ -2230,7 +2230,7 @@ pub struct ScoringConstants {
     /// in everyday-interaction range, far enough that random
     /// territorial overlap doesn't trip the pressure lift.
     #[serde(default = "default_social_perception_radius")]
-    pub social_perception_radius: i32,
+    pub social_perception_radius: f32,
     /// Ticket 109 (Phase A) — weight on the `respect_diff` arm of the
     /// composite `social_status_distress` scalar:
     /// `clamp((nearest_other.respect - focal.respect), 0, 1)`. Default
@@ -3026,10 +3026,10 @@ pub struct ScoringConstants {
     pub corruption_social_bonus: f32,
     pub corruption_suppression_threshold: f32,
     pub corruption_suppression_scale: f32,
-    pub carcass_detection_range: i32,
+    pub carcass_detection_range: f32,
     /// Tile radius within which a cat "smells" corruption on nearby tiles.
     /// Corruption beyond this range is out of sensing reach.
-    pub corruption_smell_range: i32,
+    pub corruption_smell_range: f32,
     // --- 382 — Building placement (autonomous coordinator path) ---
     /// 382: selection rule for `compute_building_placement()`. Default
     /// `InfluenceMap` replaces the radius-16 spiral search from
@@ -3094,7 +3094,7 @@ pub struct ScoringConstants {
     /// 382: Manhattan range over which `same_kind_proximity` lifts.
     /// Beyond this distance the term is exactly zero.
     #[serde(default = "default_building_placement_same_kind_proximity_range")]
-    pub building_placement_same_kind_proximity_range: i32,
+    pub building_placement_same_kind_proximity_range: f32,
     /// 382: structure-halo radius used by `update_colony_district_map`
     /// when stamping the frontier axis around existing buildings.
     #[serde(default = "default_colony_district_structure_halo_radius")]
@@ -3374,8 +3374,8 @@ impl Default for ScoringConstants {
             corruption_social_bonus: 0.15,
             corruption_suppression_threshold: 0.3,
             corruption_suppression_scale: 0.6,
-            carcass_detection_range: 15,
-            corruption_smell_range: 5,
+            carcass_detection_range: 15.0,
+            corruption_smell_range: 5.0,
         }
     }
 }
@@ -3390,7 +3390,7 @@ pub struct DispositionConstants {
     /// Lower than `starvation_interrupt_threshold` — only fires when the cat
     /// is on the verge of starvation death, not merely hungry.
     pub critical_hunger_interrupt_threshold: f32,
-    pub threat_awareness_range: i32,
+    pub threat_awareness_range: f32,
     pub threat_urgency_divisor: f32,
     pub flee_threshold_base: f32,
     pub flee_threshold_boldness_scale: f32,
@@ -3432,22 +3432,22 @@ pub struct DispositionConstants {
     pub flee_safety_need_threshold: f32,
     pub damaged_building_threshold: f32,
     pub ward_strength_low_threshold: f32,
-    pub hunt_terrain_search_radius: i32,
-    pub forage_terrain_search_radius: i32,
-    pub social_target_range: i32,
-    pub wildlife_threat_range: i32,
+    pub hunt_terrain_search_radius: f32,
+    pub forage_terrain_search_radius: f32,
+    pub social_target_range: f32,
+    pub wildlife_threat_range: f32,
     /// Proximity radius for counting allies fighting the same threat.
-    pub allies_fighting_range: i32,
+    pub allies_fighting_range: f32,
     pub allies_fighting_cap: usize,
     /// Minimum HP ratio for a guarding cat to enter a FightThreat chain.
     pub guard_fight_health_min: f32,
     pub combat_effective_hunting_cross_train: f32,
-    pub herb_detection_range: i32,
-    pub prey_detection_range: i32,
+    pub herb_detection_range: f32,
+    pub prey_detection_range: f32,
     pub corrupted_tile_threshold: f32,
     pub mentor_skill_threshold_high: f32,
     pub mentor_skill_threshold_low: f32,
-    pub mentoring_detection_range: i32,
+    pub mentoring_detection_range: f32,
     pub directive_bonus_base_weight: f32,
     pub directive_independence_penalty: f32,
     pub directive_stubbornness_penalty: f32,
@@ -3455,9 +3455,9 @@ pub struct DispositionConstants {
     pub fondness_social_weight: f32,
     pub novelty_social_weight: f32,
     pub disposition_independence_penalty: f32,
-    pub fated_love_detection_range: i32,
-    pub fated_rival_detection_range: i32,
-    pub cascading_bonus_range: i32,
+    pub fated_love_detection_range: f32,
+    pub fated_rival_detection_range: f32,
+    pub cascading_bonus_range: f32,
     pub resting_complete_hunger: f32,
     pub resting_complete_energy: f32,
     pub resting_complete_temperature: f32,
@@ -3470,7 +3470,7 @@ pub struct DispositionConstants {
     pub resting_max_replans: u32,
     pub sleep_duration_deficit_multiplier: f32,
     pub sleep_duration_base: u64,
-    pub guard_threat_detection_range: i32,
+    pub guard_threat_detection_range: f32,
     pub guard_patrol_radius: f32,
     /// §L2.10.7 perimeter offset (tiles) from colony center used as the
     /// fallback anchor for cat Patrol and HerbcraftWard spatial axes
@@ -3499,15 +3499,15 @@ pub struct DispositionConstants {
     /// beat clustering across the colony.
     #[serde(default = "default_patrol_sector_rotation_ticks")]
     pub patrol_sector_rotation_ticks: u64,
-    pub social_chain_target_range: i32,
+    pub social_chain_target_range: f32,
     pub mentor_temperature_threshold: f32,
     pub groom_temperature_threshold: f32,
-    pub building_search_range: i32,
-    pub crafting_herb_detection_range: i32,
+    pub building_search_range: f32,
+    pub crafting_herb_detection_range: f32,
     pub crafting_herbcraft_skill_threshold: f32,
-    pub coordinating_target_range: i32,
+    pub coordinating_target_range: f32,
     pub coordinating_distance_penalty: f32,
-    pub explore_range: i32,
+    pub explore_range: f32,
     pub scent_downwind_dot_threshold: f32,
     pub scent_dense_forest_modifier: f32,
     pub scent_light_forest_modifier: f32,
@@ -3520,14 +3520,14 @@ pub struct DispositionConstants {
     /// for any residual reader but are not consulted by the new
     /// grid-sampled detection path.
     #[serde(default = "default_scent_search_radius")]
-    pub scent_search_radius: i32,
+    pub scent_search_radius: f32,
     /// Phase 2B — minimum `PreyScentMap` value at the strongest
     /// nearby bucket for a cat to register "prey is scent-detectable
     /// here." Below this, the hunt-search step returns without
     /// committing to a prey target.
     #[serde(default = "default_scent_detect_threshold")]
     pub scent_detect_threshold: f32,
-    pub den_discovery_range: i32,
+    pub den_discovery_range: f32,
     pub den_discovery_base_chance: f32,
     pub den_discovery_skill_scale: f32,
     pub den_raid_kill_fraction: f32,
@@ -3538,9 +3538,9 @@ pub struct DispositionConstants {
     pub respect_gain_building: f32,
     pub respect_gain_coordinating: f32,
     pub respect_gain_socializing: f32,
-    pub pounce_range_patient: i32,
-    pub pounce_range_impatient: i32,
-    pub pounce_range_default: i32,
+    pub pounce_range_patient: f32,
+    pub pounce_range_impatient: f32,
+    pub pounce_range_default: f32,
     pub pounce_awareness_idle: f32,
     pub pounce_awareness_alert: f32,
     pub pounce_awareness_fleeing: f32,
@@ -3551,8 +3551,8 @@ pub struct DispositionConstants {
     pub pounce_skill_base: f32,
     pub pounce_skill_scale: f32,
     pub hunt_catch_skill_growth: f32,
-    pub stalk_start_buffer: i32,
-    pub stalk_start_minimum: i32,
+    pub stalk_start_buffer: f32,
+    pub stalk_start_minimum: f32,
     /// Ticket 100 — additive lift applied to `effective_stalk_distance`
     /// per unit of `PreyState.alertness`. A nervous rabbit
     /// (`alertness ≈ 1.0`) pushes a typical patient stalker out by
@@ -3593,12 +3593,12 @@ pub struct DispositionConstants {
     pub chase_stuck_ticks: u64,
     pub chase_speed: i32,
     pub approach_speed: i32,
-    pub approach_give_up_distance: i32,
-    pub search_belief_radius: i32,
+    pub approach_give_up_distance: f32,
+    pub search_belief_radius: f32,
     pub search_wind_direction_threshold: f32,
     pub search_jitter_chance: f32,
     pub search_speed: i32,
-    pub search_visual_detection_range: i32,
+    pub search_visual_detection_range: f32,
     pub search_timeout_ticks: u64,
     pub travel_timeout_ticks: u64,
     pub travel_no_path_stuck_ticks: u64,
@@ -3661,7 +3661,7 @@ pub struct DispositionConstants {
     /// than the social-family ranges (10) so cats must encounter the
     /// corpse to react.
     #[serde(default = "default_burial_sense_range")]
-    pub burial_sense_range: i32,
+    pub burial_sense_range: f32,
     /// 035: Belonging-tier fulfillment lift on burial completion.
     /// Mirrors the small social_warmth gain from grooming.
     #[serde(default = "default_bury_belonging_gain")]
@@ -3703,7 +3703,7 @@ pub struct DispositionConstants {
     pub respect_per_witness: f32,
     /// Manhattan radius for counting witnesses to a chain completion.
     #[serde(default = "default_respect_witness_radius")]
-    pub respect_witness_radius: i32,
+    pub respect_witness_radius: f32,
     /// Diminishing-returns cap on witness count.
     #[serde(default = "default_respect_witness_cap")]
     pub respect_witness_cap: u32,
@@ -3779,21 +3779,21 @@ pub struct DispositionConstants {
     /// survey step. Cats can see around themselves — a single-tile stamp
     /// doesn't model that. Default 4 (9×9 = 81 tiles).
     #[serde(default = "default_survey_explore_radius")]
-    pub survey_explore_radius: i32,
+    pub survey_explore_radius: f32,
     pub exploration_decay_rate: f32,
     /// Radius around each living cat that gets marked explored every tick,
     /// modelling passive awareness — cats notice their surroundings as they
     /// move through the world.  Smaller than `survey_explore_radius` (active
     /// perception).  Default 2 (5×5 = 25 tiles).
     #[serde(default = "default_passive_explore_radius")]
-    pub passive_explore_radius: i32,
+    pub passive_explore_radius: f32,
     /// Radius used by `unexplored_fraction_nearby` to determine how
     /// familiar a cat's local area feels.  Decoupled from `explore_range`
     /// (action distance) — a cat's sense of "I know this place" should
     /// cover a smaller area than "how far I could walk to explore."
     /// Default 10 (21×21 = 441 tiles).
     #[serde(default = "default_explore_perception_radius")]
-    pub explore_perception_radius: i32,
+    pub explore_perception_radius: f32,
     /// `still_goal` threshold for the §7.2 commitment gate on Exploring
     /// plans.  When `unexplored_fraction_nearby` drops below this value,
     /// the cat's desire to explore fades and an OpenMinded plan may be
@@ -3883,7 +3883,7 @@ pub struct DispositionConstants {
     /// remember resting here, but I also remember a hawk near here last
     /// week" gate.
     #[serde(default = "default_safe_rest_threat_suppression_radius")]
-    pub safe_rest_threat_suppression_radius: i32,
+    pub safe_rest_threat_suppression_radius: f32,
     // --- Contextual threat evaluation (zoo vs bush) ---
     /// Threat intensity multiplier when the cat is inside a ward's repel radius.
     #[serde(default = "default_threat_ward_dampening")]
@@ -3893,7 +3893,7 @@ pub struct DispositionConstants {
     pub threat_colony_building_dampening: f32,
     /// Manhattan range within which a building counts as "nearby" for threat dampening.
     #[serde(default = "default_threat_building_safety_range")]
-    pub threat_building_safety_range: i32,
+    pub threat_building_safety_range: f32,
     /// Radius from colony center used to normalize colony proximity factor.
     #[serde(default = "default_threat_colony_radius")]
     pub threat_colony_radius: f32,
@@ -3902,7 +3902,7 @@ pub struct DispositionConstants {
     pub threat_colony_center_dampening: f32,
     /// Range within which other cats count as allies for threat dampening.
     #[serde(default = "default_threat_ally_range")]
-    pub threat_ally_range: i32,
+    pub threat_ally_range: f32,
     /// Per-ally dampening factor: effective urgency = 1 / (1 + n * this).
     #[serde(default = "default_threat_ally_dampening_per_cat")]
     pub threat_ally_dampening_per_cat: f32,
@@ -3917,7 +3917,7 @@ pub struct DispositionConstants {
     pub cook_duration: DurationDays,
     /// Manhattan range within which a cat counts as "at" the Kitchen to cook.
     #[serde(default = "default_kitchen_cook_radius")]
-    pub kitchen_cook_radius: i32,
+    pub kitchen_cook_radius: f32,
     /// Ticket 075 — `CommitmentTenure` Modifier tenure window. Once a
     /// cat adopts a disposition, the modifier lifts that disposition's
     /// constituent DSE scores by `oscillation_score_lift` for this many
@@ -4029,7 +4029,7 @@ pub struct DispositionConstants {
     /// detour eligibility at a roughly-third-of-map distance even
     /// when cost arithmetic would otherwise permit it.
     #[serde(default = "default_herb_stash_reachable_radius")]
-    pub herb_stash_reachable_radius: i32,
+    pub herb_stash_reachable_radius: f32,
 }
 
 fn default_true() -> bool {
@@ -4061,8 +4061,8 @@ fn default_threat_ward_dampening() -> f32 {
 fn default_threat_colony_building_dampening() -> f32 {
     0.5
 }
-fn default_threat_building_safety_range() -> i32 {
-    5
+fn default_threat_building_safety_range() -> f32 {
+    5.0
 }
 fn default_threat_colony_radius() -> f32 {
     30.0
@@ -4070,8 +4070,8 @@ fn default_threat_colony_radius() -> f32 {
 fn default_threat_colony_center_dampening() -> f32 {
     0.4
 }
-fn default_threat_ally_range() -> i32 {
-    8
+fn default_threat_ally_range() -> f32 {
+    8.0
 }
 fn default_threat_ally_dampening_per_cat() -> f32 {
     0.4
@@ -4086,8 +4086,8 @@ fn default_cook_duration() -> DurationDays {
     DurationDays::new(0.04)
 }
 
-fn default_kitchen_cook_radius() -> i32 {
-    1
+fn default_kitchen_cook_radius() -> f32 {
+    1.0
 }
 
 /// Ticket 075 — `CommitmentTenure` Modifier tenure window. ~30
@@ -4133,8 +4133,8 @@ fn default_intention_preempt_strength_regime_boundary() -> f32 {
 /// diagonal. Wide enough that a cat working mid-map can still route
 /// through the stash, narrow enough that cross-map detours are
 /// suppressed.
-fn default_herb_stash_reachable_radius() -> i32 {
-    60
+fn default_herb_stash_reachable_radius() -> f32 {
+    60.0
 }
 
 fn default_cook_base_score() -> f32 {
@@ -4450,8 +4450,8 @@ fn default_intraspecies_conflict_freeze_hide_lift() -> f32 {
 /// nearest-other-cat resolution. Mirrors a typical "in the same
 /// camp / next room" distance — close enough to be socially salient,
 /// far enough that random territorial overlap doesn't trigger.
-fn default_social_perception_radius() -> i32 {
-    8
+fn default_social_perception_radius() -> f32 {
+    8.0
 }
 
 /// Ticket 109 (Phase A) — equal weight on `respect_diff` arm of the
@@ -4573,8 +4573,8 @@ fn default_safe_rest_memory_strength_initial() -> f32 {
     0.6
 }
 
-fn default_safe_rest_threat_suppression_radius() -> i32 {
-    5
+fn default_safe_rest_threat_suppression_radius() -> f32 {
+    5.0
 }
 
 fn default_gate_reckless_health_threshold() -> f32 {
@@ -5026,8 +5026,8 @@ fn default_disposal_inventory_excess_midpoint() -> f32 {
     0.5
 }
 
-fn default_scent_search_radius() -> i32 {
-    20
+fn default_scent_search_radius() -> f32 {
+    20.0
 }
 
 fn default_scent_detect_threshold() -> f32 {
@@ -5167,8 +5167,8 @@ fn default_building_placement_midden_periphery_weight() -> f32 {
 fn default_building_placement_same_kind_proximity_weight() -> f32 {
     0.2
 }
-fn default_building_placement_same_kind_proximity_range() -> i32 {
-    12
+fn default_building_placement_same_kind_proximity_range() -> f32 {
+    12.0
 }
 fn default_colony_district_structure_halo_radius() -> f32 {
     8.0
@@ -5206,7 +5206,7 @@ impl Default for DispositionConstants {
             starvation_interrupt_threshold: 0.15,
             exhaustion_interrupt_threshold: 0.10,
             critical_hunger_interrupt_threshold: 0.15,
-            threat_awareness_range: 10,
+            threat_awareness_range: 10.0,
             threat_urgency_divisor: 10.0,
             flee_threshold_base: 0.15,
             flee_threshold_boldness_scale: 0.4,
@@ -5230,20 +5230,20 @@ impl Default for DispositionConstants {
             flee_safety_need_threshold: 0.6,
             damaged_building_threshold: 0.4,
             ward_strength_low_threshold: 0.3,
-            hunt_terrain_search_radius: 15,
-            forage_terrain_search_radius: 10,
-            social_target_range: 10,
-            wildlife_threat_range: 10,
-            allies_fighting_range: 8,
+            hunt_terrain_search_radius: 15.0,
+            forage_terrain_search_radius: 10.0,
+            social_target_range: 10.0,
+            wildlife_threat_range: 10.0,
+            allies_fighting_range: 8.0,
             allies_fighting_cap: 5,
             guard_fight_health_min: 0.5,
             combat_effective_hunting_cross_train: 0.3,
-            herb_detection_range: 15,
-            prey_detection_range: 10,
+            herb_detection_range: 15.0,
+            prey_detection_range: 10.0,
             corrupted_tile_threshold: 0.1,
             mentor_skill_threshold_high: 0.6,
             mentor_skill_threshold_low: 0.3,
-            mentoring_detection_range: 10,
+            mentoring_detection_range: 10.0,
             directive_bonus_base_weight: 0.5,
             directive_independence_penalty: 0.3,
             directive_stubbornness_penalty: 0.4,
@@ -5251,9 +5251,9 @@ impl Default for DispositionConstants {
             fondness_social_weight: 0.6,
             novelty_social_weight: 0.4,
             disposition_independence_penalty: 0.2,
-            fated_love_detection_range: 15,
-            fated_rival_detection_range: 15,
-            cascading_bonus_range: 5,
+            fated_love_detection_range: 15.0,
+            fated_rival_detection_range: 15.0,
+            cascading_bonus_range: 5.0,
             resting_complete_hunger: 0.5,
             resting_complete_energy: 0.3,
             resting_complete_temperature: 0.3,
@@ -5263,21 +5263,21 @@ impl Default for DispositionConstants {
             resting_max_replans: 12,
             sleep_duration_deficit_multiplier: 175.0,
             sleep_duration_base: 75,
-            guard_threat_detection_range: 10,
+            guard_threat_detection_range: 10.0,
             guard_patrol_radius: 10.0,
             patrol_perimeter_offset: 12,
             patrol_sector_grid_w: default_patrol_sector_grid_w(),
             patrol_sector_grid_h: default_patrol_sector_grid_h(),
             patrol_sector_rotation_ticks: default_patrol_sector_rotation_ticks(),
-            social_chain_target_range: 15,
+            social_chain_target_range: 15.0,
             mentor_temperature_threshold: 0.5,
             groom_temperature_threshold: 0.7,
-            building_search_range: 30,
-            crafting_herb_detection_range: 15,
+            building_search_range: 30.0,
+            crafting_herb_detection_range: 15.0,
             crafting_herbcraft_skill_threshold: 0.0,
-            coordinating_target_range: 30,
+            coordinating_target_range: 30.0,
             coordinating_distance_penalty: 0.01,
-            explore_range: 20,
+            explore_range: 20.0,
             scent_downwind_dot_threshold: 0.0,
             scent_dense_forest_modifier: 0.5,
             scent_light_forest_modifier: 0.75,
@@ -5285,7 +5285,7 @@ impl Default for DispositionConstants {
             scent_min_range: 20.0,
             scent_search_radius: default_scent_search_radius(),
             scent_detect_threshold: default_scent_detect_threshold(),
-            den_discovery_range: 3,
+            den_discovery_range: 3.0,
             den_discovery_base_chance: 0.02,
             den_discovery_skill_scale: 0.01,
             den_raid_kill_fraction: 0.4,
@@ -5296,9 +5296,9 @@ impl Default for DispositionConstants {
             respect_gain_building: 0.15,
             respect_gain_coordinating: 0.05,
             respect_gain_socializing: 0.02,
-            pounce_range_patient: 2,
-            pounce_range_impatient: 3,
-            pounce_range_default: 2,
+            pounce_range_patient: 2.0,
+            pounce_range_impatient: 3.0,
+            pounce_range_default: 2.0,
             pounce_awareness_idle: 0.95,
             pounce_awareness_alert: 0.65,
             pounce_awareness_fleeing: 0.30,
@@ -5309,8 +5309,8 @@ impl Default for DispositionConstants {
             pounce_skill_base: 0.5,
             pounce_skill_scale: 0.5,
             hunt_catch_skill_growth: 0.01,
-            stalk_start_buffer: 2,
-            stalk_start_minimum: 5,
+            stalk_start_buffer: 2.0,
+            stalk_start_minimum: 5.0,
             // 100: effective_stalk_distance lifts.
             alertness_push: default_alertness_push(),
             species_push: default_species_push(),
@@ -5323,12 +5323,12 @@ impl Default for DispositionConstants {
             chase_stuck_ticks: 10,
             chase_speed: 3,
             approach_speed: 3,
-            approach_give_up_distance: 60,
-            search_belief_radius: 25,
+            approach_give_up_distance: 60.0,
+            search_belief_radius: 25.0,
             search_wind_direction_threshold: 0.3,
             search_jitter_chance: 0.20,
             search_speed: 2,
-            search_visual_detection_range: 15,
+            search_visual_detection_range: 15.0,
             search_timeout_ticks: 80,
             travel_timeout_ticks: 200,
             travel_no_path_stuck_ticks: 10,
@@ -5434,10 +5434,10 @@ impl Default for DispositionConstants {
             safe_rest_threat_suppression_radius: default_safe_rest_threat_suppression_radius(),
             threat_ward_dampening: 0.3,
             threat_colony_building_dampening: 0.5,
-            threat_building_safety_range: 5,
+            threat_building_safety_range: 5.0,
             threat_colony_radius: 30.0,
             threat_colony_center_dampening: 0.4,
-            threat_ally_range: 8,
+            threat_ally_range: 8.0,
             threat_ally_dampening_per_cat: 0.4,
             cooked_food_multiplier: default_cooked_food_multiplier(),
             cook_duration: default_cook_duration(),
@@ -5466,7 +5466,7 @@ pub struct ColonyScoreConstants {
     pub deaths_starvation_penalty: f64,
     pub deaths_injury_penalty: f64,
     pub deaths_old_age_bonus: f64,
-    pub den_shelter_radius: i32,
+    pub den_shelter_radius: f32,
     pub activation_breadth_bonus: f64,
     pub activation_depth_bonus: f64,
 }
@@ -5482,7 +5482,7 @@ impl Default for ColonyScoreConstants {
             deaths_starvation_penalty: 30.0,
             deaths_injury_penalty: 15.0,
             deaths_old_age_bonus: 5.0,
-            den_shelter_radius: 4,
+            den_shelter_radius: 4.0,
             activation_breadth_bonus: 20.0,
             activation_depth_bonus: 5.0,
         }
@@ -5499,27 +5499,27 @@ pub struct WildlifeConstants {
     pub patrol_jitter_chance: f32,
     pub detection_narrative_cooldown: u64,
     pub spawn_narrative_cooldown: u64,
-    pub base_detection_range: i32,
-    pub forest_range_penalty: i32,
+    pub base_detection_range: f32,
+    pub forest_range_penalty: f32,
     pub threat_safety_drain: f32,
     pub threat_mood_penalty: f32,
     pub threat_mood_ticks: u64,
     pub predator_hunt_chance: f32,
-    pub predator_hunt_range_fox: i32,
-    pub predator_hunt_range_hawk: i32,
-    pub predator_hunt_range_snake: i32,
-    pub predator_hunt_range_shadow_fox: i32,
+    pub predator_hunt_range_fox: f32,
+    pub predator_hunt_range_hawk: f32,
+    pub predator_hunt_range_snake: f32,
+    pub predator_hunt_range_shadow_fox: f32,
     pub predator_kill_chance: f32,
     pub predator_kill_narrative_chance: f32,
     pub initial_fox_count_min: u32,
     pub initial_fox_count_max: u32,
-    pub initial_fox_min_distance: i32,
+    pub initial_fox_min_distance: f32,
     pub initial_hawk_count_min: u32,
     pub initial_hawk_count_max: u32,
-    pub initial_hawk_min_distance: i32,
+    pub initial_hawk_min_distance: f32,
     pub initial_snake_count_min: u32,
     pub initial_snake_count_max: u32,
-    pub initial_snake_min_distance: i32,
+    pub initial_snake_min_distance: f32,
     /// Corruption emitted per tick by an uncleansed carcass.
     pub carcass_corruption_rate: f32,
     /// Chance a shadow fox kill leaves a rotting carcass (vs consuming fully).
@@ -5558,17 +5558,17 @@ pub struct WildlifeConstants {
     /// Corruption deposit rate per tick while encircling.
     pub ward_siege_corruption_rate: f32,
     /// Tile radius around ward affected by siege corruption.
-    pub ward_siege_corruption_radius: i32,
+    pub ward_siege_corruption_radius: f32,
     /// Max ticks a shadow fox will encircle before reverting to patrol.
     pub ward_siege_max_ticks: u64,
     /// If a cat comes within this range, encircling fox switches to stalking.
-    pub siege_break_range: i32,
+    pub siege_break_range: f32,
     /// Threat power multiplier from local tile corruption (additive, e.g. 0.5 = +50% at full corruption).
     pub corruption_threat_multiplier: f32,
     /// Ticks a shadow fox must wait after an ambush before it can stalk again.
     pub ambush_cooldown_ticks: u32,
     /// Range (manhattan) within which cats witness an ambush and have safety drained.
-    pub ambush_witness_range: i32,
+    pub ambush_witness_range: f32,
     /// Safety drain applied to cats who witness a nearby ambush.
     pub ambush_witness_safety_drain: f32,
     /// 219: half-life (in ticks) of `RecentAmbushMap` per-tile values.
@@ -5686,7 +5686,7 @@ pub struct WildlifeConstants {
     /// requires adjacency). Phase B is detection-only; Phase C wires
     /// the per-tick safety/mood drain.
     #[serde(default = "default_shadow_fox_haunting_edge_distance")]
-    pub shadow_fox_haunting_edge_distance: i32,
+    pub shadow_fox_haunting_edge_distance: f32,
     /// While Reconstituting (sitting on a high-corruption tile),
     /// coherence recovers at `recovery_corrupt × this` per tick.
     /// Default `3.0` makes recovery decisive — a shadow-fox that
@@ -5699,7 +5699,7 @@ pub struct WildlifeConstants {
     /// future change can tune perception scope without recompiling
     /// the sensory profile.
     #[serde(default = "default_shadow_fox_motivation_scan_radius")]
-    pub shadow_fox_motivation_scan_radius: i32,
+    pub shadow_fox_motivation_scan_radius: f32,
     /// Minimum drive-pressure required for the motivation tick to
     /// transition out of the current state. When all four drives'
     /// pressures fall below this, the tick declines to transition —
@@ -5722,7 +5722,7 @@ pub struct WildlifeConstants {
     /// 8 tiles cats are effectively isolated from each other for
     /// shadow-fox perception purposes.
     #[serde(default = "default_shadow_fox_dread_isolation_radius")]
-    pub shadow_fox_dread_isolation_radius: i32,
+    pub shadow_fox_dread_isolation_radius: f32,
     /// Minimum number of nearby allies (within
     /// `shadow_fox_dread_isolation_radius`) that triggers Dread
     /// group-suppression. Default `2` — a cat with at least 2 allies
@@ -5743,7 +5743,7 @@ pub struct WildlifeConstants {
     /// psychologically present, far enough to not trigger the
     /// adjacent-cell combat threshold.
     #[serde(default = "default_shadow_fox_haunting_drain_radius")]
-    pub shadow_fox_haunting_drain_radius: i32,
+    pub shadow_fox_haunting_drain_radius: f32,
     /// Per-tick negative mood-valence delta applied to a cat being
     /// haunted (additive on `Mood.valence`, clamped at -1). Default
     /// `0.002` — over a 150-tick haunting episode the cat's mood
@@ -5776,7 +5776,7 @@ pub struct WildlifeConstants {
     /// the motivation scan radius; lifted as a knob in case Entropy
     /// should range farther than the other drives.
     #[serde(default = "default_shadow_fox_frontier_detection_range")]
-    pub shadow_fox_frontier_detection_range: i32,
+    pub shadow_fox_frontier_detection_range: f32,
 }
 
 impl Default for WildlifeConstants {
@@ -5788,27 +5788,27 @@ impl Default for WildlifeConstants {
             patrol_jitter_chance: 0.1,
             detection_narrative_cooldown: 100,
             spawn_narrative_cooldown: 50,
-            base_detection_range: 8,
-            forest_range_penalty: 1,
+            base_detection_range: 8.0,
+            forest_range_penalty: 1.0,
             threat_safety_drain: 0.15,
             threat_mood_penalty: -0.2,
             threat_mood_ticks: 30,
             predator_hunt_chance: 0.1,
-            predator_hunt_range_fox: 3,
-            predator_hunt_range_hawk: 5,
-            predator_hunt_range_snake: 1,
-            predator_hunt_range_shadow_fox: 3,
+            predator_hunt_range_fox: 3.0,
+            predator_hunt_range_hawk: 5.0,
+            predator_hunt_range_snake: 1.0,
+            predator_hunt_range_shadow_fox: 3.0,
             predator_kill_chance: 0.3,
             predator_kill_narrative_chance: 0.15,
             initial_fox_count_min: 2,
             initial_fox_count_max: 3,
-            initial_fox_min_distance: 10,
+            initial_fox_min_distance: 10.0,
             initial_hawk_count_min: 1,
             initial_hawk_count_max: 2,
-            initial_hawk_min_distance: 10,
+            initial_hawk_min_distance: 10.0,
             initial_snake_count_min: 1,
             initial_snake_count_max: 2,
-            initial_snake_min_distance: 7,
+            initial_snake_min_distance: 7.0,
             carcass_corruption_rate: 0.002,
             carcass_drop_chance: 0.25,
             carcass_max_age: 500,
@@ -5818,12 +5818,12 @@ impl Default for WildlifeConstants {
             ward_siege_chance: 0.3,
             ward_siege_decay_bonus: 0.0005,
             ward_siege_corruption_rate: 0.005,
-            ward_siege_corruption_radius: 3,
+            ward_siege_corruption_radius: 3.0,
             ward_siege_max_ticks: 200,
-            siege_break_range: 3,
+            siege_break_range: 3.0,
             corruption_threat_multiplier: 0.5,
             ambush_cooldown_ticks: 100,
-            ambush_witness_range: 12,
+            ambush_witness_range: 12.0,
             ambush_witness_safety_drain: 0.08,
             recent_ambush_half_life_ticks: default_recent_ambush_half_life_ticks(),
             fox_approach_corridor_deposit_per_tick: default_fox_approach_corridor_deposit_per_tick(
@@ -5879,24 +5879,24 @@ fn default_shadow_fox_entropy_distance_scale() -> f32 {
     0.1
 }
 
-fn default_shadow_fox_haunting_edge_distance() -> i32 {
-    4
+fn default_shadow_fox_haunting_edge_distance() -> f32 {
+    4.0
 }
 
 fn default_shadow_fox_reconstituting_recovery_multiplier() -> f32 {
     3.0
 }
 
-fn default_shadow_fox_motivation_scan_radius() -> i32 {
-    12
+fn default_shadow_fox_motivation_scan_radius() -> f32 {
+    12.0
 }
 
 fn default_shadow_fox_motivation_min_pressure() -> f32 {
     0.05
 }
 
-fn default_shadow_fox_dread_isolation_radius() -> i32 {
-    8
+fn default_shadow_fox_dread_isolation_radius() -> f32 {
+    8.0
 }
 
 fn default_shadow_fox_dread_group_threshold() -> u32 {
@@ -5907,8 +5907,8 @@ fn default_shadow_fox_dread_group_suppression() -> f32 {
     0.2
 }
 
-fn default_shadow_fox_haunting_drain_radius() -> i32 {
-    5
+fn default_shadow_fox_haunting_drain_radius() -> f32 {
+    5.0
 }
 
 fn default_shadow_fox_haunting_mood_drain() -> f32 {
@@ -5927,8 +5927,8 @@ fn default_shadow_fox_haunting_escalation_ticks() -> u64 {
     30
 }
 
-fn default_shadow_fox_frontier_detection_range() -> i32 {
-    12
+fn default_shadow_fox_frontier_detection_range() -> f32 {
+    12.0
 }
 
 fn default_shadow_fox_coherence_decay_clean() -> f32 {
@@ -6024,11 +6024,11 @@ pub struct FoxEcologyConstants {
 
     // --- Risk assessment ---
     /// Distance at which a fox actively avoids a healthy adult cat.
-    pub cat_avoidance_range: i32,
+    pub cat_avoidance_range: f32,
     /// Hunger level above which fox considers attacking risky targets.
     pub desperate_hunger_threshold: f32,
     /// Distance from den at which fox attacks ANY intruder (when cubs present).
-    pub den_defense_range: i32,
+    pub den_defense_range: f32,
     /// Health fraction below which fox flees.
     pub flee_health_threshold: f32,
     /// Number of nearby cats that triggers fox flee response.
@@ -6072,7 +6072,7 @@ pub struct FoxEcologyConstants {
 
     // --- Territory ---
     /// Default territory radius from den in tiles.
-    pub territory_radius: i32,
+    pub territory_radius: f32,
     /// Scent amount deposited per marking event.
     pub scent_deposit: f32,
     /// Global scent decay on `FoxScentMap` (and the symmetric
@@ -6092,15 +6092,15 @@ pub struct FoxEcologyConstants {
     /// Hard cap on fox dens in the world.
     pub max_dens: usize,
     /// Minimum tile distance between fox dens.
-    pub min_den_spacing: i32,
+    pub min_den_spacing: f32,
 
     // --- Store raiding ---
     /// Distance at which fox can detect colony food stores.
-    pub raid_smell_range: i32,
+    pub raid_smell_range: f32,
     /// Food units stolen per successful raid.
     pub raid_food_stolen: f32,
     /// Cat proximity to stores that deters a raid.
-    pub guard_deterrent_range: i32,
+    pub guard_deterrent_range: f32,
 
     // --- Ward / cat scent ---
     /// Hunger threshold above which a fox pushes through wards anyway.
@@ -6136,7 +6136,7 @@ pub struct FoxEcologyConstants {
     /// Maximum fox dens placed during world gen.
     pub initial_den_count_max: u32,
     /// Minimum distance from colony center for initial den placement.
-    pub initial_den_min_distance: i32,
+    pub initial_den_min_distance: f32,
 }
 
 impl Default for FoxEcologyConstants {
@@ -6150,9 +6150,9 @@ impl Default for FoxEcologyConstants {
             satiation_after_scavenge: DurationDays::new(0.5),
 
             // Risk assessment
-            cat_avoidance_range: 6,
+            cat_avoidance_range: 6.0,
             desperate_hunger_threshold: 0.9,
-            den_defense_range: 5,
+            den_defense_range: 5.0,
             flee_health_threshold: 0.4,
             outnumbered_flee_count: 2,
 
@@ -6176,16 +6176,16 @@ impl Default for FoxEcologyConstants {
             starvation_death_duration: DurationDays::new(2.0),
 
             // Territory
-            territory_radius: 18,
+            territory_radius: 18.0,
             scent_deposit: 0.1,
             scent_decay_rate: RatePerDay::new(0.1),
             max_dens: 3,
-            min_den_spacing: 25,
+            min_den_spacing: 25.0,
 
             // Store raiding
-            raid_smell_range: 12,
+            raid_smell_range: 12.0,
             raid_food_stolen: 2.0,
-            guard_deterrent_range: 5,
+            guard_deterrent_range: 5.0,
 
             // Ward / cat scent
             ward_hunger_override_threshold: 0.7,
@@ -6203,7 +6203,7 @@ impl Default for FoxEcologyConstants {
             // Initial spawn
             initial_den_count_min: 1,
             initial_den_count_max: 2,
-            initial_den_min_distance: 15,
+            initial_den_min_distance: 15.0,
         }
     }
 }
@@ -6223,13 +6223,13 @@ pub struct HawkEcologyConstants {
     /// Health fraction below which hawk switches to Fleeing.
     pub flee_health_threshold: f32,
     /// Tile range at which a hawk avoids healthy adult cats.
-    pub cat_avoidance_range: i32,
+    pub cat_avoidance_range: f32,
     /// Tile range from which hawk initiates a dive.
-    pub dive_range: i32,
+    pub dive_range: f32,
     /// Detection range for spotting prey from altitude.
-    pub detection_range: i32,
+    pub detection_range: f32,
     /// Tiles searched for a Perch zone.
-    pub perch_search_radius: i32,
+    pub perch_search_radius: f32,
     /// Ticks the hawk perches before advancing the Resting plan.
     pub rest_duration_ticks: u64,
     /// Sustained starvation before death.
@@ -6249,10 +6249,10 @@ impl Default for HawkEcologyConstants {
             hunger_decay_rate: RatePerDay::new(0.15),
             satiation_after_dive_kill: DurationDays::new(0.7),
             flee_health_threshold: 0.4,
-            cat_avoidance_range: 4,
-            dive_range: 6,
-            detection_range: 12,
-            perch_search_radius: 15,
+            cat_avoidance_range: 4.0,
+            dive_range: 6.0,
+            detection_range: 12.0,
+            perch_search_radius: 15.0,
             rest_duration_ticks: 200,
             starvation_death_duration: DurationDays::new(2.0),
             post_action_cooldown: DurationDays::new(0.4),
@@ -6285,11 +6285,11 @@ pub struct SnakeEcologyConstants {
     /// Health fraction below which snake switches to Fleeing.
     pub flee_health_threshold: f32,
     /// Tile range for strike (adjacency by default).
-    pub strike_range: i32,
+    pub strike_range: f32,
     /// Detection range for sensing prey from cover.
-    pub detection_range: i32,
+    pub detection_range: f32,
     /// Search radius for Cover zone.
-    pub cover_search_radius: i32,
+    pub cover_search_radius: f32,
     /// Long; snakes survive lean periods.
     pub starvation_death_duration: DurationDays,
     /// Post-strike / post-bask cooldown.
@@ -6310,9 +6310,9 @@ impl Default for SnakeEcologyConstants {
             ambush_settle_ticks: 40,
             satiation_after_strike_kill: DurationDays::new(2.0),
             flee_health_threshold: 0.5,
-            strike_range: 1,
-            detection_range: 4,
-            cover_search_radius: 8,
+            strike_range: 1.0,
+            detection_range: 4.0,
+            cover_search_radius: 8.0,
             starvation_death_duration: DurationDays::new(5.0),
             post_action_cooldown: DurationDays::new(0.5),
             softmax_temperature: 0.15,
@@ -6340,8 +6340,8 @@ pub struct FateConstants {
     pub rival_zodiac_score: f32,
     pub rival_personality_weight: f32,
     pub rival_jitter: f32,
-    pub love_awaken_distance: i32,
-    pub rival_awaken_distance: i32,
+    pub love_awaken_distance: f32,
+    pub rival_awaken_distance: f32,
 }
 
 impl Default for FateConstants {
@@ -6354,8 +6354,8 @@ impl Default for FateConstants {
             rival_zodiac_score: 0.5,
             rival_personality_weight: 0.3,
             rival_jitter: 0.05,
-            love_awaken_distance: 5,
-            rival_awaken_distance: 10,
+            love_awaken_distance: 5.0,
+            rival_awaken_distance: 10.0,
         }
     }
 }
@@ -6432,20 +6432,20 @@ pub struct CoordinationConstants {
     /// raw food) to issue a build.
     #[serde(default = "default_unmet_demand_amplifier")]
     pub unmet_demand_amplifier: f32,
-    pub wildlife_breach_range: i32,
+    pub wildlife_breach_range: f32,
     pub build_directive_priority_base: f32,
     pub build_directive_priority_building_scale: f32,
     pub forage_critical_multiplier: f32,
     pub build_repair_priority_base: f32,
     pub build_repair_priority_building_scale: f32,
     /// Range from colony buildings within which wildlife counts as a threat.
-    pub threat_proximity_range: i32,
+    pub threat_proximity_range: f32,
     /// Priority for targeted patrol toward an incursion point.
     pub threat_patrol_targeted_priority: f32,
     /// Range from a building at which wildlife triggers a Fight directive (breach).
-    pub colony_breach_range: i32,
+    pub colony_breach_range: f32,
     /// Radius (manhattan) to check fox scent near colony center for preemptive patrol.
-    pub preemptive_patrol_scent_radius: i32,
+    pub preemptive_patrol_scent_radius: f32,
     /// Scent level threshold above which a preemptive patrol is issued.
     pub preemptive_patrol_scent_threshold: f32,
     /// Priority for preemptive patrol issued from fox scent detection.
@@ -6478,7 +6478,7 @@ pub struct CoordinationConstants {
     /// Radius (tiles) around colony center that coordinators sweep for
     /// corruption hotspots.
     #[serde(default = "default_corruption_search_radius")]
-    pub corruption_search_radius: i32,
+    pub corruption_search_radius: f32,
     /// Sample-step size for the corruption sweep (every Nth tile).
     #[serde(default = "default_corruption_search_step")]
     pub corruption_search_step: i32,
@@ -6503,11 +6503,11 @@ pub struct CoordinationConstants {
     pub urgent_directive_priority_threshold: f32,
     /// Maximum range in tiles for urgent directive auto-dispatch.
     #[serde(default = "default_urgent_dispatch_range")]
-    pub urgent_dispatch_range: i32,
+    pub urgent_dispatch_range: f32,
     /// Tiles around colony center within which a shadow-fox triggers posse
     /// assembly. Large enough to catch foxes before they ambush.
     #[serde(default = "default_posse_alarm_range")]
-    pub posse_alarm_range: i32,
+    pub posse_alarm_range: f32,
     /// How many cats the coordinator summons for a posse. 3-4 is the sweet
     /// spot: enough for ally damage bonuses, not so many the colony is
     /// disarmed defensively.
@@ -6548,8 +6548,8 @@ pub struct CoordinationConstants {
     pub alignment_match_increment: f32,
 }
 
-fn default_corruption_search_radius() -> i32 {
-    20
+fn default_corruption_search_radius() -> f32 {
+    20.0
 }
 fn default_corruption_search_step() -> i32 {
     3
@@ -6581,12 +6581,12 @@ fn default_urgent_directive_priority_threshold() -> f32 {
     // letting normal directives flow through physical coordinator delivery.
     0.75
 }
-fn default_urgent_dispatch_range() -> i32 {
-    50
+fn default_urgent_dispatch_range() -> f32 {
+    50.0
 }
 
-fn default_posse_alarm_range() -> i32 {
-    20
+fn default_posse_alarm_range() -> f32 {
+    20.0
 }
 
 fn default_posse_size() -> usize {
@@ -6650,16 +6650,16 @@ fn default_construct_site_directive_priority() -> f32 {
     0.85
 }
 
-fn default_survey_explore_radius() -> i32 {
-    4
+fn default_survey_explore_radius() -> f32 {
+    4.0
 }
 
-fn default_passive_explore_radius() -> i32 {
-    2
+fn default_passive_explore_radius() -> f32 {
+    2.0
 }
 
-fn default_explore_perception_radius() -> i32 {
-    10
+fn default_explore_perception_radius() -> f32 {
+    10.0
 }
 
 fn default_explore_satiation_threshold() -> f32 {
@@ -6690,11 +6690,11 @@ fn default_bury_ticks() -> u64 {
     60
 }
 
-fn default_burial_sense_range() -> i32 {
+fn default_burial_sense_range() -> f32 {
     // 035: smaller than the 10-tile social-family ranges. Cats must
     // encounter the corpse to react; design intent is "burial is a
     // local response to a local death."
-    8
+    8.0
 }
 
 fn default_bury_belonging_gain() -> f32 {
@@ -6713,11 +6713,11 @@ fn default_grave_anti_corruption_strength() -> f32 {
     0.05
 }
 
-fn default_grave_anti_corruption_radius() -> i32 {
+fn default_grave_anti_corruption_radius() -> f32 {
     // 035: foundation-only aura radius. Smaller than ward radii so a
     // cluster of graves doesn't accidentally re-paper a corruption
     // hotspot before the balance-tuning pass.
-    4
+    4.0
 }
 
 fn default_acceptance_per_feed_kitten_per_tick() -> f32 {
@@ -6750,9 +6750,9 @@ fn default_respect_per_witness() -> f32 {
     0.0001
 }
 
-fn default_respect_witness_radius() -> i32 {
-    // Manhattan tiles. Mirrors hearth_effect_radius scale.
-    5
+fn default_respect_witness_radius() -> f32 {
+    // Tile-domain radius. Mirrors hearth_effect_radius scale.
+    5.0
 }
 
 fn default_respect_witness_cap() -> u32 {
@@ -6848,16 +6848,16 @@ impl Default for CoordinationConstants {
             tanning_pressure_multiplier: default_tanning_pressure_multiplier(),
             cook_directive_priority: default_cook_directive_priority(),
             unmet_demand_amplifier: default_unmet_demand_amplifier(),
-            wildlife_breach_range: 10,
+            wildlife_breach_range: 10.0,
             build_directive_priority_base: 0.5,
             build_directive_priority_building_scale: 0.2,
             forage_critical_multiplier: 0.8,
             build_repair_priority_base: 0.6,
             build_repair_priority_building_scale: 0.1,
-            threat_proximity_range: 20,
+            threat_proximity_range: 20.0,
             threat_patrol_targeted_priority: 0.6,
-            colony_breach_range: 8,
-            preemptive_patrol_scent_radius: 25,
+            colony_breach_range: 8.0,
+            preemptive_patrol_scent_radius: 25.0,
             preemptive_patrol_scent_threshold: 0.3,
             preemptive_patrol_priority: 0.4,
             no_store_pressure_multiplier: 5.0,
@@ -7470,7 +7470,7 @@ impl Default for KnowledgeConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PersonalityFrictionConstants {
-    pub friction_range: i32,
+    pub friction_range: f32,
     pub tradition_vs_independence_threshold: f32,
     pub tradition_vs_independence_decay: f32,
     pub diligence_vs_playfulness_threshold: f32,
@@ -7484,7 +7484,7 @@ pub struct PersonalityFrictionConstants {
 impl Default for PersonalityFrictionConstants {
     fn default() -> Self {
         Self {
-            friction_range: 3,
+            friction_range: 3.0,
             tradition_vs_independence_threshold: 0.8,
             tradition_vs_independence_decay: -0.0002,
             diligence_vs_playfulness_threshold: 0.8,
@@ -7510,9 +7510,9 @@ pub struct WorldGenConstants {
     /// Target number of DeepPool sites per map.
     pub deep_pool_count: usize,
     /// Minimum manhattan distance between any two special site anchors.
-    pub special_min_spacing: i32,
+    pub special_min_spacing: f32,
     /// Minimum manhattan distance from AncientRuin to colony site.
-    pub corruption_colony_min_distance: i32,
+    pub corruption_colony_min_distance: f32,
     /// Minimum distance from map edges for special site placement.
     pub edge_margin: i32,
     /// Maximum candidates to evaluate per type after shuffle.
@@ -7526,8 +7526,8 @@ impl Default for WorldGenConstants {
             fairy_ring_count: 2,
             standing_stone_count: 3,
             deep_pool_count: 2,
-            special_min_spacing: 15,
-            corruption_colony_min_distance: 30,
+            special_min_spacing: 15.0,
+            corruption_colony_min_distance: 30.0,
             edge_margin: 10,
             max_placement_attempts: 500,
         }
@@ -7724,7 +7724,7 @@ pub struct TremorConstants {
     /// Larger values make prey more sensitive to distant footfall but
     /// flatten the spatial gradient. Default 6 tiles — roughly two
     /// bucket-radii at the canonical bucket_size=3.
-    pub detect_radius: i32,
+    pub detect_radius: f32,
 }
 
 impl Default for TremorConstants {
@@ -7739,7 +7739,7 @@ impl Default for TremorConstants {
             deposit_per_tick: 1.0,
             decay_per_tick: 0.4,
             detect_threshold: 0.25,
-            detect_radius: 6,
+            detect_radius: 6.0,
         }
     }
 }
@@ -7764,48 +7764,48 @@ pub struct EnvironmentalQualityConstants {
     pub comfort_terrain_rock: f32,
     // --- Comfort: building bonuses (peak × condition, with radii) ---
     pub comfort_building_den_peak: f32,
-    pub comfort_building_den_radius: i32,
+    pub comfort_building_den_radius: f32,
     pub comfort_building_hearth_peak: f32,
-    pub comfort_building_hearth_radius: i32,
+    pub comfort_building_hearth_radius: f32,
     pub comfort_building_stores_peak: f32,
-    pub comfort_building_stores_radius: i32,
+    pub comfort_building_stores_radius: f32,
     pub comfort_building_workshop_peak: f32,
-    pub comfort_building_workshop_radius: i32,
+    pub comfort_building_workshop_radius: f32,
     pub comfort_building_garden_peak: f32,
-    pub comfort_building_garden_radius: i32,
+    pub comfort_building_garden_radius: f32,
     pub comfort_building_ward_post_peak: f32,
-    pub comfort_building_ward_post_radius: i32,
+    pub comfort_building_ward_post_radius: f32,
     // --- Cleanliness ---
     pub cleanliness_terrain_mud: f32,
     pub cleanliness_corpse_peak: f32,
-    pub cleanliness_corpse_radius: i32,
+    pub cleanliness_corpse_radius: f32,
     pub cleanliness_dirty_building_peak: f32,
-    pub cleanliness_dirty_building_radius: i32,
+    pub cleanliness_dirty_building_radius: f32,
     // --- Beauty (terrain sources) ---
     pub beauty_terrain_fairy_ring_peak: f32,
-    pub beauty_terrain_fairy_ring_radius: i32,
+    pub beauty_terrain_fairy_ring_radius: f32,
     pub beauty_terrain_standing_stone_peak: f32,
-    pub beauty_terrain_standing_stone_radius: i32,
+    pub beauty_terrain_standing_stone_radius: f32,
     pub beauty_terrain_deep_pool_peak: f32,
-    pub beauty_terrain_deep_pool_radius: i32,
+    pub beauty_terrain_deep_pool_radius: f32,
     pub beauty_terrain_garden_peak: f32,
-    pub beauty_terrain_garden_radius: i32,
+    pub beauty_terrain_garden_radius: f32,
     pub beauty_terrain_ancient_ruin: f32,
     /// Subtracted from on-tile beauty proportional to `tile.corruption`
     /// during the terrain sweep. High corruption suppresses beauty.
     pub beauty_corruption_suppression: f32,
     // --- Beauty (building aesthetic upkeep) ---
     pub beauty_building_den_peak: f32,
-    pub beauty_building_den_radius: i32,
+    pub beauty_building_den_radius: f32,
     pub beauty_building_hearth_peak: f32,
-    pub beauty_building_hearth_radius: i32,
+    pub beauty_building_hearth_radius: f32,
     pub beauty_building_garden_peak: f32,
-    pub beauty_building_garden_radius: i32,
+    pub beauty_building_garden_radius: f32,
     // --- Mystery ---
-    pub mystery_stamp_radius: i32,
+    pub mystery_stamp_radius: f32,
     pub mystery_stamp_threshold: f32,
     // --- Corruption (perception map) ---
-    pub corruption_stamp_radius: i32,
+    pub corruption_stamp_radius: f32,
     pub corruption_stamp_threshold: f32,
     // --- Modifier (personality scaling + combination) ---
     /// Multiplier on `local_comfort` per unit warmth. `0.3` ⇒ a
@@ -7847,46 +7847,46 @@ impl Default for EnvironmentalQualityConstants {
             comfort_terrain_rock: -0.1,
             // Comfort buildings
             comfort_building_den_peak: 0.20,
-            comfort_building_den_radius: 2,
+            comfort_building_den_radius: 2.0,
             comfort_building_hearth_peak: 0.25,
-            comfort_building_hearth_radius: 3,
+            comfort_building_hearth_radius: 3.0,
             comfort_building_stores_peak: 0.05,
-            comfort_building_stores_radius: 1,
+            comfort_building_stores_radius: 1.0,
             comfort_building_workshop_peak: 0.10,
-            comfort_building_workshop_radius: 1,
+            comfort_building_workshop_radius: 1.0,
             comfort_building_garden_peak: 0.15,
-            comfort_building_garden_radius: 2,
+            comfort_building_garden_radius: 2.0,
             comfort_building_ward_post_peak: 0.05,
-            comfort_building_ward_post_radius: 1,
+            comfort_building_ward_post_radius: 1.0,
             // Cleanliness
             cleanliness_terrain_mud: -0.15,
             cleanliness_corpse_peak: -0.4,
-            cleanliness_corpse_radius: 3,
+            cleanliness_corpse_radius: 3.0,
             cleanliness_dirty_building_peak: -0.3,
-            cleanliness_dirty_building_radius: 2,
+            cleanliness_dirty_building_radius: 2.0,
             // Beauty terrain
             beauty_terrain_fairy_ring_peak: 0.4,
-            beauty_terrain_fairy_ring_radius: 3,
+            beauty_terrain_fairy_ring_radius: 3.0,
             beauty_terrain_standing_stone_peak: 0.25,
-            beauty_terrain_standing_stone_radius: 2,
+            beauty_terrain_standing_stone_radius: 2.0,
             beauty_terrain_deep_pool_peak: 0.15,
-            beauty_terrain_deep_pool_radius: 2,
+            beauty_terrain_deep_pool_radius: 2.0,
             beauty_terrain_garden_peak: 0.20,
-            beauty_terrain_garden_radius: 2,
+            beauty_terrain_garden_radius: 2.0,
             beauty_terrain_ancient_ruin: -0.1,
             beauty_corruption_suppression: 0.2,
             // Beauty buildings
             beauty_building_den_peak: 0.10,
-            beauty_building_den_radius: 1,
+            beauty_building_den_radius: 1.0,
             beauty_building_hearth_peak: 0.10,
-            beauty_building_hearth_radius: 1,
+            beauty_building_hearth_radius: 1.0,
             beauty_building_garden_peak: 0.20,
-            beauty_building_garden_radius: 2,
+            beauty_building_garden_radius: 2.0,
             // Mystery
-            mystery_stamp_radius: 2,
+            mystery_stamp_radius: 2.0,
             mystery_stamp_threshold: 0.0,
             // Corruption perception
-            corruption_stamp_radius: 3,
+            corruption_stamp_radius: 3.0,
             corruption_stamp_threshold: 0.0,
             // Modifier
             warmth_bonus: 0.3,
@@ -7914,13 +7914,13 @@ pub struct FulfillmentConstants {
     /// Decay multiplier when no bonded cat is within proximity range.
     pub social_warmth_isolation_multiplier: f32,
     /// Manhattan distance to detect nearby bonded companions for isolation check.
-    pub social_warmth_isolation_range: i32,
+    pub social_warmth_isolation_range: f32,
     /// social_warmth gain per groom-other completion (both parties).
     pub social_warmth_groom_other_gain: f32,
     /// Passive per-tick social_warmth gain when a bonded companion is nearby.
     pub social_warmth_bond_proximity_rate: f32,
     /// Manhattan range for bond-proximity social_warmth restoration.
-    pub social_warmth_bond_proximity_range: i32,
+    pub social_warmth_bond_proximity_range: f32,
     /// Per-tick social_warmth gain while actively socializing with a target.
     pub social_warmth_socialize_per_tick: f32,
     // --- Ticket 032: body-condition axis (ship-inert) ---
@@ -7956,10 +7956,10 @@ impl Default for FulfillmentConstants {
         Self {
             social_warmth_base_decay: 0.00008,
             social_warmth_isolation_multiplier: 2.5,
-            social_warmth_isolation_range: 3,
+            social_warmth_isolation_range: 3.0,
             social_warmth_groom_other_gain: 0.08,
             social_warmth_bond_proximity_rate: 0.0002,
-            social_warmth_bond_proximity_range: 3,
+            social_warmth_bond_proximity_range: 3.0,
             social_warmth_socialize_per_tick: 0.001,
             // Ticket 032 — body_condition axis ships inert.
             body_condition_decay_per_unit_hunger_deficit: 0.0,
@@ -8141,7 +8141,7 @@ pub struct CourtshipPracticeConstants {
     /// emission target. Wider than `MATE_TARGET_RANGE = 10` because
     /// joint practices are multi-season — a cat may pursue a partner
     /// across the colony, not require adjacency every tick.
-    pub candidate_range: i32,
+    pub candidate_range: f32,
     /// Minimum quality score for a Friends-bonded peer to trigger
     /// emission. See `PairingConstants::emission_threshold` for the
     /// 257-recalibration rationale.
@@ -8180,7 +8180,7 @@ impl Default for CourtshipPracticeConstants {
         // `logs/baselines/current.json` and the seed-42 mating-chain
         // verdict gate.
         Self {
-            candidate_range: 25,
+            candidate_range: 25.0,
             emission_threshold: 0.20,
             bias_multiplier: 1.5,
             romantic_floor: 0.05,
@@ -8202,7 +8202,7 @@ pub struct PlayBoutPracticeConstants {
     /// Manhattan-distance candidate filter when scanning for a play
     /// partner. Tighter than Courtship (4 vs 25) — play is opportunistic
     /// co-presence rather than colony-wide pursuit.
-    pub candidate_range: i32,
+    pub candidate_range: f32,
     /// Minimum quality score for a peer to trigger PlayBout emission.
     /// Score = playfulness_avg + mood_valence_avg + bond_score; floor of
     /// 0.5 keeps emissions out of the noise-floor for low-mood pairs.
@@ -8252,7 +8252,7 @@ pub struct PlayBoutPracticeConstants {
 impl Default for PlayBoutPracticeConstants {
     fn default() -> Self {
         Self {
-            candidate_range: 4,
+            candidate_range: 4.0,
             emission_threshold: 0.5,
             bias_multiplier: 1.2,
             playfulness_floor: 0.6,
@@ -8309,7 +8309,7 @@ pub struct EscapeViabilityConstants {
     /// "two-turn flight options" footprint at the current 1
     /// tile/tick movement rate.
     #[serde(default = "default_escape_viability_sprint_radius")]
-    pub sprint_radius: i32,
+    pub sprint_radius: f32,
     /// Multiplier on the terrain-openness term
     /// (walkable / box-area). `terrain_weight + mobility_weight +
     /// dependent_weight` should remain ≤ 1.0 so the scalar saturates
@@ -8359,8 +8359,8 @@ pub struct EscapeViabilityConstants {
     pub cover_availability_threshold: f32,
 }
 
-fn default_escape_viability_sprint_radius() -> i32 {
-    3
+fn default_escape_viability_sprint_radius() -> f32 {
+    3.0
 }
 fn default_escape_viability_terrain_weight() -> f32 {
     0.6
@@ -8717,7 +8717,7 @@ pub struct AffordancesConstants {
     /// `(perceiver, target)` beyond this range are not written; consumers
     /// see the `0.0` default. Mirrors the belief-substrate `WITNESS_RANGE`
     /// of 10 tiles by default.
-    pub sensing_range: i32,
+    pub sensing_range: f32,
     pub predation: PredationAffordanceConstants,
     pub threat_response: ThreatResponseAffordanceConstants,
     pub conflict_low: ConflictLowAffordanceConstants,
@@ -8728,7 +8728,7 @@ pub struct AffordancesConstants {
 impl Default for AffordancesConstants {
     fn default() -> Self {
         Self {
-            sensing_range: 10,
+            sensing_range: 10.0,
             predation: PredationAffordanceConstants::default(),
             threat_response: ThreatResponseAffordanceConstants::default(),
             conflict_low: ConflictLowAffordanceConstants::default(),
@@ -8760,7 +8760,7 @@ pub struct PlayCueEmissionConstants {
     /// `PlayBow` candidate-range in tiles. A peer must be within this
     /// range (Manhattan) for the actor to consider soliciting. Default 5
     /// — close enough for the bow to be perceived.
-    pub playbow_candidate_range_tiles: i32,
+    pub playbow_candidate_range_tiles: f32,
     /// Per-tick probability that an eligible cat emits a `PlayBow`.
     /// Default `0.002` — roughly one solicitation per 500 eligible ticks,
     /// modulated by cooldown.
@@ -8775,7 +8775,7 @@ pub struct PlayCueEmissionConstants {
     pub reciprocal_window_ticks: u64,
     /// Manhattan range within which an approaching peer counts as
     /// "advanced into engagement range". Default 3 tiles.
-    pub reciprocal_engagement_range_tiles: i32,
+    pub reciprocal_engagement_range_tiles: f32,
     /// Tick count a pair must remain in `NearPairCache` together before
     /// the tracker emits `SustainedCoPresence`. Default 30 — short
     /// adjacencies don't count as engagement signal; ~30 ticks of
@@ -8792,11 +8792,11 @@ impl Default for PlayCueEmissionConstants {
         Self {
             playbow_min_playfulness: 0.4,
             playbow_min_mood_valence: 0.0,
-            playbow_candidate_range_tiles: 5,
+            playbow_candidate_range_tiles: 5.0,
             playbow_emit_chance_per_tick: 0.002,
             playbow_cooldown_ticks: 200,
             reciprocal_window_ticks: 80,
-            reciprocal_engagement_range_tiles: 3,
+            reciprocal_engagement_range_tiles: 3.0,
             sustained_copresence_threshold_ticks: 30,
             sustained_copresence_emit_cooldown_ticks: 200,
         }
@@ -8852,12 +8852,12 @@ mod tests {
         let d = SimConstants::default();
         // Hawk — ticket 025 §9 table.
         assert_eq!(d.hawk_ecology.flee_health_threshold, 0.4);
-        assert_eq!(d.hawk_ecology.cat_avoidance_range, 4);
-        assert_eq!(d.hawk_ecology.dive_range, 6);
+        assert_eq!(d.hawk_ecology.cat_avoidance_range, 4.0);
+        assert_eq!(d.hawk_ecology.dive_range, 6.0);
         assert_eq!(d.hawk_ecology.outnumbered_flee_count, 2);
         assert_eq!(d.hawk_ecology.softmax_temperature, 0.15);
         // Snake — ticket 025 §9 table.
-        assert_eq!(d.snake_ecology.strike_range, 1);
+        assert_eq!(d.snake_ecology.strike_range, 1.0);
         assert_eq!(d.snake_ecology.flee_health_threshold, 0.5);
         assert_eq!(d.snake_ecology.cold_threshold, 0.3);
         assert_eq!(d.snake_ecology.bask_warmth_restore, 1.0);
@@ -8894,8 +8894,8 @@ mod tests {
         });
         let parsed: SimConstants =
             serde_json::from_value(legacy_json).expect("legacy header should still load");
-        assert_eq!(parsed.hawk_ecology.dive_range, 6);
-        assert_eq!(parsed.snake_ecology.strike_range, 1);
+        assert_eq!(parsed.hawk_ecology.dive_range, 6.0);
+        assert_eq!(parsed.snake_ecology.strike_range, 1.0);
     }
 
     /// 284 (first-light) + 296 (curve-shape extraction): ward-placement

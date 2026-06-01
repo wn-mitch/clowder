@@ -528,11 +528,12 @@ const CRAFT_ITEM_W_THREAT: f32 = 0.30;
 const CRAFT_ITEM_W_SKILL: f32 = 0.20;
 const CRAFT_ITEM_W_RECENT: f32 = 0.50;
 
-/// Ticket 463 — Manhattan reach threshold for a cat's Stores. Cats
-/// within this distance of a Stores building can pull its inputs into
-/// inventory via `RetrieveCraftInputs`. Matches the proximity used by
-/// other Stores-walking resolvers (cooking / drying / smoking).
-const CRAFT_ITEM_STORES_REACH: i32 = 64;
+/// Ticket 463 — Euclidean reach threshold (tile-domain) for a cat's
+/// Stores. Cats within this distance of a Stores building can pull its
+/// inputs into inventory via `RetrieveCraftInputs`. Matches the
+/// proximity used by other Stores-walking resolvers (cooking / drying /
+/// smoking). Ticket 492 switched from Manhattan to Euclidean.
+const CRAFT_ITEM_STORES_REACH: f32 = 64.0;
 
 /// Ticket 463 — per-cat recipe-scoring loop for `CraftItemAspiration`.
 /// Walks every recipe in the registry, computes the per-cat reachable-
@@ -619,7 +620,7 @@ fn step2_craft_item_recipe_scoring(
         *reachable.entry(slot.kind).or_insert(0) += 1;
     }
     for (store_pos, store_agg) in &stores_snapshot.stores {
-        if pos.manhattan_distance(store_pos) > CRAFT_ITEM_STORES_REACH {
+        if pos.distance_to(store_pos) > CRAFT_ITEM_STORES_REACH {
             continue;
         }
         for (&kind, &count) in store_agg {

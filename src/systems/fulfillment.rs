@@ -38,8 +38,8 @@ pub fn decay_fulfillment(
             if other == entity {
                 return false;
             }
-            let dist = pos.manhattan_distance(&other_pos);
-            if dist == 0 || dist > fc.social_warmth_isolation_range {
+            let dist = pos.distance_to(&other_pos);
+            if dist == 0.0 || dist > fc.social_warmth_isolation_range {
                 return false;
             }
             relationships
@@ -83,8 +83,8 @@ pub fn bond_proximity_social_warmth(
             if other == entity {
                 return false;
             }
-            let dist = pos.manhattan_distance(&other_pos);
-            if dist == 0 || dist > fc.social_warmth_bond_proximity_range {
+            let dist = pos.distance_to(&other_pos);
+            if dist == 0.0 || dist > fc.social_warmth_bond_proximity_range {
                 return false;
             }
             relationships

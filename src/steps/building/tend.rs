@@ -67,7 +67,7 @@ pub fn resolve_tend(
         return StepOutcome::unwitnessed(StepResult::Fail("garden not found".into()));
     };
 
-    if pos.manhattan_distance(garden_pos) > 1 {
+    if pos.distance_to(garden_pos) > 1.0 {
         if cached_path.is_none() {
             *cached_path = path_plan.find_full_path(*pos, *garden_pos, map);
         }

@@ -76,14 +76,14 @@ pub fn resolve_flee_travel(
 ) -> StepOutcome<Option<FleeWitness>> {
     let reached = if *pos == target {
         true
-    } else if pos.manhattan_distance(&target) <= 1 {
+    } else if pos.distance_to(&target) <= 1.0 {
         *pos = target;
         true
     } else {
         if let Some(next) = path_plan.next_step(*pos, target, map) {
             *pos = next;
         }
-        *pos == target || pos.manhattan_distance(&target) <= 1
+        *pos == target || pos.distance_to(&target) <= 1.0
     };
     if !reached {
         return StepOutcome {

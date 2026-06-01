@@ -17,8 +17,8 @@ _Last generated: 2026-06-01._
 | In progress | 5 |
 | Ready | 122 |
 | Parked | 12 |
-| Blocked | 30 |
-| **Open total** | **169** |
+| Blocked | 31 |
+| **Open total** | **170** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,12 +40,12 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[ai-substrate] · score 0.91_
 - **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · score 0.90_
+- **[466](docs/open-work/tickets/466-travelto-greedy-step-pathing-lift-a-fallback-into-catpathplannext-step.md)** — TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step — _[ai-substrate] · score 0.90_
 
-## Epic progress (7)
+## Epic progress (8)
 
 Per-epic completion derived from each epic's roster table (or inline child references for phased epics).
 
@@ -57,6 +57,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 | **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 27 | 21 | 6 (0 / 3 / 1 / 2) | `▰▰▰▰▰▰▰▰▱▱` 78% |
 | **[135](docs/open-work/tickets/135-continuous-position-migration.md)** Continuous-position migration | ready | 0 | — | — | _no roster_ |
+| **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** Phase 2 | ready | 0 | — | — | _no roster_ |
 | **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** Sim per-tick throughput | in-progress | 0 | — | — | _no roster_ |
 
 ## In progress (5)
@@ -487,7 +488,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · parked 2026-05-25 · added 2026-05-18_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · parked 2026-05-20 · added 2026-05-20_
 
-## Blocked (30)
+## Blocked (31)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[018](docs/open-work/tickets/018-ruin-clearings.md)** — Ruin clearings (corruption nodes, PMD-flavored) — _[magic-mythic] · blocked-by 016 · added 2026-04-22_
@@ -519,6 +520,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
+- **[494](docs/open-work/tickets/494-492-euclidean-migration-per-drift-triage.md)** — 492 Euclidean migration: per-drift triage — _[substrate-migration] · blocked-by 492 · added 2026-06-01_
 
 ## Landed archive (352)
 

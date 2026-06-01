@@ -61,7 +61,7 @@ pub fn resolve_repair(
         return StepOutcome::unwitnessed(StepResult::Fail("building not found".into()));
     };
 
-    if pos.manhattan_distance(building_pos) > 1 {
+    if pos.distance_to(building_pos) > 1.0 {
         if cached_path.is_none() {
             *cached_path = path_plan.find_full_path(*pos, *building_pos, map);
         }

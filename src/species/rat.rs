@@ -48,8 +48,8 @@ impl PreyProfile for Rat {
     fn graze_cadence(&self) -> u64 {
         25
     }
-    fn alert_radius(&self) -> i32 {
-        4
+    fn alert_radius(&self) -> f32 {
+        4.0
     }
     fn freeze_ticks(&self) -> u64 {
         2
@@ -79,8 +79,8 @@ impl PreyProfile for Rat {
     fn den_raid_drop(&self) -> u32 {
         5
     }
-    fn den_spacing(&self) -> i32 {
-        10
+    fn den_spacing(&self) -> f32 {
+        10.0
     }
     fn den_density(&self) -> usize {
         100

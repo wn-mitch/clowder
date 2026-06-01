@@ -25,14 +25,14 @@ use crate::steps::{StepOutcome, StepResult};
 /// Diagonal step toward `target`. Returns `true` once the hawk is within
 /// `arrival_dist` tiles. Ignores terrain — hawks fly. Caller is
 /// responsible for refreshing `target` when zone semantics change.
-fn step_flying(pos: &mut Position, target: Position, arrival_dist: i32) -> bool {
-    if pos.manhattan_distance(&target) <= arrival_dist {
+fn step_flying(pos: &mut Position, target: Position, arrival_dist: f32) -> bool {
+    if pos.distance_to(&target) <= arrival_dist {
         return true;
     }
     let dx = (target.x() - pos.x()).signum();
     let dy = (target.y() - pos.y()).signum();
     pos.set_tile(pos.x() + dx, pos.y() + dy);
-    pos.manhattan_distance(&target) <= arrival_dist
+    pos.distance_to(&target) <= arrival_dist
 }
 
 /// Nearest map-edge position from `pos`. Used by `resolve_flee_sky` so
@@ -87,7 +87,7 @@ pub fn resolve_soar_to(
     let Some(target) = step_state.target_position else {
         return StepOutcome::bare(StepResult::Fail("no target position for SoarTo".into()));
     };
-    if step_flying(pos, target, 1) {
+    if step_flying(pos, target, 1.0) {
         return StepOutcome::bare(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -123,11 +123,11 @@ pub fn resolve_spot_prey(
     pos: &Position,
     prey_positions: &[Position],
     step_state: &mut HawkStepState,
-    detection_range: i32,
+    detection_range: f32,
 ) -> StepOutcome<bool> {
     let spotted = prey_positions
         .iter()
-        .any(|p| p.manhattan_distance(pos) <= detection_range);
+        .any(|p| p.distance_to(pos) <= detection_range);
     if spotted {
         return StepOutcome::witnessed(StepResult::Advance);
     }
@@ -166,11 +166,11 @@ pub fn resolve_dive_attack(
     pos: &mut Position,
     step_state: &mut HawkStepState,
     prey: &[(Entity, Position)],
-    strike_range: i32,
+    strike_range: f32,
 ) -> StepOutcome<Option<Entity>> {
     let Some((target_entity, target_pos)) = prey
         .iter()
-        .min_by_key(|(_, p)| p.manhattan_distance(pos))
+        .min_by_key(|(_, p)| p.tile_distance_squared(pos))
         .copied()
     else {
         return StepOutcome::unwitnessed(StepResult::Fail("no prey for dive".into()));
@@ -241,7 +241,7 @@ pub fn resolve_flee_sky(
     map: &TileMap,
 ) -> StepOutcome<bool> {
     let target = nearest_edge_target(*pos, map.width, map.height);
-    if step_flying(pos, target, 2) {
+    if step_flying(pos, target, 2.0) {
         return StepOutcome::witnessed(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -285,15 +285,20 @@ mod tests {
     fn soar_moves_diagonally_then_advances() {
         let map = TileMap::new(20, 20, Terrain::Grass);
         let mut pos = Position::new(0, 0);
+        // Ticket 494 — target bumped from (2,2) to (3,3) to preserve
+        // the "tick 1 = Continue, tick 2 = Advance" semantic under the
+        // post-realignment Chebyshev `distance_to`. Under Chebyshev,
+        // (1,1) is already 1 step from (2,2) → step_flying's
+        // `arrival_dist = 1.0` arms immediately, collapsing the test.
+        // With target (3,3): tick 1 → (1,1), Chebyshev to (3,3) = 2 →
+        // Continue; tick 2 → (2,2), Chebyshev to (3,3) = 1 → Advance.
         let mut state = HawkStepState {
-            target_position: Some(Position::new(2, 2)),
+            target_position: Some(Position::new(3, 3)),
             ..HawkStepState::default()
         };
-        // Tick 1 moves to (1,1) — still 2 away (Manhattan).
         let o1 = resolve_soar_to(&mut pos, &mut state, &map);
         assert!(matches!(o1.result, StepResult::Continue));
         assert_eq!(pos, Position::new(1, 1));
-        // Tick 2 moves to (2,2) — arrived.
         let o2 = resolve_soar_to(&mut pos, &mut state, &map);
         assert!(matches!(o2.result, StepResult::Advance));
     }
@@ -303,7 +308,7 @@ mod tests {
         let pos = Position::new(5, 5);
         let prey = vec![Position::new(8, 5)];
         let mut state = HawkStepState::default();
-        let outcome = resolve_spot_prey(&pos, &prey, &mut state, 5);
+        let outcome = resolve_spot_prey(&pos, &prey, &mut state, 5.0);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert!(outcome.witness);
     }
@@ -313,7 +318,7 @@ mod tests {
         let pos = Position::new(5, 5);
         let prey = vec![Position::new(20, 20)];
         let mut state = HawkStepState::default();
-        let outcome = resolve_spot_prey(&pos, &prey, &mut state, 5);
+        let outcome = resolve_spot_prey(&pos, &prey, &mut state, 5.0);
         assert!(matches!(outcome.result, StepResult::Continue));
         assert!(!outcome.witness);
     }
@@ -323,7 +328,7 @@ mod tests {
         let mut pos = Position::new(8, 5);
         let prey = vec![(Entity::from_bits(7), Position::new(8, 6))];
         let mut state = HawkStepState::default();
-        let outcome = resolve_dive_attack(&mut pos, &mut state, &prey, 1);
+        let outcome = resolve_dive_attack(&mut pos, &mut state, &prey, 1.0);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert_eq!(outcome.witness, Some(Entity::from_bits(7)));
     }
@@ -332,7 +337,7 @@ mod tests {
     fn dive_attack_fails_without_prey() {
         let mut pos = Position::new(5, 5);
         let mut state = HawkStepState::default();
-        let outcome = resolve_dive_attack(&mut pos, &mut state, &[], 2);
+        let outcome = resolve_dive_attack(&mut pos, &mut state, &[], 2.0);
         assert!(matches!(outcome.result, StepResult::Fail(_)));
         assert!(outcome.witness.is_none());
     }

@@ -62,12 +62,12 @@ pub fn resolve_load_drying_rack(
     skills: &Skills,
     crafting: &CraftingConstants,
     racks: &mut Query<(Entity, &Position, &Structure, &mut DryingRackState)>,
-    proximity: i32,
+    proximity: f32,
 ) -> StepOutcome<bool> {
     // Find the nearest idle drying rack within proximity. Iterating
     // mutably is the standard Bevy pattern; collect a candidate Entity
     // first so the borrow doesn't span the actual load mutation.
-    let mut best: Option<(Entity, i32)> = None;
+    let mut best: Option<(Entity, f32)> = None;
     for (entity, pos, structure, state) in racks.iter() {
         if structure.kind != crate::components::building::StructureType::DryingRack {
             continue;
@@ -75,7 +75,7 @@ pub fn resolve_load_drying_rack(
         if structure.effectiveness() == 0.0 || state.loaded.is_some() {
             continue;
         }
-        let d = cat_pos.manhattan_distance(pos);
+        let d = cat_pos.distance_to(pos);
         if d > proximity {
             continue;
         }

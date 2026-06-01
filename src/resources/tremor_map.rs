@@ -90,7 +90,8 @@ impl TremorMap {
     /// nearby buckets are zero. Mirrors `PreyScentMap::highest_nearby`
     /// so prey AI can ask "where is vibration strongest near me?"
     /// without iterating cat entities.
-    pub fn highest_nearby(&self, x: i32, y: i32, radius: i32) -> Option<(i32, i32)> {
+    pub fn highest_nearby(&self, x: i32, y: i32, radius: f32) -> Option<(i32, i32)> {
+        let radius = radius.max(0.0).round() as i32;
         let mut best_val = 0.0f32;
         let mut best_pos = None;
         let bx_center = x / self.bucket_size;
@@ -123,7 +124,8 @@ impl TremorMap {
     /// Peak intensity within `radius` — the scalar version of
     /// `highest_nearby`. Used by `try_detect_cat` to gate
     /// `PreyAiState::Alert` against `TremorConstants::detect_threshold`.
-    pub fn peak_nearby(&self, x: i32, y: i32, radius: i32) -> f32 {
+    pub fn peak_nearby(&self, x: i32, y: i32, radius: f32) -> f32 {
+        let radius = radius.max(0.0).round() as i32;
         let mut best = 0.0f32;
         let bx_center = x / self.bucket_size;
         let by_center = y / self.bucket_size;
@@ -303,7 +305,7 @@ mod tests {
         let mut map = TremorMap::new(30, 30, 3);
         map.deposit(10, 10, 0.9);
         map.deposit(0, 0, 0.3);
-        let best = map.highest_nearby(8, 8, 5);
+        let best = map.highest_nearby(8, 8, 5.0);
         assert!(best.is_some());
         let (wx, wy) = best.unwrap();
         assert!((wx - 10).abs() <= 3);
@@ -316,15 +318,15 @@ mod tests {
         map.deposit(10, 10, 0.9);
         map.deposit(0, 0, 0.3);
         // Peak within radius 5 of (8, 8) → bucket at (10, 10).
-        assert!((map.peak_nearby(8, 8, 5) - 0.9).abs() < 0.01);
+        assert!((map.peak_nearby(8, 8, 5.0) - 0.9).abs() < 0.01);
         // Out-of-range distant deposit doesn't leak in.
-        assert_eq!(map.peak_nearby(25, 25, 2), 0.0);
+        assert_eq!(map.peak_nearby(25, 25, 2.0), 0.0);
     }
 
     #[test]
     fn highest_nearby_returns_none_when_all_zero() {
         let map = TremorMap::new(30, 30, 3);
-        assert!(map.highest_nearby(15, 15, 10).is_none());
+        assert!(map.highest_nearby(15, 15, 10.0).is_none());
     }
 
     #[test]

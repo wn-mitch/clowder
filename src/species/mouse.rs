@@ -48,8 +48,8 @@ impl PreyProfile for Mouse {
     fn graze_cadence(&self) -> u64 {
         40
     }
-    fn alert_radius(&self) -> i32 {
-        3
+    fn alert_radius(&self) -> f32 {
+        3.0
     }
     fn freeze_ticks(&self) -> u64 {
         1
@@ -79,8 +79,8 @@ impl PreyProfile for Mouse {
     fn den_raid_drop(&self) -> u32 {
         6
     }
-    fn den_spacing(&self) -> i32 {
-        10
+    fn den_spacing(&self) -> f32 {
+        10.0
     }
     fn den_density(&self) -> usize {
         100

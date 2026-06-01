@@ -101,13 +101,13 @@ pub fn nearest_construction_site<'a>(
     buildings: impl Iterator<Item = (&'a Structure, &'a Position, Option<&'a ConstructionSite>)>,
     cat_pos: Position,
 ) -> Option<Position> {
-    let mut best: Option<(Position, i32)> = None;
+    let mut best: Option<(Position, f32)> = None;
     for (structure, anchor, site) in buildings {
         if site.is_none() {
             continue;
         }
         let center = structure.center(anchor);
-        let d = cat_pos.manhattan_distance(&center);
+        let d = cat_pos.distance_to(&center);
         if best.is_none_or(|(_, cur)| d < cur) {
             best = Some((center, d));
         }
@@ -163,7 +163,7 @@ pub fn apply_building_effects(
         match structure.kind {
             StructureType::Den => {
                 for (cat_pos, mut needs) in &mut cats {
-                    if cat_pos.manhattan_distance(&center) <= b.den_effect_radius {
+                    if cat_pos.distance_to(&center) <= b.den_effect_radius {
                         needs.temperature =
                             (needs.temperature + den_temperature_bonus * eff).min(1.0);
                         needs.safety = (needs.safety + den_safety_bonus * eff).min(1.0);
@@ -172,7 +172,7 @@ pub fn apply_building_effects(
             }
             StructureType::Hearth => {
                 for (cat_pos, mut needs) in &mut cats {
-                    if cat_pos.manhattan_distance(&center) <= b.hearth_effect_radius {
+                    if cat_pos.distance_to(&center) <= b.hearth_effect_radius {
                         needs.social = (needs.social + hearth_social_bonus * eff).min(1.0);
                         if is_cold {
                             needs.temperature =
@@ -192,7 +192,7 @@ pub fn apply_building_effects(
         // Dirty building discomfort: mild temperature drain for nearby cats.
         if structure.cleanliness < b.dirty_threshold {
             for (cat_pos, mut needs) in &mut cats {
-                if cat_pos.manhattan_distance(&center) <= b.dirty_discomfort_radius {
+                if cat_pos.distance_to(&center) <= b.dirty_discomfort_radius {
                     needs.temperature = (needs.temperature
                         - dirty_temperature_drain * (1.0 - structure.cleanliness))
                         .max(0.0);
@@ -267,7 +267,7 @@ pub fn tidy_buildings(
         }
         for (building_pos, mut structure) in &mut buildings {
             let center = structure.center(building_pos);
-            if cat_pos.manhattan_distance(&center) <= b.tidy_radius {
+            if cat_pos.distance_to(&center) <= b.tidy_radius {
                 activation.record(Feature::BuildingTidied);
                 structure.cleanliness = (structure.cleanliness + tidy_cleanliness_rate).min(1.0);
             }
@@ -304,7 +304,7 @@ pub fn process_gates(
         } else if gate.open {
             let mut best_diligence: Option<f32> = None;
             for (cat_pos, personality, needs) in &cats {
-                if cat_pos.manhattan_distance(gate_pos) == 1 {
+                if cat_pos.distance_to(gate_pos) == 1.0 {
                     let effective = if needs.energy < b.gate_tired_energy_threshold {
                         personality.diligence * b.gate_tired_diligence_scale
                     } else {

@@ -239,7 +239,7 @@ fn stamp_terrain_comfort(
         _ => 0.0,
     };
     if peak != 0.0 {
-        stamp(field, x, y, peak, 0);
+        stamp(field, x, y, peak, 0.0);
     }
 }
 
@@ -251,7 +251,7 @@ fn stamp_terrain_cleanliness(
     c: &crate::resources::sim_constants::EnvironmentalQualityConstants,
 ) {
     if terrain == Terrain::Mud {
-        stamp(field, x, y, c.cleanliness_terrain_mud, 0);
+        stamp(field, x, y, c.cleanliness_terrain_mud, 0.0);
     }
 }
 
@@ -292,13 +292,13 @@ fn stamp_terrain_beauty(
             c.beauty_terrain_garden_peak,
             c.beauty_terrain_garden_radius,
         ),
-        Terrain::AncientRuin => stamp(field, x, y, c.beauty_terrain_ancient_ruin, 0),
+        Terrain::AncientRuin => stamp(field, x, y, c.beauty_terrain_ancient_ruin, 0.0),
         _ => {}
     }
     if corruption > 0.0 {
         let suppression = -corruption * c.beauty_corruption_suppression;
         if suppression != 0.0 {
-            stamp(field, x, y, suppression, 0);
+            stamp(field, x, y, suppression, 0.0);
         }
     }
 }

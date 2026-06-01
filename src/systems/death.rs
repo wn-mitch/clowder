@@ -184,7 +184,7 @@ pub fn check_death(
                 &constants.sensory.cat,
                 *dead_pos,
                 crate::components::SensorySignature::CAT,
-                c.grief_detection_range as f32,
+                c.grief_detection_range,
             ) {
                 mood.modifiers.push_back(
                     MoodModifier::new(
@@ -312,7 +312,7 @@ pub fn update_grave_aura_map(
 ) {
     aura.clear();
     let strength = constants.death.grave_anti_corruption_strength;
-    let radius = constants.death.grave_anti_corruption_radius as f32;
+    let radius = constants.death.grave_anti_corruption_radius;
     if strength <= 0.0 || radius <= 0.0 {
         return;
     }

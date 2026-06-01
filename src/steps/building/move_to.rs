@@ -39,7 +39,7 @@ pub fn resolve_move_to(
     let Some(target) = target_position else {
         return StepOutcome::bare(StepResult::Fail("no target position for MoveTo".into()));
     };
-    if pos.manhattan_distance(&target) == 0 {
+    if pos.distance_to(&target) == 0.0 {
         if cat_tile_counts.get(pos).copied().unwrap_or(0) > 1 {
             let occupied: HashSet<Position> = cat_tile_counts
                 .iter()

@@ -475,7 +475,7 @@ fn score_target_consideration(
                     None => return 0.0,
                 },
             };
-            let distance = ctx.self_position.manhattan_distance(&landmark_pos) as f32;
+            let distance = ctx.self_position.distance_to(&landmark_pos);
             s.score(distance)
         }
         Consideration::Marker(m) => {

@@ -128,11 +128,11 @@ pub fn snake_evaluate_and_plan(
     for (snake_entity, snake_state, snake_pos, needs, personality) in &snakes {
         let cats_nearby = cat_positions
             .iter()
-            .filter(|p| p.manhattan_distance(snake_pos) <= sc.detection_range)
+            .filter(|p| p.distance_to(snake_pos) <= sc.detection_range)
             .count();
         let prey_nearby = prey_positions
             .iter()
-            .any(|p| p.manhattan_distance(snake_pos) <= sc.detection_range);
+            .any(|p| p.distance_to(snake_pos) <= sc.detection_range);
         let on_warm_terrain = if map.in_bounds(snake_pos.x(), snake_pos.y()) {
             is_warm(map.get(snake_pos.x(), snake_pos.y()).terrain)
         } else {
@@ -196,11 +196,11 @@ fn build_planner_state(
     snake_pos: &Position,
     prey_positions: &[Position],
     on_warm_terrain: bool,
-    strike_range: i32,
+    strike_range: f32,
 ) -> SnakePlannerState {
     let prey_in_range = prey_positions
         .iter()
-        .any(|p| p.manhattan_distance(snake_pos) <= strike_range);
+        .any(|p| p.distance_to(snake_pos) <= strike_range);
     SnakePlannerState {
         zone: SnakeZone::Cover,
         prey_in_range,
@@ -220,7 +220,7 @@ fn resolve_zone_position(
         SnakeZone::Cover => Some(snake_pos),
         SnakeZone::HuntingGround => prey_positions
             .iter()
-            .min_by_key(|p| snake_pos.manhattan_distance(p))
+            .min_by_key(|p| snake_pos.tile_distance_squared(p))
             .copied(),
         SnakeZone::BaskingSpot => find_nearest_warm_tile(snake_pos, map),
         SnakeZone::MapEdge => {

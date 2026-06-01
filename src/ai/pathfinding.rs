@@ -498,8 +498,8 @@ mod tests {
         let next = step_toward(&from, &to, &map, &[]).expect("should move on open terrain");
 
         // Must be strictly closer in Manhattan distance
-        let before = from.manhattan_distance(&to);
-        let after = next.manhattan_distance(&to);
+        let before = from.distance_to(&to);
+        let after = next.distance_to(&to);
         assert!(
             after < before,
             "next position {next:?} is not closer to {to:?} than {from:?} (before={before}, after={after})"
@@ -527,9 +527,16 @@ mod tests {
             "stepped onto water tile at (1,1)"
         );
 
-        // Must still be closer
-        let before = from.manhattan_distance(&to);
-        let after = next.manhattan_distance(&to);
+        // Must still be closer — measured radially (Euclidean).
+        // Ticket 494 — under the realigned Chebyshev `distance_to`, a
+        // cardinal step toward a pure-diagonal target doesn't strictly
+        // decrease step-count (max(2,3) == max(3,3)), but it still makes
+        // geometric progress. `euclidean_distance` is the right metric
+        // for "did pathfinding move us toward the target in 2D space"
+        // — the substrate's chosen cost metric (Chebyshev) shouldn't
+        // bleed into a test of geometric direction.
+        let before = from.euclidean_distance(&to);
+        let after = next.euclidean_distance(&to);
         assert!(
             after < before,
             "fallback position {next:?} is not closer to {to:?}"

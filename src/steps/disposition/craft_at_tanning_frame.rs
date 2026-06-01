@@ -51,7 +51,7 @@ pub fn resolve_craft_at_tanning_frame(
     wearables: &mut crate::components::equipment::WearableSlots,
     recipes: &RecipeRegistry,
     tanning_frame_positions: &[Position],
-    proximity: i32,
+    proximity: f32,
 ) -> StepOutcome<Option<RecipeId>> {
     resolve_craft_at_station(
         recipe_id,

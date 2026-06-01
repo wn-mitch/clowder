@@ -134,7 +134,7 @@ pub struct FoxDenRow {
     pub x: i32,
     pub y: i32,
     pub cubs_present: u32,
-    pub territory_radius: i32,
+    pub territory_radius: f32,
     pub scent_strength: f32,
 }
 

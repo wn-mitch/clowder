@@ -116,7 +116,7 @@ pub fn wildlife_ai(
                         // can orbit a concrete ward, not a grid cell.
                         let siege_anchor = ward_positions
                             .iter()
-                            .min_by_key(|(wp, _)| next.manhattan_distance(wp));
+                            .min_by_key(|(wp, _)| next.tile_distance_squared(wp));
                         if let Some((wp, _radius)) = siege_anchor {
                             if rng.rng.random::<f32>() < c.ward_siege_chance {
                                 *ai_state = WildlifeAiState::EncirclingWard {
@@ -221,7 +221,7 @@ pub fn wildlife_ai(
                         &constants.sensory.shadow_fox,
                         *cp,
                         crate::components::SensorySignature::CAT,
-                        c.siege_break_range as f32,
+                        c.siege_break_range,
                         &map,
                     )
                 });
@@ -369,7 +369,7 @@ pub fn wildlife_ai(
                 // haunting_drain_radius.
                 let dx_t = target_x - pos.x();
                 let dy_t = target_y - pos.y();
-                let dist = dx_t.abs() + dy_t.abs();
+                let dist = (dx_t.abs() + dy_t.abs()) as f32;
                 let (step_dx, step_dy) = if dist < edge_distance {
                     // Too close — step directly away.
                     (-dx_t.signum(), -dy_t.signum())
@@ -717,16 +717,16 @@ pub fn detect_threats(
             }
             // Patrolling cats get doubled detection range.
             if current.action == Action::Patrol {
-                range *= 2;
+                range *= 2.0;
             }
             // Watchtower doubles detection range for cats standing on one.
             if watchtower_positions
                 .iter()
-                .any(|wp| cat_pos.manhattan_distance(wp) == 0)
+                .any(|wp| cat_pos.distance_to(wp) == 0.0)
             {
-                range *= 2;
+                range *= 2.0;
             }
-            range.max(1)
+            range.max(1.0)
         };
 
         for &(threat_entity, threat_pos, species) in &threats {
@@ -739,7 +739,7 @@ pub fn detect_threats(
                 &constants.sensory.cat,
                 threat_pos,
                 crate::components::SensorySignature::WILDLIFE,
-                detection_range as f32,
+                detection_range,
             ) {
                 continue;
             }
@@ -905,7 +905,7 @@ pub fn predator_hunt_prey(
             continue;
         }
 
-        let hunt_range: i32 = match predator.species {
+        let hunt_range: f32 = match predator.species {
             WildSpecies::Fox => c.predator_hunt_range_fox,
             WildSpecies::Hawk => c.predator_hunt_range_hawk,
             WildSpecies::Snake => c.predator_hunt_range_snake,
@@ -916,7 +916,7 @@ pub fn predator_hunt_prey(
             .profile_for(crate::components::SensorySpecies::Wild(predator.species));
 
         // Find nearest prey in range. Phase 5a: predator sight with LoS.
-        let mut nearest: Option<(Entity, i32)> = None;
+        let mut nearest: Option<(Entity, f32)> = None;
         for (prey_entity, _prey_animal, prey_pos) in prey.iter() {
             if !crate::systems::sensing::observer_sees_at_with_los(
                 crate::components::SensorySpecies::Wild(predator.species),
@@ -924,12 +924,12 @@ pub fn predator_hunt_prey(
                 predator_profile,
                 *prey_pos,
                 crate::components::SensorySignature::PREY,
-                hunt_range as f32,
+                hunt_range,
                 &map,
             ) {
                 continue;
             }
-            let dist = pred_pos.manhattan_distance(prey_pos);
+            let dist = pred_pos.distance_to(prey_pos);
             if nearest.is_none() || dist < nearest.unwrap().1 {
                 nearest = Some((prey_entity, dist));
             }
@@ -1262,8 +1262,9 @@ pub fn shadowfox_motivation_tick(
         let mut nearest_frontier_dist = i32::MAX;
         let mut best_corruption_tile: Option<Position> = None;
         let mut best_corruption_value: f32 = -1.0;
-        for dy in -scan_radius..=scan_radius {
-            for dx in -scan_radius..=scan_radius {
+        let scan_radius_i = scan_radius.round() as i32;
+        for dy in -scan_radius_i..=scan_radius_i {
+            for dx in -scan_radius_i..=scan_radius_i {
                 let tx = pos.x() + dx;
                 let ty = pos.y() + dy;
                 if !map.in_bounds(tx, ty) {
@@ -1318,7 +1319,7 @@ pub fn shadowfox_motivation_tick(
         let mut best_target: Option<Position> = None;
         let mut dread_pressure: f32 = 0.0;
         for (cat_pos, mood, safety_deficit) in cat_data.iter() {
-            let dist = pos.manhattan_distance(cat_pos);
+            let dist = pos.distance_to(cat_pos);
             if dist > scan_radius {
                 continue;
             }
@@ -1328,8 +1329,8 @@ pub fn shadowfox_motivation_tick(
             let ally_count = cat_anchors
                 .iter()
                 .filter(|other| {
-                    let od = cat_pos.manhattan_distance(other);
-                    od > 0 && od <= isolation_radius
+                    let od = cat_pos.distance_to(other);
+                    od > 0.0 && od <= isolation_radius
                 })
                 .count() as u32;
             let isolation_factor = if ally_count >= group_threshold {
@@ -1348,7 +1349,7 @@ pub fn shadowfox_motivation_tick(
         // ---- Entropy pressure: inverse distance to nearest frontier ----
         let entropy_pressure = nearest_frontier
             .map(|fp| {
-                let d = pos.manhattan_distance(&fp).max(0) as f32;
+                let d = pos.distance_to(&fp).max(0.0);
                 1.0 / (1.0 + entropy_scale * d)
             })
             .unwrap_or(0.0);
@@ -1410,7 +1411,7 @@ pub fn shadowfox_motivation_tick(
             1 => nearest_threatened
                 .zip(ward_anchors.iter().min_by_key(|(wp, _)| {
                     nearest_threatened
-                        .map(|t| t.manhattan_distance(wp))
+                        .map(|t| t.tile_distance_squared(wp))
                         .unwrap_or(i32::MAX)
                 }))
                 .map(
@@ -1570,7 +1571,7 @@ pub fn shadowfox_haunting_drain(
         // eyes in the dark" framing.
         let mut drained_any = false;
         for (cat_pos, mut needs, mut mood) in cats.iter_mut() {
-            if fox_pos.manhattan_distance(cat_pos) > drain_radius {
+            if fox_pos.distance_to(cat_pos) > drain_radius {
                 continue;
             }
             needs.safety = (needs.safety - safety_drain).max(0.0);
@@ -1695,12 +1696,12 @@ pub fn predator_stalk_cats(
         // --- Ward avoidance: shadow foxes absolutely avoid wards ---
         let in_ward = ward_positions
             .iter()
-            .any(|(wp, radius)| (wl_pos.manhattan_distance(wp) as f32) <= *radius);
+            .any(|(wp, radius)| (wl_pos.distance_to(wp)) <= *radius);
         if in_ward {
             // Flee away from nearest ward.
             if let Some((ward_pos, _)) = ward_positions
                 .iter()
-                .min_by_key(|(wp, _)| wl_pos.manhattan_distance(wp))
+                .min_by_key(|(wp, _)| wl_pos.tile_distance_squared(wp))
             {
                 let away_dx = (wl_pos.x() - ward_pos.x()).signum();
                 let away_dy = (wl_pos.y() - ward_pos.y()).signum();
@@ -1730,16 +1731,16 @@ pub fn predator_stalk_cats(
                             &constants.sensory.shadow_fox,
                             *cp,
                             crate::components::SensorySignature::CAT,
-                            c.base_detection_range as f32,
+                            c.base_detection_range,
                             &map,
                         )
                     })
                     .filter(|(_, cp)| {
                         !ward_positions
                             .iter()
-                            .any(|(wp, radius)| (cp.manhattan_distance(wp) as f32) <= *radius)
+                            .any(|(wp, radius)| (cp.distance_to(wp)) <= *radius)
                     })
-                    .min_by_key(|(_, cp)| wl_pos.manhattan_distance(cp));
+                    .min_by_key(|(_, cp)| wl_pos.tile_distance_squared(cp));
 
                 if let Some((_, cat_pos)) = nearest {
                     // 5% chance per tick to begin stalking.
@@ -1756,7 +1757,7 @@ pub fn predator_stalk_cats(
                 let target_pos = Position::new(target_x, target_y);
                 let target_warded = ward_positions
                     .iter()
-                    .any(|(wp, radius)| (target_pos.manhattan_distance(wp) as f32) <= *radius);
+                    .any(|(wp, radius)| (target_pos.distance_to(wp)) <= *radius);
                 if target_warded {
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
                     activation.record(Feature::ShadowFoxAvoidedWard);
@@ -1770,8 +1771,8 @@ pub fn predator_stalk_cats(
                     let target_pos = Position::new(target_x, target_y);
                     if let Some((cat_entity, cat_pos)) = cat_positions
                         .iter()
-                        .filter(|(_, cp)| cp.manhattan_distance(&target_pos) <= 1)
-                        .min_by_key(|(_, cp)| wl_pos.manhattan_distance(cp))
+                        .filter(|(_, cp)| cp.distance_to(&target_pos) <= 1.0)
+                        .min_by_key(|(_, cp)| wl_pos.tile_distance_squared(cp))
                     {
                         let cat_pos = *cat_pos;
                         if let Ok((
@@ -1872,7 +1873,7 @@ pub fn predator_stalk_cats(
                             if *witness_entity == *cat_entity {
                                 continue;
                             }
-                            if wl_pos.manhattan_distance(witness_pos) <= c.ambush_witness_range {
+                            if wl_pos.distance_to(witness_pos) <= c.ambush_witness_range {
                                 if let Ok((_, _, _, mut w_needs, mut w_mood, _, _, _)) =
                                     cats.get_mut(*witness_entity)
                                 {
@@ -1893,14 +1894,14 @@ pub fn predator_stalk_cats(
                     // After ambush, revert to patrolling with cooldown before next stalk.
                     animal.ambush_cooldown = c.ambush_cooldown_ticks;
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
-                } else if dist > c.base_detection_range * 2 {
+                } else if (dist as f32) > c.base_detection_range * 2.0 {
                     // Target moved too far, give up.
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
                 } else {
                     // Update target to nearest cat's current position.
                     if let Some((_, cat_pos)) = cat_positions
                         .iter()
-                        .min_by_key(|(_, cp)| wl_pos.manhattan_distance(cp))
+                        .min_by_key(|(_, cp)| wl_pos.tile_distance_squared(cp))
                     {
                         *ai_state = WildlifeAiState::Stalking {
                             target_x: cat_pos.x(),
@@ -1969,7 +1970,7 @@ pub fn spawn_initial_wildlife(world: &mut World, colony_center: Position) {
     {
         let rng = &mut world.resource_mut::<SimRng>().rng;
 
-        let find_spawn = |min_dist: i32,
+        let find_spawn = |min_dist: f32,
                           species: WildSpecies,
                           rng: &mut rand_chacha::ChaCha8Rng|
          -> Option<Position> {
@@ -1977,7 +1978,7 @@ pub fn spawn_initial_wildlife(world: &mut World, colony_center: Position) {
                 let x: i32 = rng.random_range(0..map_width);
                 let y: i32 = rng.random_range(0..map_height);
                 let pos = Position::new(x, y);
-                if pos.manhattan_distance(&colony_center) < min_dist {
+                if pos.distance_to(&colony_center) < min_dist {
                     continue;
                 }
                 let terrain = terrain_snapshot[(y * map_width + x) as usize].2;
@@ -2151,7 +2152,7 @@ pub fn spawn_initial_fox_dens(world: &mut World, colony_center: Position) {
                 let y: i32 = rng.random_range(0..map_height);
                 let pos = Position::new(x, y);
 
-                if pos.manhattan_distance(&colony_center) < fc.initial_den_min_distance {
+                if pos.distance_to(&colony_center) < fc.initial_den_min_distance {
                     continue;
                 }
 
@@ -2163,7 +2164,7 @@ pub fn spawn_initial_fox_dens(world: &mut World, colony_center: Position) {
                 // Check spacing from other dens.
                 let too_close = den_positions
                     .iter()
-                    .any(|dp| pos.manhattan_distance(dp) < fc.min_den_spacing);
+                    .any(|dp| pos.distance_to(dp) < fc.min_den_spacing);
                 if too_close {
                     continue;
                 }
@@ -2621,7 +2622,7 @@ pub fn fox_ai_decision(
                 let is_forest = matches!(terrain, Terrain::DenseForest | Terrain::LightForest);
                 let far_from_dens = dens
                     .iter()
-                    .all(|(_, _, dp)| pos.manhattan_distance(dp) >= fc.min_den_spacing);
+                    .all(|(_, _, dp)| pos.distance_to(dp) >= fc.min_den_spacing);
                 let low_scent = scent_map.get(pos.x(), pos.y()) < 0.1;
 
                 if is_forest && far_from_dens && low_scent {
@@ -2707,7 +2708,7 @@ pub fn fox_ai_decision(
                     &constants.sensory.fox,
                     *cp,
                     crate::components::SensorySignature::CAT,
-                    wc.base_detection_range as f32,
+                    wc.base_detection_range,
                     &map,
                 )
             })
@@ -2733,7 +2734,7 @@ pub fn fox_ai_decision(
                 if den.cubs_present > 0 {
                     let threat = cat_positions
                         .iter()
-                        .find(|(_, cp, _)| den_pos.manhattan_distance(cp) <= fc.den_defense_range);
+                        .find(|(_, cp, _)| den_pos.distance_to(cp) <= fc.den_defense_range);
                     if let Some((cat_e, cat_pos, _)) = threat {
                         *phase = FoxAiPhase::Confronting {
                             target_id: cat_e.to_bits(),
@@ -2762,7 +2763,7 @@ pub fn fox_ai_decision(
                         &constants.sensory.fox,
                         *cp,
                         crate::components::SensorySignature::CAT,
-                        wc.base_detection_range as f32,
+                        wc.base_detection_range,
                         &map,
                     )
             });
@@ -2792,10 +2793,10 @@ pub fn fox_ai_decision(
                     &constants.sensory.fox,
                     **sp,
                     crate::components::SensorySignature::CARCASS,
-                    fc.raid_smell_range as f32,
+                    fc.raid_smell_range,
                 ) && !cat_positions
                     .iter()
-                    .any(|(_, cp, _)| sp.manhattan_distance(cp) <= fc.guard_deterrent_range)
+                    .any(|(_, cp, _)| sp.distance_to(cp) <= fc.guard_deterrent_range)
             });
             if let Some(sp) = store_pos {
                 *phase = FoxAiPhase::Raiding {
@@ -2823,11 +2824,11 @@ pub fn fox_ai_decision(
                         &constants.sensory.fox,
                         **pp,
                         crate::components::SensorySignature::PREY,
-                        (wc.predator_hunt_range_fox * 3) as f32,
+                        wc.predator_hunt_range_fox * 3.0,
                         &map,
                     )
                 })
-                .min_by_key(|(_, pp)| pos.manhattan_distance(pp));
+                .min_by_key(|(_, pp)| pos.tile_distance_squared(pp));
             if let Some((prey_e, prey_pos)) = nearest_prey {
                 *phase = FoxAiPhase::HuntingPrey {
                     target: Some(prey_e.to_bits()),
@@ -2844,8 +2845,8 @@ pub fn fox_ai_decision(
         if fox.hunger < 0.3 && fox.home_den.is_some() {
             if let Some(den_entity) = fox.home_den {
                 if let Ok((_, _, den_pos)) = dens.get(den_entity) {
-                    let dist = pos.manhattan_distance(den_pos);
-                    if dist <= 2 {
+                    let dist = pos.distance_to(den_pos);
+                    if dist <= 2.0 {
                         *phase = FoxAiPhase::Resting { ticks: 500 };
                         *ai_state = WildlifeAiState::Waiting;
                         continue;
@@ -2871,11 +2872,12 @@ pub fn fox_ai_decision(
                 if den.scent_strength < 0.3 {
                     *phase = FoxAiPhase::ScentMarking;
                     // Move toward territory edge.
+                    let radius_i = den.territory_radius.round() as i32;
                     let edge_x = den_pos.x()
                         + if pos.x() > den_pos.x() {
-                            den.territory_radius
+                            radius_i
                         } else {
-                            -den.territory_radius
+                            -radius_i
                         };
                     let edge_y = den_pos.y();
                     *ai_state = WildlifeAiState::Stalking {
@@ -2891,8 +2893,8 @@ pub fn fox_ai_decision(
         if fox.hunger < fc.ward_hunger_override_threshold {
             let nearest_ward = ward_positions
                 .iter()
-                .filter(|(wp, radius)| (pos.manhattan_distance(wp) as f32) <= *radius)
-                .min_by_key(|(wp, _)| pos.manhattan_distance(wp));
+                .filter(|(wp, radius)| (pos.distance_to(wp)) <= *radius)
+                .min_by_key(|(wp, _)| pos.tile_distance_squared(wp));
             if let Some((ward_pos, _)) = nearest_ward {
                 let away_dx = (pos.x() - ward_pos.x()).signum();
                 let away_dy = (pos.y() - ward_pos.y()).signum();
@@ -2950,8 +2952,8 @@ pub fn fox_ai_decision(
         // --- Mutual avoidance: move away from nearby cats ---
         let closest_cat = cat_positions
             .iter()
-            .filter(|(_, cp, _)| pos.manhattan_distance(cp) <= fc.cat_avoidance_range)
-            .min_by_key(|(_, cp, _)| pos.manhattan_distance(cp));
+            .filter(|(_, cp, _)| pos.distance_to(cp) <= fc.cat_avoidance_range)
+            .min_by_key(|(_, cp, _)| pos.tile_distance_squared(cp));
         if let Some((_, cat_pos, _)) = closest_cat {
             // Move in the opposite direction from the cat.
             let away_dx = (pos.x() - cat_pos.x()).signum();
@@ -2975,16 +2977,16 @@ pub fn fox_ai_decision(
             if let Ok((_, den, den_pos)) = dens.get(den_entity) {
                 // 3.16: Cat presence near den contracts effective patrol radius.
                 let den_presence = cat_scent.get(den_pos.x(), den_pos.y());
-                let effective_radius = if den_presence > 0.1 {
+                let effective_radius: f32 = if den_presence > 0.1 {
                     // Contract by up to 50% based on cat scent intensity.
                     let contraction = (den_presence * 0.5).min(0.5);
-                    ((den.territory_radius as f32) * (1.0 - contraction)).max(3.0) as i32
+                    (den.territory_radius * (1.0 - contraction)).max(3.0)
                 } else {
                     den.territory_radius
                 };
 
                 // If far from effective territory, return.
-                let dist = pos.manhattan_distance(den_pos);
+                let dist = pos.distance_to(den_pos);
                 if dist > effective_radius {
                     *phase = FoxAiPhase::Returning {
                         x: den_pos.x(),
@@ -3001,8 +3003,8 @@ pub fn fox_ai_decision(
                 if fox.hunger > 0.4 {
                     let nearest_prey_pos = prey
                         .iter()
-                        .filter(|(_, pp)| den_pos.manhattan_distance(pp) <= effective_radius * 2)
-                        .min_by_key(|(_, pp)| pos.manhattan_distance(pp))
+                        .filter(|(_, pp)| den_pos.distance_to(pp) <= effective_radius * 2.0)
+                        .min_by_key(|(_, pp)| pos.tile_distance_squared(pp))
                         .map(|(_, pp)| *pp);
                     if let Some(prey_pos) = nearest_prey_pos {
                         let dx = (prey_pos.x() - pos.x()).signum();
@@ -3339,7 +3341,7 @@ pub fn fox_store_raid_tick(
         // Check if a cat appeared near the stores — abort if so.
         let guarded = cat_positions.iter().any(|cp| {
             let store_pos = Position::new(target_x, target_y);
-            cp.manhattan_distance(&store_pos) <= fc.guard_deterrent_range
+            cp.distance_to(&store_pos) <= fc.guard_deterrent_range
         });
 
         if guarded {
@@ -3657,7 +3659,7 @@ mod tests {
         assert!(!positions.is_empty(), "should spawn at least some wildlife");
         for pos in &positions {
             assert!(
-                pos.manhattan_distance(&colony) >= 7,
+                pos.distance_to(&colony) >= 7.0,
                 "wildlife at ({}, {}) is too close to colony at ({}, {})",
                 pos.x(),
                 pos.y(),

@@ -33,9 +33,9 @@ fn step_slithering(
     pos: &mut Position,
     budget: &mut MovementBudget,
     target: Position,
-    arrival_dist: i32,
+    arrival_dist: f32,
 ) -> bool {
-    if pos.manhattan_distance(&target) <= arrival_dist {
+    if pos.distance_to(&target) <= arrival_dist {
         return true;
     }
     if !budget.try_spend_step() {
@@ -44,7 +44,7 @@ fn step_slithering(
     let dx = (target.x() - pos.x()).signum();
     let dy = (target.y() - pos.y()).signum();
     pos.set_tile(pos.x() + dx, pos.y() + dy);
-    pos.manhattan_distance(&target) <= arrival_dist
+    pos.distance_to(&target) <= arrival_dist
 }
 
 fn nearest_edge_target(pos: Position, map_width: i32, map_height: i32) -> Position {
@@ -91,7 +91,7 @@ pub fn resolve_slide_to(
     let Some(target) = step_state.target_position else {
         return StepOutcome::bare(StepResult::Fail("no target position for SlideTo".into()));
     };
-    if step_slithering(pos, budget, target, 1) {
+    if step_slithering(pos, budget, target, 1.0) {
         return StepOutcome::bare(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -162,11 +162,11 @@ pub fn resolve_strike(
     budget: &mut MovementBudget,
     step_state: &mut SnakeStepState,
     prey: &[(Entity, Position)],
-    strike_range: i32,
+    strike_range: f32,
 ) -> StepOutcome<Option<Entity>> {
     let Some((target_entity, target_pos)) = prey
         .iter()
-        .min_by_key(|(_, p)| p.manhattan_distance(pos))
+        .min_by_key(|(_, p)| p.tile_distance_squared(pos))
         .copied()
     else {
         return StepOutcome::unwitnessed(StepResult::Fail("no prey for strike".into()));
@@ -238,7 +238,7 @@ pub fn resolve_retreat(
     map: &TileMap,
 ) -> StepOutcome<bool> {
     let target = nearest_edge_target(*pos, map.width, map.height);
-    if step_slithering(pos, budget, target, 2) {
+    if step_slithering(pos, budget, target, 2.0) {
         return StepOutcome::witnessed(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -363,7 +363,7 @@ mod tests {
         let mut budget = snake_budget();
         let prey = vec![(Entity::from_bits(11), Position::new(5, 6))];
         let mut state = SnakeStepState::default();
-        let outcome = resolve_strike(&mut pos, &mut budget, &mut state, &prey, 1);
+        let outcome = resolve_strike(&mut pos, &mut budget, &mut state, &prey, 1.0);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert_eq!(outcome.witness, Some(Entity::from_bits(11)));
     }
@@ -373,7 +373,7 @@ mod tests {
         let mut pos = Position::new(5, 5);
         let mut budget = snake_budget();
         let mut state = SnakeStepState::default();
-        let outcome = resolve_strike(&mut pos, &mut budget, &mut state, &[], 1);
+        let outcome = resolve_strike(&mut pos, &mut budget, &mut state, &[], 1.0);
         assert!(matches!(outcome.result, StepResult::Fail(_)));
     }
 

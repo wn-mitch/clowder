@@ -29,11 +29,11 @@ pub fn step_toward(
     target: Position,
     cached_path: &mut Option<Vec<Position>>,
     map: &TileMap,
-    arrival_dist: i32,
+    arrival_dist: f32,
     deterrent_map: &CatPatrolDeterrentMap,
     sc: &ScoringConstants,
 ) -> bool {
-    if pos.manhattan_distance(&target) <= arrival_dist {
+    if pos.distance_to(&target) <= arrival_dist {
         return true;
     }
     if cached_path.is_none() {
@@ -95,7 +95,7 @@ pub fn resolve_travel_to(
         target,
         &mut step_state.cached_path,
         map,
-        1,
+        1.0,
         deterrent_map,
         sc,
     ) {
@@ -266,7 +266,7 @@ mod tests {
             Position::new(9, 9),
             &mut cache,
             &map,
-            1,
+            1.0,
             &deterrent,
             &sc,
         );

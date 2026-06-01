@@ -16,7 +16,7 @@ use crate::species::SpeciesRegistry;
 /// Shuffles candidates for randomness, enforces min spacing for even coverage.
 fn seed_dens(
     habitat_tiles: &[(i32, i32)],
-    min_spacing: i32,
+    min_spacing: f32,
     max_dens: usize,
     rng: &mut impl Rng,
 ) -> Vec<Position> {
@@ -29,9 +29,7 @@ fn seed_dens(
             break;
         }
         let pos = Position::new(x, y);
-        let far_enough = dens
-            .iter()
-            .all(|d| pos.manhattan_distance(d) >= min_spacing);
+        let far_enough = dens.iter().all(|d| pos.distance_to(d) >= min_spacing);
         if far_enough {
             dens.push(pos);
         }
@@ -69,7 +67,7 @@ pub fn seed_prey_ecosystem(world: &mut World) {
         den_habitat: &'static [Terrain],
         prey_habitat: &'static [Terrain],
         prey_count: usize,
-        den_spacing: i32,
+        den_spacing: f32,
         den_density: usize,
         den_template: PreyDen,
     }
