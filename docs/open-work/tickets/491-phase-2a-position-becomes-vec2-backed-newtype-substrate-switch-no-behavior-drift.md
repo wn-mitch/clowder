@@ -133,3 +133,19 @@ perception change.
   rationale: 1,315 Position::new sites + 314 manhattan calls in 64 files
   make 139 a multi-thousand-line PR; this sub-phase is the
   type-substitution-only slice.
+- 2026-05-31: implementation landed at 7ba5a40d. Migration touched
+  77 files (+1139, -899). 443 `pos.x`/`pos.y` field reads converted
+  to method calls via mass sed; 28 write sites manually rewritten to
+  `set_tile(...)`. Hash/Eq/PartialEq keyed on `tile()` to preserve
+  HashMap<Position> sites — 15 sites untouched.
+- 2026-05-31: verification — 2594 lib tests pass; 1 pre-existing
+  test failure (`picking_up_scavenging`) confirmed failing on main
+  too, not a regression. Persistence round-trip tests pass (6/6).
+  `just check`: 9/10 sub-checks pass; `check_influence_map_registry`
+  flaky (passes ~25-50% per memory); `check_orchestration_frontmatter`
+  fails on pre-existing ticket 490. `just soak 42 && just verdict`:
+  verdict=concern, survival=pass, continuity=pass. Footer drift
+  attributable to the 32 upstream commits between baseline
+  (`post-482-source-promotions`) and main (MovementBudget gating
+  affecting fox/ward behavior, warm-floor founder fix, etc.) — not
+  to the substrate switch.
