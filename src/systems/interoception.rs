@@ -188,7 +188,8 @@ fn sprint_box_area(radius: i32) -> u32 {
 /// Threat-coupled escape viability in `[0, 1]`. **Single-axis** — pure
 /// physics about whether the cat can escape an *active* threat;
 /// ambient/personality anxiety lives on separate scalars (ticket 126's
-/// phobia family). Ticket 103.
+/// phobia family). Ticket 103 + ticket 138 (re-enables the mobility
+/// term that was punted at 103's landing).
 ///
 /// Returns `1.0` when `nearest_threat` is `None`. Rationale: with no
 /// active threat, escape is trivially viable, and the no-threat
@@ -197,22 +198,34 @@ fn sprint_box_area(radius: i32) -> u32 {
 /// check threat presence don't accidentally trigger on a low-openness
 /// peacetime cat).
 ///
-/// When a threat is present, composes two terms:
+/// When a threat is present, composes three terms:
 ///
 /// 1. **Terrain openness** — fraction of walkable tiles in the
 ///    `(2 * sprint_radius + 1)²` bounding box centered on the cat.
 ///    Closed terrain (walls, water, cliff) drops viability.
-/// 2. **Dependent penalty** — flat subtractive when
+/// 2. **Mobility advantage** (ticket 138) — raw cadence delta
+///    `(own_per_tick − threat_per_tick) / mobility_normalization`
+///    clamped to `[−1, +1]`, remapped to `[0, 1]` via `× 0.5 + 0.5`.
+///    A cat outpacing a slower threat saturates near 1.0; equal
+///    cadence is neutral 0.5; slower cat drops to 0.0.
+/// 3. **Dependent penalty** — flat subtractive when
 ///    `has_nearby_dependent` is true. Models cost-of-abandonment: a
 ///    cat next to a kitten or bonded mate registers escape as less
 ///    viable.
 ///
-/// Composition: `terrain_weight * openness - dependent_weight *
-/// dependent_penalty (if has_nearby_dependent)`, clamped to `[0, 1]`.
-/// Weights configurable via `EscapeViabilityConstants`.
+/// Composition: `terrain_weight × openness + mobility_weight ×
+/// mobility_term − dependent_weight × dependent_penalty (if
+/// has_nearby_dependent)`, clamped to `[0, 1]`. Weights configurable
+/// via [`EscapeViabilityConstants`].
+///
+/// **Caller note** — `own_per_tick` and `threat_per_tick` are both
+/// `MovementBudget::per_tick` reads. Default to `1.0` when the threat
+/// entity has no `MovementBudget` (pre-138 save-load).
 pub fn escape_viability(
     self_pos: Position,
     nearest_threat: Option<Position>,
+    own_per_tick: f32,
+    threat_per_tick: f32,
     map: &TileMap,
     has_nearby_dependent: bool,
     constants: &EscapeViabilityConstants,
@@ -225,13 +238,20 @@ pub fn escape_viability(
     let area = sprint_box_area(constants.sprint_radius) as f32;
     let openness = if area > 0.0 { walkable / area } else { 0.0 };
 
+    let mobility_advantage = ((own_per_tick - threat_per_tick)
+        / constants.mobility_normalization.max(f32::EPSILON))
+    .clamp(-1.0, 1.0);
+    let mobility_term = mobility_advantage * 0.5 + 0.5;
+
     let dependent_term = if has_nearby_dependent {
         constants.dependent_weight * constants.dependent_penalty
     } else {
         0.0
     };
 
-    (constants.terrain_weight * openness - dependent_term).clamp(0.0, 1.0)
+    (constants.terrain_weight * openness + constants.mobility_weight * mobility_term
+        - dependent_term)
+        .clamp(0.0, 1.0)
 }
 
 /// Body-state-appropriate safe-rest tile. Scans the cat's `Memory`
@@ -1171,7 +1191,7 @@ mod tests {
         assert_eq!(own_injury_site(&model, Position::new(5, 5)), None);
     }
 
-    // ---- Ticket 103 — `escape_viability` ----
+    // ---- Ticket 103 + 138 — `escape_viability` ----
 
     use crate::resources::map::{Terrain, TileMap};
 
@@ -1179,11 +1199,24 @@ mod tests {
         TileMap::new(width, height, Terrain::Grass)
     }
 
+    /// Helper: neutral-cadence call (both sides at 1.0/tick — the v1
+    /// cat-vs-equal-fox/hawk/shadowfox case). Mobility term contributes
+    /// `mobility_weight × 0.5` regardless of weight tuning.
+    fn ev_neutral(
+        pos: Position,
+        threat: Option<Position>,
+        map: &TileMap,
+        has_dep: bool,
+        constants: &EscapeViabilityConstants,
+    ) -> f32 {
+        escape_viability(pos, threat, 1.0, 1.0, map, has_dep, constants)
+    }
+
     #[test]
     fn escape_viability_one_with_no_threat() {
         let map = open_grass_map(20, 20);
         let constants = EscapeViabilityConstants::default();
-        let v = escape_viability(Position::new(10, 10), None, &map, false, &constants);
+        let v = ev_neutral(Position::new(10, 10), None, &map, false, &constants);
         assert_eq!(v, 1.0);
     }
 
@@ -1191,7 +1224,7 @@ mod tests {
     fn escape_viability_no_threat_short_circuits_terrain() {
         // Same `None` threat in two very different terrains must
         // produce the same 1.0 — locks in the contract that the
-        // no-threat branch never reads the map.
+        // no-threat branch never reads the map (or the cadence).
         let mut walled = open_grass_map(20, 20);
         for x in 0..20 {
             for y in 0..20 {
@@ -1201,32 +1234,32 @@ mod tests {
         let open = open_grass_map(20, 20);
         let constants = EscapeViabilityConstants::default();
         let pos = Position::new(10, 10);
-        assert_eq!(escape_viability(pos, None, &walled, false, &constants), 1.0);
-        assert_eq!(escape_viability(pos, None, &open, false, &constants), 1.0);
+        assert_eq!(ev_neutral(pos, None, &walled, false, &constants), 1.0);
+        assert_eq!(ev_neutral(pos, None, &open, false, &constants), 1.0);
     }
 
     #[test]
     fn escape_viability_high_in_open_terrain() {
-        // Threat present, all-grass map, no dependents → terrain
-        // weight × full openness = 0.7 (with default weights).
+        // Threat present, all-grass map, no dependents, equal cadence.
+        // 0.6 × 1.0 (openness) + 0.2 × 0.5 (neutral mobility) = 0.7.
         let map = open_grass_map(20, 20);
         let constants = EscapeViabilityConstants::default();
-        let v = escape_viability(
+        let v = ev_neutral(
             Position::new(10, 10),
             Some(Position::new(3, 3)),
             &map,
             false,
             &constants,
         );
-        // Default terrain_weight = 0.7, full openness, no dependent.
         assert!((v - 0.7).abs() < 1e-4, "got {v}");
     }
 
     #[test]
     fn escape_viability_low_in_corner() {
-        // Cat at (1, 1) surrounded by walls within the sprint box —
-        // openness should drop below half. Build a 9×9 map of walls
-        // with only a 3×3 patch of grass around (1, 1).
+        // Cat at (1, 1) surrounded by walls within the sprint box.
+        // Sprint radius 3 → 7×7 = 49-tile box. Walkable subset = 9.
+        // openness = 9/49 ≈ 0.184. With new weights and neutral
+        // mobility: 0.6 × 0.184 + 0.1 = 0.21. Still well below 0.3.
         let mut map = TileMap::new(9, 9, Terrain::Wall);
         for x in 0..=2 {
             for y in 0..=2 {
@@ -1234,32 +1267,32 @@ mod tests {
             }
         }
         let constants = EscapeViabilityConstants::default();
-        let v = escape_viability(
+        let v = ev_neutral(
             Position::new(1, 1),
             Some(Position::new(8, 8)),
             &map,
             false,
             &constants,
         );
-        // Sprint radius 3 → 7×7 = 49-tile box. Walkable subset is
-        // the 3×3 grass patch = 9 tiles. Openness = 9/49 ≈ 0.184.
-        // viability = 0.7 × 0.184 ≈ 0.129. Well below 0.3.
         assert!(v < 0.3, "expected low viability in corner, got {v}");
     }
 
     #[test]
     fn escape_viability_reduced_with_dependent() {
+        // New weights: terrain 0.6, mobility 0.2 (×0.5 = 0.1 neutral),
+        // dependent 0.2 × 1.0 = 0.2.
+        // without: 0.6 + 0.1 = 0.7
+        // with:    0.6 + 0.1 − 0.2 = 0.5
         let map = open_grass_map(20, 20);
         let constants = EscapeViabilityConstants::default();
         let pos = Position::new(10, 10);
         let threat = Some(Position::new(3, 3));
 
-        let without = escape_viability(pos, threat, &map, false, &constants);
-        let with = escape_viability(pos, threat, &map, true, &constants);
+        let without = ev_neutral(pos, threat, &map, false, &constants);
+        let with = ev_neutral(pos, threat, &map, true, &constants);
 
-        // Penalty = 0.3 × 1.0 = 0.3 → 0.7 - 0.3 = 0.4.
-        assert!((without - 0.7).abs() < 1e-4);
-        assert!((with - 0.4).abs() < 1e-4);
+        assert!((without - 0.7).abs() < 1e-4, "got without={without}");
+        assert!((with - 0.5).abs() < 1e-4, "got with={with}");
         assert!(with < without);
     }
 
@@ -1267,15 +1300,18 @@ mod tests {
     fn escape_viability_clamps_to_unit_range() {
         let map = open_grass_map(20, 20);
         // Pathological weights — dependent_penalty inflated past
-        // terrain_weight. Should still clamp at 0.0, not go negative.
+        // (terrain + mobility). Should still clamp at 0.0, not go
+        // negative.
         let constants = EscapeViabilityConstants {
             sprint_radius: 3,
             terrain_weight: 0.5,
+            mobility_weight: 0.0,
+            mobility_normalization: 1.0,
             dependent_weight: 1.0,
             dependent_penalty: 1.0,
             cover_availability_threshold: 0.5,
         };
-        let v = escape_viability(
+        let v = ev_neutral(
             Position::new(10, 10),
             Some(Position::new(3, 3)),
             &map,
@@ -1283,6 +1319,147 @@ mod tests {
             &constants,
         );
         assert_eq!(v, 0.0);
+    }
+
+    // ---- Ticket 138 — mobility-differential term ----
+
+    #[test]
+    fn escape_viability_mobility_neutral_when_equal_cadence() {
+        // Equal cadence → mobility_advantage = 0 → mobility_term = 0.5.
+        // Confirms the neutral case used by the helper above.
+        let map = open_grass_map(20, 20);
+        let constants = EscapeViabilityConstants::default();
+        let v = escape_viability(
+            Position::new(10, 10),
+            Some(Position::new(3, 3)),
+            1.0,
+            1.0,
+            &map,
+            false,
+            &constants,
+        );
+        // 0.6 × 1.0 + 0.2 × 0.5 = 0.7.
+        assert!((v - 0.7).abs() < 1e-4, "got {v}");
+    }
+
+    #[test]
+    fn escape_viability_mobility_boost_when_faster() {
+        // Cat at 1.0/tick vs snake at 0.5/tick: advantage = +0.5
+        // raw → +0.75 remapped. Mobility contribution = 0.15.
+        // Total = 0.6 × 1.0 + 0.15 = 0.75.
+        let map = open_grass_map(20, 20);
+        let constants = EscapeViabilityConstants::default();
+        let v = escape_viability(
+            Position::new(10, 10),
+            Some(Position::new(3, 3)),
+            1.0,
+            0.5,
+            &map,
+            false,
+            &constants,
+        );
+        assert!((v - 0.75).abs() < 1e-4, "got {v}");
+    }
+
+    #[test]
+    fn escape_viability_mobility_penalty_when_slower() {
+        // Cat at 0.5/tick vs threat at 1.0/tick: advantage = −0.5
+        // raw → 0.25 remapped. Mobility contribution = 0.05.
+        // Total = 0.6 × 1.0 + 0.05 = 0.65.
+        let map = open_grass_map(20, 20);
+        let constants = EscapeViabilityConstants::default();
+        let v = escape_viability(
+            Position::new(10, 10),
+            Some(Position::new(3, 3)),
+            0.5,
+            1.0,
+            &map,
+            false,
+            &constants,
+        );
+        assert!((v - 0.65).abs() < 1e-4, "got {v}");
+    }
+
+    #[test]
+    fn escape_viability_mobility_composes_with_terrain() {
+        // Half-open terrain (openness = 0.5), faster cat (boost +0.05
+        // on top of neutral 0.1). Confirms terrain and mobility add
+        // rather than fight.
+        let mut map = open_grass_map(7, 7);
+        // Set roughly half the tiles in the sprint box to Wall.
+        for x in 0..7 {
+            for y in 0..4 {
+                map.set(x, y, Terrain::Wall);
+            }
+        }
+        let constants = EscapeViabilityConstants::default();
+        let v_neutral = escape_viability(
+            Position::new(3, 3),
+            Some(Position::new(0, 0)),
+            1.0,
+            1.0,
+            &map,
+            false,
+            &constants,
+        );
+        let v_faster = escape_viability(
+            Position::new(3, 3),
+            Some(Position::new(0, 0)),
+            1.0,
+            0.5,
+            &map,
+            false,
+            &constants,
+        );
+        // Faster cadence must raise viability vs neutral cadence in
+        // the same terrain.
+        assert!(
+            v_faster > v_neutral,
+            "faster cadence should boost viability: {v_faster} vs {v_neutral}"
+        );
+        // The lift should be exactly mobility_weight × 0.25 (the
+        // remap-delta between 0.5 and 0.75): 0.2 × 0.25 = 0.05.
+        assert!(
+            (v_faster - v_neutral - 0.05).abs() < 1e-4,
+            "boost magnitude wrong: {} vs expected 0.05",
+            v_faster - v_neutral
+        );
+    }
+
+    #[test]
+    fn escape_viability_mobility_clamps_at_extremes() {
+        // Very large cadence gap → clamped to ±1.0 raw → remapped to
+        // 0.0 or 1.0. Multiplied by mobility_weight = 0.2 → bounds the
+        // mobility contribution to [0.0, 0.2].
+        let map = open_grass_map(20, 20);
+        let constants = EscapeViabilityConstants::default();
+        // Massive advantage.
+        let v_huge_advantage = escape_viability(
+            Position::new(10, 10),
+            Some(Position::new(3, 3)),
+            10.0,
+            0.0,
+            &map,
+            false,
+            &constants,
+        );
+        // 0.6 + 0.2 × 1.0 = 0.8 (mobility saturates at full).
+        assert!(
+            (v_huge_advantage - 0.8).abs() < 1e-4,
+            "got {v_huge_advantage}"
+        );
+        // Massive penalty.
+        let v_huge_penalty = escape_viability(
+            Position::new(10, 10),
+            Some(Position::new(3, 3)),
+            0.0,
+            10.0,
+            &map,
+            false,
+            &constants,
+        );
+        // 0.6 + 0.2 × 0.0 = 0.6.
+        assert!((v_huge_penalty - 0.6).abs() < 1e-4, "got {v_huge_penalty}");
     }
 
     #[test]

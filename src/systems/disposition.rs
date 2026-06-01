@@ -414,7 +414,19 @@ pub fn evaluate_dispositions(
         ),
     >,
     all_positions: Query<(Entity, &Position, Option<&PreyAnimal>), Without<Dead>>,
-    wildlife: Query<(Entity, &Position), With<WildAnimal>>,
+    // Ticket 138 — widened with `Option<&MovementBudget>` (field-level
+    // edit; safe under Bevy's schedule-edge-perturbation rule) so the
+    // ScoringContext builder can pass the threat's `per_tick` cadence
+    // into `escape_viability`. `Option<...>` defends against pre-138
+    // save-loaded wildlife missing the component.
+    wildlife: Query<
+        (
+            Entity,
+            &Position,
+            Option<&crate::components::MovementBudget>,
+        ),
+        With<WildAnimal>,
+    >,
     building_query: Query<(
         Entity,
         &Structure,
@@ -475,8 +487,15 @@ pub fn evaluate_dispositions(
         cat_positions.push((e, *p));
     }
 
-    let wildlife_positions: Vec<(Entity, Position)> =
-        wildlife.iter().map(|(e, p)| (e, *p)).collect();
+    // Ticket 138 — carry per_tick alongside the position so the
+    // `escape_viability` mobility-differential term has access to the
+    // threat's cadence at scoring time. Defaults to 1.0 for any
+    // pre-138 save-loaded wildlife missing the MovementBudget
+    // component (matches the new cat-side default).
+    let wildlife_positions: Vec<(Entity, Position, f32)> = wildlife
+        .iter()
+        .map(|(e, p, b)| (e, *p, b.map(|mb| mb.per_tick).unwrap_or(1.0)))
+        .collect();
 
     // §Phase 4c.3: snapshot kittens for Caretake urgency wiring.
     let kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState> = cooking
@@ -643,10 +662,10 @@ pub fn evaluate_dispositions(
         // the author uses internally.
         let nearest_threat = wildlife_positions
             .iter()
-            .filter(|(_, wp)| pos.manhattan_distance(wp) <= d.wildlife_threat_range)
-            .min_by_key(|(_, wp)| pos.manhattan_distance(wp));
+            .filter(|(_, wp, _)| pos.manhattan_distance(wp) <= d.wildlife_threat_range)
+            .min_by_key(|(_, wp, _)| pos.manhattan_distance(wp));
 
-        let allies_fighting_threat = if let Some(&(_, threat_pos)) = nearest_threat {
+        let allies_fighting_threat = if let Some(&(_, threat_pos, _)) = nearest_threat {
             action_snapshot
                 .iter()
                 .filter(|(e, ally_pos, action)| {
@@ -937,7 +956,18 @@ pub fn evaluate_dispositions(
             // `Option<Position>`.
             escape_viability: crate::systems::interoception::escape_viability(
                 *pos,
-                nearest_threat.map(|(_, p)| *p),
+                nearest_threat.map(|(_, p, _)| *p),
+                // Ticket 138 — own cadence; cats are always at 1.0
+                // in v1 (per-cat-cadence is out of scope per the
+                // ticket). Hard-coded rather than threaded through
+                // the query to keep the cat query under Bevy's
+                // 16-param limit. When per-cat cadence lands, swap
+                // for the cat's own `MovementBudget::per_tick`.
+                1.0,
+                // Threat cadence — `wildlife_positions` carries
+                // per_tick alongside position; default 1.0 for
+                // save-loaded threats missing the component.
+                nearest_threat.map(|(_, _, pt)| *pt).unwrap_or(1.0),
                 &map,
                 markers.has(markers::Parent::KEY, entity) || has_pair_bond,
                 &constants.escape_viability,
@@ -1133,12 +1163,12 @@ pub fn evaluate_dispositions(
                     }),
                 // §L2.10.7 Flee anchor: position of the nearest
                 // wildlife threat already scanned for allies_fighting.
-                nearest_threat: nearest_threat.map(|(_, p)| *p),
+                nearest_threat: nearest_threat.map(|(_, p, _)| *p),
                 // 263: paired entity id (mirror of the goap.rs site).
                 // `evaluate_dispositions` is unscheduled; the field is
                 // populated here for type-correctness so 263's consumer
                 // axes don't read a stale `None` on a future re-enable.
-                nearest_threat_entity: nearest_threat.map(|(e, _)| *e),
+                nearest_threat_entity: nearest_threat.map(|(e, _, _)| *e),
                 // §L2.10.7 Coordinate anchor: colony center. The
                 // coordinator's perch is approximated as the colony
                 // origin tile — single-perch model. Future refinement

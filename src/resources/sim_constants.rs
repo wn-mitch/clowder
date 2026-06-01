@@ -8311,15 +8311,34 @@ pub struct EscapeViabilityConstants {
     #[serde(default = "default_escape_viability_sprint_radius")]
     pub sprint_radius: i32,
     /// Multiplier on the terrain-openness term
-    /// (walkable / box-area). `terrain_weight + dependent_weight`
-    /// should remain ≤ 1.0 so the scalar saturates at 1.0 in fully
-    /// open terrain with no dependents. Default 0.7.
+    /// (walkable / box-area). `terrain_weight + mobility_weight +
+    /// dependent_weight` should remain ≤ 1.0 so the scalar saturates
+    /// at 1.0 in fully open terrain with the maximum mobility
+    /// advantage and no dependents. Default 0.6 (ticket 138 — was
+    /// 0.7, reduced by 0.1 to make room for the new mobility term).
     #[serde(default = "default_escape_viability_terrain_weight")]
     pub terrain_weight: f32,
+    /// Multiplier on the mobility-advantage term (ticket 138). The
+    /// raw mobility advantage is
+    /// `clamp((own_per_tick − threat_per_tick) / mobility_normalization, −1, +1)`
+    /// remapped to `[0, 1]` via `advantage × 0.5 + 0.5`. A cat at
+    /// 1.0/tick facing a snake at 0.5/tick saturates at full
+    /// advantage → contributes `mobility_weight × 1.0`. Default 0.2.
+    #[serde(default = "default_escape_viability_mobility_weight")]
+    pub mobility_weight: f32,
+    /// Normalizer on the (own − threat) cadence delta. With default
+    /// 1.0, a 1.0-vs-0.5 cadence gap saturates the advantage at
+    /// +0.5 raw → +1.0 remapped → full mobility-term contribution.
+    /// Tune up to soften the term, down to make it bite at smaller
+    /// cadence gaps. Default 1.0.
+    #[serde(default = "default_escape_viability_mobility_normalization")]
+    pub mobility_normalization: f32,
     /// Multiplier on the dependent-presence penalty term. Subtracted
-    /// from the terrain term when `has_nearby_dependent` is true,
-    /// modeling cost-of-abandonment for parents and pair-bonded
-    /// cats. Default 0.3.
+    /// from the terrain + mobility composition when
+    /// `has_nearby_dependent` is true, modeling cost-of-abandonment
+    /// for parents and pair-bonded cats. Default 0.2 (ticket 138 —
+    /// was 0.3, reduced by 0.1 to keep the weight sum ≤ 1.0 after
+    /// adding mobility_weight=0.2).
     #[serde(default = "default_escape_viability_dependent_weight")]
     pub dependent_weight: f32,
     /// Bool-style penalty magnitude — when present, the dependent
@@ -8344,10 +8363,16 @@ fn default_escape_viability_sprint_radius() -> i32 {
     3
 }
 fn default_escape_viability_terrain_weight() -> f32 {
-    0.7
+    0.6
+}
+fn default_escape_viability_mobility_weight() -> f32 {
+    0.2
+}
+fn default_escape_viability_mobility_normalization() -> f32 {
+    1.0
 }
 fn default_escape_viability_dependent_weight() -> f32 {
-    0.3
+    0.2
 }
 fn default_escape_viability_dependent_penalty() -> f32 {
     1.0
@@ -8361,6 +8386,8 @@ impl Default for EscapeViabilityConstants {
         Self {
             sprint_radius: default_escape_viability_sprint_radius(),
             terrain_weight: default_escape_viability_terrain_weight(),
+            mobility_weight: default_escape_viability_mobility_weight(),
+            mobility_normalization: default_escape_viability_mobility_normalization(),
             dependent_weight: default_escape_viability_dependent_weight(),
             dependent_penalty: default_escape_viability_dependent_penalty(),
             cover_availability_threshold: default_cover_availability_threshold(),

@@ -108,7 +108,21 @@ pub struct NarrativeEmitter<'w> {
 pub struct WorldStateQueries<'w, 's> {
     pub all_positions:
         Query<'w, 's, (Entity, &'static Position, Option<&'static PreyAnimal>), Without<Dead>>,
-    pub wildlife: Query<'w, 's, (Entity, &'static Position), With<WildAnimal>>,
+    /// Ticket 138 — widened with `Option<&MovementBudget>` (field-level
+    /// edit; safe under Bevy's schedule-edge-perturbation rule) so the
+    /// ScoringContext builder can pass the threat's `per_tick` cadence
+    /// into `escape_viability`. `Option<...>` defends against pre-138
+    /// save-loaded wildlife missing the component.
+    pub wildlife: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static Position,
+            Option<&'static crate::components::MovementBudget>,
+        ),
+        With<WildAnimal>,
+    >,
     pub building_query: Query<
         'w,
         's,
@@ -1554,8 +1568,15 @@ pub fn evaluate_and_plan(
         }
     }
 
-    let wildlife_positions: Vec<(Entity, Position)> =
-        world_state.wildlife.iter().map(|(e, p)| (e, *p)).collect();
+    // Ticket 138 — carry per_tick alongside position so the
+    // `escape_viability` mobility-differential term has access to the
+    // threat's cadence at scoring time. Defaults to 1.0 for save-
+    // loaded wildlife missing the MovementBudget component.
+    let wildlife_positions: Vec<(Entity, Position, f32)> = world_state
+        .wildlife
+        .iter()
+        .map(|(e, p, b)| (e, *p, b.map(|mb| mb.per_tick).unwrap_or(1.0)))
+        .collect();
 
     // §Phase 4c.3: snapshot kittens for Caretake urgency wiring.
     let kitten_snapshot: Vec<crate::ai::caretake_targeting::KittenState> = world_state
@@ -1885,10 +1906,10 @@ pub fn evaluate_and_plan(
         // author uses internally.
         let nearest_threat = wildlife_positions
             .iter()
-            .filter(|(_, wp)| pos.manhattan_distance(wp) <= d.wildlife_threat_range)
-            .min_by_key(|(_, wp)| pos.manhattan_distance(wp));
+            .filter(|(_, wp, _)| pos.manhattan_distance(wp) <= d.wildlife_threat_range)
+            .min_by_key(|(_, wp, _)| pos.manhattan_distance(wp));
 
-        let allies_fighting_threat = if let Some(&(_, threat_pos)) = nearest_threat {
+        let allies_fighting_threat = if let Some(&(_, threat_pos, _)) = nearest_threat {
             action_snapshot
                 .iter()
                 .filter(|(e, ally_pos, action)| {
@@ -2416,7 +2437,12 @@ pub fn evaluate_and_plan(
             // parked as ticket 128.
             escape_viability: crate::systems::interoception::escape_viability(
                 *pos,
-                nearest_threat.map(|(_, p)| *p),
+                nearest_threat.map(|(_, p, _)| *p),
+                // Ticket 138 — cats are always at 1.0 in v1; see
+                // disposition.rs companion site for rationale.
+                1.0,
+                // Threat cadence from the wildlife scan tuple.
+                nearest_threat.map(|(_, _, pt)| *pt).unwrap_or(1.0),
                 &res.map,
                 markers.has(markers::Parent::KEY, entity) || has_pair_bond,
                 &res.constants.escape_viability,
@@ -2556,7 +2582,7 @@ pub fn evaluate_and_plan(
             // only meaningful for a specific entity.
             hide_recency_of_threat_cue: {
                 let creature_recency = nearest_threat
-                    .map(|&(t, _)| t)
+                    .map(|&(t, _, _)| t)
                     .and_then(|t| {
                         world_state
                             .predator_beliefs
@@ -2578,7 +2604,7 @@ pub fn evaluate_and_plan(
                 creature_recency.max(ambient_recency).clamp(0.0, 1.0)
             },
             hide_perceived_intent_clarity: nearest_threat
-                .map(|&(t, _)| t)
+                .map(|&(t, _, _)| t)
                 .and_then(|t| {
                     world_state
                         .predator_beliefs
@@ -2687,11 +2713,11 @@ pub fn evaluate_and_plan(
                     }),
                 // §L2.10.7 Flee anchor: position of the nearest
                 // wildlife threat already scanned for allies_fighting.
-                nearest_threat: nearest_threat.map(|&(_, p)| p),
+                nearest_threat: nearest_threat.map(|&(_, p, _)| p),
                 // 263: paired entity id for entity-pair affordance reads.
                 // Same source as `nearest_threat` (the wildlife scan
                 // tuple); both Some/None together.
-                nearest_threat_entity: nearest_threat.map(|&(e, _)| e),
+                nearest_threat_entity: nearest_threat.map(|&(e, _, _)| e),
                 // §L2.10.7 Coordinate anchor: colony center as the
                 // coordinator's perch (single-perch model).
                 coordinator_perch: Some(res.colony_center.0),
