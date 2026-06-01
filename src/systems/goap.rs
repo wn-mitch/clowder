@@ -1311,9 +1311,11 @@ fn evaluate_threat_context(
     };
 
     // Colony proximity: near buildings or colony center dampens threat.
+    // Radial perception of safety — "can I see/be near the colony" —
+    // uses `euclidean_distance` per the 494 split.
     let near_buildings = building_positions
         .iter()
-        .any(|bp| pos.distance_to(bp) <= d.threat_building_safety_range);
+        .any(|bp| pos.euclidean_distance(bp) <= d.threat_building_safety_range);
     let colony_factor = if near_buildings {
         d.threat_colony_building_dampening
     } else {
@@ -1323,9 +1325,11 @@ fn evaluate_threat_context(
     };
 
     // Allies: each nearby cat reduces perceived threat (diminishing returns).
+    // Radial co-perception of allies — visual/auditory awareness of
+    // nearby cats — uses `euclidean_distance` per the 494 split.
     let ally_count = cat_positions
         .iter()
-        .filter(|(e, cp)| *e != entity && pos.distance_to(cp) <= d.threat_ally_range)
+        .filter(|(e, cp)| *e != entity && pos.euclidean_distance(cp) <= d.threat_ally_range)
         .count()
         .min(d.allies_fighting_cap);
     let ally_factor = 1.0 / (1.0 + ally_count as f32 * d.threat_ally_dampening_per_cat);
@@ -1902,11 +1906,14 @@ pub fn evaluate_and_plan(
         // resolver to pick the actual target.
 
         // Allies-fighting still needs the nearest-threat position to
-        // count co-fighting cats; the same flat-range scan that the
-        // author uses internally.
+        // count co-fighting cats. Threat-radius and ally-radius reads
+        // are radial visual/auditory perception, so they use
+        // `euclidean_distance` — the 494 escape hatch — rather than
+        // the Chebyshev tactical metric. Mirror of the parallel scan
+        // in `disposition.rs::evaluate_dispositions`.
         let nearest_threat = wildlife_positions
             .iter()
-            .filter(|(_, wp, _)| pos.distance_to(wp) <= d.wildlife_threat_range)
+            .filter(|(_, wp, _)| pos.euclidean_distance(wp) <= d.wildlife_threat_range)
             .min_by_key(|(_, wp, _)| pos.tile_distance_squared(wp));
 
         let allies_fighting_threat = if let Some(&(_, threat_pos, _)) = nearest_threat {
@@ -1915,7 +1922,7 @@ pub fn evaluate_and_plan(
                 .filter(|(e, ally_pos, action)| {
                     *e != entity
                         && *action == Action::Fight
-                        && ally_pos.distance_to(&threat_pos) <= d.allies_fighting_range
+                        && ally_pos.euclidean_distance(&threat_pos) <= d.allies_fighting_range
                 })
                 .count()
                 .min(d.allies_fighting_cap)

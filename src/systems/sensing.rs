@@ -254,7 +254,14 @@ impl EnvCtx {
 /// action-based tremor amplifier — each gated behind a verisimilitude
 /// hypothesis per the Balance Methodology rule in `CLAUDE.md`.
 pub fn detect(observer: ObserverCtx<'_>, target: TargetCtx, env: EnvCtx) -> SensoryResult {
-    let dist = observer.position.distance_to(&target.position);
+    // Sight / hearing / scent / tremor are *radial* wave-propagation
+    // channels — light, sound, and odor fall off with physical distance,
+    // not with king-move step count. Use `euclidean_distance` (the 494
+    // escape hatch) so perception decouples from the Chebyshev tactical
+    // metric that gates path cost. Pre-fix this used `distance_to`,
+    // which after 494 over-classified the unit ball as a square and
+    // inflated `HasThreatNearby` authoring ~40%.
+    let dist = observer.position.euclidean_distance(&target.position);
 
     let sight_range = effective_range(
         observer.profile.sight,
@@ -547,7 +554,10 @@ pub fn prey_cat_proximity(
     cat_action_tremor_mul: f32,
     cat_visual_mask: f32,
 ) -> f32 {
-    let dist = prey_pos.distance_to(&cat_pos);
+    // Prey's sensory awareness of an approaching cat is a radial sight /
+    // tremor read — same physical phenomenon as `detect()` above, so
+    // the same escape hatch applies.
+    let dist = prey_pos.euclidean_distance(&cat_pos);
     if dist == 0.0 {
         return 0.0;
     }
@@ -989,13 +999,15 @@ pub fn update_target_existence_markers(
         let want_carcass = carcass_scent_map.get(pos.x(), pos.y()) > 0.0;
 
         // 035: HasUnburiedCorpse — any unburied dead colony cat within
-        // burial_sense_range Manhattan tiles. Plain Manhattan rather
-        // than `observer_smells_at` keeps the predicate cheap and
-        // matches design-intent that all cats sense colony-mate death
-        // within range; no sensory-channel attenuation.
+        // `burial_sense_range` (radial). Scent-mediated awareness of a
+        // colony-mate's death; uses `euclidean_distance` for radial
+        // physical falloff rather than the Chebyshev tactical metric.
+        // Plain radial read rather than `observer_smells_at` keeps the
+        // predicate cheap and matches design-intent that all cats sense
+        // colony-mate death within range; no sensory-channel attenuation.
         let want_unburied = dead_cat_positions
             .iter()
-            .any(|dp| pos.distance_to(dp) <= burial_range);
+            .any(|dp| pos.euclidean_distance(dp) <= burial_range);
 
         toggle_target_marker(
             &mut commands,
@@ -1539,11 +1551,13 @@ mod tests {
     }
 
     #[test]
-    fn observer_sees_at_matches_old_manhattan_check() {
+    fn observer_sees_at_matches_radial_check() {
         // Phase 3 sight-channel migrations (herb, prey, search-visual)
-        // all use `dist <= range` in the pre-migration code. Under
-        // identity multipliers the helper must return the same boolean.
-        // Test every (legacy_range, dx, dy) combination up to 2× range.
+        // all use `dist <= range` in the pre-migration code with a
+        // radial-Euclidean reference (post-494 follow-on: perception is
+        // radial, not Chebyshev). Under identity multipliers the helper
+        // must return the same boolean. Test every (legacy_range, dx,
+        // dy) combination up to 2× range.
         use crate::resources::sim_constants::SensoryConstants;
         let sensory = SensoryConstants::default();
         let cat_profile = &sensory.cat;
@@ -1553,7 +1567,7 @@ mod tests {
             for dx in -(range * 2)..=(range * 2) {
                 for dy in -(range * 2)..=(range * 2) {
                     let target = Position::new(dx, dy);
-                    let dist = center.distance_to(&target);
+                    let dist = center.euclidean_distance(&target);
                     let old_detected = dist <= range as f32;
                     let new_detected = observer_sees_at(
                         SensorySpecies::Cat,
@@ -1573,9 +1587,10 @@ mod tests {
     }
 
     #[test]
-    fn observer_smells_at_matches_old_manhattan_check() {
+    fn observer_smells_at_matches_radial_check() {
         // Phase 3 scent-binary migration (carcass smell) uses the same
-        // binary `dist <= range` in pre-migration code.
+        // binary `dist <= range` in pre-migration code with a radial
+        // reference — scent diffusion is physically radial.
         use crate::resources::sim_constants::SensoryConstants;
         let sensory = SensoryConstants::default();
         let cat_profile = &sensory.cat;
@@ -1584,7 +1599,7 @@ mod tests {
         for dx in -(range * 2)..=(range * 2) {
             for dy in -(range * 2)..=(range * 2) {
                 let target = Position::new(dx, dy);
-                let dist = center.distance_to(&target);
+                let dist = center.euclidean_distance(&target);
                 let old_detected = dist <= range as f32;
                 let new_detected = observer_smells_at(
                     SensorySpecies::Cat,
@@ -1625,7 +1640,7 @@ mod tests {
                 for dx in -(alert_radius_i * 2)..=(alert_radius_i * 2) {
                     for dy in -(alert_radius_i * 2)..=(alert_radius_i * 2) {
                         let cat_pos = Position::new(dx, dy);
-                        let dist = prey_pos.distance_to(&cat_pos);
+                        let dist = prey_pos.euclidean_distance(&cat_pos);
                         let old_proximity = if dist > alert_radius || dist == 0.0 {
                             0.0
                         } else {
@@ -1658,13 +1673,15 @@ mod tests {
     }
 
     #[test]
-    fn cat_sees_threat_matches_old_manhattan_check() {
+    fn cat_sees_threat_matches_radial_check() {
         // Exhaustive equivalence proof for the Phase 2 migration:
         // old code computed `pos.distance_to(wp) <= d.threat_awareness_range`
-        // with threat_awareness_range = 10. The new path uses the cat's
-        // sight channel only (not multi-channel detect()) because the
-        // original call was explicitly visual. Every tile in a 2×-range
-        // neighborhood is tested so every boundary case is covered.
+        // with threat_awareness_range = 10 and a radial reference
+        // (visual perception falls off radially with line-of-sight
+        // distance). The new path uses the cat's sight channel only
+        // (not multi-channel detect()) because the original call was
+        // explicitly visual. Every tile in a 2×-range neighborhood is
+        // tested so every boundary case is covered.
         use crate::resources::sim_constants::SensoryConstants;
         let sensory = SensoryConstants::default();
         let cat_profile = &sensory.cat;
@@ -1674,7 +1691,7 @@ mod tests {
         for dx in -(old_range_i * 2)..=(old_range_i * 2) {
             for dy in -(old_range_i * 2)..=(old_range_i * 2) {
                 let wp = Position::new(dx, dy);
-                let dist = center.distance_to(&wp);
+                let dist = center.euclidean_distance(&wp);
                 let old_detected = dist <= old_range;
                 let new_detected = cat_sees_threat_at(center, cat_profile, wp);
                 assert_eq!(

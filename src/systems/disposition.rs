@@ -658,11 +658,14 @@ pub fn evaluate_dispositions(
         // for forward-compat parity.
 
         // Allies-fighting still needs the nearest-threat position to
-        // count co-fighting cats; use the same flat-range scan that
-        // the author uses internally.
+        // count co-fighting cats. Threat-radius and ally-radius reads
+        // are radial visual/auditory perception ("is there a predator
+        // I can see/hear?" / "are my allies near enough to flank?"), so
+        // they use `euclidean_distance` — the 494 escape hatch — rather
+        // than the Chebyshev tactical metric.
         let nearest_threat = wildlife_positions
             .iter()
-            .filter(|(_, wp, _)| pos.distance_to(wp) <= d.wildlife_threat_range)
+            .filter(|(_, wp, _)| pos.euclidean_distance(wp) <= d.wildlife_threat_range)
             .min_by_key(|(_, wp, _)| pos.tile_distance_squared(wp));
 
         let allies_fighting_threat = if let Some(&(_, threat_pos, _)) = nearest_threat {
@@ -671,7 +674,7 @@ pub fn evaluate_dispositions(
                 .filter(|(e, ally_pos, action)| {
                     *e != entity
                         && *action == Action::Fight
-                        && ally_pos.distance_to(&threat_pos) <= d.allies_fighting_range
+                        && ally_pos.euclidean_distance(&threat_pos) <= d.allies_fighting_range
                 })
                 .count()
                 .min(d.allies_fighting_cap)
