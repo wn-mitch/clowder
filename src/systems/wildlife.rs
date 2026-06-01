@@ -58,6 +58,7 @@ pub fn wildlife_ai(
             &WildAnimal,
             &mut Position,
             &mut WildlifeAiState,
+            &mut crate::components::MovementBudget,
             Has<ShadowFoxDrives>,
         ),
         (Without<FoxState>, Without<HawkState>, Without<SnakeState>),
@@ -97,7 +98,7 @@ pub fn wildlife_ai(
         .map(|(w, p)| (*p, w.repel_radius() * ward_multiplier))
         .collect();
 
-    for (animal, mut pos, mut ai_state, is_shadow_fox) in &mut query {
+    for (animal, mut pos, mut ai_state, mut budget, is_shadow_fox) in &mut query {
         match *ai_state {
             WildlifeAiState::Patrolling { dx, dy } => {
                 // 260: shadow-fox orthogonal-axis avoidance.
@@ -143,13 +144,23 @@ pub fn wildlife_ai(
                 if map.in_bounds(next.x, next.y)
                     && is_patrol_terrain(map.get(next.x, next.y).terrain, animal.species)
                 {
-                    *pos = next;
+                    // Ticket 138 — gate every step on MovementBudget.
+                    // At per_tick=1.0 (current default for all
+                    // wildlife_ai consumers — shadow-fox + legacy
+                    // critters) this is a no-op behaviorally;
+                    // structural so future per-species cadence is
+                    // parameter-only.
+                    if budget.try_spend_step() {
+                        *pos = next;
+                    }
                 } else {
                     // Reverse direction and try the other way.
                     let rev = Position::new(pos.x - dx, pos.y - dy);
                     if map.in_bounds(rev.x, rev.y) {
                         *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
-                        *pos = rev;
+                        if budget.try_spend_step() {
+                            *pos = rev;
+                        }
                     }
                     // If neither works, stay put (cornered).
                 }
@@ -173,6 +184,7 @@ pub fn wildlife_ai(
                 let next = Position::new(pos.x + dx, pos.y + dy);
                 if map.in_bounds(next.x, next.y)
                     && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                    && budget.try_spend_step()
                 {
                     *pos = next;
                 }
@@ -182,7 +194,7 @@ pub fn wildlife_ai(
             }
             WildlifeAiState::Fleeing { dx, dy } => {
                 let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y) {
+                if map.in_bounds(next.x, next.y) && budget.try_spend_step() {
                     *pos = next;
                 }
                 // If we'd go off-map, despawn is handled by cleanup_wildlife.
@@ -244,6 +256,7 @@ pub fn wildlife_ai(
                     let next = Position::new(pos.x + dx, pos.y + dy);
                     if map.in_bounds(next.x, next.y)
                         && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                        && budget.try_spend_step()
                     {
                         *pos = next;
                     }
@@ -279,7 +292,9 @@ pub fn wildlife_ai(
                 if map.in_bounds(next.x, next.y)
                     && map.get(next.x, next.y).terrain.is_wildlife_passable()
                 {
-                    *pos = next;
+                    if budget.try_spend_step() {
+                        *pos = next;
+                    }
                 } else {
                     // Can't reach target, revert to patrolling.
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
@@ -301,6 +316,7 @@ pub fn wildlife_ai(
                     let next = Position::new(pos.x + dx, pos.y + dy);
                     if map.in_bounds(next.x, next.y)
                         && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                        && budget.try_spend_step()
                     {
                         *pos = next;
                     }
@@ -332,6 +348,7 @@ pub fn wildlife_ai(
                 let next = Position::new(pos.x + dx, pos.y + dy);
                 if map.in_bounds(next.x, next.y)
                     && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                    && budget.try_spend_step()
                 {
                     *pos = next;
                 }
@@ -371,6 +388,7 @@ pub fn wildlife_ai(
                 let next = Position::new(pos.x + step_dx, pos.y + step_dy);
                 if map.in_bounds(next.x, next.y)
                     && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                    && budget.try_spend_step()
                 {
                     *pos = next;
                 }
@@ -386,6 +404,7 @@ pub fn wildlife_ai(
                 let next = Position::new(pos.x + dx, pos.y + dy);
                 if map.in_bounds(next.x, next.y)
                     && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                    && budget.try_spend_step()
                 {
                     *pos = next;
                 }
@@ -3016,13 +3035,21 @@ pub fn fox_ai_decision(
 /// Move foxes according to their FoxAiPhase. Runs INSTEAD of wildlife_ai for
 /// entities with FoxState (which are excluded from wildlife_ai via Without filter).
 pub fn fox_movement(
-    mut foxes: Query<(&FoxAiPhase, &mut Position, &mut WildlifeAiState), With<FoxState>>,
+    mut foxes: Query<
+        (
+            &FoxAiPhase,
+            &mut Position,
+            &mut WildlifeAiState,
+            &mut crate::components::MovementBudget,
+        ),
+        With<FoxState>,
+    >,
     map: Res<TileMap>,
     mut rng: ResMut<SimRng>,
     constants: Res<SimConstants>,
 ) {
     let _c = &constants.wildlife;
-    for (phase, mut pos, mut ai_state) in &mut foxes {
+    for (phase, mut pos, mut ai_state, mut budget) in &mut foxes {
         match phase {
             FoxAiPhase::Resting { .. } | FoxAiPhase::DenGuarding => {
                 // Don't move.
@@ -3032,12 +3059,20 @@ pub fn fox_movement(
                 if map.in_bounds(next.x, next.y)
                     && is_patrol_terrain(map.get(next.x, next.y).terrain, WildSpecies::Fox)
                 {
-                    *pos = next;
+                    // Ticket 138 — gate on MovementBudget. Foxes are
+                    // at per_tick=1.0 today, so a no-op behaviorally;
+                    // wired structurally so future fox-cadence tuning
+                    // is parameter-only.
+                    if budget.try_spend_step() {
+                        *pos = next;
+                    }
                 } else {
                     // Reverse and try.
                     let rev = Position::new(pos.x - dx, pos.y - dy);
                     if map.in_bounds(rev.x, rev.y) {
-                        *pos = rev;
+                        if budget.try_spend_step() {
+                            *pos = rev;
+                        }
                         *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
                     }
                 }
@@ -3066,6 +3101,7 @@ pub fn fox_movement(
                     let next = Position::new(pos.x + dx, pos.y + dy);
                     if map.in_bounds(next.x, next.y)
                         && map.get(next.x, next.y).terrain.is_wildlife_passable()
+                        && budget.try_spend_step()
                     {
                         *pos = next;
                     }
@@ -3073,7 +3109,7 @@ pub fn fox_movement(
             }
             FoxAiPhase::Fleeing { dx, dy } => {
                 let next = Position::new(pos.x + dx, pos.y + dy);
-                if map.in_bounds(next.x, next.y) {
+                if map.in_bounds(next.x, next.y) && budget.try_spend_step() {
                     *pos = next;
                 }
             }
@@ -3472,8 +3508,19 @@ mod tests {
         pos: Position,
         ai_state: WildlifeAiState,
     ) -> Entity {
+        // Ticket 138 — wildlife_ai now requires MovementBudget on
+        // its query. In production an `OnAdd<WildAnimal>` observer
+        // inserts the species default; tests bypass the observer
+        // (they build a bare Schedule, not a full App) so we
+        // inject the budget manually here.
         world
-            .spawn((WildAnimal::new(species), pos, Health::default(), ai_state))
+            .spawn((
+                WildAnimal::new(species),
+                pos,
+                Health::default(),
+                ai_state,
+                crate::components::MovementBudget::for_species(species),
+            ))
             .id()
     }
 
