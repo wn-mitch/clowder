@@ -237,13 +237,27 @@ follow-on work:
    improved 126→32. Submerged-item state and shore-adjacent Fish
    spawn (R4/R5) deferred as substrate follow-ons under 495.
 
-2. **`HoldUntilSafe: global step timeout` 0 → 670 (new)**. New mode.
-   Cats sit in `HoldUntilSafe` (post-wildlife-threat hold) past the
-   global step watchdog. Likely substrate-effect: Chebyshev's tighter
-   threat-perception ("how close is the predator in step-cost") may be
-   keeping cats in hold mode longer than Euclidean's amplitude reading
-   warranted, or the "is the threat still close" loop expects an
-   Euclidean falloff. Needs a sibling ticket.
+2. **`HoldUntilSafe: global step timeout` 243 → 742 → 94**.
+   `[verified-fixed — ticket 496 at 9b3f5d43]`. Root cause was not
+   the HoldUntilSafe exit predicate (`RouteCostField`-gated, already
+   substrate-correct) — it was the *upstream* `HasThreatNearby`
+   over-classification. Perception-layer reads at `sensing.rs:257`
+   (the unified sight/hearing/scent gate), `sensing.rs:550`
+   (`prey_cat_proximity`), `sensing.rs:998` (burial-sense),
+   `goap.rs:1316,1328` (threat-dampening building/ally proximity),
+   and the allies-fighting nearest-threat scans at
+   `disposition.rs:665,674` / `goap.rs:1909,1918` inherited the 494
+   Chebyshev default. A Chebyshev radius-R ball is `(2R+1)²` tiles
+   (441 for R=10) vs Euclidean's `πR² ≈ 314` — ~40% inflation of
+   the perception disc, cascaded through Flee/Hold step counts.
+   Fix 496 rebinds those 8 production sites (+ 4 test references)
+   to `euclidean_distance`, the documented escape hatch authored in
+   494 for "scent diffusion, ward-glow falloff, sound amplitude,
+   visual perception." Post-fix soak `logs/tuned-42-9b3f5d43`: 94
+   (well under the ≤300 acceptance band, even below the pre-494
+   anchor's 243). Per-tick rate 0.0079 → 0.00156/tick (5× reduction).
+   `shadow_foxes_avoided_ward_total` recovered 0 → 1024;
+   `wards_placed_total` 0 → 10.
 
 3. **`EngagePrey: lost prey during approach` 28 → 126 (4.5×)**.
    Up substantially. Likely substrate-effect: prey evasion math may

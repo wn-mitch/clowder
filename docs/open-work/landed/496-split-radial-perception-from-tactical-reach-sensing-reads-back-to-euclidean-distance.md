@@ -1,17 +1,17 @@
 ---
 id: 496
 title: split radial perception from tactical reach — sensing reads back to euclidean_distance
-status: blocked
+status: done
 cluster: substrate-migration
 initiative: []
 added: 2026-06-01
 parked: null
-blocked-by: [494]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 9b3f5d43
+landed-on: 2026-06-01
 ---
 
 ## Why
@@ -139,3 +139,15 @@ anchor).
   the 494 Chebyshev default but should always have been radial-Euclidean —
   documented as the use case for `Position::euclidean_distance` since 494.
   Fix is a rebinding at 8 production sites; no new substrate, no API change.
+
+- 2026-06-01: landed at `9b3f5d43`. Post-fix soak `logs/tuned-42-9b3f5d43`:
+  `HoldUntilSafe: global step timeout` = 94 (vs post-494 742 and pre-494
+  anchor 243 — well under the ≤300 acceptance band). Per-tick rate
+  0.0079 → 0.00156/tick (5× reduction). Continuity canaries pass
+  (grooming 1618 · play 44 · mentoring 802 · courtship 8712).
+  `shadow_foxes_avoided_ward_total` recovered 0 → 1024;
+  `wards_placed_total` 0 → 10. Welfare/shelter (494 follow-on #6) and
+  SearchPrey scent residual (494 follow-on #3 territory) remain
+  out-of-scope per this ticket; they'll get their own follow-ons.
+  cargo test --lib clean (2596 pass, 0 new failures; 2 pre-existing
+  surrounded_colony ring tests still red — pre-existing per 494 row #7).
