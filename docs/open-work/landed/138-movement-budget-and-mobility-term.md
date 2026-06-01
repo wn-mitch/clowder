@@ -11,7 +11,7 @@ blocked-by: [135]
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: pending
+landed-at: 8db89281
 landed-on: 2026-05-31
 ---
 
