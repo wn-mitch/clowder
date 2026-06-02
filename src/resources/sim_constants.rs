@@ -70,6 +70,13 @@ pub struct SimConstants {
     /// `<Predator>` initialization, and the passive-decay stagger period.
     #[serde(default)]
     pub beliefs: BeliefsConstants,
+    /// Ticket 294 — colony-level aggregation of per-cat `LocationBeliefs`
+    /// for substrate readers (e.g. ward placement) that need a colony
+    /// view of the C3 facets. Ships with permissive defaults so the
+    /// `RecentAmbushMap` retirement preserves pre-294 semantics; tuning
+    /// belongs to 291's full ColonyKnowledge restructure.
+    #[serde(default)]
+    pub belief_aggregation: BeliefAggregationConstants,
     /// Ticket 261 — ActionAffordances substrate. Per-action heuristic
     /// weights + min-eligibility threshold + global sensing range. Five
     /// family-grouped sub-structs; each kind carries an `AffordanceWeights`
@@ -8567,6 +8574,36 @@ impl Default for BeliefsConstants {
             // yields a lift in [0,1]; sustained co-presence over many
             // seconds saturates at OBSERVED_MAX.
             sustained_copresence_saturation_ticks: 60,
+        }
+    }
+}
+
+// ---------- BeliefAggregationConstants (ticket 294) ----------
+
+/// Colony-aggregation tunables for the C3 belief substrate. The 294
+/// `RecentAmbushMap` retirement reads `LocationBeliefs.recency_of_threat_cue`
+/// via `belief_aggregation::aggregated_location_belief`, which gates
+/// each cat's contribution by their `Facet::strength` to silence
+/// not-yet-decayed-but-no-longer-confident memories.
+///
+/// Default `min_strength_to_contribute = 0.0` admits every cat that has
+/// any entry at the bucket — matches the pre-294 semantics where every
+/// witnessed ambush bumped the colony-shared field regardless of how
+/// long ago. Raising the floor is the lever for tuning ward placement
+/// toward "areas where cats *still actively remember* ambushes" vs.
+/// "areas where someone once saw one."
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct BeliefAggregationConstants {
+    /// Per-cat `Facet::strength` floor below which the cat's belief
+    /// does not contribute to the aggregated colony view. Default 0.0
+    /// — every cat with any entry contributes (pre-294 semantics).
+    pub min_strength_to_contribute: f32,
+}
+
+impl Default for BeliefAggregationConstants {
+    fn default() -> Self {
+        Self {
+            min_strength_to_contribute: 0.0,
         }
     }
 }

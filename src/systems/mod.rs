@@ -95,6 +95,7 @@ pub mod affordance_writer;
 pub mod ai;
 pub mod aspiration_picker;
 pub mod aspirations;
+pub mod belief_aggregation;
 pub mod belief_integrator;
 pub mod buildings;
 pub mod cat_movement;
