@@ -10709,8 +10709,7 @@ fn resolve_zone_position(
         PlannerZone::PatrolZone => stores_positions
             .iter()
             .filter_map(|sp| {
-                perimeter_offset_position(sp, d.guard_patrol_radius as i32, map)
-                    .map(|p| (sp, p))
+                perimeter_offset_position(sp, d.guard_patrol_radius as i32, map).map(|p| (sp, p))
             })
             .min_by_key(|(sp, _)| pos.tile_distance_squared(*sp))
             .map(|(_, p)| p)
@@ -10725,8 +10724,7 @@ fn resolve_zone_position(
         PlannerZone::MaterialPile => material_pile_positions
             .iter()
             .filter(|(_, mp, _)| {
-                map.in_bounds(mp.x(), mp.y())
-                    && map.get(mp.x(), mp.y()).terrain.is_passable()
+                map.in_bounds(mp.x(), mp.y()) && map.get(mp.x(), mp.y()).terrain.is_passable()
             })
             .min_by_key(|(_, mp, _)| pos.tile_distance_squared(mp))
             .map(|(_, p, _)| *p),
@@ -10743,8 +10741,7 @@ fn resolve_zone_position(
         PlannerZone::CarcassPile => food_pile_positions
             .iter()
             .filter(|(_, fp, _)| {
-                map.in_bounds(fp.x(), fp.y())
-                    && map.get(fp.x(), fp.y()).terrain.is_passable()
+                map.in_bounds(fp.x(), fp.y()) && map.get(fp.x(), fp.y()).terrain.is_passable()
             })
             .min_by_key(|(_, fp, _)| pos.tile_distance_squared(fp))
             .map(|(_, p, _)| *p),
@@ -11139,8 +11136,7 @@ fn build_zone_distances(
             material_pile_positions
                 .iter()
                 .filter(|(_, mp, _)| {
-                    map.in_bounds(mp.x(), mp.y())
-                        && map.get(mp.x(), mp.y()).terrain.is_passable()
+                    map.in_bounds(mp.x(), mp.y()) && map.get(mp.x(), mp.y()).terrain.is_passable()
                 })
                 .min_by_key(|(_, mp, _)| pos.tile_distance_squared(mp))
                 .map(|(_, p, _)| *p),
@@ -11150,8 +11146,7 @@ fn build_zone_distances(
             food_pile_positions
                 .iter()
                 .filter(|(_, fp, _)| {
-                    map.in_bounds(fp.x(), fp.y())
-                        && map.get(fp.x(), fp.y()).terrain.is_passable()
+                    map.in_bounds(fp.x(), fp.y()) && map.get(fp.x(), fp.y()).terrain.is_passable()
                 })
                 .min_by_key(|(_, fp, _)| pos.tile_distance_squared(fp))
                 .map(|(_, p, _)| *p),
@@ -11515,8 +11510,7 @@ mod tests {
         let picked = food_piles
             .iter()
             .filter(|(_, fp, _)| {
-                map.in_bounds(fp.x(), fp.y())
-                    && map.get(fp.x(), fp.y()).terrain.is_passable()
+                map.in_bounds(fp.x(), fp.y()) && map.get(fp.x(), fp.y()).terrain.is_passable()
             })
             .min_by_key(|(_, fp, _)| cat_pos.tile_distance_squared(fp))
             .map(|(_, p, _)| *p);
@@ -11546,8 +11540,7 @@ mod tests {
         let picked = food_piles
             .iter()
             .filter(|(_, fp, _)| {
-                map.in_bounds(fp.x(), fp.y())
-                    && map.get(fp.x(), fp.y()).terrain.is_passable()
+                map.in_bounds(fp.x(), fp.y()) && map.get(fp.x(), fp.y()).terrain.is_passable()
             })
             .min_by_key(|(_, fp, _)| cat_pos.tile_distance_squared(fp))
             .map(|(_, p, _)| *p);
