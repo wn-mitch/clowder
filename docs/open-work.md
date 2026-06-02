@@ -15,10 +15,10 @@ _Last generated: 2026-06-02._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 122 |
+| Ready | 121 |
 | Parked | 12 |
 | Blocked | 30 |
-| **Open total** | **169** |
+| **Open total** | **168** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -39,11 +39,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[492](docs/open-work/tickets/492-phase-2b-euclidean-perception-radius-constants-i32f32.md)** — Phase 2b — Euclidean perception + radius constants i32→f32 — _[ai-substrate] · score 0.91_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
 - **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
-- **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · score 0.90_
+- **[294](docs/open-work/tickets/294-recentambushmap-retirement-colony-resource-moves-to-per-cat-locationbeliefsrecency-of-threat-cue-258-follow-on.md)** — RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on) — _[belief-perception] · score 0.90_
+- **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · score 0.90_
 
 ## Epic progress (8)
 
@@ -68,11 +68,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (122)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (33 ready, 6 blocked)
+### ai-substrate (32 ready, 6 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -105,7 +105,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[466](docs/open-work/tickets/466-travelto-greedy-step-pathing-lift-a-fallback-into-catpathplannext-step.md)** — TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step — _[ai-substrate] · added 2026-05-25_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
 - **[489](docs/open-work/tickets/489-dse-score-collapse-contract-audit-pattern-b-personality-in-cp-floored-need-across-the-cat-action-dse-corpus.md)** — DSE score-collapse contract — audit Pattern B (personality-in-CP + floored need) across the cat-action DSE corpus — _[ai-substrate] · added 2026-05-30_
-- **[492](docs/open-work/tickets/492-phase-2b-euclidean-perception-radius-constants-i32f32.md)** — Phase 2b — Euclidean perception + radius constants i32→f32 — _[ai-substrate] · added 2026-05-31_
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
 
 ### social-coordination (19 ready, 4 blocked)
@@ -348,7 +347,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (122)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -470,7 +469,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[484](docs/open-work/tickets/484-refresh-seed-42-verdict-baseline-post-017463470472260-substrate-landings.md)** — Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings — _[diagnostics-and-tooling] · added 2026-05-27_
 - **[489](docs/open-work/tickets/489-dse-score-collapse-contract-audit-pattern-b-personality-in-cp-floored-need-across-the-cat-action-dse-corpus.md)** — DSE score-collapse contract — audit Pattern B (personality-in-CP + floored need) across the cat-action DSE corpus — _[ai-substrate] · added 2026-05-30_
 - **[490](docs/open-work/tickets/490-warm-floor-founder-familiarity-collapses-early-game-spatial-dispersion-cuddle-puddle.md)** — warm-floor founder familiarity collapses early-game spatial dispersion (cuddle puddle) — _[social-coordination] · added 2026-05-30_
-- **[492](docs/open-work/tickets/492-phase-2b-euclidean-perception-radius-constants-i32f32.md)** — Phase 2b — Euclidean perception + radius constants i32→f32 — _[ai-substrate] · added 2026-05-31_
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
 
 ## Parked (12)
@@ -521,14 +519,15 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (356)
+## Landed archive (357)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-06 (5)
+### 2026-06 (6)
 
 - **[497](docs/open-work/landed/497-complete-492494-manhattan-distance-retirement-26-remaining-call-sites-in-src.md)** — complete 492/494 manhattan_distance retirement (~26 remaining call-sites in src/) _(2026-06-02)_
 - **[494](docs/open-work/landed/494-492-euclidean-migration-per-drift-triage.md)** — 492 Euclidean migration: per-drift triage _(2026-06-02)_
+- **[492](docs/open-work/landed/492-phase-2b-euclidean-perception-radius-constants-i32f32.md)** — Phase 2b — Euclidean perception + radius constants i32→f32 _(2026-06-02)_
 - **[496](docs/open-work/landed/496-split-radial-perception-from-tactical-reach-sensing-reads-back-to-euclidean-distance.md)** — split radial perception from tactical reach — sensing reads back to euclidean_distance _(2026-06-01)_
 - **[495](docs/open-work/landed/495-carcasspile-picker-filters-unreachable-tiles-fish-carcasses-on-water.md)** — CarcassPile picker filters unreachable tiles (Fish carcasses on water) _(2026-06-01)_
 - **[491](docs/open-work/landed/491-phase-2a-position-becomes-vec2-backed-newtype-substrate-switch-no-behavior-drift.md)** — Phase 2a — Position becomes Vec2-backed newtype (substrate switch, no behavior drift) _(2026-06-01)_

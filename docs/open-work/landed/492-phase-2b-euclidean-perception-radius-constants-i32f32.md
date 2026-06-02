@@ -1,7 +1,7 @@
 ---
 id: 492
 title: Phase 2b — Euclidean perception + radius constants i32→f32
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-06-02
 ---
 
 ## Why
@@ -83,3 +83,4 @@ just routes more callers through it.
 - 2026-05-31: opened as sub-phase 2b sibling of 491. 491 landed the
   substrate type-switch with zero behavior drift; this ticket lifts
   perception to Euclidean and is the balance-drift step.
+- 2026-06-02: subsumed by 494/496/497 cascade — Chebyshev as default, Euclidean as radial escape hatch (inverted vs original Euclidean-first framing); call-sites all retired at 1f6d1b28. The 4-artifact hypothesize step left for a separate balance follow-on if needed.

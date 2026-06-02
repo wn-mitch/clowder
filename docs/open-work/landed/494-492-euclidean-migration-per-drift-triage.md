@@ -7,7 +7,7 @@ orchestration: substrate-sensitive
 initiative: []
 added: 2026-06-01
 parked: null
-blocked-by: [492]
+blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
