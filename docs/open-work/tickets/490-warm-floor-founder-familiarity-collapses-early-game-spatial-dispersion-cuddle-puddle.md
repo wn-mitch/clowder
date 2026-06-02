@@ -3,6 +3,7 @@ id: 490
 title: warm-floor founder familiarity collapses early-game spatial dispersion (cuddle puddle)
 status: ready
 cluster: social-coordination
+orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-30
 parked: null

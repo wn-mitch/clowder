@@ -202,16 +202,27 @@ mod tests {
         // Rat profile reads differently from cardinal-baked Manhattan
         // tuning. Captured as a substrate-effect follow-on under
         // ticket 494's "remaining-rows" section.
+        //
+        // Ticket 497 — derive `kills` from the rat-meat histogram, not
+        // `ByproductSpawned / 4`. Under the full Chebyshev migration
+        // the cat's perception widens enough to detect and kill ambient
+        // den-spawned prey (e.g. stray rabbit) within the scenario
+        // window. The bp_total / 4 estimator conflates those non-rat
+        // kills as rats, then demands a whisker per "kill" that didn't
+        // produce one. Mirrors the rabbit test's 464-era fix.
         let report = run(&SCENARIO_RAT, None, Some(800), 42);
-        // 368: Rat drops 4 byproducts per kill (Bone + Sinew + Whisker + Bristle).
-        let bp_total = report
-            .feature_counts
-            .get("ByproductSpawned")
-            .copied()
-            .unwrap_or(0) as usize;
-        let kills = bp_total / 4;
+        let kills = report.final_item_kinds.get("rat").copied().unwrap_or(0);
         if kills == 0 {
-            panic!("expected ≥1 rat kill within 800 ticks (ByproductSpawned fired {bp_total}×)");
+            let bp_total = report
+                .feature_counts
+                .get("ByproductSpawned")
+                .copied()
+                .unwrap_or(0) as usize;
+            panic!(
+                "expected ≥1 rat kill within 800 ticks (rat meat histogram empty; \
+                 global ByproductSpawned fired {bp_total}×; histogram = {:?})",
+                report.final_item_kinds,
+            );
         }
         for kind in ["bone", "sinew", "whisker", "bristle"] {
             let n = report.final_item_kinds.get(kind).copied().unwrap_or(0);

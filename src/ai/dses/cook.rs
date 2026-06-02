@@ -46,7 +46,7 @@ impl CookDse {
     pub fn new() -> Self {
         // §L2.10.7 Cook spatial axis: `Composite { Logistic(8, 0.5),
         // Invert }` evaluates `1 - Logistic(cost)` over normalized
-        // cost = manhattan_distance / COOK_KITCHEN_RANGE. Close-enough
+        // cost = chebyshev_distance / COOK_KITCHEN_RANGE. Close-enough
         // plateau: at cost=0 ≈ 0.98, at cost=1 ≈ 0.02. Outer
         // ClampMin(0.1) floor so distant cats still score non-zero —
         // the WS composition (vs CP) makes Cook robust either way,

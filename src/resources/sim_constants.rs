@@ -5966,7 +5966,7 @@ fn default_fox_approach_corridor_half_life_ticks() -> u32 {
 /// 260: `WardCoverageMap` intensity above which shadow foxes flip
 /// into ward-avoidance. Calibrated so the new substrate-visible
 /// trigger fires at roughly the same boundary as the pre-260
-/// hardcoded `manhattan_distance <= repel_radius * 3.0` check
+/// hardcoded `pre-492 manhattan_distance <= repel_radius * 3.0` check
 /// (default ward strength 1.0, repel_radius ≈ 9, multiplier 3 →
 /// fox flinches inside ~27 tiles; 0.15 coverage corresponds to a
 /// similar gradient point on the linear falloff).

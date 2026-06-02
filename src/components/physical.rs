@@ -184,7 +184,7 @@ impl Position {
     /// retired in ticket 492 in favor of `distance_to` (Euclidean) or
     /// `chebyshev_distance` (tactical reach).
     #[deprecated(
-        note = "retired by ticket 492; use distance_to (Euclidean) or chebyshev_distance (tactical reach)"
+        note = "retired by ticket 492; use distance_to / chebyshev_distance (8-direction movement) or euclidean_distance (radial sensing — scent, sound, perception falloff)"
     )]
     pub fn manhattan_distance(&self, other: &Position) -> i32 {
         let (sx, sy) = self.tile();

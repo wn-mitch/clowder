@@ -1292,7 +1292,7 @@ fn evaluate_threat_context(
         .min_by_key(|(wp, _)| pos.tile_distance_squared(wp));
 
     let (threat_pos, _) = nearest?;
-    let dist = pos.manhattan_distance(threat_pos) as f32;
+    let dist = pos.distance_to(threat_pos);
 
     // Base urgency: inverse distance.
     let base_urgency = (1.0 - dist / d.threat_urgency_divisor).max(0.0);
@@ -1303,7 +1303,7 @@ fn evaluate_threat_context(
     // Ward protection: inside a ward's repel radius dampens threat.
     let within_ward = ward_data
         .iter()
-        .any(|(wp, radius)| (pos.manhattan_distance(wp) as f32) < *radius);
+        .any(|(wp, radius)| (pos.chebyshev_distance(wp) as f32) < *radius);
     let ward_factor = if within_ward {
         d.threat_ward_dampening
     } else {
@@ -1319,7 +1319,7 @@ fn evaluate_threat_context(
     let colony_factor = if near_buildings {
         d.threat_colony_building_dampening
     } else {
-        let colony_dist = pos.manhattan_distance(colony_center) as f32;
+        let colony_dist = pos.distance_to(colony_center);
         let normalized = (colony_dist / d.threat_colony_radius).min(1.0);
         d.threat_colony_center_dampening + (1.0 - d.threat_colony_center_dampening) * normalized
     };
@@ -2298,7 +2298,7 @@ pub fn evaluate_and_plan(
                     &res.constants.sensory.cat,
                     *pp,
                     crate::components::SensorySignature::CAT,
-                    d.fated_love_detection_range as f32,
+                    d.fated_love_detection_range,
                 )
             });
         let rival_nearby = fated_rival
@@ -2311,7 +2311,7 @@ pub fn evaluate_and_plan(
                     &res.constants.sensory.cat,
                     *rp,
                     crate::components::SensorySignature::CAT,
-                    d.fated_rival_detection_range as f32,
+                    d.fated_rival_detection_range,
                 )
             });
         let (active_directive_action_ordinal, active_directive_bonus) =
@@ -4269,7 +4269,7 @@ pub fn resolve_goap_plans(
             if *is_site {
                 let n = cat_pos_list
                     .iter()
-                    .filter(|cp| cp.manhattan_distance(site_pos) <= 1)
+                    .filter(|cp| cp.chebyshev_distance(site_pos) <= 1)
                     .count();
                 if n > 0 {
                     counts.insert(*site_e, n);
@@ -6861,7 +6861,7 @@ fn dispatch_step_action(
                 .target_entity
                 .and_then(|t| ec.wildlife.get(t).ok().map(|(_, p)| *p));
             let fight_outcome = if let Some(target_pos) = target_pos_opt {
-                let dist = pos.manhattan_distance(&target_pos);
+                let dist = pos.chebyshev_distance(&target_pos);
                 if dist > 1 {
                     if plan.step_state[step_idx].cached_path.is_none()
                         || plan.step_state[step_idx]
@@ -7254,7 +7254,7 @@ fn dispatch_step_action(
         GoapActionKind::SetWard => {
             // Walk to ward placement target if one was set by the coordinator.
             if let Some(ward_target) = plan.ward_placement_pos {
-                if pos.manhattan_distance(&ward_target) > 1 {
+                if pos.chebyshev_distance(&ward_target) > 1 {
                     if plan.step_state[step_idx].cached_path.is_none() {
                         let path_plan = cat_path_plan!(ward_target);
                         plan.step_state[step_idx].cached_path =
@@ -7395,7 +7395,7 @@ fn dispatch_step_action(
                 .first_remedy_kind()
                 .unwrap_or(crate::components::magic::RemedyKind::HealingPoultice);
             let at_workshop = snaps.building_snapshot.iter().any(|(_, kind, p, _, _)| {
-                *kind == StructureType::Stores && pos.manhattan_distance(p) <= 1
+                *kind == StructureType::Stores && pos.chebyshev_distance(p) <= 1
             });
             let result = crate::steps::magic::resolve_prepare_remedy(
                 ticks,
@@ -7548,7 +7548,7 @@ fn dispatch_step_action(
 
             // Walk toward the target if we have one and we're not adjacent.
             if let Some(target) = plan.step_state[step_idx].target_position {
-                if pos.manhattan_distance(&target) > 0 {
+                if pos.chebyshev_distance(&target) > 0 {
                     if plan.step_state[step_idx].cached_path.is_none() {
                         let path_plan = cat_path_plan!(target);
                         plan.step_state[step_idx].cached_path =
@@ -7591,7 +7591,7 @@ fn dispatch_step_action(
                         // cat cleansing a hotspot may be standing next to
                         // (not on) the actual source.
                         for (_, mut carcass, cp) in &mut magic_params.carcass_query {
-                            if !carcass.cleansed && pos.manhattan_distance(cp) <= 1 {
+                            if !carcass.cleansed && pos.chebyshev_distance(cp) <= 1 {
                                 carcass.cleansed = true;
                                 if let Some(ref mut act) = narr.activation {
                                     act.record(Feature::CarcassCleansed);
@@ -7649,7 +7649,7 @@ fn dispatch_step_action(
                 // Walk to the carcass if we aren't on it yet.
                 let walking = plan.step_state[step_idx]
                     .target_position
-                    .is_some_and(|target| pos.manhattan_distance(&target) > 0);
+                    .is_some_and(|target| pos.chebyshev_distance(&target) > 0);
 
                 if walking {
                     let target = plan.step_state[step_idx].target_position.unwrap();
@@ -8943,7 +8943,7 @@ fn resolve_travel_to(
             path.remove(0);
             *pos = next;
         }
-        if pos.manhattan_distance(&target) <= 1 {
+        if pos.chebyshev_distance(&target) <= 1 {
             // Anti-stacking jitter.
             if cat_tile_counts.get(&target).copied().unwrap_or(0) > 1 {
                 let occupied: std::collections::HashSet<Position> = cat_tile_counts
@@ -8968,7 +8968,7 @@ fn resolve_travel_to(
         if let Some(next) = path_plan.next_step(*pos, target, map) {
             *pos = next;
         }
-        if pos.manhattan_distance(&target) <= 1 {
+        if pos.chebyshev_distance(&target) <= 1 {
             return crate::steps::StepResult::Advance;
         }
         // Early exit: pathfinding found no path and greedy step made no progress.
@@ -9183,7 +9183,7 @@ fn resolve_search_prey(
                 cat_profile,
                 **pp,
                 crate::components::SensorySignature::PREY,
-                d.search_visual_detection_range as f32,
+                d.search_visual_detection_range,
             )
         })
         .map(
@@ -9543,8 +9543,8 @@ fn resolve_engage_prey(
         .prey_scent_maps
         .for_kind(prey_kind)
         .get(prey_pos.x(), prey_pos.y());
-    let raw_stalk_distance = (d.stalk_start_minimum as f32)
-        + (d.stalk_start_buffer as f32) * personality.patience
+    let raw_stalk_distance = d.stalk_start_minimum
+        + d.stalk_start_buffer * personality.patience
         + d.alertness_push * prey_state.alertness
         + d.species_push * species_sens
         + personality.patience * d.tremor_push * tremor_at_prey
@@ -9552,8 +9552,8 @@ fn resolve_engage_prey(
     // Clamp to `[min, min + 2 × buffer]` so a clean settled-prey read
     // can't collapse the stalk distance below the personality-neutral
     // base, and a perfect-storm reading can't more-than-double it.
-    let stalk_low = d.stalk_start_minimum as f32;
-    let stalk_high = stalk_low + 2.0 * (d.stalk_start_buffer as f32);
+    let stalk_low = d.stalk_start_minimum;
+    let stalk_high = stalk_low + 2.0 * d.stalk_start_buffer;
     let stalk_start_base = raw_stalk_distance.clamp(stalk_low, stalk_high).round() as i32;
     // 263: affordance-biased stalk-start. Bias is dormant by default;
     // at non-zero `hunt_stalk_chase_affordance_bias`, high stalk
@@ -10509,7 +10509,7 @@ fn find_nearest_tile(
             if !predicate(tile.terrain) {
                 continue;
             }
-            let dist = from.manhattan_distance(&p);
+            let dist = from.chebyshev_distance(&p);
             if dist == 0 {
                 continue;
             }
@@ -10542,7 +10542,7 @@ fn find_random_nearby_tile(
             if map.in_bounds(p.x(), p.y()) {
                 let tile = map.get(p.x(), p.y());
                 if predicate(tile.terrain) {
-                    let dist = from.manhattan_distance(&p);
+                    let dist = from.chebyshev_distance(&p);
                     if dist > 0 {
                         candidates.push((p, 1.0 / (dist as f32 * dist as f32)));
                     }
@@ -10687,7 +10687,7 @@ fn resolve_zone_position(
         PlannerZone::RestingSpot => stores_positions
             .iter()
             .filter_map(|sp| perimeter_offset_position(sp, 1, map).map(|p| (sp, p)))
-            .min_by_key(|(sp, _)| pos.tile_distance_squared(*sp))
+            .min_by_key(|(sp, _)| pos.tile_distance_squared(sp))
             .map(|(_, p)| p)
             .or(Some(*pos)),
         PlannerZone::SocialTarget => cat_positions
@@ -10711,7 +10711,7 @@ fn resolve_zone_position(
             .filter_map(|sp| {
                 perimeter_offset_position(sp, d.guard_patrol_radius as i32, map).map(|p| (sp, p))
             })
-            .min_by_key(|(sp, _)| pos.tile_distance_squared(*sp))
+            .min_by_key(|(sp, _)| pos.tile_distance_squared(sp))
             .map(|(_, p)| p)
             .or(Some(*pos)),
         // Ticket 495 — filter to passable in-bounds tiles before the
@@ -10961,7 +10961,7 @@ fn viable_groom_candidate_for(
     cat_positions.iter().any(|(other, other_pos)| {
         *other != entity
             && !currently_groomed.contains(other)
-            && pos.manhattan_distance(other_pos) <= range
+            && pos.chebyshev_distance(other_pos) <= range
     })
 }
 
@@ -10978,7 +10978,7 @@ fn classify_zone(
 ) -> PlannerZone {
     if stores_positions
         .iter()
-        .any(|sp| pos.manhattan_distance(sp) <= 2)
+        .any(|sp| pos.chebyshev_distance(sp) <= 2)
     {
         return PlannerZone::Stores;
     }
@@ -10989,7 +10989,7 @@ fn classify_zone(
     // radius (≤ 1 tile) for the same reason.
     if food_pile_positions
         .iter()
-        .any(|(_, fp, _)| pos.manhattan_distance(fp) <= 1)
+        .any(|(_, fp, _)| pos.chebyshev_distance(fp) <= 1)
     {
         return PlannerZone::CarcassPile;
     }
@@ -10999,25 +10999,25 @@ fn classify_zone(
     // see "I'm at a pile" first to gate the pickup action.
     if material_pile_positions
         .iter()
-        .any(|(_, mp, _)| pos.manhattan_distance(mp) <= 1)
+        .any(|(_, mp, _)| pos.chebyshev_distance(mp) <= 1)
     {
         return PlannerZone::MaterialPile;
     }
     if construction_positions
         .iter()
-        .any(|(_, cp)| pos.manhattan_distance(cp) <= 2)
+        .any(|(_, cp)| pos.chebyshev_distance(cp) <= 2)
     {
         return PlannerZone::ConstructionSite;
     }
     if farm_positions
         .iter()
-        .any(|fp| pos.manhattan_distance(fp) <= 2)
+        .any(|fp| pos.chebyshev_distance(fp) <= 2)
     {
         return PlannerZone::Farm;
     }
     if herb_positions
         .iter()
-        .any(|(_, hp, _)| pos.manhattan_distance(hp) <= 3)
+        .any(|(_, hp, _)| pos.chebyshev_distance(hp) <= 3)
     {
         return PlannerZone::HerbPatch;
     }
@@ -11211,7 +11211,7 @@ fn build_zone_distances(
                 continue;
             }
             let Some(tp) = to_pos else { continue };
-            let dist = fp.manhattan_distance(&tp) as u32;
+            let dist = fp.chebyshev_distance(&tp) as u32;
             let cost = (dist / 3).max(1); // Scale down: 3 tiles ≈ 1 planning cost.
             distances.set(from_zone, to_zone, cost);
         }
@@ -11317,19 +11317,12 @@ mod tests {
     #[test]
     fn find_nearest_tile_preserves_minimum_distance() {
         let mut map = TileMap::new(21, 21, Terrain::Water);
-        // A ring of passable tiles at manhattan distance 3 from (10, 10),
+        // A ring of passable tiles at chebyshev distance 3 from (10, 10),
         // plus one isolated passable tile at distance 5. The picker must
-        // return some distance-3 tile, never the distance-5 one.
-        let ring: Vec<(i32, i32)> = vec![
-            (10, 7),
-            (10, 13),
-            (7, 10),
-            (13, 10),
-            (11, 8),
-            (9, 12),
-            (12, 9),
-            (8, 11),
-        ];
+        // return some distance-3 tile, never the distance-5 one. Cardinal
+        // tiles only — diagonals like (11, 8) are chebyshev=2 under the
+        // 8-direction movement metric and would tie-break ahead of the ring.
+        let ring: Vec<(i32, i32)> = vec![(10, 7), (10, 13), (7, 10), (13, 10)];
         for (x, y) in &ring {
             map.set(*x, *y, Terrain::Grass);
         }
@@ -11337,7 +11330,7 @@ mod tests {
         let from = Position::new(10, 10);
         let result =
             find_nearest_tile(&from, &map, 10, |t| t.is_passable()).expect("ring is populated");
-        assert_eq!(from.manhattan_distance(&result), 3);
+        assert_eq!(from.chebyshev_distance(&result), 3);
         assert!(ring.contains(&(result.x(), result.y())));
     }
 
@@ -11452,7 +11445,7 @@ mod tests {
             resolved, cat,
             "fallback must never return the cat's own tile (degenerate path)"
         );
-        assert!(cat.manhattan_distance(&resolved) >= 1);
+        assert!(cat.chebyshev_distance(&resolved) >= 1);
     }
 
     /// When neither the frontier nor any nearby passable tile resolves,
@@ -11498,7 +11491,7 @@ mod tests {
 
         let near_water = Entity::from_raw_u32(1).unwrap();
         let far_grass = Entity::from_raw_u32(2).unwrap();
-        let food_piles = vec![
+        let food_piles = [
             (near_water, Position::new(5, 5), ItemKind::RawFish),
             (far_grass, Position::new(12, 5), ItemKind::RawMouse),
         ];
@@ -11531,7 +11524,7 @@ mod tests {
 
         let entity_a = Entity::from_raw_u32(1).unwrap();
         let entity_b = Entity::from_raw_u32(2).unwrap();
-        let food_piles = vec![
+        let food_piles = [
             (entity_a, Position::new(5, 5), ItemKind::RawFish),
             (entity_b, Position::new(10, 10), ItemKind::RawFish),
         ];

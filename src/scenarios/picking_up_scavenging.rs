@@ -156,9 +156,20 @@ pub static SCENARIO: Scenario = Scenario {
     // before PickingUp's eligibility flows through the L1→L2 pool. The
     // commit suppresses L3 emission for several ticks; the first
     // PickUp election lands around tick 11 in the ~12-tick range. Set
-    // to 16 to give the test budget enough headroom to capture ≥1
+    // to 30 to give the test budget enough headroom to capture ≥1
     // PickUp win across seed-42 noise.
-    default_ticks: 16,
+    //
+    // Ticket 497 — bumped 16 → 30. Under the post-497 full Chebyshev
+    // realignment (specifically the threat-context block's
+    // `colony_dist`), the cat reads itself as closer to the colony when
+    // wandering diagonally — Chebyshev gives the substrate-correct
+    // 8-direction movement distance. Threat-dampening factor shifts;
+    // the first PickUp election slips past tick 16 when ambient
+    // wildlife (Hawk/Snake spawned at map edges per
+    // `wildlife.rs::spawn_wildlife`) is in play. Same family of
+    // seed-42 fragility as 494's 200 → 800 bump on the rat-byproduct
+    // test.
+    default_ticks: 30,
     setup: setup_picking_up_scavenging,
     // Ticket 198 — substrate-fires gate. PickingUp's resolver writes
     // `ItemRetrieved` on successful pickup; this scenario empirically
