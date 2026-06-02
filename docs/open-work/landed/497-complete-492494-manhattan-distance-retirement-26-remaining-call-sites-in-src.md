@@ -1,7 +1,7 @@
 ---
 id: 497
 title: complete 492/494 manhattan_distance retirement (~26 remaining call-sites in src/)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-06-02
 ---
 
 ## Why
@@ -137,3 +137,4 @@ Avoids a single 26-site mega-commit that masks the per-site reasoning.
   492/494 sweep missed. Not in 494's scope (which targeted the spatial
   metric realignment for plan-failure regressions). Each surviving
   call-site needs a tactical-vs-radial decision before migration.
+- 2026-06-02: 26 manhattan_distance call-sites retired (22 production + 2 tests + 2 comments). Threat-context block uniformly Chebyshev. Two test fragilities surfaced and fixed at the test layer: rat-byproduct ambient-kill conflation (pre-existing 464-class defect) and picking_up_scavenging seed-42 budget. Follow-on: goap.rs:1318 near_buildings still on euclidean.
