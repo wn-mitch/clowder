@@ -175,3 +175,18 @@ Implementation phases:
   the facet shape; 294 / 293 provide the retirement pattern (colony
   per-tick rollup → per-cat belief state).
 - 2026-05-19: accuracy audit pass — blocked-by empty and status ready; ShelterFacet not yet in src/ (aspirational); home_den exists in prey.rs/wildlife.rs but not on canonical cat component yet; 258 belief substrate exists in src/components/beliefs.rs
+- 2026-06-02: empirical anchor from ticket 494 closure. The post-494
+  Chebyshev realignment shifted `welfare.shelter` from baseline
+  `0.125` to `0.0` in `logs/tuned-42-9b3f5d43` (-100%), with
+  `welfare` aggregate dropping `0.554 → 0.480` (-19.2%). This is
+  exactly the per-tick spatial rollup pathology this ticket targets:
+  a metric change to `Position::distance_to` (Euclidean → Chebyshev,
+  matching 8-direction movement cost) ripples through
+  `compute_shelter`'s `den_shelter_radius` count and collapses the
+  signal to zero, despite the colony surviving 91k ticks vs baseline
+  59k (+54%, a substrate-positive outcome on every other axis).
+  Concrete evidence the spatial rollup is fragile under metric
+  changes; belief-rollup migration is well-motivated. The new
+  baseline `logs/tuned-42-9b3f5d43` carries a welfare/shelter
+  caveat pointing here so future verdicts treat the axis as
+  tracked-known-shape, not a fresh concern.
