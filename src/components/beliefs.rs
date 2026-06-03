@@ -175,6 +175,17 @@ pub struct MentalModel {
     /// receptivity (e.g., busy hunting, or recently widowed) reads
     /// correctly: high bond, low affordance.
     pub perceived_receptivity: Facet,
+    /// 293: per-cat per-location belief about prey availability. Range
+    /// `[0.0, 1.0]` — high means "this location has prey", low means
+    /// "this location is empty". Authored on `WitnessableEvent::Hunt`
+    /// (success lifts), `HuntScentDetected` (weak lift), and
+    /// `HuntSearchYieldedNoPrey` (drops, weighted by tiles searched).
+    /// Replaces the legacy per-cat `HuntingPriors` dense grid; the colony
+    /// view is derived via `aggregate_location_belief_snapshot` rather
+    /// than maintained as a separate Resource. Slow-timescale tunables
+    /// (`BeliefAxisTunables::slow()`) — spatial yield is stable, not a
+    /// fast reactive signal.
+    pub prey_yield: Facet,
     pub last_updated_tick: u64,
     pub evidence_count: u32,
     pub candidates: Vec<CandidateFacet>,
@@ -204,6 +215,9 @@ pub enum FacetSlot {
     Predictability,
     PerceivedHostility,
     PerceivedReceptivity,
+    /// 293: per-location prey-yield belief. Only meaningful on
+    /// [`LocationBeliefs`] (the cat-keyed mental models don't author it).
+    PreyYield,
 }
 
 // ---------------------------------------------------------------------------

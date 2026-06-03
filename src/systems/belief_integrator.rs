@@ -759,6 +759,7 @@ fn decay_models<K: std::hash::Hash + Eq + Copy>(
             &cfg.perceived_receptivity,
             period,
         );
+        decay_facet(&mut model.prey_yield, &cfg.prey_yield, period);
         model.last_updated_tick = tick;
         let max_strength = [
             model.perceived_injury_level.strength,
@@ -769,6 +770,7 @@ fn decay_models<K: std::hash::Hash + Eq + Copy>(
             model.predictability.strength,
             model.perceived_hostility.strength,
             model.perceived_receptivity.strength,
+            model.prey_yield.strength,
         ]
         .into_iter()
         .fold(0.0f32, f32::max);

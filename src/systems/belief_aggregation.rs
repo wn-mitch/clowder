@@ -114,6 +114,7 @@ fn select_facet(model: &MentalModel, slot: FacetSlot) -> &Facet {
         FacetSlot::Predictability => &model.predictability,
         FacetSlot::PerceivedHostility => &model.perceived_hostility,
         FacetSlot::PerceivedReceptivity => &model.perceived_receptivity,
+        FacetSlot::PreyYield => &model.prey_yield,
     }
 }
 
@@ -207,6 +208,25 @@ mod tests {
         // Only the second cat's bucket appears.
         assert_eq!(snap.len(), 1);
         assert!((snap[&bucket_position(20, 20)] - 0.4).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn prey_yield_facet_surfaces_through_aggregator() {
+        let mut lb = LocationBeliefs::default();
+        let key = bucket_position(40, 40);
+        let mut model = MentalModel::default();
+        model.prey_yield.value = 0.8;
+        model.prey_yield.strength = 0.6;
+        lb.models.insert(key, model);
+        let cfg = BeliefAggregationConstants::default();
+        let v = aggregated_location_belief([&lb], FacetSlot::PreyYield, p(40, 40), &cfg);
+        assert!(
+            (v - 0.8).abs() < f32::EPSILON,
+            "PreyYield slot dispatches to model.prey_yield; got {v}"
+        );
+        let snap = aggregate_location_belief_snapshot([&lb], FacetSlot::PreyYield, &cfg);
+        assert_eq!(snap.len(), 1);
+        assert!((snap[&key] - 0.8).abs() < f32::EPSILON);
     }
 
     #[test]

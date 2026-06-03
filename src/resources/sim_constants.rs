@@ -8480,6 +8480,11 @@ pub struct BeliefsConstants {
     /// is a stable disposition modulated by current life-stage, not a
     /// per-tick reactive read.
     pub perceived_receptivity: BeliefAxisTunables,
+    /// 293: per-location prey-yield belief on [`LocationBeliefs`]. Slow-
+    /// timescale — spatial prey availability is stable knowledge built
+    /// across many observations, not a fast reactive read. Replaces the
+    /// legacy `HuntingPriors` proxy grid.
+    pub prey_yield: BeliefAxisTunables,
     pub species_violence_priors: SpeciesViolencePriors,
     /// Passive-decay pass runs every Nth tick, with per-cat phase staggered
     /// by `entity.index() % period`. Default 20 — amortizes cost; missing
@@ -8550,6 +8555,7 @@ impl Default for BeliefsConstants {
             },
             perceived_hostility: BeliefAxisTunables::fast(),
             perceived_receptivity: BeliefAxisTunables::slow(),
+            prey_yield: BeliefAxisTunables::slow(),
             species_violence_priors: SpeciesViolencePriors::default(),
             decay_stagger_period: 20,
             low_ward_reserve_threshold: 2,
