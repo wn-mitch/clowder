@@ -5,9 +5,9 @@
 //! derived each cadence from the per-cat `LocationBeliefs.prey_yield`
 //! facet — max-over-cats with a strength-floor gate — using the
 //! [`crate::systems::belief_aggregation::aggregate_location_belief_snapshot`]
-//! helper that ticket 294 introduced. The reader surface
-//! (`ColonyHuntingMap::beliefs.get()`, `best_direction`, snapshot
-//! downsampling) is unchanged in this commit; the value source is.
+//! helper that ticket 294 introduced. The visualization-consumer reader
+//! (`snapshot.rs::record_spatial_events`) keeps reading the same passive
+//! grid; only the value source changed.
 //!
 //! Cadence ties to `BeliefsConstants::decay_stagger_period` (default 20
 //! ticks). Per-tick rebuild would be wasteful — the underlying facets
@@ -40,13 +40,13 @@ pub fn rebuild_colony_hunting_map(
         &constants.belief_aggregation,
     );
     colony_map.reset_to_prior();
-    let grid_w = colony_map.beliefs.grid_w;
-    let grid_h = colony_map.beliefs.grid_h;
+    let grid_w = colony_map.grid_w;
+    let grid_h = colony_map.grid_h;
     for ((bx, by), value) in snapshot.iter() {
         // `LocationKey` already encodes 5-tile-bucket coordinates, which
-        // matches `HuntingPriors::bucket_size = 5` — no rescaling needed.
+        // matches `ColonyHuntingMap::BUCKET_SIZE = 5` — no rescaling.
         if (0..grid_w as i32).contains(bx) && (0..grid_h as i32).contains(by) {
-            colony_map.beliefs.beliefs[(*by as usize) * grid_w + (*bx as usize)] = *value;
+            colony_map.beliefs[(*by as usize) * grid_w + (*bx as usize)] = *value;
         }
     }
 }
@@ -54,11 +54,8 @@ pub fn rebuild_colony_hunting_map(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::beliefs::{bucket_position, LocationKey, MentalModel};
-    use crate::components::hunting_priors::DEFAULT_PRIOR;
-    use crate::resources::sim_constants::{BeliefAggregationConstants, BeliefsConstants};
-    use bevy::math::Vec2;
-    use std::collections::HashMap;
+    use crate::components::beliefs::{bucket_position, MentalModel};
+    use crate::resources::colony_hunting_map::DEFAULT_PRIOR;
 
     fn make_cat(world: &mut World, bucket: (i32, i32), value: f32, strength: f32) -> Entity {
         let mut lb = LocationBeliefs::default();
@@ -91,10 +88,10 @@ mod tests {
 
         let map = world.resource::<ColonyHuntingMap>();
         // Bucket (2,2) covers tiles 10..14. Sample any tile in that bucket.
-        assert!((map.beliefs.get(10, 10) - 0.8).abs() < f32::EPSILON);
-        assert!((map.beliefs.get(20, 20) - 0.5).abs() < f32::EPSILON);
+        assert!((map.get(10, 10) - 0.8).abs() < f32::EPSILON);
+        assert!((map.get(20, 20) - 0.5).abs() < f32::EPSILON);
         // Bucket nobody observed → DEFAULT_PRIOR
-        assert!((map.beliefs.get(50, 50) - DEFAULT_PRIOR).abs() < f32::EPSILON);
+        assert!((map.get(50, 50) - DEFAULT_PRIOR).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -107,14 +104,14 @@ mod tests {
         let mut map = ColonyHuntingMap::default();
         // Seed a sentinel value at one cell — after the system runs it
         // should be unchanged (because the cadence gate skips).
-        map.beliefs.beliefs[0] = 0.123;
+        map.beliefs[0] = 0.123;
         world.insert_resource(map);
         make_cat(&mut world, (2, 2), 0.9, 1.0);
 
         run_rebuild(&mut world);
 
         let map = world.resource::<ColonyHuntingMap>();
-        assert!((map.beliefs.beliefs[0] - 0.123).abs() < f32::EPSILON);
+        assert!((map.beliefs[0] - 0.123).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -123,8 +120,7 @@ mod tests {
         world.insert_resource(TimeState::default());
         world.insert_resource(SimConstants::default());
         let mut map = ColonyHuntingMap::default();
-        // Pre-fill so we can verify reset on rebuild with no cats.
-        for cell in map.beliefs.beliefs.iter_mut() {
+        for cell in map.beliefs.iter_mut() {
             *cell = 0.95;
         }
         world.insert_resource(map);
@@ -132,21 +128,8 @@ mod tests {
         run_rebuild(&mut world);
 
         let map = world.resource::<ColonyHuntingMap>();
-        for cell in map.beliefs.beliefs.iter() {
+        for cell in map.beliefs.iter() {
             assert!((cell - DEFAULT_PRIOR).abs() < f32::EPSILON);
         }
-    }
-
-    // Compile-time guard against the snapshot HashMap diverging from
-    // LocationKey shape; the real system iterates `snapshot.iter()` and
-    // we want a fast failure if the type changes.
-    #[allow(dead_code)]
-    fn _shape_check(_: HashMap<LocationKey, f32>) {}
-
-    #[allow(dead_code)]
-    fn _unused_consts() {
-        let _ = BeliefAggregationConstants::default();
-        let _ = BeliefsConstants::default();
-        let _ = Vec2::default();
     }
 }

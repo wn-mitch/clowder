@@ -1,10 +1,9 @@
 //! Fox spatial memory — per-fox bayesian belief grids.
 //!
-//! Follows the same bucketed overlay pattern as [`HuntingPriors`] and
-//! [`FoxScentMap`]. Each fox has its own belief grids, enabling emergent
-//! individual territory knowledge and risk perception.
+//! Follows the same bucketed overlay pattern as [`FoxScentMap`]. Each
+//! fox has its own belief grids, enabling emergent individual territory
+//! knowledge and risk perception.
 //!
-//! [`HuntingPriors`]: crate::components::hunting_priors::HuntingPriors
 //! [`FoxScentMap`]: crate::resources::fox_scent_map::FoxScentMap
 
 use bevy_ecs::prelude::*;

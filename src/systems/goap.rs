@@ -20,7 +20,6 @@ use crate::components::goap_plan::{
     GoapPlan, PendingUrgencies, PlanEvent, PlanNarrative, StepExecutionState, UrgencyKind,
     UrgentNeed,
 };
-use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::items::{Item, ItemKind};
 use crate::components::magic::{Harvestable, Herb, HerbKind, Inventory, Ward};
@@ -33,7 +32,6 @@ use crate::components::prey::{
 };
 use crate::components::skills::{Corruption, MagicAffinity, Skills};
 use crate::components::wildlife::WildAnimal;
-use crate::resources::colony_hunting_map::ColonyHuntingMap;
 use crate::resources::event_log::{EventKind, EventLog, HuntOutcome};
 use crate::resources::exploration_map::ExplorationMap;
 use crate::resources::food::FoodStores;
@@ -635,6 +633,12 @@ pub struct TargetMarkerQueries<'w, 's> {
 pub struct ExecutorContext<'w, 's> {
     pub map: ResMut<'w, TileMap>,
     pub wind: Res<'w, crate::resources::wind::WindState>,
+    /// 293: read-only per-cat `LocationBeliefs` lookup for the search-
+    /// step's `best_prey_direction` reader. Disjoint from the cats
+    /// query because `&LocationBeliefs` is read-only here and the
+    /// `belief_integrator` writer runs in a separate Chain block
+    /// earlier in the tick.
+    pub location_beliefs: Query<'w, 's, &'static crate::components::beliefs::LocationBeliefs>,
     pub time: Res<'w, TimeState>,
     pub time_scale: Res<'w, crate::resources::time::TimeScale>,
     pub constants: Res<'w, SimConstants>,
@@ -3899,7 +3903,6 @@ pub fn resolve_goap_plans(
             (
                 &Gender,
                 Option<&mut ActionHistory>,
-                &mut HuntingPriors,
                 Option<&mut crate::components::grooming::GroomingCondition>,
                 &mut crate::components::mental::Mood,
                 &mut Health,
@@ -3949,7 +3952,6 @@ pub fn resolve_goap_plans(
     mut relationships: ResMut<Relationships>,
     mut narr: NarrativeEmitter<'_>,
     mut rng: ResMut<SimRng>,
-    mut colony_map: ResMut<ColonyHuntingMap>,
     den_query: Query<(Entity, &PreyDen, &Position), Without<PreyAnimal>>,
     mut prey_params: PreyHuntParams,
     mut commands: Commands,
@@ -4300,10 +4302,9 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |(
-                    (e, _, _, _, _, _, _, _, _, _),
-                    (_, _, _, g, _, _, _, _, _, _, _, _, _, _, _),
-                )| { (e, g.as_ref().map_or(0.8, |g| g.0)) },
+                |((e, _, _, _, _, _, _, _, _, _), (_, _, g, _, _, _, _, _, _, _, _, _, _, _))| {
+                    (e, g.as_ref().map_or(0.8, |g| g.0))
+                },
             )
             .collect(),
         // Gender snapshot for §7.M.7.4's `resolve_mate_with` partner lookup —
@@ -4312,10 +4313,9 @@ pub fn resolve_goap_plans(
         gender: cats
             .iter()
             .map(
-                |(
-                    (e, _, _, _, _, _, _, _, _, _),
-                    (g, _, _, _, _, _, _, _, _, _, _, _, _, _, _),
-                )| { (e, *g) },
+                |((e, _, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _))| {
+                    (e, *g)
+                },
             )
             .collect(),
         cat_tile_counts: {
@@ -4380,7 +4380,7 @@ pub fn resolve_goap_plans(
         },
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, _, health, _, _, _, _, _, _, _, _, _))| {
+            .filter(|(_, (_, _, _, _, health, _, _, _, _, _, _, _, _, _))| {
                 health.current < health.max
             })
             .map(|((e, _, _, pos, _, _, _, _, _, _), _)| (e, *pos))
@@ -4413,10 +4413,9 @@ pub fn resolve_goap_plans(
         cat_grooming: cats
             .iter()
             .filter_map(
-                |(
-                    (e, _, _, _, _, _, _, _, _, _),
-                    (_, _, _, gc, _, _, _, _, _, _, _, _, _, _, _),
-                )| { gc.map(|g| (e, g.0)) },
+                |((e, _, _, _, _, _, _, _, _, _), (_, _, gc, _, _, _, _, _, _, _, _, _, _, _))| {
+                    gc.map(|g| (e, g.0))
+                },
             )
             .collect(),
         // §6.5.4 kinship lookup — `(kitten_entity) → (mother, father)`.
@@ -4509,7 +4508,6 @@ pub fn resolve_goap_plans(
         (
             gender,
             history,
-            mut hunting_priors,
             mut grooming,
             mut mood,
             mut health,
@@ -4871,7 +4869,6 @@ pub fn resolve_goap_plans(
             personality,
             name,
             gender,
-            &mut hunting_priors,
             grooming.as_deref_mut(),
             &mut mood,
             &mut health,
@@ -4882,7 +4879,6 @@ pub fn resolve_goap_plans(
             &mut relationships,
             &mut narr,
             &mut rng,
-            &mut colony_map,
             &mut prey_query,
             &mut stores_query,
             &items_query,
@@ -5546,7 +5542,7 @@ pub fn resolve_goap_plans(
     // Deferred grooming restorations — apply grooming condition delta and
     // §7.W social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((_, (_, _, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _, _))) =
+        if let Ok((_, (_, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _, _))) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -5813,7 +5809,6 @@ fn dispatch_step_action(
     personality: &Personality,
     name: &Name,
     gender: &Gender,
-    hunting_priors: &mut HuntingPriors,
     grooming: Option<&mut crate::components::grooming::GroomingCondition>,
     mood: &mut crate::components::mental::Mood,
     health: &mut Health,
@@ -5824,7 +5819,6 @@ fn dispatch_step_action(
     relationships: &mut Relationships,
     narr: &mut NarrativeEmitter,
     rng: &mut SimRng,
-    colony_map: &mut ColonyHuntingMap,
     prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
     stores_query: &mut Query<&mut StoredItems>,
     items_query: &Query<
@@ -6010,12 +6004,16 @@ fn dispatch_step_action(
             // disjoint field borrow at the same call site.
             let faction_overlay_q = &ec.faction_overlay_q;
             let is_focal = ec_is_focal(ec, cat_entity);
+            // 293: thread the cat's own `LocationBeliefs` for the
+            // per-cat `best_prey_direction` lookup inside the search
+            // step. The query lives on the goap system's separate
+            // `location_beliefs` field; lookup is `O(1)`.
+            let cat_loc_beliefs = ec.location_beliefs.get(cat_entity).ok();
             resolve_search_prey(
                 &mut plan.step_state[step_idx],
                 ticks,
                 pos,
-                hunting_priors,
-                colony_map,
+                cat_loc_beliefs,
                 prey_query,
                 den_query,
                 inventory,
@@ -6078,7 +6076,6 @@ fn dispatch_step_action(
                 inventory,
                 wearables,
                 skills,
-                hunting_priors,
                 prey_query,
                 prey_params,
                 &ec.map,
@@ -9012,8 +9009,10 @@ fn resolve_search_prey(
     state: &mut StepExecutionState,
     ticks: u64,
     pos: &mut Position,
-    hunting_priors: &mut HuntingPriors,
-    colony_map: &mut ColonyHuntingMap,
+    // 293: the cat's own per-bucket prey-yield beliefs. `None` for
+    // cats spawned without a `LocationBeliefs` component (test setups
+    // pre-258); the search step still works using wind / patrol_dir.
+    loc_beliefs: Option<&crate::components::beliefs::LocationBeliefs>,
     prey_query: &Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
     den_query: &Query<(Entity, &PreyDen, &Position), Without<PreyAnimal>>,
     inventory: &mut Inventory,
@@ -9108,10 +9107,8 @@ fn resolve_search_prey(
                     }
                 }
 
-                hunting_priors.record_catch(&den_pos_copy);
-                // 293: substrate emission for the den-raid kill — replaces
-                // the legacy `colony_map.beliefs.record_catch` colony-side
-                // write. Integrator's `Hunt` arm lifts the actor's
+                // 293: substrate emission for the den-raid kill —
+                // integrator's `Hunt` arm lifts the actor's
                 // `LocationBeliefs.prey_yield` at the bucket.
                 narr.witnessable.write(
                     crate::messages::witnessable_event::WitnessableEvent::Hunt {
@@ -9153,16 +9150,23 @@ fn resolve_search_prey(
         }
     }
 
-    // Search movement: belief > colony belief > wind > patrol_dir.
-    let belief_dir = hunting_priors.best_direction(pos, d.search_belief_radius);
-    let colony_dir = colony_map
-        .beliefs
-        .best_direction(pos, d.search_belief_radius);
+    // 293: search movement priority — per-cat prey-yield belief > wind >
+    // patrol_dir. Drops the legacy "colony-belief gradient" fallback
+    // because the colony view is now derived from per-cat beliefs; any
+    // cat with positive evidence about a bucket already surfaces in
+    // their own LocationBeliefs. The cross-cat aggregate read survives
+    // on the visualization snapshot only (snapshot.rs).
+    let belief_dir = loc_beliefs.and_then(|lb| {
+        crate::systems::belief_aggregation::best_prey_direction(
+            lb,
+            *pos,
+            d.search_belief_radius,
+            crate::resources::colony_hunting_map::DEFAULT_PRIOR,
+        )
+    });
     let (wx, wy) = wind.direction();
     let (mut dx, mut dy) = if let Some((bx, by)) = belief_dir {
         (bx, by)
-    } else if let Some((cx, cy)) = colony_dir {
-        (cx, cy)
     } else if wx.abs() > d.search_wind_direction_threshold
         || wy.abs() > d.search_wind_direction_threshold
     {
@@ -9287,9 +9291,9 @@ fn resolve_search_prey(
 
     if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
         state.target_entity = Some(prey_entity);
-        hunting_priors.record_scent(prey_pos_ref);
-        // 293: dual-emit — substrate path that will subsume the legacy
-        // `record_scent` writer once HuntingPriors retires in Commit 4.
+        // 293: substrate-only scent detection. Integrator's
+        // `HuntScentDetected` arm lifts the actor's
+        // `LocationBeliefs.prey_yield` at the bucket.
         narr.witnessable.write(
             crate::messages::witnessable_event::WitnessableEvent::HuntScentDetected {
                 actor: _cat_entity,
@@ -9326,10 +9330,10 @@ fn resolve_search_prey(
             // Have food from earlier — advance to deposit.
             return crate::steps::StepResult::Advance;
         }
-        hunting_priors.record_failed_search(pos, ticks);
-        // 293: dual-emit — substrate path that will subsume the legacy
-        // `record_failed_search` writer once HuntingPriors retires in
-        // Commit 4.
+        // 293: substrate-only failed-search emission. Integrator's
+        // `HuntSearchYieldedNoPrey` arm drops the actor's
+        // `LocationBeliefs.prey_yield` at the bucket, scaled by
+        // tiles_searched.
         narr.witnessable.write(
             crate::messages::witnessable_event::WitnessableEvent::HuntSearchYieldedNoPrey {
                 actor: _cat_entity,
@@ -9435,7 +9439,6 @@ fn resolve_engage_prey(
     // mutated to remove a wielded bone weapon when it snaps on a miss.
     wearables: &mut crate::components::equipment::WearableSlots,
     skills: &mut Skills,
-    hunting_priors: &mut HuntingPriors,
     prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
     prey_params: &mut PreyHuntParams,
     map: &TileMap,
@@ -9840,8 +9843,6 @@ fn resolve_engage_prey(
                 Some(species_name),
                 None,
             );
-
-            hunting_priors.record_catch(&prey_pos);
 
             if consumed_in_place {
                 // Plan dies here — the cat's hunt-and-deposit chain is

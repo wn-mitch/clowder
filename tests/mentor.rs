@@ -4,7 +4,6 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
 use clowder::ai::CurrentAction;
-use clowder::components::hunting_priors::HuntingPriors;
 use clowder::components::identity::{Gender, Name};
 use clowder::components::magic::Inventory;
 use clowder::components::mental::{Memory, Mood};
@@ -100,7 +99,6 @@ fn mentoring_restores_mastery() {
             Personality::random(&mut rand::rng()),
             Name("Mentor".to_string()),
             Gender::Tom,
-            HuntingPriors::default(),
             Mood::default(),
             Memory::default(),
         ))
@@ -154,7 +152,6 @@ fn mentoring_grows_apprentice_skill() {
         Personality::random(&mut rand::rng()),
         Name("Mentor".to_string()),
         Gender::Tom,
-        HuntingPriors::default(),
         Mood::default(),
         Memory::default(),
     ));
@@ -202,7 +199,6 @@ fn mentoring_builds_fondness() {
             Personality::random(&mut rand::rng()),
             Name("Mentor".to_string()),
             Gender::Tom,
-            HuntingPriors::default(),
             Mood::default(),
             Memory::default(),
         ))

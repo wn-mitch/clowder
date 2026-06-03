@@ -2,8 +2,8 @@ use bevy_ecs::prelude::*;
 
 /// Spatial grid tracking fox territorial scent marks.
 ///
-/// Follows the same bucketed overlay pattern as `HuntingPriors` and
-/// `ColonyHuntingMap`. Foxes deposit scent during patrol and marking phases;
+/// Follows the same bucketed overlay pattern as `ColonyHuntingMap`.
+/// Foxes deposit scent during patrol and marking phases;
 /// all buckets decay globally each tick. Cats can detect high-scent areas
 /// to increase vigilance, and rival foxes use scent to recognise claimed
 /// territory.

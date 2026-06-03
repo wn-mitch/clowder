@@ -104,6 +104,53 @@ where
     out
 }
 
+/// Width in tiles of one `LocationKey` bucket — the granularity at which
+/// `LocationBeliefs` quantizes positions. Constant across all readers so
+/// the bucket-to-tile conversion is uniform.
+pub const LOCATION_BUCKET_SIZE: i32 = 5;
+
+/// 293: scan the cat's own [`LocationBeliefs`] within `radius_buckets` of
+/// `pos` and return a unit direction step toward the bucket with the
+/// highest `prey_yield.value` that exceeds `min_value`. Returns `None`
+/// when no qualifying bucket is reachable — caller falls back to patrol
+/// drift.
+///
+/// Replaces the legacy `HuntingPriors::best_direction` reader. The
+/// `min_value` threshold sits at the substrate's neutral midpoint (0.5)
+/// so this matches the legacy "buckets above `DEFAULT_PRIOR`" semantic;
+/// uninformed buckets (`strength == 0`, `value == 0`) automatically fall
+/// below the threshold.
+pub fn best_prey_direction(
+    beliefs: &LocationBeliefs,
+    pos: Position,
+    radius_buckets: f32,
+    min_value: f32,
+) -> Option<(i32, i32)> {
+    let origin_bx = pos.x() / LOCATION_BUCKET_SIZE;
+    let origin_by = pos.y() / LOCATION_BUCKET_SIZE;
+    let r = radius_buckets.max(0.0).round() as i32;
+
+    let mut best_value = min_value;
+    let mut best_bucket: Option<(i32, i32)> = None;
+    for dy in -r..=r {
+        for dx in -r..=r {
+            let bx = origin_bx + dx;
+            let by = origin_by + dy;
+            if let Some(model) = beliefs.models.get(&(bx, by)) {
+                if model.prey_yield.value > best_value {
+                    best_value = model.prey_yield.value;
+                    best_bucket = Some((bx, by));
+                }
+            }
+        }
+    }
+    best_bucket.map(|(bx, by)| {
+        let center_x = bx * LOCATION_BUCKET_SIZE + LOCATION_BUCKET_SIZE / 2;
+        let center_y = by * LOCATION_BUCKET_SIZE + LOCATION_BUCKET_SIZE / 2;
+        ((center_x - pos.x()).signum(), (center_y - pos.y()).signum())
+    })
+}
+
 fn select_facet(model: &MentalModel, slot: FacetSlot) -> &Facet {
     match slot {
         FacetSlot::PerceivedInjuryLevel => &model.perceived_injury_level,
@@ -208,6 +255,59 @@ mod tests {
         // Only the second cat's bucket appears.
         assert_eq!(snap.len(), 1);
         assert!((snap[&bucket_position(20, 20)] - 0.4).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn best_prey_direction_picks_highest_value_above_threshold() {
+        let mut lb = LocationBeliefs::default();
+        let pos = p(50, 50); // origin bucket (10, 10)
+        let mut nearby_low = MentalModel::default();
+        nearby_low.prey_yield.value = 0.55; // barely above threshold
+        nearby_low.prey_yield.strength = 0.5;
+        lb.models.insert((11, 10), nearby_low);
+
+        let mut nearby_high = MentalModel::default();
+        nearby_high.prey_yield.value = 0.9;
+        nearby_high.prey_yield.strength = 0.9;
+        lb.models.insert((10, 11), nearby_high);
+
+        let dir = best_prey_direction(&lb, pos, 3.0, 0.5).expect("a qualifying bucket exists");
+        // Best bucket is (10, 11), center at (52, 57); origin (50, 50);
+        // dx = 2.signum() = 1 ... wait — center_x = 10*5 + 2 = 52, dx =
+        // 52-50 = 2 → signum 1; center_y = 11*5 + 2 = 57, dy = 7 → 1.
+        assert_eq!(dir, (1, 1));
+    }
+
+    #[test]
+    fn best_prey_direction_returns_none_when_no_bucket_qualifies() {
+        let mut lb = LocationBeliefs::default();
+        let pos = p(50, 50);
+        // Bucket inside radius but below threshold.
+        let mut weak = MentalModel::default();
+        weak.prey_yield.value = 0.4;
+        weak.prey_yield.strength = 0.9;
+        lb.models.insert((10, 10), weak);
+
+        assert!(best_prey_direction(&lb, pos, 3.0, 0.5).is_none());
+    }
+
+    #[test]
+    fn best_prey_direction_skips_buckets_outside_radius() {
+        let mut lb = LocationBeliefs::default();
+        let pos = p(50, 50); // origin bucket (10, 10)
+        let mut far = MentalModel::default();
+        far.prey_yield.value = 0.99;
+        far.prey_yield.strength = 0.9;
+        // Bucket 30 buckets away — far outside radius 3.
+        lb.models.insert((40, 10), far);
+
+        assert!(best_prey_direction(&lb, pos, 3.0, 0.5).is_none());
+    }
+
+    #[test]
+    fn best_prey_direction_empty_beliefs_returns_none() {
+        let lb = LocationBeliefs::default();
+        assert!(best_prey_direction(&lb, p(50, 50), 5.0, 0.5).is_none());
     }
 
     #[test]

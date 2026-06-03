@@ -372,9 +372,8 @@ pub fn emit_spatial_snapshots(
 
     if config.hunting_belief_interval > 0 && tick.is_multiple_of(config.hunting_belief_interval) {
         if let Some(map) = colony_map.as_ref() {
-            let priors = &map.beliefs;
             let (w, h, values) =
-                downsample_belief_grid(&priors.beliefs, priors.grid_w, priors.grid_h, 32, 32);
+                downsample_belief_grid(&map.beliefs, map.grid_w, map.grid_h, 32, 32);
             log.push(
                 tick,
                 EventKind::HuntingBeliefSnapshot {

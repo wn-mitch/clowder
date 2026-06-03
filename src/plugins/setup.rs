@@ -7,7 +7,6 @@ use bevy_ecs::world::World;
 
 use crate::components::fulfillment::Fulfillment;
 use crate::components::grooming::GroomingCondition;
-use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Age, Name, Species};
 use crate::components::magic::Inventory;
 use crate::components::mental::{Memory, Mood};
@@ -113,7 +112,6 @@ pub fn cat_bundle(
                 crate::components::equipment::WearableSlots::default(),
             ),
             crate::components::disposition::ActionHistory::default(),
-            HuntingPriors::default(),
             grooming,
             crate::components::goap_plan::PendingUrgencies::default(),
             crate::components::SensorySpecies::Cat,

@@ -19,7 +19,6 @@ pub mod grooming;
 pub mod hawk_goap_plan;
 pub mod held_goal_stack;
 pub mod held_intention;
-pub mod hunting_priors;
 pub mod identity;
 pub mod injury_cache;
 pub mod item_gate;

@@ -14,7 +14,6 @@ use crate::components::coordination::{ActiveDirective, Directive, DirectiveKind,
 use crate::components::disposition::{
     ActionHistory, ActionOutcome, ActionRecord, Disposition, DispositionKind,
 };
-use crate::components::hunting_priors::HuntingPriors;
 use crate::components::identity::{Gender, LifeStage, Name};
 use crate::components::items::{Item, ItemKind};
 use crate::components::joint_intention::{joint_bias_for, PracticeKind};
@@ -29,7 +28,6 @@ use crate::components::prey::{
 use crate::components::skills::{MagicAffinity, Skills};
 use crate::components::task_chain::{FailurePolicy, StepKind, TaskChain, TaskStep};
 use crate::components::wildlife::WildAnimal;
-use crate::resources::colony_hunting_map::ColonyHuntingMap;
 
 /// Bundled system params for prey-related data in `resolve_disposition_chains`.
 /// Avoids hitting Bevy's 16-parameter system limit.
@@ -3150,7 +3148,6 @@ pub fn resolve_disposition_chains(
                 &Gender,
                 Option<&mut Disposition>,
                 Option<&mut ActionHistory>,
-                &mut HuntingPriors,
                 Option<&mut crate::components::grooming::GroomingCondition>,
                 &mut crate::components::mental::Mood,
                 Option<&mut crate::components::fulfillment::Fulfillment>,
@@ -3178,7 +3175,6 @@ pub fn resolve_disposition_chains(
     mut narr: NarrativeEmitter<'_>,
     time: Res<TimeState>,
     mut rng: ResMut<SimRng>,
-    mut colony_map: ResMut<ColonyHuntingMap>,
     den_query: Query<(Entity, &PreyDen, &Position), Without<PreyAnimal>>,
     mut prey_params: PreyHuntParams,
     mut commands: Commands,
@@ -3203,16 +3199,14 @@ pub fn resolve_disposition_chains(
         // Grooming condition for target lookups during social interactions.
         grooming: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (_, _, _, _, _, g, _, _))| {
-                (e, g.map_or(0.8, |g| g.0))
-            })
+            .map(|((e, _, _, _, _, _, _, _, _), (_, _, _, _, g, _, _))| (e, g.map_or(0.8, |g| g.0)))
             .collect(),
         // Gender snapshot — used by `MateWith` to look up the partner's
         // gender for §7.M.7.4's gestator-selection fix without double-
         // borrowing the mutable `cats` query.
         gender: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (_, g, _, _, _, _, _, _))| (e, *g))
+            .map(|((e, _, _, _, _, _, _, _, _), (_, g, _, _, _, _, _))| (e, *g))
             .collect(),
         // Tile occupancy for anti-stacking jitter on PatrolTo arrival.
         cat_tile_counts: {
@@ -3246,16 +3240,7 @@ pub fn resolve_disposition_chains(
             personality,
             mut memory,
         ),
-        (
-            name,
-            gender,
-            disposition,
-            history,
-            mut hunting_priors,
-            mut grooming,
-            mut mood,
-            mut fulfillment_opt,
-        ),
+        (name, gender, disposition, history, mut grooming, mut mood, mut fulfillment_opt),
     ) in &mut cats
     {
         // Den discovery: peek at current step kind without mutable borrow.
@@ -3318,11 +3303,9 @@ pub fn resolve_disposition_chains(
                                 }
                             }
 
-                            hunting_priors.record_catch(&den_pos_copy);
                             // 293: substrate emission for the den-raid kill —
-                            // replaces the legacy `colony_map.beliefs.record_catch`
-                            // colony-side write. The integrator's `Hunt` arm
-                            // lifts the actor's `LocationBeliefs.prey_yield`
+                            // the integrator's `Hunt` arm lifts the actor's
+                            // `LocationBeliefs.prey_yield`
                             // at the bucket; `ColonyHuntingMap` is now derived
                             // from those per-cat beliefs.
                             narr.witnessable.write(
@@ -3500,7 +3483,6 @@ pub fn resolve_disposition_chains(
             &mut memory,
             name,
             gender,
-            &mut hunting_priors,
             grooming.as_deref_mut(),
             &mut fulfillment_opt,
             &mut prey_query,
@@ -3513,7 +3495,6 @@ pub fn resolve_disposition_chains(
             &mut narr,
             &time,
             &mut rng,
-            &mut colony_map,
             constants,
             &mut commands,
             &snaps,
@@ -3582,10 +3563,8 @@ pub fn resolve_disposition_chains(
     // of social warmth, which otherwise has no sim-level restorer.
     // §7.W: also apply social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((
-            (_, _, _, _, _, mut needs, _, _, _),
-            (_, _, _, _, _, grooming, _, fulfillment),
-        )) = cats.get_mut(groom.target)
+        if let Ok(((_, _, _, _, _, mut needs, _, _, _), (_, _, _, _, grooming, _, fulfillment))) =
+            cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
                 g.0 = (g.0 + groom.grooming_delta).min(1.0);
@@ -3706,7 +3685,6 @@ fn dispatch_chain_step(
     memory: &mut Memory,
     name: &Name,
     gender: &Gender,
-    hunting_priors: &mut HuntingPriors,
     grooming: Option<&mut crate::components::grooming::GroomingCondition>,
     fulfillment_opt: &mut Option<Mut<crate::components::fulfillment::Fulfillment>>,
     prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
@@ -3722,7 +3700,6 @@ fn dispatch_chain_step(
     narr: &mut NarrativeEmitter,
     time: &TimeState,
     rng: &mut SimRng,
-    colony_map: &mut ColonyHuntingMap,
     constants: &SimConstants,
     commands: &mut Commands,
     snaps: &ChainStepSnapshots,
@@ -4001,8 +3978,6 @@ fn dispatch_chain_step(
                             );
                         }
 
-                        hunting_priors.record_catch(&prey_pos);
-
                         // Multi-kill: if inventory has room, hunt for more.
                         if inventory.is_full() {
                             chain.advance();
@@ -4129,17 +4104,16 @@ fn dispatch_chain_step(
                 }
             } else {
                 // === SEARCH === (no target yet — move toward best-known hunting ground)
-                // Priority: personal belief > colony belief > wind > patrol_dir.
-                let belief_dir = hunting_priors.best_direction(pos, d.search_belief_radius);
-                let colony_dir = colony_map
-                    .beliefs
-                    .best_direction(pos, d.search_belief_radius);
+                // Priority: wind > patrol_dir. The production scheduling
+                // path (`goap.rs::resolve_search_prey`) consults the cat's
+                // own `LocationBeliefs.prey_yield` via
+                // `best_prey_direction`. `resolve_disposition_chains` is
+                // unscheduled and doesn't carry a `LocationBeliefs` query
+                // (same precedent as `patrol_threat_recency` above) —
+                // defaults to None, which yields a no-belief-signal
+                // search behavior here.
                 let (wx, wy) = wind.direction();
-                let (mut dx, mut dy) = if let Some((bx, by)) = belief_dir {
-                    (bx, by)
-                } else if let Some((cx, cy)) = colony_dir {
-                    (cx, cy)
-                } else if wx.abs() > d.search_wind_direction_threshold
+                let (mut dx, mut dy) = if wx.abs() > d.search_wind_direction_threshold
                     || wy.abs() > d.search_wind_direction_threshold
                 {
                     (-(wx.signum() as i32), -(wy.signum() as i32))
@@ -4206,10 +4180,9 @@ fn dispatch_chain_step(
 
                     if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
                         step.target_entity = Some(prey_entity);
-                        hunting_priors.record_scent(prey_pos_ref);
-                        // 293: dual-emit — substrate path that will subsume
-                        // the legacy `record_scent` writer once HuntingPriors
-                        // retires in Commit 4.
+                        // 293: substrate-only scent detection. Integrator's
+                        // `HuntScentDetected` arm lifts the witness's own
+                        // `LocationBeliefs.prey_yield` at the bucket.
                         narr.witnessable.write(
                             crate::messages::witnessable_event::WitnessableEvent::HuntScentDetected {
                                 actor: cat_entity,
@@ -4277,10 +4250,10 @@ fn dispatch_chain_step(
                         chain.advance();
                         chain.sync_targets(current);
                     } else {
-                        hunting_priors.record_failed_search(pos, ticks);
-                        // 293: dual-emit — substrate path that will subsume
-                        // the legacy `record_failed_search` writer once
-                        // HuntingPriors retires in Commit 4.
+                        // 293: substrate-only failed-search emission.
+                        // Integrator's `HuntSearchYieldedNoPrey` arm drops
+                        // the actor's `LocationBeliefs.prey_yield` at the
+                        // bucket, scaled by tiles_searched.
                         narr.witnessable.write(
                             crate::messages::witnessable_event::WitnessableEvent::HuntSearchYieldedNoPrey {
                                 actor: cat_entity,
