@@ -555,10 +555,9 @@ pub struct ScoringContext<'a> {
     /// substrate's "I have no memory of threats here" reading.
     /// Surfaced in `ctx_scalars` as `"patrol_threat_recency"`.
     /// Dormant in DSE scoring at land — `patrol_threat_recency_weight`
-    /// is `0.0` until the activation follow-on lifts it. Mirrors the
-    /// `recent_ambush_at_position` precomputed-scalar pattern; ticket
-    /// 294 will eventually fold the colony-shared `RecentAmbushMap`
-    /// into this per-cat facet at the source side.
+    /// is `0.0` until the activation follow-on lifts it. Sibling to
+    /// `recent_ambush_at_position`, both now sourced from per-cat
+    /// `LocationBeliefs.recency_of_threat_cue` after the 294 cutover.
     pub patrol_threat_recency: f32,
     /// 268: per-cat belief recency-of-threat-cue for the Hide DSE.
     /// Populated at `ScoringContext` construction as

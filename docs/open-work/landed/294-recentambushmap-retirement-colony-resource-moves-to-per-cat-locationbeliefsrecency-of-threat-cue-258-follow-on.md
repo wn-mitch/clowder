@@ -1,7 +1,7 @@
 ---
 id: 294
 title: RecentAmbushMap retirement — colony Resource moves to per-cat LocationBeliefs.recency_of_threat_cue (258 follow-on)
-status: ready
+status: done
 cluster: belief-perception
 orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-06-03
 ---
 
 ## Why
@@ -73,3 +73,4 @@ Hypothesis: per-cat ambush belief aggregated via belief-agreement preserves ward
 
 - 2026-05-11: opened as 258 follow-on. Per 258's plan-agent: this is the widest-blast-radius retirement of the four proxies; sequenced last. Sibling proxies: 290 (RDF), 292 (RTF), 293 (HuntingPriors).
 - 2026-05-19: accuracy audit pass — 258/219 (prerequisites) are landed; 291 (aggregated-view dependency) is open ready; all file paths and Rust symbols verified.
+- 2026-06-03: Landed via 5-commit cascade: helper (291 minimal slice) → event variant + integrator arm → reader cutover → Resource retirement → balance doc. Hard survival gates hold; commit-4 verdict shows ~0% drift vs freshly-promoted post-294 baseline. MatingOccurred regression is pre-existing on main (see balance doc §Diagnostic pass); follow-on scope captured.
