@@ -1662,14 +1662,12 @@ pub fn predator_stalk_cats(
     mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
     time: Res<TimeState>,
     mut activation: ResMut<SystemActivation>,
-    mut recent_ambush_map: ResMut<crate::resources::RecentAmbushMap>,
     mut body_part_writer: MessageWriter<crate::messages::body_part_injury::BodyPartInjury>,
-    // 294: dual-emit window. Writes both the legacy colony-shared
-    // `RecentAmbushMap` deposit (consumed by the unchanged readers) AND
-    // the new per-cat `WitnessableEvent::PredatorAmbush` (consumed by
-    // `belief_integrator::apply_observation` to lift each witness's
-    // `LocationBeliefs[bucket(pos)].recency_of_threat_cue`). Commit 4
-    // retires the legacy deposit; this commit lands the parallel substrate.
+    // 294: per-cat substrate replacement for the retired colony-shared
+    // `RecentAmbushMap`. Emits `WitnessableEvent::PredatorAmbush`; each
+    // cat within `WITNESS_RANGE` (10 Manhattan) lifts their
+    // `LocationBeliefs[bucket(pos)].recency_of_threat_cue` in
+    // `belief_integrator::apply_observation`.
     mut witnessable_writer: MessageWriter<crate::messages::witnessable_event::WitnessableEvent>,
     // 477 — focal-cat resolver-trace sink for ambush armor reduction.
     focal_trace: crate::resources::trace_log::FocalTraceParam,
@@ -1858,17 +1856,11 @@ pub fn predator_stalk_cats(
                                 );
                             }
 
-                            // 219: stamp the ambush onto the colony-shared
-                            // event-memory map at the predator's tile. The
-                            // map decays exponentially each tick via
-                            // `update_recent_ambush_map`; future tickets 220
-                            // (ward-placement) and 221 (caretake-relocate)
-                            // consume the resulting hotspot signal.
-                            recent_ambush_map.deposit(wl_pos.x(), wl_pos.y(), 1.0);
-                            // 294: dual-emit the per-cat substrate variant.
-                            // `belief_integrator` lifts every witness's
-                            // `LocationBeliefs[bucket(pos)].recency_of_threat_cue`.
-                            // Commit 4 drops the legacy deposit above.
+                            // 294: emit the per-cat substrate event. Each
+                            // cat within `WITNESS_RANGE` (10 Manhattan) of
+                            // `*wl_pos` lifts their
+                            // `LocationBeliefs[bucket(*wl_pos)].recency_of_threat_cue`
+                            // in `belief_integrator::apply_observation`.
                             witnessable_writer.write(
                                 crate::messages::witnessable_event::WitnessableEvent::PredatorAmbush {
                                     predator: predator_entity,
@@ -3441,17 +3433,6 @@ pub fn fox_scent_tick(
             _ => {}
         }
     }
-}
-
-/// 219: per-tick exponential decay for `RecentAmbushMap`. Deposits
-/// happen inline in `predator_stalk_cats` at the same site as
-/// `EventLog::Ambush` emission; this system only owns the decay so
-/// the map fades when ambushes stop firing in a region.
-pub fn update_recent_ambush_map(
-    mut map: ResMut<crate::resources::RecentAmbushMap>,
-    constants: Res<SimConstants>,
-) {
-    map.decay_all(constants.wildlife.recent_ambush_half_life_ticks);
 }
 
 /// 312: per-tick decay + deposit for `FoxApproachCorridorMap`.

@@ -210,16 +210,11 @@ pub struct ChainResources<'w> {
     /// Ward-coverage influence map — sampled by `compute_ward_placement`
     /// for anti-clustering (skip tiles already covered by other wards).
     pub ward_coverage_map: Res<'w, crate::resources::WardCoverageMap>,
-    /// 220: recent-ambush event memory consumed by
-    /// `compute_ward_placement` (gated by `ward_ambush_anchor_weight`,
-    /// dormant at land). Carried here so the legacy
-    /// `disposition_to_chain` path stays type-correct even though it is
-    /// unscheduled (ticket 027b).
-    pub recent_ambush_map: Res<'w, crate::resources::RecentAmbushMap>,
     /// 220: kill-site scent (Phase 2C substrate) consumed by
     /// `compute_ward_placement` (gated by `ward_recency_anchor_weight`,
-    /// dormant at land). Carried for the same reason as
-    /// `recent_ambush_map`.
+    /// dormant at land). Carried so the legacy `disposition_to_chain`
+    /// path stays type-correct even though it is unscheduled
+    /// (ticket 027b).
     pub carcass_scent_map: Res<'w, crate::resources::CarcassScentMap>,
     /// 312: fox-approach corridor traffic consumed by
     /// `compute_ward_placement` (gated by

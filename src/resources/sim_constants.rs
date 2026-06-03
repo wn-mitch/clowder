@@ -5578,15 +5578,6 @@ pub struct WildlifeConstants {
     pub ambush_witness_range: f32,
     /// Safety drain applied to cats who witness a nearby ambush.
     pub ambush_witness_safety_drain: f32,
-    /// 219: half-life (in ticks) of `RecentAmbushMap` per-tile values.
-    /// Each tick the map multiplies all tiles by
-    /// `0.5.powf(1.0 / recent_ambush_half_life_ticks)`. Default 5000
-    /// ticks (~one in-game day at default scale) keeps clusters of
-    /// 2–3 ambushes/2k ticks documented in 210 closeout visible at
-    /// non-trivial intensity for the downstream ward-placement /
-    /// caretake-relocate consumers (tickets 220 / 221).
-    #[serde(default = "default_recent_ambush_half_life_ticks")]
-    pub recent_ambush_half_life_ticks: u32,
     /// 312: deposit per tick when a patrolling ShadowFox advances
     /// through a tile. Lays a corridor-traffic gradient sampled by
     /// `compute_ward_placement` to recognize topological criticality
@@ -5600,9 +5591,8 @@ pub struct WildlifeConstants {
     #[serde(default = "default_fox_approach_corridor_deposit_per_tick")]
     pub fox_approach_corridor_deposit_per_tick: f32,
     /// 312: half-life (in ticks) of `FoxApproachCorridorMap` per-tile
-    /// values. Same exponential-decay shape as
-    /// `recent_ambush_half_life_ticks` but slower — default 20_000
-    /// ticks (~4 in-game days) reflects that corridors are stable
+    /// values. Exponential-decay shape with default 20_000 ticks
+    /// (~4 in-game days) reflects that corridors are stable
     /// terrain features (fox patrol routes persist across many
     /// ambush events). Slower-than-ambush decay keeps the substrate
     /// visible on routes that see traffic every few days but no
@@ -5832,7 +5822,6 @@ impl Default for WildlifeConstants {
             ambush_cooldown_ticks: 100,
             ambush_witness_range: 12.0,
             ambush_witness_safety_drain: 0.08,
-            recent_ambush_half_life_ticks: default_recent_ambush_half_life_ticks(),
             fox_approach_corridor_deposit_per_tick: default_fox_approach_corridor_deposit_per_tick(
             ),
             fox_approach_corridor_half_life_ticks: default_fox_approach_corridor_half_life_ticks(),
@@ -5956,10 +5945,6 @@ fn default_shadow_fox_coherence_recovery_threshold() -> f32 {
 
 fn default_shadow_fox_coherence_dissolution_threshold() -> f32 {
     0.0
-}
-
-fn default_recent_ambush_half_life_ticks() -> u32 {
-    5000
 }
 
 fn default_fox_approach_corridor_deposit_per_tick() -> f32 {

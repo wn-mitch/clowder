@@ -8,12 +8,6 @@ pub struct ColonyContext<'w> {
     pub priority: Option<Res<'w, crate::resources::colony_priority::ColonyPriority>>,
     pub exploration_map: Res<'w, crate::resources::ExplorationMap>,
     pub fox_scent_map: Res<'w, crate::resources::FoxScentMap>,
-    /// 219: colony-shared spatial memory of recent ambush events.
-    /// Read at ScoringContext build time in `disposition.rs` and
-    /// `goap.rs` to populate `recent_ambush_at_position`. Dormant in
-    /// scoring at land (no DSE consumes it yet) but trace-visible via
-    /// `ctx_scalars` so soak-trace verification can see the substrate.
-    pub recent_ambush_map: Res<'w, crate::resources::RecentAmbushMap>,
     /// 220: per-tile carcass-scent sample. Read at ScoringContext build
     /// time to populate `carcass_scent_at_position`. Substrate is
     /// Phase 2C; this entry restores the perception-scalar consumer

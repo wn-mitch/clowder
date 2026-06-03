@@ -148,7 +148,7 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
         ColonyDistrictMap, ComfortMap, ConstructionSiteMap, CorruptionInfluenceMap,
         CoverAvailabilityMap, ExplorationMap, FoodLocationMap, FoxApproachCorridorMap, FoxScentMap,
         GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, MysteryMap, PreyScentMaps,
-        RecentAmbushMap, TileMap, TremorMap, WardCoverageMap, WardIntentMap, WardSiegeFearMap,
+        TileMap, TremorMap, WardCoverageMap, WardIntentMap, WardSiegeFearMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -192,10 +192,6 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // it so soak-trace can verify the marker author reads the same
     // map the L1 trace reports.
     registry.register::<CoverAvailabilityMap>();
-    // 219: colony-shared recent-ambush event memory. Dormant in
-    // scoring at land (no DSE reads it yet); registered so its samples
-    // surface in `trace-*.jsonl` for soak-trace verification.
-    registry.register::<RecentAmbushMap>();
     // 312: fox-approach corridor traffic map. Dormant in scoring at
     // land (`ward_fox_approach_corridor_weight = 0.0`); registered so
     // its samples surface in `trace-*.jsonl` for soak-trace
@@ -1391,7 +1387,6 @@ impl Plugin for SimulationPlugin {
                         // sibling perturbs Bevy's topological sort and
                         // collapsed Hunting/Foraging on seed-42).
                         systems::wildlife::update_fox_approach_corridor_map,
-                        systems::wildlife::update_recent_ambush_map,
                         systems::wildlife::predator_hunt_prey,
                         systems::wildlife::carcass_decay,
                         systems::wildlife::carcass_scent_tick,

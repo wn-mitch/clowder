@@ -4262,7 +4262,6 @@ mod tests {
         world.insert_resource(crate::resources::WardCoverageMap::default());
         world.insert_resource(crate::resources::ColonyDistrictMap::default());
         world.insert_resource(crate::resources::WardIntentMap::default());
-        world.insert_resource(crate::resources::RecentAmbushMap::default());
         world.insert_resource(crate::resources::CarcassScentMap::default());
         world.insert_resource(crate::resources::FoxApproachCorridorMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(
@@ -4319,7 +4318,6 @@ mod tests {
         world.insert_resource(crate::resources::WardCoverageMap::default());
         world.insert_resource(crate::resources::ColonyDistrictMap::default());
         world.insert_resource(crate::resources::WardIntentMap::default());
-        world.insert_resource(crate::resources::RecentAmbushMap::default());
         world.insert_resource(crate::resources::CarcassScentMap::default());
         world.insert_resource(crate::resources::FoxApproachCorridorMap::default());
         world.insert_resource(crate::resources::map::TileMap::new(

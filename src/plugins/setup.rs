@@ -550,12 +550,6 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // `mark_dirty()` to schedule re-stamping.
     world.insert_resource(crate::resources::CoverAvailabilityMap::default());
 
-    // 219: colony-shared recent-ambush event memory. Deposits happen
-    // inline in `predator_stalk_cats`; exponential decay runs each
-    // tick via `update_recent_ambush_map`. Dormant in scoring at
-    // land (no DSE consumes it yet) but trace-visible.
-    world.insert_resource(crate::resources::RecentAmbushMap::default());
-
     // 312: fox-approach corridor map (perception axis for ward placement).
     // Populated by `update_fox_approach_corridor_map` reading
     // ShadowFox `Position` + `FoxAiPhase` each tick; exponential decay

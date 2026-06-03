@@ -111,8 +111,6 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     // in Chain 2a. Cold-start `dirty = true` so the first scheduler
     // tick stamps from `TileMap` before HideEligible reads.
     world.insert_resource(crate::resources::CoverAvailabilityMap::default());
-    // 219: colony-shared recent-ambush event memory.
-    world.insert_resource(crate::resources::RecentAmbushMap::default());
     // 312: fox-approach corridor map. Dormant at default
     // `SimConstants` (scorer weight 0.0). Activated by the FO-1
     // chokepoint scenario via a per-fixture `SimConstants` override.
