@@ -218,17 +218,19 @@ pub fn evaluate_coordinators(
 // ---------------------------------------------------------------------------
 
 #[derive(SystemParam)]
-pub struct WardPlacementSignals<'w> {
+pub struct WardPlacementSignals<'w, 's> {
     pub tile_map: Res<'w, crate::resources::map::TileMap>,
     pub fox_scent: Res<'w, crate::resources::FoxScentMap>,
     pub cat_scent: Res<'w, crate::resources::CatScentMap>,
     pub ward_coverage: Res<'w, crate::resources::WardCoverageMap>,
-    /// 220: recent-ambush event memory (from ticket 219). Read at
-    /// each candidate tile to bias placement toward empirical hot zones
-    /// rather than the geometric perimeter. Weight gated by
-    /// `ScoringConstants::ward_ambush_anchor_weight` — ships at 0.0,
-    /// so the read is performed but has no scoring effect at land.
-    pub recent_ambush: Res<'w, crate::resources::RecentAmbushMap>,
+    /// 294: per-cat ambush-memory belief, aggregated colony-wide for
+    /// candidate-position sampling. Replaces the retired colony-shared
+    /// `RecentAmbushMap` (219). Built once per `compute_ward_placement`
+    /// call via `belief_aggregation::aggregate_location_belief_snapshot`;
+    /// candidates look up `bucket_position(x, y)` against the snapshot
+    /// rather than calling `Resource.get()`. Weight remains gated by
+    /// `ScoringConstants::ward_ambush_anchor_weight` (dormant at 0.0).
+    pub location_beliefs: Query<'w, 's, &'static crate::components::beliefs::LocationBeliefs>,
     /// 220: kill-site scent (Phase 2C substrate). Same dormant-at-land
     /// posture as `recent_ambush`; weight gated by
     /// `ScoringConstants::ward_recency_anchor_weight`.
@@ -564,12 +566,21 @@ pub fn assess_colony_needs(
             // Bevy's 16-param tuple limit).
             let seed = time.tick.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ coord_entity.to_bits();
             let mut local_rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+            // 294: snapshot the colony's per-cat recency-of-threat-cue
+            // beliefs into a HashMap<LocationKey, f32> so candidate
+            // sampling stays O(1) per tile. Built once per call.
+            let recent_ambush_aggregated =
+                crate::systems::belief_aggregation::aggregate_location_belief_snapshot(
+                    placement_signals.location_beliefs.iter(),
+                    crate::components::beliefs::FacetSlot::RecencyOfThreatCue,
+                    &constants.belief_aggregation,
+                );
             let placement_maps = PlacementMaps {
                 fox_scent: &placement_signals.fox_scent,
                 cat_scent: &placement_signals.cat_scent,
                 ward_coverage: &placement_signals.ward_coverage,
                 tile_map: &placement_signals.tile_map,
-                recent_ambush: &placement_signals.recent_ambush,
+                recent_ambush_aggregated: &recent_ambush_aggregated,
                 carcass_scent: &placement_signals.carcass_scent,
                 fox_approach_corridor: &placement_signals.fox_approach_corridor,
             };
@@ -2195,10 +2206,16 @@ pub(crate) struct PlacementMaps<'a> {
     pub cat_scent: &'a crate::resources::CatScentMap,
     pub ward_coverage: &'a crate::resources::WardCoverageMap,
     pub tile_map: &'a crate::resources::map::TileMap,
-    /// 220: ambush-event memory (substrate from ticket 219). Sampled at
-    /// each candidate tile in `compute_ward_placement` and lifted into
-    /// the threat term, gated by `ward_ambush_anchor_weight`.
-    pub recent_ambush: &'a crate::resources::RecentAmbushMap,
+    /// 294: pre-built snapshot of colony-aggregated
+    /// `LocationBeliefs.recency_of_threat_cue` per `LocationKey`
+    /// bucket. Buckets absent from the map have effective value 0.0
+    /// (no cat has a qualifying belief there). Built once per
+    /// `compute_ward_placement` call from the SystemParam-side
+    /// `Query<&LocationBeliefs>`; sampled per candidate tile and
+    /// lifted into the threat term, gated by
+    /// `ward_ambush_anchor_weight`.
+    pub recent_ambush_aggregated:
+        &'a std::collections::HashMap<crate::components::beliefs::LocationKey, f32>,
     /// 220: kill-site scent (Phase 2C substrate). Same dormant-at-land
     /// posture as `recent_ambush`; gated by `ward_recency_anchor_weight`.
     pub carcass_scent: &'a crate::resources::CarcassScentMap,
@@ -2410,12 +2427,13 @@ pub(crate) fn compute_ward_placement(
         // 220 lift terms. Skip the sigmoid evaluation entirely when the
         // weight is zero so dormant runs incur no extra arithmetic.
         let ambush_lift = if w_ambush > 0.0 {
-            w_ambush
-                * logistic_threat_lift(
-                    maps.recent_ambush.get(candidate.x(), candidate.y()),
-                    curve_k,
-                    curve_m,
-                )
+            let key = crate::components::beliefs::bucket_position(candidate.x(), candidate.y());
+            let sample = maps
+                .recent_ambush_aggregated
+                .get(&key)
+                .copied()
+                .unwrap_or(0.0);
+            w_ambush * logistic_threat_lift(sample, curve_k, curve_m)
         } else {
             0.0
         };
@@ -3020,7 +3038,12 @@ mod tests {
         crate::resources::CatScentMap,
         crate::resources::WardCoverageMap,
         crate::resources::map::TileMap,
-        crate::resources::RecentAmbushMap,
+        // 294: ward placement now reads an aggregated snapshot of
+        // per-cat `LocationBeliefs.recency_of_threat_cue` rather than
+        // the colony-shared `RecentAmbushMap`. Tests build an empty
+        // map (no cat has a belief yet) — equivalent to the prior
+        // default RecentAmbushMap (all-zero grid).
+        std::collections::HashMap<crate::components::beliefs::LocationKey, f32>,
         crate::resources::CarcassScentMap,
         crate::resources::FoxApproachCorridorMap,
     ) {
@@ -3029,7 +3052,7 @@ mod tests {
             crate::resources::CatScentMap::default(),
             crate::resources::WardCoverageMap::default(),
             crate::resources::map::TileMap::new(120, 90, crate::resources::Terrain::Grass),
-            crate::resources::RecentAmbushMap::default(),
+            std::collections::HashMap::new(),
             crate::resources::CarcassScentMap::default(),
             crate::resources::FoxApproachCorridorMap::default(),
         )
@@ -3084,7 +3107,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3150,7 +3173,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3211,7 +3234,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3245,7 +3268,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3290,7 +3313,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3326,7 +3349,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3369,7 +3392,7 @@ mod tests {
             cat_scent: &cp_a,
             ward_coverage: &wc_a,
             tile_map: &tm_a,
-            recent_ambush: &ra_a,
+            recent_ambush_aggregated: &ra_a,
             carcass_scent: &cs_a,
             fox_approach_corridor: &fac_a,
         };
@@ -3379,14 +3402,14 @@ mod tests {
         // holds, the placement should not move toward the new hot zone.
         let (mut fs_b, cp_b, wc_b, tm_b, mut ra_b, mut cs_b, fac_b) = empty_placement_maps();
         fs_b.deposit(67, 45, 1.0);
-        ra_b.deposit(40, 70, 1.0);
+        ra_b.insert(crate::components::beliefs::bucket_position(40, 70), 1.0);
         cs_b.deposit(40, 70, 1.0);
         let maps_b = PlacementMaps {
             fox_scent: &fs_b,
             cat_scent: &cp_b,
             ward_coverage: &wc_b,
             tile_map: &tm_b,
-            recent_ambush: &ra_b,
+            recent_ambush_aggregated: &ra_b,
             carcass_scent: &cs_b,
             fox_approach_corridor: &fac_b,
         };
@@ -3437,13 +3460,13 @@ mod tests {
         // Equidistant rival signals from the anchor at (60, 45):
         // fox-scent at (60, 38), ambush at (60, 52) — both 7 tiles away.
         fs.deposit(60, 38, 1.0);
-        ra.deposit(60, 52, 1.0);
+        ra.insert(crate::components::beliefs::bucket_position(60, 52), 1.0);
         let maps = PlacementMaps {
             fox_scent: &fs,
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3495,7 +3518,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3540,7 +3563,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3589,7 +3612,7 @@ mod tests {
             cat_scent: &cp_a,
             ward_coverage: &wc_a,
             tile_map: &tm_a,
-            recent_ambush: &ra_a,
+            recent_ambush_aggregated: &ra_a,
             carcass_scent: &cs_a,
             fox_approach_corridor: &fac_a,
         };
@@ -3605,7 +3628,7 @@ mod tests {
             cat_scent: &cp_b,
             ward_coverage: &wc_b,
             tile_map: &tm_b,
-            recent_ambush: &ra_b,
+            recent_ambush_aggregated: &ra_b,
             carcass_scent: &cs_b,
             fox_approach_corridor: &fac_b,
         };
@@ -3661,7 +3684,7 @@ mod tests {
             cat_scent: &cp_a,
             ward_coverage: &wc_a,
             tile_map: &tm_a,
-            recent_ambush: &ra_a,
+            recent_ambush_aggregated: &ra_a,
             carcass_scent: &cs_a,
             fox_approach_corridor: &fac_a,
         };
@@ -3676,7 +3699,7 @@ mod tests {
             cat_scent: &cp_b,
             ward_coverage: &wc_b,
             tile_map: &tm_b,
-            recent_ambush: &ra_b,
+            recent_ambush_aggregated: &ra_b,
             carcass_scent: &cs_b,
             fox_approach_corridor: &fac_b,
         };
@@ -3750,7 +3773,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };
@@ -3816,7 +3839,7 @@ mod tests {
             cat_scent: &cp_a,
             ward_coverage: &wc_a,
             tile_map: &tm_a,
-            recent_ambush: &ra_a,
+            recent_ambush_aggregated: &ra_a,
             carcass_scent: &cs_a,
             fox_approach_corridor: &fac_a,
         };
@@ -3829,7 +3852,7 @@ mod tests {
             cat_scent: &cp_b,
             ward_coverage: &wc_b,
             tile_map: &tm_b,
-            recent_ambush: &ra_b,
+            recent_ambush_aggregated: &ra_b,
             carcass_scent: &cs_b,
             fox_approach_corridor: &fac_b,
         };
@@ -3900,7 +3923,7 @@ mod tests {
             cat_scent: &cp,
             ward_coverage: &wc,
             tile_map: &tm,
-            recent_ambush: &ra,
+            recent_ambush_aggregated: &ra,
             carcass_scent: &cs,
             fox_approach_corridor: &fac,
         };

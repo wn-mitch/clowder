@@ -187,8 +187,8 @@ mod tests {
     use crate::resources::map::{Terrain, TileMap};
     use crate::resources::sim_constants::WardPlacementCatValueComposition;
     use crate::resources::{
-        CarcassScentMap, CatScentMap, FoxApproachCorridorMap, FoxScentMap, RecentAmbushMap,
-        SimConstants, WardCoverageMap,
+        CarcassScentMap, CatScentMap, FoxApproachCorridorMap, FoxScentMap, SimConstants,
+        WardCoverageMap,
     };
     use crate::systems::coordination::{compute_ward_placement, PlacementMaps};
     use rand::SeedableRng;
@@ -250,7 +250,9 @@ mod tests {
         CatScentMap,
         WardCoverageMap,
         TileMap,
-        RecentAmbushMap,
+        // 294: aggregated per-cat recency-of-threat-cue snapshot (empty in
+        // scenario tests — no cats hold beliefs at start).
+        std::collections::HashMap<crate::components::beliefs::LocationKey, f32>,
         CarcassScentMap,
         FoxApproachCorridorMap,
     ) {
@@ -289,7 +291,12 @@ mod tests {
 
         let ward_coverage = WardCoverageMap::default();
         let tile_map = TileMap::new(MAP_WIDTH, MAP_HEIGHT, Terrain::Grass);
-        let recent_ambush = RecentAmbushMap::default();
+        // 294: ward placement reads an aggregated per-cat belief map.
+        // Scenario has no cats with `LocationBeliefs` populated for the
+        // recency-of-threat-cue facet, so an empty HashMap matches the
+        // pre-294 all-zero RecentAmbushMap default.
+        let recent_ambush: std::collections::HashMap<crate::components::beliefs::LocationKey, f32> =
+            std::collections::HashMap::new();
         let carcass_scent = CarcassScentMap::default();
         let fox_approach_corridor = FoxApproachCorridorMap::default();
 
@@ -398,7 +405,7 @@ mod tests {
                 cat_scent: &cat_scent,
                 ward_coverage: &ward_coverage,
                 tile_map: &tile_map,
-                recent_ambush: &recent_ambush,
+                recent_ambush_aggregated: &recent_ambush,
                 carcass_scent: &carcass_scent,
                 fox_approach_corridor: &fox_approach_corridor,
             };

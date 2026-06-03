@@ -350,8 +350,8 @@ fn spawn_shadow_fox(world: &mut World) {
 mod tests {
     use super::*;
     use crate::resources::{
-        CarcassScentMap, CatScentMap, FoxApproachCorridorMap, FoxScentMap, RecentAmbushMap,
-        SimConstants, WardCoverageMap,
+        CarcassScentMap, CatScentMap, FoxApproachCorridorMap, FoxScentMap, SimConstants,
+        WardCoverageMap,
     };
     use crate::systems::coordination::{compute_ward_placement, PlacementMaps};
     use rand::SeedableRng;
@@ -410,7 +410,9 @@ mod tests {
 
         let cat_scent = CatScentMap::default();
         let ward_coverage = WardCoverageMap::default();
-        let recent_ambush = RecentAmbushMap::default();
+        // 294: ward placement now reads an aggregated per-cat belief map.
+        let recent_ambush: std::collections::HashMap<crate::components::beliefs::LocationKey, f32> =
+            std::collections::HashMap::new();
         let carcass_scent = CarcassScentMap::default();
 
         let maps = PlacementMaps {
@@ -418,7 +420,7 @@ mod tests {
             cat_scent: &cat_scent,
             ward_coverage: &ward_coverage,
             tile_map: &tile_map,
-            recent_ambush: &recent_ambush,
+            recent_ambush_aggregated: &recent_ambush,
             carcass_scent: &carcass_scent,
             fox_approach_corridor: &corridor,
         };
@@ -503,7 +505,9 @@ mod tests {
 
         let cat_scent = CatScentMap::default();
         let ward_coverage = WardCoverageMap::default();
-        let recent_ambush = RecentAmbushMap::default();
+        // 294: ward placement now reads an aggregated per-cat belief map.
+        let recent_ambush: std::collections::HashMap<crate::components::beliefs::LocationKey, f32> =
+            std::collections::HashMap::new();
         let carcass_scent = CarcassScentMap::default();
 
         let maps = PlacementMaps {
@@ -511,7 +515,7 @@ mod tests {
             cat_scent: &cat_scent,
             ward_coverage: &ward_coverage,
             tile_map: &tile_map,
-            recent_ambush: &recent_ambush,
+            recent_ambush_aggregated: &recent_ambush,
             carcass_scent: &carcass_scent,
             fox_approach_corridor: &corridor,
         };

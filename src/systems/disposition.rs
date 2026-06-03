@@ -1049,7 +1049,14 @@ pub fn evaluate_dispositions(
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x(), pos.y()),
-            recent_ambush_at_position: colony.recent_ambush_map.get(pos.x(), pos.y()),
+            // 294: per-cat substrate cutover. `evaluate_dispositions` is
+            // unscheduled and doesn't carry a `LocationBeliefs` query
+            // (matches the `patrol_threat_recency: 0.0` precedent below).
+            // Defaults to 0.0 — same outcome as "cat has no belief entry
+            // at this bucket". The live scoring path in
+            // `goap.rs::evaluate_and_plan` reads the per-cat
+            // `LocationBeliefs.recency_of_threat_cue` properly.
+            recent_ambush_at_position: 0.0,
             carcass_scent_at_position: colony.carcass_scent_map.get(pos.x(), pos.y()),
             // 301: coordinator-stamped ward-placement intent at cat's
             // position. Dormant at default; see `goap.rs` mirror site.
@@ -1765,12 +1772,19 @@ pub fn disposition_to_chain(
                 // `Crafting` umbrella. Dead arm — `disposition_to_chain`
                 // is unscheduled (ticket 027b); the live path is the
                 // GOAP planner. Retained for type-system completeness.
+                // 294: dead arm (`disposition_to_chain` unscheduled per the
+                // comment above). Build an empty aggregated-belief map so
+                // the type checks; this path never executes in production.
+                let recent_ambush_aggregated: std::collections::HashMap<
+                    crate::components::beliefs::LocationKey,
+                    f32,
+                > = std::collections::HashMap::new();
                 let placement_maps = crate::systems::coordination::PlacementMaps {
                     fox_scent: &res.fox_scent_map,
                     cat_scent: &res.cat_scent_map,
                     ward_coverage: &res.ward_coverage_map,
                     tile_map: &res.map,
-                    recent_ambush: &res.recent_ambush_map,
+                    recent_ambush_aggregated: &recent_ambush_aggregated,
                     carcass_scent: &res.carcass_scent_map,
                     fox_approach_corridor: &res.fox_approach_corridor_map,
                 };
@@ -5035,15 +5049,20 @@ mod tests {
         let fox_scent_map = crate::resources::FoxScentMap::default();
         let cat_scent_map = crate::resources::CatScentMap::default();
         let ward_coverage_map = crate::resources::WardCoverageMap::default();
-        let recent_ambush_map = crate::resources::RecentAmbushMap::default();
         let carcass_scent_map = crate::resources::CarcassScentMap::default();
         let fox_approach_corridor_map = crate::resources::FoxApproachCorridorMap::default();
+        // 294: ward placement now reads an aggregated per-cat belief
+        // snapshot instead of the colony-shared `RecentAmbushMap`.
+        let recent_ambush_aggregated: std::collections::HashMap<
+            crate::components::beliefs::LocationKey,
+            f32,
+        > = std::collections::HashMap::new();
         let placement_maps = crate::systems::coordination::PlacementMaps {
             fox_scent: &fox_scent_map,
             cat_scent: &cat_scent_map,
             ward_coverage: &ward_coverage_map,
             tile_map: &map,
-            recent_ambush: &recent_ambush_map,
+            recent_ambush_aggregated: &recent_ambush_aggregated,
             carcass_scent: &carcass_scent_map,
             fox_approach_corridor: &fox_approach_corridor_map,
         };

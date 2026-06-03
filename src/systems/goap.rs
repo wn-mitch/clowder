@@ -2526,7 +2526,24 @@ pub fn evaluate_and_plan(
                 0.5,
             ),
             fox_scent_level: colony.fox_scent_map.get(pos.x(), pos.y()),
-            recent_ambush_at_position: colony.recent_ambush_map.get(pos.x(), pos.y()),
+            // 294: per-cat `LocationBeliefs.recency_of_threat_cue`
+            // sampled at the cat's current bucket — the per-cat
+            // substrate replacement for the retired colony-wide
+            // `RecentAmbushMap`. Reads 0.0 when the cat has no belief
+            // entry for that bucket (never witnessed a nearby ambush)
+            // OR the cat is missing the `LocationBeliefs` component
+            // (test paths, freshly spawned). The `patrol_threat_recency`
+            // field below uses the same shape against the patrol-sector
+            // anchor; this read is at the cat's actual position.
+            recent_ambush_at_position: world_state
+                .location_beliefs
+                .get(entity)
+                .ok()
+                .and_then(|lb| {
+                    let key = crate::components::beliefs::bucket_position(pos.x(), pos.y());
+                    lb.models.get(&key).map(|m| m.recency_of_threat_cue.value)
+                })
+                .unwrap_or(0.0),
             carcass_scent_at_position: colony.carcass_scent_map.get(pos.x(), pos.y()),
             // 301: coordinator-stamped ward-placement intent at cat's
             // position. Dormant at default — the resource is allocated
