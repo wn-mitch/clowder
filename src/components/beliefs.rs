@@ -297,6 +297,65 @@ pub struct ColonyReservesBelief {
 }
 
 // ---------------------------------------------------------------------------
+// ShelterBeliefs (ticket 374)
+// ---------------------------------------------------------------------------
+
+/// Per-cat housing-security belief, ticket 374. Four orthogonal sub-axes
+/// describing the cat's relationship with its claimed `home_den`:
+///
+/// - `belonging` — do I have a home_den claimed at all? Lifts on
+///   `WitnessableEvent::DenClaimed`; drops on `DenLost`.
+/// - `quality` — belief about the home_den's structural condition.
+///   Lifts on `DenRepaired`; drops on `DenDamaged`.
+/// - `continuity` — how long has it been mine? Updated passively each
+///   stagger period: accrues when the cat is within range of its
+///   home_den, decays when away. Not event-driven.
+/// - `threat` — belief about active siege or contestation. Lifts on
+///   `DenSieged`; drops on `DenSiegeBroken`.
+///
+/// All sub-axes are `[0.0, 1.0]`. Callers (welfare rollup, pressure
+/// accumulator) compose them — the substrate does not enforce ordering
+/// or relations between them. Pillar 3 (orthogonal axes, not louder
+/// single alarms) — each sub-axis encodes a distinct situation; the
+/// cat's downstream score combines them via documented composition,
+/// not by collapsing them at the perception layer.
+///
+/// Departs from [`Facet`]'s value/prior/strength shape because the
+/// four sub-axes describe one subject (the home_den) rather than four
+/// independent beliefs about four independent subjects. A single
+/// `last_updated_tick` covers the whole struct — sub-axis read-cadence
+/// concerns are downstream.
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ShelterFacet {
+    pub belonging: f32,
+    pub quality: f32,
+    pub continuity: f32,
+    pub threat: f32,
+    pub last_updated_tick: u64,
+}
+
+/// Per-cat shelter belief + claimed home_den entity, ticket 374.
+///
+/// `home_den` carries `#[serde(skip)]` matching [`CatBeliefs::models`]
+/// — raw `Entity` ids don't round-trip across saves. On load,
+/// re-established by the spawn-time claim system reading nearest
+/// functional Den; in-sim, set by `DenClaimed` integrator wiring.
+///
+/// Replaces the per-tick spatial proximity rollup at
+/// `colony_score::compute_shelter` and the `unsheltered_sleepers`
+/// counting at `coordination::assess_colony_needs`. The legacy
+/// signals were structurally brittle (collapsed to zero under metric
+/// changes, gated on rare `Sleep`+distance conjunctions); the belief
+/// substrate makes housing security a continuous psychological state
+/// the cat carries rather than a transient spatial query.
+#[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ShelterBeliefs {
+    #[serde(skip)]
+    pub home_den: Option<Entity>,
+    pub facet: ShelterFacet,
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

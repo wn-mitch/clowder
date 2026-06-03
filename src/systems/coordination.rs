@@ -1244,6 +1244,7 @@ pub fn accumulate_build_pressure(
             &Position,
             &crate::ai::CurrentAction,
             &crate::components::magic::Inventory,
+            &crate::components::beliefs::ShelterBeliefs,
         ),
         Without<Dead>,
     >,
@@ -1292,14 +1293,20 @@ pub fn accumulate_build_pressure(
             && items.is_effectively_full(StructureType::Stores, &items_query)
     });
 
-    // Cats sleeping without a Den nearby.
-    let unsheltered_sleepers = cats
+    // 374: cats whose housing-security belief is below the
+    // configured threshold. Replaces the pre-374 spatial-conjunction
+    // signal (`action == Sleep && distance > 4`), which fired only on
+    // a rare coincidence and collapsed to zero under metric changes
+    // (see ticket 494). The belief read fires on the rising edge of
+    // any of the four shelter sub-axes (belonging, quality, threat),
+    // so a cat whose home den was just damaged, or who has no claim
+    // at all, contributes to build pressure regardless of action or
+    // current spatial position.
+    let housing_insecure_count = cats
         .iter()
-        .filter(|(cat_pos, action, _inv)| {
-            action.action == crate::ai::Action::Sleep
-                && !buildings.iter().any(|(s, bpos)| {
-                    s.kind == StructureType::Den && cat_pos.distance_to(&s.center(bpos)) <= 4.0
-                })
+        .filter(|(_, _, _, shelter)| {
+            crate::systems::shelter_beliefs::housing_insecurity(&shelter.facet)
+                > constants.shelter_beliefs.insecurity_threshold
         })
         .count();
 
@@ -1385,7 +1392,7 @@ pub fn accumulate_build_pressure(
         .sum::<usize>();
     let hide_items_in_inventories = cats
         .iter()
-        .map(|(_, _, inv)| {
+        .map(|(_, _, inv, _)| {
             inv.pouch
                 .iter()
                 .filter(|s| s.kind == crate::components::items::ItemKind::Hide)
@@ -1423,9 +1430,15 @@ pub fn accumulate_build_pressure(
             pressure.storage *= BuildPressure::DECAY;
         }
 
-        // Shelter pressure.
-        if unsheltered_sleepers > 0 {
-            pressure.shelter += rate * unsheltered_sleepers as f32;
+        // 374: shelter pressure driven by belief-side housing
+        // insecurity. Rate-shape preserved (per-stagger lift scaled by
+        // count of insecure cats, decay otherwise) so the existing
+        // `BuildPressure::highest_actionable` channel comparison still
+        // selects Den vs. other channels with comparable magnitudes;
+        // the *trigger* moved from rare-conjunction spatial to
+        // belief-driven, which is the documented intent.
+        if housing_insecure_count > 0 {
+            pressure.shelter += rate * housing_insecure_count as f32;
         } else {
             pressure.shelter *= BuildPressure::DECAY;
         }

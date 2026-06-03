@@ -246,6 +246,96 @@ pub enum WitnessableEvent {
         position: Position,
         tick: u64,
     },
+    /// 374 — `cat` set `home_den = Some(den)` for the first time. Lifts
+    /// the cat's `ShelterBeliefs.facet.belonging` toward 1.0 and seeds
+    /// `quality` from the Den's current `Structure::condition` —
+    /// without seeding, a healthy newly-built Den never emits
+    /// `DenDamaged`/`DenRepaired` and quality stays at 0, which would
+    /// silently zero the cat's security contribution. Self-only
+    /// observation (other cats don't witness a den-claim ceremony).
+    DenClaimed {
+        cat: Entity,
+        den: Entity,
+        position: Position,
+        condition: f32,
+        tick: u64,
+    },
+    /// 374 — `cat` dropped `home_den` back to `None`. Lifts the cat's
+    /// `ShelterBeliefs.facet.belonging` toward 0.0 and clears
+    /// `quality` / `threat` (no claimed den → those axes have no
+    /// subject). Self-only observation. `reason` carries the cause of
+    /// loss for downstream narrative surfaces.
+    DenLost {
+        cat: Entity,
+        den: Entity,
+        reason: DenLostReason,
+        position: Position,
+        tick: u64,
+    },
+    /// 374 — `den`'s `Structure::condition` crossed
+    /// `damage_threshold_high` or `damage_threshold_low` downward.
+    /// Lifts `ShelterBeliefs.facet.quality` toward `new_condition` for
+    /// any witness whose `home_den == Some(den)`. Not gated on
+    /// proximity — the cat learns about damage to their home wherever
+    /// they are (out hunting, away at work). `old_condition` /
+    /// `new_condition` allow integrators to scale lift magnitude with
+    /// drop size if desired; v1 ignores them.
+    DenDamaged {
+        den: Entity,
+        position: Position,
+        old_condition: f32,
+        new_condition: f32,
+        tick: u64,
+    },
+    /// 374 — `den`'s `Structure::condition` crossed
+    /// `damage_threshold_low` or `damage_threshold_high` upward.
+    /// Symmetric to `DenDamaged` — lifts `quality` toward
+    /// `new_condition` for witnesses with matching `home_den`.
+    DenRepaired {
+        den: Entity,
+        position: Position,
+        old_condition: f32,
+        new_condition: f32,
+        tick: u64,
+    },
+    /// 374 — at least one fox is within `siege_proximity` of a known
+    /// cat-`den` (transition: `foxes_present_prev == 0`,
+    /// `foxes_present_now > 0`). Lifts
+    /// `ShelterBeliefs.facet.threat` toward 1.0 for any witness whose
+    /// `home_den == Some(den)`. Not gated on proximity — a cat at
+    /// work learns their home is being threatened. (Future tickets
+    /// may add a "scout reports" cadence; v1 emits directly.)
+    DenSieged {
+        den: Entity,
+        position: Position,
+        foxes_present: u32,
+        tick: u64,
+    },
+    /// 374 — siege predicate flipped back to clear (fox count fell to
+    /// 0 within `siege_proximity` of `den`). Symmetric to `DenSieged`;
+    /// lifts `threat` toward 0.0 for matching home_den witnesses.
+    DenSiegeBroken {
+        den: Entity,
+        position: Position,
+        tick: u64,
+    },
+}
+
+/// 374 — categorized reason a cat's `home_den` was lost. Routed via
+/// `WitnessableEvent::DenLost`. Narrative-surface only at land; the
+/// integrator updates belonging uniformly regardless of reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum DenLostReason {
+    /// The Den entity despawned (structure destroyed, fully decayed
+    /// to ruin, or world-edit removal).
+    Destroyed,
+    /// The cat actively abandoned the den (future: dispersing
+    /// juveniles, mate-bonded pair re-claiming together).
+    Abandoned,
+    /// The cat was displaced by another claimant (future: claim
+    /// arbitration — out-of-scope per ticket 374 §"Out of scope",
+    /// variant ships so the enum doesn't need re-shaping later).
+    Displaced,
 }
 
 /// Behavioral state of a relay cat at the moment of a startle cue. Drives

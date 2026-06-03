@@ -24,13 +24,14 @@ use bevy_ecs::prelude::*;
 use crate::components::beliefs::{
     bucket_position, CatBeliefs, ColonyReservesBelief, ContextBeliefs, EnvironmentalContextKey,
     EvidenceKind, Facet, LocationBeliefs, MentalModel, PredatorBeliefs, ReserveBelief,
+    ShelterBeliefs,
 };
 use crate::components::magic::{Inventory, ResourceKind};
 use crate::components::physical::{Dead, Position};
 use crate::components::wildlife::{WildAnimal, WildSpecies};
 use crate::messages::witnessable_event::WitnessableEvent;
 use crate::resources::sim_constants::{
-    BeliefAxisTunables, BeliefsConstants, SpeciesViolencePriors,
+    BeliefAxisTunables, BeliefsConstants, ShelterBeliefConstants, SpeciesViolencePriors,
 };
 use crate::resources::time::TimeState;
 use crate::resources::SimConstants;
@@ -76,6 +77,7 @@ pub fn integrate_beliefs(
             &mut PredatorBeliefs,
             &mut ContextBeliefs,
             &mut ColonyReservesBelief,
+            &mut ShelterBeliefs,
         ),
         Without<Dead>,
     >,
@@ -83,14 +85,32 @@ pub fn integrate_beliefs(
 ) {
     let tick = time.tick;
     let cfg = &constants.beliefs;
+    let shelter_cfg = &constants.shelter_beliefs;
 
     // ---- Pass A — Observation -----------------------------------------
     for ev in events.read() {
+        // 374: shelter den-state events (DenDamaged / DenRepaired /
+        // DenSieged / DenSiegeBroken) broadcast to any cat whose
+        // home_den matches the den, regardless of sensing range — a
+        // cat at work learns their home is being threatened. The
+        // four self-keyed shelter events (DenClaimed / DenLost) are
+        // gated on `witness == cat` inside the dispatcher, which is
+        // independent of range. Other events keep the standard
+        // range-gated path.
+        let range_gated = !is_shelter_broadcast_event(ev);
         let pos = event_position(ev);
-        for (witness_ent, witness_pos, mut cats, mut locs, mut preds, mut contexts, mut reserves) in
-            witnesses.iter_mut()
+        for (
+            witness_ent,
+            witness_pos,
+            mut cats,
+            mut locs,
+            mut preds,
+            mut contexts,
+            mut reserves,
+            mut shelter,
+        ) in witnesses.iter_mut()
         {
-            if !within_range(witness_pos, &pos) {
+            if range_gated && !within_range(witness_pos, &pos) {
                 continue;
             }
             apply_observation(
@@ -98,11 +118,13 @@ pub fn integrate_beliefs(
                 witness_ent,
                 tick,
                 cfg,
+                shelter_cfg,
                 &mut cats,
                 &mut locs,
                 &mut preds,
                 &mut contexts,
                 &mut reserves,
+                &mut shelter,
             );
         }
     }
@@ -111,8 +133,16 @@ pub fn integrate_beliefs(
     let period = cfg.decay_stagger_period.max(1);
     let priors = &cfg.species_violence_priors;
     let tick_phase = tick % period;
-    for (witness_ent, witness_pos, mut cats, mut locs, mut preds, mut contexts, mut reserves) in
-        witnesses.iter_mut()
+    for (
+        witness_ent,
+        witness_pos,
+        mut cats,
+        mut locs,
+        mut preds,
+        mut contexts,
+        mut reserves,
+        _shelter,
+    ) in witnesses.iter_mut()
     {
         if (witness_ent.index_u32() as u64) % period != tick_phase {
             continue;
@@ -212,8 +242,31 @@ fn event_position(ev: &WitnessableEvent) -> Position {
         | WitnessableEvent::CarriesFesteringWound { position, .. }
         | WitnessableEvent::PredatorAmbush { position, .. }
         | WitnessableEvent::HuntSearchYieldedNoPrey { position, .. }
-        | WitnessableEvent::HuntScentDetected { position, .. } => *position,
+        | WitnessableEvent::HuntScentDetected { position, .. }
+        | WitnessableEvent::DenClaimed { position, .. }
+        | WitnessableEvent::DenLost { position, .. }
+        | WitnessableEvent::DenDamaged { position, .. }
+        | WitnessableEvent::DenRepaired { position, .. }
+        | WitnessableEvent::DenSieged { position, .. }
+        | WitnessableEvent::DenSiegeBroken { position, .. } => *position,
     }
+}
+
+/// 374: shelter den-state events broadcast to any cat whose `home_den`
+/// matches, independent of sensing range. Returns true only for
+/// `DenDamaged`/`DenRepaired`/`DenSieged`/`DenSiegeBroken` — the two
+/// cat-keyed shelter events (`DenClaimed`/`DenLost`) still flow through
+/// the standard range-gated path because their `witness == cat` gate
+/// in the dispatcher provides the equivalent filter and the cat is
+/// trivially within range of its own event position.
+fn is_shelter_broadcast_event(ev: &WitnessableEvent) -> bool {
+    matches!(
+        ev,
+        WitnessableEvent::DenDamaged { .. }
+            | WitnessableEvent::DenRepaired { .. }
+            | WitnessableEvent::DenSieged { .. }
+            | WitnessableEvent::DenSiegeBroken { .. }
+    )
 }
 
 fn within_range(a: &Position, b: &Position) -> bool {
@@ -235,11 +288,13 @@ fn apply_observation(
     witness: Entity,
     tick: u64,
     cfg: &BeliefsConstants,
+    shelter_cfg: &ShelterBeliefConstants,
     cats: &mut CatBeliefs,
     locs: &mut LocationBeliefs,
     _preds: &mut PredatorBeliefs,
     contexts: &mut ContextBeliefs,
     reserves: &mut ColonyReservesBelief,
+    shelter: &mut ShelterBeliefs,
 ) {
     match ev {
         WitnessableEvent::Attack {
@@ -759,7 +814,117 @@ fn apply_observation(
             model.last_updated_tick = tick;
             model.evidence_count = model.evidence_count.saturating_add(1);
         }
+        // 374: shelter belief integrator arms. Self-keyed events
+        // (DenClaimed/DenLost) gate on `witness == cat`. Den-state
+        // events (Damaged/Repaired/Sieged/SiegeBroken) gate on the
+        // witness's `home_den == Some(den)`. The Pass-A range filter
+        // is already skipped for the four broadcast variants by
+        // `is_shelter_broadcast_event`.
+        WitnessableEvent::DenClaimed {
+            cat,
+            den,
+            condition,
+            ..
+        } => {
+            if *cat != witness {
+                return;
+            }
+            shelter.home_den = Some(*den);
+            shelter.facet.belonging = lerp_to(
+                shelter.facet.belonging,
+                1.0,
+                shelter_cfg.belonging_learning_rate,
+            );
+            // Seed quality from the den's current condition — without
+            // this, a healthy newly-built Den never emits a damage or
+            // repair threshold-crossing, so `quality` would stay at 0
+            // and the cat's security contribution would silently zero
+            // regardless of belonging.
+            shelter.facet.quality = lerp_to(
+                shelter.facet.quality,
+                condition.clamp(0.0, 1.0),
+                shelter_cfg.quality_learning_rate,
+            );
+            shelter.facet.last_updated_tick = tick;
+        }
+        WitnessableEvent::DenLost { cat, reason, .. } => {
+            if *cat != witness {
+                return;
+            }
+            shelter.home_den = None;
+            shelter.facet.belonging = lerp_to(
+                shelter.facet.belonging,
+                0.0,
+                shelter_cfg.belonging_learning_rate,
+            );
+            // Quality and threat lose their subject when the home_den
+            // is dropped; reset to neutral so a fresh claim starts
+            // clean rather than inheriting stale beliefs about a
+            // different den.
+            shelter.facet.quality = 0.0;
+            shelter.facet.threat = 0.0;
+            // Continuity is preserved on Abandoned (the cat carries
+            // the felt time-at-home memory), reset on Destroyed
+            // (the substrate of the felt-time-at-home is gone),
+            // partially decayed on Displaced (memory persists but
+            // attenuates). v1 zeroes all three for simplicity;
+            // refinement is a 374 follow-on.
+            let _ = reason;
+            shelter.facet.continuity = 0.0;
+            shelter.facet.last_updated_tick = tick;
+        }
+        WitnessableEvent::DenDamaged {
+            den, new_condition, ..
+        } => {
+            if shelter.home_den != Some(*den) {
+                return;
+            }
+            shelter.facet.quality = lerp_to(
+                shelter.facet.quality,
+                new_condition.clamp(0.0, 1.0),
+                shelter_cfg.quality_learning_rate,
+            );
+            shelter.facet.last_updated_tick = tick;
+        }
+        WitnessableEvent::DenRepaired {
+            den, new_condition, ..
+        } => {
+            if shelter.home_den != Some(*den) {
+                return;
+            }
+            shelter.facet.quality = lerp_to(
+                shelter.facet.quality,
+                new_condition.clamp(0.0, 1.0),
+                shelter_cfg.quality_learning_rate,
+            );
+            shelter.facet.last_updated_tick = tick;
+        }
+        WitnessableEvent::DenSieged { den, .. } => {
+            if shelter.home_den != Some(*den) {
+                return;
+            }
+            shelter.facet.threat =
+                lerp_to(shelter.facet.threat, 1.0, shelter_cfg.threat_learning_rate);
+            shelter.facet.last_updated_tick = tick;
+        }
+        WitnessableEvent::DenSiegeBroken { den, .. } => {
+            if shelter.home_den != Some(*den) {
+                return;
+            }
+            shelter.facet.threat =
+                lerp_to(shelter.facet.threat, 0.0, shelter_cfg.threat_learning_rate);
+            shelter.facet.last_updated_tick = tick;
+        }
     }
+}
+
+/// 374: single EMA step on a `[0.0, 1.0]` scalar. Mirrors the
+/// `update_facet` shape but operates on plain floats since
+/// `ShelterFacet` sub-axes aren't `Facet`s — they're raw `f32`s
+/// without separate prior/strength bookkeeping. Clamps the result
+/// so callers don't need to.
+fn lerp_to(current: f32, observed: f32, learning_rate: f32) -> f32 {
+    (current + learning_rate * (observed - current)).clamp(0.0, 1.0)
 }
 
 fn bump_reserve_strength(entry: &mut ReserveBelief, cfg: &BeliefsConstants, tick: u64) {
@@ -910,6 +1075,7 @@ mod tests {
                 PredatorBeliefs::default(),
                 ContextBeliefs::default(),
                 ColonyReservesBelief::default(),
+                ShelterBeliefs::default(),
             ))
             .id()
     }

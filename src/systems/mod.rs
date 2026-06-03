@@ -130,6 +130,7 @@ pub mod pregnancy;
 pub mod preservation;
 pub mod prey;
 pub mod sensing;
+pub mod shelter_beliefs;
 pub mod snake_goap;
 pub mod snapshot;
 pub mod social;

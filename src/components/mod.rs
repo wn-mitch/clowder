@@ -58,7 +58,7 @@ pub use aspirations::{
 pub use beliefs::{
     bucket_position as bucket_location_position, CandidateFacet, CatBeliefs, ContextBeliefs,
     EnvironmentalContextKey, EvidenceKind, Facet, FacetSlot, LocationBeliefs, LocationKey,
-    MentalModel, PredatorBeliefs,
+    MentalModel, PredatorBeliefs, ShelterBeliefs, ShelterFacet,
 };
 pub use body_zones::{
     BodyPart, BodyPartState, CatBodyModel, PartCategory, PartCondition, CAT_BODY_PART_COUNT,

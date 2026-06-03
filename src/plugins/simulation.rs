@@ -1693,6 +1693,23 @@ impl Plugin for SimulationPlugin {
                         // within-tick is valid when writer is chained
                         // before reader).
                         systems::belief_integrator::gossip_inventory_observations,
+                        // 374 — shelter belief substrate. Four
+                        // per-stagger systems that own the home_den
+                        // claim lifecycle (claim/lose), continuity
+                        // accrual/decay, and emit DenDamaged /
+                        // DenRepaired / DenSieged / DenSiegeBroken
+                        // events for `integrate_beliefs` to consume
+                        // same-tick. Chained before `integrate_beliefs`
+                        // so this stagger's events land in this tick's
+                        // Pass A. Schedule-edge perturbation is
+                        // expected at land — Phase C reader cutover
+                        // re-baselines `welfare.shelter` and
+                        // `pressure.shelter` against the post-substrate
+                        // signal shape.
+                        systems::shelter_beliefs::claim_home_dens,
+                        systems::shelter_beliefs::update_shelter_continuity,
+                        systems::shelter_beliefs::emit_den_condition_events,
+                        systems::shelter_beliefs::detect_den_sieges,
                         // 258 — C3 belief substrate integrator. Pass A
                         // consumes WitnessableEvent messages → EMA updates
                         // on per-cat mental models; pass B implants species

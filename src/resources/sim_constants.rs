@@ -77,6 +77,12 @@ pub struct SimConstants {
     /// belongs to 291's full ColonyKnowledge restructure.
     #[serde(default)]
     pub belief_aggregation: BeliefAggregationConstants,
+    /// Ticket 374 — per-cat shelter belief tunables. Four-axis EMA rates,
+    /// continuity accrual/decay, and the Phase C welfare/pressure
+    /// composition weights. `#[serde(default)]` so pre-374 events.jsonl
+    /// headers deserialize cleanly.
+    #[serde(default)]
+    pub shelter_beliefs: ShelterBeliefConstants,
     /// Ticket 261 — ActionAffordances substrate. Per-action heuristic
     /// weights + min-eligibility threshold + global sensing range. Five
     /// family-grouped sub-structs; each kind carries an `AffordanceWeights`
@@ -8587,6 +8593,91 @@ impl Default for BeliefAggregationConstants {
     fn default() -> Self {
         Self {
             min_strength_to_contribute: 0.0,
+        }
+    }
+}
+
+// ---------- ShelterBeliefConstants (ticket 374) ----------
+
+/// Tunables for the per-cat `ShelterBeliefs` housing-security facet,
+/// ticket 374. Four orthogonal sub-axes (belonging, quality, continuity,
+/// threat) each carry their own EMA learning-rate toward observed values;
+/// continuity is the only axis updated passively (per-tick accrual when
+/// the cat is within range of its home_den, decay when away).
+///
+/// Reader composition weights (`continuity_weight`, `insecurity_threshold`)
+/// shape the Phase C consumer rewrite of `compute_shelter` and
+/// `pressure.shelter`. Defaults are starting-point values; the Phase D
+/// hypothesize cycle tunes them against the post-494 baseline.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct ShelterBeliefConstants {
+    /// EMA step toward the observed value on `DenClaimed`/`DenLost`
+    /// (target 1.0/0.0). High because belonging is event-keyed and
+    /// shouldn't lag a single observation.
+    pub belonging_learning_rate: f32,
+    /// EMA step toward observed value on `DenDamaged`/`DenRepaired`.
+    /// Slower than belonging — the cat's belief about quality builds
+    /// across several condition-crossing events, not one.
+    pub quality_learning_rate: f32,
+    /// EMA step toward observed value on `DenSieged`/`DenSiegeBroken`.
+    /// Fast — threat is a reactive read; a single siege event should
+    /// snap the belief up promptly.
+    pub threat_learning_rate: f32,
+    /// Per-stagger continuity accrual when within `home_den_radius`
+    /// of the claimed `home_den`. Slow enough that "time at home"
+    /// builds across many ticks.
+    pub continuity_accrual_per_stagger: f32,
+    /// Per-stagger continuity decay when outside `home_den_radius`
+    /// of the claimed `home_den`, or when `home_den == None`. Slow —
+    /// a cat at work hunting should not lose continuity quickly.
+    pub continuity_decay_per_stagger: f32,
+    /// Tile distance considered "at home" for continuity accrual.
+    /// Matches the historical `den_shelter_radius` default (4.0) so
+    /// pre-374 spatial-proximity tuning intuition transfers.
+    pub home_den_radius: f32,
+    /// Tile distance from a cat's home_den at which an active fox is
+    /// considered to be sieging the den. Triggers `DenSieged`/
+    /// `DenSiegeBroken` emit.
+    pub siege_proximity: f32,
+    /// `Structure::condition` thresholds at which `DenDamaged` /
+    /// `DenRepaired` emit. Crossing a threshold downward triggers
+    /// `DenDamaged`; crossing upward triggers `DenRepaired`. Matches
+    /// `Structure::effectiveness()` knees at 0.2 and 0.5.
+    pub damage_threshold_low: f32,
+    pub damage_threshold_high: f32,
+    /// Weight applied to the `continuity` sub-axis in the welfare
+    /// rollup at `compute_shelter`. The other three axes compose
+    /// multiplicatively (belonging × quality × (1 - threat));
+    /// continuity scales the result. Default 1.0 = full weight.
+    pub continuity_weight: f32,
+    /// Per-cat housing-insecurity threshold above which the cat
+    /// contributes to `pressure.shelter`. Computed as
+    /// `1.0 - belonging * quality * (1 - threat)`. Higher = stricter
+    /// (fewer cats counted as insecure). Default 0.5 — a cat with
+    /// belonging 0.5 contributes; a cat fully sheltered does not.
+    pub insecurity_threshold: f32,
+}
+
+impl Default for ShelterBeliefConstants {
+    fn default() -> Self {
+        Self {
+            belonging_learning_rate: 0.8,
+            quality_learning_rate: 0.2,
+            threat_learning_rate: 0.5,
+            continuity_accrual_per_stagger: 0.01,
+            continuity_decay_per_stagger: 0.002,
+            home_den_radius: 4.0,
+            siege_proximity: 6.0,
+            damage_threshold_low: 0.2,
+            damage_threshold_high: 0.5,
+            // 374: 0.3 default — belonging/quality/(1-threat) provides
+            // ~70% of a cat's security signal regardless of continuity,
+            // and continuity adds up to ~30% extra credit for cats that
+            // have spent time at home. Reserved for tuning; the
+            // pre-soak default of 1.0 silently zeroed welfare.shelter
+            // because cats with home_den but continuity=0 contributed 0.
+            continuity_weight: 0.3,
+            insecurity_threshold: 0.5,
         }
     }
 }

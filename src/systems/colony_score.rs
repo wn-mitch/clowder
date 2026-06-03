@@ -1,41 +1,38 @@
 use bevy_ecs::prelude::*;
 
-use crate::components::building::{Structure, StructureType};
+use crate::components::beliefs::{ShelterBeliefs, ShelterFacet};
 use crate::components::identity::Species;
 use crate::components::mental::Mood;
 use crate::components::physical::{Dead, Health, Needs, Position};
 use crate::resources::colony_score::{ColonyScore, ColonyScoreSnapshot};
 use crate::resources::event_log::{EventKind, EventLog};
 use crate::resources::relationships::{BondType, Relationships};
-use crate::resources::sim_constants::SimConstants;
+use crate::resources::sim_constants::{ShelterBeliefConstants, SimConstants};
 use crate::resources::snapshot_config::SnapshotConfig;
 use crate::resources::system_activation::{FeatureCategory, SystemActivation};
 use crate::resources::time::{SimConfig, TimeState};
+use crate::systems::shelter_beliefs::shelter_security;
 
 // ---------------------------------------------------------------------------
 // Welfare computation helpers
 // ---------------------------------------------------------------------------
 
-/// Fraction of living cats within a functional den's shelter radius.
-fn compute_shelter(
-    cats: &[(Position,)],
-    dens: &[(Position, &Structure)],
-    den_shelter_radius: f32,
-) -> f32 {
-    if cats.is_empty() {
+/// 374: average per-cat housing-security belief across living cats.
+/// Replaces the pre-374 spatial-proximity rollup (count of cats within
+/// `den_shelter_radius` of a functional Den / total cats) with a
+/// belief-side aggregation — each cat carries their own composed
+/// security from `ShelterBeliefs.facet`, the colony score averages
+/// the population.
+///
+/// Cats whose belief has not yet been seeded (`home_den == None`,
+/// belonging = 0) contribute 0 — same as the pre-374 spatial
+/// semantics where a cat far from any Den contributed 0.
+fn compute_shelter(facets: &[&ShelterFacet], cfg: &ShelterBeliefConstants) -> f32 {
+    if facets.is_empty() {
         return 0.0;
     }
-    let sheltered = cats
-        .iter()
-        .filter(|(cat_pos,)| {
-            dens.iter().any(|(den_anchor, structure)| {
-                let center = structure.center(den_anchor);
-                let eff = structure.effectiveness();
-                eff > 0.0 && cat_pos.distance_to(&center) <= den_shelter_radius
-            })
-        })
-        .count();
-    sheltered as f32 / cats.len() as f32
+    let sum: f32 = facets.iter().map(|f| shelter_security(f, cfg)).sum();
+    sum / facets.len() as f32
 }
 
 /// Average hunger across living cats.
@@ -99,8 +96,10 @@ pub fn emit_colony_score(
     constants: Res<SimConstants>,
     activation: Res<SystemActivation>,
     relationships: Res<Relationships>,
-    cat_query: Query<(&Position, &Needs, &Health, &Mood), (With<Species>, Without<Dead>)>,
-    den_query: Query<(&Position, &Structure), Without<Species>>,
+    cat_query: Query<
+        (&Position, &Needs, &Health, &Mood, &ShelterBeliefs),
+        (With<Species>, Without<Dead>),
+    >,
     mut score: ResMut<ColonyScore>,
     mut event_log: Option<ResMut<EventLog>>,
 ) {
@@ -119,34 +118,28 @@ pub fn emit_colony_score(
     }
 
     // --- Gather cat data ---
-    let cat_positions: Vec<(Position,)> = cat_query.iter().map(|(p, _, _, _)| (*p,)).collect();
-    let needs: Vec<&Needs> = cat_query.iter().map(|(_, n, _, _)| n).collect();
-    let healths: Vec<f32> = cat_query.iter().map(|(_, _, h, _)| h.current).collect();
+    let needs: Vec<&Needs> = cat_query.iter().map(|(_, n, _, _, _)| n).collect();
+    let healths: Vec<f32> = cat_query.iter().map(|(_, _, h, _, _)| h.current).collect();
     let effective_moods: Vec<f32> = cat_query
         .iter()
-        .map(|(_, _, _, m)| {
+        .map(|(_, _, _, m, _)| {
             let mod_sum: f32 = m.modifiers.iter().map(|md| md.amount).sum();
             (m.valence + mod_sum).clamp(-1.0, 1.0)
         })
         .collect();
+    let shelter_facets: Vec<&ShelterFacet> =
+        cat_query.iter().map(|(_, _, _, _, s)| &s.facet).collect();
 
-    let living_cats = cat_positions.len() as u64;
+    let living_cats = needs.len() as u64;
 
     // Update peak population.
     if living_cats > score.peak_population {
         score.peak_population = living_cats;
     }
 
-    // --- Gather den data ---
-    let dens: Vec<(Position, &Structure)> = den_query
-        .iter()
-        .filter(|(_, s)| s.kind == StructureType::Den)
-        .map(|(p, s)| (*p, s))
-        .collect();
-
     // --- Compute welfare axes ---
     let cs = &constants.colony_score;
-    let shelter = compute_shelter(&cat_positions, &dens, cs.den_shelter_radius);
+    let shelter = compute_shelter(&shelter_facets, &constants.shelter_beliefs);
     let nourishment = compute_nourishment(&needs);
     let health = compute_health(&healths);
     let happiness = compute_happiness(&effective_moods);
@@ -272,48 +265,78 @@ pub fn emit_colony_score(
 mod tests {
     use super::*;
 
-    use crate::resources::sim_constants::ColonyScoreConstants;
+    fn test_cfg() -> ShelterBeliefConstants {
+        ShelterBeliefConstants::default()
+    }
 
-    fn test_shelter_radius() -> f32 {
-        ColonyScoreConstants::default().den_shelter_radius
+    fn fully_housed() -> ShelterFacet {
+        ShelterFacet {
+            belonging: 1.0,
+            quality: 1.0,
+            continuity: 1.0,
+            threat: 0.0,
+            last_updated_tick: 0,
+        }
     }
 
     #[test]
-    fn shelter_all_cats_in_range() {
-        let cats = vec![(Position::new(7, 7),), (Position::new(8, 6),)];
-        let den_structure = Structure::new(StructureType::Den); // condition 1.0
-        let dens = vec![(Position::new(5, 5), &den_structure)];
-        // Den center = (6, 6). Cat (7,7) → dist 2. Cat (8,6) → dist 2.
-        let score = compute_shelter(&cats, &dens, test_shelter_radius());
+    fn shelter_fully_housed_cats_max_score() {
+        let f1 = fully_housed();
+        let f2 = fully_housed();
+        let facets = vec![&f1, &f2];
+        let score = compute_shelter(&facets, &test_cfg());
         assert!((score - 1.0).abs() < 1e-6);
     }
 
     #[test]
-    fn shelter_no_dens() {
-        let cats = vec![(Position::new(5, 5),)];
-        let dens: Vec<(Position, &Structure)> = vec![];
-        assert_eq!(compute_shelter(&cats, &dens, test_shelter_radius()), 0.0);
+    fn shelter_no_home_den_contributes_zero() {
+        // Default ShelterFacet has belonging=0 (no claim) → contribution 0.
+        let f = ShelterFacet::default();
+        let facets = vec![&f];
+        assert_eq!(compute_shelter(&facets, &test_cfg()), 0.0);
     }
 
     #[test]
-    fn shelter_cat_out_of_range() {
-        let cats = vec![
-            (Position::new(7, 7),),   // dist 2 from center (6,6) — in range
-            (Position::new(20, 20),), // far away
-        ];
-        let den_structure = Structure::new(StructureType::Den);
-        let dens = vec![(Position::new(5, 5), &den_structure)];
-        let score = compute_shelter(&cats, &dens, test_shelter_radius());
-        assert!((score - 0.5).abs() < 1e-6);
+    fn shelter_averages_population_security() {
+        let secure = fully_housed();
+        let insecure = ShelterFacet::default();
+        let facets = vec![&secure, &insecure];
+        let score = compute_shelter(&facets, &test_cfg());
+        assert!(
+            (score - 0.5).abs() < 1e-6,
+            "expected mean(1.0, 0.0) = 0.5; got {score}"
+        );
     }
 
     #[test]
-    fn shelter_non_functional_den_ignored() {
-        let cats = vec![(Position::new(7, 7),)];
-        let mut den_structure = Structure::new(StructureType::Den);
-        den_structure.condition = 0.1; // below 0.2 → effectiveness 0
-        let dens = vec![(Position::new(5, 5), &den_structure)];
-        assert_eq!(compute_shelter(&cats, &dens, test_shelter_radius()), 0.0);
+    fn shelter_threat_pulls_security_down() {
+        let mut f = fully_housed();
+        f.threat = 1.0;
+        let facets = vec![&f];
+        // belonging*quality*(1-threat) = 1*1*0 = 0; continuity factor doesn't rescue.
+        assert!(compute_shelter(&facets, &test_cfg()) < 1e-6);
+    }
+
+    #[test]
+    fn shelter_damaged_den_pulls_quality_down() {
+        let mut f = fully_housed();
+        f.quality = 0.4; // belief about damaged den
+        let facets = vec![&f];
+        let score = compute_shelter(&facets, &test_cfg());
+        // 1.0 * 0.4 * 1.0 * (1.0*1.0 + 0.0) = 0.4
+        assert!((score - 0.4).abs() < 1e-6, "expected 0.4; got {score}");
+    }
+
+    #[test]
+    fn shelter_continuity_weight_zero_ignores_continuity() {
+        let mut cfg = test_cfg();
+        cfg.continuity_weight = 0.0;
+        let mut f = fully_housed();
+        f.continuity = 0.0; // no felt time at home
+        let facets = vec![&f];
+        let score = compute_shelter(&facets, &cfg);
+        // base 1.0 * factor (0*0 + 1) = 1.0
+        assert!((score - 1.0).abs() < 1e-6, "expected 1.0; got {score}");
     }
 
     #[test]
@@ -350,7 +373,7 @@ mod tests {
 
     #[test]
     fn all_welfare_empty_is_zero() {
-        assert_eq!(compute_shelter(&[], &[], test_shelter_radius()), 0.0);
+        assert_eq!(compute_shelter(&[], &test_cfg()), 0.0);
         assert_eq!(compute_nourishment(&[]), 0.0);
         assert_eq!(compute_health(&[]), 0.0);
         assert_eq!(compute_happiness(&[]), 0.0);

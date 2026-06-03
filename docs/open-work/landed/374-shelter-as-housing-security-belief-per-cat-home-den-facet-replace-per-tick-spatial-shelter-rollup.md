@@ -1,7 +1,7 @@
 ---
 id: 374
 title: Shelter as housing-security belief — per-cat home-den facet, replace per-tick spatial shelter rollup
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-06-03
 ---
 
 ## Why
@@ -190,3 +190,4 @@ Implementation phases:
   baseline `logs/tuned-42-9b3f5d43` carries a welfare/shelter
   caveat pointing here so future verdicts treat the axis as
   tracked-known-shape, not a fresh concern.
+- 2026-06-03: 2026-06-03: landed substrate cutover. New ShelterBeliefs component carrying home_den + 4-axis ShelterFacet; 6 WitnessableEvent variants (DenClaimed/Lost/Damaged/Repaired/Sieged/SiegeBroken); 4 per-stagger systems own the home_den claim, continuity, damage-emit, siege-detect paths; compute_shelter and pressure.shelter rewritten as belief rollups. Diagnostic pass: pre-fix continuity_weight=1.0 silently zeroed welfare.shelter; fixed by seeding quality from condition on DenClaimed and defaulting continuity_weight=0.3. Soak verdict: concern (drift expected per balance doc) — survival/continuity canaries pass, never_fired_expected_positives resolved, shelter 0.0→0.0498 (new-nonzero re-baselining off the post-494 structurally-zero spatial signal). Same mating-renaissance schedule-edge shape as 293.

@@ -146,6 +146,13 @@ pub fn cat_bundle(
             // WitnessableEvent variants; dormant at land (consumer
             // is ticket 309).
             crate::components::beliefs::ColonyReservesBelief::default(),
+            // 374 — per-cat housing-security belief (home_den +
+            // four orthogonal sub-axes: belonging, quality,
+            // continuity, threat). Spawned empty with no home_den.
+            // Founder spawn, kitten birth, and construction-complete
+            // claim paths set the field; six WitnessableEvent
+            // variants update the sub-axes via belief_integrator.
+            crate::components::ShelterBeliefs::default(),
             // 095 Phase 1 — anatomical injury substrate. Shadow
             // co-resident with Health during Stage A; sole source of
             // truth after Stage B cutover.

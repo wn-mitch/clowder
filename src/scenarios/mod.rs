@@ -71,6 +71,7 @@ pub mod preset;
 pub mod prey_byproduct_spawn;
 pub mod route_cost_decision;
 pub mod runner;
+pub mod shelter_belief_security;
 pub mod smoking_chain_complete;
 pub mod smoking_chain_eligibility;
 pub mod surrounded_colony;
@@ -251,6 +252,11 @@ pub const ALL: &[&Scenario] = &[
     // resulting low-reserve state via stagger-tick InventoryObserved
     // broadcasts; `HasLowWardReserve` marker fires.
     &colony_reserves_belief::SCENARIO,
+    // 374 — ShelterBeliefs substrate first-light. Four-phase
+    // lifecycle (claim, damage, siege, siege broken) drives each
+    // sub-axis through its full update path; the lifecycle test
+    // asserts belonging/quality/threat respond as documented.
+    &shelter_belief_security::SCENARIO,
     // 313 (301 FO-3) — surrounded-colony ring-coverage fixture.
     // 5 cats clustered at center, 8 ShadowFoxes static on the
     // periphery. `mod tests` asserts that 4 successive
