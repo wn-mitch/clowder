@@ -187,6 +187,20 @@ pub enum WitnessableEvent {
         position: Position,
         tick: u64,
     },
+    /// 294 — A predator successfully ambushed a cat. Lifts witnesses'
+    /// `LocationBeliefs[bucket(position)].recency_of_threat_cue` to
+    /// `OBSERVED_MAX` — the per-cat substrate replacement for the
+    /// retired colony-wide `RecentAmbushMap`. Witness gating is the
+    /// integrator's standard `WITNESS_RANGE = 10` Manhattan check; only
+    /// nearby cats learn first-hand, with colony-level aggregation
+    /// derived via `belief_aggregation::aggregated_location_belief` for
+    /// readers that need a colony view (e.g. ward placement).
+    PredatorAmbush {
+        predator: Entity,
+        victim: Entity,
+        position: Position,
+        tick: u64,
+    },
     /// 472 — `actor` carries a `WoundKind::Festering` wound on the named
     /// `body_part`. Emitted at a throttled cadence per festering cat by
     /// `emit_festering_observations` rather than at the moment the wound

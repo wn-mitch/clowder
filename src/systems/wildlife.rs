@@ -1629,6 +1629,7 @@ fn same_motivation_kind(a: &WildlifeAiState, b: &WildlifeAiState) -> bool {
 pub fn predator_stalk_cats(
     mut wildlife: Query<
         (
+            Entity,
             &mut WildAnimal,
             &Position,
             &mut WildlifeAiState,
@@ -1663,6 +1664,13 @@ pub fn predator_stalk_cats(
     mut activation: ResMut<SystemActivation>,
     mut recent_ambush_map: ResMut<crate::resources::RecentAmbushMap>,
     mut body_part_writer: MessageWriter<crate::messages::body_part_injury::BodyPartInjury>,
+    // 294: dual-emit window. Writes both the legacy colony-shared
+    // `RecentAmbushMap` deposit (consumed by the unchanged readers) AND
+    // the new per-cat `WitnessableEvent::PredatorAmbush` (consumed by
+    // `belief_integrator::apply_observation` to lift each witness's
+    // `LocationBeliefs[bucket(pos)].recency_of_threat_cue`). Commit 4
+    // retires the legacy deposit; this commit lands the parallel substrate.
+    mut witnessable_writer: MessageWriter<crate::messages::witnessable_event::WitnessableEvent>,
     // 477 — focal-cat resolver-trace sink for ambush armor reduction.
     focal_trace: crate::resources::trace_log::FocalTraceParam,
 ) {
@@ -1683,7 +1691,7 @@ pub fn predator_stalk_cats(
         .map(|(e, p, _, _, _, _, _, _)| (e, *p))
         .collect();
 
-    for (mut animal, wl_pos, mut ai_state, _health) in &mut wildlife {
+    for (predator_entity, mut animal, wl_pos, mut ai_state, _health) in &mut wildlife {
         // Query filter `With<ShadowFoxDrives>` gates this loop to shadow
         // foxes only (regular foxes use fox_ai_decision; hawks/snakes
         // don't carry the drives substrate). Ticket 023 Phase A.
@@ -1857,6 +1865,18 @@ pub fn predator_stalk_cats(
                             // (ward-placement) and 221 (caretake-relocate)
                             // consume the resulting hotspot signal.
                             recent_ambush_map.deposit(wl_pos.x(), wl_pos.y(), 1.0);
+                            // 294: dual-emit the per-cat substrate variant.
+                            // `belief_integrator` lifts every witness's
+                            // `LocationBeliefs[bucket(pos)].recency_of_threat_cue`.
+                            // Commit 4 drops the legacy deposit above.
+                            witnessable_writer.write(
+                                crate::messages::witnessable_event::WitnessableEvent::PredatorAmbush {
+                                    predator: predator_entity,
+                                    victim: *cat_entity,
+                                    position: *wl_pos,
+                                    tick: time.tick,
+                                },
+                            );
 
                             mood.modifiers.push_back(
                                 MoodModifier::new(

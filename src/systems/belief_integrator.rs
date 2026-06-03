@@ -203,7 +203,8 @@ fn event_position(ev: &WitnessableEvent) -> Position {
         | WitnessableEvent::PlayBow { position, .. }
         | WitnessableEvent::ReciprocalAdvance { position, .. }
         | WitnessableEvent::SustainedCoPresence { position, .. }
-        | WitnessableEvent::CarriesFesteringWound { position, .. } => *position,
+        | WitnessableEvent::CarriesFesteringWound { position, .. }
+        | WitnessableEvent::PredatorAmbush { position, .. } => *position,
     }
 }
 
@@ -627,6 +628,25 @@ fn apply_observation(
             );
             model.last_updated_tick = tick;
             model.evidence_count = model.evidence_count.saturating_add(1);
+        }
+
+        WitnessableEvent::PredatorAmbush { position, .. } => {
+            // 294: witnesses within sensing range lift their
+            // `LocationBeliefs[bucket(pos)].recency_of_threat_cue` to
+            // `OBSERVED_MAX`. Per-cat substrate replacement for the
+            // retired colony-wide `RecentAmbushMap`. The integrator's
+            // outer loop has already filtered by `within_range`; here we
+            // just bump the facet.
+            let loc_key = bucket_position(position.x(), position.y());
+            let loc_model = locs.models.entry(loc_key).or_default();
+            update_facet(
+                &mut loc_model.recency_of_threat_cue,
+                OBSERVED_MAX,
+                tick,
+                &cfg.recency_of_threat_cue,
+            );
+            loc_model.last_updated_tick = tick;
+            loc_model.evidence_count = loc_model.evidence_count.saturating_add(1);
         }
 
         WitnessableEvent::CarriesFesteringWound {
@@ -1673,5 +1693,66 @@ mod tests {
             "recipient lift ({self_lift}) should exceed third-party lift ({third_party_lift})"
         );
         assert!(third_party_lift > 0.0);
+    }
+
+    // ---- 294 — PredatorAmbush variant ---------------------------------
+
+    #[test]
+    fn predator_ambush_lifts_witness_location_recency() {
+        let (mut world, mut schedule) = test_world(100);
+        let predator = spawn_wildlife(&mut world, WildSpecies::ShadowFox, Position::new(10, 10));
+        let victim = spawn_cat(&mut world, Position::new(10, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10)); // within WITNESS_RANGE=10
+
+        world.write_message(WitnessableEvent::PredatorAmbush {
+            predator,
+            victim,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let locs = world
+            .get::<LocationBeliefs>(witness)
+            .expect("witness has LocationBeliefs");
+        let key = crate::components::beliefs::bucket_position(10, 10);
+        let model = locs
+            .models
+            .get(&key)
+            .expect("witness should hold a LocationBeliefs entry at the ambush bucket");
+        assert!(
+            model.recency_of_threat_cue.value > 0.0,
+            "recency_of_threat_cue should lift on PredatorAmbush; got {}",
+            model.recency_of_threat_cue.value
+        );
+        assert!(model.recency_of_threat_cue.strength > 0.0);
+        assert_eq!(
+            model.recency_of_threat_cue.last_source,
+            EvidenceKind::Observation
+        );
+    }
+
+    #[test]
+    fn predator_ambush_out_of_range_witness_does_not_update() {
+        let (mut world, mut schedule) = test_world(100);
+        let predator = spawn_wildlife(&mut world, WildSpecies::ShadowFox, Position::new(0, 0));
+        let victim = spawn_cat(&mut world, Position::new(0, 0));
+        let far = spawn_cat(&mut world, Position::new(50, 50));
+
+        world.write_message(WitnessableEvent::PredatorAmbush {
+            predator,
+            victim,
+            position: Position::new(0, 0),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let locs = world.get::<LocationBeliefs>(far).unwrap();
+        assert!(
+            locs.models.is_empty(),
+            "out-of-range cats should not learn first-hand about an ambush"
+        );
     }
 }
