@@ -71,7 +71,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = REPO_ROOT / "logs" / "runs.duckdb"
 LOGS_DIR = REPO_ROOT / "logs"
 CHARTS_DIR = REPO_ROOT / "logs" / "charts"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 DEFAULT_EXCLUDE_DIR_NAMES = {"charts", "baselines"}
 HANDLED_EVENT_TYPES = {"CatSnapshot", "Death", "ColonyScore"}
@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS runs (
     run_id                  VARCHAR PRIMARY KEY,
     archive                 VARCHAR,
     kind                    VARCHAR,
-    seed                    INTEGER,
+    seed                    BIGINT,
     rep                     INTEGER,
     focal                   VARCHAR,
     forced_weather          VARCHAR,
@@ -923,16 +923,14 @@ def cmd_build(args: argparse.Namespace) -> int:
     for path in tqdm(events_files, desc="events", unit="file"):
         try:
             ingest_events_file(con, path, cache, with_scores=args.with_scores)
-        except Exception as exc:  # noqa: BLE001 — surface the bad file
-            print(f"\nlogdb: failed on {path}: {exc}", file=sys.stderr)
-            raise
+        except Exception as exc:  # noqa: BLE001 — surface the bad file, keep going
+            print(f"\nlogdb: skipping {path}: {exc}", file=sys.stderr)
 
     for path in tqdm(trace_files, desc="traces", unit="file"):
         try:
             ingest_trace_file(con, path, cache)
         except Exception as exc:  # noqa: BLE001
-            print(f"\nlogdb: failed on {path}: {exc}", file=sys.stderr)
-            raise
+            print(f"\nlogdb: skipping {path}: {exc}", file=sys.stderr)
 
     con.execute("ANALYZE")
 
