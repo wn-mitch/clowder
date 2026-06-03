@@ -9280,6 +9280,20 @@ fn resolve_search_prey(
     if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
         state.target_entity = Some(prey_entity);
         hunting_priors.record_scent(prey_pos_ref);
+        // 293: dual-emit — substrate path that will subsume the legacy
+        // `record_scent` writer once HuntingPriors retires in Commit 4.
+        narr.witnessable.write(
+            crate::messages::witnessable_event::WitnessableEvent::HuntScentDetected {
+                actor: _cat_entity,
+                prey_kind: prey_query
+                    .iter()
+                    .find(|(e, _, _, _)| *e == prey_entity)
+                    .map(|(_, _, cfg, _)| cfg.kind)
+                    .unwrap_or(crate::components::prey::PreyKind::Mouse),
+                position: *prey_pos_ref,
+                tick: time.tick,
+            },
+        );
         emit_hunt_narrative(
             narr,
             time,
@@ -9305,6 +9319,17 @@ fn resolve_search_prey(
             return crate::steps::StepResult::Advance;
         }
         hunting_priors.record_failed_search(pos, ticks);
+        // 293: dual-emit — substrate path that will subsume the legacy
+        // `record_failed_search` writer once HuntingPriors retires in
+        // Commit 4.
+        narr.witnessable.write(
+            crate::messages::witnessable_event::WitnessableEvent::HuntSearchYieldedNoPrey {
+                actor: _cat_entity,
+                position: *pos,
+                tiles_searched: ticks,
+                tick: time.tick,
+            },
+        );
         return crate::steps::StepResult::Fail("no scent found".into());
     }
 

@@ -56,6 +56,12 @@ const OBSERVED_FAIL: f32 = 0.0;
 /// from third-party perspective is weaker than the recipient's perspective).
 const OBSERVED_HALF: f32 = 0.5;
 
+/// 293: EMA observed-value for `WitnessableEvent::HuntScentDetected` — sits
+/// between neutral (0.5) and `OBSERVED_MAX` so scent yields a mild positive
+/// lift, matching the legacy ratio of `record_scent` (+0.05) to
+/// `record_catch` (+0.15) ≈ 1/3 of the catch lift.
+const SCENT_OBSERVED_VALUE: f32 = 0.65;
+
 #[allow(clippy::type_complexity)]
 pub fn integrate_beliefs(
     time: Res<TimeState>,
@@ -204,7 +210,9 @@ fn event_position(ev: &WitnessableEvent) -> Position {
         | WitnessableEvent::ReciprocalAdvance { position, .. }
         | WitnessableEvent::SustainedCoPresence { position, .. }
         | WitnessableEvent::CarriesFesteringWound { position, .. }
-        | WitnessableEvent::PredatorAmbush { position, .. } => *position,
+        | WitnessableEvent::PredatorAmbush { position, .. }
+        | WitnessableEvent::HuntSearchYieldedNoPrey { position, .. }
+        | WitnessableEvent::HuntScentDetected { position, .. } => *position,
     }
 }
 
@@ -412,8 +420,31 @@ fn apply_observation(
         }
 
         WitnessableEvent::Hunt {
-            hunter, success, ..
+            hunter,
+            position,
+            success,
+            ..
         } => {
+            // 293: location-side prey-yield update fires for any witness
+            // (self and third-party). A successful hunt is direct evidence
+            // that the bucket holds prey; a failed attempt is weaker
+            // negative evidence. Cat-side updates (perceived_violence_capability,
+            // predictability) below still skip the self-witness path.
+            let loc_key = bucket_position(position.x(), position.y());
+            let loc_model = locs.models.entry(loc_key).or_default();
+            update_facet(
+                &mut loc_model.prey_yield,
+                if *success {
+                    OBSERVED_MAX
+                } else {
+                    OBSERVED_FAIL
+                },
+                tick,
+                &cfg.prey_yield,
+            );
+            loc_model.last_updated_tick = tick;
+            loc_model.evidence_count = loc_model.evidence_count.saturating_add(1);
+
             if *hunter == witness {
                 return;
             }
@@ -644,6 +675,60 @@ fn apply_observation(
                 OBSERVED_MAX,
                 tick,
                 &cfg.recency_of_threat_cue,
+            );
+            loc_model.last_updated_tick = tick;
+            loc_model.evidence_count = loc_model.evidence_count.saturating_add(1);
+        }
+
+        WitnessableEvent::HuntSearchYieldedNoPrey {
+            actor,
+            position,
+            tiles_searched,
+            ..
+        } => {
+            // 293: searching a region and coming up empty is a self-only
+            // observation — other cats don't witness an absence. The
+            // searcher's `LocationBeliefs[bucket(pos)].prey_yield` is
+            // pulled toward `OBSERVED_FAIL` with magnitude scaled by
+            // effort (`tiles_searched`). The legacy
+            // `HuntingPriors::record_failed_search` applied a linear
+            // `-tiles_searched / 2000.0` delta; we match the shape here
+            // by intensity-scaling the EMA step.
+            if *actor != witness {
+                return;
+            }
+            let loc_key = bucket_position(position.x(), position.y());
+            let loc_model = locs.models.entry(loc_key).or_default();
+            let intensity = (*tiles_searched as f32 / 2000.0).clamp(0.0, 1.0);
+            let tun = &cfg.prey_yield;
+            loc_model.prey_yield.value +=
+                tun.learning_rate * intensity * (OBSERVED_FAIL - loc_model.prey_yield.value);
+            loc_model.prey_yield.strength =
+                (loc_model.prey_yield.strength + tun.strength_per_observation * intensity).min(1.0);
+            loc_model.prey_yield.last_source = EvidenceKind::Observation;
+            loc_model.prey_yield.last_updated_tick = tick;
+            loc_model.last_updated_tick = tick;
+            loc_model.evidence_count = loc_model.evidence_count.saturating_add(1);
+        }
+
+        WitnessableEvent::HuntScentDetected {
+            actor, position, ..
+        } => {
+            // 293: smelling prey is a self-only observation that weakly
+            // lifts the searcher's prey_yield at the bucket. Magnitude
+            // sits between neutral (0.5) and OBSERVED_MAX — preserves
+            // the legacy `record_scent`'s mild positive contribution
+            // (+0.05 vs +0.15 for catch) within the EMA convention.
+            if *actor != witness {
+                return;
+            }
+            let loc_key = bucket_position(position.x(), position.y());
+            let loc_model = locs.models.entry(loc_key).or_default();
+            update_facet(
+                &mut loc_model.prey_yield,
+                SCENT_OBSERVED_VALUE,
+                tick,
+                &cfg.prey_yield,
             );
             loc_model.last_updated_tick = tick;
             loc_model.evidence_count = loc_model.evidence_count.saturating_add(1);
@@ -1756,5 +1841,190 @@ mod tests {
             locs.models.is_empty(),
             "out-of-range cats should not learn first-hand about an ambush"
         );
+    }
+
+    // ---- 293 — Hunt-yield + Scent + Failed-search variants ----------------
+
+    #[test]
+    fn hunt_success_lifts_witness_location_prey_yield() {
+        let (mut world, mut schedule) = test_world(100);
+        let hunter = spawn_cat(&mut world, Position::new(20, 20));
+        let witness = spawn_cat(&mut world, Position::new(22, 20)); // within WITNESS_RANGE
+        world.write_message(WitnessableEvent::Hunt {
+            hunter,
+            prey_kind: crate::components::prey::PreyKind::Mouse,
+            position: Position::new(20, 20),
+            success: true,
+            tick: 100,
+        });
+        schedule.run(&mut world);
+        let key = crate::components::beliefs::bucket_position(20, 20);
+
+        // Hunter (self-witness) — location-side update fires even though
+        // the cat-side updates short-circuit.
+        let hunter_locs = world.get::<LocationBeliefs>(hunter).unwrap();
+        let hunter_model = hunter_locs
+            .models
+            .get(&key)
+            .expect("hunter's own prey_yield should lift on a successful catch");
+        assert!(hunter_model.prey_yield.value > 0.0);
+        assert!(hunter_model.prey_yield.strength > 0.0);
+
+        // Third-party witness — also lifts.
+        let witness_locs = world.get::<LocationBeliefs>(witness).unwrap();
+        let witness_model = witness_locs
+            .models
+            .get(&key)
+            .expect("witness location prey_yield should lift");
+        assert!(witness_model.prey_yield.value > 0.0);
+    }
+
+    #[test]
+    fn hunt_failure_pulls_prey_yield_toward_zero() {
+        let (mut world, mut schedule) = test_world(100);
+        let hunter = spawn_cat(&mut world, Position::new(30, 30));
+        // Seed a pre-existing positive belief so the EMA pull is observable.
+        {
+            let mut locs = world.get_mut::<LocationBeliefs>(hunter).unwrap();
+            let key = crate::components::beliefs::bucket_position(30, 30);
+            let model = locs.models.entry(key).or_default();
+            model.prey_yield.value = 0.8;
+            model.prey_yield.strength = 0.5;
+        }
+        world.write_message(WitnessableEvent::Hunt {
+            hunter,
+            prey_kind: crate::components::prey::PreyKind::Mouse,
+            position: Position::new(30, 30),
+            success: false,
+            tick: 100,
+        });
+        schedule.run(&mut world);
+        let key = crate::components::beliefs::bucket_position(30, 30);
+        let model = world
+            .get::<LocationBeliefs>(hunter)
+            .unwrap()
+            .models
+            .get(&key)
+            .unwrap();
+        assert!(
+            model.prey_yield.value < 0.8,
+            "failed Hunt should pull prey_yield toward 0.0; got {}",
+            model.prey_yield.value
+        );
+    }
+
+    #[test]
+    fn search_yielded_no_prey_drops_actor_prey_yield() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(40, 40));
+        let bystander = spawn_cat(&mut world, Position::new(41, 40)); // close but not the actor
+        {
+            let mut locs = world.get_mut::<LocationBeliefs>(actor).unwrap();
+            let key = crate::components::beliefs::bucket_position(40, 40);
+            let model = locs.models.entry(key).or_default();
+            model.prey_yield.value = 0.7;
+        }
+        world.write_message(WitnessableEvent::HuntSearchYieldedNoPrey {
+            actor,
+            position: Position::new(40, 40),
+            tiles_searched: 2000, // intensity = 1.0
+            tick: 100,
+        });
+        schedule.run(&mut world);
+        let key = crate::components::beliefs::bucket_position(40, 40);
+        let actor_model = world
+            .get::<LocationBeliefs>(actor)
+            .unwrap()
+            .models
+            .get(&key)
+            .unwrap();
+        assert!(
+            actor_model.prey_yield.value < 0.7,
+            "actor's prey_yield should drop on a fruitless search; got {}",
+            actor_model.prey_yield.value
+        );
+        // Third-party bystander does NOT witness absence.
+        let bystander_locs = world.get::<LocationBeliefs>(bystander).unwrap();
+        assert!(
+            bystander_locs.models.is_empty(),
+            "third-party cats don't witness a non-event"
+        );
+    }
+
+    #[test]
+    fn search_yielded_no_prey_intensity_scales_with_tiles() {
+        // Two actors search the same bucket with very different efforts;
+        // the longer search produces a larger drop in prey_yield.
+        let (mut world, mut schedule) = test_world(100);
+        let short_searcher = spawn_cat(&mut world, Position::new(60, 60));
+        let long_searcher = spawn_cat(&mut world, Position::new(80, 80));
+        for actor in [short_searcher, long_searcher] {
+            let mut locs = world.get_mut::<LocationBeliefs>(actor).unwrap();
+            let key = if actor == short_searcher {
+                crate::components::beliefs::bucket_position(60, 60)
+            } else {
+                crate::components::beliefs::bucket_position(80, 80)
+            };
+            let model = locs.models.entry(key).or_default();
+            model.prey_yield.value = 0.5;
+        }
+        world.write_message(WitnessableEvent::HuntSearchYieldedNoPrey {
+            actor: short_searcher,
+            position: Position::new(60, 60),
+            tiles_searched: 200, // intensity = 0.1
+            tick: 100,
+        });
+        world.write_message(WitnessableEvent::HuntSearchYieldedNoPrey {
+            actor: long_searcher,
+            position: Position::new(80, 80),
+            tiles_searched: 2000, // intensity = 1.0
+            tick: 100,
+        });
+        schedule.run(&mut world);
+        let short_v = world
+            .get::<LocationBeliefs>(short_searcher)
+            .unwrap()
+            .models
+            .get(&crate::components::beliefs::bucket_position(60, 60))
+            .unwrap()
+            .prey_yield
+            .value;
+        let long_v = world
+            .get::<LocationBeliefs>(long_searcher)
+            .unwrap()
+            .models
+            .get(&crate::components::beliefs::bucket_position(80, 80))
+            .unwrap()
+            .prey_yield
+            .value;
+        assert!(
+            long_v < short_v,
+            "longer search ({long_v}) should drop prey_yield more than shorter ({short_v})"
+        );
+    }
+
+    #[test]
+    fn scent_detected_weakly_lifts_actor_prey_yield() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(50, 50));
+        world.write_message(WitnessableEvent::HuntScentDetected {
+            actor,
+            prey_kind: crate::components::prey::PreyKind::Mouse,
+            position: Position::new(50, 50),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+        let key = crate::components::beliefs::bucket_position(50, 50);
+        let model = world
+            .get::<LocationBeliefs>(actor)
+            .unwrap()
+            .models
+            .get(&key)
+            .expect("scent should establish a LocationBeliefs entry");
+        // Scent's observed value sits between neutral (0.5) and
+        // OBSERVED_MAX; the lift moves the default (0.0) toward it but
+        // less than a successful Hunt would.
+        assert!(model.prey_yield.value > 0.0);
+        assert!(model.prey_yield.strength > 0.0);
     }
 }

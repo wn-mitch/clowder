@@ -221,6 +221,31 @@ pub enum WitnessableEvent {
         position: Position,
         tick: u64,
     },
+    /// 293 — `actor` searched a region for prey and came up empty. Lowers
+    /// the witness's own `LocationBeliefs[bucket(position)].prey_yield` —
+    /// per-cat substrate replacement for the retired
+    /// `HuntingPriors::record_failed_search` writer. Only the actor
+    /// integrates this (a third party doesn't witness *absence*); the
+    /// integrator's standard self-only update rule applies. `tiles_searched`
+    /// scales the magnitude — a longer empty sweep is stronger evidence.
+    HuntSearchYieldedNoPrey {
+        actor: Entity,
+        position: Position,
+        tiles_searched: u64,
+        tick: u64,
+    },
+    /// 293 — `actor` detected prey scent at `position`. Weakly lifts the
+    /// witness's own `LocationBeliefs[bucket(position)].prey_yield` —
+    /// preserves the legacy `HuntingPriors::record_scent` signal as a
+    /// substrate-visible perceptual surface. Scent is a self-only
+    /// observation (other cats didn't smell it); the integrator's
+    /// self-witness rule mirrors `HuntSearchYieldedNoPrey`.
+    HuntScentDetected {
+        actor: Entity,
+        prey_kind: PreyKind,
+        position: Position,
+        tick: u64,
+    },
 }
 
 /// Behavioral state of a relay cat at the moment of a startle cue. Drives
