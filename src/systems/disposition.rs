@@ -3319,7 +3319,21 @@ pub fn resolve_disposition_chains(
                             }
 
                             hunting_priors.record_catch(&den_pos_copy);
-                            colony_map.beliefs.record_catch(&den_pos_copy);
+                            // 293: substrate emission for the den-raid kill —
+                            // replaces the legacy `colony_map.beliefs.record_catch`
+                            // colony-side write. The integrator's `Hunt` arm
+                            // lifts the actor's `LocationBeliefs.prey_yield`
+                            // at the bucket; `ColonyHuntingMap` is now derived
+                            // from those per-cat beliefs.
+                            narr.witnessable.write(
+                                crate::messages::witnessable_event::WitnessableEvent::Hunt {
+                                    hunter: cat_entity,
+                                    prey_kind: den.kind,
+                                    position: den_pos_copy,
+                                    success: true,
+                                    tick: time.tick,
+                                },
+                            );
 
                             // Send raid message — den mutation happens in apply_den_raids.
                             prey_params.raid_writer.write(DenRaided {
@@ -4547,9 +4561,7 @@ fn dispatch_chain_step(
                 target,
                 needs,
                 fulfillment_ref,
-                hunting_priors,
                 relationships,
-                colony_map,
                 &snaps.grooming,
                 time.tick,
                 &constants.social,
@@ -4615,9 +4627,7 @@ fn dispatch_chain_step(
                 target,
                 needs,
                 fulfillment_ref,
-                hunting_priors,
                 relationships,
-                colony_map,
                 &snaps.grooming,
                 time.tick,
                 &constants.social,

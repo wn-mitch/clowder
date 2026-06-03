@@ -93,6 +93,7 @@ pub mod belief_aggregation;
 pub mod belief_integrator;
 pub mod buildings;
 pub mod cat_movement;
+pub mod colony_hunting_map;
 pub mod colony_knowledge;
 pub mod colony_score;
 pub mod combat;

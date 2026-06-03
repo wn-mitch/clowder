@@ -1699,6 +1699,15 @@ impl Plugin for SimulationPlugin {
                         // priors for nearby predators and decays facets
                         // toward priors on each cat's stagger tick.
                         systems::belief_integrator::integrate_beliefs,
+                        // 293 — derive `ColonyHuntingMap` from per-cat
+                        // `LocationBeliefs.prey_yield`. Replaces the
+                        // legacy social-transmission `absorb` pathway
+                        // (socialize / groom_other) and the direct
+                        // `colony_map.beliefs.record_catch` writes
+                        // retired this same commit. Chained after
+                        // `integrate_beliefs` so the aggregation sees
+                        // this tick's freshly-updated facets.
+                        systems::colony_hunting_map::rebuild_colony_hunting_map,
                         // 261 — ActionAffordances substrate writer. Reads
                         // facets the integrator authored this tick (within
                         // a single `.chain()` block so the ordering is

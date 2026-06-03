@@ -6370,9 +6370,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity,
                 needs,
                 fulfillment_ref,
-                hunting_priors,
                 relationships,
-                colony_map,
                 &snaps.grooming,
                 ec.time.tick,
                 &ec.constants.social,
@@ -6508,9 +6506,7 @@ fn dispatch_step_action(
                 plan.step_state[step_idx].target_entity,
                 needs,
                 fulfillment_ref,
-                hunting_priors,
                 relationships,
-                colony_map,
                 &snaps.grooming,
                 ec.time.tick,
                 &ec.constants.social,
@@ -9113,7 +9109,19 @@ fn resolve_search_prey(
                 }
 
                 hunting_priors.record_catch(&den_pos_copy);
-                colony_map.beliefs.record_catch(&den_pos_copy);
+                // 293: substrate emission for the den-raid kill — replaces
+                // the legacy `colony_map.beliefs.record_catch` colony-side
+                // write. Integrator's `Hunt` arm lifts the actor's
+                // `LocationBeliefs.prey_yield` at the bucket.
+                narr.witnessable.write(
+                    crate::messages::witnessable_event::WitnessableEvent::Hunt {
+                        hunter: _cat_entity,
+                        prey_kind: den.kind,
+                        position: den_pos_copy,
+                        success: true,
+                        tick: time.tick,
+                    },
+                );
 
                 prey_params.raid_writer.write(DenRaided {
                     den_entity,

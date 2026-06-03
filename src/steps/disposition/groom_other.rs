@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 
 use crate::components::fulfillment::Fulfillment;
-use crate::components::hunting_priors::HuntingPriors;
 use crate::components::physical::Needs;
-use crate::resources::colony_hunting_map::ColonyHuntingMap;
 use crate::resources::relationships::Relationships;
 use crate::resources::sim_constants::{
     DispositionConstants, FulfillmentConstants, SocialConstants,
@@ -30,7 +28,9 @@ pub struct GroomOutcome {
 /// **Real-world effect** — mutates relationships (fondness +
 /// familiarity + last_interaction) between actor and target,
 /// boosts actor's social need and both parties' `social_warmth`
-/// fulfillment axis, exchanges hunting priors with the colony map.
+/// fulfillment axis. Ticket 293 retired the cat↔colony hunting-prior
+/// blend that previously rode this resolver — cross-cat consensus is
+/// now derived from per-cat `LocationBeliefs.prey_yield`.
 /// On completion (`ticks >= groom_other_duration`), yields a
 /// deferred `GroomOutcome` that the caller applies in a post-loop
 /// pass — `&mut Fulfillment` on the target conflicts with the
@@ -43,10 +43,10 @@ pub struct GroomOutcome {
 /// selects one, but a plan that predates the selection may
 /// arrive with `target_entity == None`.
 ///
-/// **Runtime preconditions** — relationship + colony-map mutations
-/// only occur inside `if let Some(target) = target_entity`. On a
-/// missing target the step still Continues / Advances over time
-/// so the chain doesn't stall, but the witness stays `None`.
+/// **Runtime preconditions** — relationship mutations only occur
+/// inside `if let Some(target) = target_entity`. On a missing target
+/// the step still Continues / Advances over time so the chain
+/// doesn't stall, but the witness stays `None`.
 ///
 /// **Witness** — `StepOutcome<Option<GroomOutcome>>`. `Some(outcome)`
 /// on completion when a target was present — the caller applies
@@ -70,9 +70,7 @@ pub fn resolve_groom_other(
     target_entity: Option<Entity>,
     needs: &mut Needs,
     fulfillment: &mut Fulfillment,
-    hunting_priors: &mut HuntingPriors,
     relationships: &mut Relationships,
-    colony_map: &mut ColonyHuntingMap,
     grooming_snapshot: &HashMap<Entity, f32>,
     tick: u64,
     social: &SocialConstants,
@@ -112,8 +110,6 @@ pub fn resolve_groom_other(
         relationships
             .get_or_insert(cat_entity, target)
             .last_interaction = tick;
-        colony_map.absorb(hunting_priors, d.groom_other_colony_absorb_rate);
-        hunting_priors.learn_from(&colony_map.beliefs, d.groom_other_personal_learn_rate);
     }
 
     if ticks >= d.groom_other_duration {
@@ -158,24 +154,14 @@ mod tests {
         )
     }
 
-    fn make_deps() -> (
-        Relationships,
-        ColonyHuntingMap,
-        HuntingPriors,
-        HashMap<Entity, f32>,
-    ) {
-        (
-            Relationships::default(),
-            ColonyHuntingMap::default(),
-            HuntingPriors::default(),
-            HashMap::new(),
-        )
+    fn make_deps() -> (Relationships, HashMap<Entity, f32>) {
+        (Relationships::default(), HashMap::new())
     }
 
     #[test]
     fn groom_other_feeds_social_warmth() {
         let (social, disp, fc) = test_constants();
-        let (mut rels, mut colony_map, mut priors, snapshot) = make_deps();
+        let (mut rels, snapshot) = make_deps();
         let mut needs = Needs::default();
         let mut fulfillment = Fulfillment::default();
         let initial_sw = fulfillment.social_warmth;
@@ -190,9 +176,7 @@ mod tests {
             None, // no target — just verifying groomer's fulfillment
             &mut needs,
             &mut fulfillment,
-            &mut priors,
             &mut rels,
-            &mut colony_map,
             &snapshot,
             0,
             &social,
@@ -213,7 +197,7 @@ mod tests {
     #[test]
     fn groom_other_no_longer_feeds_temperature() {
         let (social, disp, fc) = test_constants();
-        let (mut rels, mut colony_map, mut priors, snapshot) = make_deps();
+        let (mut rels, snapshot) = make_deps();
         let mut needs = Needs::default();
         let mut fulfillment = Fulfillment::default();
         let initial_temp = needs.temperature;
@@ -227,9 +211,7 @@ mod tests {
             None,
             &mut needs,
             &mut fulfillment,
-            &mut priors,
             &mut rels,
-            &mut colony_map,
             &snapshot,
             0,
             &social,
@@ -249,7 +231,7 @@ mod tests {
     #[test]
     fn groom_other_target_receives_social_warmth_via_outcome() {
         let (social, disp, fc) = test_constants();
-        let (mut rels, mut colony_map, mut priors, snapshot) = make_deps();
+        let (mut rels, snapshot) = make_deps();
         let mut needs = Needs::default();
         let mut fulfillment = Fulfillment::default();
 
@@ -263,9 +245,7 @@ mod tests {
             Some(target),
             &mut needs,
             &mut fulfillment,
-            &mut priors,
             &mut rels,
-            &mut colony_map,
             &snapshot,
             0,
             &social,

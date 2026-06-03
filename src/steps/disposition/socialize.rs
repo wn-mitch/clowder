@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 
 use crate::components::fulfillment::Fulfillment;
-use crate::components::hunting_priors::HuntingPriors;
 use crate::components::physical::Needs;
-use crate::resources::colony_hunting_map::ColonyHuntingMap;
 use crate::resources::relationships::Relationships;
 use crate::resources::sim_constants::{
     DispositionConstants, FulfillmentConstants, SocialConstants,
@@ -16,9 +14,13 @@ use crate::steps::{StepOutcome, StepResult};
 ///
 /// **Real-world effect** — mutates relationship state
 /// (fondness, familiarity, last_interaction) between `cat_entity`
-/// and `target_entity`, boosts the actor's `needs.social`,
-/// restores `social_warmth` fulfillment axis per tick (§7.W), and
-/// exchanges hunting-prior knowledge with the colony map.
+/// and `target_entity`, boosts the actor's `needs.social`, and
+/// restores `social_warmth` fulfillment axis per tick (§7.W).
+///
+/// Ticket 293 retired the cat↔colony hunting-priors blend that
+/// previously rode this resolver — cross-cat consensus is now
+/// derived from per-cat `LocationBeliefs.prey_yield` via
+/// `systems::colony_hunting_map::rebuild_colony_hunting_map`.
 ///
 /// **Plan-level preconditions** — emitted under
 /// `ZoneIs(PlannerZone::SocialTarget)` by
@@ -53,9 +55,7 @@ pub fn resolve_socialize(
     target_entity: Option<Entity>,
     needs: &mut Needs,
     fulfillment: &mut Fulfillment,
-    hunting_priors: &mut HuntingPriors,
     relationships: &mut Relationships,
-    colony_map: &mut ColonyHuntingMap,
     grooming_snapshot: &HashMap<Entity, f32>,
     tick: u64,
     social: &SocialConstants,
@@ -98,8 +98,6 @@ pub fn resolve_socialize(
         relationships
             .get_or_insert(cat_entity, target)
             .last_interaction = tick;
-        colony_map.absorb(hunting_priors, d.socialize_colony_absorb_rate);
-        hunting_priors.learn_from(&colony_map.beliefs, d.socialize_personal_learn_rate);
 
         // §7.W warmth split: socializing feeds social_warmth per tick.
         fulfillment.social_warmth =
@@ -140,24 +138,14 @@ mod tests {
         )
     }
 
-    fn make_deps() -> (
-        Relationships,
-        ColonyHuntingMap,
-        HuntingPriors,
-        HashMap<Entity, f32>,
-    ) {
-        (
-            Relationships::default(),
-            ColonyHuntingMap::default(),
-            HuntingPriors::default(),
-            HashMap::new(),
-        )
+    fn make_deps() -> (Relationships, HashMap<Entity, f32>) {
+        (Relationships::default(), HashMap::new())
     }
 
     #[test]
     fn socialize_feeds_social_warmth() {
         let (social, disp, fc) = test_constants();
-        let (mut rels, mut colony_map, mut priors, snapshot) = make_deps();
+        let (mut rels, snapshot) = make_deps();
         let mut needs = Needs::default();
         let mut fulfillment = Fulfillment::default();
         let initial_sw = fulfillment.social_warmth;
@@ -172,9 +160,7 @@ mod tests {
             Some(target),
             &mut needs,
             &mut fulfillment,
-            &mut priors,
             &mut rels,
-            &mut colony_map,
             &snapshot,
             0,
             &social,
@@ -201,7 +187,7 @@ mod tests {
     #[test]
     fn socialize_no_target_no_warmth() {
         let (social, disp, fc) = test_constants();
-        let (mut rels, mut colony_map, mut priors, snapshot) = make_deps();
+        let (mut rels, snapshot) = make_deps();
         let mut needs = Needs::default();
         let mut fulfillment = Fulfillment::default();
         let initial_sw = fulfillment.social_warmth;
@@ -215,9 +201,7 @@ mod tests {
             None,
             &mut needs,
             &mut fulfillment,
-            &mut priors,
             &mut rels,
-            &mut colony_map,
             &snapshot,
             0,
             &social,
@@ -238,7 +222,7 @@ mod tests {
     #[test]
     fn socialize_warmth_clamps_at_one() {
         let (social, disp, fc) = test_constants();
-        let (mut rels, mut colony_map, mut priors, snapshot) = make_deps();
+        let (mut rels, snapshot) = make_deps();
         let mut needs = Needs::default();
         let mut fulfillment = Fulfillment {
             social_warmth: 0.9999,
@@ -255,9 +239,7 @@ mod tests {
             Some(target),
             &mut needs,
             &mut fulfillment,
-            &mut priors,
             &mut rels,
-            &mut colony_map,
             &snapshot,
             0,
             &social,
@@ -282,8 +264,8 @@ mod tests {
     #[test]
     fn socialize_with_pairing_bias_amplifies_fondness_and_familiarity() {
         let (social, disp, fc) = test_constants();
-        let (mut rels_baseline, mut cm_a, mut pr_a, snap_a) = make_deps();
-        let (mut rels_biased, mut cm_b, mut pr_b, snap_b) = make_deps();
+        let (mut rels_baseline, snap_a) = make_deps();
+        let (mut rels_biased, snap_b) = make_deps();
         let mut needs_a = Needs::default();
         let mut needs_b = Needs::default();
         let mut full_a = Fulfillment::default();
@@ -299,9 +281,7 @@ mod tests {
             Some(target),
             &mut needs_a,
             &mut full_a,
-            &mut pr_a,
             &mut rels_baseline,
-            &mut cm_a,
             &snap_a,
             0,
             &social,
@@ -316,9 +296,7 @@ mod tests {
             Some(target),
             &mut needs_b,
             &mut full_b,
-            &mut pr_b,
             &mut rels_biased,
-            &mut cm_b,
             &snap_b,
             0,
             &social,
