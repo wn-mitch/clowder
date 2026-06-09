@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-09
+
+### Added
+- Three-layer AI substrate (epic 060, phases 1–6): L1 influence maps + ECS marker registry, L2 IAUS DSE scoring with a unified trace-visible modifier pipeline, L3 softmax-over-Intentions commitment feeding the GOAP/HTN planner; focal-cat L2/L3 trace sidecar with a locked score-parity invariant
+- Belief layer: per-cat mental-model facets replacing raw colony rollups — shelter as housing-security belief, prey-yield beliefs (HuntingPriors retired), predator-ambush beliefs (RecentAmbushMap retired), colony-reserves belief for anticipatory crafting
+- HTN methods and multi-step arcs: rear_kitten (wean / teach / release), mourn_at_grave, courtship; JointIntention practices (courtship, play bouts) with witnessable cues
+- Items-are-real doctrine: Source/Transfer/Sink gates on every item state transition plus a strict linter; anatomical slot inventory (worn slots + carry pouch), warrior's-kit crafting chain, Workshop recipes, equipment-modifier aggregation surfaced in the L2 trace
+- Kitten substrate: sub-stage markers, BegForFood, kittens electing actions at L3 through the canonical dispatch path
+- Hunting and wildlife depth: tremor influence map with Stalk/Pounce, A* fallback for concave-trap escapes, per-species MovementBudget, escape-viability mobility differential
+- Body zones: WoundKind axis, Festering substrate, injury-attributed deaths
+- Environment-quality five-axis influence maps; ward-siege fear map
+- Tooling: `just verdict` one-call run validation (canaries + drift + colony-score channel), `just hypothesize` four-artifact balance runs, DuckDB log analytics with charts, flamegraph recipe, foreman/polecat parallel-session orchestration
+
+### Changed
+- `Position` is a Vec2-backed newtype; distance semantics migrated Manhattan → Euclidean/Chebyshev across all call sites (radial perception split from tactical reach)
+- Founder relationships initialize with a warm floor (familiarity/fondness bands + social-warmth spawn floor)
+- GOAP goal encoding refactored to a `GoalKind` sum type with substrate decomposition helpers
+
+### Performance
+- Event-driven retirements of per-tick hot paths: passive familiarity behind a CatMoved cache, lazy sustained-copresence eviction, near-pair cache eviction on CatDied, scratch-buffer allocation reuse
+
+### Fixed
+- Inter-cat Mates-bond exclusivity gap
+- CarcassPile picker no longer targets impassable tiles
+- Sprite asset path resolution; materials atlas rebind
+- logdb ingest: 64-bit seeds, unreadable files skipped instead of aborting
+
+### Known issues
+- Per-tick throughput regressed ~63% over the substrate-refactor landing window; tracked as perf epic 480 (top remaining hot path: `author_joint_intentions`)
+- Early-game founder spatial dispersion collapses ("cuddle puddle"); diagnosed in ticket 490 with fix direction chosen
+
 ## [0.2.0] - 2026-04-19
 
 ### Added
