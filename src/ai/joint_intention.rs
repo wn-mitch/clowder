@@ -203,10 +203,16 @@ pub fn author_joint_intentions(
 
     // -----------------------------------------------------------------
     // Pass 1: partner-state snapshot (post-Pass-0, pre-drop).
+    //
+    // 459 — stage rides in the snapshot so the Pass-2 mismatch check
+    // reads it directly instead of an O(J²) `joints.iter().find()`
+    // inner scan. Pass-2 stage mutations apply *after* the loop, so
+    // the snapshot's pre-Pass-2 stage is exactly what the old find()
+    // observed — behavior-identical.
     // -----------------------------------------------------------------
-    let partner_snapshot: HashMap<Entity, (PracticeKind, Entity)> = joints
+    let partner_snapshot: HashMap<Entity, (PracticeKind, Entity, PracticeStage)> = joints
         .iter()
-        .map(|(e, j)| (e, (j.practice, j.partner)))
+        .map(|(e, j)| (e, (j.practice, j.partner, j.stage)))
         .collect();
     let pregnant_snapshot: HashMap<Entity, bool> = joints
         .iter()
@@ -267,7 +273,7 @@ pub fn author_joint_intentions(
         // snapshot — the cascade fires on the FOLLOWING tick.
         let partner_in_practice = partner_snapshot
             .get(&joint.partner)
-            .is_some_and(|(kind, p_partner)| *kind == joint.practice && *p_partner == entity);
+            .is_some_and(|(kind, p_partner, _)| *kind == joint.practice && *p_partner == entity);
 
         let proxies = JointIntentionProxies {
             self_stage: self_fit.stage,
@@ -321,17 +327,15 @@ pub fn author_joint_intentions(
 
         // Mismatch tracking — lower-Entity-index side reports to avoid
         // double-counting. Only when partner still has a JI and stages
-        // differ.
-        if let Some((p_kind, p_partner_entity)) = partner_snapshot.get(&joint.partner) {
-            if *p_kind == joint.partner_practice() && *p_partner_entity == entity {
-                // Look up partner's stage from the joints query.
-                if let Some((_, partner_joint)) = joints.iter().find(|(pe, _)| *pe == joint.partner)
-                {
-                    if entity.index() < joint.partner.index() && partner_joint.stage != joint.stage
-                    {
-                        mismatch_emissions.push(joint.practice);
-                    }
-                }
+        // differ. 459 — partner stage comes from the Pass-1 snapshot
+        // (pre-Pass-2 state, same as the retired inner find() observed).
+        if let Some((p_kind, p_partner_entity, p_stage)) = partner_snapshot.get(&joint.partner) {
+            if *p_kind == joint.partner_practice()
+                && *p_partner_entity == entity
+                && entity.index() < joint.partner.index()
+                && *p_stage != joint.stage
+            {
+                mismatch_emissions.push(joint.practice);
             }
         }
     }
@@ -421,6 +425,20 @@ pub fn author_joint_intentions(
     let positions: Vec<(Entity, Position)> = all_positions.iter().map(|(e, p)| (e, *p)).collect();
     let mut claimed_this_tick: HashSet<Entity> = HashSet::new();
 
+    // 459 — Mates-bonded set, built in ONE O(pairs) pass. The 453
+    // exclusivity gates previously re-scanned the whole relationship
+    // BTreeMap per matchmaker actor (self gate) AND per candidate
+    // (third-party gate) — `iter_for` is an unindexed full-map filter,
+    // so the courtship pass cost O(cats² × pairs) per tick: the
+    // dominant self-time in this system's 22% flamegraph share.
+    // Membership semantics are identical: bond storage is symmetric,
+    // so "has any Mates bond" ⇔ "appears in this set".
+    let mates_bonded: HashSet<Entity> = relationships
+        .iter()
+        .filter(|(_, rel)| rel.bond == Some(BondType::Mates))
+        .flat_map(|((a, b), _)| [a, b])
+        .collect();
+
     // ---------- Courtship pass ----------
     for (entity, position) in needs_emit.iter() {
         let Some(self_fit) = fitness.get(&entity).copied() else {
@@ -436,6 +454,7 @@ pub fn author_joint_intentions(
             &positions,
             &fitness,
             &relationships,
+            &mates_bonded,
             courtship_constants,
         ) else {
             continue;
@@ -697,6 +716,7 @@ fn bond_tier_score(bond: Option<BondType>) -> f32 {
 /// Moved from `crate::ai::pairing::pick_partner` in 127 Commit C.
 /// Future practices declare their own matchmaker via per-practice
 /// dispatch.
+#[allow(clippy::too_many_arguments)]
 fn pick_courtship_partner(
     self_entity: Entity,
     self_position: &Position,
@@ -704,15 +724,24 @@ fn pick_courtship_partner(
     positions: &[(Entity, Position)],
     fitness: &HashMap<Entity, MatingFitness>,
     relationships: &Relationships,
+    mates_bonded: &HashSet<Entity>,
     practice_constants: &CourtshipPracticeConstants,
 ) -> Option<Entity> {
     // Ticket 453: Mates-exclusivity perception gate. A cat already in a
     // `BondType::Mates` bond does not emit new Courtship JointIntentions
     // toward third parties under the current substrate shape.
-    if relationships
-        .iter_for(self_entity)
-        .any(|(_, rel)| rel.bond == Some(BondType::Mates))
-    {
+    //
+    // 459 — set-membership replaces the per-call `iter_for` full-map
+    // scan; the debug parity assertion localizes any divergence at the
+    // first divergent call (431 discipline).
+    debug_assert_eq!(
+        mates_bonded.contains(&self_entity),
+        relationships
+            .iter_for(self_entity)
+            .any(|(_, rel)| rel.bond == Some(BondType::Mates)),
+        "mates_bonded set diverged from relationship scan for {self_entity:?}"
+    );
+    if mates_bonded.contains(&self_entity) {
         return None;
     }
 
@@ -753,10 +782,18 @@ fn pick_courtship_partner(
             continue;
         }
         // Ticket 453: skip candidates already Mates-bonded to a third
-        // party. (Self-Mates already excluded by the early return above.)
-        if relationships.iter_for(*other).any(|(third, third_rel)| {
-            third != self_entity && third_rel.bond == Some(BondType::Mates)
-        }) {
+        // party. (Self-Mates already excluded by the early return above,
+        // and bonds are symmetric — so any Mates bond the candidate
+        // holds is necessarily with a third party. 459: set-membership
+        // replaces the per-candidate full-map scan.)
+        debug_assert_eq!(
+            mates_bonded.contains(other),
+            relationships.iter_for(*other).any(|(third, third_rel)| {
+                third != self_entity && third_rel.bond == Some(BondType::Mates)
+            }),
+            "mates_bonded set diverged from candidate scan for {other:?}"
+        );
+        if mates_bonded.contains(other) {
             continue;
         }
         let fondness = rel.fondness.max(0.0);
@@ -1262,6 +1299,11 @@ mod tests {
             (c, Position::new(2, 0)),
         ];
         let constants = SimConstants::default();
+        let mates_bonded: HashSet<Entity> = rels
+            .iter()
+            .filter(|(_, rel)| rel.bond == Some(BondType::Mates))
+            .flat_map(|((x, y), _)| [x, y])
+            .collect();
         let picked = pick_courtship_partner(
             a,
             &Position::new(0, 0),
@@ -1269,6 +1311,7 @@ mod tests {
             &positions,
             &fitness,
             &rels,
+            &mates_bonded,
             &constants.practices.courtship,
         );
         assert!(
@@ -1315,6 +1358,11 @@ mod tests {
             (d, Position::new(5, 5)),
         ];
         let constants = SimConstants::default();
+        let mates_bonded: HashSet<Entity> = rels
+            .iter()
+            .filter(|(_, rel)| rel.bond == Some(BondType::Mates))
+            .flat_map(|((x, y), _)| [x, y])
+            .collect();
         let picked = pick_courtship_partner(
             a,
             &Position::new(0, 0),
@@ -1322,6 +1370,7 @@ mod tests {
             &positions,
             &fitness,
             &rels,
+            &mates_bonded,
             &constants.practices.courtship,
         );
         assert_eq!(
