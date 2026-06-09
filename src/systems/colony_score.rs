@@ -165,7 +165,7 @@ pub fn emit_colony_score(
     // Cache the per-tick computation on the resource so the post-loop
     // footer writer (and ticket-125 verdict tooling) can read welfare
     // axes + aggregate without re-tailing the events.jsonl.
-    score.last_snapshot = Some(ColonyScoreSnapshot {
+    let snapshot = ColonyScoreSnapshot {
         shelter,
         nourishment,
         health,
@@ -173,7 +173,34 @@ pub fn emit_colony_score(
         fulfillment,
         welfare,
         aggregate,
-    });
+    };
+    score.last_snapshot = Some(snapshot.clone());
+
+    // TPS-invariant checkpoint: freeze the snapshot AND the achievement
+    // ledger once, at the first emission at or after
+    // `checkpoint_elapsed_ticks` *elapsed* (not absolute) ticks. The
+    // ledger must freeze too — it is the other elapsed-time-dependent
+    // term in the aggregate, so an end-of-run read rewards faster
+    // binaries, not healthier colonies.
+    let checkpoint_mark = cs.checkpoint_elapsed_ticks;
+    if score.checkpoint.is_none()
+        && checkpoint_mark > 0
+        && time.tick.saturating_sub(score.run_start_tick) >= checkpoint_mark
+    {
+        score.checkpoint = Some(crate::resources::colony_score::ColonyScoreCheckpoint {
+            captured_at_elapsed_tick: time.tick.saturating_sub(score.run_start_tick),
+            snapshot,
+            seasons_survived: score.seasons_survived,
+            peak_population: score.peak_population,
+            kittens_born: score.kittens_born,
+            kittens_matured: score.kittens_matured,
+            structures_built: score.structures_built,
+            bonds_formed: score.bonds_formed,
+            deaths_starvation: score.deaths_starvation,
+            deaths_old_age: score.deaths_old_age,
+            deaths_injury: score.deaths_injury,
+        });
+    }
 
     // --- Bond tier snapshot ---
     let mut friends_count = 0u64;

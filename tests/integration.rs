@@ -261,6 +261,79 @@ fn footer_carries_colony_score_block() {
     cleanup(&dir);
 }
 
+/// Sibling of `footer_carries_colony_score_block` for the 2026-06-09
+/// instrumentation wave: throughput fields (perf epic 480), the
+/// TPS-invariant score checkpoint, and the founder-dispersion canary
+/// windows (ticket 490).
+#[test]
+fn footer_carries_throughput_checkpoint_and_dispersion_surfaces() {
+    let dir = make_test_dir("instrumentation-footer");
+    let mut app = build_test_app(42, &dir);
+    for _ in 0..200 {
+        if app.should_exit().is_some() {
+            break;
+        }
+        app.update();
+    }
+    let footer_str = emit_headless_footer(app.world_mut());
+    drop(app);
+
+    let footer: serde_json::Value =
+        serde_json::from_str(&footer_str).expect("footer must parse as JSON");
+
+    // Perf epic 480 — throughput surface. Measured wall-clock, so the
+    // values are nondeterministic; assert presence + sanity only.
+    let wall = footer
+        .get("wall_elapsed_secs")
+        .and_then(|v| v.as_f64())
+        .expect("footer must include numeric wall_elapsed_secs");
+    assert!(wall > 0.0, "wall_elapsed_secs must be positive; got {wall}");
+    let tps = footer
+        .get("ticks_per_sec")
+        .and_then(|v| v.as_f64())
+        .expect("footer must include numeric ticks_per_sec");
+    assert!(tps > 0.0, "ticks_per_sec must be positive; got {tps}");
+
+    // TPS-invariant checkpoint — present but null at 200 elapsed ticks
+    // (capture mark is 50k elapsed). Null-until-reached is the contract
+    // verdict's surface-selection fallback depends on.
+    let checkpoint = footer
+        .get("colony_score_at_checkpoint")
+        .expect("footer must include colony_score_at_checkpoint field");
+    assert!(
+        checkpoint.is_null(),
+        "checkpoint must be null before checkpoint_elapsed_ticks; got {checkpoint}"
+    );
+
+    // Ticket 490 — founder-dispersion windows. The resource is inserted
+    // at world build, founders carry the marker, and the snapshot
+    // cadence has fired by tick 200 — expect a non-empty array whose
+    // rows carry the window fields.
+    let dispersion = footer
+        .get("founder_dispersion")
+        .expect("footer must include founder_dispersion field");
+    let rows = dispersion
+        .as_array()
+        .expect("founder_dispersion must be an array");
+    assert!(
+        !rows.is_empty(),
+        "founder_dispersion must have >=1 window after 200 ticks of snapshots"
+    );
+    for field in [
+        "window_start_elapsed",
+        "window_end_elapsed",
+        "mean_dist",
+        "samples",
+    ] {
+        assert!(
+            rows[0].get(field).is_some(),
+            "founder_dispersion row missing field {field}"
+        );
+    }
+
+    cleanup(&dir);
+}
+
 /// Drive cats to near-starvation, then run for long enough that at least one
 /// of them eats. Verifies the eat plumbing (sense food → plan → travel →
 /// EatAtStores → hunger restored) is wired up end to end. Targeted at the

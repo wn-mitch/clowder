@@ -64,9 +64,11 @@ pub fn emit_cat_snapshots(
         Without<Dead>,
     >,
     names: Query<&Name>,
+    founders: Query<&Position, (With<crate::components::identity::Founder>, Without<Dead>)>,
     relationships: Res<Relationships>,
     parenting_scalars: Res<ParentingScalars>,
     constants: Res<SimConstants>,
+    mut dispersion: Option<ResMut<crate::resources::FounderDispersionStats>>,
     mut event_log: Option<ResMut<EventLog>>,
 ) {
     let Some(ref mut log) = event_log else { return };
@@ -75,6 +77,22 @@ pub fn emit_cat_snapshots(
         return;
     }
     let season = time.season(&sim_config);
+
+    // Ticket 490 — founder-dispersion canary sample. Rides the snapshot
+    // cadence (no new system; instrumentation-only, never read by sim
+    // behavior). The cuddle-puddle defect was invisible to every
+    // event-count gate — this is the spatial statistic that catches it.
+    if let Some(ref mut stats) = dispersion {
+        let positions: Vec<(f32, f32)> = founders
+            .iter()
+            .map(|p| (p.x() as f32, p.y() as f32))
+            .collect();
+        if let Some(mean_dist) =
+            crate::resources::founder_dispersion::mean_dist_to_centroid(&positions)
+        {
+            stats.record(time.tick, mean_dist);
+        }
+    }
 
     // Ticket 431 Stage D — system-level arena Vec for the top-3-by-fondness
     // sort. Pre-Stage-D this allocated a fresh `Vec<(Entity, &Relationship)>`

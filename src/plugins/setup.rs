@@ -450,7 +450,18 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
     // the non-zero start_tick. ColonyScore was inserted earlier with defaults.
     if let Some(mut score) = world.get_resource_mut::<crate::resources::ColonyScore>() {
         score.last_recorded_season = start_tick / config.ticks_per_season;
+        // Anchor for the TPS-invariant checkpoint: `emit_colony_score`
+        // computes elapsed = tick - run_start_tick (ticks are absolute).
+        score.run_start_tick = start_tick;
     }
+    // Ticket 490 — founder-dispersion canary accumulator (sampled by
+    // `emit_cat_snapshots`, surfaced in the headless footer).
+    world.insert_resource(
+        crate::resources::founder_dispersion::FounderDispersionStats {
+            run_start_tick: start_tick,
+            ..Default::default()
+        },
+    );
     world.insert_resource(config);
     world.insert_resource(WeatherState::default());
     world.insert_resource(crate::resources::ForcedConditions::default());
@@ -493,6 +504,11 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
         let fulfillment = Fulfillment::founder(i, cat_count);
         let position = Position::new(spawn_x, spawn_y);
         let entity = spawn_cat_from_blueprint(world, cat, position, needs, fulfillment);
+        // Ticket 490 — instrumentation marker for the founder-dispersion
+        // canary (read by `emit_cat_snapshots`' dispersion sampler).
+        world
+            .entity_mut(entity)
+            .insert(crate::components::identity::Founder);
         entity_ids.push(entity);
     }
 

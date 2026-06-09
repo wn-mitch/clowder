@@ -59,6 +59,24 @@ class Verdict:
     # exited before the first ColonyScore emission). Each value is a dict of
     # `{baseline, observed, delta_pct, band}` keyed by colony-score field name.
     colony_score_drift: dict[str, dict[str, Any]] | None = None
+    # Which footer block backed `colony_score_drift`. "checkpoint" = the
+    # TPS-invariant fixed-elapsed-tick capture (preferred); "end_of_run" =
+    # legacy surface, confounded with binary throughput on wall-clock
+    # soaks. None when there is no drift readout at all.
+    colony_score_surface: str | None = None
+    # Ticket 490: founder-dispersion windows (post-spawn) whose mean
+    # distance-to-centroid fell below the absolute floor — the cuddle-
+    # puddle spatial signature. `None` when the footer lacks the block
+    # (pre-490 archives); `[]` when present and healthy. Absolute-floor
+    # (not baseline-relative) so the canary is live before any baseline
+    # carries the field.
+    founder_dispersion_low: list[dict[str, Any]] | None = None
+    # Perf epic 480: throughput-vs-baseline channel. `None` when the runs
+    # are incomparable (different duration budgets AND either side lacks
+    # the `ticks_per_sec` footer field). Degradation-only gating: bands
+    # are wide because single-run throughput is noisy under parallel-
+    # session CPU contention; escalates to concern at most, never fail.
+    throughput_drift: dict[str, Any] | None = None
     # Ticket 194 / P3: per-tick rate normalization for cross-run comparison
     # at unequal durations. `duration_drift_pct` is None when either side's
     # duration is unreadable; the overall verdict only escalates on rate-
@@ -503,7 +521,9 @@ def derive_overall(canary_survival: str, canary_continuity: str,
                    constants: str, drift: list[dict[str, Any]],
                    colony_score: dict[str, dict[str, Any]] | None,
                    duration_drift_pct: float | None = None,
-                   plan_failure_canary: list[dict[str, Any]] | None = None) -> str:
+                   plan_failure_canary: list[dict[str, Any]] | None = None,
+                   throughput: dict[str, Any] | None = None,
+                   dispersion_low: list[dict[str, Any]] | None = None) -> str:
     if canary_survival == "fail":
         return "fail"
     if canary_continuity == "fail" or constants == "drift":
@@ -530,6 +550,16 @@ def derive_overall(canary_survival: str, canary_continuity: str,
     # silently via plan_failures_by_reason churn" — the 364→394 Wean
     # 0→2439 jump (no deaths, welfare improved) would have caught here.
     if plan_failure_canary:
+        return "concern"
+    # Perf epic 480: throughput degradation escalates to concern at most,
+    # never fail — single-run TPS can be faked by parallel-session CPU
+    # contention. The gap this closes is "stairstep perf regression that
+    # only surfaces weeks later in the LOESS chart."
+    if throughput and throughput.get("band") in ("concern", "strong-concern"):
+        return "concern"
+    # Ticket 490: founders huddling below the dispersion floor is the
+    # cuddle-puddle signature — invisible to every event-count gate.
+    if dispersion_low:
         return "concern"
     return "pass"
 
@@ -560,16 +590,38 @@ def colony_score_band(delta_pct: float) -> str:
     return "fail"
 
 
+def select_colony_score_blocks(
+        baseline: dict[str, Any],
+        observed: dict[str, Any]) -> tuple[Any, Any, str]:
+    """Pick the colony-score comparison surface.
+
+    Prefers `colony_score_at_checkpoint` when BOTH footers carry a
+    non-null block captured at the SAME `checkpoint_constant` — that
+    surface is TPS-invariant (frozen at a fixed elapsed sim-tick), so it
+    isn't confounded by binary throughput on wall-clock soaks. Falls
+    back to the end-of-run `colony_score` block otherwise (legacy
+    baselines, runs that died before the mark, or mismatched constants).
+    """
+    b_cp = baseline.get("colony_score_at_checkpoint")
+    o_cp = observed.get("colony_score_at_checkpoint")
+    if (isinstance(b_cp, dict) and isinstance(o_cp, dict)
+            and b_cp.get("checkpoint_constant") is not None
+            and b_cp.get("checkpoint_constant") == o_cp.get("checkpoint_constant")):
+        return b_cp, o_cp, "checkpoint"
+    return baseline.get("colony_score"), observed.get("colony_score"), "end_of_run"
+
+
 def colony_score_drift(baseline: dict[str, Any],
                        observed: dict[str, Any]) -> dict[str, dict[str, Any]] | None:
-    """Per-field numerical drift on `_footer.colony_score`.
+    """Per-field numerical drift on the selected colony-score surface.
 
-    Returns `None` if either side lacks the block (older baseline, or a
-    run that exited before first emission). Returns an empty dict only
-    when both blocks exist but contain no comparable numeric fields.
+    Surface selection per `select_colony_score_blocks` (checkpoint
+    preferred, end-of-run fallback). Returns `None` if either side lacks
+    the selected block (older baseline, or a run that exited before
+    first emission). Returns an empty dict only when both blocks exist
+    but contain no comparable numeric fields.
     """
-    b_block = baseline.get("colony_score")
-    o_block = observed.get("colony_score")
+    b_block, o_block, _surface = select_colony_score_blocks(baseline, observed)
     if not isinstance(b_block, dict) or not isinstance(o_block, dict):
         return None
 
@@ -594,6 +646,91 @@ def colony_score_drift(baseline: dict[str, Any],
             "band": colony_score_band(delta),
         }
     return rows
+
+
+# Ticket 490: founder-dispersion absolute floor. Healthy early-game
+# founder spread is ~24 tiles mean dist-to-centroid; the cuddle-puddle
+# regression collapsed it to ~4.7. Window 0 (elapsed < 3000) contains
+# the spawn clump (~1.3 tiles, expected) and is skipped.
+FOUNDER_DISPERSION_FLOOR_TILES = 10.0
+FOUNDER_DISPERSION_SKIP_BEFORE_ELAPSED = 3_000
+
+
+def founder_dispersion_low(footer: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """Windows below the dispersion floor. None = field absent (old run)."""
+    rows = footer.get("founder_dispersion")
+    if not isinstance(rows, list):
+        return None
+    flagged: list[dict[str, Any]] = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        start = r.get("window_start_elapsed", 0)
+        if not isinstance(start, (int, float)) \
+                or start < FOUNDER_DISPERSION_SKIP_BEFORE_ELAPSED:
+            continue
+        md = r.get("mean_dist")
+        if isinstance(md, (int, float)) and md < FOUNDER_DISPERSION_FLOOR_TILES:
+            flagged.append(r)
+    return flagged
+
+
+# Perf epic 480: throughput drift bands. Wide and degradation-only —
+# a single run's wall-clock throughput is confounded by parallel-session
+# CPU contention (the reason ticket 480 tracks p90 across runs, not
+# single samples). A 15% single-run dip is plausible contention noise;
+# a 40% dip is almost certainly real. Improvements never gate.
+THROUGHPUT_CONCERN_PCT = 15.0
+THROUGHPUT_STRONG_PCT = 40.0
+
+
+def throughput_band(delta_pct: float) -> str:
+    if delta_pct >= -THROUGHPUT_CONCERN_PCT:
+        return "pass"
+    if delta_pct >= -THROUGHPUT_STRONG_PCT:
+        return "concern"
+    return "strong-concern"
+
+
+def throughput_drift(baseline: dict[str, Any], observed: dict[str, Any],
+                     baseline_duration_secs: Any,
+                     observed_duration_secs: Any) -> dict[str, Any] | None:
+    """Throughput-vs-baseline comparison (perf epic 480).
+
+    Metric selection, in preference order:
+    1. `ticks_per_sec` when both footers carry it — the honest instrument
+       (measured wall-clock, robust to wipeout-shortened runs).
+    2. `elapsed_ticks` when both runs had the same `duration_secs` budget
+       — ticks-done-in-a-fixed-wall-budget, works against every archive
+       baseline written before `ticks_per_sec` landed.
+    Returns `None` when neither applies (incomparable).
+    """
+    b_tps = baseline.get("ticks_per_sec")
+    o_tps = observed.get("ticks_per_sec")
+    if isinstance(b_tps, (int, float)) and isinstance(o_tps, (int, float)) \
+            and b_tps > 0 and o_tps > 0:
+        metric, b, o = "ticks_per_sec", float(b_tps), float(o_tps)
+    else:
+        b_et = baseline.get("elapsed_ticks")
+        o_et = observed.get("elapsed_ticks")
+        durations_match = (
+            isinstance(baseline_duration_secs, (int, float))
+            and isinstance(observed_duration_secs, (int, float))
+            and baseline_duration_secs == observed_duration_secs
+        )
+        if durations_match and isinstance(b_et, int) and isinstance(o_et, int) \
+                and b_et > 0 and o_et > 0:
+            metric, b, o = "elapsed_ticks", float(b_et), float(o_et)
+        else:
+            return None
+    delta = (o - b) / b * 100.0
+    return {
+        "metric": metric,
+        "baseline": round(b, 1),
+        "observed": round(o, 1),
+        "delta_pct": round(delta, 1),
+        "band": throughput_band(delta),
+    }
 
 
 def derive_next_steps(v: Verdict, run_dir: Path, footer: dict[str, Any]) -> list[str]:
@@ -656,6 +793,29 @@ def derive_next_steps(v: Verdict, run_dir: Path, footer: dict[str, Any]) -> list
             f"plan-failure rate regression: {shape}{rest} - "
             f"`just q events {run_dir} _footer` to inspect the dict"
         )
+    # Ticket 490: name the huddled windows so the caller can jump to the
+    # spatial drill (position scan / trace) instead of re-deriving it.
+    if v.founder_dispersion_low:
+        worst = min(v.founder_dispersion_low,
+                    key=lambda r: r.get("mean_dist", 0.0))
+        steps.append(
+            f"founder dispersion below {FOUNDER_DISPERSION_FLOOR_TILES:.0f}-tile floor in "
+            f"{len(v.founder_dispersion_low)} window(s) (worst "
+            f"{worst.get('mean_dist', 0):.1f} tiles at elapsed "
+            f"{worst.get('window_start_elapsed', '?')}) — cuddle-puddle "
+            f"signature; see ticket 490, check bond graph + social-warmth pull"
+        )
+    # Perf epic 480: name a throughput degradation and route the caller
+    # to the contention-vs-real disambiguation step before they burn a
+    # bisect on machine noise.
+    if v.throughput_drift and v.throughput_drift.get("band") in ("concern", "strong-concern"):
+        t = v.throughput_drift
+        steps.append(
+            f"throughput {t['delta_pct']:+.1f}% on {t['metric']} "
+            f"({t['baseline']} → {t['observed']}) — re-run on an idle machine "
+            f"or `just sweep-stats` across seeds to rule out contention; "
+            f"if real, flamegraph + open a 480-child ticket"
+        )
     # Ticket 125: name colony_score axes that moved out of band so the
     # caller can decide whether the drift is intentional (file a hypothesis)
     # or a regression (bisect-canary on the moved axis).
@@ -672,6 +832,16 @@ def derive_next_steps(v: Verdict, run_dir: Path, footer: dict[str, Any]) -> list
             steps.append(
                 f"colony_score drift: {top} — file a hypothesis if intentional, "
                 f"`just bisect-canary <axis>` if not"
+            )
+        # The end-of-run surface is TPS-confounded (welfare × seasons and
+        # the ledger both grow with elapsed sim-time on a wall-clock
+        # budget). Flag the fallback so a score delta isn't mistaken for
+        # behavior change when it might be binary speed.
+        if v.colony_score_surface == "end_of_run":
+            steps.append(
+                "colony_score compared on the end-of-run surface "
+                "(TPS-confounded) — promote a baseline that carries "
+                "colony_score_at_checkpoint for a sim-time-invariant comparison"
             )
     return steps
 
@@ -736,6 +906,8 @@ def main(argv: list[str]) -> int:
     baseline_seed: int | None = None
     drift_rows: list[dict[str, Any]] = []
     cs_drift: dict[str, dict[str, Any]] | None = None
+    cs_surface: str | None = None
+    tp_drift: dict[str, Any] | None = None
     plan_failure_rows: list[dict[str, Any]] = []
     baseline_dur: int | None = None
     observed_dur = run_duration_ticks(events_path)
@@ -749,15 +921,23 @@ def main(argv: list[str]) -> int:
             drift_rows = footer_drift(baseline_footer, footer,
                                       baseline_dur, observed_dur)
             cs_drift = colony_score_drift(baseline_footer, footer)
+            if cs_drift is not None:
+                _, _, cs_surface = select_colony_score_blocks(baseline_footer, footer)
+            tp_drift = throughput_drift(
+                baseline_footer, footer,
+                read_header_field(baseline_path, ".duration_secs"),
+                read_header_field(events_path, ".duration_secs"))
             plan_failure_rows = plan_failure_canary(
                 baseline_footer, footer, baseline_dur, observed_dur)
         if baseline_dur and observed_dur:
             duration_drift_pct = round(
                 abs(observed_dur - baseline_dur) / baseline_dur * 100.0, 1)
 
+    dispersion_rows = founder_dispersion_low(footer)
+
     overall = derive_overall(surv_status, cont_status, constants_status,
                              drift_rows, cs_drift, duration_drift_pct,
-                             plan_failure_rows)
+                             plan_failure_rows, tp_drift, dispersion_rows)
     # Seed mismatch is a comparability failure: the drift table is bogus
     # because we're comparing different control worlds. Downgrade the
     # verdict (but never below the survival/continuity verdict) and let
@@ -792,6 +972,9 @@ def main(argv: list[str]) -> int:
         seed_match_vs_baseline=seed_status,
         footer_drift=drift_rows,
         colony_score_drift=cs_drift,
+        colony_score_surface=cs_surface,
+        founder_dispersion_low=dispersion_rows,
+        throughput_drift=tp_drift,
         plan_failure_canary=plan_failure_rows,
         baseline_duration_ticks=baseline_dur,
         observed_duration_ticks=observed_dur,
@@ -859,7 +1042,8 @@ def _text(v: Verdict) -> str:
         # Headline two axes (aggregate + welfare) plus the top out-of-band
         # axis if any. Keeps the text mode terse; full per-field readout is
         # in the JSON envelope.
-        lines.append("  colony_score drift:")
+        surface = f" ({v.colony_score_surface})" if v.colony_score_surface else ""
+        lines.append(f"  colony_score drift{surface}:")
         for axis in ("aggregate", "welfare"):
             row = v.colony_score_drift.get(axis)
             if row:
@@ -876,6 +1060,19 @@ def _text(v: Verdict) -> str:
                 d = row["delta_pct"]
                 d_s = "  new" if d is None else f"{d:+5.1f}%"
                 lines.append(f"    {row['band']:8s} {d_s}  {axis} ({row['baseline']} → {row['observed']})")
+    if v.founder_dispersion_low:
+        worst = min(v.founder_dispersion_low, key=lambda r: r.get("mean_dist", 0.0))
+        lines.append(
+            f"  dispersion: LOW in {len(v.founder_dispersion_low)} window(s) "
+            f"(worst {worst.get('mean_dist', 0):.1f} tiles, floor "
+            f"{FOUNDER_DISPERSION_FLOOR_TILES:.0f})"
+        )
+    if v.throughput_drift:
+        t = v.throughput_drift
+        lines.append(
+            f"  throughput: {t['band']:8s} {t['delta_pct']:+5.1f}%  "
+            f"{t['metric']} ({t['baseline']} → {t['observed']})"
+        )
     if v.plan_failure_canary:
         lines.append("  plan-failure regressions:")
         for r in v.plan_failure_canary[:5]:

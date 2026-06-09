@@ -158,5 +158,76 @@ class TestDeriveOverallEscalation(unittest.TestCase):
         self.assertEqual(result, "pass")
 
 
+def make_checkpoint_block(aggregate=500.0, constant=50_000, **overrides):
+    """Build a colony_score_at_checkpoint footer block."""
+    block = make_block(aggregate=aggregate, **overrides)
+    block["captured_at_elapsed_tick"] = constant + 13
+    block["checkpoint_constant"] = constant
+    return block
+
+
+class TestCheckpointSurfaceSelection(unittest.TestCase):
+    """TPS-invariant checkpoint surface preferred over end-of-run when
+    both runs carry it at the same checkpoint constant."""
+
+    def test_prefers_checkpoint_when_both_carry_it(self):
+        baseline = {
+            "colony_score": make_block(aggregate=1000.0),
+            "colony_score_at_checkpoint": make_checkpoint_block(aggregate=500.0),
+        }
+        observed = {
+            "colony_score": make_block(aggregate=700.0),  # end-of-run dropped 30%
+            "colony_score_at_checkpoint": make_checkpoint_block(aggregate=510.0),
+        }
+        _, _, surface = verdict.select_colony_score_blocks(baseline, observed)
+        self.assertEqual(surface, "checkpoint")
+        rows = verdict.colony_score_drift(baseline, observed)
+        # Checkpoint delta is +2% (pass) — the -30% end-of-run delta is
+        # the TPS-confounded reading the checkpoint exists to avoid.
+        self.assertEqual(rows["aggregate"]["band"], "pass")
+        self.assertEqual(rows["aggregate"]["delta_pct"], 2.0)
+
+    def test_falls_back_when_baseline_is_legacy(self):
+        baseline = {"colony_score": make_block(aggregate=1000.0)}
+        observed = {
+            "colony_score": make_block(aggregate=950.0),
+            "colony_score_at_checkpoint": make_checkpoint_block(),
+        }
+        _, _, surface = verdict.select_colony_score_blocks(baseline, observed)
+        self.assertEqual(surface, "end_of_run")
+        rows = verdict.colony_score_drift(baseline, observed)
+        self.assertEqual(rows["aggregate"]["delta_pct"], -5.0)
+
+    def test_falls_back_when_observed_checkpoint_null(self):
+        # Run died (or was too short) before the checkpoint mark.
+        baseline = {
+            "colony_score": make_block(),
+            "colony_score_at_checkpoint": make_checkpoint_block(),
+        }
+        observed = {
+            "colony_score": make_block(),
+            "colony_score_at_checkpoint": None,
+        }
+        _, _, surface = verdict.select_colony_score_blocks(baseline, observed)
+        self.assertEqual(surface, "end_of_run")
+
+    def test_falls_back_on_checkpoint_constant_mismatch(self):
+        baseline = {
+            "colony_score": make_block(),
+            "colony_score_at_checkpoint": make_checkpoint_block(constant=50_000),
+        }
+        observed = {
+            "colony_score": make_block(),
+            "colony_score_at_checkpoint": make_checkpoint_block(constant=60_000),
+        }
+        _, _, surface = verdict.select_colony_score_blocks(baseline, observed)
+        self.assertEqual(surface, "end_of_run")
+
+    def test_checkpoint_drift_none_when_fallback_also_missing(self):
+        baseline = {"colony_score_at_checkpoint": make_checkpoint_block()}
+        observed = {"colony_score_at_checkpoint": None}
+        self.assertIsNone(verdict.colony_score_drift(baseline, observed))
+
+
 if __name__ == "__main__":
     unittest.main()

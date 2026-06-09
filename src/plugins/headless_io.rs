@@ -617,6 +617,68 @@ pub fn emit_headless_footer(world: &mut World) -> String {
         }
     };
 
+    // TPS-invariant score checkpoint (sibling of the end-of-run block).
+    // `null` when the run never reached `checkpoint_elapsed_ticks` —
+    // verdict falls back to the end-of-run block and labels the
+    // comparison surface accordingly. `checkpoint_constant` is echoed so
+    // verdict can refuse to compare checkpoints captured at different
+    // marks.
+    let colony_score_checkpoint_block = {
+        let checkpoint_constant = world
+            .resource::<SimConstants>()
+            .colony_score
+            .checkpoint_elapsed_ticks;
+        let score = world.resource::<crate::resources::ColonyScore>();
+        match &score.checkpoint {
+            Some(cp) => serde_json::json!({
+                "captured_at_elapsed_tick": cp.captured_at_elapsed_tick,
+                "checkpoint_constant": checkpoint_constant,
+                "aggregate": cp.snapshot.aggregate,
+                "welfare": cp.snapshot.welfare,
+                "shelter": cp.snapshot.shelter,
+                "nourishment": cp.snapshot.nourishment,
+                "health": cp.snapshot.health,
+                "happiness": cp.snapshot.happiness,
+                "fulfillment": cp.snapshot.fulfillment,
+                "seasons_survived": cp.seasons_survived,
+                "peak_population": cp.peak_population,
+                "kittens_born": cp.kittens_born,
+                "kittens_matured": cp.kittens_matured,
+                "structures_built": cp.structures_built,
+                "bonds_formed": cp.bonds_formed,
+                "deaths_starvation": cp.deaths_starvation,
+                "deaths_old_age": cp.deaths_old_age,
+                "deaths_injury": cp.deaths_injury,
+            }),
+            None => serde_json::Value::Null,
+        }
+    };
+
+    // Ticket 490 — founder-dispersion canary windows. Spatial statistic
+    // the event-count canaries are structurally blind to (the cuddle
+    // puddle had flat courtship/grooming tallies). Window 0 contains the
+    // spawn clump and is expected low; verdict's floor check skips it.
+    let founder_dispersion_block = {
+        use crate::resources::founder_dispersion::DISPERSION_WINDOW_TICKS;
+        match world.get_resource::<crate::resources::FounderDispersionStats>() {
+            Some(stats) => serde_json::Value::Array(
+                stats
+                    .windows
+                    .iter()
+                    .map(|(window, (sum, n))| {
+                        serde_json::json!({
+                            "window_start_elapsed": window * DISPERSION_WINDOW_TICKS,
+                            "window_end_elapsed": (window + 1) * DISPERSION_WINDOW_TICKS,
+                            "mean_dist": if *n > 0 { sum / *n as f64 } else { 0.0 },
+                            "samples": n,
+                        })
+                    })
+                    .collect(),
+            ),
+            None => serde_json::Value::Null,
+        }
+    };
+
     // Ticket 410 — tick bounds. The header carries `start_tick`; the
     // footer historically did not, forcing consumers (verdict.py,
     // logq.py, ad-hoc agents) to pair footer with header to compute a
@@ -631,12 +693,30 @@ pub fn emit_headless_footer(world: &mut World) -> String {
     let final_tick = world.resource::<TimeState>().tick;
     let elapsed_ticks = final_tick.saturating_sub(start_tick);
 
+    // Perf-epic 480 — throughput surface. `Instant` never feeds sim
+    // state, so these fields are observability-only and cannot perturb
+    // seed determinism. `wall_elapsed_secs` is measured (not the
+    // configured `duration_secs` budget) so ticks_per_sec stays honest
+    // for wipeout-shortened runs.
+    let wall_elapsed_secs = world
+        .resource::<HeadlessRunStart>()
+        .0
+        .elapsed()
+        .as_secs_f64();
+    let ticks_per_sec = if wall_elapsed_secs > 0.0 {
+        elapsed_ticks as f64 / wall_elapsed_secs
+    } else {
+        0.0
+    };
+
     let event_log = world.resource::<EventLog>();
     let footer = serde_json::json!({
         "_footer": true,
         "start_tick": start_tick,
         "final_tick": final_tick,
         "elapsed_ticks": elapsed_ticks,
+        "wall_elapsed_secs": wall_elapsed_secs,
+        "ticks_per_sec": ticks_per_sec,
         "wards_placed_total": feature_count(Feature::WardPlaced),
         "wards_despawned_total": feature_count(Feature::WardDespawned),
         "ward_count_final": ward_count_final,
@@ -659,6 +739,8 @@ pub fn emit_headless_footer(world: &mut World) -> String {
         "continuity_tallies": event_log.continuity_tallies,
         "welfare_axes": welfare_axes,
         "colony_score": colony_score_block,
+        "colony_score_at_checkpoint": colony_score_checkpoint_block,
+        "founder_dispersion": founder_dispersion_block,
     });
 
     let footer_str = footer.to_string();

@@ -112,6 +112,8 @@ test-llm:
 test-verdict:
     python3 tests/verdict/test_colony_score_drift.py -v
     python3 tests/verdict/test_plan_failure_canary.py -v
+    python3 tests/verdict/test_throughput_drift.py -v
+    python3 tests/verdict/test_founder_dispersion.py -v
 
 # Ticket 229: similar.py chunkers + retrieval — pure-Python tests with
 # a deterministic fake embedder so the suite runs without downloading

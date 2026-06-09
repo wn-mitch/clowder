@@ -132,6 +132,21 @@ allocation hotspots — scratch-buffer reuse).
 - **205** — social_status_distress O(N²) (4.2% inclusive at HEAD — smaller
   than originally reported; reconfirm methodology before fixing)
 
+## Gate (landed 2026-06-09)
+The structural answer to "stairstep regressions surface weeks late":
+- Footer now carries `wall_elapsed_secs` + `ticks_per_sec`
+  (`emit_headless_footer`; `Instant` never feeds sim state).
+- `just verdict` gained a `throughput_drift` channel — prefers
+  `ticks_per_sec` (duration-invariant), falls back to `elapsed_ticks`
+  at matching `duration_secs` (works against every existing archive
+  baseline). Degradation-only bands: pass ≥ −15%, concern −15..−40%,
+  strong-concern < −40%; escalates the overall verdict to concern at
+  most (contention can fake a single-run dip; p90-across-runs remains
+  this epic's authoritative trend instrument).
+- `just promote` ratchets: refuses a baseline >15% slower than
+  `current.json` unless `--accept-throughput-regression` is passed —
+  the baseline lineage can no longer quietly absorb stairsteps.
+
 ## Children (landed against this epic)
 - **485** — track_sustained_copresence lazy + `last_touched_tick`
   (landed-at `d82cd645`, 2026-05-28). Inclusive 25.37% → 12.44%; 60s

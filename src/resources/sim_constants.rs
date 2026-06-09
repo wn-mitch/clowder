@@ -1987,6 +1987,27 @@ pub struct ScoringConstants {
     /// — the IAUS contest then yields to Eat at the stockpile.
     #[serde(default = "default_stockpile_satiation_scale")]
     pub stockpile_satiation_scale: f32,
+    /// Ticket 490 (R3) — `WorkPressureAffiliativeYield` threshold.
+    /// Physical-need pressure (`1 − phys_satisfaction`) floor below
+    /// which the modifier is a no-op. Above it, the affiliative DSE
+    /// class (Socialize, GroomOther) is multiplicatively damped so
+    /// bond-warmth-seeking *yields to productive pull* — a hungry/tired
+    /// founder leaves the clump to eat/forage/hunt instead of being
+    /// walked back by the social-deficit axes. Acts on the warmth-
+    /// seeking DRIVER score (visible in the L2 modifier trace), not on
+    /// eligibility — the 487 gate-only fix shifted bandwidth to Patrol;
+    /// this prices it into the need that's actually pulling.
+    #[serde(default = "default_work_pressure_affiliative_yield_threshold")]
+    pub work_pressure_affiliative_yield_threshold: f32,
+    /// Ticket 490 (R3) — maximum multiplicative damp
+    /// `WorkPressureAffiliativeYield` applies to Socialize/GroomOther at
+    /// physical-need pressure 1.0. The multiplier is
+    /// `(1 − suppression).max(0)` where `suppression =
+    /// ((pressure − threshold) / (1 − threshold)) × scale`. Asymmetric:
+    /// a fed, rested cat's affiliative scoring is untouched — warm
+    /// friends still converge off-hours.
+    #[serde(default = "default_work_pressure_affiliative_yield_scale")]
+    pub work_pressure_affiliative_yield_scale: f32,
     /// Ticket 146 — saturating-composition cap on the cumulative positive
     /// lift any one DSE can receive across the §3.5.1 modifier pipeline.
     /// `0.0` disables the cap (raw additive sum). With `0.30` and two
@@ -3177,6 +3198,9 @@ impl Default for ScoringConstants {
             fox_scent_suppression_scale: 0.8,
             stockpile_satiation_threshold: default_stockpile_satiation_threshold(),
             stockpile_satiation_scale: default_stockpile_satiation_scale(),
+            work_pressure_affiliative_yield_threshold:
+                default_work_pressure_affiliative_yield_threshold(),
+            work_pressure_affiliative_yield_scale: default_work_pressure_affiliative_yield_scale(),
             max_additive_lift_per_dse: default_max_additive_lift_per_dse(),
             body_distress_promotion_threshold: default_body_distress_promotion_threshold(),
             body_distress_promotion_lift: default_body_distress_promotion_lift(),
@@ -4184,6 +4208,24 @@ fn default_stockpile_satiation_threshold() -> f32 {
 /// to ~15% of their pre-modifier value.
 fn default_stockpile_satiation_scale() -> f32 {
     0.85
+}
+
+/// Ticket 490 (R3) — `WorkPressureAffiliativeYield` threshold. Physical-
+/// need pressure (`1 − phys_satisfaction`) floor below which affiliative
+/// scoring is untouched. 0.5 = the damp engages once the cat's
+/// physiological needs are less than half-satisfied — i.e. there is
+/// real work (eat / forage / hunt / sleep) being deferred.
+fn default_work_pressure_affiliative_yield_threshold() -> f32 {
+    0.5
+}
+
+/// Ticket 490 (R3) — `WorkPressureAffiliativeYield` scale. Maximum
+/// multiplicative damp on Socialize/GroomOther at pressure 1.0. 0.5
+/// halves affiliative scores at full physical-need pressure — enough
+/// for Eat/Forage/Hunt (which score *up* on the same hunger signal) to
+/// win the contest, without zeroing social behavior outright.
+fn default_work_pressure_affiliative_yield_scale() -> f32 {
+    0.5
 }
 
 /// Ticket 088 — `BodyDistressPromotion` Modifier threshold.
@@ -5474,6 +5516,21 @@ pub struct ColonyScoreConstants {
     pub den_shelter_radius: f32,
     pub activation_breadth_bonus: f64,
     pub activation_depth_bonus: f64,
+    /// Elapsed-tick mark at which `emit_colony_score` freezes a one-shot
+    /// `ColonyScoreCheckpoint` (snapshot + achievement ledger). Soaks are
+    /// fixed *wall-clock* (900 s), so end-of-run score is confounded with
+    /// binary throughput — both the `welfare × seasons` multiplier and the
+    /// achievement ledger grow with elapsed sim-time, and the 2026-05 63%
+    /// TPS regression deflated end-of-run aggregate ~30% with identical
+    /// behavior. The checkpoint is the TPS-invariant comparison surface
+    /// `just verdict` prefers when both runs carry it.
+    ///
+    /// 50_000 = 2.5 seasons (season transitions at 20k/40k/60k elapsed):
+    /// sits 10k ticks from the nearest integer-season boundary (avoids
+    /// knife-edge multiplier flips) and ~20% below the slowest observed
+    /// current run (~63k elapsed in 900 s), so every current binary
+    /// reaches it. 0 disables capture.
+    pub checkpoint_elapsed_ticks: u64,
 }
 
 impl Default for ColonyScoreConstants {
@@ -5490,6 +5547,7 @@ impl Default for ColonyScoreConstants {
             den_shelter_radius: 4.0,
             activation_breadth_bonus: 20.0,
             activation_depth_bonus: 5.0,
+            checkpoint_elapsed_ticks: 50_000,
         }
     }
 }

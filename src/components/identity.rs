@@ -16,6 +16,12 @@ pub struct Name(pub String);
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Species;
 
+/// Marker: this cat is one of the world-gen founders (ticket 490).
+/// Instrumentation-only — read by the founder-dispersion sampler in
+/// `emit_cat_snapshots`, never by sim behavior.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Founder;
+
 // ---------------------------------------------------------------------------
 // Age
 // ---------------------------------------------------------------------------

@@ -22,6 +22,40 @@ pub struct ColonyScoreSnapshot {
 }
 
 // ---------------------------------------------------------------------------
+// ColonyScoreCheckpoint — TPS-invariant fixed-elapsed-tick capture.
+// ---------------------------------------------------------------------------
+
+/// One-shot freeze of the full score state at
+/// `ColonyScoreConstants::checkpoint_elapsed_ticks` elapsed ticks.
+///
+/// Soaks run a fixed *wall-clock* budget, so the end-of-run score grows
+/// with binary throughput: both the `welfare × seasons` multiplier and
+/// the achievement ledger accumulate with elapsed sim-time. Freezing
+/// the snapshot **and the ledger counters** at a fixed sim-time mark
+/// makes the checkpoint a pure function of (seed, constants, behavior)
+/// — the comparison surface `just verdict` prefers when both runs carry
+/// it. The end-of-run snapshot remains alongside it (still useful as a
+/// "how far did we get" lens; just not TPS-comparable).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ColonyScoreCheckpoint {
+    /// Actual elapsed tick of capture (emission granularity is
+    /// `economy_interval`, so this lands at the first emission at or
+    /// after the configured constant).
+    pub captured_at_elapsed_tick: u64,
+    /// Welfare axes + aggregate as computed at the checkpoint emission.
+    pub snapshot: ColonyScoreSnapshot,
+    pub seasons_survived: u64,
+    pub peak_population: u64,
+    pub kittens_born: u64,
+    pub kittens_matured: u64,
+    pub structures_built: u64,
+    pub bonds_formed: u64,
+    pub deaths_starvation: u64,
+    pub deaths_old_age: u64,
+    pub deaths_injury: u64,
+}
+
+// ---------------------------------------------------------------------------
 // ColonyScore
 // ---------------------------------------------------------------------------
 
@@ -72,6 +106,16 @@ pub struct ColonyScore {
     /// before the first emission; populated each subsequent emission.
     #[serde(default)]
     pub last_snapshot: Option<ColonyScoreSnapshot>,
+    /// Absolute tick the run started at (≈ 1.2 M; seeded by
+    /// `build_new_world` beside `last_recorded_season`). Lets the
+    /// checkpoint capture compute *elapsed* ticks without a header
+    /// round-trip — ticks on disk are absolute, never zero-based.
+    #[serde(default)]
+    pub run_start_tick: u64,
+    /// TPS-invariant fixed-elapsed-tick capture. `None` until the run
+    /// crosses `checkpoint_elapsed_ticks`; captured exactly once.
+    #[serde(default)]
+    pub checkpoint: Option<ColonyScoreCheckpoint>,
 }
 
 impl ColonyScore {
