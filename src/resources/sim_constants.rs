@@ -1269,15 +1269,22 @@ impl Default for RelationshipsConstants {
             // a "stranger gathering" world that the design rejects.
             founder_fondness_min: 0.1,
             founder_fondness_max: 0.4,
-            // Lift familiarity off `[0.1, 0.3)` to straddle the Friends
-            // graduation gate (0.4): pairs with familiarity ≥ 0.4 AND
-            // fondness ≥ 0.3 graduate to BondType::Friends at the next
-            // bond_check_interval (50 ticks). This collapses the
-            // socialize_target novelty axis (1 - familiarity) from
-            // [0.7, 0.9) to [0.4, 0.6), removing the spawn-time
-            // "everyone is maximally novel" cuddle-puddle attractor.
-            founder_familiarity_min: 0.4,
-            founder_familiarity_max: 0.6,
+            // Ticket 490 (R1) — a TRUE straddle of the Friends
+            // graduation gate (0.4). The previous band [0.4, 0.6) sat
+            // entirely at/above the gate, so with fondness [0.1, 0.4)
+            // every sufficiently-fond founder pair graduated to
+            // BondType::Friends on the first bond check — and bonded
+            // pairs accrue passive `bond_proximity_social_warmth`,
+            // turning the whole founder set into one spatial attractor
+            // (dispersion collapsed 24 → 4.7 tiles: the bond-driven
+            // cuddle puddle). [0.3, 0.5) restores the struct-level
+            // comment's stated intent: ~half of pairs land Friends,
+            // half stay unbonded — founder heterogeneity. The novelty
+            // axis (1 − familiarity) reads [0.5, 0.7], still safely
+            // below the old over-socializing [0.7, 0.9) band that the
+            // original lift off [0.1, 0.3) was guarding against.
+            founder_familiarity_min: 0.3,
+            founder_familiarity_max: 0.5,
         }
     }
 }
@@ -4220,12 +4227,17 @@ fn default_work_pressure_affiliative_yield_threshold() -> f32 {
 }
 
 /// Ticket 490 (R3) — `WorkPressureAffiliativeYield` scale. Maximum
-/// multiplicative damp on Socialize/GroomOther at pressure 1.0. 0.5
-/// halves affiliative scores at full physical-need pressure — enough
-/// for Eat/Forage/Hunt (which score *up* on the same hunger signal) to
-/// win the contest, without zeroing social behavior outright.
+/// multiplicative damp on Socialize/GroomOther at pressure 1.0.
+///
+/// **Ships dormant (0.0 = identity transform).** The 2026-06-09
+/// first-light A/B (seed 42, 120 s, scale 0.5) hit the known
+/// Patrol-absorption cascade: freed bandwidth flowed to Patrol
+/// (13% → 22% of snapshots) and Flee (23% → 33%), Cook FELL
+/// (19% → 11%), and founder dispersion dropped below the ticket-490
+/// canary floor. The damp must price where the freed bandwidth lands
+/// before activation — see the 490 follow-on activation ticket.
 fn default_work_pressure_affiliative_yield_scale() -> f32 {
-    0.5
+    0.0
 }
 
 /// Ticket 088 — `BodyDistressPromotion` Modifier threshold.

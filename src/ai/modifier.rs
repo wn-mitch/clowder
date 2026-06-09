@@ -93,6 +93,11 @@ const TILE_CORRUPTION: &str = "tile_corruption";
 /// check. Centralising the constant here keeps the
 /// modifier-trigger surface alongside its peers.
 const FOOD_SCARCITY: &str = "food_scarcity";
+/// Ticket 490 — `WorkPressureAffiliativeYield` trigger input. The
+/// scalar surface publishes `Needs::physiological_satisfaction()` as
+/// `phys_satisfaction`; the modifier inverts it into physical-need
+/// pressure.
+const PHYS_SATISFACTION: &str = "phys_satisfaction";
 /// Ticket 088 — `BodyDistressPromotion` Modifier trigger input. The
 /// 087 perception substrate computes
 /// `interoception::body_distress_composite` as max of
@@ -1362,6 +1367,99 @@ impl ScoreModifier for StockpileSatiation {
 
     fn name(&self) -> &'static str {
         "stockpile_satiation"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkPressureAffiliativeYield
+// ---------------------------------------------------------------------------
+
+/// Ticket 490 (R3) — affiliative warmth-seeking yields to productive
+/// pull. Companion to `StockpileSatiation` on the social axis.
+///
+/// **Why:** Bonded cats accrue `social_warmth` passively near each other
+/// (`bond_proximity_social_warmth`) and bleed it at the isolation rate
+/// when apart — so a founder who walks away to forage watches its
+/// `social_deficit` / `social_warmth_deficit` axes spike, Socialize or
+/// GroomOther wins the next contest, and the bond-biased target picker
+/// walks it straight back to the clump. The elastic band never yields
+/// to work; founders huddle at ~4.7 tiles dispersion instead of the
+/// healthy ~24 ("cuddle puddle", ticket 490). The 487 fix gated
+/// GroomOther *eligibility* without touching this driver — the freed
+/// bandwidth flowed to Patrol, not work. This modifier acts on the
+/// driver: when the cat's own physical needs are pressing, the
+/// affiliative class scores down and the same hunger/energy signal
+/// that's pressing scores Eat/Forage/Hunt/Sleep *up*, so the freed
+/// bandwidth is pre-priced into work, not Patrol.
+///
+/// **Trigger:** physical-need pressure `1 − phys_satisfaction` above
+/// `work_pressure_affiliative_yield_threshold` (default 0.5).
+///
+/// **Transform:** multiplicative damp, same shape as
+/// `StockpileSatiation`:
+///   `score *= (1 − suppression).max(0.0)` where
+///   `suppression = ((pressure − threshold) / (1 − threshold)) × scale`.
+///
+/// **Applies to:** `socialize`, `groom_other` — the proximity-seeking
+/// affiliative class. **Not** Mate/courtship (mating-canary protection:
+/// the 2026-04 social-target-range change regressed MatingOccurred −67%
+/// by perturbing this contest), **not** Caretake (kitten welfare must
+/// never yield to the parent's own snack), **not** the fulfillment
+/// *accrual* systems (founders stay warm Friends — only the spatial
+/// pull yields).
+///
+/// **Asymmetry:** below threshold the modifier is a no-op, so a fed,
+/// rested colony converges and socializes exactly as before — "warm
+/// friends who range the map during the working day, converging when
+/// no productive pull exists."
+///
+/// **Gate semantics:** multiplicative damp is naturally safe on
+/// `score <= 0`; mirrors `StockpileSatiation`.
+pub struct WorkPressureAffiliativeYield {
+    threshold: f32,
+    scale: f32,
+}
+
+impl WorkPressureAffiliativeYield {
+    pub fn new(sc: &ScoringConstants) -> Self {
+        Self {
+            threshold: sc.work_pressure_affiliative_yield_threshold,
+            scale: sc.work_pressure_affiliative_yield_scale,
+        }
+    }
+
+    /// Suppression coefficient in `[0, 1]` given physical-need
+    /// pressure. Below `threshold` returns 0; above, scales linearly
+    /// to `scale` at `pressure = 1.0`.
+    fn suppression(&self, pressure: f32) -> f32 {
+        if pressure <= self.threshold {
+            return 0.0;
+        }
+        ((pressure - self.threshold) / (1.0 - self.threshold)) * self.scale
+    }
+}
+
+impl ScoreModifier for WorkPressureAffiliativeYield {
+    fn apply(
+        &self,
+        dse_id: DseId,
+        score: f32,
+        ctx: &EvalCtx,
+        fetch: &dyn Fn(&str, Entity) -> f32,
+    ) -> f32 {
+        if !matches!(dse_id.0, SOCIALIZE | GROOM_OTHER) {
+            return score;
+        }
+        let pressure = (1.0 - fetch(PHYS_SATISFACTION, ctx.cat)).clamp(0.0, 1.0);
+        let suppression = self.suppression(pressure);
+        if suppression <= 0.0 {
+            return score;
+        }
+        score * (1.0 - suppression).max(0.0)
+    }
+
+    fn name(&self) -> &'static str {
+        "work_pressure_affiliative_yield"
     }
 }
 
@@ -3960,6 +4058,15 @@ pub fn default_modifier_pipeline(
     // territory-pressure modifiers visually adjacent in the trace
     // output.
     pipeline.push(Box::new(StockpileSatiation::new(sc)));
+    // Ticket 490 (R3) — `WorkPressureAffiliativeYield` registers with
+    // the multiplicative damps, immediately after its template sibling
+    // `StockpileSatiation`. Same asymmetric threshold/scale shape, on
+    // the social axis: warmth-seeking (Socialize / GroomOther) yields
+    // when the cat's own physical needs are pressing, so bond-driven
+    // co-location stops out-competing eat/forage/hunt during the
+    // working day. Order among the damps doesn't load-bear (disjoint
+    // DSE matrices + disjoint trigger scalars).
+    pipeline.push(Box::new(WorkPressureAffiliativeYield::new(sc)));
     // The retired `apply_disposition_failure_cooldown` damped scores
     // *after* the existing modifier pipeline ran and *before* the
     // additive bonus passes. DispositionFailureCooldown registers here
@@ -4851,7 +4958,10 @@ mod tests {
         // 101: bumped 37 → 38 with `EnvironmentalQualityModifier`
         // (additive lift on Sleep/Idle/GroomSelf/GroomOther/Socialize
         // keyed on the five env-quality influence maps).
-        assert_eq!(pipeline.len(), 38, "expected 38 registered modifiers");
+        // 490: bumped 38 → 39 with `WorkPressureAffiliativeYield`
+        // (multiplicative damp on Socialize/GroomOther keyed on
+        // physical-need pressure — affiliative pull yields to work).
+        assert_eq!(pipeline.len(), 39, "expected 39 registered modifiers");
     }
 
     // -----------------------------------------------------------------------
@@ -4973,6 +5083,123 @@ mod tests {
             out, 0.0,
             "zero score stays zero — multiplicative damp is safe"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Ticket 490 (R3) WorkPressureAffiliativeYield
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn work_pressure_yield_no_damp_below_threshold() {
+        // The lonely-but-fed case MUST pass through untouched — a cat
+        // with satisfied physical needs keeps its full affiliative
+        // scoring (warm friends converge off-hours).
+        let modifier = WorkPressureAffiliativeYield {
+            threshold: 0.5,
+            scale: 0.5,
+        };
+        let (_, ctx) = test_ctx();
+        // phys_satisfaction = 0.8 ⇒ pressure = 0.2 (below threshold)
+        let fetch = |name: &str, _: Entity| match name {
+            PHYS_SATISFACTION => 0.8,
+            _ => 0.0,
+        };
+        let socialize = modifier.apply(DseId(SOCIALIZE), 0.7, &ctx, &fetch);
+        let groom = modifier.apply(DseId(GROOM_OTHER), 0.55, &ctx, &fetch);
+        assert!(
+            (socialize - 0.7).abs() < 1e-6,
+            "fed cat's Socialize unchanged; got {socialize}"
+        );
+        assert!(
+            (groom - 0.55).abs() < 1e-6,
+            "fed cat's GroomOther unchanged; got {groom}"
+        );
+    }
+
+    #[test]
+    fn work_pressure_yield_damps_affiliative_class_above_threshold() {
+        // phys_satisfaction = 0.2 ⇒ pressure = 0.8.
+        // suppression = (0.8 - 0.5) / 0.5 × 0.5 = 0.3
+        // Socialize 0.7 × 0.7 = 0.49; GroomOther 0.55 × 0.7 = 0.385
+        let modifier = WorkPressureAffiliativeYield {
+            threshold: 0.5,
+            scale: 0.5,
+        };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            PHYS_SATISFACTION => 0.2,
+            _ => 0.0,
+        };
+        let socialize = modifier.apply(DseId(SOCIALIZE), 0.7, &ctx, &fetch);
+        let groom = modifier.apply(DseId(GROOM_OTHER), 0.55, &ctx, &fetch);
+        assert!(
+            (socialize - 0.49).abs() < 1e-3,
+            "hungry cat's Socialize damped; got {socialize}"
+        );
+        assert!(
+            (groom - 0.385).abs() < 1e-3,
+            "hungry cat's GroomOther damped; got {groom}"
+        );
+    }
+
+    #[test]
+    fn work_pressure_yield_full_pressure_halves_affiliative_scores() {
+        // pressure = 1.0 ⇒ suppression = scale = 0.5 ⇒ score × 0.5.
+        let modifier = WorkPressureAffiliativeYield {
+            threshold: 0.5,
+            scale: 0.5,
+        };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            PHYS_SATISFACTION => 0.0,
+            _ => 0.0,
+        };
+        let socialize = modifier.apply(DseId(SOCIALIZE), 0.8, &ctx, &fetch);
+        assert!(
+            (socialize - 0.4).abs() < 1e-3,
+            "full-pressure Socialize halves; got {socialize}"
+        );
+    }
+
+    #[test]
+    fn work_pressure_yield_excludes_mate_caretake_and_work_dses() {
+        // Mate / courtship excluded for mating-canary protection (the
+        // 2026-04 social-target-range lesson: anything perturbing this
+        // contest must not touch Mate). Caretake excluded — kitten
+        // welfare never yields to the parent's own snack. Work DSEs
+        // (Hunt/Forage/Eat) are the *destination* of the freed
+        // bandwidth, never damped here.
+        let modifier = WorkPressureAffiliativeYield {
+            threshold: 0.5,
+            scale: 0.5,
+        };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            PHYS_SATISFACTION => 0.0, // pressure = 1.0
+            _ => 0.0,
+        };
+        for dse in [MATE, CARETAKE, HUNT, FORAGE, EAT, SLEEP, GROOM_SELF] {
+            let out = modifier.apply(DseId(dse), 0.5, &ctx, &fetch);
+            assert!(
+                (out - 0.5).abs() < 1e-6,
+                "dse {dse} (non-affiliative) unchanged; got {out}"
+            );
+        }
+    }
+
+    #[test]
+    fn work_pressure_yield_zero_score_stays_zero() {
+        let modifier = WorkPressureAffiliativeYield {
+            threshold: 0.5,
+            scale: 0.5,
+        };
+        let (_, ctx) = test_ctx();
+        let fetch = |name: &str, _: Entity| match name {
+            PHYS_SATISFACTION => 0.0,
+            _ => 0.0,
+        };
+        let out = modifier.apply(DseId(SOCIALIZE), 0.0, &ctx, &fetch);
+        assert_eq!(out, 0.0, "zero score stays zero");
     }
 
     #[test]

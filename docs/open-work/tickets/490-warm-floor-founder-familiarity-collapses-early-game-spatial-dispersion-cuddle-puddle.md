@@ -128,3 +128,23 @@ canaries stay green and `structures_built` does not drop.
   warm-floor `founder_familiarity` [0.4,0.6) over-graduates founder pairs to
   `BondType::Friends`, collapsing early-game dispersion 24→4.7 tiles; 487/488
   amplify. Courtship/grooming event counts and `structures_built` unaffected.
+- 2026-06-09: designer's call resolved — **R1 + R3 compose**, plus the
+  dispersion canary (pulled in from §Out-of-scope since the defect was
+  invisible to every existing gate). Implemented:
+  - **Canary**: `Founder` marker (spawn loop) + `FounderDispersionStats`
+    resource sampled inside `emit_cat_snapshots` (no new system —
+    schedule-edge discipline); footer `founder_dispersion` window blocks;
+    `just verdict` absolute floor (mean dist < 10 tiles in any
+    post-spawn ≥3000-elapsed window → concern).
+  - **R1**: `founder_familiarity` → [0.3, 0.5) — a true straddle of the
+    0.4 Friends gate (~half of pairs graduate); novelty axis reads
+    [0.5, 0.7], below the old over-socializing [0.7, 0.9).
+  - **R3**: `WorkPressureAffiliativeYield` registered ScoreModifier —
+    multiplicative damp on {Socialize, GroomOther} keyed on
+    `1 − phys_satisfaction` (threshold 0.5, scale 0.5), templated on
+    StockpileSatiation. Driver-level (the 487 lesson: gate-only fixes
+    shift bandwidth to Patrol); trace-visible; excludes Mate/Caretake;
+    accrual systems untouched so founders stay warm Friends.
+  Verification per §Verification pending: A/B dispersion recovery,
+  socialize win-share guard, mating/bond canaries, Patrol-absorption
+  check.
