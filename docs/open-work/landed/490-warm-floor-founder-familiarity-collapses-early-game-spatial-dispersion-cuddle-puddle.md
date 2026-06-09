@@ -1,7 +1,7 @@
 ---
 id: 490
 title: warm-floor founder familiarity collapses early-game spatial dispersion (cuddle puddle)
-status: ready
+status: done
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 25e5bd9c
+landed-on: 2026-06-11
 ---
 
 <!--
@@ -148,3 +148,28 @@ canaries stay green and `structures_built` does not drop.
   Verification per §Verification pending: A/B dispersion recovery,
   socialize win-share guard, mating/bond canaries, Patrol-absorption
   check.
+- 2026-06-09 (A/B results — premise re-verified at HEAD, outcome
+  reshaped): three 120 s seed-42 variants on the v0.3.0+wave binary via
+  `CLOWDER_OVERRIDES`, read through the new `founder_dispersion` footer:
+  - **control** (old band + R3 off): 21.5/17.2/12.5 tiles in the
+    +3000..12000 windows — **the 4.7-tile puddle no longer reproduces
+    at HEAD**. The intervening 494–497 Euclidean-migration landings
+    (opened after this ticket's diagnosis) evidently dissolved the
+    spatial attractor. Lesson re-learned: verify spatial premises at
+    HEAD before fixing ([[feedback_verify_spatial_premise]]).
+  - **R1-only**: identical to control within rounding — founder
+    familiarity saturates within the first few thousand ticks, so the
+    init band is behaviorally inert at HEAD. R1 ships anyway as intent
+    realignment (the constant now does what its comment says).
+  - **R1+R3 at scale 0.5**: Patrol-absorption cascade, full strength —
+    Patrol 13%→22% and Flee 23%→33% of snapshots, Cook 19%→11%,
+    dispersion 6.4/5.7 tiles (below the canary floor). The damp freed
+    affiliative bandwidth without pricing its destination; it landed in
+    Patrol/predator-exposure, not work — the exact failure
+    [[project_l3_patrol_absorption_cascade]] documents.
+  **Disposition**: canary landed (the durable fix — the defect class
+  can't go invisible again); R1 landed; **R3 ships dormant (scale
+  0.0)** with activation moved to a follow-on ticket that must price
+  the freed-bandwidth destination. Closing — the observed defect is
+  resolved upstream and now guarded.
+- 2026-06-11: canary + R1 landed; R3 dormant at scale 0.0 (Patrol/Flee absorption at 0.5 — follow-on 501); defect itself resolved upstream by 494-497, premise re-verified via the new dispersion footer

@@ -1,7 +1,7 @@
 ---
 id: 205
 title: social_status_distress perception cost — 25% per-tick slowdown from O(N) nearest-cat scan
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-06-11
 ---
 
 ## Why
@@ -65,3 +65,4 @@ Net asymptotic: **O(N²) per tick on the perception layer alone**, where N is th
 
 - 2026-05-07: Opened in the same commit that lands 109 Phase A's verification. Surfaced via `just verdict` reporting `duration_drift_pct: 25.0%` against `logs/tuned-42-pre-108-109`. Phase B sub-tickets (142/143/144) inherit this cost; optimizing once amortizes across the family.
 - 2026-05-19: accuracy audit pass — perception scalar location verified (src/systems/interoception.rs:316-405), structural-option candidates sound, investigation methodology correct.
+- 2026-06-11: closed overtaken-by-events: social_status_distress below samply_top report threshold (<2% inclusive) at logs/flamegraphs/42-bdc7125496d6/ — the 485/486/459 retirements removed the pressure that made it visible; no fix needed

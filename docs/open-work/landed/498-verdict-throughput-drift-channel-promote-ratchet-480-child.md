@@ -1,7 +1,7 @@
 ---
 id: 498
 title: verdict throughput-drift channel + promote ratchet (480 child)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 9cc21779
+landed-on: 2026-06-11
 ---
 
 ## Why
@@ -71,3 +71,4 @@ clause, `derive_next_steps` hint, text-mode line, stdlib-unittest file.
 - 2026-06-09: opened + implemented in the same session (instrumentation
   wave, pre-490/459 work). Bands deliberately wide; concern-cap rationale
   recorded in §Scope.
+- 2026-06-11: implemented same-session: footer tps fields, verdict throughput_drift (concern-capped), promote ratchet

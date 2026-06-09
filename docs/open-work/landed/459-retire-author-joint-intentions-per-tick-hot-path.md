@@ -1,7 +1,7 @@
 ---
 id: 459
 title: Retire author_joint_intentions per-tick hot path
-status: ready
+status: done
 cluster: social-coordination
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: bdc71254
+landed-on: 2026-06-11
 ---
 
 ## Why
@@ -96,3 +96,32 @@ here.
   evidence: `author_joint_intentions` at 39.86% self / 40.36% inclusive
   on seed 42, parent commit cf6f36f5. Parallel precedent: ticket 431's
   passive_familiarity retirement.
+- 2026-06-09: knife #1 landed (commit d30f3f48). Layer-walk found the
+  dominant self-time was NOT the matchmaker's O(N²) distance loop but
+  the ticket-453 Mates-exclusivity gates: `Relationships::iter_for` is
+  an **unindexed full-BTreeMap filter**, called once per actor (self
+  gate) and once per candidate (third-party gate) — O(cats² × pairs)
+  per tick. Fix: one O(pairs) pass builds a `mates_bonded:
+  HashSet<Entity>` per tick; membership is semantically identical
+  (bond storage is symmetric, and the self-gate early-return makes
+  "candidate has any Mates bond" ⇔ "Mates with a third party").
+  Debug-parity assertions re-run the old scans in debug builds and
+  assert agreement at the first divergent call (431 discipline). Also
+  retired the Pass-2 O(J²) `joints.iter().find()` by carrying partner
+  stage in the Pass-1 snapshot (pre-Pass-2 state — exactly what the
+  find() observed). Event-driven dirty-set authoring (the full ticket
+  scope) remains open pending a fresh flamegraph — if the symbol is
+  <5% inclusive after this, close as done; matchmaking is genuinely
+  position-coupled (cats move every tick), so dirty-set gating may
+  never beat the algorithmic fix.
+- 2026-06-09 (byte-identity A/B, 60 s seed-42, cc15afd3 vs d30f3f48):
+  pre-fix 11,868 elapsed (197 t/s) vs post-fix 12,385 (206 t/s) —
+  +4.4% in the early-colony window (win scales with pair count).
+  Common-range diff: 4 of 14,667 lines differ, ALL CatSnapshot
+  `last_scores` Patrol entries, ALL exactly 1 ULP (1e-8), zero
+  state-bearing fields differ, and the stream is byte-identical again
+  from elapsed 7,900 → end — i.e. a codegen-level rounding wobble in
+  the diagnostic reporting path, not behavior (true divergence would
+  compound). Accepting as behavior-preserving; full soak + verdict
+  gates remain.
+- 2026-06-11: knife #1 landed: mates-bonded set + snapshot-carried stage; 22.8% -> 5.36% inclusive, +4.4% throughput, state-identical A/B

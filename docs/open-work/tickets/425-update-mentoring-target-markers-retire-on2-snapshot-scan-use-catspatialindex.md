@@ -1,13 +1,13 @@
 ---
 id: 425
 title: update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex
-status: blocked
+status: ready
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-19
 parked: null
-blocked-by: [205]
+blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []

@@ -1,7 +1,7 @@
 ---
 id: 499
 title: TPS-invariant colony-score checkpoint (fixed elapsed-tick capture + verdict surface preference)
-status: ready
+status: done
 cluster: tooling-diagnostics-ui
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 9cc21779
+landed-on: 2026-06-11
 ---
 
 ## Why
@@ -78,3 +78,4 @@ verdict surface preference. Capture lives in
 - 2026-06-09: opened + implemented same session. 50k mark justified in
   the constant's doc comment; assessment doc records the
   effective-as-lens / ineffective-as-target verdict.
+- 2026-06-11: implemented same-session: checkpoint capture at 50k elapsed + verdict surface preference; assessment at docs/balance/colony-score-metric-assessment.md

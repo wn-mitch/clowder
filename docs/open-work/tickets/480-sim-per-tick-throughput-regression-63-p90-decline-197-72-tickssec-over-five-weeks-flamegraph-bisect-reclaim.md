@@ -125,12 +125,29 @@ allocation hotspots — scratch-buffer reuse).
   Lazy / event-driven eviction is the dominant lever.
 
 ## Children (open)
-- **486** — update_near_pair_cache death-retain via CatDied (13.3% inclusive)
-- **459** — retire author_joint_intentions per-tick hot path (22.8% inclusive,
-  down from 40% on 05-23 — partial taming already; now top knife at 25.4%
-  share post-485)
-- **205** — social_status_distress O(N²) (4.2% inclusive at HEAD — smaller
-  than originally reported; reconfirm methodology before fixing)
+- **486** — update_near_pair_cache death-retain via CatDied (13.3% inclusive
+  at the 05-28 profile; 5.4% at the 06-09 profile below)
+- **500** — Relationships::iter_for unindexed full-map scan — audit per-tick
+  call sites (opened from 459's layer-walk)
+
+## Children (closed 2026-06-09)
+- **459** — landed (knife #1): single-pass mates-bonded set retired the
+  O(cats²×pairs) iter_for scans. 22.8% → **5.36% inclusive**; 60 s A/B
+  +4.4% throughput (197 → 206 t/s) with byte-identical state in the
+  common range (4 lines of 1-ULP diagnostic last_scores wobble, zero
+  propagation).
+- **205** — closed overtaken-by-events: `social_status_distress` below
+  the samply_top report threshold (<2% inclusive) at
+  `logs/flamegraphs/42-bdc7125496d6/`.
+
+**2026-06-09 HEAD flamegraph** (`logs/flamegraphs/42-bdc7125496d6/`, 60 s seed-42):
+| # | symbol | self% | incl% | note |
+|---|---|---:|---:|---|
+| 1 | track_sustained_copresence | 18.8 | **19.0** | crept back post-485 (was 12.4) — re-knife candidate |
+| 2 | Relationships::modify_familiarity | 16.6 | **17.2** | BTreeMap entry churn — new knife, fold into 500's audit |
+| 3 | integrate_beliefs | 8.5 | 8.6 | grew from 1.9% at the 05-28 profile |
+| 4 | prey_ai / try_detect_cat | 7.7 | 8.0 | |
+| 5 | author_joint_intentions | 0.7 | 5.4 | post-459; remainder is matchmaker target scoring |
 
 ## Gate (landed 2026-06-09)
 The structural answer to "stairstep regressions surface weeks late":
