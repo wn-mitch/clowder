@@ -1,0 +1,166 @@
+# Clowder 0.4.0 — "Free Range": fluid locomotion + living predator-prey world
+
+## Context
+
+v0.3.0 was tagged 2026-06-09; 0.4.0 starts clean. The goal is a considerable leap in cat verisimilitude, with one hard requirement: **all creatures gain genuinely fluid free-range movement** — arbitrary headings, curved motion, momentum — not 8-direction tile-hopping, and not merely interpolated tile-hopping.
+
+**Repo state as of 2026-06-11 (post-0.3.0 landings already on main):**
+- **459 landed** (`bdc71254`): single-pass mates-bonded set retired the O(cats²×pairs) scans in `author_joint_intentions` — 22.8% → 5.36% inclusive, +4.4% throughput, byte-identical state. **205 closed** (overtaken: <2% at the post-459 flamegraph). **490 landed** (founder-dispersion fix; `WorkPressureAffiliativeYield` ships dormant at 0.0 — its activation is ticket 501, NOT in this release's scope).
+- **498/499 landed** (instrumentation): footer carries `ticks_per_sec`; `just verdict` gained a **`throughput_drift` channel** (pass ≥ −15%, concern to −40%); `just promote` **ratchets** (refuses baselines >15% slower without `--accept-throughput-regression`); founder-dispersion canary live.
+- **Baseline promoted 2026-06-11**: `post-459-490-instrumentation` (`logs/baselines/current.json`, commit `bdc71254`, dirty=true — dirt is the user's `scripts/logdb.py` mod, non-sim).
+- **480 knife table refreshed (06-09 flamegraph)**: #1 `track_sustained_copresence` 19.0% inclusive (crept back post-485 — re-knife), #2 `Relationships::modify_familiarity` 17.2% (new; folds into 500's audit), #3 `integrate_beliefs` 8.6% (grew from 1.9%), #4 `prey_ai`/`try_detect_cat` 8.0%, #5 `author_joint_intentions` remainder 5.4%. Open perf children: **500** (iter_for unindexed-scan audit), **486** (near_pair_cache death-retain).
+
+**Corpus review findings (vs `docs/systems/ai-substrate-refactor.md`):**
+- Epic 060 is ~82% landed. Remaining tracks: C3 retirement chain (291/292; 293/294 landed), JointIntention practices, §261 affordance activation. No significant overlaps — the corpus layers cleanly (L1 cues → L2 beliefs → L3 decisions).
+- Continuous-position epic (135): Phases 0–2 landed (137 render interp, 138 MovementBudget, 491 Vec2 newtype, 492/494 metric split) except cleanup 493. Phase 3 (140 steering) unblocks when 493 lands.
+- Ticket 466 subsumed by 493 (close as superseded). Ticket 351 is an unfilled template (fill + keep as extraction precursor to 310). **Ticket 304 unlandable** (needs nonexistent cat-vs-cat combat) — user approved descope + prerequisite ticket.
+
+**Movement verisimilitude assessment (drives the Phase II design):**
+1. *Heading quantization everywhere* — every position write is `Position::new(x±1, y±1)`: A* waypoints (`pathfinding.rs:252`), greedy `step_toward` (`:369`), `signum()` steppers in `wildlife.rs`/`prey.rs`/snake/hawk. Steering at raw A* waypoints would NOT fix this (consecutive waypoints are always 8-neighbors → headings stay at 45° multiples). Requires **path smoothing (string-pulling)**.
+2. *No momentum* — instant reversals (`wildlife.rs:158`), instant full-speed starts/stops. Requires persistent velocity + acceleration-limited steering.
+3. *No gaits* — stalk/stroll/flee all at 1.0 tile/tick; snake's 0.5 is tick-skipping (stutter). Requires per-action gait speed multipliers.
+4. *Tail-chasing pursuit* — chases aim at the target's current tile; nearest-pick at `wildlife.rs:234` is still Manhattan. Requires `pursue()` lead interception.
+5. *Teleport band-aids* — `jitter_if_stacked` (`patrol_to.rs:75`) teleports stacked cats; `flee_travel.rs:79` snaps the final tile. Replace with separation steering.
+6. *Tile-quantized perception* — `distance_to` AND `euclidean_distance` both measure between tile indices (`physical.rs:174` uses `tile()`, not world coords). Sub-tile geometry is invisible to perception.
+7. *Terrain shapes routes, not speed* — DenseForest costs 3× in A* but is crossed at full speed.
+8. *Stale doc* — `physical.rs:18` references a `SavedPosition` in persistence.rs that doesn't exist (Position serializes transparently; sub-tile positions already round-trip).
+
+**Metric consequence (load-bearing):** arbitrary headings force a **Euclidean speed clamp** (L∞ would make ground speed direction-dependent: +41% at 45°). Isotropic travel time then *inverts ticket 494*: the substrate-correct perception metric becomes world-space Euclidean again. `distance_to` pivots back (Chebyshev demoted to tile-tactical reads: strike range, reach-this-tick). Diagonal travel becomes √2 slower than the grid era — a deliberate, hypothesis-carried re-baseline (drift provably tied to verisimilitude, per the established methodology).
+
+**User decisions (locked):**
+- Bundle ALL THREE verisimilitude clusters: predator-prey living world (266/310/351), social belief/affordance wiring (264/265), C3 retirement (291/292; 304 descoped).
+- Bundle the 480 perf recovery — 0.4.0 must ship faster than 0.3.0 despite prey scoring + steering.
+- All creature types migrate to fluid movement (extends 140's scope to hawk, snake, prey, shadowfox).
+- Birds: radial teleport → fast continuous flight (`bird_burst_speed` ≈ 3.0, `Flying`).
+- Fluid movement means arbitrary headings + momentum, not waypoint-hopping (user correction on first plan draft).
+
+**Pre-existing working-copy state:** `scripts/logdb.py` is modified (user's change) — do not touch or commit it.
+
+---
+
+## Global landing sequence
+
+Each numbered item is a separately-committed, separately-soaked landing (jj, solo-to-main, conventional commits). Re-baseline points marked ⚑.
+
+### Phase I — Perf recovery first (banks budget for new per-tick cost)
+
+*(459 + 205 + baseline refresh already done on main — see Context. Remaining knives per the 06-09 table:)*
+
+1. **500** — `Relationships::iter_for` unindexed full-map-scan audit + the new `modify_familiarity` knife (17.2% inclusive — BTreeMap entry churn; the ticket names it fold-in scope). Classify per-tick call sites (per-actor / per-candidate / event-driven); hoist hot sites to once-per-tick precomputed sets (459's fix shape) or add a per-entity adjacency index. Gate: behavior-preserving (byte-identical stream where achievable) + flamegraph pre/post + verdict `throughput_drift` pass.
+2. **Copresence re-knife + 486** — `track_sustained_copresence` crept back to 19.0% post-485 (open a new child ticket against epic 480 per its knife discipline; diagnose why the 485 lazy-eviction fix eroded before re-fixing); **486** near_pair_cache death-retain via CatDied (5.4%). Watch `integrate_beliefs` (8.6%, grew from 1.9%) — Phases IV–V add belief writers on top of it; if it's still growing, knife it now. Gate: same as step 1.
+3. **484 disposition** ⚑ — the baseline was already refreshed + promoted (2026-06-11, `post-459-490-instrumentation`); after steps 1–2 land, re-promote from a clean post-perf commit and land/close 484 (its scope is satisfied by the promote lineage). The promote ratchet now guards this automatically.
+
+### Phase II — Fluid free-range movement (493 → 140 redesigned, extended to all movers)
+
+4. **493** — `step_toward` becomes thin `find_path` wrapper (`pathfinding.rs:369`), greedy fallback on A* `None`, signature unchanged. Close **466** as superseded (carry its gate: `TravelTo(*): no path and stuck ≤ 100`). Closes Phase 2 (139). Gate: zero-drift soak + verdict.
+5. **Steering + smoothing primitives (inert)** — new `src/ai/steering.rs`, pure functions + unit tests:
+   - `smooth_path(path, map, overlays) -> Vec<Vec2>` — string-pulling over the A* tile path: prune any waypoint whose predecessor→successor segment passes a **cost-aware supercover raycast** (every crossed tile passable AND terrain+overlay cost ≤ the pruned corridor's per-tile cost ceiling + epsilon — smoothing must never shortcut through fox-scent/corruption the router paid to avoid).
+   - `steer(vel, desired, max_accel) -> Vec2` — acceleration-limited velocity update (momentum; curved turns; no instant reversals).
+   - `seek/arrive/flee/wander` — desired-velocity generators with arbitrary headings; `wander` = current heading + bounded angular jitter (meander, not tile-hop).
+   - `pursue(pos, target_pos, target_vel, max_speed)` — lead interception toward predicted position.
+   - `separation(pos, neighbors, radius) -> Vec2` — personal-space force; will replace jitter-teleports.
+   - New `MovementConstants` in `sim_constants.rs`: per-species `max_speed` (cat/fox/hawk/shadowfox 1.0, snake 0.5, prey_ground 1.0, `bird_burst_speed` 3.0), per-species `max_accel` (~0.25 tiles/tick²; hawk higher), gait multipliers (`stalk_speed_mult` ~0.4, `sprint_speed_mult` ~1.4), `separation_radius` ~0.6, `waypoint_arrival_radius` 0.35, `path_recompute_min_ticks` 8, `path_recompute_target_drift_tiles` 3. `WildSpecies::default_movement_budget` → constants lookup. Gate: footer-identical soak (no consumers yet).
+6. **Integrator + components + first cat resolvers** —
+   - Components in `physical.rs`: `Velocity(Vec2)` — *persistent* actual velocity, integrator-owned; `DesiredVelocity(Vec2)` — written by decision layers, **consumed-and-cleared** by the integrator each tick (the bisectability invariant: unmigrated resolvers write `Position` directly and express no desire — no double-move; their Velocity decays to zero). `Flying` marker (terrain-exempt, bounds-clamp only). Fix the stale `SavedPosition` comment.
+   - `src/systems/movement.rs::integrate_velocities` at **head of Chain 4, before `emit_cat_moved_messages` (`simulation.rs:1781`)**: `vel = steer(vel, desired, max_accel)` clamped **Euclidean** to `MovementBudget.per_tick` (reinterpreted as max speed — `escape_viability` read survives); sub-stepped passability (anti-tunneling at burst speeds) with wall-slide (`(new.x,old.y)` → `(old.x,new.y)` → stop+zero velocity); consume desired.
+   - Migrate `resolve_travel_to` (goap.rs:8894), `patrol_to.rs`, `flee_travel.rs`: A* path → `smooth_path` → seek the furthest unpruned waypoint; pop within arrival radius. Remove the flee snap-to-target (`flee_travel.rs:79`). Patrol per-tile safety gain keys off movement progress. Resolver rustdoc (5-heading contract) updated.
+   - Gate: **four-artifact** — predictions: cardinal travel-time parity ±5%, diagonal legs ~√2 slower (verisimilitude-justified), continuity canaries ±10%, deterministic-replay green (extend `tests/integration.rs:120` to ≥1000 ticks with position traces in the byte-compared stream). Visual: `just run-game` — cats move in straight lines at arbitrary angles and curve through turns; zero staircase paths.
+7. **Remaining cat resolvers + separation + arrival audit** — goap.rs inline arms (~6876, 7275, 7560, 7660, ~9523), `src/steps/building/*`, `apply_remedy.rs`, `task_chains.rs`. **Delete `jitter_if_stacked` and arrival-jitter teleports** — replaced by a separation desired-velocity blend among co-located cats (retire the `cat_tile_counts` occupancy plumbing where it only served jitter). Arrival convention: containing-tile equality (Position Eq is tile-keyed — no test churn); adjacency = `chebyshev_distance <= 1` unchanged. Audit greps for `== target` / `= target;` / adjacency reads; review snake strike range, combat adjacency, feed/groom same-tile interactions. Gate: soak-trace + verdict + frame-diff vs step 6.
+8. **Perception metric pivot (494 inverted, deliberate)** — `distance_to` returns **world-space Euclidean** (`self.0.distance(other.0)`); `euclidean_distance` recomputed from world coords (currently tile-quantized); `tile_distance_squared` reviewed for order-equivalence (becomes Euclidean-squared); `chebyshev_distance` stays for tile-tactical reads (strike/reach-this-tick) — audit its call sites to confirm each is genuinely tactical. Update `physical.rs` rustdoc narrative (the 494 rationale now argues the other way: isotropic continuous movement ⇒ Euclidean is the substrate-correct metric). Gate: **four-artifact** — predictions: nearest-X picks shift at former Chebyshev ties (diagonal candidates no longer read as near as cardinal); Hunt/Forage/Social target selection drifts small; canaries ±10%. Own landing so frame-diff isolates metric drift from locomotion drift.
+9. **Fox, hawk, snake** — fox `step_toward` (steps/fox/mod.rs:27) → smoothed-path seek via DesiredVelocity; hawk `step_flying` → straight-line `seek` + `Flying` at spawn (single author point: `on_wild_animal_added`); snake `step_slithering` → continuous 0.5 speed (delete tick-skip budget gate — same average speed, no stutter). Gate: hypothesize — snake injuries / HawkDiveLanded / SnakeStrikeLanded ±10%; smoke tests green.
+10. **Prey ground + bird burst flight** — `prey.rs` set_tile sites (202, 432, 439, 521–570, 609) → DesiredVelocity writes (decision-side habitat checks stay; `graze_cadence` still gates when moves are authored; wander uses angular-jitter meander). `bird_teleport` → `PreyAiState::BurstFlight { target }` (same radial 5–8 target selection), birds get `Flying`, exhaustive-match arms updated (silent-canary rule). Gate: hypothesize — bird deaths-by-cat ≈ baseline (2–3 ticks airborne at 3.0 vs cat 1.0 — gap grows), ground-prey kill rates ±10%.
+11. **wildlife_ai (shadowfox legacy) + 310 seam** — all `signum()`/`Position::new(±1)` arms → DesiredVelocity headings (ward/`CatScentMap` lookahead reads stay tile-grid per epic constraint, sampling the tile ahead along the heading); fix the Manhattan nearest-pick at `wildlife.rs:234` → `distance_to`. Module rustdoc gains the 310 contract: *decision layers write `DesiredVelocity` via steering, never `Position`; `MovementBudget.per_tick` is the speed cap.* Gate: hypothesize — `ShadowFoxAmbush ≤ 10` holds, ward-avoidance rates ±10%.
+12. **Gaits + pursuit + terrain speed** —
+    - Gait selection per resolver: Hunt stalk phase at `stalk_speed_mult` (slow sinuous approach), pounce/Flee at `sprint_speed_mult`, default walk at 1.0. Wires into the stalk-cadence sites in hunt resolvers (replaces tick-gated stalking).
+    - Hunt chase + fox pursuit switch `seek(target_pos)` → `pursue(target_pos, target_vel)` (lead interception).
+    - Integrator samples containing-tile `movement_cost()` → speed multiplier (Grass 1.0, DenseForest ~0.6, Rock ~0.5; constants) — terrain finally costs speed, not just route preference.
+    - Gate: **four-artifact** — predictions: Hunt success +5–15% (interception + gait contrast), pursuit durations shift, flee survival up modestly; canaries ±10%.
+13. **Budget retirement + recompute throttling + render check + perf gate** ⚑ — delete `MovementBudget` accumulator/`try_spend_step`; retire per-tick `accumulate_movement_budget`; A* recompute only on target drift > N tiles or M ticks. Render: with true velocity motion, per-tick smoothstep easing in `entity_sprites.rs` will pulse — switch velocity-movers to linear interpolation. Final `rg "set_tile\|Position::new" src/` sweep of mover code (only spawn/scenario-legit sites remain). **Flow-field pursuit stays deferred** (follow-on ticket; steering is source-agnostic). Gate: ticks/sec vs Phase-I baseline net-neutral-or-better. Re-baseline + promote.
+
+### Phase III — C3 retirement chain
+
+14. **292** — RecentTargetFailures → ContextBeliefs predictability. Emit-sites first (behavior-neutral: `WitnessableEvent::TargetActionFailed` at `plan_substrate/lifecycle.rs:50,96`), then one-commit cutover (sensor re-read + 6 target-DSE component swap + delete component/spawn-insert/prune system). Known granularity loss (action-keyed → target-keyed); pre-registered pivot: `EnvironmentalContextKey::ActionExecution(GoapActionKind)` if concordance fails. Gate: four-artifact.
+15. **291** — ColonyKnowledge promotion via mental-model agreement (quorum=3 within epsilon at strength threshold) replacing carrier-count + Memory scan; public API preserved; `KnowledgePromoted/Forgotten` Feature hooks must fire on the new path (silent-canary exposure); mythic-texture canary is the sensitive gate. Gate: four-artifact; Jaccard ≥ ~80% vs legacy set; false-belief scenario proves the new capability.
+16. **304 descope ceremony** — `just open-ticket` for "cat-vs-cat aggression substrate" (adjacent to 267 escalation rungs, targeted 0.5.0); re-block 304 on it.
+
+### Phase IV — Social + wildlife belief/affordance wiring (263's dormant-then-activate pattern)
+
+17. **264 dormant wire** — per-target axes at weight 0.0: `socialize_target.rs` (affiliation_history + Affordance(Socialize)), `groom_other_target.rs` (+perceived_hostility), `mate_target.rs` (perceived_receptivity), `mentor_target.rs`, `caretake_target.rs` (perceived_injury_level replaces raw-HP read), `dependent_kitten_target.rs` (Affordance(FeedKitten)). Three silent-inert traps checked per commit: dispatcher branch, `ctx_scalars` population, Feature classification. Gate: verdict null-drift.
+18. **265 dormant wire (fox/hawk/snake; shadowfox slice moves into 310)** — commit 1: affordance scalars into species scorers at weight 0.0; commit 2: wildlife-side beliefs (insert `CatBeliefs::default()` at wildlife spawn, extend `belief_integrator` witness queries, violence priors) — reader+writer same commit. Gate: verdict null-drift.
+19. **314 + writer extensions** — `affordance_writer.rs`: `write_cat_vs_prey` (Stalk/Chase/Pounce), `write_wildlife_vs_prey` (Chase), `write_prey_perceiver` (Bolt/ScatterGroup heuristics — speed-ratio inputs now real numbers thanks to Phase II); prey get `PredatorBeliefs` at spawn with priors via integrator Implant pass. All dormant. Keep prey rows in existing Chain-2b slot; spatial prefilter if pair count blows up. Gate: verdict null-drift.
+20. **264 activations** — per-DSE lifts, ordered Socialize → GroomOther → Mate (verify 027 Mate-cadence canary) → Mentor/Caretake/FeedKitten. Gate: four-artifact + frame-diff each.
+21. **265 activations** — per-species lifts. Gate: four-artifact each (`wildlife_species_clash` scenario, ShadowFoxAmbush ≤ 10, wildlife-mortality canary). If a wildlife focal-trace harness gap surfaces, open a tooling ticket — don't smuggle it in.
+
+### Phase V — Predator-prey living world
+
+22. **351** — fill template, then mechanical extraction: `wildlife.rs` shadowfox branches (`wildlife_ai` 72–430, `predator_stalk_cats` 1629+, coherence/motivation ticks 1091+) → `src/systems/shadow_fox_ai.rs`. Registrations stay **in place within existing `.chain()` blocks** (schedule-edge hazard). Gate: byte-identical event stream in common tick range (485 precedent).
+23. **310 staged** (four-artifact per behavior-affecting stage):
+    - S1 satiation: extend `ShadowFoxDrives` (components/wildlife.rs:229) as a **fifth input to the existing 023 four-drive softmax**; set on ambush/prey-kill, decay on the 16-tick cadence; `ShadowFoxConstants` tunables.
+    - S2 den + retreat: `ShadowFoxDen` spawned entity at corruption-saturated origin (FoxDen precedent); retreat intention `SingleMinded` until arrival; motion via `steering::arrive` through DesiredVelocity (consumes the step-11 contract).
+    - S3 ambush memory: bespoke `ShadowFoxBeliefs` component (den, last_kill_site+tick, last_ward_encounter) — documented migration path to MentalModel; kill-site avoidance as a **named trace-visible consideration**, not movement-layer if-statement.
+    - S4 DSE-shaped scoring + time-of-day: `src/ai/shadowfox_scoring.rs` mirroring `fox_scoring.rs` (own dispatcher — silent-inert rule); DSEs `shadowfox_{hunt,retreat,patrol}.rs` in DseRegistry; absorbs 265's shadowfox affordance slice; twilight/night weighting via `day_phase_scalar` precedent. New Features default `expected_to_fire_per_soak=false`.
+    - S5 retire the `ward_positions × shadow_fox_ward_repel_multiplier` snapshot in `predator_stalk_cats` → `WardCoverageMap` reads (pillar 2: substrate first, hack retires second). Prediction: ambushes spread across run, not waves; hard gate `ShadowFoxAmbush ≤ 10`.
+24. ⚑ Re-baseline + promote (stable-predator baseline for 266).
+25. **266** — prey AI. Parallel light scorer `src/ai/prey_scoring.rs` (fox_scoring template), NOT `evaluate_and_plan`. **Alert-set gating** (only prey with a live detected predator are scored) + `prey_ai_cadence_ticks=8` within the set. Election writes `PreyAiState::{Bolting,Scattering}`; resolution authors DesiredVelocity via `steering::flee`/cover-seek — prey bolt in arcs away from the predator's heading, scatter breaks pursuit lock against `pursue()`-armed cats. Land Bolt first, then ScatterGroup. Gate: four-artifact vs post-310 baseline — Hunt-success drop ≤30%, **`Starvation == 0` hard**, frame-diff shows cat Hunt scoring *shape* stable; per-PreyKind thresholds only if uniform fails.
+
+### Phase VI — Release ceremony
+
+26. **Perf release gate** — flamegraph + perf soak at RC: p90 ticks/sec > the v0.3.0 tag's p90 (`just logdb-chart soak-throughput-over-time` is the authoritative trend instrument; the verdict `throughput_drift` channel and promote ratchet enforce per-landing, but the release gate is the cross-run p90). HEAD is already ahead of the tag (459 landed post-tag) — the gate verifies Phases II–V didn't spend more than Phase I banked.
+27. ⚑ **`just baseline-dataset v0.4.0`** + promote.
+28. **Land all tickets** — `just land` each (clears blocked-by on dependents + regen index); `just similar-build` once at end; `just wiki` (SimulationPlugin changed).
+29. **CHANGELOG.md** 0.4.0 entry; `Cargo.toml` 0.3.0 → 0.4.0; commit; annotated tag `v0.4.0`, `jj git push` + push tag. New `docs/systems/movement.md` documenting Velocity/DesiredVelocity, smoothing, gait, arrival, and metric conventions.
+
+---
+
+## Key design decisions (already made, with rationale)
+
+| Decision | Choice | Why |
+|---|---|---|
+| Fluid headings | A* path → **string-pulled corridor** → steer at furthest visible waypoint | Raw A* waypoints are always 8-neighbors → headings stay 45°-quantized; smoothing is what breaks the staircase. Cost-aware raycast so smoothing can't shortcut through overlay costs. |
+| Momentum | Persistent `Velocity` + consumed `DesiredVelocity`, acceleration-limited `steer()` | Curved turns, real flee arcs, no instant reversals — and preserves per-resolver bisectability (no desire = no move). |
+| Speed clamp metric | **Euclidean** | Arbitrary headings make L∞ anisotropic (+41% ground speed at 45°). Diagonal travel √2 slower than grid era — hypothesis-carried re-baseline. |
+| Perception metric | `distance_to` pivots to world-space Euclidean (494 inverted); Chebyshev stays for tile-tactical reads | Perception must match actual (now isotropic) locomotion; also fixes tile-quantized `euclidean_distance`. Own landing for clean drift attribution. |
+| Crowding | Separation steering force; delete jitter/arrival teleports | Continuous positions make "stacking" a non-event; personal space emerges instead of teleporting. |
+| Gaits | Per-action speed multipliers (stalk ~0.4 / walk 1.0 / sprint ~1.4) + terrain speed multiplier | Gait contrast is core cat verisimilitude; replaces tick-skip stutter; terrain finally costs speed. |
+| Pursuit | `pursue()` lead interception for Hunt chase + fox | Tail-chasing reads as dumb; interception + prey Bolt arcs (266) produce real chase geometry. |
+| Integrator placement | Head of Chain 4, before `emit_cat_moved_messages` | After every decision writer; CatMoved/NearPairCache see post-move positions same tick; render interp unchanged. |
+| Arrival | Containing-tile equality (Position Eq already tile-keyed) | Zero test churn; adjacency checks survive. |
+| Flow-field pursuit (140 §4) | Deferred to follow-on ticket | Worst perf shape in a perf-pinned release; covered by RouteCostField + recompute throttle. |
+| Prey scoring entry | Parallel light scorer + alert-set gating + cadence | `evaluate_and_plan` drags GOAP/markers prey don't need; idle prey never scored. |
+| 351 vs 310 | Separate: extraction first, byte-identical gate | Mixing code-motion with balance stages destroys frame-diff attribution. |
+| 304 | Descoped (user-approved); prerequisite ticket opened | Emit site requires nonexistent cat-vs-cat combat. |
+
+## Critical files
+
+- `src/components/physical.rs` — Velocity, DesiredVelocity, Flying; metric pivot; tile-keyed Eq (arrival convention; add cross-ref doc-comment); fix stale SavedPosition comment
+- `src/ai/steering.rs` (new) — smooth_path, steer, seek/arrive/flee/wander/pursue/separation; `src/systems/movement.rs` (new) — integrator
+- `src/ai/pathfinding.rs` — 493 wrapper; supercover raycast helper
+- `src/plugins/simulation.rs` — Chain-4 integrator insertion (~:1781); registration discipline
+- `src/systems/goap.rs` — resolve_travel_to:8894 + four inline walk arms
+- `src/steps/{disposition,building,magic,fox,hawk,snake}/` — resolver migration set
+- `src/systems/prey.rs`, `src/systems/wildlife.rs` → `src/systems/shadow_fox_ai.rs` (new)
+- `src/systems/affordance_writer.rs` — cat→prey / wildlife→prey / prey-perceiver extensions
+- `src/ai/fox_scoring.rs` (template) → `src/ai/prey_scoring.rs`, `src/ai/shadowfox_scoring.rs` (new dispatchers)
+- `src/ai/joint_intention.rs` — 459 perf knife
+- `src/ai/dses/` — 264 wiring sites + new `prey_bolt.rs`, `prey_scatter_group.rs`, `shadowfox_*.rs`
+- `src/resources/sim_constants.rs` — MovementConstants, ShadowFoxConstants, PreyConstants additions
+- `src/components/movement_budget.rs` — accumulator retirement; `src/rendering/entity_sprites.rs` — interpolation mode check
+
+## Verification (binds every landing)
+
+- Per landing: `just check && just test`; `just soak-trace 42 <focal matching baseline>` + `just verdict` (hard gates: Starvation==0, ShadowFoxAmbush≤10, footer written, never-fired==0; continuity canaries ≥1: grooming/play/mentoring/courtship). Soak pre-flight: focal cat in roster + fresh `cargo build --release` after each commit.
+- Balance-affecting steps (6, 8, 9–12, 14–15, 20–21, 23, 25): four-artifact `just hypothesize` + frame-diff + balance doc. Behavior-neutral steps (1–2, 4–5, 17–19, 22): verdict null-drift (byte-identical stream where stated).
+- Perf steps: flamegraph pre/post + 60–120s perf soak; rates divide by `elapsed_ticks`, never `final_tick`. The verdict `throughput_drift` channel (498) runs on every soak automatically; `just promote` ratchets baselines — pass `--accept-throughput-regression` only with a written justification (none expected this release).
+- Determinism: extended `simulation_is_deterministic` (≥1000 ticks, position traces in byte-compared stream) green throughout.
+- Final visual pass: `just run-game` — arbitrary-angle straight lines, curved turns, stalk-slow/sprint-fast gait contrast, prey bolting in arcs, birds flying, shadowfox hunting/retreating with intent; **zero staircase paths, zero teleports**.
+
+## Top risks
+
+1. **Metric pivot drift (step 8)** — every nearest-X pick and range gate shifts. Own landing + four-artifact isolates it; Chebyshev call-site audit prevents accidental tactical-read regressions.
+2. **266 starves cats** — dormant-wire first, post-310 baseline, ≤30% Hunt-drop + Starvation==0 gates, per-PreyKind knobs in reserve. (Pursuit interception in step 12 partially offsets prey competence.) Perf note: `prey_ai`/`try_detect_cat` is already 8.0% inclusive at the 06-09 flamegraph *before* prey scoring exists — alert-set gating is load-bearing, and 266's perf soak should watch this frame specifically.
+3. **310 S5 re-opens 7-cat ambush waves** — lands last in stage order, after satiation/den/memory.
+4. **One-tick arrival latency + momentum** — decisions observe movement one integrator pass later; acceleration cap means short hops take an extra tick or two. Watchdogs absorb it; budget scenario-test tick adjustments; seed-42 softmax perturbation expected at steps 6–8 (the hypothesize gates carry it).
+5. **Silent-inert axes** — three traps per new DSE commit: dispatcher branch, ctx_scalars population, Feature classification.
+6. **Schedule-edge perturbation** — every new system enters existing `.chain()` blocks.
+7. **Smoothing-overlay interaction** — cost-ceiling raycast is the guard; add a unit test: smoothed path through a fox-scent field never crosses tiles above the corridor ceiling.
+8. **Release size** — 29 landings, each independently soaked and bisectable; ⚑ re-baselines cap drift-attribution blast radius. Natural deferral line if needed: Phase IV activations (20–21) ship landed-dormant.
