@@ -33,10 +33,19 @@ fn setup(world: &mut World, seed: u64) {
 
     // Near-certain snap on the first missed strike so the branch is
     // deterministically exercised (production default is 0.04).
-    world
-        .resource_mut::<crate::resources::sim_constants::SimConstants>()
-        .combat
-        .bone_weapon_snap_chance_on_miss = 0.95;
+    {
+        let mut constants = world.resource_mut::<crate::resources::sim_constants::SimConstants>();
+        constants.combat.bone_weapon_snap_chance_on_miss = 0.95;
+        // 493 follow-up: a missed strike must actually OCCUR for the
+        // snap roll to run. Under A*-first chase stepping the seed-42
+        // trajectory landed 5/5 clean catches and the snap branch was
+        // never entered — the scenario rode hunt-outcome luck. Zero
+        // the pounce skill terms so strikes reliably miss (same
+        // load-the-dice philosophy as the 0.95 snap chance above; the
+        // test asserts the snap + trace row, not catch success).
+        constants.disposition.pounce_skill_base = 0.02;
+        constants.disposition.pounce_skill_scale = 0.0;
+    }
 
     {
         use crate::resources::map::{Terrain, TileMap};

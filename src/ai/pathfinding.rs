@@ -343,7 +343,47 @@ pub fn find_path(
 // Greedy step-toward pathfinding
 // ---------------------------------------------------------------------------
 
-/// Move one tile closer to `to` using greedy directional preference.
+/// Move one tile closer to `to` along the A*-planned route, with the
+/// legacy greedy step as fallback (ticket 493 — 135 Phase 2c).
+///
+/// Consults [`find_path`] once and returns the first waypoint of the
+/// returned route — the same cost surface the router uses
+/// (`terrain.movement_cost() + sum(overlays)`), so per-tick chase steps
+/// no longer strand in concave-terrain local minima while travel plans
+/// route around them. Falls back to the greedy directional step when A*
+/// returns `None` (target impassable / unreachable / out of bounds —
+/// e.g. chasing prey that just entered an enclave), preserving the
+/// pre-493 "keep pressing toward it" behavior instead of freezing.
+///
+/// Contract preserved from the greedy era: returns `None` when
+/// `from == to`, and `None` when every option is blocked (the entity is
+/// stuck). Signature unchanged — callers (hunt-chase arms in goap.rs /
+/// disposition.rs) need no changes. Phase 3 (#140) replaces tile-step
+/// consumption with steering over smoothed paths; this wrapper is the
+/// API shape that work consumes.
+pub fn step_toward(
+    from: &Position,
+    to: &Position,
+    map: &TileMap,
+    overlays: &[WeightedOverlay<'_>],
+) -> Option<Position> {
+    if from == to {
+        return None;
+    }
+
+    if let Some(path) = find_path(*from, *to, map, overlays) {
+        // Non-empty by construction: `from != to` and `find_path`
+        // excludes `from` itself from the returned waypoints.
+        if let Some(&first) = path.first() {
+            return Some(first);
+        }
+    }
+
+    greedy_step_toward(from, to, map, overlays)
+}
+
+/// The pre-493 greedy directional step — retained verbatim as
+/// `step_toward`'s fallback for A*-`None` cases.
 ///
 /// Considers candidates in directional order:
 /// 1. Diagonal step (dx, dy)
@@ -365,8 +405,8 @@ pub fn find_path(
 /// out-of-bounds or impassable (the entity is stuck).
 ///
 /// This is intentionally simple — it is not A* and will get stuck in local
-/// minima (e.g. concave obstacles). That is acceptable for Phase 1.
-pub fn step_toward(
+/// minima (e.g. concave obstacles).
+pub fn greedy_step_toward(
     from: &Position,
     to: &Position,
     map: &TileMap,
@@ -544,7 +584,10 @@ mod tests {
     }
 
     /// When target is directly north and the vertical step is blocked,
-    /// step_toward must return None — not the current position.
+    /// the GREEDY step must return None — not the current position.
+    /// (493: the invariant moved to `greedy_step_toward`; the
+    /// `step_toward` wrapper now routes AROUND the obstacle — see
+    /// `step_toward_routes_around_blocking_tile`.)
     #[test]
     fn returns_none_when_cardinal_blocked_and_axis_aligned() {
         let mut map = open_map();
@@ -555,10 +598,35 @@ mod tests {
         let from = Position::new(5, 5);
         let to = Position::new(5, 0);
 
-        let result = step_toward(&from, &to, &map, &[]);
+        let result = greedy_step_toward(&from, &to, &map, &[]);
         assert!(
             result.is_none(),
             "expected None when only vertical candidate is blocked on axis-aligned path, got {result:?}"
+        );
+    }
+
+    /// Ticket 493 — the wrapper's whole point: where greedy strands
+    /// (single blocking tile on an axis-aligned path), A*-first
+    /// `step_toward` returns a detour step that still makes geometric
+    /// progress.
+    #[test]
+    fn step_toward_routes_around_blocking_tile() {
+        let mut map = open_map();
+        map.set(5, 4, Terrain::Water);
+
+        let from = Position::new(5, 5);
+        let to = Position::new(5, 0);
+
+        let next = step_toward(&from, &to, &map, &[])
+            .expect("A*-first step_toward must route around the water tile");
+        assert_ne!(next, from, "must actually move");
+        assert!(
+            map.get(next.x(), next.y()).terrain.is_passable(),
+            "step must land on passable terrain"
+        );
+        assert!(
+            next.euclidean_distance(&to) < from.euclidean_distance(&to),
+            "detour step {next:?} should still close distance to {to:?}"
         );
     }
 
@@ -734,12 +802,13 @@ mod tests {
         );
     }
 
-    /// At `&[]`, `step_toward` returns the first passable candidate in
+    /// At `&[]`, the GREEDY step returns the first passable candidate in
     /// directional order — diagonal first, even when the diagonal is on
     /// expensive terrain (DenseForest=3) and the cardinal is on grass (1).
-    /// This is the no-op-at-`&[]` invariant: the substrate refactor must
-    /// not change fox movement (which always passes `&[]`) at terrain
-    /// boundaries.
+    /// This is the 222 no-op-at-`&[]` invariant, which 493 moved to
+    /// `greedy_step_toward` (the fallback). The `step_toward` wrapper
+    /// deliberately routes on the A* cost surface instead — terrain-
+    /// boundary drift is 493's verdict-gated behavior change.
     #[test]
     fn step_toward_empty_overlay_preserves_direction_order() {
         let mut map = open_map();
@@ -752,7 +821,7 @@ mod tests {
         let from = Position::new(0, 0);
         let to = Position::new(2, 2);
 
-        let next = step_toward(&from, &to, &map, &[]).expect("should find a step");
+        let next = greedy_step_toward(&from, &to, &map, &[]).expect("should find a step");
         assert_eq!(
             next,
             Position::new(1, 1),

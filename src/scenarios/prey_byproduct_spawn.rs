@@ -68,7 +68,13 @@ pub static SCENARIO_BIRD: Scenario = Scenario {
     // drops on Grass/forest tiles) shifts bird-hunt timing past the
     // original 200-tick window. Mouse/Rat/Rabbit still land in time
     // (more guaranteed hits per pounce); Bird is more brittle.
-    default_ticks: 300,
+    //
+    // 493: bumped 300 → 800 (the number 494 used for the rat sibling's
+    // unit test). A*-first `step_toward` re-times the chase against the
+    // bird's radial-teleport escape; the first bird kill slips past 300
+    // on seed 42. Plan.md step 10 replaces the teleport with burst
+    // flight and will re-time this again.
+    default_ticks: 800,
     setup: setup_bird,
     expected_features: &["ByproductSpawned"],
 };
@@ -296,9 +302,12 @@ mod tests {
     /// time but Bird is more brittle (longer pre-pounce stalk + lower
     /// catch chance per `PreyProfile`). The extended budget keeps the
     /// per-row coverage of the byproduct table intact.
+    ///
+    /// 493: 300 → 800 alongside the scenario's `default_ticks` bump —
+    /// A*-first `step_toward` re-times the chase vs the bird teleport.
     #[test]
     fn bird_kills_produce_feather_and_bone() {
-        let report = run(&SCENARIO_BIRD, None, Some(300), 42);
+        let report = run(&SCENARIO_BIRD, None, Some(800), 42);
         // Ticket 494 — derive kill count from the *cat's bird meat
         // count* rather than the global `ByproductSpawned` canary.
         // The canary counts every byproduct firing in the world,
