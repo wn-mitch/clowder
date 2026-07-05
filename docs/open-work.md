@@ -15,10 +15,10 @@ _Last generated: 2026-07-05._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 119 |
+| Ready | 118 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **165** |
+| **Open total** | **164** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -39,9 +39,9 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
-- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
-- **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · score 0.90_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · score 0.90_
 - **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · score 0.90_
 
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (119)
+## Ready by cluster (118)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -106,7 +106,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
 - **[501](docs/open-work/tickets/501-workpressureaffiliativeyield-first-light-activation-price-the-freed-bandwidth-destination-patrolflee-absorption-at-scale-05.md)** — WorkPressureAffiliativeYield first-light activation — price the freed-bandwidth destination (Patrol/Flee absorption at scale 0.5) — _[ai-substrate] · added 2026-06-11_
 - **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
-- **[506](docs/open-work/tickets/506-nearpaircache-admits-prey-and-items-26k-of-26k-pairs-are-non-cat-social-pipeline-does-x800-phantom-work-and-cats-accrue-meaningless-prey-familiarity-480-child.md)** — NearPairCache admits prey and items — 26k of 26k pairs are non-cat; social pipeline does x800 phantom work and cats accrue meaningless prey familiarity (480 child) — _[ai-substrate] · added 2026-07-05_
+- **[507](docs/open-work/tickets/507-recalibrate-social-perception-and-welfare-constants-against-undiluted-post-506-inputs-fulfillment-38pct-happiness-13pct-social-status-distress-live-for-the-first-time.md)** — Recalibrate social-perception and welfare constants against undiluted post-506 inputs (fulfillment -38pct, happiness -13pct, social_status_distress live for the first time) — _[ai-substrate] · added 2026-07-05_
 
 ### social-coordination (17 ready, 4 blocked)
 
@@ -226,10 +226,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
-### diagnostics-and-tooling (1 ready)
-
-- **[484](docs/open-work/tickets/484-refresh-seed-42-verdict-baseline-post-017463470472260-substrate-landings.md)** — Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings — _[diagnostics-and-tooling] · added 2026-05-27_
-
 ## Ready by initiative (83 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
@@ -344,7 +340,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (119)
+## Ready (118)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -459,12 +455,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
 - **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
-- **[484](docs/open-work/tickets/484-refresh-seed-42-verdict-baseline-post-017463470472260-substrate-landings.md)** — Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings — _[diagnostics-and-tooling] · added 2026-05-27_
 - **[489](docs/open-work/tickets/489-dse-score-collapse-contract-audit-pattern-b-personality-in-cp-floored-need-across-the-cat-action-dse-corpus.md)** — DSE score-collapse contract — audit Pattern B (personality-in-CP + floored need) across the cat-action DSE corpus — _[ai-substrate] · added 2026-05-30_
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
 - **[501](docs/open-work/tickets/501-workpressureaffiliativeyield-first-light-activation-price-the-freed-bandwidth-destination-patrolflee-absorption-at-scale-05.md)** — WorkPressureAffiliativeYield first-light activation — price the freed-bandwidth destination (Patrol/Flee absorption at scale 0.5) — _[ai-substrate] · added 2026-06-11_
 - **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
-- **[506](docs/open-work/tickets/506-nearpaircache-admits-prey-and-items-26k-of-26k-pairs-are-non-cat-social-pipeline-does-x800-phantom-work-and-cats-accrue-meaningless-prey-familiarity-480-child.md)** — NearPairCache admits prey and items — 26k of 26k pairs are non-cat; social pipeline does x800 phantom work and cats accrue meaningless prey familiarity (480 child) — _[ai-substrate] · added 2026-07-05_
+- **[507](docs/open-work/tickets/507-recalibrate-social-perception-and-welfare-constants-against-undiluted-post-506-inputs-fulfillment-38pct-happiness-13pct-social-status-distress-live-for-the-first-time.md)** — Recalibrate social-perception and welfare constants against undiluted post-506 inputs (fulfillment -38pct, happiness -13pct, social_status_distress live for the first time) — _[ai-substrate] · added 2026-07-05_
 
 ## Parked (12)
 
@@ -513,16 +508,18 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (369)
+## Landed archive (371)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-07 (4)
+### 2026-07 (6)
 
+- **[506](docs/open-work/landed/506-nearpaircache-admits-prey-and-items-26k-of-26k-pairs-are-non-cat-social-pipeline-does-x800-phantom-work-and-cats-accrue-meaningless-prey-familiarity-480-child.md)** — NearPairCache admits prey and items — 26k of 26k pairs are non-cat; social pipeline does x800 phantom work and cats accrue meaningless prey familiarity (480 child) _(2026-07-05)_
 - **[505](docs/open-work/landed/505-integrate-beliefs-pass-b-decays-every-mental-model-facet-every-stagger-even-at-fixed-point-at-rest-skip-141-percent-self-at-post-504-flamegraph-480-child.md)** — integrate_beliefs Pass B decays every mental-model facet every stagger even at fixed point — at-rest skip (14.1 percent self at post-504 flamegraph, 480 child) _(2026-07-05)_
 - **[504](docs/open-work/landed/504-track-sustained-copresence-re-knife-per-pair-btreemap-entry-descents-per-tick-key-vec-alloc-survived-485-197-percent-self-at-post-500-flamegraph-480-child.md)** — track_sustained_copresence re-knife — per-pair BTreeMap entry descents + per-tick key-Vec alloc survived 485 (19.7 percent self at post-500 flamegraph, 480 child) _(2026-07-05)_
 - **[502](docs/open-work/landed/502-reciperegistry-hashmap-iteration-order-is-per-process-random-recipe-score-ties-break-nondeterministically-across-processes.md)** — RecipeRegistry HashMap iteration order is per-process random — recipe score ties break nondeterministically across processes _(2026-07-05)_
 - **[500](docs/open-work/landed/500-relationshipsiter-for-is-an-unindexed-full-map-scan-audit-per-tick-call-sites-consider-per-entity-index.md)** — Relationships::iter_for is an unindexed full-map scan — audit per-tick call sites, consider per-entity index _(2026-07-05)_
+- **[484](docs/open-work/landed/484-refresh-seed-42-verdict-baseline-post-017463470472260-substrate-landings.md)** — Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings _(2026-07-05)_
 
 ### 2026-06 (14)
 

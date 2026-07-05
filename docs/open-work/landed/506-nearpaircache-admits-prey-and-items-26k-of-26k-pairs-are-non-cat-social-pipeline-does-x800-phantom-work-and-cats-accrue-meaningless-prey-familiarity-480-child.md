@@ -1,7 +1,7 @@
 ---
 id: 506
 title: NearPairCache admits prey and items — 26k of 26k pairs are non-cat; social pipeline does x800 phantom work and cats accrue meaningless prey familiarity (480 child)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 3e4f7caf356f
+landed-on: 2026-07-05
 ---
 
 ## Why
@@ -86,3 +86,4 @@ pairs. Four-artifact soak gates above. `ShadowFoxAmbush <= 10`,
 ## Log
 - 2026-07-05: opened from 505's post-landing flamegraph
   (integrate_beliefs unchanged at 14.1%) + composition probes.
+- 2026-07-05: R2 landed: Or<(With<CatBeliefs>, With<WildAnimal>)> admission; four-artifact in docs/balance/near-pair-composition.md — tps +65.4% (67.7->112.0), zero deaths, kittens 4, all canaries; social/belief frames all below flamegraph threshold; welfare recalibration spun to 507

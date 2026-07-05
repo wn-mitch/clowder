@@ -125,9 +125,20 @@ allocation hotspots — scratch-buffer reuse).
   Lazy / event-driven eviction is the dominant lever.
 
 ## Children (open)
-- **504** — track_sustained_copresence re-knife: per-pair BTreeMap entry
-  descents + per-tick key-Vec alloc survived 485 (19.7% self at the
-  07-05 post-500 profile below)
+- (none — Phase-I 0.4.0 recovery complete 2026-07-05; next knife is
+  `prey_ai`/`try_detect_cat`, 24.7% incl at the post-506 profile,
+  which plan.md already assigns to 266's alert-set gating in Phase V)
+
+**2026-07-05 post-506 flamegraph** (`logs/flamegraphs/42-3e4f7caf356f/`, 60 s seed-42):
+| # | symbol | self% | incl% | note |
+|---|---|---:|---:|---|
+| 1 | prey_ai / try_detect_cat | 23.9 | **24.7** | → 266 alert-set gating (Phase V); watch per plan.md risk #2 |
+| 2 | evaluate_and_plan | 0.9 | 14.7 | mostly flood_dijkstra (9.6) |
+| 3 | QueryState::update_archetypes | 8.6 | 12.4 | bevy overhead, grew as share only |
+| — | update_near_pair_cache / passive_familiarity / track_sustained_copresence / integrate_beliefs | — | — | **all below report threshold** (were 7.0 / 6.8 / 19.7 / 14.1) — retired by 500/504/505/506 |
+
+Cumulative Phase-I throughput: 67.7 → **112.0 t/s (+65.4%)** at the
+900s seed-42 soak (`logs/tuned-42-3e4f7caf`).
 
 **2026-07-05 post-500 flamegraph** (`logs/flamegraphs/42-6571f9f6c0a8/`, 60 s seed-42):
 | # | symbol | self% | incl% | note |
@@ -189,3 +200,16 @@ The structural answer to "stairstep regressions surface weeks late":
   502-recipe-forks + 503-Patrol-ULP (both root-caused this session).
   Audit found ONE hot site → per-entity adjacency index not justified;
   iter_for doc-comment now states O(pairs).
+- **504** — track_sustained_copresence merge-join (landed-at
+  `410b54e0`, 2026-07-05). 19.66% self → below report threshold;
+  byte-identical modulo 503 signature; cumulative +13.6% t/s.
+- **505** — FleeFrom→threat CatBeliefs ballast write removed
+  (landed-at `837b1aaf`, 2026-07-05). Byte-identical; flamegraph
+  UNCHANGED — which forced the sizing probes that found 506.
+- **506** — NearPairCache composition: admission restricted to cats +
+  wildlife (landed-at `3e4f7caf`, 2026-07-05). ~26k of ~26k pairs had
+  a non-cat endpoint; the WHOLE 459→500→504→505 knife lineage was
+  shaving phantom work. Behavior-affecting (social-scalar
+  un-dilution) — four-artifact in
+  `docs/balance/near-pair-composition.md`; welfare recalibration →
+  ticket 507. **+65.4% t/s cumulative.**

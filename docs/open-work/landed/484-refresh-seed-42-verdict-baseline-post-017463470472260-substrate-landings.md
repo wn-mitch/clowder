@@ -1,7 +1,7 @@
 ---
 id: 484
 title: Refresh seed-42 verdict baseline post-017/463/470/472/260 substrate landings
-status: ready
+status: done
 cluster: diagnostics-and-tooling
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 3e4f7caf
+landed-on: 2026-07-05
 ---
 
 ## Why
@@ -57,3 +57,4 @@ Single `just soak 42 && just verdict logs/tuned-42-<sha> && just promote logs/tu
 ## Log
 
 - 2026-05-27: opened as a 429 follow-on. 429's verdict failed on pre-429 drift attributable to 017 / 463 / 470 / 472 / 260 / 477 / 334 substrate landings between the stale baseline (post-055-mood-drift) and HEAD. Baseline-refresh is the unblocker.
+- 2026-07-05: scope satisfied by the Phase-I promote lineage: baseline post-phase1-perf-recovery-social-undilution promoted 2026-07-05 from logs/tuned-42-3e4f7caf (commit 3e4f7caf, +65.4% tps, ratchet clean). The 2026-06-11 post-459-490-instrumentation promotion was an interim refresh on the same lineage
