@@ -224,8 +224,15 @@ pub enum FacetSlot {
 // Components
 // ---------------------------------------------------------------------------
 
-/// Per-cat mental models of other cats. Entity-keyed; entries for despawned
-/// cats are cleaned by `belief_integrator`'s liveness sweep.
+/// Per-cat mental models of other cats. Entity-keyed. **Cats only** —
+/// wildlife/predator targets belong in [`PredatorBeliefs`], locations in
+/// [`LocationBeliefs`] (ticket 505 removed the one writer that leaked
+/// wildlife entities in here as unread decay ballast).
+///
+/// There is no liveness sweep (a pre-505 version of this comment claimed
+/// one existed; it never did). Entries for despawned cats persist until
+/// `decay_models`' strength-eviction retires them — bounded at colony
+/// scale because only cat entities are keyed.
 ///
 /// `#[serde(skip)]` per the `pairing.rs` / `held_intention.rs` precedent —
 /// raw `Entity` ids don't round-trip across saves, so the substrate
