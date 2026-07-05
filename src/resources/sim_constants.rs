@@ -59,7 +59,13 @@ pub struct MovementConstants {
     /// replaces the jitter-teleport anti-stacking hacks (plan step 7).
     pub separation_radius: f32,
     /// A smoothed-path waypoint counts as reached inside this radius;
-    /// the mover then seeks the next one.
+    /// the mover then seeks the next one. MUST be > max_speed / 2:
+    /// the pop check samples position once per tick, so a mover
+    /// stepping `max_speed` per tick can jump clean over any window
+    /// with diameter < max_speed and then orbit the missed waypoint
+    /// forever (the step-6 verification soak produced ~1,750
+    /// `TravelTo(*): travel timeout` failures at the original 0.35
+    /// before this constraint was understood).
     pub waypoint_arrival_radius: f32,
     /// Minimum ticks between A* recomputes for a moving traveler
     /// (recompute throttling, plan step 13).
@@ -85,7 +91,7 @@ impl Default for MovementConstants {
             stalk_speed_mult: 0.4,
             sprint_speed_mult: 1.4,
             separation_radius: 0.6,
-            waypoint_arrival_radius: 0.35,
+            waypoint_arrival_radius: 0.6,
             path_recompute_min_ticks: 8,
             path_recompute_target_drift_tiles: 3.0,
         }
@@ -5510,7 +5516,13 @@ impl Default for DispositionConstants {
             search_speed: 2,
             search_visual_detection_range: 15.0,
             search_timeout_ticks: 80,
-            travel_timeout_ticks: 200,
+            // 140 step 6 — 200 → 300. Fluid movement makes legs
+            // legitimately slower: acceleration from rest (~4 ticks
+            // per stop) and the Euclidean speed cap (diagonal travel
+            // sqrt(2) slower than the grid era — the plan's
+            // hypothesis-carried re-baseline). 1.5x headroom keeps
+            // the watchdog meaningful without mass-failing patrols.
+            travel_timeout_ticks: 300,
             travel_no_path_stuck_ticks: 10,
             global_step_timeout_ticks: 500,
             forage_jitter_chance: 0.10,
