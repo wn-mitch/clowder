@@ -106,6 +106,77 @@ impl Relationships {
         rel.familiarity = (rel.familiarity + delta).clamp(0.0, 1.0);
     }
 
+    /// Ticket 500 — apply one familiarity `delta` to every pair in
+    /// `keys` via a single merge-join walk over the sorted map, instead
+    /// of one O(log pairs) `entry` descent per pair.
+    ///
+    /// `passive_familiarity` calls `modify_familiarity` once per cached
+    /// near-pair per tick; at the 2026-06-09 flamegraph those repeated
+    /// root-to-leaf `BTreeMap::entry` walks were 16.55% self CPU. Both
+    /// `NearPairCache::pairs` and `self.data` are `BTreeMap`s over the
+    /// same `normalize_key`-canonicalized `(Entity, Entity)` key, so the
+    /// two sorted sequences co-walk with two cursors in
+    /// O(pairs_total + keys) with sequential memory access.
+    ///
+    /// Contract: `keys` must yield keys already normalized (per
+    /// [`normalize_key`] / `near_pair_cache::normalize_pair`) in strictly
+    /// ascending `(Entity, Entity)` order — exactly what iterating a
+    /// `BTreeMap`'s keys produces. Keys absent from the map are inserted
+    /// with `Relationship::default()` before the delta lands, matching
+    /// [`Self::modify_familiarity`]'s `get_or_insert` semantics.
+    pub fn modify_familiarity_batch(
+        &mut self,
+        keys: impl Iterator<Item = (Entity, Entity)>,
+        delta: f32,
+    ) {
+        let mut keys = keys.peekable();
+        // Pairs present in `keys` but not yet in the map — get_or_insert
+        // semantics. Usually empty (pairs exist after first contact), so
+        // the Vec rarely allocates.
+        let mut missing: Vec<(Entity, Entity)> = Vec::new();
+        let mut prev: Option<(Entity, Entity)> = None;
+        for (&map_key, rel) in self.data.iter_mut() {
+            loop {
+                match keys.peek() {
+                    Some(&k) if k < map_key => {
+                        debug_assert!(
+                            prev.is_none_or(|p| p < k),
+                            "modify_familiarity_batch keys not strictly ascending",
+                        );
+                        prev = Some(k);
+                        missing.push(k);
+                        keys.next();
+                    }
+                    Some(&k) if k == map_key => {
+                        debug_assert!(
+                            prev.is_none_or(|p| p < k),
+                            "modify_familiarity_batch keys not strictly ascending",
+                        );
+                        prev = Some(k);
+                        rel.familiarity = (rel.familiarity + delta).clamp(0.0, 1.0);
+                        keys.next();
+                        break;
+                    }
+                    _ => break,
+                }
+            }
+        }
+        // Keys beyond the last map entry.
+        for k in keys {
+            debug_assert!(
+                prev.is_none_or(|p| p < k),
+                "modify_familiarity_batch keys not strictly ascending",
+            );
+            prev = Some(k);
+            missing.push(k);
+        }
+        for (a, b) in missing {
+            debug_assert_eq!((a, b), normalize_key(a, b));
+            let rel = self.data.entry((a, b)).or_default();
+            rel.familiarity = (rel.familiarity + delta).clamp(0.0, 1.0);
+        }
+    }
+
     /// Adjust romantic attachment, clamped to \[0.0, 1.0\].
     pub fn modify_romantic(&mut self, a: Entity, b: Entity, delta: f32) {
         let rel = self.get_or_insert(a, b);
@@ -122,6 +193,14 @@ impl Relationships {
     /// caller only iterates / filters / sums — `all_for` materializes
     /// the entire Vec which the 427 perf survey flagged as a small but
     /// avoidable per-tick alloc hotspot (~800 KB/soak).
+    ///
+    /// **Cost: O(total pairs), NOT O(degree)** (ticket 500). This is a
+    /// filter over the entire pair-keyed map — there is no per-entity
+    /// index. Calling it per-actor (or worse, per-candidate) from a
+    /// per-tick path multiplies by total pair count; the 453 courtship
+    /// gates did exactly that and cost 22% of the flamegraph before 459
+    /// hoisted them to a once-per-tick set. Hoist hot call sites to a
+    /// per-tick precomputed set/map before reaching for this in a loop.
     pub fn iter_for(&self, entity: Entity) -> impl Iterator<Item = (Entity, &Relationship)> + '_ {
         self.data.iter().filter_map(move |(&(a, b), rel)| {
             if a == entity {
@@ -247,6 +326,72 @@ mod tests {
 
         rels.modify_romantic(a, b, -10.0);
         assert_eq!(rels.get(a, b).unwrap().romantic, 0.0);
+    }
+
+    /// Ticket 500 — the batch merge-join must be observationally
+    /// identical to N individual `modify_familiarity` calls: same
+    /// updates, same clamps, same get_or_insert behavior for missing
+    /// pairs.
+    #[test]
+    fn modify_familiarity_batch_matches_individual_calls() {
+        let mut world = World::new();
+        let ents: Vec<Entity> = (0..6).map(|_| world.spawn_empty().id()).collect();
+
+        // Seed a map with some pairs at varied familiarity, including
+        // one near the 1.0 clamp.
+        let seed = |rels: &mut Relationships| {
+            rels.get_or_insert(ents[0], ents[1]).familiarity = 0.25;
+            rels.get_or_insert(ents[0], ents[2]).familiarity = 0.98;
+            rels.get_or_insert(ents[2], ents[3]).familiarity = 0.5;
+            rels.get_or_insert(ents[4], ents[5]).familiarity = 0.0;
+        };
+        let mut batch = Relationships::default();
+        let mut individual = Relationships::default();
+        seed(&mut batch);
+        seed(&mut individual);
+
+        // Keys: two existing pairs, one missing pair (get_or_insert
+        // path), one pair beyond the last map entry. Collected via a
+        // BTreeMap so ordering matches the batch contract.
+        let keys: BTreeMap<(Entity, Entity), ()> = [
+            (ents[0], ents[1]),
+            (ents[0], ents[2]),
+            (ents[1], ents[3]), // missing from the map
+            (ents[4], ents[5]),
+        ]
+        .into_iter()
+        .map(|(a, b)| (normalize_key(a, b), ()))
+        .collect();
+
+        let delta = 0.05;
+        batch.modify_familiarity_batch(keys.keys().copied(), delta);
+        for &(a, b) in keys.keys() {
+            individual.modify_familiarity(a, b, delta);
+        }
+
+        let batch_state: Vec<_> = batch
+            .iter()
+            .map(|(k, r)| (k, r.familiarity.to_bits()))
+            .collect();
+        let individual_state: Vec<_> = individual
+            .iter()
+            .map(|(k, r)| (k, r.familiarity.to_bits()))
+            .collect();
+        assert_eq!(batch_state, individual_state);
+        // Clamp actually engaged on the 0.98 pair.
+        assert_eq!(batch.get(ents[0], ents[2]).unwrap().familiarity, 1.0);
+        // Missing pair inserted with default + delta.
+        assert_eq!(batch.get(ents[1], ents[3]).unwrap().familiarity, delta);
+    }
+
+    /// Empty key set must be a no-op (and not touch existing entries).
+    #[test]
+    fn modify_familiarity_batch_empty_keys_is_noop() {
+        let (a, b) = test_entities();
+        let mut rels = Relationships::default();
+        rels.get_or_insert(a, b).familiarity = 0.4;
+        rels.modify_familiarity_batch(std::iter::empty(), 0.1);
+        assert_eq!(rels.get(a, b).unwrap().familiarity, 0.4);
     }
 
     #[test]

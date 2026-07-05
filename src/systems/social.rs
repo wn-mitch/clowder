@@ -197,9 +197,11 @@ pub fn passive_familiarity(
         .social
         .passive_familiarity_rate
         .per_tick(&time_scale);
-    for (&(a, b), _dist) in cache.pairs.iter() {
-        relationships.modify_familiarity(a, b, passive_familiarity_rate);
-    }
+    // Ticket 500 — single merge-join walk instead of one BTreeMap
+    // `entry` descent per pair (16.55% self CPU at the 06-09
+    // flamegraph). `cache.pairs` keys are normalize_pair-canonical and
+    // BTreeMap-sorted, exactly the batch contract.
+    relationships.modify_familiarity_batch(cache.pairs.keys().copied(), passive_familiarity_rate);
 }
 
 // ---------------------------------------------------------------------------
