@@ -42,3 +42,26 @@ smoothed corridors). Baseline deliberately NOT promoted on this run;
 if 508's soak does not restore fertility (kittens ≥ 1) and cut
 hotspot deaths, the 493+508 pair gets re-examined together
 (archive-vs-archive attribution).
+
+## Iteration 2 — 508 ThreatBeliefOverlay (2026-07-05)
+
+### Observation (`logs/tuned-42-8e06c997`, vs post-506 baseline)
+- ShadowFoxAmbush deaths **6 → 2** (predicted 0-2 ✓); FoxConfrontation 2.
+- kittens_born **0 → 2** (predicted ≥1 ✓); welfare 0.316 → 0.444.
+- ticks_per_sec 126.1 → **132.4** — the per-cat overlay costs nothing
+  measurable (bucket lookups are O(log n) over tiny per-cat maps).
+- Hotspot-box presence 1.8% → 2.3% (predicted <1% ✗): the overlay only
+  reroutes cats whose OWN beliefs carry the cue — fewer ambushes means
+  fewer witnesses, so presence rises while lethality falls. The
+  prediction targeted the wrong proxy; deaths were the goal metric.
+- Scoring-shape prediction (Patrol/Flee stable) NOT EVALUABLE by
+  frame-diff: the comparison runs diverge at colony-survival level
+  (one half-dead, one healthy), swamping any routing-layer signal.
+  By construction the overlay writes A* edge costs only.
+
+### Concordance
+Core predictions concordant (deaths, fertility, canaries, perf); one
+proxy prediction discordant with a mechanism-consistent explanation
+(witness-gated subjectivity), one not evaluable. 508 lands; the
+proxy lesson recorded: for subjective-belief substrate, gate on harm
+metrics, not exposure metrics.

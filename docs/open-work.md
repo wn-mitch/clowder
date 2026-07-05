@@ -15,10 +15,10 @@ _Last generated: 2026-07-05._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 118 |
+| Ready | 117 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **164** |
+| **Open total** | **163** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,10 +40,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.91_
+- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.90_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
-- **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · score 0.90_
-- **[425](docs/open-work/tickets/425-update-mentoring-target-markers-retire-on2-snapshot-scan-use-catspatialindex.md)** — update_mentoring_target_markers retire O(N^2) snapshot scan use CatSpatialIndex — _[ai-substrate] · score 0.90_
+- **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · score 0.90_
 
 ## Epic progress (8)
 
@@ -68,11 +68,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (118)
+## Ready by cluster (117)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (33 ready, 5 blocked)
+### ai-substrate (32 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -105,7 +105,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[501](docs/open-work/tickets/501-workpressureaffiliativeyield-first-light-activation-price-the-freed-bandwidth-destination-patrolflee-absorption-at-scale-05.md)** — WorkPressureAffiliativeYield first-light activation — price the freed-bandwidth destination (Patrol/Flee absorption at scale 0.5) — _[ai-substrate] · added 2026-06-11_
 - **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
 - **[507](docs/open-work/tickets/507-recalibrate-social-perception-and-welfare-constants-against-undiluted-post-506-inputs-fulfillment-38pct-happiness-13pct-social-status-distress-live-for-the-first-time.md)** — Recalibrate social-perception and welfare constants against undiluted post-506 inputs (fulfillment -38pct, happiness -13pct, social_status_distress live for the first time) — _[ai-substrate] · added 2026-07-05_
-- **[508](docs/open-work/tickets/508-cat-routing-is-threat-belief-blind-locationbeliefs-threat-cues-never-feed-path-overlays-six-serial-deaths-at-the-shadowfox-haunting-ground-under-a-star-first-stepping-493.md)** — Cat routing is threat-belief-blind — LocationBeliefs threat cues never feed path overlays; six serial deaths at the shadowfox haunting ground under A-star-first stepping (493) — _[ai-substrate] · added 2026-07-05_
 - **[509](docs/open-work/tickets/509-mating-conversion-margin-haseligiblemate-flickers-with-htn-abandon-maslow-pregate-zeroes-eligible-windows-courtship-stage-advance-falloff-9130-to-12-and-the-section-7-commitment-layer-reads-00-all-run.md)** — Mating conversion margin: HasEligibleMate flickers with HTN Abandon, Maslow pregate zeroes eligible windows, courtship stage-advance falloff 9130-to-12, and the section-7 commitment layer reads 0.0 all run — _[ai-substrate] · added 2026-07-05_
 
 ### social-coordination (17 ready, 4 blocked)
@@ -339,7 +338,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (118)
+## Ready (117)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -457,7 +456,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[501](docs/open-work/tickets/501-workpressureaffiliativeyield-first-light-activation-price-the-freed-bandwidth-destination-patrolflee-absorption-at-scale-05.md)** — WorkPressureAffiliativeYield first-light activation — price the freed-bandwidth destination (Patrol/Flee absorption at scale 0.5) — _[ai-substrate] · added 2026-06-11_
 - **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
 - **[507](docs/open-work/tickets/507-recalibrate-social-perception-and-welfare-constants-against-undiluted-post-506-inputs-fulfillment-38pct-happiness-13pct-social-status-distress-live-for-the-first-time.md)** — Recalibrate social-perception and welfare constants against undiluted post-506 inputs (fulfillment -38pct, happiness -13pct, social_status_distress live for the first time) — _[ai-substrate] · added 2026-07-05_
-- **[508](docs/open-work/tickets/508-cat-routing-is-threat-belief-blind-locationbeliefs-threat-cues-never-feed-path-overlays-six-serial-deaths-at-the-shadowfox-haunting-ground-under-a-star-first-stepping-493.md)** — Cat routing is threat-belief-blind — LocationBeliefs threat cues never feed path overlays; six serial deaths at the shadowfox haunting ground under A-star-first stepping (493) — _[ai-substrate] · added 2026-07-05_
 - **[509](docs/open-work/tickets/509-mating-conversion-margin-haseligiblemate-flickers-with-htn-abandon-maslow-pregate-zeroes-eligible-windows-courtship-stage-advance-falloff-9130-to-12-and-the-section-7-commitment-layer-reads-00-all-run.md)** — Mating conversion margin: HasEligibleMate flickers with HTN Abandon, Maslow pregate zeroes eligible windows, courtship stage-advance falloff 9130-to-12, and the section-7 commitment layer reads 0.0 all run — _[ai-substrate] · added 2026-07-05_
 
 ## Parked (12)
@@ -507,12 +505,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (373)
+## Landed archive (374)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-07 (8)
+### 2026-07 (9)
 
+- **[508](docs/open-work/landed/508-cat-routing-is-threat-belief-blind-locationbeliefs-threat-cues-never-feed-path-overlays-six-serial-deaths-at-the-shadowfox-haunting-ground-under-a-star-first-stepping-493.md)** — Cat routing is threat-belief-blind — LocationBeliefs threat cues never feed path overlays; six serial deaths at the shadowfox haunting ground under A-star-first stepping (493) _(2026-07-05)_
 - **[506](docs/open-work/landed/506-nearpaircache-admits-prey-and-items-26k-of-26k-pairs-are-non-cat-social-pipeline-does-x800-phantom-work-and-cats-accrue-meaningless-prey-familiarity-480-child.md)** — NearPairCache admits prey and items — 26k of 26k pairs are non-cat; social pipeline does x800 phantom work and cats accrue meaningless prey familiarity (480 child) _(2026-07-05)_
 - **[505](docs/open-work/landed/505-integrate-beliefs-pass-b-decays-every-mental-model-facet-every-stagger-even-at-fixed-point-at-rest-skip-141-percent-self-at-post-504-flamegraph-480-child.md)** — integrate_beliefs Pass B decays every mental-model facet every stagger even at fixed point — at-rest skip (14.1 percent self at post-504 flamegraph, 480 child) _(2026-07-05)_
 - **[504](docs/open-work/landed/504-track-sustained-copresence-re-knife-per-pair-btreemap-entry-descents-per-tick-key-vec-alloc-survived-485-197-percent-self-at-post-500-flamegraph-480-child.md)** — track_sustained_copresence re-knife — per-pair BTreeMap entry descents + per-tick key-Vec alloc survived 485 (19.7 percent self at post-500 flamegraph, 480 child) _(2026-07-05)_

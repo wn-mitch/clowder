@@ -1,7 +1,7 @@
 ---
 id: 508
 title: Cat routing is threat-belief-blind — LocationBeliefs threat cues never feed path overlays; six serial deaths at the shadowfox haunting ground under A-star-first stepping (493)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 8e06c997
+landed-on: 2026-07-05
 ---
 
 ## Why
@@ -80,3 +80,4 @@ overlay is routing-layer, not scoring-layer).
 ## Log
 - 2026-07-05: opened from the 493 landing gates (/diagnose-collapse
   three-agent sweep + position scans; evidence tables above).
+- 2026-07-05: ThreatBeliefOverlay landed: deaths 6->2, kittens 0->2, +18.2% tps; four-artifact in docs/balance/astar-first-stepping.md iter 2
