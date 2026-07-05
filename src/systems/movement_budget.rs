@@ -51,6 +51,18 @@ pub fn accumulate_movement_budget(
             Without<WildAnimal>,
         ),
     >,
+    // 140 step 6 — anything with a Position but no DesiredVelocity
+    // (pre-140 saves, test scaffolds). Wildlife included: species
+    // migrations (plan steps 9-11) will read these on wildlife too.
+    movers_missing_desire: Query<
+        Entity,
+        (
+            With<Position>,
+            With<Needs>,
+            Without<crate::components::physical::DesiredVelocity>,
+            Without<crate::components::building::Structure>,
+        ),
+    >,
     constants: Res<crate::resources::SimConstants>,
 ) {
     for mut budget in &mut budgeted {
@@ -66,6 +78,17 @@ pub fn accumulate_movement_budget(
     }
     for entity in &cats_missing_budget {
         commands.entity(entity).insert(MovementBudget::cat());
+    }
+    // 140 step 6 — same lazy-insert shape for the fluid-movement pair.
+    // Live spawns get them from the blueprint bundle; save-loaded cats
+    // (pre-140 saves) and test scaffolds gain them here so the goap /
+    // disposition queries (which REQUIRE DesiredVelocity) re-admit
+    // them after one tick.
+    for entity in &movers_missing_desire {
+        commands.entity(entity).insert((
+            crate::components::physical::Velocity::default(),
+            crate::components::physical::DesiredVelocity::default(),
+        ));
     }
 }
 

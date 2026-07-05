@@ -2,7 +2,7 @@
 
 # Components
 
-207 component types derived from `#[derive(Component)]`.
+221 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspiration_emission.rs`
 
@@ -41,7 +41,7 @@
 
 ### CatBeliefs (struct)
 
-> Per-cat mental models of other cats. Entity-keyed; entries for despawned cats are cleaned by `belief_integrator`'s liveness sweep.  `#[serde(skip)]` per the `pairing.rs` / `held_intention.rs` precedent — raw `Entity` ids don't round-trip across saves, so the substrate rebuilds state from fresh observations on load.
+> Per-cat mental models of other cats. Entity-keyed. **Cats only** — wildlife/predator targets belong in [`PredatorBeliefs`], locations in [`LocationBeliefs`] (ticket 505 removed the one writer that leaked wildlife entities in here as unread decay ballast).  There is no liveness sweep (a pre-505 version of this comment claimed one existed; it never did). Entries for despawned cats persist until `decay_models`' strength-eviction retires them — bounded at colony scale because only cat entities are keyed.  `#[serde(skip)]` per the `pairing.rs` / `held_intention.rs` precedent — raw `Entity` ids don't round-trip across saves, so the substrate rebuilds state from fresh observations on load.
 
 | Field | Type |
 |-------|------|
@@ -78,6 +78,15 @@
 | Field | Type |
 |-------|------|
 | `reserves` | `HashMap<ResourceKind, ReserveBelief>` |
+
+### ShelterBeliefs (struct)
+
+> Per-cat shelter belief + claimed home_den entity, ticket 374.  `home_den` carries `#[serde(skip)]` matching [`CatBeliefs::models`] — raw `Entity` ids don't round-trip across saves. On load, re-established by the spawn-time claim system reading nearest functional Den; in-sim, set by `DenClaimed` integrator wiring.  Replaces the per-tick spatial proximity rollup at `colony_score::compute_shelter` and the `unsheltered_sleepers` counting at `coordination::assess_colony_needs`. The legacy signals were structurally brittle (collapsed to zero under metric changes, gated on rare `Sleep`+distance conjunctions); the belief substrate makes housing security a continuous psychological state the cat carries rather than a transient spatial query.
+
+| Field | Type |
+|-------|------|
+| `home_den` | `Option<Entity>` |
+| `facet` | `ShelterFacet` |
 
 ## `src/components/body_zones.rs`
 
@@ -136,7 +145,7 @@
 
 ### StoredHerbs (struct)
 
-> Ticket 084: per-Stores aggregate count of stashed herbs, keyed by `HerbKind`. Sibling to `StoredItems` (food/material Entities), but herbs stash as a lightweight count rather than spawned Item entities — matches the existing `Inventory.slots` herb representation, where herb slots carry no Entity identity and no per-instance modifiers. Capacity is per-kind and provided by the caller (sourced from `ScoringConstants::stores_herb_capacity_per_kind`).  Lifecycle: - Inserted on every `StructureType::Stores` at construction (`steps/building/construct.rs`). - Mutated by `resolve_deposit_herbs_to_stores` (add) and `resolve_retrieve_herbs_from_stores(kind)` (take). - Aggregated by `update_colony_building_markers` to author `HasStoredThornbriar` and (Commit 3) `ColonyThornbriarChronicallyLow`.
+> Ticket 084: per-Stores aggregate count of stashed herbs, keyed by `HerbKind`. Sibling to `StoredItems` (food/material Entities), but herbs stash as a lightweight count rather than spawned Item entities — matches the existing `Inventory.pouch` herb representation, where herb slots carry no Entity identity and no per-instance modifiers. Capacity is per-kind and provided by the caller (sourced from `ScoringConstants::stores_herb_capacity_per_kind`).  Lifecycle: - Inserted on every `StructureType::Stores` at construction (`steps/building/construct.rs`). - Mutated by `resolve_deposit_herbs_to_stores` (add) and `resolve_retrieve_herbs_from_stores(kind)` (take). - Aggregated by `update_colony_building_markers` to author `HasStoredThornbriar` and (Commit 3) `ColonyThornbriarChronicallyLow`.
 
 | Field | Type |
 |-------|------|
@@ -188,13 +197,13 @@
 
 ### ActiveDirective (struct)
 
-> Component placed on a target cat when a coordinator delivers a directive. Provides a score bonus to the directed action at next evaluation.
+> Component placed on a target cat when a directive is delivered. Provides a score bonus to the directed action at next evaluation.
 
 | Field | Type |
 |-------|------|
 | `kind` | `DirectiveKind` |
 | `priority` | `f32` |
-| `coordinator` | `Entity` |
+| `coordinator` | `Option<Entity>` |
 | `coordinator_social_weight` | `f32` |
 | `delivered_tick` | `u64` |
 | `target_position` | `Option<crate::components::physical::Position>` |
@@ -203,6 +212,14 @@
 ### PendingDelivery (struct)
 
 > Directive-in-transit on a coordinator walking to deliver it. Inserted when `Action::Coordinate` is chosen, removed on delivery.
+
+### ColonyAlignmentScore (struct)
+
+> 487 — EWMA of how often this cat's `CurrentAction` has been a "colony-aligned" action (Forage / Build / Cook / Hunt / Herbcraft kinds — the same set the `assess_colony_needs` directive vocabulary covers). Updated once per tick by `update_colony_alignment_scores`: multiplicative decay by `CoordinationConstants::alignment_decay_per_tick` every tick, plus an additive `alignment_match_increment` when the cat's current action is colony-aligned. The fixpoint for a cat who spends every tick on aligned work is exactly 1.0 at the default tuning.  Read by `evaluate_coordinators` as a multiplicative term wrapped in `(1 + score * alignment_skill_weight)` so the cat who *does* the most colony work naturally accumulates election credit. This is the emergent half of the day-1 cuddle-puddle fix (487): we don't pre- elect a coordinator; the colony recognises one from observed behaviour. See `update_colony_alignment_scores` + the score formula in `evaluate_coordinators`.
+
+| Field | Type |
+|-------|------|
+| `recent_aligned_actions` | `f32` |
 
 ### BuildPressure (struct)
 
@@ -247,6 +264,12 @@
 | `last_narrated_disposition` | `Option<DispositionKind>` |
 | `last_completed_tick` | `Option<(DispositionKind, u64)>` |
 | `replans_narrated` | `u32` |
+
+## `src/components/equipment.rs`
+
+### WearableSlots (struct)
+
+> A cat's worn gear — the OSRS-style equipped half of the slot-inventory model (ticket 017). At most one item per [`EquipSlot`]. Crafting a wearable auto-equips it here (see `craft_at_workshop` / `craft_at_tanning_frame`); deliberate don/doff/swap is ticket 334's `WearItem` resolver. `equipment_modifiers_for` reads only these slots — an item sitting in the pouch is carried, not worn, and contributes nothing to combat/hunt/stealth modifiers.
 
 ## `src/components/fate.rs`
 
@@ -467,19 +490,6 @@
 | `expiry_tick` | `Option<u64>` |
 | `source` | `IntentionSource` |
 
-## `src/components/hunting_priors.rs`
-
-### HuntingPriors (struct)
-
-> Per-cat spatial belief grid over prey abundance.  The map is divided into square buckets of `bucket_size` tiles. Each bucket stores a single `f32` belief in `[MIN_BELIEF, MAX_BELIEF]`. Beliefs are updated by catches, scent detections, and fruitless searches. There is no time decay — beliefs persist until overwritten by evidence.
-
-| Field | Type |
-|-------|------|
-| `beliefs` | `Vec<f32>` |
-| `grid_w` | `usize` |
-| `grid_h` | `usize` |
-| `bucket_size` | `i32` |
-
 ## `src/components/identity.rs`
 
 ### Name (struct)
@@ -489,6 +499,10 @@
 ### Species (struct)
 
 > Marker: this entity is a cat.
+
+### Founder (struct)
+
+> Marker: this cat is one of the world-gen founders (ticket 490). Instrumentation-only — read by the founder-dispersion sampler in `emit_cat_snapshots`, never by sim behavior.
 
 ### Age (struct)
 
@@ -514,6 +528,16 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `pattern` | `String` |
 | `eye_color` | `String` |
 | `distinguishing_marks` | `Vec<String>` |
+
+## `src/components/injury_cache.rs`
+
+### LastBodyPartInjury (struct)
+
+| Field | Type |
+|-------|------|
+| `source` | `InjurySource` |
+| `part` | `BodyPart` |
+| `tick` | `u64` |
 
 ## `src/components/items.rs`
 
@@ -598,11 +622,12 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### Inventory (struct)
 
-> A cat's carried inventory. Capacity-limited; holds both herbs and items.
+> A cat's carry bag (pouch) — the OSRS-style "backpack" half of the slot-inventory model (ticket 017). Holds consumables (herbs, food, remedies, materials, curios, craft inputs) and any *unworn* / carried items. Worn gear lives in the sibling [`WearableSlots`] component (`src/components/equipment.rs`), and `equipment_modifiers_for` reads only those equipped slots — presence in the pouch no longer counts as "worn." Capacity-limited via `pouch_capacity`.
 
 | Field | Type |
 |-------|------|
-| `slots` | `Vec<ItemSlot>` |
+| `pouch` | `Vec<ItemSlot>` |
+| `pouch_capacity` | `u16` |
 
 ### Ward (struct)
 
@@ -755,7 +780,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### HasFoodInInventory (struct)
 
-> 450: per-cat — `inventory.has_food()` (any slot holds an item kind classified as food, raw or cooked). Authored by `items::update_inventory_markers`. Read by: - the HTN method `[BegForFood]`'s `ApplicableWhen::Kitten ∧ ¬HasFoodInInventory` (a kitten with food doesn't beg); - 429 Phase 2's `EatFromOwnInventoryDse` eligibility filter (`.require(HasFoodInInventory::KEY).forbid(Incapacitated::KEY)`).  Distinct from the existing slot-kind markers (`HasRawFishInInventory`, `HasRawMeatInInventory`, …) which gate preservation-chain DSEs on specific raw inputs — this marker fires on *any* food, the way "cat carries something it could eat" is the right perceptual axis for the Eat-aspiration's method cascade and the eat-Sink DSE.
+> 450: per-cat — `inventory.has_food()` (any slot holds an item kind classified as food, raw or cooked). Authored by `items::update_inventory_markers`. Read by: - the HTN method `[BegForFood]`'s `ApplicableWhen::Kitten ∧ ¬HasFoodInInventory` (a kitten with food doesn't beg); - a follow-on to 429 will extend `EatDse`'s eligibility filter via a new `require_any` API so the planner builds the 1-step `[EatFromOwnInventory]` chain when pocket food is present (rather than the 2-step `[TravelTo(Stores), EatAtStores]`). 429's scope is the items-are-real substrate contract; the GOAP-side wiring is a separate balance change.  Distinct from the existing slot-kind markers (`HasRawFishInInventory`, `HasRawMeatInInventory`, …) which gate preservation-chain DSEs on specific raw inputs — this marker fires on *any* food, the way "cat carries something it could eat" is the right perceptual axis for the Eat-aspiration's method cascade and the eat-Sink resolver.
 
 ### HasRemedyHerbs (struct)
 
@@ -805,6 +830,14 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 > 235: per-cat marker — at least one `Stores` building is within `DispositionConstants::herb_stash_reachable_radius` Manhattan tiles of this cat's position. Authored by `goap.rs::herb_stash_accessible_for` in the per-cat MarkerSnapshot loop (twin call sites: `evaluate_and_plan` and `build_planner_markers`, both required for snapshot/planner-replay parity).  Read on the deposit-prefix branch of pickup-class plan templates (PickingUp / Cooking / Caretaking / Herbalism / Hunting). Combined with `HasHerbsInInventory` + `CarryingIs(Herbs)` precondition + the existing `ZoneIs(Stores)` constraint, A* composes `[TravelTo(Stores), DepositHerbs(prefix), <goal-action>]` as an alternative to `[DropItem, <goal-action>]` when the stash is reachable, picking by cost. Far-from-stores cats fall back to the DropItem prefix because the marker is false.  Sibling pattern to `MaterialsAvailable` (per-cat reachability author at `goap.rs::materials_available_for`).
 
+### HasFoodStorageAccessible (struct)
+
+> Per-cat marker — at least one `Stores` building is within `DispositionConstants::herb_stash_reachable_radius` Manhattan tiles of this cat's position (the same geometric check as `HasHerbStashAccessible`, kept as a distinct marker so PickingUp eligibility reads as "needs food storage" rather than "needs herb stash" at the call site). Authored by `goap.rs::stores_accessible_for` in the per-cat MarkerSnapshot loop (twin call sites: `evaluate_and_plan` and `build_planner_markers`, both required for snapshot/planner-replay parity).  Required on `PickingUpDse` eligibility — without a reachable Stores there is no deposit destination, and picking food off the ground only feeds the visual shuffle (`resolve_deposit_at_stores`'s no-store fallback used to drop food back at the cat's tile, re-latching `HasGroundCarcass` and re-eligibilizing pickup; with this gate the loop never starts). When this is `false`, scoring pressure should route to `Build` to construct one — see the follow-on construction-pressure work referenced in the bugfix plan.
+
+### HasGroomCandidate (struct)
+
+> 487: per-cat marker — ≥1 peer is a viable allogrooming target right now. Authored each tick in `goap.rs::evaluate_and_plan` and its `resolve_goap_plans` planner-markers parity site by `viable_groom_candidate_for`, which scans cats within `GROOM_OTHER_TARGET_RANGE` Manhattan tiles and excludes those who are themselves currently mid-`GoapActionKind::GroomOther` (i.e. the chain-grooming target of another cat this tick — the "cuddle puddle" failure mode 484 unmasked).  Required on `GroomOtherDse`'s eligibility filter. Without this, the broad-phase `score_actions` gate (`has_social_target`) admits any in-range peer, so a founder cohort where every cat is everyone's social target collapses into chain-grooming dominance — the post-`ca5d59c4` puddle 487 fixes. The marker is additive: a peer gated out as "already being groomed" can still receive other social actions; this only stops a NEW cat from joining the pile.  Same shape as [`HasFoodStorageAccessible`] (the 484 precedent): a per-cat reachability marker authored from a colony-wide scan, gating a DSE eligibility filter that previously fired on broad-phase presence alone.
+
 ### ColonyState (struct)
 
 > Marker for the single colony-state entity. Spawned exactly once per simulation by `setup.rs::build_new_world` (production) and `scenarios/env.rs::init_scenario_world_with` (scenario harness). Colony-scoped markers below (ThornbriarAvailable, HasFunctionalKitchen, …) attach to this entity. Authored each FixedUpdate tick by the colony-marker chain (`buildings::update_colony_building_markers`, `magic::update_{herb_availability,ward_coverage,ward_siege}_markers`) and cached into `WorldSnapshots::colony_markers` by `world_snapshots::populate_world_snapshots`; `goap::evaluate_and_plan` reads the cached bundle to populate `MarkerSnapshot`. Tickets 168, 433.
@@ -847,9 +880,13 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 > 443: per-cat composite — the cat could conceivably elect `SmokeMeat` this tick. Fires when EITHER the cat already carries smokeable inventory (`HasSmokeableInInventory`) OR has a free slot AND the colony has smokeable meat + fuel in `StoredItems` (`HasFreeSlot && HasSmokeableInStores`). Reader: `SmokeMeatDse` eligibility filter. Writer: `goap::evaluate_and_plan` via `MarkerSnapshot::set_entity`.  Mirrors `HasDryableAccessible` for the two-ingredient smoking chain. `HasSmokeableInInventory` (both meat AND fuel) is still authored — resolvers read it to short-circuit retrieve steps when the cat already carries the needed items.
 
-### HasCraftInputInInventory (struct)
+### CanSatisfyAnyWorkshopRecipeFromPouch (struct)
 
-> 457: per-cat — the cat carries ≥1 Phase 2 Workshop-recipe input (Twig / Bristle / Fiber / Flower / Stone / Feather / PolishedStone). Authored by `items::update_inventory_markers` mirroring the existing `HasRawFishInInventory` / `HasFuelInInventory` rows. Reader: `CraftAtWorkshopDse` eligibility filter.  Recipe-agnostic by design — any single Workshop input present in inventory satisfies the marker; the resolver picks the specific recipe at execute time. Mirrors the 367 inventory-marker shape (`HasDryableInInventory` fires on any RawFish OR RawOrgan; the drying resolver picks the specific raw input). A cat with Twig but no Bristle still fires the marker — the L3 may elect Crafting, the resolver finds no full recipe satisfied, returns Fail, and the cat re-plans (substrate-honest: the per-recipe scoring lives at recipe- variety, deferred per ticket scope).  Stores-side retrieve is intentionally NOT in scope for first-light. Cats gather inputs via hunt (Bristle from `PreyByproductConstants`) plus forage (`resolve_forage` drops Twig / Fiber / Flower at `forage_ingredient_drop_chance = 0.10`) and craft when inputs are already in hand. The plan template is single-step `[CraftAtWorkshop]`, no `RetrieveCraftInput` leg.
+> 468: per-cat — the cat's pouch alone satisfies the full input set of at least one Workshop recipe. Authored by `items::update_inventory_markers` by walking `RecipeRegistry`, filtering by `StationRequirement::Workshop`, and short-circuiting on the first recipe where `inventory.satisfies_recipe(recipe)` is true. Reader: `CraftAtWorkshopDse` eligibility filter + (legacy retired) `crafting_actions()` plan template.  Replaces the 457 `HasCraftInputInInventory` (recipe-agnostic any- input gate) which over-fired the DSE: cats carrying a single Twig elected Crafting and bailed at execute time with "no workshop recipe fully satisfied by inventory" (ticket 468). The new marker makes L2 eligibility truthful — `eligible ⇔ plan(executable)` from the pouch alone — and the type-level retire of `CraftAtWorkshop(None)` shapes the planner so unsatisfiable craft plans cannot be built.  The HaveItem path (`craft_have_item_actions`) does NOT consult this marker — that arm pins a specific recipe upstream via `aspiration_picker::recipe_inputs_reachable` over the combined inventory + nearby Stores aggregate, and the planner sequences `RetrieveCraftInputs` to top up the pouch before Crafting.
+
+### CanSatisfyAnyTanningFrameRecipeFromPouch (struct)
+
+> 468: per-cat — the cat's pouch alone satisfies the full input set of at least one Tanning Frame recipe. Sibling of [`CanSatisfyAnyWorkshopRecipeFromPouch`] over `StationRequirement::TanningFrame`. Reader: `CraftAtTanningFrameDse` eligibility filter.
 
 ### HasLoadedSmokingRackOffCooldown (struct)
 
@@ -1031,6 +1068,23 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 |-------|------|
 | `last_pride_crisis_tick` | `Option<u64>` |
 
+### PlayBowCooldown (struct)
+
+> Ticket 279 — per-cat tracker for `PlayBow` / `ReciprocalAdvance` emit cadence. `last_playbow_tick` is read by the reciprocal-advance emitter to test whether a peer's recent solicitation is still inside `reciprocal_window_ticks`; `last_reciprocal_advance_tick` chains reciprocity (advance → counter-advance) within the same window without requiring a fresh play-bow.
+
+| Field | Type |
+|-------|------|
+| `last_playbow_tick` | `Option<u64>` |
+| `last_reciprocal_advance_tick` | `Option<u64>` |
+
+### FesteringObservationCooldown (struct)
+
+> Ticket 472 — per-cat throttle for `CarriesFesteringWound` emit cadence. Festering is a *persistent state* (not a one-shot event), so the emitter fires once per cat every `festering_observation_interval_ticks` rather than every tick. Lifetime is bound to the cat; the emitter inserts on first emit and re-stamps subsequently.
+
+| Field | Type |
+|-------|------|
+| `last_emit_tick` | `Option<u64>` |
+
 ## `src/components/mourning.rs`
 
 ### Mourning (struct)
@@ -1041,6 +1095,17 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 |-------|------|
 | `deceased_name` | `String` |
 | `started_tick` | `u64` |
+
+## `src/components/movement_budget.rs`
+
+### MovementBudget (struct)
+
+> Per-entity step-opportunity accumulator. Ticked by `accumulate_movement_budget`; spent by movement consumers.
+
+| Field | Type |
+|-------|------|
+| `accumulator` | `f32` |
+| `per_tick` | `f32` |
 
 ## `src/components/parenting_activity.rs`
 
@@ -1081,25 +1146,29 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ## `src/components/physical.rs`
 
+### Velocity (struct)
+
+> Persistent actual velocity, world units (tiles) per tick — **integrator-owned** (`systems::movement::integrate_velocities` is the only production writer). Decision layers never touch this; they express desire via [`DesiredVelocity`] and the integrator turns desire into motion under the acceleration cap. Not serialized into saves: velocity is transient motion state that reconstructs from fresh desires within ~4 ticks of load.
+
+### DesiredVelocity (struct)
+
+> Per-tick movement desire, written by decision layers (migrated resolvers), **consumed-and-cleared by the integrator each tick**.  `None` is the bisectability invariant of the staged migration: an unmigrated resolver writes `Position` directly and expresses no desire — the integrator then zeroes the mover's [`Velocity`] immediately and moves nothing, so a cat can never be moved twice in one tick (once by a legacy resolver, once by momentum). Momentum exists only across consecutive desire-writing ticks.
+
+### Flying (struct)
+
+> Terrain-exempt mover (hawks; birds in burst flight — plan steps 9-10). The integrator skips passability/wall-slide for `Flying` entities and applies the map bounds clamp only.
+
 ### Position (struct)
 
-| Field | Type |
-|-------|------|
-| `x` | `i32` |
-| `y` | `i32` |
+> World-space position. Ticket 491 (Phase 2a of the 135 continuous-position epic) made this a `Vec2<f32>`-backed newtype. For sub-phase 2a, all existing call sites continue to interact with tile-integer coordinates via `Position::new(x: i32, y: i32)` (which snaps to the tile center) and the `x()` / `y()` / `tile()` accessors. Direct Euclidean reads (`pos.world()`) become first-class in sibling sub-phases 2b/2c.  Wire format: `serde(transparent)` over `Vec2`, so new code paths serialize as a 2-element float array. (A pre-140 revision of this comment referenced a `SavedPosition` shim in `persistence.rs` that never existed — Position serializes transparently and sub-tile positions round-trip as-is.)  `PartialEq` / `Eq` / `Hash` are keyed on `tile()` — the containing integer grid cell — to preserve the pre-491 `HashMap<Position, _>` invariants without forcing call sites to migrate this sub-phase. Every `Position::new(i32, i32)` snaps to a tile center, so for sub-phase 2a this is equivalent to byte-level Vec2 equality. When sub-phase 2b/2c introduces continuous (sub-tile) positions, the `HashMap<Position, _>` sites will switch to `HashMap<(i32, i32), _>` and the manual `Hash` impl can be revisited.
 
 ### PreviousPosition (struct)
 
-> Snapshot of an entity's grid position at the start of the current tick. Used by the rendering layer to interpolate smooth movement between ticks.
-
-| Field | Type |
-|-------|------|
-| `x` | `i32` |
-| `y` | `i32` |
+> Snapshot of an entity's position at the start of the current tick. Used by the rendering layer to interpolate smooth movement between ticks.
 
 ### RenderPosition (struct)
 
-> Ticket 129 — Phase 0 of the continuous-position migration epic (#135). World-space smooth position in pixels, computed each render frame from `Position` + `PreviousPosition` + `RenderTickProgress` using a smoothstep ease-in/out curve. Sim state (containing tile, pathfinding, perception) still reads `Position` (i32 grid); only the render path consumes this. By Phase 2 (#139), `Position` itself becomes `Vec2<f32>` and this component remains as the per-frame interpolation target without changing its public shape.
+> Ticket 129 — Phase 0 of the continuous-position migration epic (#135). World-space smooth position in pixels, computed each render frame from `Position` + `PreviousPosition` + `RenderTickProgress` using a smoothstep ease-in/out curve.
 
 ### Health (struct)
 
@@ -1171,7 +1240,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `item_kind` | `ItemKind` |
 | `flee_speed` | `u32` |
 | `graze_cadence` | `u64` |
-| `alert_radius` | `i32` |
+| `alert_radius` | `f32` |
 | `freeze_ticks` | `u64` |
 | `catch_difficulty` | `f32` |
 | `flee_strategy` | `FleeStrategy` |
@@ -1207,6 +1276,12 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 | `item_kind` | `ItemKind` |
 | `den_name` | `&'static str` |
 | `raid_drop` | `u32` |
+
+## `src/components/recent_crafts.rs`
+
+### CatRecentCrafts (struct)
+
+> Per-cat ring buffer recording the last `RECENT_CRAFTS_CAPACITY` crafted recipes plus the tick each was made. See module docs for lifecycle and contract notes.
 
 ## `src/components/recent_target_failures.rs`
 
@@ -1428,7 +1503,7 @@ Variants: `PatrolTerritory`, `HuntingPrey`, `Returning`, `Resting`, `Dispersing`
 
 | Field | Type |
 |-------|------|
-| `territory_radius` | `i32` |
+| `territory_radius` | `f32` |
 | `cubs_present` | `u32` |
 | `scent_strength` | `f32` |
 | `established_tick` | `u64` |

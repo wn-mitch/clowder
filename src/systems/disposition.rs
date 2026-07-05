@@ -3156,6 +3156,9 @@ pub fn resolve_disposition_chains(
                 Option<&mut crate::components::grooming::GroomingCondition>,
                 &mut crate::components::mental::Mood,
                 Option<&mut crate::components::fulfillment::Fulfillment>,
+                // 140 step 6 — movement desire for migrated resolvers
+                // (PatrolTo); consumed by the Chain-4 integrator.
+                &mut crate::components::physical::DesiredVelocity,
             ),
         ),
         (
@@ -3204,14 +3207,16 @@ pub fn resolve_disposition_chains(
         // Grooming condition for target lookups during social interactions.
         grooming: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (_, _, _, _, g, _, _))| (e, g.map_or(0.8, |g| g.0)))
+            .map(|((e, _, _, _, _, _, _, _, _), (_, _, _, _, g, _, _, _))| {
+                (e, g.map_or(0.8, |g| g.0))
+            })
             .collect(),
         // Gender snapshot — used by `MateWith` to look up the partner's
         // gender for §7.M.7.4's gestator-selection fix without double-
         // borrowing the mutable `cats` query.
         gender: cats
             .iter()
-            .map(|((e, _, _, _, _, _, _, _, _), (_, g, _, _, _, _, _))| (e, *g))
+            .map(|((e, _, _, _, _, _, _, _, _), (_, g, _, _, _, _, _, _))| (e, *g))
             .collect(),
         // Tile occupancy for anti-stacking jitter on PatrolTo arrival.
         cat_tile_counts: {
@@ -3245,7 +3250,16 @@ pub fn resolve_disposition_chains(
             personality,
             mut memory,
         ),
-        (name, gender, disposition, history, mut grooming, mut mood, mut fulfillment_opt),
+        (
+            name,
+            gender,
+            disposition,
+            history,
+            mut grooming,
+            mut mood,
+            mut fulfillment_opt,
+            mut desired_velocity,
+        ),
     ) in &mut cats
     {
         // Den discovery: peek at current step kind without mutable borrow.
@@ -3505,6 +3519,7 @@ pub fn resolve_disposition_chains(
             &snaps,
             &mut accum,
             read_ctx.location_beliefs.get(cat_entity).ok(),
+            &mut desired_velocity,
         );
 
         if chain.is_complete() {
@@ -3569,8 +3584,10 @@ pub fn resolve_disposition_chains(
     // of social warmth, which otherwise has no sim-level restorer.
     // §7.W: also apply social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok(((_, _, _, _, _, mut needs, _, _, _), (_, _, _, _, grooming, _, fulfillment))) =
-            cats.get_mut(groom.target)
+        if let Ok((
+            (_, _, _, _, _, mut needs, _, _, _),
+            (_, _, _, _, grooming, _, fulfillment, _),
+        )) = cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
                 g.0 = (g.0 + groom.grooming_delta).min(1.0);
@@ -3714,6 +3731,9 @@ fn dispatch_chain_step(
     // component is absent — test paths / fresh spawns degrade to a
     // threat-blind route, the pre-508 behavior).
     location_beliefs: Option<&crate::components::beliefs::LocationBeliefs>,
+    // 140 step 6 — movement desire for migrated chain resolvers
+    // (PatrolTo); consumed by the Chain-4 integrator.
+    desired_velocity: &mut crate::components::physical::DesiredVelocity,
 ) {
     let d = &constants.disposition;
 
@@ -4744,6 +4764,8 @@ fn dispatch_chain_step(
                 &path_plan,
                 d,
                 &snaps.cat_tile_counts,
+                desired_velocity,
+                &constants.movement,
             );
             apply_step_result(outcome.result, chain, current);
         }

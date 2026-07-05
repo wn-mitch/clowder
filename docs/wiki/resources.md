@@ -2,9 +2,17 @@
 
 # Resources
 
-59 resource types derived from `#[derive(Resource)]`.
+61 resource types derived from `#[derive(Resource)]`.
 
 ## `src/components/coordination.rs`
+
+### ColonySelfDirectiveQueue (struct)
+
+> 487 — Colony-self directive queue. Populated by `assess_colony_needs` when no `Coordinator`-tagged cat exists yet (the day-1 founder phase), so directives like Forage / Build / Cook can fire from the colony itself before an emergent coordinator is elected. Drained by `dispatch_urgent_directives` alongside per-coordinator queues. Cleared at the start of every assess cycle so the queue reflects the latest colony state — the colony-self path is fundamentally ephemeral (no in-flight memory across cycles, unlike a coordinator's queue which threads through `Coordinate` deliveries).
+
+| Field | Type |
+|-------|------|
+| `directives` | `Vec<Directive>` |
 
 ### CoordinatorDied (struct)
 
@@ -96,11 +104,13 @@
 
 ### ColonyHuntingMap (struct)
 
-> Colony-wide shared hunting belief map. Updated through social transmission when cats interact — individual experience feeds into collective knowledge.  All cats can read this map as a baseline. Individual `HuntingPriors` on each cat overlay personal experience on top.
+> Colony-wide hunting belief grid — read by the `HuntingBeliefSnapshot` downsampler in `snapshot.rs`. Values are **derived** each cadence from per-cat `LocationBeliefs.prey_yield` via [`crate::systems::belief_aggregation::aggregate_location_belief_snapshot`]; the Resource itself is a passive output buffer kept in this shape so the visualization payload is unchanged from pre-293 runs.  Ticket 293 retired the underlying per-cat `HuntingPriors` Component and the legacy `absorb` social-transmission pathway. Per-cat reads (`best_prey_direction`) now consult the cat's own `LocationBeliefs` directly; this colony view is for the global-overlay snapshot only.
 
 | Field | Type |
 |-------|------|
-| `beliefs` | `HuntingPriors` |
+| `beliefs` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
 
 ## `src/resources/colony_knowledge.rs`
 
@@ -168,6 +178,8 @@
 | `banishments` | `u64` |
 | `last_recorded_season` | `u64` |
 | `last_snapshot` | `Option<ColonyScoreSnapshot>` |
+| `run_start_tick` | `u64` |
+| `checkpoint` | `Option<ColonyScoreCheckpoint>` |
 
 ## `src/resources/construction_site_map.rs`
 
@@ -279,6 +291,17 @@
 |-------|------|
 | `weather` | `Option<Weather>` |
 
+## `src/resources/founder_dispersion.rs`
+
+### FounderDispersionStats (struct)
+
+> Founder spatial-dispersion accumulator (ticket 490 canary).  The cuddle-puddle defect was invisible to every event-count gate — courtship/grooming tallies stayed flat while founders collapsed from ~24 to ~4.7 tiles mean distance-to-centroid. This resource accumulates that spatial statistic per elapsed-tick window so the headless footer (and `just verdict`'s absolute-floor check) can see it.  Sampled inside `emit_cat_snapshots` (no new system — instrumentation writes only, never read by sim behavior, so it cannot perturb seed determinism).
+
+| Field | Type |
+|-------|------|
+| `run_start_tick` | `u64` |
+| `windows` | `BTreeMap<u64, (f64, u64)>` |
+
 ## `src/resources/fox_approach_corridor_map.rs`
 
 ### FoxApproachCorridorMap (struct)
@@ -296,7 +319,7 @@
 
 ### FoxScentMap (struct)
 
-> Spatial grid tracking fox territorial scent marks.  Follows the same bucketed overlay pattern as `HuntingPriors` and `ColonyHuntingMap`. Foxes deposit scent during patrol and marking phases; all buckets decay globally each tick. Cats can detect high-scent areas to increase vigilance, and rival foxes use scent to recognise claimed territory.
+> Spatial grid tracking fox territorial scent marks.  Follows the same bucketed overlay pattern as `ColonyHuntingMap`. Foxes deposit scent during patrol and marking phases; all buckets decay globally each tick. Cats can detect high-scent areas to increase vigilance, and rival foxes use scent to recognise claimed territory.
 
 | Field | Type |
 |-------|------|
@@ -392,7 +415,7 @@
 
 | Field | Type |
 |-------|------|
-| `pairs` | `BTreeMap<(Entity, Entity), i32>` |
+| `pairs` | `BTreeMap<(Entity, Entity), f32>` |
 | `last_seen` | `BTreeSet<Entity>` |
 
 ## `src/resources/prey_scent_map.rs`
@@ -401,24 +424,11 @@
 
 > Per-`PreyKind` registry of scent maps. Indexed by `kind as usize`.  Replaces the pre-062 aggregate `PreyScentMap` `Resource` so cats can (a) discriminate which species' scent is on a tile and (b) eventually attenuate per emitter species (Phase 3 readiness hook — see `PerSpeciesScentRef` in `src/systems/influence_map.rs`).  `get_any` / `highest_nearby_any` fold across all five sub-maps via `f32::max`, preserving the aggregate read semantics of the pre-062 path for existing consumers; `highest_nearby_for` and `for_kind` give species-discriminating access for future dietary-specialization consumers.
 
-## `src/resources/recent_ambush_map.rs`
-
-### RecentAmbushMap (struct)
-
-> Colony-shared spatial memory of recent ambush events.  Each tile carries a 0.0–1.0 intensity that bumps to 1.0 when a predator ambushes a cat there and exponentially decays each tick. 210's closeout showed ambushes cluster spatially (60–70% of attacks land in 2–3 tile zones near colony center) and temporally (3–5 hits per cat over ~2–3k ticks before death) — neither `FoxScentMap` nor `colony_tension_recent` anchors on *where ambushes have actually happened*. `RecentAmbushMap` fills that gap as the colony-shared, event-typed-failure substrate.  Bucketed-grid layout follows the `FoxScentMap` / `PreyScentMap` pattern (120×90 world with 5-tile buckets → 24×18 = 432 cells).  **Substrate posture (per ticket 219):** ships dormant — no DSE scores against it yet. The value is sampled into `ScoringContext` and emitted via `ctx_scalars` so it shows up in `trace-*.jsonl`, keeping the substrate observable. Future tickets 220 (ward-placement) and 221 (caretake-relocate) consume it. Per §12.1 of `docs/systems/ai-substrate-refactor.md`, this joins `RecentDispositionFailures` / `RecentTargetFailures` / `HuntingPriors::record_failed_search` as a temporary typed-failure proxy that folds into the unified `Memory.LocationModel.last_threat` facet when Talk-of-the-Town cluster C3 (ticket 007) lands.
-
-| Field | Type |
-|-------|------|
-| `marks` | `Vec<f32>` |
-| `grid_w` | `usize` |
-| `grid_h` | `usize` |
-| `bucket_size` | `i32` |
-
 ## `src/resources/recipe_registry.rs`
 
 ### RecipeRegistry (struct)
 
-> Catalog of every recipe the simulation knows about.
+> Catalog of every recipe the simulation knows about.  Iteration order is **registration order** (the order `populate_recipe_registry` inserts) — ticket 502. This order is load-bearing: `emit_have_item_row`'s winner scan and [`Self::recipe_producing`]'s first-match both resolve byte-equal score ties toward the earlier-registered recipe, so registration order IS the author-curated tie-break priority (and `recipe_producing`'s doc always promised "first-registered match"). The pre-502 `HashMap` storage silently broke that promise: its per-process `RandomState` iteration order flipped ties between runs of the same binary (observed: the seed-42 canonical soak forked at elapsed tick 3750 on a warriors-kit aspiration tie and again at the first remedy craft). Keyed lookup goes through a `BTreeMap` index. Same determinism doctrine as `Relationships` (relationships.rs).
 
 ## `src/resources/relationships.rs`
 
@@ -451,6 +461,7 @@
 | `death` | `DeathConstants` |
 | `founder_age` | `FounderAgeConstants` |
 | `prey` | `PreyConstants` |
+| `movement` | `MovementConstants` |
 | `species` | `SpeciesConstants` |
 | `scoring` | `ScoringConstants` |
 | `disposition` | `DispositionConstants` |
@@ -473,6 +484,8 @@
 | `planning_substrate` | `PlanningSubstrateConstants` |
 | `escape_viability` | `EscapeViabilityConstants` |
 | `beliefs` | `BeliefsConstants` |
+| `belief_aggregation` | `BeliefAggregationConstants` |
+| `shelter_beliefs` | `ShelterBeliefConstants` |
 | `affordances` | `AffordancesConstants` |
 | `kitten_rearing` | `KittenRearingConstants` |
 | `parenting` | `ParentingActivityConstants` |
@@ -480,6 +493,8 @@
 | `tremor` | `TremorConstants` |
 | `prey_byproducts` | `PreyByproductConstants` |
 | `environmental_quality` | `EnvironmentalQualityConstants` |
+| `play_cue_emission` | `PlayCueEmissionConstants` |
+| `relationships` | `RelationshipsConstants` |
 
 ## `src/resources/snapshot_config.rs`
 
@@ -621,6 +636,19 @@
 ### WardIntentMap (struct)
 
 > 301: spatial grid carrying coordinator-stamped ward-placement intent.  Populated by [`compute_ward_placement`] when `ward_placement_semantics == DescendingResidual`: each K-round pick stamps a radial intent contribution at its winning tile, so the field encodes "the colony's spread logic wants a ward here." Consumed at score time by the Path-B `HerbcraftWardDse` (`src/ai/dses/herbcraft_ward.rs`) via a substrate-dormant scalar consideration gated on `ward_intent_dse_weight`: when a cat is standing on (or near) a stamped intent tile and the weight is lifted off 0.0, the DSE scores higher there. The cat's own choice of *whether* to set a ward is unchanged, but its propensity to commit when already on an intent tile is biased upward.  Bucketed pattern mirrors `WardCoverageMap` / `FoxScentMap`. Unlike `WardCoverageMap` (rebuilt every tick from live `Ward` entities), `WardIntentMap` is a *slowly-decaying accumulator*: stamps land during coordinator wakes (every ~20 ticks), and `decay_all` applies a per-tick decay so an intent fades over ~tens of ticks if no cat plants there.  **Dormancy invariant.** At default `SimConstants` the populator short-circuits (semantics is `SingleShotArgmax`) and the reader's weight is `0.0`, so the resource is allocated but never written to or read for behavior. Existence is for substrate-trace observability; activation is via the two ticket-301 flags.
+
+| Field | Type |
+|-------|------|
+| `marks` | `Vec<f32>` |
+| `grid_w` | `usize` |
+| `grid_h` | `usize` |
+| `bucket_size` | `i32` |
+
+## `src/resources/ward_siege_fear_map.rs`
+
+### WardSiegeFearMap (struct)
+
+> Spatial grid tracking siege-fear intensity at besieged-ward positions.  Bucketed overlay matching [`WardCoverageMap`](super::ward_coverage_map)'s shape — 120×90 default world, 5-tile buckets. The producer recomputes the grid each tick from live `WildlifeAiState::EncirclingWard` data; `clear()` zeros every bucket at the start of the rebuild, then each besieged ward stamps a falloff via [`Self::stamp_siege_at`].
 
 | Field | Type |
 |-------|------|

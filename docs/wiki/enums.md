@@ -30,7 +30,7 @@
 | [DirectiveKind](#directivekind) | 10 | `src/components/coordination.rs` |
 | [StepKind](#stepkind) | 36 | `src/components/task_chain.rs` |
 | [ZoneKind](#zonekind) | 3 | `src/components/zone.rs` |
-| [AspirationDomain](#aspirationdomain) | 13 | `src/components/aspirations.rs` |
+| [AspirationDomain](#aspirationdomain) | 14 | `src/components/aspirations.rs` |
 
 ---
 
@@ -479,8 +479,8 @@
 | `BurialFired` |
 | `cat` |
 | `deceased` |
-| `PlayFired` |
-| `cat` |
+| `JointPlayBoutCompleted` |
+| `actor` |
 | `partner` |
 | `CourtshipDrifted` |
 | `cat_a` |
@@ -686,4 +686,5 @@
 | `Hidework` |
 | `Pigment` |
 | `Cairn` |
+| `Crafting` |
 

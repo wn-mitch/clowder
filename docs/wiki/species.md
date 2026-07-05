@@ -18,7 +18,7 @@
 | `item_kind` | ItemKind::RawBird | ItemKind::RawFish | ItemKind::RawMouse | ItemKind::RawRabbit | ItemKind::RawRat |
 | `flee_speed` | 3 | 0 | 1 | 1 | 1 |
 | `graze_cadence` | 35 | 50 | 40 | 20 | 25 |
-| `alert_radius` | 8 | 2 | 3 | 6 | 4 |
+| `alert_radius` | 8.0 | 2.0 | 3.0 | 6.0 | 4.0 |
 | `freeze_ticks` | 1 | 0 | 1 | 10 | 2 |
 | `catch_difficulty` | 0.5 | 0.6 | 0.9 | 0.85 | 1.0 |
 | `flee_strategy` | FleeStrategy::Teleport | FleeStrategy::Stationary | FleeStrategy::SeekCover | FleeStrategy::Standard | FleeStrategy::SeekCover |
@@ -28,7 +28,7 @@
 | `den_spawn_rate` | 0.004 | 0.006 | 0.01 | 0.01 | 0.012 |
 | `den_habitat` | &[Terrain::LightForest] | &[Terrain::Water] | &[Terrain::LightForest] | &[Terrain::Grass] | &[Terrain::DenseForest] |
 | `den_raid_drop` | 3 | 3 | 6 | 4 | 5 |
-| `den_spacing` | 15 | 20 | 10 | 20 | 10 |
+| `den_spacing` | 15.0 | 20.0 | 10.0 | 20.0 | 10.0 |
 | `den_density` | 250 | 250 | 100 | 250 | 100 |
 | `seasonal_breed_modifier` | Spring: 1.5, Summer: 1.0 | Spring: 2.0, Summer: 0.5, Autumn: 0.3, Winter: 0.1 | Spring: 1.5, Summer: 1.0, Autumn: 0.5, Winter: 0.1 | Spring: 2.0, Summer: 1.0 | Spring: 1.5, Summer: 1.0, Autumn: 0.5, Winter: 0.2 |
 
@@ -46,7 +46,7 @@
 | `item_kind` | ItemKind::RawBird |
 | `flee_speed` | 3 |
 | `graze_cadence` | 35 |
-| `alert_radius` | 8 |
+| `alert_radius` | 8.0 |
 | `freeze_ticks` | 1 |
 | `catch_difficulty` | 0.5 |
 | `flee_strategy` | FleeStrategy::Teleport |
@@ -56,7 +56,7 @@
 | `den_spawn_rate` | 0.004 |
 | `den_habitat` | &[Terrain::LightForest] |
 | `den_raid_drop` | 3 |
-| `den_spacing` | 15 |
+| `den_spacing` | 15.0 |
 | `den_density` | 250 |
 | `seasonal_breed_modifier` | Spring: 1.5, Summer: 1.0 |
 
@@ -74,7 +74,7 @@
 | `item_kind` | ItemKind::RawFish |
 | `flee_speed` | 0 |
 | `graze_cadence` | 50 |
-| `alert_radius` | 2 |
+| `alert_radius` | 2.0 |
 | `freeze_ticks` | 0 |
 | `catch_difficulty` | 0.6 |
 | `flee_strategy` | FleeStrategy::Stationary |
@@ -84,7 +84,7 @@
 | `den_spawn_rate` | 0.006 |
 | `den_habitat` | &[Terrain::Water] |
 | `den_raid_drop` | 3 |
-| `den_spacing` | 20 |
+| `den_spacing` | 20.0 |
 | `den_density` | 250 |
 | `seasonal_breed_modifier` | Spring: 2.0, Summer: 0.5, Autumn: 0.3, Winter: 0.1 |
 
@@ -102,7 +102,7 @@
 | `item_kind` | ItemKind::RawMouse |
 | `flee_speed` | 1 |
 | `graze_cadence` | 40 |
-| `alert_radius` | 3 |
+| `alert_radius` | 3.0 |
 | `freeze_ticks` | 1 |
 | `catch_difficulty` | 0.9 |
 | `flee_strategy` | FleeStrategy::SeekCover |
@@ -112,7 +112,7 @@
 | `den_spawn_rate` | 0.01 |
 | `den_habitat` | &[Terrain::LightForest] |
 | `den_raid_drop` | 6 |
-| `den_spacing` | 10 |
+| `den_spacing` | 10.0 |
 | `den_density` | 100 |
 | `seasonal_breed_modifier` | Spring: 1.5, Summer: 1.0, Autumn: 0.5, Winter: 0.1 |
 
@@ -130,7 +130,7 @@
 | `item_kind` | ItemKind::RawRabbit |
 | `flee_speed` | 1 |
 | `graze_cadence` | 20 |
-| `alert_radius` | 6 |
+| `alert_radius` | 6.0 |
 | `freeze_ticks` | 10 |
 | `catch_difficulty` | 0.85 |
 | `flee_strategy` | FleeStrategy::Standard |
@@ -140,7 +140,7 @@
 | `den_spawn_rate` | 0.01 |
 | `den_habitat` | &[Terrain::Grass] |
 | `den_raid_drop` | 4 |
-| `den_spacing` | 20 |
+| `den_spacing` | 20.0 |
 | `den_density` | 250 |
 | `seasonal_breed_modifier` | Spring: 2.0, Summer: 1.0 |
 
@@ -158,7 +158,7 @@
 | `item_kind` | ItemKind::RawRat |
 | `flee_speed` | 1 |
 | `graze_cadence` | 25 |
-| `alert_radius` | 4 |
+| `alert_radius` | 4.0 |
 | `freeze_ticks` | 2 |
 | `catch_difficulty` | 1.0 |
 | `flee_strategy` | FleeStrategy::SeekCover |
@@ -168,7 +168,7 @@
 | `den_spawn_rate` | 0.012 |
 | `den_habitat` | &[Terrain::DenseForest] |
 | `den_raid_drop` | 5 |
-| `den_spacing` | 10 |
+| `den_spacing` | 10.0 |
 | `den_density` | 100 |
 | `seasonal_breed_modifier` | Spring: 1.5, Summer: 1.0, Autumn: 0.5, Winter: 0.2 |
 

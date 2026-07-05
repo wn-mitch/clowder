@@ -73,17 +73,30 @@ pub fn resolve_flee_travel(
     threat: Option<Entity>,
     path_plan: &CatPathPlan<'_>,
     map: &TileMap,
+    // 140 step 6 — flee expresses desire; the Chain-4 integrator does
+    // the moving (momentum makes real flee arcs). The pre-140
+    // snap-to-target teleport (`*pos = target` inside 1 tile) is
+    // RETIRED — arrival is observed, not forced.
+    desired: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
 ) -> StepOutcome<Option<FleeWitness>> {
-    let reached = if *pos == target {
-        true
-    } else if pos.distance_to(&target) <= 1.0 {
-        *pos = target;
+    let reached = if *pos == target || pos.distance_to(&target) <= 1.0 {
         true
     } else {
-        if let Some(next) = path_plan.next_step(*pos, target, map) {
-            *pos = next;
-        }
-        *pos == target || pos.distance_to(&target) <= 1.0
+        // Smoothed corridor per tick (flee targets re-pick frequently
+        // and paths are short; recompute throttling is plan step 13).
+        // Seek the first string-pulled waypoint at full speed; sprint
+        // gait lands in step 12.
+        let aim = path_plan
+            .find_smoothed_path(*pos, target, map)
+            .and_then(|path| path.first().copied())
+            .unwrap_or(target);
+        desired.0 = Some(crate::ai::steering::seek(
+            pos.0,
+            aim.0,
+            movement.cat_max_speed,
+        ));
+        false
     };
     if !reached {
         return StepOutcome {

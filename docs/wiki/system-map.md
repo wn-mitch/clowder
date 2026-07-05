@@ -122,14 +122,26 @@ graph TD
         mood_bond_proximity_mood --> memory_decay_memories
         belief_integrator_gossip_inventory_observations["belief_integrator::gossip_inventory_observations"]
         memory_decay_memories --> belief_integrator_gossip_inventory_observations
+        shelter_beliefs_claim_home_dens["shelter_beliefs::claim_home_dens"]
+        belief_integrator_gossip_inventory_observations --> shelter_beliefs_claim_home_dens
+        shelter_beliefs_update_shelter_continuity["shelter_beliefs::update_shelter_continuity"]
+        shelter_beliefs_claim_home_dens --> shelter_beliefs_update_shelter_continuity
+        shelter_beliefs_emit_den_condition_events["shelter_beliefs::emit_den_condition_events"]
+        shelter_beliefs_update_shelter_continuity --> shelter_beliefs_emit_den_condition_events
+        shelter_beliefs_detect_den_sieges["shelter_beliefs::detect_den_sieges"]
+        shelter_beliefs_emit_den_condition_events --> shelter_beliefs_detect_den_sieges
         belief_integrator_integrate_beliefs["belief_integrator::integrate_beliefs"]
-        belief_integrator_gossip_inventory_observations --> belief_integrator_integrate_beliefs
+        shelter_beliefs_detect_den_sieges --> belief_integrator_integrate_beliefs
+        colony_hunting_map_rebuild_colony_hunting_map["colony_hunting_map::rebuild_colony_hunting_map"]
+        belief_integrator_integrate_beliefs --> colony_hunting_map_rebuild_colony_hunting_map
         affordance_writer_affordance_writer["affordance_writer::affordance_writer"]
-        belief_integrator_integrate_beliefs --> affordance_writer_affordance_writer
+        colony_hunting_map_rebuild_colony_hunting_map --> affordance_writer_affordance_writer
         items_update_low_ward_reserve_markers["items::update_low_ward_reserve_markers"]
         affordance_writer_affordance_writer --> items_update_low_ward_reserve_markers
+        coordination_update_colony_alignment_scores["coordination::update_colony_alignment_scores"]
+        items_update_low_ward_reserve_markers --> coordination_update_colony_alignment_scores
         coordination_evaluate_coordinators["coordination::evaluate_coordinators"]
-        items_update_low_ward_reserve_markers --> coordination_evaluate_coordinators
+        coordination_update_colony_alignment_scores --> coordination_evaluate_coordinators
         coordination_assess_colony_needs["coordination::assess_colony_needs"]
         coordination_evaluate_coordinators --> coordination_assess_colony_needs
         coordination_dispatch_urgent_directives["coordination::dispatch_urgent_directives"]
@@ -151,13 +163,23 @@ graph TD
         buildings_process_gates --> buildings_tidy_buildings
     end
     subgraph chain4["Chain 4: Social, Combat, Death & Narrative"]
+        movement_integrate_velocities["movement::integrate_velocities"]
         cat_movement_emit_cat_moved_messages["cat_movement::emit_cat_moved_messages"]
+        movement_integrate_velocities --> cat_movement_emit_cat_moved_messages
         social_update_near_pair_cache["social::update_near_pair_cache"]
         cat_movement_emit_cat_moved_messages --> social_update_near_pair_cache
         social_passive_familiarity["social::passive_familiarity"]
         social_update_near_pair_cache --> social_passive_familiarity
+        playbow_emitter_emit_play_bows["playbow_emitter::emit_play_bows"]
+        social_passive_familiarity --> playbow_emitter_emit_play_bows
+        playbow_emitter_emit_reciprocal_advances["playbow_emitter::emit_reciprocal_advances"]
+        playbow_emitter_emit_play_bows --> playbow_emitter_emit_reciprocal_advances
+        sustained_copresence_track_sustained_copresence["sustained_copresence::track_sustained_copresence"]
+        playbow_emitter_emit_reciprocal_advances --> sustained_copresence_track_sustained_copresence
+        festering_authoring_emit_festering_observations["festering_authoring::emit_festering_observations"]
+        sustained_copresence_track_sustained_copresence --> festering_authoring_emit_festering_observations
         personality_friction_personality_friction["personality_friction::personality_friction"]
-        social_passive_familiarity --> personality_friction_personality_friction
+        festering_authoring_emit_festering_observations --> personality_friction_personality_friction
         social_check_bonds["social::check_bonds"]
         personality_friction_personality_friction --> social_check_bonds
         colony_knowledge_update_colony_knowledge["colony_knowledge::update_colony_knowledge"]
@@ -174,12 +196,18 @@ graph TD
         wildlife_fox_confrontation_tick --> wildlife_fox_store_raid_tick
         magic_personal_corruption_effects["magic::personal_corruption_effects"]
         wildlife_fox_store_raid_tick --> magic_personal_corruption_effects
+        festering_authoring_author_festering_from_misfire["festering_authoring::author_festering_from_misfire"]
+        magic_personal_corruption_effects --> festering_authoring_author_festering_from_misfire
+        injury_cache_cache_last_body_part_injury["injury_cache::cache_last_body_part_injury"]
+        festering_authoring_author_festering_from_misfire --> injury_cache_cache_last_body_part_injury
         death_check_death["death::check_death"]
-        magic_personal_corruption_effects --> death_check_death
+        injury_cache_cache_last_body_part_injury --> death_check_death
         coordination_flag_coordinator_death["coordination::flag_coordinator_death"]
         death_check_death --> coordination_flag_coordinator_death
+        coordination_flag_coordinator_incapacitated["coordination::flag_coordinator_incapacitated"]
+        coordination_flag_coordinator_death --> coordination_flag_coordinator_incapacitated
         coordination_expire_directives["coordination::expire_directives"]
-        coordination_flag_coordinator_death --> coordination_expire_directives
+        coordination_flag_coordinator_incapacitated --> coordination_expire_directives
         death_cleanup_dead["death::cleanup_dead"]
         coordination_expire_directives --> death_cleanup_dead
         death_update_grave_aura_map["death::update_grave_aura_map"]
@@ -212,7 +240,9 @@ graph TD
         goap_emit_plan_narrative --> plan_substrate_update_prev_safety_deficit
     end
     subgraph standalone["Standalone Systems"]
+        movement_budget_on_wild_animal_added["movement_budget::on_wild_animal_added"]
         magic_CorruptionPushback["magic::CorruptionPushback"]
+        sustained_copresence_SustainedCoPresenceTracker["sustained_copresence::SustainedCoPresenceTracker"]
         parenting_activity_ParentingScalars["parenting_activity::ParentingScalars"]
         time_advance_time["time::advance_time"]
         weather_update_weather["weather::update_weather"]
@@ -221,6 +251,7 @@ graph TD
         magic_corruption_spread["magic::corruption_spread"]
         magic_ward_decay["magic::ward_decay"]
         magic_update_ward_coverage_map["magic::update_ward_coverage_map"]
+        magic_update_ward_siege_fear_map["magic::update_ward_siege_fear_map"]
         coordination_update_colony_center["coordination::update_colony_center"]
         coordination_update_colony_district_map["coordination::update_colony_district_map"]
         magic_herb_seasonal_check["magic::herb_seasonal_check"]
@@ -231,6 +262,7 @@ graph TD
         magic_apply_corruption_pushback["magic::apply_corruption_pushback"]
         magic_update_corruption_landmarks["magic::update_corruption_landmarks"]
         magic_spawn_shadow_fox_from_corruption["magic::spawn_shadow_fox_from_corruption"]
+        movement_budget_accumulate_movement_budget["movement_budget::accumulate_movement_budget"]
         wildlife_shadowfox_coherence_tick["wildlife::shadowfox_coherence_tick"]
         wildlife_shadowfox_motivation_tick["wildlife::shadowfox_motivation_tick"]
         wildlife_shadowfox_haunting_drain["wildlife::shadowfox_haunting_drain"]
@@ -254,7 +286,6 @@ graph TD
         wildlife_fox_ai_decision["wildlife::fox_ai_decision"]
         wildlife_fox_scent_tick["wildlife::fox_scent_tick"]
         wildlife_update_fox_approach_corridor_map["wildlife::update_fox_approach_corridor_map"]
-        wildlife_update_recent_ambush_map["wildlife::update_recent_ambush_map"]
         wildlife_predator_hunt_prey["wildlife::predator_hunt_prey"]
         wildlife_carcass_decay["wildlife::carcass_decay"]
         wildlife_carcass_scent_tick["wildlife::carcass_scent_tick"]

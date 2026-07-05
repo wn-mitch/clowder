@@ -99,6 +99,8 @@ fn mentoring_restores_mastery() {
             Personality::random(&mut rand::rng()),
             Name("Mentor".to_string()),
             Gender::Tom,
+            clowder::components::physical::Velocity::default(),
+            clowder::components::physical::DesiredVelocity::default(),
             Mood::default(),
             Memory::default(),
         ))
@@ -154,6 +156,8 @@ fn mentoring_grows_apprentice_skill() {
         Gender::Tom,
         Mood::default(),
         Memory::default(),
+        clowder::components::physical::Velocity::default(),
+        clowder::components::physical::DesiredVelocity::default(),
     ));
 
     let hunting_before = world.get::<Skills>(apprentice).unwrap().hunting;
@@ -199,6 +203,8 @@ fn mentoring_builds_fondness() {
             Personality::random(&mut rand::rng()),
             Name("Mentor".to_string()),
             Gender::Tom,
+            clowder::components::physical::Velocity::default(),
+            clowder::components::physical::DesiredVelocity::default(),
             Mood::default(),
             Memory::default(),
         ))

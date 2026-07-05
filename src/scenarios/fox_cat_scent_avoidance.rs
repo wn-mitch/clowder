@@ -31,7 +31,11 @@ pub static SCENARIO: Scenario = Scenario {
     // adding `tremor_tick` to the per-tick chain shifted seed-42's
     // ShadowFox approach-then-avoid pacing; the avoid still fires,
     // just later in the run.
-    default_ticks: 200,
+    // 140 step 6 — bumped 200 → 500: cats now accelerate from rest
+    // under the velocity integrator, so the cluster's steady-state
+    // scent saturation (and the fox's gradient-boundary flip) lands
+    // later on seed 42. Same re-timing family as 497/493's bumps.
+    default_ticks: 500,
     setup,
     expected_features: &["ShadowFoxAvoidedCatScent"],
 };

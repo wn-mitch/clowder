@@ -72,9 +72,14 @@ pub static SCENARIO_BIRD: Scenario = Scenario {
     // 493: bumped 300 → 800 (the number 494 used for the rat sibling's
     // unit test). A*-first `step_toward` re-times the chase against the
     // bird's radial-teleport escape; the first bird kill slips past 300
-    // on seed 42. Plan.md step 10 replaces the teleport with burst
-    // flight and will re-time this again.
-    default_ticks: 800,
+    // on seed 42.
+    //
+    // 140 step 6: bumped 800 → 2000. Cats now accelerate from rest
+    // (max_accel 0.25/tick²) under the velocity integrator, so the
+    // approach + repeated teleport-escape cycles stretch further.
+    // Plan step 10 replaces the teleport with burst flight and
+    // re-times this scenario one final time.
+    default_ticks: 2000,
     setup: setup_bird,
     expected_features: &["ByproductSpawned"],
 };
@@ -307,7 +312,7 @@ mod tests {
     /// A*-first `step_toward` re-times the chase vs the bird teleport.
     #[test]
     fn bird_kills_produce_feather_and_bone() {
-        let report = run(&SCENARIO_BIRD, None, Some(800), 42);
+        let report = run(&SCENARIO_BIRD, None, Some(2000), 42);
         // Ticket 494 — derive kill count from the *cat's bird meat
         // count* rather than the global `ByproductSpawned` canary.
         // The canary counts every byproduct firing in the world,

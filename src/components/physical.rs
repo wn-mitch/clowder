@@ -3,6 +3,38 @@ use bevy_ecs::prelude::*;
 use std::hash::{Hash, Hasher};
 
 // ---------------------------------------------------------------------------
+// Fluid movement (0.4.0 "Free Range" — ticket 140 / plan step 6)
+// ---------------------------------------------------------------------------
+
+/// Persistent actual velocity, world units (tiles) per tick —
+/// **integrator-owned** (`systems::movement::integrate_velocities` is
+/// the only production writer). Decision layers never touch this;
+/// they express desire via [`DesiredVelocity`] and the integrator
+/// turns desire into motion under the acceleration cap. Not
+/// serialized into saves: velocity is transient motion state that
+/// reconstructs from fresh desires within ~4 ticks of load.
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub struct Velocity(pub bevy::math::Vec2);
+
+/// Per-tick movement desire, written by decision layers (migrated
+/// resolvers), **consumed-and-cleared by the integrator each tick**.
+///
+/// `None` is the bisectability invariant of the staged migration: an
+/// unmigrated resolver writes `Position` directly and expresses no
+/// desire — the integrator then zeroes the mover's [`Velocity`]
+/// immediately and moves nothing, so a cat can never be moved twice
+/// in one tick (once by a legacy resolver, once by momentum).
+/// Momentum exists only across consecutive desire-writing ticks.
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub struct DesiredVelocity(pub Option<bevy::math::Vec2>);
+
+/// Terrain-exempt mover (hawks; birds in burst flight — plan steps
+/// 9-10). The integrator skips passability/wall-slide for `Flying`
+/// entities and applies the map bounds clamp only.
+#[derive(Component, Debug, Clone, Copy, Default)]
+pub struct Flying;
+
+// ---------------------------------------------------------------------------
 // Position
 // ---------------------------------------------------------------------------
 
@@ -14,8 +46,10 @@ use std::hash::{Hash, Hasher};
 /// (`pos.world()`) become first-class in sibling sub-phases 2b/2c.
 ///
 /// Wire format: `serde(transparent)` over `Vec2`, so new code paths
-/// serialize as a 2-element float array. Save format keeps the legacy
-/// `{x:i32, y:i32}` shape via `SavedPosition` in `persistence.rs`.
+/// serialize as a 2-element float array. (A pre-140 revision of this
+/// comment referenced a `SavedPosition` shim in `persistence.rs` that
+/// never existed — Position serializes transparently and sub-tile
+/// positions round-trip as-is.)
 ///
 /// `PartialEq` / `Eq` / `Hash` are keyed on `tile()` — the containing
 /// integer grid cell — to preserve the pre-491 `HashMap<Position, _>`

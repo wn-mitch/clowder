@@ -216,7 +216,20 @@ pub enum CatPathPlan<'a> {
     /// Walk the gradient of `field` toward the destination. Cheapest
     /// path (no per-step search). Use when the field is fresh and
     /// reaches the destination.
-    Field(&'a RouteCostField),
+    ///
+    /// 140 step 6 — the arm now ALSO carries the overlay refs the
+    /// field was flooded with, so `find_smoothed_path`'s cost-aware
+    /// string-pulling sees the same cost surface the router paid
+    /// (smoothing must never shortcut through fox-scent / corruption
+    /// / threat-belief fields — plan risk #7). `None`s degrade to
+    /// terrain-only smoothing (legacy/test constructors).
+    Field {
+        field: &'a RouteCostField,
+        fox: Option<FoxScentOverlay<'a>>,
+        corr: Option<CorruptionOverlay<'a>>,
+        threat: Option<crate::ai::pathfinding::ThreatBeliefOverlay<'a>>,
+        weight: f32,
+    },
     /// Fall back to A\* with overlay slices. Use when no field is
     /// available, or when the field is stale / doesn't reach the
     /// destination. Boldness factor `weight` is baked into both
@@ -267,7 +280,7 @@ impl<'a> CatPathPlan<'a> {
     /// the cat is stuck (no passable neighbor) or already at `to`.
     pub fn next_step(&self, from: Position, to: Position, map: &TileMap) -> Option<Position> {
         match self {
-            CatPathPlan::Field(field) => step_along_field(from, to, field, map),
+            CatPathPlan::Field { field, .. } => step_along_field(from, to, field, map),
             CatPathPlan::AStarFallback {
                 fox,
                 corr,
@@ -306,7 +319,7 @@ impl<'a> CatPathPlan<'a> {
         map: &TileMap,
     ) -> Option<Vec<Position>> {
         match self {
-            CatPathPlan::Field(field) => {
+            CatPathPlan::Field { field, .. } => {
                 if from == to {
                     return Some(Vec::new());
                 }
@@ -349,6 +362,67 @@ impl<'a> CatPathPlan<'a> {
             },
             CatPathPlan::NoOverlay => find_path(from, to, map, &[]),
         }
+    }
+
+    /// 140 step 6 — the overlay slice smoothing must respect: the
+    /// same cost surface this plan routes on. Empty for `NoOverlay`
+    /// (legacy terrain-only callers).
+    fn smoothing_overlays(&self) -> Vec<WeightedOverlay<'_>> {
+        match self {
+            CatPathPlan::Field {
+                fox,
+                corr,
+                threat,
+                weight,
+                ..
+            } => {
+                let mut v = Vec::with_capacity(3);
+                if let Some(f) = fox.as_ref() {
+                    v.push(WeightedOverlay::new(f, *weight));
+                }
+                if let Some(c) = corr.as_ref() {
+                    v.push(WeightedOverlay::new(c, *weight));
+                }
+                if let Some(t) = threat.as_ref() {
+                    v.push(WeightedOverlay::new(t, *weight));
+                }
+                v
+            }
+            CatPathPlan::AStarFallback {
+                fox,
+                corr,
+                threat,
+                weight,
+            } => {
+                let mut v = Vec::with_capacity(3);
+                v.push(WeightedOverlay::new(fox, *weight));
+                v.push(WeightedOverlay::new(corr, *weight));
+                if let Some(t) = threat.as_ref() {
+                    v.push(WeightedOverlay::new(t, *weight));
+                }
+                v
+            }
+            CatPathPlan::NoOverlay => Vec::new(),
+        }
+    }
+
+    /// 140 step 6 — full route from `from` to `to`, string-pulled into
+    /// sparse waypoints (`steering::smooth_path` under this plan's own
+    /// cost surface). Waypoints are tile-center `Position`s of the
+    /// retained corridor tiles; consumers seek the first entry with a
+    /// `DesiredVelocity` and pop it inside
+    /// `movement.waypoint_arrival_radius`. Returns `None` when no
+    /// route exists.
+    pub fn find_smoothed_path(
+        &self,
+        from: Position,
+        to: Position,
+        map: &TileMap,
+    ) -> Option<Vec<Position>> {
+        let path = self.find_full_path(from, to, map)?;
+        let overlays = self.smoothing_overlays();
+        let smoothed = crate::ai::steering::smooth_path(from.world(), &path, map, &overlays);
+        Some(smoothed.into_iter().map(Position).collect())
     }
 }
 

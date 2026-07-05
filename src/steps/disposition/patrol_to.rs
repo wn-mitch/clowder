@@ -40,6 +40,13 @@ pub fn resolve_patrol_to(
     path_plan: &CatPathPlan<'_>,
     d: &DispositionConstants,
     cat_tile_counts: &HashMap<Position, u32>,
+    // 140 step 6 — patrol expresses desire; the Chain-4 integrator
+    // moves the cat. `cached_path` now holds the STRING-PULLED
+    // waypoints (sparse tile centers), not the dense A* chain. The
+    // per-tile safety gain keys off en-route ticks (one desire-writing
+    // tick == one former tile-step at cat speed 1.0 — same cadence).
+    desired: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
 ) -> StepOutcome<()> {
     let Some(target) = target_position else {
         return StepOutcome::bare(StepResult::Fail("no patrol target".into()));
@@ -50,7 +57,7 @@ pub fn resolve_patrol_to(
         return StepOutcome::bare(StepResult::Advance);
     }
     if cached_path.is_none() {
-        match path_plan.find_full_path(*pos, target, map) {
+        match path_plan.find_smoothed_path(*pos, target, map) {
             Some(path) => *cached_path = Some(path),
             None => {
                 return StepOutcome::bare(StepResult::Fail("no path to patrol target".into()));
@@ -58,12 +65,25 @@ pub fn resolve_patrol_to(
         }
     }
     if let Some(ref mut path) = cached_path {
+        // Pop waypoints the integrator has carried us within reach of.
+        while let Some(wp) = path.first().copied() {
+            if pos.0.distance(wp.0) <= movement.waypoint_arrival_radius {
+                path.remove(0);
+            } else {
+                break;
+            }
+        }
         if path.is_empty() {
             jitter_if_stacked(pos, map, cat_tile_counts);
             needs.safety = (needs.safety + d.patrol_arrival_safety_gain).min(1.0);
             StepOutcome::bare(StepResult::Advance)
         } else {
-            *pos = path.remove(0);
+            let aim = path[0];
+            desired.0 = Some(crate::ai::steering::seek(
+                pos.0,
+                aim.0,
+                movement.cat_max_speed,
+            ));
             needs.safety = (needs.safety + d.patrol_per_tile_safety_gain).min(1.0);
             StepOutcome::bare(StepResult::Continue)
         }

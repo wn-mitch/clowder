@@ -118,6 +118,7 @@ pub mod items;
 pub mod magic;
 pub mod memory;
 pub mod mood;
+pub mod movement;
 pub mod movement_budget;
 pub mod narrative;
 pub mod needs;

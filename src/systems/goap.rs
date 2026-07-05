@@ -3945,6 +3945,11 @@ pub fn resolve_goap_plans(
                 // seed-1's scenario-test invariance (memory
                 // `learning_bevy_schedule_edge_perturbation`).
                 Option<&mut crate::components::recent_crafts::CatRecentCrafts>,
+                // 140 step 6 — per-tick movement desire; migrated
+                // resolvers (TravelTo / PatrolTo / FleeTravel) write
+                // it, the Chain-4 integrator consumes it. Required
+                // (cat blueprint bundle).
+                &mut crate::components::physical::DesiredVelocity,
             ),
         ),
         (
@@ -4314,9 +4319,10 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _, _), (_, _, g, _, _, _, _, _, _, _, _, _, _, _))| {
-                    (e, g.as_ref().map_or(0.8, |g| g.0))
-                },
+                |(
+                    (e, _, _, _, _, _, _, _, _, _),
+                    (_, _, g, _, _, _, _, _, _, _, _, _, _, _, _),
+                )| { (e, g.as_ref().map_or(0.8, |g| g.0)) },
             )
             .collect(),
         // Gender snapshot for §7.M.7.4's `resolve_mate_with` partner lookup —
@@ -4325,9 +4331,10 @@ pub fn resolve_goap_plans(
         gender: cats
             .iter()
             .map(
-                |((e, _, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _))| {
-                    (e, *g)
-                },
+                |(
+                    (e, _, _, _, _, _, _, _, _, _),
+                    (g, _, _, _, _, _, _, _, _, _, _, _, _, _, _),
+                )| { (e, *g) },
             )
             .collect(),
         cat_tile_counts: {
@@ -4392,7 +4399,7 @@ pub fn resolve_goap_plans(
         },
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, health, _, _, _, _, _, _, _, _, _))| {
+            .filter(|(_, (_, _, _, _, health, _, _, _, _, _, _, _, _, _, _))| {
                 health.current < health.max
             })
             .map(|((e, _, _, pos, _, _, _, _, _, _), _)| (e, *pos))
@@ -4425,9 +4432,10 @@ pub fn resolve_goap_plans(
         cat_grooming: cats
             .iter()
             .filter_map(
-                |((e, _, _, _, _, _, _, _, _, _), (_, _, gc, _, _, _, _, _, _, _, _, _, _, _))| {
-                    gc.map(|g| (e, g.0))
-                },
+                |(
+                    (e, _, _, _, _, _, _, _, _, _),
+                    (_, _, gc, _, _, _, _, _, _, _, _, _, _, _, _),
+                )| { gc.map(|g| (e, g.0)) },
             )
             .collect(),
         // §6.5.4 kinship lookup — `(kitten_entity) → (mother, father)`.
@@ -4532,6 +4540,7 @@ pub fn resolve_goap_plans(
             route_cost_field,
             body_model,
             mut recent_crafts,
+            mut desired_velocity,
         ),
     ) in &mut cats
     {
@@ -4874,6 +4883,7 @@ pub fn resolve_goap_plans(
             &mut plan,
             &mut current,
             &mut pos,
+            &mut desired_velocity,
             &mut skills,
             &mut needs,
             &mut inventory,
@@ -5554,7 +5564,7 @@ pub fn resolve_goap_plans(
     // Deferred grooming restorations — apply grooming condition delta and
     // §7.W social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((_, (_, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _, _))) =
+        if let Ok((_, (_, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _, _, _))) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -5810,6 +5820,9 @@ fn dispatch_step_action(
     plan: &mut GoapPlan,
     current: &mut CurrentAction,
     pos: &mut Position,
+    // 140 step 6 — movement desire for migrated resolvers (TravelTo /
+    // FleeTravel); consumed by the Chain-4 integrator.
+    desired_velocity: &mut crate::components::physical::DesiredVelocity,
     skills: &mut Skills,
     needs: &mut Needs,
     inventory: &mut Inventory,
@@ -5905,7 +5918,13 @@ fn dispatch_step_action(
                         __window,
                     ) =>
                 {
-                    crate::ai::route_cost::CatPathPlan::Field(__field)
+                    crate::ai::route_cost::CatPathPlan::Field {
+                        field: __field,
+                        fox: Some(__fox),
+                        corr: Some(__corr),
+                        threat: __threat,
+                        weight: __weight,
+                    }
                 }
                 _ => {
                     if let Some(__act) = narr.activation.as_deref_mut() {
@@ -6013,6 +6032,8 @@ fn dispatch_step_action(
                 &snaps.dead_cat_positions,
                 cat_entity,
                 d,
+                desired_velocity,
+                &ec.constants.movement,
             )
         }
 
@@ -6802,6 +6823,8 @@ fn dispatch_step_action(
                 &path_plan,
                 d,
                 &snaps.cat_tile_counts,
+                desired_velocity,
+                &ec.constants.movement,
             )
             .result
         }
@@ -8340,6 +8363,8 @@ fn dispatch_step_action(
                 threat,
                 &path_plan,
                 &ec.map,
+                desired_velocity,
+                &ec.constants.movement,
             );
             if let Some(w) = outcome.witness {
                 // 295 — observable side-effect for the belief substrate.
@@ -8933,6 +8958,12 @@ fn resolve_travel_to(
     dead_cat_positions: &[(Entity, Position)],
     cat_entity: Entity,
     d: &DispositionConstants,
+    // 140 step 6 — the resolver now expresses movement desire instead
+    // of writing Position per tick; the Chain-4 integrator moves the
+    // cat. Position writes remain ONLY at arrival (snap / anti-stack
+    // jitter — step 7 replaces those with separation steering).
+    desired: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
 ) -> crate::steps::StepResult {
     if state.target_position.is_none() {
         state.target_position = resolve_zone_position(
@@ -8961,19 +8992,21 @@ fn resolve_travel_to(
         return crate::steps::StepResult::Fail("no reachable zone target".into());
     };
 
-    // Cached path via `CatPathPlan` — gradient-walk over the cat's
-    // RouteCostField when fresh, A* fallback otherwise (228).
+    // 140 step 6 — smoothed corridor + desire-based movement. The
+    // cached path holds the STRING-PULLED waypoints (sparse tile
+    // centers of the retained corridor — `find_smoothed_path`), not
+    // the dense A* tile chain; the cat seeks the first waypoint with
+    // a DesiredVelocity and the Chain-4 integrator does the moving
+    // (momentum, Euclidean speed cap, wall-slide). Arrival semantics
+    // unchanged: containing-tile adjacency to the target.
     if state.cached_path.is_none() {
-        state.cached_path = path_plan.find_full_path(*pos, target, map);
+        state.cached_path = path_plan.find_smoothed_path(*pos, target, map);
     }
 
     if let Some(ref mut path) = state.cached_path {
-        if let Some(next) = path.first().copied() {
-            path.remove(0);
-            *pos = next;
-        }
         if pos.chebyshev_distance(&target) <= 1 {
-            // Anti-stacking jitter.
+            // Anti-stacking jitter (step 7 retires this teleport in
+            // favor of separation steering).
             if cat_tile_counts.get(&target).copied().unwrap_or(0) > 1 {
                 let occupied: std::collections::HashSet<Position> = cat_tile_counts
                     .keys()
@@ -8988,6 +9021,20 @@ fn resolve_travel_to(
             }
             return crate::steps::StepResult::Advance;
         }
+        // Pop waypoints the integrator has carried us within reach of.
+        while let Some(wp) = path.first().copied() {
+            if pos.0.distance(wp.0) <= movement.waypoint_arrival_radius {
+                path.remove(0);
+            } else {
+                break;
+            }
+        }
+        let aim = path.first().copied().unwrap_or(target);
+        desired.0 = Some(crate::ai::steering::seek(
+            pos.0,
+            aim.0,
+            movement.cat_max_speed,
+        ));
     } else {
         // No path found — step toward target directly via the same
         // `CatPathPlan` (gradient-walk's `next_step` falls back to

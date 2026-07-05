@@ -10,7 +10,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 |--------|--------|---------------------|------------|
 | Collective Memory | **[Built]** | `memory::decay_memories`, `colony_knowledge::update_colony_knowledge` | [doc](../systems/collective-memory.md) |
 | Corpse Handling | **[Built]** | `death::check_death`, `death::cleanup_dead`, `death::update_grave_aura_map` | [doc](../systems/corpse-handling.md) |
-| Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::update_ward_coverage_map`, `magic::herb_seasonal_check` (+14 more) | [doc](../systems/magic.md) |
+| Magic | **[Built]** | `magic::CorruptionPushback`, `magic::corruption_spread`, `magic::ward_decay`, `magic::update_ward_coverage_map`, `magic::update_ward_siege_fear_map` (+15 more) | [doc](../systems/magic.md) |
 | Mood | **[Built]** | `mood::update_mood`, `mood::mood_contagion`, `mood::bond_proximity_mood` | [doc](../systems/mood.md) |
 | Weather — Living Climate System | **[Built]** | `weather::update_weather`, `wind::update_wind` | [doc](../systems/weather.md) |
 
@@ -31,8 +31,11 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Crafted Items & Recipes | *[Aspirational]* | — | [doc](../systems/crafting.md) |
 | Disease | *[Aspirational]* | — | [doc](../systems/disease.md) |
 | Distress modifiers — lurch vs. pressure | *[Aspirational]* | — | [doc](../systems/distress-modifiers.md) |
+| ECS rules (Bevy 0.18) | *[Aspirational]* | — | [doc](../systems/ecs-rules.md) |
 | Environmental Quality | *[Aspirational]* | — | [doc](../systems/environmental-quality.md) |
+| GOAP step resolver contract | *[Aspirational]* | — | [doc](../systems/goap-resolver-contract.md) |
 | HTN method composition (design note) | *[Aspirational]* | — | [doc](../systems/htn-methods.md) |
+| Items-are-real: the Source / Transfer / Sink contract | *[Aspirational]* | — | [doc](../systems/items-are-real.md) |
 | Log Analytics Dashboard | *[Aspirational]* | — | [doc](../systems/log-analytics-dashboard.md) |
 | Mental Breaks | *[Aspirational]* | — | [doc](../systems/mental-breaks.md) |
 | Monuments — Civic & Memorial Structures | *[Aspirational]* | — | [doc](../systems/monuments.md) |
@@ -64,10 +67,12 @@ System modules with registered functions but no design doc:
 - **aspirations**: update_training_markers, update_mentoring_target_markers, adopt_kinship_aspiration, select_aspirations, check_second_aspiration_slot, check_aspiration_abandonment, track_milestones
 - **belief_integrator**: gossip_inventory_observations, integrate_beliefs
 - **cat_movement**: emit_cat_moved_messages
+- **colony_hunting_map**: rebuild_colony_hunting_map
 - **colony_score**: emit_colony_score
 - **env_quality**: update_env_quality_maps, emit_env_quality_features
 - **fate**: assign_fated_connections, awaken_fated_connections
 - **fertility**: handle_post_partum_reinsert, update_fertility_phase
+- **festering_authoring**: emit_festering_observations, author_festering_from_misfire
 - **fox_goap**: sync_fox_needs, fox_evaluate_and_plan, fox_resolve_goap_plans, feed_cubs_at_dens, resolve_paired_confrontations
 - **fox_spatial**: update_store_awareness_markers, update_den_threat_markers, update_ward_detection_markers, update_cub_marker, update_cub_hunger_markers, update_juvenile_dispersal_markers, update_den_marker
 - **fulfillment**: decay_fulfillment, bond_proximity_social_warmth, update_body_condition
@@ -75,17 +80,23 @@ System modules with registered functions but no design doc:
 - **growth**: update_life_stage_markers, update_parent_markers, tick_kitten_growth, kitten_mood_aura, update_kitten_cry_map
 - **hawk_goap**: hawk_needs_tick, sync_hawk_needs, hawk_evaluate_and_plan, hawk_resolve_goap_plans, hawk_lifecycle_tick
 - **incapacitation**: update_incapacitation
+- **injury_cache**: cache_last_body_part_injury
 - **interoception**: author_self_markers
+- **movement**: integrate_velocities
+- **movement_budget**: on_wild_animal_added, accumulate_movement_budget
 - **parenting_activity**: ParentingScalars, update_parenting_activity_biological, tick_parental_engagement, populate_parenting_scalars
 - **plan_substrate**: expire_reservations, sensors, update_prev_safety_deficit
+- **playbow_emitter**: emit_play_bows, emit_reciprocal_advances
 - **pregnancy**: tick_pregnancy
 - **preservation**: advance_preservation_drying
 - **prey**: prey_population, prey_hunger, prey_ai, prey_scent_tick, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
 - **sensing**: tremor_tick, update_terrain_markers, update_target_existence_markers, update_hide_eligible_markers
+- **shelter_beliefs**: claim_home_dens, update_shelter_continuity, emit_den_condition_events, detect_den_sieges
 - **snake_goap**: snake_needs_tick, sync_snake_needs, snake_evaluate_and_plan, snake_resolve_goap_plans, snake_lifecycle_tick
 - **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
+- **sustained_copresence**: SustainedCoPresenceTracker, track_sustained_copresence
 - **task_chains**: resolve_task_chains
 - **trace_emit**: emit_focal_trace
-- **wildlife**: shadowfox_coherence_tick, shadowfox_motivation_tick, shadowfox_haunting_drain, spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, update_recent_ambush_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
+- **wildlife**: shadowfox_coherence_tick, shadowfox_motivation_tick, shadowfox_haunting_drain, spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
 - **world_snapshots**: populate_world_snapshots
 

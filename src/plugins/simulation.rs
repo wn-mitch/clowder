@@ -1778,7 +1778,17 @@ impl Plugin for SimulationPlugin {
                     // the head of Chain 4 so all per-tick subscribers
                     // (Stage B: NearPairCache; Stage C: per-cat
                     // RouteCostCache) consume up-to-date deltas.
-                    systems::cat_movement::emit_cat_moved_messages,
+                    // 140 step 6 — velocity integrator: consumes
+                    // DesiredVelocity written by Chain-3 resolvers,
+                    // applies steer + Euclidean speed cap + sub-stepped
+                    // wall-slide motion. MUST run before
+                    // emit_cat_moved_messages so CatMoved subscribers
+                    // see post-move positions the same tick.
+                    (
+                        systems::movement::integrate_velocities,
+                        systems::cat_movement::emit_cat_moved_messages,
+                    )
+                        .chain(),
                     // 431 Stage B — rebuild the near-pair cache from the
                     // CatMoved deltas (with first-tick bootstrap from the
                     // cats query). Replaces the legacy per-tick O(N²)

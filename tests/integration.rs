@@ -137,7 +137,11 @@ fn simulation_is_deterministic() {
     let dir_a = make_test_dir("determinism-a");
     let dir_b = make_test_dir("determinism-b");
 
-    let ticks = 600u64;
+    // 140 step 6 — extended 600 → 1200 ticks so the byte-compared
+    // window (CatSnapshot positions land in the stream every 100
+    // ticks) covers sustained velocity-integrated travel, not just
+    // the pre-movement bootstrap.
+    let ticks = 1200u64;
     let mut app_a = build_test_app(42, &dir_a);
     drive_for_ticks(&mut app_a, ticks);
     drop(app_a); // ensure writers flush + close

@@ -163,6 +163,12 @@ pub fn cat_bundle(
             // behaviorally today, but the substrate is in place so
             // future per-cat-cadence tuning is parameter-only.
             crate::components::MovementBudget::cat(),
+            // 140 step 6 — fluid-movement components. Velocity is
+            // integrator-owned; DesiredVelocity starts empty (no
+            // desire) so unmigrated resolvers keep exclusive control
+            // of Position until their migration step.
+            crate::components::physical::Velocity::default(),
+            crate::components::physical::DesiredVelocity::default(),
         ),
     )
 }
