@@ -264,7 +264,8 @@ mod tests {
         // accumulate first.
         MovementBudget {
             accumulator: 1.0,
-            per_tick: WildSpecies::Snake.default_movement_budget(),
+            per_tick: crate::resources::sim_constants::MovementConstants::default()
+                .max_speed(WildSpecies::Snake),
         }
     }
 
@@ -324,7 +325,10 @@ mod tests {
         let map = TileMap::new(20, 20, Terrain::Grass);
         let mut pos = Position::new(0, 0);
         let target = Position::new(10, 0);
-        let mut budget = MovementBudget::for_species(WildSpecies::Snake);
+        let mut budget = MovementBudget::for_species(
+            WildSpecies::Snake,
+            &crate::resources::sim_constants::MovementConstants::default(),
+        );
         let mut state = SnakeStepState {
             target_position: Some(target),
             ..SnakeStepState::default()

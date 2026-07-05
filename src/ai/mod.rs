@@ -23,6 +23,7 @@ pub mod route_cost;
 pub mod scoring;
 pub mod snake_planner;
 pub mod snake_scoring;
+pub mod steering;
 pub mod target_dse;
 
 use bevy_ecs::prelude::*;

@@ -3525,7 +3525,10 @@ mod tests {
                 pos,
                 Health::default(),
                 ai_state,
-                crate::components::MovementBudget::for_species(species),
+                crate::components::MovementBudget::for_species(
+                    species,
+                    &crate::resources::sim_constants::MovementConstants::default(),
+                ),
             ))
             .id()
     }

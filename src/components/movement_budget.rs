@@ -63,11 +63,16 @@ impl MovementBudget {
     }
 
     /// Species default for wildlife. Reads
-    /// [`WildSpecies::default_movement_budget`]. Accumulator is primed
+    /// [`crate::resources::sim_constants::MovementConstants::max_speed`]
+    /// (ticket 140 retired the hardcoded `default_movement_budget`
+    /// match — speeds are tuning knobs now). Accumulator is primed
     /// at `per_tick` (mirrors the cat case — freshly-spawned wildlife
     /// can step on their first tick if their cadence allows).
-    pub fn for_species(species: WildSpecies) -> Self {
-        let per_tick = species.default_movement_budget();
+    pub fn for_species(
+        species: WildSpecies,
+        movement: &crate::resources::sim_constants::MovementConstants,
+    ) -> Self {
+        let per_tick = movement.max_speed(species);
         Self {
             accumulator: per_tick,
             per_tick,
@@ -110,7 +115,10 @@ mod tests {
 
     #[test]
     fn snake_default_is_half_cadence() {
-        let b = MovementBudget::for_species(WildSpecies::Snake);
+        let b = MovementBudget::for_species(
+            WildSpecies::Snake,
+            &crate::resources::sim_constants::MovementConstants::default(),
+        );
         assert!((b.per_tick - 0.5).abs() < f32::EPSILON);
     }
 
@@ -118,7 +126,14 @@ mod tests {
     fn fox_hawk_shadowfox_default_to_full_cadence() {
         for s in [WildSpecies::Fox, WildSpecies::Hawk, WildSpecies::ShadowFox] {
             assert!(
-                (MovementBudget::for_species(s).per_tick - 1.0).abs() < f32::EPSILON,
+                (MovementBudget::for_species(
+                    s,
+                    &crate::resources::sim_constants::MovementConstants::default()
+                )
+                .per_tick
+                    - 1.0)
+                    .abs()
+                    < f32::EPSILON,
                 "{} should default to 1.0 per tick",
                 s.name()
             );
@@ -150,7 +165,10 @@ mod tests {
 
     #[test]
     fn half_cadence_steps_every_other_tick() {
-        let mut b = MovementBudget::for_species(WildSpecies::Snake);
+        let mut b = MovementBudget::for_species(
+            WildSpecies::Snake,
+            &crate::resources::sim_constants::MovementConstants::default(),
+        );
         // Tick 0: primed at 0.5 — cannot step.
         assert!(!b.try_spend_step());
         b.accumulate();

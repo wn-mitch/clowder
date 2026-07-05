@@ -7,6 +7,106 @@ use crate::resources::time::Season;
 use crate::resources::time_units::{DurationDays, DurationSeasons, IntervalPerDay, RatePerDay};
 use crate::systems::sensing::{Channel, Falloff, SensoryProfile};
 
+// ---------- MovementConstants (0.4.0 fluid locomotion — ticket 140) ----------
+
+/// Fluid free-range movement knobs (0.4.0 "Free Range", ticket 140 /
+/// plan step 5). Speeds are world units (tiles) per tick, Euclidean —
+/// with arbitrary headings an L-infinity cap would make ground speed
+/// direction-dependent (+41% at 45 degrees). Accelerations are tiles
+/// per tick squared and feed `steering::steer`, the single source of
+/// momentum. INERT until the step-6 integrator lands; only
+/// `MovementBudget::for_species` reads the per-species speeds today
+/// (values identical to the retired `WildSpecies::default_movement_budget`
+/// match — footer-identical by construction).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MovementConstants {
+    /// Cat steady-state max speed. The grid era moved 1 tile/tick in
+    /// any of 8 directions; 1.0 Euclidean keeps cardinal parity and
+    /// makes diagonals sqrt(2) slower — the deliberate,
+    /// hypothesis-carried re-baseline plan.md names.
+    pub cat_max_speed: f32,
+    /// Fox steady-state max speed (parity with cats — chases are
+    /// decided by interception geometry and stamina, not raw speed).
+    pub fox_max_speed: f32,
+    /// Hawk cruise speed (flight is terrain-exempt; the dive burst is
+    /// its own ability, not this knob).
+    pub hawk_max_speed: f32,
+    /// ShadowFox steady-state max speed.
+    pub shadowfox_max_speed: f32,
+    /// Snake slither speed. 0.5 was previously expressed as
+    /// tick-skipping (`MovementBudget` accumulator); under the
+    /// integrator it becomes genuinely continuous half-speed motion —
+    /// same average, no stutter.
+    pub snake_max_speed: f32,
+    /// Ground prey (mouse/rat/rabbit + grounded birds) max speed.
+    pub prey_ground_max_speed: f32,
+    /// Bird escape-burst flight speed (replaces the radial teleport —
+    /// plan step 10). ~3x cat speed: a 2-3 tick head start a cat
+    /// cannot close, matching the teleport's survival profile.
+    pub bird_burst_speed: f32,
+    /// Default max acceleration (tiles/tick^2) for ground movers —
+    /// reaching full speed takes ~4 ticks; reversals curve instead of
+    /// pivoting.
+    pub max_accel: f32,
+    /// Hawk max acceleration — banking raptors turn harder than
+    /// ground movers accelerate.
+    pub hawk_max_accel: f32,
+    /// Hunt stalk-phase speed multiplier (slow sinuous approach).
+    pub stalk_speed_mult: f32,
+    /// Pounce / flee sprint multiplier.
+    pub sprint_speed_mult: f32,
+    /// Personal-space radius (tiles) for `steering::separation` —
+    /// replaces the jitter-teleport anti-stacking hacks (plan step 7).
+    pub separation_radius: f32,
+    /// A smoothed-path waypoint counts as reached inside this radius;
+    /// the mover then seeks the next one.
+    pub waypoint_arrival_radius: f32,
+    /// Minimum ticks between A* recomputes for a moving traveler
+    /// (recompute throttling, plan step 13).
+    pub path_recompute_min_ticks: u32,
+    /// Recompute immediately when the target has drifted more than
+    /// this many tiles from the position the current path was planned
+    /// against.
+    pub path_recompute_target_drift_tiles: f32,
+}
+
+impl Default for MovementConstants {
+    fn default() -> Self {
+        Self {
+            cat_max_speed: 1.0,
+            fox_max_speed: 1.0,
+            hawk_max_speed: 1.0,
+            shadowfox_max_speed: 1.0,
+            snake_max_speed: 0.5,
+            prey_ground_max_speed: 1.0,
+            bird_burst_speed: 3.0,
+            max_accel: 0.25,
+            hawk_max_accel: 0.5,
+            stalk_speed_mult: 0.4,
+            sprint_speed_mult: 1.4,
+            separation_radius: 0.6,
+            waypoint_arrival_radius: 0.35,
+            path_recompute_min_ticks: 8,
+            path_recompute_target_drift_tiles: 3.0,
+        }
+    }
+}
+
+impl MovementConstants {
+    /// Per-species steady-state max speed (the `MovementBudget.per_tick`
+    /// source — ticket 140 retired the hardcoded
+    /// `WildSpecies::default_movement_budget` match into this lookup).
+    pub fn max_speed(&self, species: crate::components::wildlife::WildSpecies) -> f32 {
+        use crate::components::wildlife::WildSpecies;
+        match species {
+            WildSpecies::Fox => self.fox_max_speed,
+            WildSpecies::Hawk => self.hawk_max_speed,
+            WildSpecies::ShadowFox => self.shadowfox_max_speed,
+            WildSpecies::Snake => self.snake_max_speed,
+        }
+    }
+}
+
 // ---------- SimConstants (top-level resource) ----------
 
 #[derive(Resource, Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -21,6 +121,11 @@ pub struct SimConstants {
     #[serde(default)]
     pub founder_age: FounderAgeConstants,
     pub prey: PreyConstants,
+    /// 0.4.0 "Free Range" fluid locomotion (ticket 140 / plan step 5).
+    /// `#[serde(default)]` so pre-140 `events.jsonl` headers still
+    /// deserialize cleanly.
+    #[serde(default)]
+    pub movement: MovementConstants,
     pub species: SpeciesConstants,
     pub scoring: ScoringConstants,
     pub disposition: DispositionConstants,

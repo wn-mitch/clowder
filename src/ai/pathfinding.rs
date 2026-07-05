@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashSet};
 
+use bevy::math::Vec2;
+
 use crate::components::physical::Position;
 use crate::resources::map::TileMap;
 
@@ -337,6 +339,111 @@ pub fn find_path(
     }
 
     None // No path exists.
+}
+
+// ---------------------------------------------------------------------------
+// Supercover raycast (ticket 140 / plan step 5 — smoothing substrate)
+// ---------------------------------------------------------------------------
+
+/// Walk every tile the segment `from -> to` (world coordinates)
+/// touches, supercover-style: when the segment passes exactly through
+/// a tile corner, BOTH corner-adjacent tiles are visited — the
+/// conservative choice, so a segment can never thread between two
+/// diagonally-touching blocked tiles.
+///
+/// Returns `Some(max_cost)` — the maximum
+/// `terrain.movement_cost() + sum(overlays)` over every crossed tile —
+/// when all crossed tiles are in-bounds and passable; `None` if any
+/// crossed tile is out of bounds or impassable.
+///
+/// This is [`crate::ai::steering::smooth_path`]'s visibility test: a
+/// string-pulled segment is admissible iff the raycast succeeds AND
+/// `max_cost` stays within the replaced corridor's cost ceiling (the
+/// smoother must never shortcut through fox-scent / corruption fields
+/// the router paid to avoid).
+pub fn supercover_raycast_max_cost(
+    from: Vec2,
+    to: Vec2,
+    map: &TileMap,
+    overlays: &[WeightedOverlay<'_>],
+) -> Option<u32> {
+    let mut max_cost: u32 = 0;
+    let mut visit = |x: i32, y: i32| -> bool {
+        if !map.in_bounds(x, y) {
+            return false;
+        }
+        let terrain = map.get(x, y).terrain;
+        if !terrain.is_passable() {
+            return false;
+        }
+        let cost = terrain
+            .movement_cost()
+            .saturating_add(sum_overlay_cost(overlays, Position::new(x, y)));
+        max_cost = max_cost.max(cost);
+        true
+    };
+
+    let (mut x, mut y) = (from.x.floor() as i32, from.y.floor() as i32);
+    let (tx, ty) = (to.x.floor() as i32, to.y.floor() as i32);
+    if !visit(x, y) {
+        return None;
+    }
+
+    let dx = to.x - from.x;
+    let dy = to.y - from.y;
+    let step_x: i32 = if dx > 0.0 { 1 } else { -1 };
+    let step_y: i32 = if dy > 0.0 { 1 } else { -1 };
+
+    // Parametric distance along the segment to the next vertical /
+    // horizontal grid boundary, and per-tile increments. Axis-parallel
+    // segments get INFINITY on the flat axis (never crossed).
+    let (mut t_max_x, t_delta_x) = if dx.abs() <= f32::EPSILON {
+        (f32::INFINITY, f32::INFINITY)
+    } else {
+        let next_boundary = if dx > 0.0 { (x + 1) as f32 } else { x as f32 };
+        ((next_boundary - from.x) / dx, (1.0 / dx).abs())
+    };
+    let (mut t_max_y, t_delta_y) = if dy.abs() <= f32::EPSILON {
+        (f32::INFINITY, f32::INFINITY)
+    } else {
+        let next_boundary = if dy > 0.0 { (y + 1) as f32 } else { y as f32 };
+        ((next_boundary - from.y) / dy, (1.0 / dy).abs())
+    };
+
+    // Manhattan bound + slack: the traversal visits at most one new
+    // tile per loop turn (two on exact corners, which also advance
+    // both axes), so this cannot loop unboundedly.
+    let mut budget = (tx - x).abs() + (ty - y).abs() + 4;
+    while (x, y) != (tx, ty) && budget > 0 {
+        budget -= 1;
+        if (t_max_x - t_max_y).abs() <= f32::EPSILON {
+            // Exact corner crossing — supercover: visit both
+            // corner-adjacent tiles, then advance diagonally.
+            if !visit(x + step_x, y) || !visit(x, y + step_y) {
+                return None;
+            }
+            x += step_x;
+            y += step_y;
+            t_max_x += t_delta_x;
+            t_max_y += t_delta_y;
+        } else if t_max_x < t_max_y {
+            x += step_x;
+            t_max_x += t_delta_x;
+        } else {
+            y += step_y;
+            t_max_y += t_delta_y;
+        }
+        if !visit(x, y) {
+            return None;
+        }
+    }
+    if (x, y) != (tx, ty) {
+        // Budget exhausted before reaching the target tile — numeric
+        // pathology (should not happen for finite inputs). Fail closed.
+        return None;
+    }
+
+    Some(max_cost)
 }
 
 // ---------------------------------------------------------------------------

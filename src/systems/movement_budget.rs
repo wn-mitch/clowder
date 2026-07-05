@@ -51,6 +51,7 @@ pub fn accumulate_movement_budget(
             Without<WildAnimal>,
         ),
     >,
+    constants: Res<crate::resources::SimConstants>,
 ) {
     for mut budget in &mut budgeted {
         budget.accumulate();
@@ -58,9 +59,10 @@ pub fn accumulate_movement_budget(
     // Lazy-insert: pre-138 saves loaded with no MovementBudget. The
     // observer handles new spawns; this handles deserialized entities.
     for (entity, animal) in &wildlife_missing_budget {
-        commands
-            .entity(entity)
-            .insert(MovementBudget::for_species(animal.species));
+        commands.entity(entity).insert(MovementBudget::for_species(
+            animal.species,
+            &constants.movement,
+        ));
     }
     for entity in &cats_missing_budget {
         commands.entity(entity).insert(MovementBudget::cat());
@@ -74,12 +76,14 @@ pub fn on_wild_animal_added(
     add: On<Add, WildAnimal>,
     animals: Query<&WildAnimal>,
     mut commands: Commands,
+    constants: Res<crate::resources::SimConstants>,
 ) {
     let entity = add.entity;
     if let Ok(animal) = animals.get(entity) {
-        commands
-            .entity(entity)
-            .insert(MovementBudget::for_species(animal.species));
+        commands.entity(entity).insert(MovementBudget::for_species(
+            animal.species,
+            &constants.movement,
+        ));
     }
 }
 
@@ -91,6 +95,7 @@ mod tests {
     #[test]
     fn accumulator_ticks_existing_budgets() {
         let mut world = World::new();
+        world.insert_resource(crate::resources::SimConstants::default());
         let entity = world
             .spawn(MovementBudget {
                 accumulator: 0.0,
@@ -107,6 +112,7 @@ mod tests {
     #[test]
     fn lazy_insert_writes_species_default_for_wildlife() {
         let mut world = World::new();
+        world.insert_resource(crate::resources::SimConstants::default());
         let entity = world
             .spawn((
                 WildAnimal {
