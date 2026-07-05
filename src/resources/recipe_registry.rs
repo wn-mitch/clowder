@@ -11,7 +11,7 @@
 // intentions citing `RecipeId`. The registry never carries
 // per-cat or per-frame state — it's static data plumbed once.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use bevy::prelude::*;
 
@@ -19,9 +19,17 @@ use crate::components::recipe::{Recipe, RecipeId};
 use crate::components::skills::Skills;
 
 /// Catalog of every recipe the simulation knows about.
+///
+/// Stored as a `BTreeMap` (not `HashMap`) so `iter()` yields a stable,
+/// process-independent order — ticket 502. `HashMap`'s per-process
+/// `RandomState` made recipe iteration order differ across runs of the
+/// same binary; `emit_have_item_row`'s winner scan breaks score ties by
+/// first-seen, so byte-equal-scoring recipes (the remedy trio) flipped
+/// between processes and broke soak-scale byte-identity. Same
+/// determinism precedent as `Relationships` (relationships.rs).
 #[derive(Resource, Default, Debug, Clone)]
 pub struct RecipeRegistry {
-    recipes: HashMap<RecipeId, Recipe>,
+    recipes: BTreeMap<RecipeId, Recipe>,
 }
 
 impl RecipeRegistry {
@@ -47,11 +55,14 @@ impl RecipeRegistry {
     /// Linear scan over registered recipes (≤50 today). If multiple
     /// recipes share an output kind (none today; flagged for revisit
     /// if a future Phase ≥2 recipe lands a second producer), this
-    /// returns the first-registered match.
+    /// returns the match with the lexicographically-smallest id
+    /// (deterministic — ticket 502).
     pub fn recipe_producing(&self, item: crate::components::items::ItemKind) -> Option<&Recipe> {
         self.iter().find(|r| r.output.item_kind == item)
     }
 
+    /// Iterate recipes in ascending `RecipeId` order (stable across
+    /// processes — ticket 502; callers may tie-break by first-seen).
     pub fn iter(&self) -> impl Iterator<Item = &Recipe> {
         self.recipes.values()
     }
@@ -152,6 +163,20 @@ mod tests {
         let mut registry = RecipeRegistry::default();
         registry.insert(sample_recipe("dup"));
         registry.insert(sample_recipe("dup"));
+    }
+
+    /// Ticket 502 — iteration order must be ascending by RecipeId
+    /// regardless of insertion order. Winner scans tie-break by
+    /// first-seen; a process-dependent order here breaks cross-process
+    /// determinism at the first byte-equal score tie.
+    #[test]
+    fn iter_yields_ascending_id_order_regardless_of_insertion_order() {
+        let mut registry = RecipeRegistry::default();
+        registry.insert(sample_recipe("z.last"));
+        registry.insert(sample_recipe("a.first"));
+        registry.insert(sample_recipe("m.middle"));
+        let ids: Vec<&str> = registry.iter().map(|r| r.id.0).collect();
+        assert_eq!(ids, vec!["a.first", "m.middle", "z.last"]);
     }
 
     // -----------------------------------------------------------------
