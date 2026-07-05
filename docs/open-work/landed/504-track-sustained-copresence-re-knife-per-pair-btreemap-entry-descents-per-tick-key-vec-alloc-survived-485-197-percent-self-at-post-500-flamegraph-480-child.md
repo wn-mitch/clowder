@@ -1,7 +1,7 @@
 ---
 id: 504
 title: track_sustained_copresence re-knife — per-pair BTreeMap entry descents + per-tick key-Vec alloc survived 485 (19.7 percent self at post-500 flamegraph, 480 child)
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ supersedes: []
 blocked-by: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 410b54e0
+landed-on: 2026-07-05
 ---
 
 ## Why
@@ -75,3 +75,4 @@ tracker's two-map read pattern:
   plan.md Phase I step 2. Diagnosis pre-verified by code read
   (sustained_copresence.rs:93,98) — the 485 comment's aliasing
   rationale for the key-Vec is factually void.
+- 2026-07-05: merge-join co-walk landed: 19.66% self -> below samply_top threshold at 42-419569a938af; verdict pass, throughput_drift +13.6% cumulative; byte-identical vs pre-504 run modulo one 503-signature Patrol ULP + tail

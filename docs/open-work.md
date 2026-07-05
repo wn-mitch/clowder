@@ -39,11 +39,11 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 
 ### Next-recommended (from `just next`)
 
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · score 0.91_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.91_
 - **[440](docs/open-work/tickets/440-migrate-simple-single-marker-score-actions-gates-to-eligibilityfilter.md)** — migrate simple single-marker score_actions gates to EligibilityFilter — _[ai-substrate] · score 0.90_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.90_
+- **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · score 0.90_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · score 0.90_
 
 ## Epic progress (8)
 
@@ -106,7 +106,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
 - **[501](docs/open-work/tickets/501-workpressureaffiliativeyield-first-light-activation-price-the-freed-bandwidth-destination-patrolflee-absorption-at-scale-05.md)** — WorkPressureAffiliativeYield first-light activation — price the freed-bandwidth destination (Patrol/Flee absorption at scale 0.5) — _[ai-substrate] · added 2026-06-11_
 - **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
-- **[504](docs/open-work/tickets/504-track-sustained-copresence-re-knife-per-pair-btreemap-entry-descents-per-tick-key-vec-alloc-survived-485-197-percent-self-at-post-500-flamegraph-480-child.md)** — track_sustained_copresence re-knife — per-pair BTreeMap entry descents + per-tick key-Vec alloc survived 485 (19.7 percent self at post-500 flamegraph, 480 child) — _[ai-substrate] · added 2026-07-05_
+- **[505](docs/open-work/tickets/505-integrate-beliefs-pass-b-decays-every-mental-model-facet-every-stagger-even-at-fixed-point-at-rest-skip-141-percent-self-at-post-504-flamegraph-480-child.md)** — integrate_beliefs Pass B decays every mental-model facet every stagger even at fixed point — at-rest skip (14.1 percent self at post-504 flamegraph, 480 child) — _[ai-substrate] · added 2026-07-05_
 
 ### social-coordination (17 ready, 4 blocked)
 
@@ -464,7 +464,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
 - **[501](docs/open-work/tickets/501-workpressureaffiliativeyield-first-light-activation-price-the-freed-bandwidth-destination-patrolflee-absorption-at-scale-05.md)** — WorkPressureAffiliativeYield first-light activation — price the freed-bandwidth destination (Patrol/Flee absorption at scale 0.5) — _[ai-substrate] · added 2026-06-11_
 - **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
-- **[504](docs/open-work/tickets/504-track-sustained-copresence-re-knife-per-pair-btreemap-entry-descents-per-tick-key-vec-alloc-survived-485-197-percent-self-at-post-500-flamegraph-480-child.md)** — track_sustained_copresence re-knife — per-pair BTreeMap entry descents + per-tick key-Vec alloc survived 485 (19.7 percent self at post-500 flamegraph, 480 child) — _[ai-substrate] · added 2026-07-05_
+- **[505](docs/open-work/tickets/505-integrate-beliefs-pass-b-decays-every-mental-model-facet-every-stagger-even-at-fixed-point-at-rest-skip-141-percent-self-at-post-504-flamegraph-480-child.md)** — integrate_beliefs Pass B decays every mental-model facet every stagger even at fixed point — at-rest skip (14.1 percent self at post-504 flamegraph, 480 child) — _[ai-substrate] · added 2026-07-05_
 
 ## Parked (12)
 
@@ -513,12 +513,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (367)
+## Landed archive (368)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-07 (2)
+### 2026-07 (3)
 
+- **[504](docs/open-work/landed/504-track-sustained-copresence-re-knife-per-pair-btreemap-entry-descents-per-tick-key-vec-alloc-survived-485-197-percent-self-at-post-500-flamegraph-480-child.md)** — track_sustained_copresence re-knife — per-pair BTreeMap entry descents + per-tick key-Vec alloc survived 485 (19.7 percent self at post-500 flamegraph, 480 child) _(2026-07-05)_
 - **[502](docs/open-work/landed/502-reciperegistry-hashmap-iteration-order-is-per-process-random-recipe-score-ties-break-nondeterministically-across-processes.md)** — RecipeRegistry HashMap iteration order is per-process random — recipe score ties break nondeterministically across processes _(2026-07-05)_
 - **[500](docs/open-work/landed/500-relationshipsiter-for-is-an-unindexed-full-map-scan-audit-per-tick-call-sites-consider-per-entity-index.md)** — Relationships::iter_for is an unindexed full-map scan — audit per-tick call sites, consider per-entity index _(2026-07-05)_
 
