@@ -3047,6 +3047,13 @@ pub struct ScoringConstants {
     /// only when no scent-free path exists.
     #[serde(default = "default_fox_scent_path_cost_max")]
     pub fox_scent_path_cost_max: u32,
+    /// 508 — max A* edge-cost contribution of the routing cat's own
+    /// `LocationBeliefs.recency_of_threat_cue` at a tile's belief
+    /// bucket (`ThreatBeliefOverlay`). Above fox-scent's 8: scent
+    /// marks territory, this marks witnessed-ambush ground. At 12, a
+    /// max-cue bucket is worth a 12-tile detour on grass.
+    #[serde(default = "default_threat_belief_path_cost_max")]
+    pub threat_belief_path_cost_max: u32,
     /// 223: Maximum additive cost contribution from corruption on a
     /// single tile during cat A* pathfinding. Symmetric shape to
     /// `fox_scent_path_cost_max`. Default `10` — slightly higher because
@@ -3464,6 +3471,7 @@ impl Default for ScoringConstants {
             wander_route_cost_weight: default_wander_route_cost_weight(),
             explore_route_cost_weight: default_explore_route_cost_weight(),
             fox_scent_path_cost_max: default_fox_scent_path_cost_max(),
+            threat_belief_path_cost_max: default_threat_belief_path_cost_max(),
             corruption_path_cost_max: default_corruption_path_cost_max(),
             route_cost_flood_budget: default_route_cost_flood_budget(),
             wander_recandidate_ticks: default_wander_recandidate_ticks(),
@@ -5146,6 +5154,10 @@ fn default_explore_route_cost_weight() -> f32 {
 /// 223: Cat A* path-cost overlay max contribution from fox scent. See
 /// `ScoringConstants::fox_scent_path_cost_max` for the rationale on
 /// the value `8`.
+fn default_threat_belief_path_cost_max() -> u32 {
+    12
+}
+
 fn default_fox_scent_path_cost_max() -> u32 {
     8
 }

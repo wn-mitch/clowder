@@ -225,6 +225,11 @@ pub enum CatPathPlan<'a> {
     AStarFallback {
         fox: FoxScentOverlay<'a>,
         corr: CorruptionOverlay<'a>,
+        /// 508 — the routing cat's own threat-belief overlay.
+        /// `None` for callers without a `LocationBeliefs` borrow
+        /// (legacy paths; non-cat movers) — identical to a cat with
+        /// no threat memories.
+        threat: Option<crate::ai::pathfinding::ThreatBeliefOverlay<'a>>,
         weight: f32,
     },
     /// Plain A\* without overlays. Used by legacy disposition-chain
@@ -263,13 +268,28 @@ impl<'a> CatPathPlan<'a> {
     pub fn next_step(&self, from: Position, to: Position, map: &TileMap) -> Option<Position> {
         match self {
             CatPathPlan::Field(field) => step_along_field(from, to, field, map),
-            CatPathPlan::AStarFallback { fox, corr, weight } => {
-                let overlays = [
-                    WeightedOverlay::new(fox, *weight),
-                    WeightedOverlay::new(corr, *weight),
-                ];
-                step_toward(&from, &to, map, &overlays)
-            }
+            CatPathPlan::AStarFallback {
+                fox,
+                corr,
+                threat,
+                weight,
+            } => match threat {
+                Some(t) => {
+                    let overlays = [
+                        WeightedOverlay::new(fox, *weight),
+                        WeightedOverlay::new(corr, *weight),
+                        WeightedOverlay::new(t, *weight),
+                    ];
+                    step_toward(&from, &to, map, &overlays)
+                }
+                None => {
+                    let overlays = [
+                        WeightedOverlay::new(fox, *weight),
+                        WeightedOverlay::new(corr, *weight),
+                    ];
+                    step_toward(&from, &to, map, &overlays)
+                }
+            },
             CatPathPlan::NoOverlay => step_toward(&from, &to, map, &[]),
         }
     }
@@ -305,13 +325,28 @@ impl<'a> CatPathPlan<'a> {
                 }
                 Some(path)
             }
-            CatPathPlan::AStarFallback { fox, corr, weight } => {
-                let overlays = [
-                    WeightedOverlay::new(fox, *weight),
-                    WeightedOverlay::new(corr, *weight),
-                ];
-                find_path(from, to, map, &overlays)
-            }
+            CatPathPlan::AStarFallback {
+                fox,
+                corr,
+                threat,
+                weight,
+            } => match threat {
+                Some(t) => {
+                    let overlays = [
+                        WeightedOverlay::new(fox, *weight),
+                        WeightedOverlay::new(corr, *weight),
+                        WeightedOverlay::new(t, *weight),
+                    ];
+                    find_path(from, to, map, &overlays)
+                }
+                None => {
+                    let overlays = [
+                        WeightedOverlay::new(fox, *weight),
+                        WeightedOverlay::new(corr, *weight),
+                    ];
+                    find_path(from, to, map, &overlays)
+                }
+            },
             CatPathPlan::NoOverlay => find_path(from, to, map, &[]),
         }
     }

@@ -2373,10 +2373,22 @@ pub fn evaluate_and_plan(
                 let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
                 (w, w)
             };
-            let overlays = [
+            // 508 — the replan-time route-cost field prices the
+            // cat's own threat beliefs; boldness/patrol weighting
+            // matches the fox-scent axis (threat-of-death respects
+            // the same personality conditioning).
+            let threat_overlay = world_state
+                .location_beliefs
+                .get(entity)
+                .ok()
+                .map(|lb| crate::ai::pathfinding::ThreatBeliefOverlay::new(lb, sc));
+            let mut overlays: Vec<crate::ai::pathfinding::WeightedOverlay> = vec![
                 crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, fox_w),
                 crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, corr_w),
             ];
+            if let Some(t) = threat_overlay.as_ref() {
+                overlays.push(crate::ai::pathfinding::WeightedOverlay::new(t, fox_w));
+            }
             crate::ai::route_cost::flood_dijkstra(
                 *pos,
                 &res.map,
@@ -5877,6 +5889,11 @@ fn dispatch_step_action(
                 crate::ai::pathfinding::CorruptionOverlay::new(&ec.map, &ec.constants.scoring);
             let __weight =
                 crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
+            // 508 — the routing cat's own threat beliefs price
+            // witnessed-ambush ground into the fallback route.
+            let __threat = ec.location_beliefs.get(cat_entity).ok().map(|lb| {
+                crate::ai::pathfinding::ThreatBeliefOverlay::new(lb, &ec.constants.scoring)
+            });
             let __current_tick = ec.time.tick;
             let __window = ec.constants.scoring.route_cost_replan_window_ticks;
             match route_cost_field {
@@ -5899,6 +5916,7 @@ fn dispatch_step_action(
                     crate::ai::route_cost::CatPathPlan::AStarFallback {
                         fox: __fox,
                         corr: __corr,
+                        threat: __threat,
                         weight: __weight,
                     }
                 }
@@ -6102,6 +6120,7 @@ fn dispatch_step_action(
                 // phase entry so `tremor_tick` (next tick) reads the
                 // correct emission multiplier.
                 &ec.constants.sensory,
+                ec.location_beliefs.get(cat_entity).ok(),
                 current,
                 // 477: combat constants + focal sink for the equipment
                 // weapon-strike bonus + bone-snap canary.
@@ -9474,6 +9493,10 @@ fn resolve_engage_prey(
     // 100 — per-species tremor `base_range` lookup for the
     // `effective_stalk_distance` species_push term.
     sensory: &crate::resources::sim_constants::SensoryConstants,
+    // 508 — the routing cat's own threat beliefs (None on test paths
+    // without the component); prices witnessed-ambush ground into
+    // chase-step overlays.
+    location_beliefs: Option<&crate::components::beliefs::LocationBeliefs>,
     // 100 — cat's CurrentAction. The resolver stamps `Action::Stalk`
     // on stalk-phase entry and `Action::Pounce` on pounce-phase entry
     // so `tremor_tick` reads the right multiplier next tick.
@@ -9546,10 +9569,18 @@ fn resolve_engage_prey(
     // (scoring.rs:649) — that axis decides *whether* to hunt; this
     // weight decides *where* the chase route runs.
     let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
-    let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+    // 508 — chase steps also price the cat's own witnessed-ambush
+    // beliefs (a chase must not thread the shadowfox haunting ground
+    // the travel route just detoured around).
+    let threat_overlay =
+        location_beliefs.map(|lb| crate::ai::pathfinding::ThreatBeliefOverlay::new(lb, scoring));
+    let mut cat_overlays: Vec<crate::ai::pathfinding::WeightedOverlay> = vec![
         crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
         crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
     ];
+    if let Some(t) = threat_overlay.as_ref() {
+        cat_overlays.push(crate::ai::pathfinding::WeightedOverlay::new(t, w));
+    }
     let flee_strategy = prey_cfg.flee_strategy;
     let dist = pos.chebyshev_distance(&prey_pos);
 

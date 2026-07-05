@@ -3069,6 +3069,11 @@ struct MentorEffect {
 #[allow(clippy::type_complexity)]
 pub struct ChainStepReadContext<'w, 's> {
     pub constants: Res<'w, SimConstants>,
+    /// 508 — per-cat threat beliefs for `ThreatBeliefOverlay` in the
+    /// legacy disposition-chain routing (PatrolTo + prey-chase arms).
+    /// Read-only; `get(entity)` misses (component absent) degrade to
+    /// a threat-blind route, matching the pre-508 behavior.
+    pub location_beliefs: Query<'w, 's, &'static crate::components::beliefs::LocationBeliefs>,
     /// 257 / 127 — actor's JointIntention (any practice; bias readers
     /// filter to Courtship at snapshot-construction time) for the bias
     /// readers in Socialize/GroomOther/MentorCat. Disjoint from `cats`
@@ -3499,6 +3504,7 @@ pub fn resolve_disposition_chains(
             &mut commands,
             &snaps,
             &mut accum,
+            read_ctx.location_beliefs.get(cat_entity).ok(),
         );
 
         if chain.is_complete() {
@@ -3704,6 +3710,10 @@ fn dispatch_chain_step(
     commands: &mut Commands,
     snaps: &ChainStepSnapshots,
     accum: &mut ChainStepAccumulators,
+    // 508 — the routing cat's own threat beliefs (None when the
+    // component is absent — test paths / fresh spawns degrade to a
+    // threat-blind route, the pre-508 behavior).
+    location_beliefs: Option<&crate::components::beliefs::LocationBeliefs>,
 ) {
     let d = &constants.disposition;
 
@@ -3723,10 +3733,16 @@ fn dispatch_chain_step(
     );
     let corr_overlay = crate::ai::pathfinding::CorruptionOverlay::new(map, &constants.scoring);
     let w = crate::ai::pathfinding::cat_path_weight_from_boldness(personality.boldness);
-    let cat_overlays: [crate::ai::pathfinding::WeightedOverlay; 2] = [
+    // 508 — witnessed-ambush ground priced into chase + patrol routes.
+    let threat_overlay = location_beliefs
+        .map(|lb| crate::ai::pathfinding::ThreatBeliefOverlay::new(lb, &constants.scoring));
+    let mut cat_overlays: Vec<crate::ai::pathfinding::WeightedOverlay> = vec![
         crate::ai::pathfinding::WeightedOverlay::new(&fox_overlay, w),
         crate::ai::pathfinding::WeightedOverlay::new(&corr_overlay, w),
     ];
+    if let Some(t) = threat_overlay.as_ref() {
+        cat_overlays.push(crate::ai::pathfinding::WeightedOverlay::new(t, w));
+    }
 
     match step_kind {
         StepKind::HuntPrey { patrol_dir } => {
@@ -4716,6 +4732,7 @@ fn dispatch_chain_step(
             let path_plan = crate::ai::route_cost::CatPathPlan::AStarFallback {
                 fox: fox_overlay,
                 corr: corr_overlay,
+                threat: threat_overlay,
                 weight: w,
             };
             let outcome = crate::steps::disposition::resolve_patrol_to(

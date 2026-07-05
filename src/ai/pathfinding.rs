@@ -187,6 +187,53 @@ impl TileCostOverlay for CatPatrolDeterrentOverlay<'_> {
     }
 }
 
+/// 508 — routing cost overlay reading the ROUTING CAT'S OWN
+/// [`LocationBeliefs`](crate::components::beliefs::LocationBeliefs)
+/// `recency_of_threat_cue` at each tile's 5-tile belief bucket.
+/// Subjective by construction: only a cat that witnessed (or was told
+/// about) ambushes near a bucket detours around it — this is the 258
+/// belief substrate feeding the feet, not a resurrection of the
+/// retired colony-shared `RecentAmbushMap`.
+///
+/// Cost shape mirrors [`FoxScentOverlay`]:
+/// `round(cue.clamp(0, 1) * max_cost)`. Default `max_cost = 12` —
+/// deliberately above fox-scent's 8: scent marks territory, this
+/// marks places colony-mates were ambushed. Opened after the 493
+/// soak, where six cats died serially at one shadowfox haunting
+/// ground their own threat beliefs already knew about (scoring read
+/// the cue; routing did not).
+#[derive(Clone, Copy)]
+pub struct ThreatBeliefOverlay<'a> {
+    beliefs: &'a crate::components::beliefs::LocationBeliefs,
+    max_cost: u32,
+}
+
+impl<'a> ThreatBeliefOverlay<'a> {
+    pub fn new(
+        beliefs: &'a crate::components::beliefs::LocationBeliefs,
+        sc: &crate::resources::sim_constants::ScoringConstants,
+    ) -> Self {
+        Self {
+            beliefs,
+            max_cost: sc.threat_belief_path_cost_max,
+        }
+    }
+}
+
+impl TileCostOverlay for ThreatBeliefOverlay<'_> {
+    fn cost_at(&self, pos: Position) -> u32 {
+        let key = crate::components::beliefs::bucket_position(pos.x(), pos.y());
+        let cue = self
+            .beliefs
+            .models
+            .get(&key)
+            .map(|m| m.recency_of_threat_cue.value)
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0);
+        (cue * self.max_cost as f32).round() as u32
+    }
+}
+
 // ---------------------------------------------------------------------------
 // A* pathfinding
 // ---------------------------------------------------------------------------
@@ -740,6 +787,42 @@ mod tests {
     // -----------------------------------------------------------------------
     // A* find_path tests
     // -----------------------------------------------------------------------
+
+    /// 508 — a cat whose LocationBeliefs carry a hot threat cue at a
+    /// bucket routes AROUND it; a naive cat (empty beliefs) goes
+    /// straight through. Subjectivity is the substrate contract.
+    #[test]
+    fn threat_belief_overlay_detours_witnessed_ambush_ground() {
+        use crate::components::beliefs::{bucket_position, LocationBeliefs};
+
+        let map = open_map();
+        let sc = crate::resources::sim_constants::ScoringConstants::default();
+        let from = Position::new(1, 7);
+        let to = Position::new(18, 7);
+
+        // Hot threat memory at the bucket containing the straight-line
+        // midpoint (bucket cells are 5 tiles; (10,7) -> bucket (2,1)).
+        let mut beliefs = LocationBeliefs::default();
+        let mut model = crate::components::beliefs::MentalModel::default();
+        model.recency_of_threat_cue.value = 1.0;
+        model.recency_of_threat_cue.strength = 1.0;
+        beliefs.models.insert(bucket_position(10, 7), model);
+
+        let overlay = ThreatBeliefOverlay::new(&beliefs, &sc);
+        let overlays = [WeightedOverlay::new(&overlay, 1.0)];
+        let informed = find_path(from, to, &map, &overlays).expect("path exists");
+        let naive = find_path(from, to, &map, &[]).expect("path exists");
+
+        let hot = |p: &Position| bucket_position(p.x(), p.y()) == bucket_position(10, 7);
+        assert!(
+            naive.iter().any(hot),
+            "naive straight-line path should cross the hot bucket"
+        );
+        assert!(
+            !informed.iter().any(hot),
+            "threat-informed path must detour around the witnessed-ambush bucket; got {informed:?}"
+        );
+    }
 
     #[test]
     fn find_path_open_terrain() {
