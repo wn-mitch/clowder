@@ -169,7 +169,17 @@ pub static SCENARIO: Scenario = Scenario {
     // `wildlife.rs::spawn_wildlife`) is in play. Same family of
     // seed-42 fragility as 494's 200 → 800 bump on the rat-byproduct
     // test.
-    default_ticks: 30,
+    //
+    // 2026-07-05 — bumped 30 → 60, aligning with the budget the
+    // in-file unit tests already use (`run(&SCENARIO, None, Some(60),
+    // 42)`). At 30 ticks the gate rode a single softmax draw: PickUp
+    // held p≈90% at tick 1 but a marginal float shift (floating
+    // `stable` toolchain codegen drift — no sim commit involved)
+    // flipped the seeded draw to Forage (p≈10%), whose multi-tick plan
+    // consumed the whole budget. At 60 ticks the Forage plan completes,
+    // re-election runs, and PickUp lands 3 retrievals — the gate
+    // measures the substrate again, not one draw.
+    default_ticks: 60,
     setup: setup_picking_up_scavenging,
     // Ticket 198 — substrate-fires gate. PickingUp's resolver writes
     // `ItemRetrieved` on successful pickup; this scenario empirically
