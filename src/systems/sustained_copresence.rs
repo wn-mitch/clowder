@@ -78,93 +78,140 @@ pub fn track_sustained_copresence(
     let cfg = &constants.play_cue_emission;
     let threshold = cfg.sustained_copresence_threshold_ticks;
     let cooldown = cfg.sustained_copresence_emit_cooldown_ticks;
+    let prev = tick.saturating_sub(1);
 
-    // Walk the cache in BTreeMap key order; for each live pair, increment
-    // (or reset, on discontinuity) its counter, check threshold + cooldown,
-    // emit + reset on fire.
+    // Ticket 504 — merge-join co-walk. `cache.pairs` and
+    // `tracker.pair_ticks` are BTreeMaps over the same
+    // `normalize_pair`-canonicalized key, so one two-cursor sweep
+    // replaces the pre-504 shape: a per-tick `Vec` collect of every
+    // cache key plus one O(log n) `entry` root-descent per pair
+    // (19.66% self CPU at the 07-05 post-500 flamegraph — same knife
+    // shape 500 removed from `passive_familiarity`). The 485 comment
+    // justified the key-Vec as borrow hygiene, but `Res<NearPairCache>`
+    // and `ResMut<SustainedCoPresenceTracker>` are disjoint system
+    // params — there was never an aliasing problem. Field-destructuring
+    // the tracker lets the matched arm mutate `pair_ticks` entries in
+    // place while the emit arm reads/writes `last_emit`.
     //
-    // Ticket 485: collecting the keys before the entry loop lets us hold a
-    // `&mut tracker` exclusively inside the loop without aliasing
-    // `cache.pairs` (the prior shape pre-collected the same Vec). The
-    // `last_touched_tick` carried in each entry handles eviction lazily —
-    // a pair that drops out has its entry stay in the map but with a stale
-    // `last_touched_tick`; if the pair returns, the discontinuity check
-    // resets the count.
-    let pair_keys: Vec<(Entity, Entity)> = cache.pairs.keys().copied().collect();
-    for key in pair_keys {
-        // Increment the counter in a tight scope so the mutable borrow on
-        // `tracker.pair_ticks` ends before we look at `tracker.last_emit`.
-        let count = {
-            let entry = tracker.pair_ticks.entry(key).or_insert((0, tick));
-            // Discontinuity check: if we did not observe this pair on the
-            // immediately preceding tick, the run resets. `tick == 0` is
-            // the bootstrap case (saturating_sub keeps it well-defined).
-            let prev = tick.saturating_sub(1);
-            if entry.1 != prev {
-                entry.0 = 1;
-            } else {
-                entry.0 = entry.0.saturating_add(1);
-            }
-            entry.1 = tick;
-            entry.0
-        };
+    // The 485 lazy-eviction semantics are unchanged: stale tracker
+    // entries (pair no longer cached) are skipped by the cursor (their
+    // `last_touched_tick` goes stale exactly as before) and swept by
+    // the periodic GC below.
+    let tracker = &mut *tracker;
+    let pair_ticks = &mut tracker.pair_ticks;
+    let last_emit = &mut tracker.last_emit;
 
+    // Cache pairs with no tracker entry yet — inserted after the walk
+    // (can't insert into `pair_ticks` mid-`iter_mut`). Their fresh
+    // count is 1, so the threshold branch is unreachable for them at
+    // any threshold > 1 (canonical config); the shared closure keeps
+    // pathological configs correct, at the cost of those emissions
+    // sorting after the matched-arm emissions within the same tick
+    // (default-config byte stream is unaffected).
+    let mut new_pairs: Vec<(Entity, Entity)> = Vec::new();
+    // Entries whose endpoint despawned this tick — removed after the
+    // walk (mid-iteration removal is what the pre-504 Vec allowed).
+    let mut dead_keys: Vec<(Entity, Entity)> = Vec::new();
+
+    // Threshold/cooldown/emit tail, shared by the matched arm and the
+    // (rare) fresh-pair path. Returns `false` when the pair's entry
+    // must be dropped because an endpoint despawned this tick.
+    let fire_check = |key: (Entity, Entity),
+                      count_slot: &mut u32,
+                      last_emit: &mut BTreeMap<(Entity, Entity), u64>,
+                      events: &mut MessageWriter<WitnessableEvent>|
+     -> bool {
+        let count = *count_slot;
         if count < threshold {
-            continue;
+            return true;
         }
-
-        // Cooldown check — skip if we emitted for this pair recently.
-        let in_cooldown = tracker
-            .last_emit
+        let in_cooldown = last_emit
             .get(&key)
             .copied()
             .map(|last_tick| tick.saturating_sub(last_tick) < cooldown)
             .unwrap_or(false);
         if in_cooldown {
-            if let Some(c) = tracker.pair_ticks.get_mut(&key) {
-                c.0 = 0;
-            }
-            continue;
+            *count_slot = 0;
+            return true;
         }
-
-        // Need both cats' Position to populate the event. If either lookup
-        // misses (e.g. the cat despawned this same tick), drop the pair —
-        // the next-tick path will not re-touch it and the periodic GC below
-        // sweeps it.
+        // Need both cats' Position to populate the event. If either
+        // lookup misses (e.g. the cat despawned this same tick), drop
+        // the pair — the next-tick path will not re-touch it and the
+        // periodic GC below sweeps it.
         let (a, b) = key;
         let Ok(pos_a) = cats.get(a) else {
-            tracker.pair_ticks.remove(&key);
-            continue;
+            return false;
         };
-        let Ok(_pos_b) = cats.get(b) else {
-            tracker.pair_ticks.remove(&key);
-            continue;
-        };
-        let ticks_held = count;
-
-        // Emit symmetrically: each direction carries its own `actor`/`target`
-        // so the integrator's per-cat lift fires for both directions of the
-        // pair's mutual perception.
+        if cats.get(b).is_err() {
+            return false;
+        }
+        // Emit symmetrically: each direction carries its own
+        // `actor`/`target` so the integrator's per-cat lift fires for
+        // both directions of the pair's mutual perception.
         events.write(WitnessableEvent::SustainedCoPresence {
             actor: a,
             target: b,
-            ticks_held,
+            ticks_held: count,
             position: *pos_a,
             tick,
         });
         events.write(WitnessableEvent::SustainedCoPresence {
             actor: b,
             target: a,
-            ticks_held,
+            ticks_held: count,
             position: *pos_a,
             tick,
         });
+        *count_slot = 0;
+        last_emit.insert(key, tick);
+        true
+    };
 
-        // Reset the count and stamp the cooldown.
-        if let Some(c) = tracker.pair_ticks.get_mut(&key) {
-            c.0 = 0;
+    let mut cache_keys = cache.pairs.keys().copied().peekable();
+    for (&key, entry) in pair_ticks.iter_mut() {
+        loop {
+            match cache_keys.peek() {
+                Some(&k) if k < key => {
+                    new_pairs.push(k);
+                    cache_keys.next();
+                }
+                Some(&k) if k == key => {
+                    // Matched — increment (or reset on discontinuity:
+                    // the pair was not observed on the immediately
+                    // preceding tick; `tick == 0` bootstrap stays
+                    // well-defined via `saturating_sub`).
+                    if entry.1 != prev {
+                        entry.0 = 1;
+                    } else {
+                        entry.0 = entry.0.saturating_add(1);
+                    }
+                    entry.1 = tick;
+                    if !fire_check(key, &mut entry.0, last_emit, &mut events) {
+                        dead_keys.push(key);
+                    }
+                    cache_keys.next();
+                    break;
+                }
+                // Cache exhausted, or this tracker entry is stale
+                // (lazy-evicted pair) — move to the next entry.
+                _ => break,
+            }
         }
-        tracker.last_emit.insert(key, tick);
+    }
+    // Cache pairs beyond the last tracker entry.
+    for k in cache_keys {
+        new_pairs.push(k);
+    }
+    for key in dead_keys {
+        pair_ticks.remove(&key);
+    }
+    for key in new_pairs {
+        // Fresh entry: first observed tick → count 1, exactly what the
+        // pre-504 `or_insert((0, tick))` + discontinuity-reset produced.
+        let mut slot = (1u32, tick);
+        if fire_check(key, &mut slot.0, last_emit, &mut events) {
+            pair_ticks.insert(key, slot);
+        }
     }
 
     // Periodic GC. The lazy-eviction shape leaves stale entries in
