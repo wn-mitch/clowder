@@ -125,10 +125,22 @@ allocation hotspots — scratch-buffer reuse).
   Lazy / event-driven eviction is the dominant lever.
 
 ## Children (open)
-- **486** — update_near_pair_cache death-retain via CatDied (13.3% inclusive
-  at the 05-28 profile; 5.4% at the 06-09 profile below)
+- **504** — track_sustained_copresence re-knife: per-pair BTreeMap entry
+  descents + per-tick key-Vec alloc survived 485 (19.7% self at the
+  07-05 post-500 profile below)
 - **500** — Relationships::iter_for unindexed full-map scan — audit per-tick
-  call sites (opened from 459's layer-walk)
+  call sites (opened from 459's layer-walk). Fix implemented 2026-07-05
+  (`modify_familiarity_batch` merge-join, 16.6% → 4.6% self); landing
+  in flight.
+
+**2026-07-05 post-500 flamegraph** (`logs/flamegraphs/42-6571f9f6c0a8/`, 60 s seed-42):
+| # | symbol | self% | incl% | note |
+|---|---|---:|---:|---|
+| 1 | track_sustained_copresence | 19.7 | **21.7** | → 504 (entry-descent shape, same as 500's knife) |
+| 2 | integrate_beliefs | 10.8 | 10.9 | absolute cost ≈ flat vs 06-09; share grew as pie shrank. Knife decision after 504 (plan.md step 2) |
+| 3 | prey_ai / try_detect_cat | 9.5 | 9.9 | 266 pre-existing load — alert-set gating is load-bearing there |
+| 4 | evaluate_and_plan | 2.0 | 8.9 | mostly flood_dijkstra |
+| 5 | modify_familiarity_batch | 4.6 | 6.0 | post-500 remainder (was modify_familiarity 16.6/17.2) |
 
 ## Children (closed 2026-06-09)
 - **459** — landed (knife #1): single-pass mates-bonded set retired the
@@ -169,3 +181,7 @@ The structural answer to "stairstep regressions surface weeks late":
   (landed-at `d82cd645`, 2026-05-28). Inclusive 25.37% → 12.44%; 60s
   throughput 122.8 → 141.1 t/s (+14.9%). Behavior-preserving (byte-identical
   event stream in common tick range).
+- **486** — update_near_pair_cache departure-set eviction (landed-at
+  `9a05a29c`, 2026-05-30 — diff-based, not the CatDied shape the ticket
+  proposed; see landed/486). Was mislisted under "Children (open)"
+  until 2026-07-05.

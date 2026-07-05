@@ -20,32 +20,46 @@ use crate::components::skills::Skills;
 
 /// Catalog of every recipe the simulation knows about.
 ///
-/// Stored as a `BTreeMap` (not `HashMap`) so `iter()` yields a stable,
-/// process-independent order — ticket 502. `HashMap`'s per-process
-/// `RandomState` made recipe iteration order differ across runs of the
-/// same binary; `emit_have_item_row`'s winner scan breaks score ties by
-/// first-seen, so byte-equal-scoring recipes (the remedy trio) flipped
-/// between processes and broke soak-scale byte-identity. Same
-/// determinism precedent as `Relationships` (relationships.rs).
+/// Iteration order is **registration order** (the order
+/// `populate_recipe_registry` inserts) — ticket 502. This order is
+/// load-bearing: `emit_have_item_row`'s winner scan and
+/// [`Self::recipe_producing`]'s first-match both resolve byte-equal
+/// score ties toward the earlier-registered recipe, so registration
+/// order IS the author-curated tie-break priority (and
+/// `recipe_producing`'s doc always promised "first-registered match").
+/// The pre-502 `HashMap` storage silently broke that promise: its
+/// per-process `RandomState` iteration order flipped ties between
+/// runs of the same binary (observed: the seed-42 canonical soak
+/// forked at elapsed tick 3750 on a warriors-kit aspiration tie and
+/// again at the first remedy craft). Keyed lookup goes through a
+/// `BTreeMap` index. Same determinism doctrine as `Relationships`
+/// (relationships.rs).
 #[derive(Resource, Default, Debug, Clone)]
 pub struct RecipeRegistry {
-    recipes: BTreeMap<RecipeId, Recipe>,
+    /// Recipes in registration order — the tie-break priority surface.
+    recipes: Vec<Recipe>,
+    /// `RecipeId` → index into `recipes` for keyed lookup.
+    index: BTreeMap<RecipeId, usize>,
 }
 
 impl RecipeRegistry {
     /// Register a recipe. Panics on duplicate ids — recipe ids
     /// are stable identifiers and silent overwrites would mask
     /// merge conflicts between contributors editing the populate
-    /// function.
+    /// function. Registration position doubles as tie-break
+    /// priority (see type-level doc) — insert order in
+    /// `populate_recipe_registry` is a design surface, not
+    /// happenstance.
     pub fn insert(&mut self, recipe: Recipe) {
         let id = recipe.id;
-        if self.recipes.insert(id, recipe).is_some() {
+        if self.index.insert(id, self.recipes.len()).is_some() {
             panic!("duplicate RecipeId registered: {id:?}");
         }
+        self.recipes.push(recipe);
     }
 
     pub fn get(&self, id: RecipeId) -> Option<&Recipe> {
-        self.recipes.get(&id)
+        self.index.get(&id).map(|&i| &self.recipes[i])
     }
 
     /// 462: find the recipe whose output is `item`. Used by the
@@ -53,18 +67,20 @@ impl RecipeRegistry {
     /// `GoalKind::HaveItem(item)` Intention into a craft plan.
     ///
     /// Linear scan over registered recipes (≤50 today). If multiple
-    /// recipes share an output kind (none today; flagged for revisit
-    /// if a future Phase ≥2 recipe lands a second producer), this
-    /// returns the match with the lexicographically-smallest id
-    /// (deterministic — ticket 502).
+    /// recipes share an output kind (the two ward recipes share a
+    /// placeholder output today, but wards are never HaveItem lookup
+    /// targets), this returns the first-registered match — now
+    /// actually true (502); the pre-502 HashMap made it per-process
+    /// arbitrary despite this doc's promise.
     pub fn recipe_producing(&self, item: crate::components::items::ItemKind) -> Option<&Recipe> {
         self.iter().find(|r| r.output.item_kind == item)
     }
 
-    /// Iterate recipes in ascending `RecipeId` order (stable across
-    /// processes — ticket 502; callers may tie-break by first-seen).
+    /// Iterate recipes in registration order (stable across processes
+    /// — ticket 502). First-seen-wins consumers inherit registration
+    /// order as their tie-break priority.
     pub fn iter(&self) -> impl Iterator<Item = &Recipe> {
-        self.recipes.values()
+        self.recipes.iter()
     }
 
     pub fn len(&self) -> usize {
@@ -165,18 +181,21 @@ mod tests {
         registry.insert(sample_recipe("dup"));
     }
 
-    /// Ticket 502 — iteration order must be ascending by RecipeId
-    /// regardless of insertion order. Winner scans tie-break by
-    /// first-seen; a process-dependent order here breaks cross-process
-    /// determinism at the first byte-equal score tie.
+    /// Ticket 502 — iteration order must be registration order,
+    /// independent of id ordering and (unlike the pre-502 HashMap) of
+    /// per-process hash state. Winner scans tie-break by first-seen;
+    /// registration order is the author-curated tie-break priority.
     #[test]
-    fn iter_yields_ascending_id_order_regardless_of_insertion_order() {
+    fn iter_yields_registration_order() {
         let mut registry = RecipeRegistry::default();
         registry.insert(sample_recipe("z.last"));
         registry.insert(sample_recipe("a.first"));
         registry.insert(sample_recipe("m.middle"));
         let ids: Vec<&str> = registry.iter().map(|r| r.id.0).collect();
-        assert_eq!(ids, vec!["a.first", "m.middle", "z.last"]);
+        assert_eq!(ids, vec!["z.last", "a.first", "m.middle"]);
+        // Keyed lookup unaffected by position.
+        assert_eq!(registry.get(RecipeId("a.first")).unwrap().id.0, "a.first");
+        assert_eq!(registry.get(RecipeId("m.middle")).unwrap().id.0, "m.middle");
     }
 
     // -----------------------------------------------------------------

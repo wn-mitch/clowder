@@ -71,10 +71,21 @@ and the two runs it compares live in one process anyway.
   the type.
 
 ## Recommended direction
-R2. The registry is the substrate; pinning order at the storage layer
-fixes the observed site and the latent `recipe_for_item` first-match in
-one move, with the repo's existing BTreeMap-for-determinism precedent.
-R1 alone leaves a landmine the next `.iter().find()` caller steps on.
+~~R2~~ → **R2/R3 hybrid (registration-order Vec + BTreeMap id index)**,
+revised after the R2 (lex-order BTreeMap) soak: lex order pinned the
+seed-42 aspiration tie at elapsed tick 3750 toward
+`warriors_kit.bone_stiletto` (Crafting displaced Cooking for Basil at
+hunger 0.93) and the trajectory cascaded to a survival-canary FAIL
+(kittens_born 0, MatingOccurred never fired, 3 low-dispersion windows
+— `logs/tuned-42-6571f9f6-runa`). No pin can "preserve" the old
+behavior (the old behavior was per-process randomness, not a code
+property), but the tie-break priority should be an **author-curated
+design surface**, not id-string lexicography — and
+`recipe_producing`'s doc already promised "first-registered match".
+Registration order in `populate_recipe_registry` is now that surface:
+iteration runs over the insertion-order Vec; keyed lookup via a
+BTreeMap index. R2-pure is preserved in history at `6571f9f6` for the
+soak evidence.
 
 ## Out of scope
 - A corpus-wide audit of sim-path `HashMap` iteration for other
@@ -100,3 +111,8 @@ R1 alone leaves a landmine the next `.iter().find()` caller steps on.
 - 2026-07-05: opened mid-session from the ticket-500 byte-identity gate
   (three-way soak comparison isolated the flip to cross-process
   HashMap order, not the 500 merge-join). R2 recommended.
+- 2026-07-05 (later): R2 lex-pin soaked at `6571f9f6` → survival FAIL
+  (see revised Recommended direction). Reshaped to registration-order
+  Vec + id index; `recipe_producing`'s "first-registered" doc promise
+  now actually holds. Seed-42 health under the new pin verified by
+  fresh soak before landing.

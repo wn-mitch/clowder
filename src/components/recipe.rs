@@ -28,9 +28,10 @@ use crate::components::items::ItemKind;
 /// string into a `&'static str` — acceptable because RecipeId
 /// values are bounded by the recipe-registry size (~10-50) and
 /// deserialization is rare (logdb / save-load / debug paths).
-/// `Ord` (502): the registry stores recipes in a `BTreeMap` keyed on
-/// this id so every iteration-order consumer (winner scans, first-match
-/// lookups) is process-independent — lexicographic by id string.
+/// `Ord` (502): the registry's keyed-lookup index is a `BTreeMap` on
+/// this id (iteration itself runs over the registration-order `Vec` —
+/// see `RecipeRegistry`'s type-level doc for why that order is
+/// load-bearing).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
 pub struct RecipeId(pub &'static str);
 

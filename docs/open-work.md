@@ -15,10 +15,10 @@ _Last generated: 2026-07-05._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 119 |
+| Ready | 121 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **165** |
+| **Open total** | **167** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,11 +68,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (119)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (32 ready, 5 blocked)
+### ai-substrate (34 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -106,6 +106,8 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[493](docs/open-work/tickets/493-phase-2c-step-toward-retires-to-find-path-wrapper-pathfinding-cleanup.md)** — Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup) — _[ai-substrate] · added 2026-05-31_
 - **[500](docs/open-work/tickets/500-relationshipsiter-for-is-an-unindexed-full-map-scan-audit-per-tick-call-sites-consider-per-entity-index.md)** — Relationships::iter_for is an unindexed full-map scan — audit per-tick call sites, consider per-entity index — _[ai-substrate] · added 2026-06-09_
 - **[501](docs/open-work/tickets/501-workpressureaffiliativeyield-first-light-activation-price-the-freed-bandwidth-destination-patrolflee-absorption-at-scale-05.md)** — WorkPressureAffiliativeYield first-light activation — price the freed-bandwidth destination (Patrol/Flee absorption at scale 0.5) — _[ai-substrate] · added 2026-06-11_
+- **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
+- **[504](docs/open-work/tickets/504-track-sustained-copresence-re-knife-per-pair-btreemap-entry-descents-per-tick-key-vec-alloc-survived-485-197-percent-self-at-post-500-flamegraph-480-child.md)** — track_sustained_copresence re-knife — per-pair BTreeMap entry descents + per-tick key-Vec alloc survived 485 (19.7 percent self at post-500 flamegraph, 480 child) — _[ai-substrate] · added 2026-07-05_
 
 ### social-coordination (17 ready, 4 blocked)
 
@@ -344,7 +346,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (119)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -465,6 +467,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[500](docs/open-work/tickets/500-relationshipsiter-for-is-an-unindexed-full-map-scan-audit-per-tick-call-sites-consider-per-entity-index.md)** — Relationships::iter_for is an unindexed full-map scan — audit per-tick call sites, consider per-entity index — _[ai-substrate] · added 2026-06-09_
 - **[501](docs/open-work/tickets/501-workpressureaffiliativeyield-first-light-activation-price-the-freed-bandwidth-destination-patrolflee-absorption-at-scale-05.md)** — WorkPressureAffiliativeYield first-light activation — price the freed-bandwidth destination (Patrol/Flee absorption at scale 0.5) — _[ai-substrate] · added 2026-06-11_
 - **[502](docs/open-work/tickets/502-reciperegistry-hashmap-iteration-order-is-per-process-random-recipe-score-ties-break-nondeterministically-across-processes.md)** — RecipeRegistry HashMap iteration order is per-process random — recipe score ties break nondeterministically across processes — _[items-crafting] · added 2026-07-05_
+- **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
+- **[504](docs/open-work/tickets/504-track-sustained-copresence-re-knife-per-pair-btreemap-entry-descents-per-tick-key-vec-alloc-survived-485-197-percent-self-at-post-500-flamegraph-480-child.md)** — track_sustained_copresence re-knife — per-pair BTreeMap entry descents + per-tick key-Vec alloc survived 485 (19.7 percent self at post-500 flamegraph, 480 child) — _[ai-substrate] · added 2026-07-05_
 
 ## Parked (12)
 
