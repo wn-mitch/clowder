@@ -47,7 +47,29 @@ use crate::resources::time::{SimConfig, TimeScale, TimeState};
 pub fn update_near_pair_cache(
     mut cache: ResMut<NearPairCache>,
     mut moved_reader: MessageReader<CatMoved>,
-    cats: Query<(Entity, &Position), (Without<Dead>, Without<Structure>)>,
+    // Ticket 506 — admission is restricted to the entities that
+    // participate in the familiarity/co-presence substrate: cats
+    // (`CatBeliefs` rides every cat spawn incl. kittens — the
+    // blueprint bundle in setup.rs, pinned by pregnancy.rs's parity
+    // test) and wildlife (`WildAnimal` — the §9.2 BefriendedAlly
+    // surface reads cat×wildlife familiarity). The pre-506 filter —
+    // only `(Without<Dead>, Without<Structure>)` — admitted every
+    // prey animal and ground item: ~26k of ~26k cached pairs had a
+    // non-cat endpoint, `passive_familiarity` minted Relationships
+    // entries for all of them every tick, and threshold-crossing
+    // prey pairs emitted SustainedCoPresence whose actors became
+    // unread CatBeliefs ballast. See ticket 506.
+    cats: Query<
+        (Entity, &Position),
+        (
+            Without<Dead>,
+            Without<Structure>,
+            Or<(
+                With<crate::components::CatBeliefs>,
+                With<crate::components::wildlife::WildAnimal>,
+            )>,
+        ),
+    >,
     constants: Res<SimConstants>,
 ) {
     let range = constants.social.passive_familiarity_range;
@@ -69,13 +91,13 @@ pub fn update_near_pair_cache(
     // diffing `live` against `cache.last_seen`.
     //
     // We diff (not the `CatDied` stream the ticket proposed) because
-    // the cats query is permissive — `(Without<Dead>, Without<Structure>)`
-    // also admits wildlife / items / prey that carry `Position`, and
-    // those depart via direct `commands.entity(_).despawn()` calls
-    // (prey kills, herb pickup, etc.), not via `Dead` insertion. The
-    // diff catches all departures uniformly; using only `CatDied`
-    // would leak entries for non-cat entities and trip
-    // `passive_familiarity`'s debug divergence assert.
+    // the admitted set still spans two departure paths: cats leave
+    // via `Dead` insertion, wildlife (506 keeps them for the §9.2
+    // befriend surface) via direct `commands.entity(_).despawn()`.
+    // The diff catches both uniformly; using only `CatDied` would
+    // leak wildlife entries and trip `passive_familiarity`'s debug
+    // divergence assert. (Pre-506 the query also admitted prey +
+    // items, which made the diff even more load-bearing.)
     //
     // Steady-state (no departures, no moves): both `gone` and `moved`
     // are empty, both conditional blocks are skipped, and the system's
@@ -163,7 +185,19 @@ pub fn passive_familiarity(
     // First panic localizes the exact tick + pair where `update_near_pair_cache`
     // diverges from the original loop's invariant. Release builds skip both
     // params (zero cost).
-    #[cfg(debug_assertions)] cats: Query<(Entity, &Position), (Without<Dead>, Without<Structure>)>,
+    // 506 — filter mirrors `update_near_pair_cache`'s admission set;
+    // a mismatch here trips the brute-force parity panic below.
+    #[cfg(debug_assertions)] cats: Query<
+        (Entity, &Position),
+        (
+            Without<Dead>,
+            Without<Structure>,
+            Or<(
+                With<crate::components::CatBeliefs>,
+                With<crate::components::wildlife::WildAnimal>,
+            )>,
+        ),
+    >,
     #[cfg(debug_assertions)] time: Res<TimeState>,
 ) {
     #[cfg(debug_assertions)]
@@ -219,9 +253,13 @@ pub fn passive_familiarity(
 /// vs. avoid would flicker the marker each tick at the boundary.
 ///
 /// **Note**: `Relationships` accepts cat ↔ wildlife pairs at the
-/// storage layer, but no production system writes familiarity for
-/// such pairs today. The author runs each tick and produces a
-/// no-op until a follow-on (or test fixtures) seed familiarity.
+/// storage layer, and `passive_familiarity` DOES write familiarity
+/// for them — wildlife are admitted into `NearPairCache` (kept
+/// deliberately by ticket 506's composition fix precisely so this
+/// surface stays live; a pre-506 version of this comment claimed no
+/// production writer existed, which had been wrong since the 431
+/// cache landed). A cat that persistently shares space with a fox
+/// accrues the familiarity this author reads.
 ///
 /// Algorithm: for each (cat, wildlife) pair where familiarity ≥
 /// upgrade-threshold, tag both. If either side carries the marker
@@ -748,12 +786,21 @@ mod tests {
         (world, schedule)
     }
 
+    /// 506 — the cache admission filter requires `CatBeliefs` (cats)
+    /// or `WildAnimal` (wildlife); test entities spawn with the cat
+    /// discriminator, mirroring the production blueprint bundle.
+    fn spawn_near_pair_cat(world: &mut World, pos: Position) -> Entity {
+        world
+            .spawn((pos, crate::components::CatBeliefs::default()))
+            .id()
+    }
+
     #[test]
     fn passive_familiarity_increases_for_adjacent_cats() {
         let (mut world, mut schedule) = setup_world();
 
-        let a = world.spawn(Position::new(5, 5)).id();
-        let b = world.spawn(Position::new(5, 6)).id();
+        let a = spawn_near_pair_cat(&mut world, Position::new(5, 5));
+        let b = spawn_near_pair_cat(&mut world, Position::new(5, 6));
 
         // Init relationship.
         world
@@ -778,8 +825,8 @@ mod tests {
     fn passive_familiarity_unchanged_for_distant_cats() {
         let (mut world, mut schedule) = setup_world();
 
-        let a = world.spawn(Position::new(0, 0)).id();
-        let b = world.spawn(Position::new(10, 10)).id();
+        let a = spawn_near_pair_cat(&mut world, Position::new(0, 0));
+        let b = spawn_near_pair_cat(&mut world, Position::new(10, 10));
 
         world
             .resource_mut::<Relationships>()
@@ -794,6 +841,57 @@ mod tests {
             .unwrap()
             .familiarity;
         assert_eq!(fam, 0.0, "distant cats should not gain familiarity");
+    }
+
+    /// Ticket 506 — the cache admits cats (`CatBeliefs`) and wildlife
+    /// (`WildAnimal`) ONLY. Prey and bare-Position entities (items)
+    /// sitting inside `passive_familiarity_range` must produce zero
+    /// cache pairs and zero Relationships entries. Pre-506 the filter
+    /// admitted everything with a Position: 26k of 26k cached pairs in
+    /// a seed-42 soak had a non-cat endpoint.
+    #[test]
+    fn near_pair_cache_excludes_prey_and_items() {
+        let (mut world, mut schedule) = setup_world();
+
+        let cat_a = spawn_near_pair_cat(&mut world, Position::new(5, 5));
+        let cat_b = spawn_near_pair_cat(&mut world, Position::new(5, 6));
+        // Wildlife next to the cats — admitted (befriend surface).
+        let fox = world
+            .spawn((
+                Position::new(5, 7),
+                crate::components::wildlife::WildAnimal::new(
+                    crate::components::wildlife::WildSpecies::Fox,
+                ),
+            ))
+            .id();
+        // Prey + bare-Position (item-shaped) entities in range — excluded.
+        let prey = world
+            .spawn((Position::new(5, 4), crate::components::prey::PreyAnimal))
+            .id();
+        let item_shaped = world.spawn(Position::new(6, 5)).id();
+
+        schedule.run(&mut world);
+
+        let cache = world.resource::<crate::resources::near_pair_cache::NearPairCache>();
+        for &(a, b) in cache.pairs.keys() {
+            for e in [a, b] {
+                assert!(
+                    e != prey && e != item_shaped,
+                    "cache must not contain prey/item endpoints; found pair ({a:?}, {b:?})"
+                );
+            }
+        }
+        // The admitted trio all pair up (within range).
+        let key_ab = crate::resources::near_pair_cache::normalize_pair(cat_a, cat_b);
+        let key_bfox = crate::resources::near_pair_cache::normalize_pair(cat_b, fox);
+        assert!(
+            cache.pairs.contains_key(&key_ab),
+            "cat×cat pair must be cached"
+        );
+        assert!(
+            cache.pairs.contains_key(&key_bfox),
+            "cat×wildlife pair must be cached (§9.2 befriend surface)"
+        );
     }
 
     #[test]
