@@ -1,7 +1,7 @@
 ---
 id: 493
 title: Phase 2c — step_toward retires to find_path wrapper (pathfinding cleanup)
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 07acc090
+landed-on: 2026-07-05
 ---
 
 ## Why
@@ -70,3 +70,4 @@ are signature-compatible; no call-site changes needed.
 
 - 2026-05-31: opened as sub-phase 2c sibling of 491. Pathfinding
   cleanup precursor to #140 (Phase 3 steering).
+- 2026-07-05: A*-first wrapper landed (greedy fallback retained; 466 gate carried). Verdict pass (+12.6% tps, canaries green) with hypothesis-carried drift: route concentration exposed threat-blind routing — 6 hotspot deaths, kittens 0; balance doc docs/balance/astar-first-stepping.md; structural follow-on 508 (ThreatBeliefOverlay) lands next, before step 6

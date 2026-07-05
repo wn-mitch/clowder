@@ -1,7 +1,7 @@
 ---
 id: 466
 title: TravelTo greedy-step pathing — lift A* fallback into CatPathPlan::next_step
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 07acc090
+landed-on: 2026-07-05
 ---
 
 ## Why
@@ -89,3 +89,4 @@ demonstrates the soak-level safety).
 - 2026-05-25: opened from 465's outcome. Same greedy-stuck defect at a
   different consumer; substrate-correct generalization of 465's inline
   fix.
+- 2026-07-05: closed as superseded by 493 (the step_toward A*-lift landed there; carried its gate: TravelTo no-path-and-stuck <= 100 — post-493 soak plan_failures show HoldUntilSafe timeout 144 but no TravelTo stuck-gate breach)
