@@ -1,7 +1,7 @@
 ---
 id: 502
 title: RecipeRegistry HashMap iteration order is per-process random — recipe score ties break nondeterministically across processes
-status: ready
+status: done
 cluster: items-crafting
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 360315e1
+landed-on: 2026-07-05
 ---
 
 ## Why
@@ -116,3 +116,4 @@ soak evidence.
   Vec + id index; `recipe_producing`'s "first-registered" doc promise
   now actually holds. Seed-42 health under the new pin verified by
   fresh soak before landing.
+- 2026-07-05: registration-order Vec + BTreeMap id index (reshaped from lex BTreeMap after seed-42 lex-pin collapse — see Recommended direction). Same-binary pair byte-identical modulo 503 Patrol-ULP signature; seed-42 verdict pass (kittens=2, +9.8% tps). Lex-pin evidence preserved at 6571f9f6 / logs/tuned-42-6571f9f6-runa
