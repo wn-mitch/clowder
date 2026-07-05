@@ -50,7 +50,23 @@ pair-keyed state.
   load-bearing; touch only with a determinism gate).
 
 ## Current state
-Opened from the 459 knife-#1 landing. No audit performed yet.
+Audit complete (2026-07-05, anchored on the 06-09 flamegraph at `bdc71254`,
+`modify_familiarity` 17.15% incl / 16.55% self — top child `BTreeMap::entry`):
+
+| call site | cadence | flamegraph-visible | disposition |
+|---|---|---|---|
+| `social.rs::passive_familiarity` → `modify_familiarity` per near-pair | per-pair-per-tick | **yes — the knife (16.55% self)** | [verified-hot] fixed — `modify_familiarity_batch` merge-join |
+| `disposition.rs:983` → `social_status_distress` → `iter_for(nearest_other)` | per-cat-per-tick | no (≤ the 2.75% shared BTreeMap-iter frame) | [suspect-warm] left; re-audit if it surfaces post-500/502 |
+| `mate_target.rs:205` per-candidate Mates scan | per-candidate at eval cadence | no | [suspect-warm] 459 sister-shape; hoist to a mates set if it ever surfaces |
+| `joint_intention.rs:740/791` | `debug_assert!` only | release-free | fine |
+| `aspirations.rs::track_milestones` FormBond arm | per-active-FormBond-aspiration | no | fine (event-scale) |
+| `snapshot.rs:130` | snapshot cadence (arena-reused) | no | fine |
+| `coordination.rs:44` | election cadence | no | out of scope (BTreeMap-order load-bearing) |
+| `cat_inspect.rs:411` / `social.rs` tests | UI / test | n/a | fine |
+
+Per the Approach's own rule (index only if ≥3 hot sites remain after
+hoisting): **one** hot site existed; the per-entity adjacency index is not
+justified. `iter_for` doc-comment now states the O(pairs) cost.
 
 ## Approach
 1. `rg "iter_for|all_for" src/` → table of call sites × calling system ×
@@ -69,3 +85,11 @@ Opened from the 459 knife-#1 landing. No audit performed yet.
 
 ## Log
 - 2026-06-09: opened from 459's layer-walk (knife #1: Mates-gate scans).
+- 2026-07-05: audit table landed (see Current state). Fix:
+  `Relationships::modify_familiarity_batch` — single merge-join co-walk of
+  `NearPairCache::pairs` and `Relationships::data` (both BTreeMaps over the
+  same normalize_key canonicalization), replacing one O(log pairs) `entry`
+  descent per near-pair per tick in `passive_familiarity`. Missing pairs
+  collected and inserted after the walk (get_or_insert parity). Unit test
+  asserts bit-identical familiarity vs N individual calls. Verification
+  running: 900s soak-trace 42/Simba + verdict + post-flamegraph.
