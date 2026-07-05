@@ -128,10 +128,6 @@ allocation hotspots — scratch-buffer reuse).
 - **504** — track_sustained_copresence re-knife: per-pair BTreeMap entry
   descents + per-tick key-Vec alloc survived 485 (19.7% self at the
   07-05 post-500 profile below)
-- **500** — Relationships::iter_for unindexed full-map scan — audit per-tick
-  call sites (opened from 459's layer-walk). Fix implemented 2026-07-05
-  (`modify_familiarity_batch` merge-join, 16.6% → 4.6% self); landing
-  in flight.
 
 **2026-07-05 post-500 flamegraph** (`logs/flamegraphs/42-6571f9f6c0a8/`, 60 s seed-42):
 | # | symbol | self% | incl% | note |
@@ -185,3 +181,11 @@ The structural answer to "stairstep regressions surface weeks late":
   `9a05a29c`, 2026-05-30 — diff-based, not the CatDied shape the ticket
   proposed; see landed/486). Was mislisted under "Children (open)"
   until 2026-07-05.
+- **500** — Relationships iter_for audit + modify_familiarity knife
+  (landed-at `18e8c671`, 2026-07-05). `modify_familiarity_batch`
+  merge-join over NearPairCache×Relationships: 16.55% → 4.63% self;
+  900s verdict pass with throughput_drift **+9.3%** (67.7 → 74.0 t/s).
+  Byte-identical vs current-toolchain control modulo pre-existing
+  502-recipe-forks + 503-Patrol-ULP (both root-caused this session).
+  Audit found ONE hot site → per-entity adjacency index not justified;
+  iter_for doc-comment now states O(pairs).

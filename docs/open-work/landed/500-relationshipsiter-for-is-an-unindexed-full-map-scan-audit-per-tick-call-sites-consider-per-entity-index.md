@@ -1,7 +1,7 @@
 ---
 id: 500
 title: Relationships::iter_for is an unindexed full-map scan — audit per-tick call sites, consider per-entity index
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ supersedes: []
 blocked-by: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 18e8c671
+landed-on: 2026-07-05
 ---
 
 ## Why
@@ -93,3 +93,4 @@ justified. `iter_for` doc-comment now states the O(pairs) cost.
   collected and inserted after the walk (get_or_insert parity). Unit test
   asserts bit-identical familiarity vs N individual calls. Verification
   running: 900s soak-trace 42/Simba + verdict + post-flamegraph.
+- 2026-07-05: modify_familiarity_batch merge-join: 16.55% -> 4.63% self; verdict pass, throughput_drift +9.3%; byte-clean vs current-toolchain control (only diffs were 502's pre-existing recipe forks + 503's Patrol ULP wobble); audit table in Current state
