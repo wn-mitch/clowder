@@ -108,7 +108,23 @@ fn cleanup(dir: &Path) {
 // Tests
 // ---------------------------------------------------------------------------
 
-/// Same seed + same binary + same machine → byte-identical `events.jsonl`.
+/// Strip the wall-clock-only fields the 498 instrumentation added to the
+/// footer (`wall_elapsed_secs`, `ticks_per_sec`). They are measurements of
+/// the host machine, not sim state — two same-seed runs of the same binary
+/// legitimately differ on them, so the determinism gate must exclude them
+/// while still comparing every sim-state footer field structurally.
+fn normalize_footer_line(line: &str) -> serde_json::Value {
+    let mut v: serde_json::Value =
+        serde_json::from_str(line).expect("footer line must parse as JSON");
+    let obj = v.as_object_mut().expect("footer must be a JSON object");
+    obj.remove("wall_elapsed_secs");
+    obj.remove("ticks_per_sec");
+    v
+}
+
+/// Same seed + same binary + same machine → byte-identical `events.jsonl`
+/// event lines, plus a structurally-identical footer modulo wall-clock
+/// fields (see [`normalize_footer_line`]).
 ///
 /// This is the core determinism gate that lets `just verdict` and the
 /// regression-measurement tooling treat re-runs of the same code as a true
@@ -130,20 +146,44 @@ fn simulation_is_deterministic() {
     drive_for_ticks(&mut app_b, ticks);
     drop(app_b);
 
-    let bytes_a =
-        std::fs::read(dir_a.join("events.jsonl")).expect("events.jsonl missing for run A");
-    let bytes_b =
-        std::fs::read(dir_b.join("events.jsonl")).expect("events.jsonl missing for run B");
+    let text_a = std::fs::read_to_string(dir_a.join("events.jsonl"))
+        .expect("events.jsonl missing for run A");
+    let text_b = std::fs::read_to_string(dir_b.join("events.jsonl"))
+        .expect("events.jsonl missing for run B");
 
-    let identical = bytes_a == bytes_b;
+    let lines_a: Vec<&str> = text_a.lines().collect();
+    let lines_b: Vec<&str> = text_b.lines().collect();
 
-    if !identical {
+    let mut divergence: Option<String> = None;
+    if lines_a.len() != lines_b.len() {
+        divergence = Some(format!(
+            "line counts differ: A={} B={}",
+            lines_a.len(),
+            lines_b.len()
+        ));
+    } else {
+        for (i, (la, lb)) in lines_a.iter().zip(lines_b.iter()).enumerate() {
+            let is_footer = la.starts_with("{\"_footer\"") || lb.starts_with("{\"_footer\"");
+            let equal = if is_footer {
+                normalize_footer_line(la) == normalize_footer_line(lb)
+            } else {
+                la == lb
+            };
+            if !equal {
+                divergence = Some(format!("first divergent line: {} (1-indexed)", i + 1));
+                break;
+            }
+        }
+    }
+
+    if let Some(reason) = divergence {
         // Leave the temp dirs in place so the failure is debuggable.
         panic!(
-            "events.jsonl bytes differ across same-seed runs:\n  A: {} bytes ({:?})\n  B: {} bytes ({:?})\n  diff with: cmp {:?} {:?}",
-            bytes_a.len(),
+            "events.jsonl differs across same-seed runs ({}):\n  A: {} bytes ({:?})\n  B: {} bytes ({:?})\n  diff with: diff {:?} {:?}",
+            reason,
+            text_a.len(),
             dir_a,
-            bytes_b.len(),
+            text_b.len(),
             dir_b,
             dir_a.join("events.jsonl"),
             dir_b.join("events.jsonl"),
