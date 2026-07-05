@@ -109,8 +109,15 @@ for t in "${unique_impls[@]+"${unique_impls[@]}"}"; do
     # `[[:<:]]` / `[[:>:]]` word boundaries prevent PreyScentMap
     # matching PreyScentMaps (and vice versa). Inside grep -E we use
     # alternation with `[^A-Za-z0-9_]` because POSIX `\b` is unreliable.
-    if printf '%s\n' "$non_comment" \
-        | grep -qE "(^|[^A-Za-z0-9_])register::<[[:space:]]*${t}[[:space:]]*>\(\)"; then
+    #
+    # Herestrings, NOT `printf | grep -q`: under `set -o pipefail`,
+    # `grep -q` exits at the first match and `printf` — still writing a
+    # >64KB payload into the closed pipe — dies with SIGPIPE (141),
+    # which pipefail then reports as the pipeline's status. Matched
+    # types were nondeterministically (timing/load-dependent) counted
+    # as offenders; this was the "retry ~10×" flake.
+    if grep -qE "(^|[^A-Za-z0-9_])register::<[[:space:]]*${t}[[:space:]]*>\(\)" \
+        <<< "$non_comment"; then
         continue
     fi
     # `register_with(...)` body containing a `<Type>(` constructor.
@@ -120,9 +127,8 @@ for t in "${unique_impls[@]+"${unique_impls[@]}"}"; do
     # false positives (a string literal containing the type name
     # would slip through) over false negatives — the latter is the
     # regression we're closing.
-    if printf '%s\n' "$non_comment" \
-        | grep -qE "(^|[^A-Za-z0-9_])${t}[[:space:]]*\(" \
-        && printf '%s\n' "$non_comment" | grep -q "register_with"; then
+    if grep -qE "(^|[^A-Za-z0-9_])${t}[[:space:]]*\(" <<< "$non_comment" \
+        && grep -q "register_with" <<< "$non_comment"; then
         continue
     fi
     offenders+=("$t")
