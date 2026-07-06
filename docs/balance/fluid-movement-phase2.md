@@ -112,3 +112,44 @@ land in) but not sufficient. Methodological note for the bugfix doc:
 defect UPSTREAM of the fix's layer, not of a wrong fix — the layer
 walk should have climbed from the commitment layer to the eligibility
 layer one iteration sooner.
+
+## Iteration 3 — step 8: perception metric pivot, 494 inverted (2026-07-06)
+
+### Hypothesis
+With locomotion now isotropic (Euclidean speed clamp), pivoting
+`distance_to` to world-space Euclidean re-aligns perception with
+actual travel time. Diagonal candidates read √2 farther than the
+Chebyshev era — nearest-X picks shift at former Chebyshev ties, range
+gates tighten at diagonals, and the colony re-equilibrates without
+survival damage.
+
+### Changes
+- `distance_to` → `self.0.distance(other.0)` (world-space, sub-tile
+  visible); `euclidean_distance` → same metric (was tile-quantized),
+  survives as the radial intent-marker; `tile_distance_squared` →
+  `dx²+dy²` over tiles (pre-494 body; i32/Ord-composable nearest-pick).
+- Chebyshev call-site audit (33 sites): all direct callers are
+  adjacency/strike/reach reads — stay.
+- `distance_to`-with-small-constant audit: 10 tactical sites converted
+  to `chebyshev_distance`/tile-equality (shadowfox ambush-adjacency,
+  gate-hold `== 1.0` [exact float equality — would never fire under a
+  continuous metric], patrol/move_to same-tile arrival, 5 building/
+  remedy `> 1.0` approach gates [Euclidean would forbid diagonal work
+  positions and fight the separation force]). Radial keeps: workshop
+  bonus zone, fox den zones, flee arrival tolerance, building auras.
+- NearPairCache admission + debug parity stay **tile-quantized**
+  Euclidean (`tile_distance_squared`): `CatMoved` fires on tile
+  crossings only, so a continuous admission metric would desync the
+  event-driven cache (caught by the 431 parity panic in `just test`).
+- Hawk `step_flying` arrival stays Chebyshev (signum tile-stepper
+  until step 10 retires it).
+
+### Predictions (pre-registered)
+| # | Prediction | Band |
+|---|---|---|
+| P1 | 1200-tick determinism byte-gate green | hard (observed pre-soak in `just test`) |
+| P2 | Starvation == 0; ShadowFoxAmbush ≤ 10; never-fired == 0 | hard gate |
+| P3 | Continuity canaries ≥ 1 each; trajectory divergence expected (nearest-pick ties flip → softmax RNG stream shifts) | hard gate / soft rates |
+| P4 | kittens_born ≥ 1 | hard-ish; diagnose before landing on miss |
+| P5 | GoalUnreachable-family plan-failure rates within ~2× of iteration-2 run (range gates tighten at diagonals; watch Guarding 102 / Hunting 83 / PickingUp 81 / Foraging 50 / Herbalism 21 raw counts, rate-normalized) | gate |
+| P6 | Throughput parity with iteration 2 (137 tps) — metric swap is arithmetic-neutral (Euclidean sqrt vs abs/max; tile_distance_squared unchanged cost) | verdict channel |

@@ -151,7 +151,15 @@ pub fn update_near_pair_cache(
             if *other == *rescan_entity {
                 continue;
             }
-            let dist = other_pos.distance_to(&rescan_pos);
+            // 140 step 8 — tile-quantized Euclidean, NOT world-space
+            // `distance_to`. The cache is invalidated by `CatMoved`,
+            // which fires only on containing-tile crossings (`Position`
+            // `PartialEq` is tile-keyed). A continuous metric would let
+            // sub-tile drift move pairs across the `range` boundary
+            // with no event to re-scan them, permanently desyncing the
+            // cache from the brute-force parity check in
+            // `passive_familiarity`.
+            let dist = (other_pos.tile_distance_squared(&rescan_pos) as f32).sqrt();
             if dist <= range {
                 let key = normalize_pair(*rescan_entity, *other);
                 cache.pairs.insert(key, dist);
@@ -207,7 +215,11 @@ pub fn passive_familiarity(
         let mut brute: BTreeSet<(Entity, Entity)> = BTreeSet::new();
         for i in 0..cats_vec.len() {
             for j in (i + 1)..cats_vec.len() {
-                if cats_vec[i].1.distance_to(&cats_vec[j].1) <= range {
+                // Mirrors the builder's tile-quantized metric (step 8:
+                // CatMoved is tile-crossing-driven, so admission must be
+                // tile-resolution — see `update_near_pair_cache`).
+                let dist_sq = cats_vec[i].1.tile_distance_squared(&cats_vec[j].1) as f32;
+                if dist_sq.sqrt() <= range {
                     brute.insert(normalize_pair(cats_vec[i].0, cats_vec[j].0));
                 }
             }

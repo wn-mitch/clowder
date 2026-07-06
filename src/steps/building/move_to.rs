@@ -37,7 +37,7 @@ pub fn resolve_move_to(
     let Some(target) = target_position else {
         return StepOutcome::bare(StepResult::Fail("no target position for MoveTo".into()));
     };
-    if pos.distance_to(&target) == 0.0 {
+    if *pos == target {
         // 140 step 7 — the arrival anti-stack jitter-teleport is
         // RETIRED; co-located cats drift apart via the separation
         // desire pass (`movement::apply_separation`) instead.

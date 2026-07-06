@@ -25,14 +25,19 @@ use crate::steps::{StepOutcome, StepResult};
 /// Diagonal step toward `target`. Returns `true` once the hawk is within
 /// `arrival_dist` tiles. Ignores terrain — hawks fly. Caller is
 /// responsible for refreshing `target` when zone semantics change.
+///
+/// Tile-tactical Chebyshev on purpose (step-8 audit): this is a
+/// signum tile-stepper — one king-move per tick — so "tiles until
+/// arrival" IS Chebyshev until step 10 migrates hawks to burst-flight
+/// `DesiredVelocity`, which retires this helper.
 fn step_flying(pos: &mut Position, target: Position, arrival_dist: f32) -> bool {
-    if pos.distance_to(&target) <= arrival_dist {
+    if (pos.chebyshev_distance(&target) as f32) <= arrival_dist {
         return true;
     }
     let dx = (target.x() - pos.x()).signum();
     let dy = (target.y() - pos.y()).signum();
     pos.set_tile(pos.x() + dx, pos.y() + dy);
-    pos.distance_to(&target) <= arrival_dist
+    (pos.chebyshev_distance(&target) as f32) <= arrival_dist
 }
 
 /// Nearest map-edge position from `pos`. Used by `resolve_flee_sky` so

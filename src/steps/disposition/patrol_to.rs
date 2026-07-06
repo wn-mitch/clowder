@@ -47,7 +47,7 @@ pub fn resolve_patrol_to(
     let Some(target) = target_position else {
         return StepOutcome::bare(StepResult::Fail("no patrol target".into()));
     };
-    if pos.distance_to(&target) == 0.0 {
+    if *pos == target {
         // 140 step 7 — arrival jitter-teleport RETIRED; co-located
         // cats drift apart via `movement::apply_separation`.
         needs.safety = (needs.safety + d.patrol_arrival_safety_gain).min(1.0);

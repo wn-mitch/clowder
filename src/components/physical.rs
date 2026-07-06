@@ -147,70 +147,76 @@ impl Position {
     }
 
     /// Default "how close" read — perception, pursuit, social spacing,
-    /// any consideration shaped like "how many steps until I get there."
-    /// Returns Chebyshev (king-move) distance as f32 so it composes with
-    /// `range` constants and curve evaluators.
+    /// any consideration shaped like "how long until I get there."
+    /// Returns **world-space Euclidean** distance between the continuous
+    /// positions (sub-tile geometry included).
     ///
-    /// Cats move 8-directionally with edge cost 1 (see
-    /// `ai/pathfinding.rs::heuristic`), so the substrate-correct
-    /// "distance" — the one that aligns *perception* with *movement* —
-    /// is Chebyshev. A diagonal-of-1 reads as 1, matching the single
-    /// step it costs to traverse. Pre-494, this returned Euclidean
-    /// (diagonal=1.41) which produced a proprioceptive mismatch: cats
-    /// scored targets by a metric they couldn't actually travel under.
+    /// 140 step 8 — ticket 494 inverted, deliberately. 494 made this
+    /// Chebyshev because cats then moved 8-directionally at edge cost 1:
+    /// a diagonal-of-1 cost one step, so Chebyshev was the metric that
+    /// aligned perception with movement. The Phase II integrator changed
+    /// the movement substrate: movers steer along arbitrary headings
+    /// under a **Euclidean speed clamp** (`integrate_velocities` —
+    /// L∞ would make ground speed direction-dependent, +41% at 45°), so
+    /// travel time is now isotropic and the substrate-correct
+    /// perception metric is Euclidean again. Diagonal targets read √2
+    /// farther than the grid era — that is real travel time now, not a
+    /// proprioceptive mismatch.
     ///
-    /// Sites that genuinely want radial Euclidean — scent diffusion
-    /// gradients, ward-glow falloff, visual-amplitude reads — should
-    /// call [`Position::euclidean_distance`] explicitly.
+    /// Chebyshev is demoted to *tile-tactical* reads — strike range,
+    /// adjacency, reach-this-tick — via
+    /// [`Position::chebyshev_distance`]. If a comparison encodes "am I
+    /// on/next to the tile" (`<= 1`-style), use that; if it encodes
+    /// "how far away is it," use this.
     pub fn distance_to(&self, other: &Position) -> f32 {
-        self.chebyshev_distance(other) as f32
+        self.0.distance(other.0)
     }
 
     /// Squared "pick nearest" metric via containing tiles. Returns
-    /// `chebyshev_distance² (=max(|dx|,|dy|)²)` so it composes with
-    /// `min_by_key`, `sort_by_key`, and `Ord::cmp` while staying
-    /// order-equivalent to `distance_to`.
+    /// `dx² + dy²` (Euclidean squared over tile deltas) so it composes
+    /// with `min_by_key`, `sort_by_key`, and `Ord::cmp`.
     ///
-    /// Pre-494 this returned `dx² + dy²` (Euclidean squared) and was
-    /// order-equivalent to the then-Euclidean `distance_to`. Now that
-    /// `distance_to` is Chebyshev, this stays order-equivalent by
-    /// squaring Chebyshev — preserves the "pick nearest" semantic for
-    /// every existing call site without re-introducing the Euclidean
-    /// perception/movement mismatch.
+    /// 140 step 8 — back to Euclidean-squared (the pre-494 body),
+    /// matching the now-Euclidean [`Position::distance_to`]. Order-
+    /// equivalence caveat: this is *tile-quantized* (i32-composable),
+    /// so a nearest-pick can differ from world-space `distance_to`
+    /// ordering by sub-tile offsets at near-ties — acceptable for the
+    /// "pick nearest" semantic every call site wants. It is NOT order-
+    /// equivalent to Chebyshev: former Chebyshev ties (e.g. (3,3) vs
+    /// (3,0)) now order by true radial distance — that shift is the
+    /// point of the step-8 pivot.
     pub fn tile_distance_squared(&self, other: &Position) -> i32 {
-        let c = self.chebyshev_distance(other);
-        c * c
+        let (sx, sy) = self.tile();
+        let (ox, oy) = other.tile();
+        let dx = sx - ox;
+        let dy = sy - oy;
+        dx * dx + dy * dy
     }
 
     /// Chebyshev (king-move) distance via containing tiles —
-    /// `max(|dx|, |dy|)`. The 8-direction movement metric: "how many
-    /// steps until I'm there?" — both *navigational* (path cost) and
-    /// *perceptual* (after ticket 494's substrate realignment). Use
-    /// directly when the i32 return is preferred over `distance_to`'s
-    /// f32.
+    /// `max(|dx|, |dy|)`. **Tile-tactical reads only** (140 step 8
+    /// demotion): strike range, adjacency (`<= 1`), reach-this-tick,
+    /// tile-grid A* heuristics. Perception / "how far" reads use the
+    /// now-Euclidean [`Position::distance_to`] — under the Phase II
+    /// integrator's Euclidean speed clamp, travel time is isotropic
+    /// and Chebyshev no longer models it.
     pub fn chebyshev_distance(&self, other: &Position) -> i32 {
         let (sx, sy) = self.tile();
         let (ox, oy) = other.tile();
         (sx - ox).abs().max((sy - oy).abs())
     }
 
-    /// Radial Euclidean distance — √(Δx² + Δy²) via containing tiles.
-    ///
-    /// **Escape hatch.** The default "how close" read is
-    /// [`Position::distance_to`] (Chebyshev), which matches 8-direction
-    /// movement cost. Use *this* method only when the consideration
-    /// genuinely measures radial physical space: scent diffusion
-    /// gradients, ward-glow / wardlight falloff, sound amplitude,
-    /// visual perception that falls off with line-of-sight distance.
-    ///
-    /// Most consumers should *not* call this — if you're asking "how
-    /// far," you almost certainly want `distance_to`.
+    /// Radial Euclidean distance — world-space, sub-tile geometry
+    /// included. Since 140 step 8 this is the same metric as
+    /// [`Position::distance_to`]; the name survives as an intent
+    /// marker for call sites that measure radial physical space
+    /// regardless of the locomotion model — scent diffusion gradients,
+    /// ward-glow / wardlight falloff, sound amplitude, line-of-sight
+    /// perception falloff. (Pre-step-8 this was tile-quantized —
+    /// `floor()`ed coords hid sub-tile geometry; now it reads the
+    /// continuous positions directly.)
     pub fn euclidean_distance(&self, other: &Position) -> f32 {
-        let (sx, sy) = self.tile();
-        let (ox, oy) = other.tile();
-        let dx = (sx - ox) as f32;
-        let dy = (sy - oy) as f32;
-        (dx * dx + dy * dy).sqrt()
+        self.0.distance(other.0)
     }
 
     /// Manhattan (grid-step) distance via containing tiles. Retained
@@ -460,26 +466,49 @@ mod tests {
 
     #[test]
     fn position_distance() {
-        // Ticket 494 — `distance_to` is now Chebyshev (king-move) so
-        // perception aligns with 8-direction movement cost: the (3, 4)
-        // offset reads as 4 ("max leg"), matching the 4 diagonal steps
-        // it actually takes a cat to traverse. Pre-494 this asserted
-        // 5.0 (Euclidean √(9+16)) — that overstated diagonal traversal
-        // cost and decoupled scoring from pathfinding.
+        // 140 step 8 — `distance_to` is world-space Euclidean (494
+        // inverted): under the Phase II integrator's Euclidean speed
+        // clamp, travel time is isotropic, so the (3, 4) offset reads
+        // as 5 (√(9+16)) — matching actual travel time again. The
+        // 494-era Chebyshev read (4.0) survives only in
+        // `chebyshev_distance` for tile-tactical reads.
         let a = Position::new(0, 0);
         let b = Position::new(3, 4);
         let dist = a.distance_to(&b);
-        assert!((dist - 4.0).abs() < 1e-5, "expected 4.0, got {dist}");
+        assert!((dist - 5.0).abs() < 1e-5, "expected 5.0, got {dist}");
+    }
+
+    #[test]
+    fn position_distance_reads_sub_tile_geometry() {
+        // World-space means sub-tile offsets are visible: two points
+        // inside the same tile are not distance-0 apart.
+        let a = Position::from_world(Vec2::new(2.1, 2.1));
+        let b = Position::from_world(Vec2::new(2.9, 2.1));
+        assert!((a.distance_to(&b) - 0.8).abs() < 1e-5);
+        // Tile-tactical reads still see them as co-located.
+        assert_eq!(a.chebyshev_distance(&b), 0);
+        assert_eq!(a.tile_distance_squared(&b), 0);
     }
 
     #[test]
     fn position_euclidean_distance_keeps_radial_semantics() {
-        // The escape hatch for genuinely radial reads (scent diffusion,
-        // ward-glow falloff). Still computes √(Δx² + Δy²).
+        // Intent-marker alias for genuinely radial reads (scent
+        // diffusion, ward-glow falloff). Same world-space metric as
+        // `distance_to` since step 8 (pre-step-8 it was tile-quantized).
         let a = Position::new(0, 0);
         let b = Position::new(3, 4);
         let dist = a.euclidean_distance(&b);
         assert!((dist - 5.0).abs() < 1e-5, "expected 5.0, got {dist}");
+    }
+
+    #[test]
+    fn tile_distance_squared_is_euclidean_squared_over_tiles() {
+        let a = Position::new(0, 0);
+        // Step 8: dx² + dy², not Chebyshev². Former Chebyshev ties
+        // (3,0) vs (3,3) now order by radial distance.
+        assert_eq!(a.tile_distance_squared(&Position::new(3, 0)), 9);
+        assert_eq!(a.tile_distance_squared(&Position::new(3, 3)), 18);
+        assert_eq!(a.tile_distance_squared(&Position::new(3, 4)), 25);
     }
 
     #[test]

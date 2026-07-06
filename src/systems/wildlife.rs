@@ -722,7 +722,7 @@ pub fn detect_threats(
             // Watchtower doubles detection range for cats standing on one.
             if watchtower_positions
                 .iter()
-                .any(|wp| cat_pos.distance_to(wp) == 0.0)
+                .any(|wp| cat_pos.chebyshev_distance(wp) == 0)
             {
                 range *= 2.0;
             }
@@ -1777,7 +1777,7 @@ pub fn predator_stalk_cats(
                     let target_pos = Position::new(target_x, target_y);
                     if let Some((cat_entity, cat_pos)) = cat_positions
                         .iter()
-                        .filter(|(_, cp)| cp.distance_to(&target_pos) <= 1.0)
+                        .filter(|(_, cp)| cp.chebyshev_distance(&target_pos) <= 1)
                         .min_by_key(|(_, cp)| wl_pos.tile_distance_squared(cp))
                     {
                         let cat_pos = *cat_pos;

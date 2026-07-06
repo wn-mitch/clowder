@@ -63,7 +63,7 @@ pub fn resolve_repair(
         return StepOutcome::unwitnessed(StepResult::Fail("building not found".into()));
     };
 
-    if pos.distance_to(building_pos) > 1.0 {
+    if pos.chebyshev_distance(building_pos) > 1 {
         // 140 step 7 — desire-based approach over the smoothed corridor.
         path_plan.desire_step_along_smoothed(
             pos,

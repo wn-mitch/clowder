@@ -304,7 +304,7 @@ pub fn process_gates(
         } else if gate.open {
             let mut best_diligence: Option<f32> = None;
             for (cat_pos, personality, needs) in &cats {
-                if cat_pos.distance_to(gate_pos) == 1.0 {
+                if cat_pos.chebyshev_distance(gate_pos) == 1 {
                     let effective = if needs.energy < b.gate_tired_energy_threshold {
                         personality.diligence * b.gate_tired_diligence_scale
                     } else {
