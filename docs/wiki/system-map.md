@@ -163,7 +163,9 @@ graph TD
         buildings_process_gates --> buildings_tidy_buildings
     end
     subgraph chain4["Chain 4: Social, Combat, Death & Narrative"]
+        movement_apply_separation["movement::apply_separation"]
         movement_integrate_velocities["movement::integrate_velocities"]
+        movement_apply_separation --> movement_integrate_velocities
         cat_movement_emit_cat_moved_messages["cat_movement::emit_cat_moved_messages"]
         movement_integrate_velocities --> cat_movement_emit_cat_moved_messages
         social_update_near_pair_cache["social::update_near_pair_cache"]
@@ -268,7 +270,6 @@ graph TD
         wildlife_shadowfox_haunting_drain["wildlife::shadowfox_haunting_drain"]
         wildlife_spawn_wildlife["wildlife::spawn_wildlife"]
         wildlife_wildlife_ai["wildlife::wildlife_ai"]
-        wildlife_fox_movement["wildlife::fox_movement"]
         wildlife_fox_needs_tick["wildlife::fox_needs_tick"]
         fox_goap_sync_fox_needs["fox_goap::sync_fox_needs"]
         fox_goap_fox_evaluate_and_plan["fox_goap::fox_evaluate_and_plan"]

@@ -82,7 +82,7 @@ System modules with registered functions but no design doc:
 - **incapacitation**: update_incapacitation
 - **injury_cache**: cache_last_body_part_injury
 - **interoception**: author_self_markers
-- **movement**: integrate_velocities
+- **movement**: apply_separation, integrate_velocities
 - **movement_budget**: on_wild_animal_added, accumulate_movement_budget
 - **parenting_activity**: ParentingScalars, update_parenting_activity_biological, tick_parental_engagement, populate_parenting_scalars
 - **plan_substrate**: expire_reservations, sensors, update_prev_safety_deficit
@@ -97,6 +97,6 @@ System modules with registered functions but no design doc:
 - **sustained_copresence**: SustainedCoPresenceTracker, track_sustained_copresence
 - **task_chains**: resolve_task_chains
 - **trace_emit**: emit_focal_trace
-- **wildlife**: shadowfox_coherence_tick, shadowfox_motivation_tick, shadowfox_haunting_drain, spawn_wildlife, wildlife_ai, fox_movement, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
+- **wildlife**: shadowfox_coherence_tick, shadowfox_motivation_tick, shadowfox_haunting_drain, spawn_wildlife, wildlife_ai, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
 - **world_snapshots**: populate_world_snapshots
 
