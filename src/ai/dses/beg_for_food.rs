@@ -101,6 +101,26 @@ impl BegForFoodDse {
         )
     }
 
+    /// Stage 3 sibling (ticket 511) — `JuvenileKitten` ∧
+    /// ¬`HasFoodInInventory`. The pre-511 doctrine ("by the time a
+    /// kitten can forage, mentoring is the right channel") assumed the
+    /// FeedKitten care path covered juvenile hunger; the 511 evidence
+    /// (Duskkit-45 / Nettlekit-64 starving one hunger-decay span after
+    /// their last feed, adults one tile away) showed weaned dependents
+    /// had NO functioning pathway once care-band targeting moved on.
+    /// Ethological shape (user decision, 2026-07-06): weaned juveniles
+    /// eat solid food themselves — Eat opens to `juvenile_and_up`
+    /// (eat.rs) and begging persists as the pestering fallback when a
+    /// juvenile is hungry with no food in pouch.
+    pub fn juvenile() -> Self {
+        Self::build(
+            EligibilityFilter::new()
+                .require(markers::JuvenileKitten::KEY)
+                .forbid(markers::HasFoodInInventory::KEY),
+            LifeStageSet::just(CatLifeStage::JuvenileKitten),
+        )
+    }
+
     /// Incapacitated non-kitten sibling (ticket 451) — `Incapacitated` ∧
     /// ¬`HasFoodInInventory`, life-stage filter excludes Newborn and
     /// EyesOpen kittens (they have their own siblings; Newborns carry
@@ -115,7 +135,8 @@ impl BegForFoodDse {
                 .forbid(markers::HasFoodInInventory::KEY),
             LifeStageSet::ALL
                 .without(CatLifeStage::NewbornKitten)
-                .without(CatLifeStage::EyesOpenKitten),
+                .without(CatLifeStage::EyesOpenKitten)
+                .without(CatLifeStage::JuvenileKitten),
         )
     }
 
@@ -192,6 +213,11 @@ pub fn beg_for_food_eyes_open_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(BegForFoodDse::eyes_open())
 }
 
+/// Stage 3 juvenile constructor (ticket 511).
+pub fn beg_for_food_juvenile_dse() -> Box<dyn crate::ai::dse::CatDse> {
+    Box::new(BegForFoodDse::juvenile())
+}
+
 /// Incapacitated non-kitten constructor (ticket 451).
 pub fn beg_for_food_incapacitated_dse() -> Box<dyn crate::ai::dse::CatDse> {
     Box::new(BegForFoodDse::incapacitated())
@@ -226,6 +252,16 @@ static BEG_FOR_FOOD_INCAPACITATED_REGISTRATION: crate::ai::dses::CatDseRegistrat
         construct: |_| beg_for_food_incapacitated_dse(),
     };
 
+#[linkme::distributed_slice(crate::ai::dses::CAT_DSE_REGISTRY)]
+static BEG_FOR_FOOD_JUVENILE_REGISTRATION: crate::ai::dses::CatDseRegistration =
+    crate::ai::dses::CatDseRegistration {
+        // 511 — after the 451 trio; juveniles previously had NO beg
+        // sibling at all, so this adds an eligible DSE only for
+        // Stage-3 kittens (seed drift carried by the 511 gate soak).
+        order: 3775,
+        construct: |_| beg_for_food_juvenile_dse(),
+    };
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -233,11 +269,54 @@ static BEG_FOR_FOOD_INCAPACITATED_REGISTRATION: crate::ai::dses::CatDseRegistrat
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai::dse::CatDse as _;
 
     #[test]
     fn beg_for_food_id_is_stable_across_siblings() {
         assert_eq!(BegForFoodDse::newborn().id().0, "beg_for_food");
         assert_eq!(BegForFoodDse::eyes_open().id().0, "beg_for_food");
+        assert_eq!(BegForFoodDse::juvenile().id().0, "beg_for_food");
+    }
+
+    /// 451/511 sibling-coverage invariant: for every CatLifeStage, AT
+    /// MOST one non-Incapacitated sibling's life-stage set admits it,
+    /// and every KITTEN stage has exactly one (no stage falls through
+    /// the begging surface again — the 511 juvenile gap regression
+    /// guard).
+    #[test]
+    fn sibling_life_stage_coverage_is_disjoint_and_kitten_complete() {
+        use crate::ai::dse::CatLifeStage;
+        let siblings = [
+            BegForFoodDse::newborn(),
+            BegForFoodDse::eyes_open(),
+            BegForFoodDse::juvenile(),
+        ];
+        for stage in [
+            CatLifeStage::NewbornKitten,
+            CatLifeStage::EyesOpenKitten,
+            CatLifeStage::JuvenileKitten,
+        ] {
+            let n = siblings
+                .iter()
+                .filter(|s| s.life_stages().contains(stage))
+                .count();
+            assert_eq!(
+                n, 1,
+                "kitten stage {stage:?} must map to exactly one sibling"
+            );
+        }
+        // Incapacitated sibling excludes all three kitten stages.
+        let incap = BegForFoodDse::incapacitated();
+        for stage in [
+            CatLifeStage::NewbornKitten,
+            CatLifeStage::EyesOpenKitten,
+            CatLifeStage::JuvenileKitten,
+        ] {
+            assert!(
+                !incap.life_stages().contains(stage),
+                "incapacitated sibling must exclude {stage:?} (has its own sibling)"
+            );
+        }
     }
 
     #[test]
@@ -348,15 +427,18 @@ mod tests {
             .life_stages()
             .contains(CatLifeStage::NewbornKitten));
 
-        // Incapacitated sibling reaches every stage EXCEPT the two kitten-
-        // specific siblings' targets.
+        // Incapacitated sibling reaches every stage EXCEPT the three
+        // kitten-specific siblings' targets (511 gave JuvenileKitten
+        // its own hunger-driven sibling — an incapacitated juvenile
+        // begs via that one; requiring the Incapacitated marker for a
+        // juvenile's ordinary hunger was the 511 starvation gap).
         assert!(!incapacitated
             .life_stages()
             .contains(CatLifeStage::NewbornKitten));
         assert!(!incapacitated
             .life_stages()
             .contains(CatLifeStage::EyesOpenKitten));
-        assert!(incapacitated
+        assert!(!incapacitated
             .life_stages()
             .contains(CatLifeStage::JuvenileKitten));
         assert!(incapacitated.life_stages().contains(CatLifeStage::Young));

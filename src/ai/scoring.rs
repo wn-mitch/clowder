@@ -2940,15 +2940,18 @@ mod tests {
             r.cat_dses.push(crate::ai::dses::colony_cleanse_dse());
             r.cat_dses.push(crate::ai::dses::harvest_dse());
             r.cat_dses.push(crate::ai::dses::commune_dse());
-            // Ticket 450 + 451 — BegForFood three siblings (Newborn /
-            // EyesOpen / Incapacitated). The life-stage gate ensures
-            // they only score for cats whose stage matches.
+            // Ticket 450 + 451 + 511 — BegForFood four siblings
+            // (Newborn / EyesOpen / Incapacitated / Juvenile). The
+            // life-stage gate ensures they only score for cats whose
+            // stage matches.
             r.cat_dses
                 .push(crate::ai::dses::beg_for_food::beg_for_food_newborn_dse());
             r.cat_dses
                 .push(crate::ai::dses::beg_for_food::beg_for_food_eyes_open_dse());
             r.cat_dses
                 .push(crate::ai::dses::beg_for_food::beg_for_food_incapacitated_dse());
+            r.cat_dses
+                .push(crate::ai::dses::beg_for_food::beg_for_food_juvenile_dse());
             r
         })
     }

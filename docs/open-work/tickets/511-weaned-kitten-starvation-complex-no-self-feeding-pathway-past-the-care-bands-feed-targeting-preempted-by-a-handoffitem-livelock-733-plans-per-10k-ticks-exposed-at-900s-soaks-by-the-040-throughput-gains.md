@@ -81,3 +81,16 @@ step-7 landing soak re-run green.
 ## Log
 - 2026-07-05: opened from the 140 step-7 landing gates. Full evidence
   chain above; step-7 parked locally (commit on top of main 9b56ea38).
+- 2026-07-06: user decision — R2(b), juvenile self-feeding is the
+  ethological shape. Implemented: Eat life-stages widened to
+  `juvenile_and_up()` (Stage-3 kittens are ambulant; the 451 hazard
+  applies only to Stage 1/2, unchanged) + fourth BegForFood sibling
+  `juvenile()` (JuvenileKitten ∧ ¬HasFoodInInventory; incapacitated
+  sibling's set now excludes JuvenileKitten — coverage test updated +
+  new kitten-completeness regression test). R3 (sated-target guard)
+  DEFERRED: the goap-side kitten snapshot is intentionally empty (no
+  Needs access at that arm) — needs the caretake-pass query work;
+  waste-only post-R2b, not lethal. R1 (Handing churn: measured 8,972
+  plans → 155 handoffs even in the HEALTHY baseline — chronic,
+  pre-dates Phase II) re-homed to ticket 509's commitment-layer
+  first-light (R3 there), evidence appended.
