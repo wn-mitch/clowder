@@ -123,6 +123,51 @@ pub fn on_wild_animal_added(
     }
 }
 
+/// Observer: fluid-movement author point for prey (140 step 10) —
+/// sibling of [`on_wild_animal_added`]. Every `PreyAnimal` gains
+/// `Velocity` + `DesiredVelocity` (the integrator and `prey_ai`'s
+/// desire writes require them; a missing insert silently drops the
+/// animal from `prey_ai`'s query) plus a `MovementBudget` speed cap:
+///
+/// - **Birds** (`FleeStrategy::Teleport` → `BurstFlight`): cap at
+///   `bird_burst_speed` and carry [`Flying`] (terrain-exempt,
+///   bounds-clamp-only integrator branch).
+/// - **Ground prey**: cap at `prey_ground_max_speed × flee_speed` —
+///   `flee_speed` was the pre-140 tiles-per-tick flee multiplier
+///   (rabbit 2, mouse 1); folding it into the cap preserves each
+///   species' escape-speed contrast vs the 1.0 cat.
+pub fn on_prey_animal_added(
+    add: On<Add, crate::components::prey::PreyAnimal>,
+    configs: Query<&crate::components::prey::PreyConfig>,
+    mut commands: Commands,
+    constants: Res<crate::resources::SimConstants>,
+) {
+    let entity = add.entity;
+    let Ok(config) = configs.get(entity) else {
+        return;
+    };
+    let movement = &constants.movement;
+    let is_bird = config.flee_strategy == crate::components::prey::FleeStrategy::Teleport;
+    let per_tick = if is_bird {
+        movement.bird_burst_speed
+    } else {
+        movement.prey_ground_max_speed * config.flee_speed.max(1) as f32
+    };
+    commands.entity(entity).insert((
+        MovementBudget {
+            accumulator: per_tick,
+            per_tick,
+        },
+        crate::components::physical::Velocity::default(),
+        crate::components::physical::DesiredVelocity::default(),
+    ));
+    if is_bird {
+        commands
+            .entity(entity)
+            .insert(crate::components::physical::Flying);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

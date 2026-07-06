@@ -1077,6 +1077,9 @@ impl Plugin for SimulationPlugin {
         // accumulator + the lazy-insert fallback for save-loaded
         // entities.
         app.add_observer(systems::movement_budget::on_wild_animal_added);
+        // 140 step 10 — prey sibling: Velocity/DesiredVelocity +
+        // species speed cap + Flying for burst-flight birds.
+        app.add_observer(systems::movement_budget::on_prey_animal_added);
 
         // Register messages.
         app.add_message::<crate::components::prey::PreyKilled>();

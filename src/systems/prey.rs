@@ -183,26 +183,30 @@ fn vigilance_from_pressure(
     baseline + amplitude * (-x * x).exp()
 }
 
-/// Bird instant-teleport: jump to a random habitat tile 5-8 tiles from threat.
-fn bird_teleport(
-    pos: &mut Mut<Position>,
+/// 140 step 10 — pick a bird escape-flight landing tile: a random
+/// habitat tile 5–8 tiles from the threat (identical radial selection
+/// to the retired `bird_teleport`, minus the instant jump — the bird
+/// now FLIES there via `PreyAiState::BurstFlight` + the `Flying`
+/// integrator branch at `bird_burst_speed`). `None` if 20 rejection
+/// samples all miss habitat; callers keep the ground-flee fallback.
+fn pick_burst_target(
     threat_pos: &Position,
     habitat: &[Terrain],
     map: &TileMap,
     rng: &mut SimRng,
     min_range: f32,
     max_range: f32,
-) {
+) -> Option<(i32, i32)> {
     for _ in 0..20 {
         let range = rng.rng.random_range(min_range..=max_range);
         let angle: f32 = rng.rng.random::<f32>() * std::f32::consts::TAU;
         let nx = threat_pos.x() + (angle.cos() * range) as i32;
         let ny = threat_pos.y() + (angle.sin() * range) as i32;
         if can_move_to(nx, ny, habitat, map) {
-            pos.set_tile(nx, ny);
-            return;
+            return Some((nx, ny));
         }
     }
+    None
 }
 
 /// For cover-seeking species, find a forest tile roughly in the flee direction.
@@ -253,7 +257,12 @@ fn find_cover_direction(
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn prey_ai(
     mut query: Query<
-        (&PreyConfig, &mut PreyState, &mut Position),
+        (
+            &PreyConfig,
+            &mut PreyState,
+            &mut Position,
+            &mut crate::components::physical::DesiredVelocity,
+        ),
         (With<PreyAnimal>, Without<Dead>),
     >,
     // 100: cat query now carries `&CurrentAction` so prey can read the
@@ -283,7 +292,7 @@ pub fn prey_ai(
     let p = &constants.prey;
     let focal_sink = focal_trace.sink(time.tick);
     let grazing_max_ticks = p.grazing_max_duration.ticks(&time_scale);
-    for (config, mut state, mut pos) in &mut query {
+    for (config, mut state, pos, mut desired) in &mut query {
         // O(1) den lookup for predation pressure → vigilance.
         let (pressure, home_den_pos) = state
             .home_den
@@ -323,16 +332,23 @@ pub fn prey_ai(
                             .get(threat)
                             .map(|(_, p, _, _)| *p)
                             .unwrap_or(*pos);
-                        bird_teleport(
-                            &mut pos,
+                        if let Some((tx, ty)) = pick_burst_target(
                             &threat_pos,
                             config.habitat,
                             &map,
                             &mut rng,
                             p.bird_teleport_min_range,
                             p.bird_teleport_max_range,
-                        );
-                        state.alertness = 0.0;
+                        ) {
+                            state.ai_state = PreyAiState::BurstFlight {
+                                target_x: tx,
+                                target_y: ty,
+                            };
+                            continue;
+                        }
+                        // No habitat found — freeze like ground prey.
+                        state.ai_state = PreyAiState::Alert { threat, ticks: 0 };
+                        continue;
                     } else if config.freeze_ticks == 0 {
                         // Fish: no alert/flee.
                     } else {
@@ -382,16 +398,22 @@ pub fn prey_ai(
                             .get(threat)
                             .map(|(_, p, _, _)| *p)
                             .unwrap_or(*pos);
-                        bird_teleport(
-                            &mut pos,
+                        if let Some((tx, ty)) = pick_burst_target(
                             &threat_pos,
                             config.habitat,
                             &map,
                             &mut rng,
                             p.bird_teleport_min_range,
                             p.bird_teleport_max_range,
-                        );
-                        state.alertness = 0.0;
+                        ) {
+                            state.ai_state = PreyAiState::BurstFlight {
+                                target_x: tx,
+                                target_y: ty,
+                            };
+                            continue;
+                        }
+                        state.ai_state = PreyAiState::Alert { threat, ticks: 0 };
+                        continue;
                     } else if config.freeze_ticks > 0 {
                         state.ai_state = PreyAiState::Alert { threat, ticks: 0 };
                         continue;
@@ -423,20 +445,37 @@ pub fn prey_ai(
                     }
                 }
 
-                if new_ticks % config.graze_cadence == 0 {
+                // 140 step 10 — grazing is a continuous slow meander at
+                // `ground_speed / graze_cadence` tiles/tick: the same
+                // average displacement as the pre-140 one-tile-hop-per-
+                // cadence, without teleporting between tile centers. The
+                // heading (dx, dy) meanders via the cadence-jitter above;
+                // decision-side habitat/corruption checks stay tile-grid
+                // and reverse the heading at a blocked edge.
+                {
+                    let graze_speed = constants.movement.prey_ground_max_speed
+                        / config.graze_cadence.max(1) as f32;
                     let nx = pos.x() + dx;
                     let ny = pos.y() + dy;
                     let corr_thresh = p.prey_corruption_avoidance;
 
                     if can_move_to_prey(nx, ny, config.habitat, &map, corr_thresh) {
-                        pos.set_tile(nx, ny);
+                        desired.0 = Some(crate::ai::steering::seek(
+                            pos.0,
+                            Position::new(nx, ny).0,
+                            graze_speed,
+                        ));
                     } else {
                         dx = -dx;
                         dy = -dy;
                         let rx = pos.x() + dx;
                         let ry = pos.y() + dy;
                         if can_move_to_prey(rx, ry, config.habitat, &map, corr_thresh) {
-                            pos.set_tile(rx, ry);
+                            desired.0 = Some(crate::ai::steering::seek(
+                                pos.0,
+                                Position::new(rx, ry).0,
+                                graze_speed,
+                            ));
                         }
                     }
                 }
@@ -510,72 +549,69 @@ pub fn prey_ai(
 
                 let tp = threat_pos.unwrap();
 
+                // 140 step 10 — flee arms express desire; the integrator
+                // executes at the species cap (`prey_ground_max_speed ×
+                // flee_speed`, folded into MovementBudget.per_tick by the
+                // spawn observer — the pre-140 `for _ in 0..flee_speed`
+                // multi-hop loops collapse into the speed cap).
+                let flee_cap =
+                    constants.movement.prey_ground_max_speed * config.flee_speed.max(1) as f32;
                 match config.flee_strategy {
                     FleeStrategy::Standard => {
-                        for _ in 0..config.flee_speed {
-                            if let Some((dx, dy)) = toward {
-                                // Flee toward home den.
-                                let nx = pos.x() + dx;
-                                let ny = pos.y() + dy;
-                                if can_move_to(nx, ny, config.habitat, &map) {
-                                    pos.set_tile(nx, ny);
-                                } else {
-                                    flee_step(&mut pos, tp, config.habitat, &map);
-                                }
-                            } else {
-                                flee_step(&mut pos, tp, config.habitat, &map);
-                            }
+                        let aim = toward
+                            .map(|(dx, dy)| (pos.x() + dx, pos.y() + dy))
+                            .filter(|&(nx, ny)| can_move_to(nx, ny, config.habitat, &map))
+                            .or_else(|| flee_step_target(&pos, tp, config.habitat, &map));
+                        if let Some((nx, ny)) = aim {
+                            desired.0 = Some(crate::ai::steering::seek(
+                                pos.0,
+                                Position::new(nx, ny).0,
+                                flee_cap,
+                            ));
                         }
                     }
                     FleeStrategy::SeekCover => {
                         // Prefer den direction, then forest cover, then away-from-threat.
-                        if let Some((dx, dy)) = toward {
-                            let nx = pos.x() + dx;
-                            let ny = pos.y() + dy;
-                            if can_move_to(nx, ny, config.habitat, &map) {
-                                pos.set_tile(nx, ny);
-                            } else if let Some((cdx, cdy)) = find_cover_direction(&pos, tp, &map) {
-                                let nx = pos.x() + cdx;
-                                let ny = pos.y() + cdy;
-                                if can_move_to(nx, ny, config.habitat, &map) {
-                                    pos.set_tile(nx, ny);
-                                } else {
-                                    flee_step(&mut pos, tp, config.habitat, &map);
-                                }
-                            } else {
-                                flee_step(&mut pos, tp, config.habitat, &map);
-                            }
-                        } else if let Some((dx, dy)) = find_cover_direction(&pos, tp, &map) {
-                            let nx = pos.x() + dx;
-                            let ny = pos.y() + dy;
-                            if can_move_to(nx, ny, config.habitat, &map) {
-                                pos.set_tile(nx, ny);
-                            } else {
-                                flee_step(&mut pos, tp, config.habitat, &map);
-                            }
-                        } else {
-                            flee_step(&mut pos, tp, config.habitat, &map);
+                        let aim = toward
+                            .map(|(dx, dy)| (pos.x() + dx, pos.y() + dy))
+                            .filter(|&(nx, ny)| can_move_to(nx, ny, config.habitat, &map))
+                            .or_else(|| {
+                                find_cover_direction(&pos, tp, &map)
+                                    .map(|(dx, dy)| (pos.x() + dx, pos.y() + dy))
+                                    .filter(|&(nx, ny)| can_move_to(nx, ny, config.habitat, &map))
+                            })
+                            .or_else(|| flee_step_target(&pos, tp, config.habitat, &map));
+                        if let Some((nx, ny)) = aim {
+                            desired.0 = Some(crate::ai::steering::seek(
+                                pos.0,
+                                Position::new(nx, ny).0,
+                                flee_cap,
+                            ));
                         }
                     }
                     FleeStrategy::Teleport => {
-                        let mut landed = false;
-                        for _ in 0..20 {
-                            let range = rng.rng.random_range(
-                                p.bird_teleport_min_range..=p.bird_teleport_max_range,
-                            );
-                            let angle: f32 = rng.rng.random::<f32>() * std::f32::consts::TAU;
-                            let nx = tp.x() + (angle.cos() * range) as i32;
-                            let ny = tp.y() + (angle.sin() * range) as i32;
-                            if can_move_to(nx, ny, config.habitat, &map) {
-                                pos.set_tile(nx, ny);
-                                landed = true;
-                                break;
-                            }
+                        // A bird still in ground-Fleeing (e.g. pounced into
+                        // it by a cat resolver) escalates to BurstFlight.
+                        if let Some((tx, ty)) = pick_burst_target(
+                            tp,
+                            config.habitat,
+                            &map,
+                            &mut rng,
+                            p.bird_teleport_min_range,
+                            p.bird_teleport_max_range,
+                        ) {
+                            state.ai_state = PreyAiState::BurstFlight {
+                                target_x: tx,
+                                target_y: ty,
+                            };
+                            continue;
                         }
-                        if !landed {
-                            for _ in 0..config.flee_speed {
-                                flee_step(&mut pos, tp, config.habitat, &map);
-                            }
+                        if let Some((nx, ny)) = flee_step_target(&pos, tp, config.habitat, &map) {
+                            desired.0 = Some(crate::ai::steering::seek(
+                                pos.0,
+                                Position::new(nx, ny).0,
+                                flee_cap,
+                            ));
                         }
                     }
                     FleeStrategy::Stationary => {
@@ -591,12 +627,35 @@ pub fn prey_ai(
                     ticks: new_ticks,
                 };
             }
+
+            PreyAiState::BurstFlight { target_x, target_y } => {
+                // Arrival = containing-tile equality (Position Eq is
+                // tile-keyed). Land, reset alertness, resume ground life.
+                let target = Position::new(target_x, target_y);
+                if *pos == target {
+                    state.alertness = 0.0;
+                    state.ai_state = PreyAiState::Idle;
+                    continue;
+                }
+                desired.0 = Some(crate::ai::steering::seek(
+                    pos.0,
+                    target.0,
+                    constants.movement.bird_burst_speed,
+                ));
+            }
         }
     }
 }
 
-/// Move one tile away from threat, trying diagonal then cardinals.
-fn flee_step(pos: &mut Mut<Position>, threat: &Position, habitat: &[Terrain], map: &TileMap) {
+/// Away-from-threat step target: diagonal first, then cardinals.
+/// 140 step 10 — returns the tile instead of writing Position; the
+/// caller expresses a desire toward it and the integrator moves.
+fn flee_step_target(
+    pos: &Position,
+    threat: &Position,
+    habitat: &[Terrain],
+    map: &TileMap,
+) -> Option<(i32, i32)> {
     let dx = (pos.x() - threat.x()).signum();
     let dy = (pos.y() - threat.y()).signum();
     let candidates = [
@@ -604,12 +663,9 @@ fn flee_step(pos: &mut Mut<Position>, threat: &Position, habitat: &[Terrain], ma
         (pos.x() + dx, pos.y()),
         (pos.x(), pos.y() + dy),
     ];
-    for (nx, ny) in candidates {
-        if can_move_to(nx, ny, habitat, map) {
-            pos.set_tile(nx, ny);
-            return;
-        }
-    }
+    candidates
+        .into_iter()
+        .find(|&(nx, ny)| can_move_to(nx, ny, habitat, map))
 }
 
 // ---------------------------------------------------------------------------
@@ -1376,8 +1432,32 @@ mod tests {
             speed: crate::resources::SimSpeed::Normal,
         });
         let mut schedule = Schedule::default();
-        schedule.add_systems(prey_ai);
+        // 140 step 10 — prey_ai writes desire; the integrator moves.
+        // Chain them like the production schedule (prey_ai -> Chain 4).
+        schedule.add_systems((prey_ai, crate::systems::movement::integrate_velocities).chain());
         (world, schedule)
+    }
+
+    /// Fluid-movement components the `on_prey_animal_added` observer
+    /// authors in production. Bare-Schedule tests bypass observers, so
+    /// mirror its inserts (ground-prey shape; these tests use Mouse).
+    fn fluid_prey_components(
+        config: &PreyConfig,
+    ) -> (
+        crate::components::physical::Velocity,
+        crate::components::physical::DesiredVelocity,
+        crate::components::MovementBudget,
+    ) {
+        let movement = crate::resources::sim_constants::MovementConstants::default();
+        let per_tick = movement.prey_ground_max_speed * config.flee_speed.max(1) as f32;
+        (
+            crate::components::physical::Velocity::default(),
+            crate::components::physical::DesiredVelocity::default(),
+            crate::components::MovementBudget {
+                accumulator: per_tick,
+                per_tick,
+            },
+        )
     }
 
     #[test]
@@ -1394,7 +1474,8 @@ mod tests {
             dy: 0,
             ticks: 0,
         };
-        world.spawn((PreyAnimal, config, state, Health::default(), start));
+        let fluid = fluid_prey_components(&config);
+        world.spawn((PreyAnimal, config, state, Health::default(), start, fluid));
 
         for _ in 0..60 {
             schedule.run(&mut world);
@@ -1405,9 +1486,15 @@ mod tests {
             .iter(&world)
             .find(|p| p.x() != 0 || p.y() != 0) // skip any zero-pos entities
             .unwrap_or(&start);
+        // 140 step 10 — grazing is a continuous meander at
+        // ground_speed / graze_cadence (mouse: 1/40 tiles per tick), so
+        // assert world-space displacement, not a full tile crossing (a
+        // jittering random walk needs many cadences to guarantee one).
+        let moved = final_pos.0.distance(start.0);
         assert!(
-            final_pos != start,
-            "prey should have moved from {start:?} after 60 ticks of grazing, still at {final_pos:?}"
+            moved > 0.25,
+            "prey should have meandered from {start:?} after 60 ticks of grazing; \
+             moved only {moved} tiles (at {final_pos:?})"
         );
     }
 
@@ -1428,7 +1515,8 @@ mod tests {
             toward: None,
             ticks: 0,
         };
-        world.spawn((PreyAnimal, config, state, Health::default(), start));
+        let fluid = fluid_prey_components(&config);
+        world.spawn((PreyAnimal, config, state, Health::default(), start, fluid));
 
         for _ in 0..10 {
             schedule.run(&mut world);
@@ -1472,12 +1560,14 @@ mod tests {
         let config = profile.to_config();
         let mut state = PreyState::default();
         state.alertness = 1.0; // Max alertness for reliable detection.
+        let fluid = fluid_prey_components(&config);
         world.spawn((
             PreyAnimal,
             config,
             state,
             Health::default(),
             Position::new(11, 10), // 1 tile away — high detection chance per tick
+            fluid,
         ));
 
         // Run enough ticks for probabilistic detection to trigger.

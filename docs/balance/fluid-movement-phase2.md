@@ -301,3 +301,32 @@ entity class first — the second writer is both a double-move and a
 potential strand-injector; (2) "the old code self-rescued by
 accident" is a failure mode of honest physics — pair every
 passability-enforcement change with an explicit strand-escape story.
+
+## Iteration 5 — step 10: prey ground desire + bird burst flight (2026-07-06)
+
+### Changes
+- `on_prey_animal_added` observer (sibling of the wildlife one):
+  Velocity/DesiredVelocity + MovementBudget speed cap. Ground prey cap
+  = `prey_ground_max_speed × flee_speed` (folds the pre-140
+  multi-hop-per-tick flee loops into the cap — rabbit keeps its 2.0
+  escape-speed contrast vs the 1.0 cat); birds cap at
+  `bird_burst_speed` (3.0) and carry `Flying`.
+- `bird_teleport` → `PreyAiState::BurstFlight { target }`: identical
+  radial 5–8-from-threat landing-site selection, but the bird now
+  FLIES there (2–3 observable airborne ticks). Exhaustive-match rule:
+  new variant covered at both pounce-awareness sites (burst counts as
+  fleeing-awareness) and the inspect UI. Rejection-sampling miss →
+  Alert freeze like ground prey (was: silent no-op teleport).
+- Grazing = continuous meander at `ground_speed / graze_cadence`
+  tiles/tick — same average displacement as the pre-140
+  one-tile-hop-per-cadence, no tile-center teleports; cadence still
+  gates heading jitter, habitat/corruption checks stay decision-side.
+- Flee arms (Standard / SeekCover / fallbacks) express desire toward
+  the same tile-checked candidates at the species cap.
+
+### Hypothesis (gate: hypothesize)
+Bird deaths-by-cat ≈ baseline (airborne window is 2–3 ticks at 3.0 vs
+cat 1.0 — the gap grows, cats shouldn't close it); ground-prey kill
+rates within ±10-ish% (escape-speed contrast preserved via the cap
+fold); hunt-success in band; survival + continuity canaries hold;
+DenRaided / prey-population dynamics not distorted.

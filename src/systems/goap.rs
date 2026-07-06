@@ -9737,7 +9737,11 @@ fn resolve_engage_prey(
         let awareness_base = match prey_awareness {
             PreyAiState::Idle | PreyAiState::Grazing { .. } => d.pounce_awareness_idle,
             PreyAiState::Alert { .. } => d.pounce_awareness_alert,
-            PreyAiState::Fleeing { .. } => d.pounce_awareness_fleeing,
+            // 140 step 10 — an airborne escaping bird is at least as
+            // aware as a ground-fleeing target.
+            PreyAiState::Fleeing { .. } | PreyAiState::BurstFlight { .. } => {
+                d.pounce_awareness_fleeing
+            }
         };
         let distance_mod = match dist {
             0..=1 => d.pounce_distance_close_mod,

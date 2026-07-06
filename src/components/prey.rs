@@ -64,6 +64,16 @@ pub enum PreyAiState {
         toward: Option<(i32, i32)>,
         ticks: u64,
     },
+    /// 140 step 10 — bird escape flight. Replaces the pre-140
+    /// `bird_teleport` instant jump: the bird flies to `target`
+    /// (picked by the same radial 5–8-tiles-from-threat selection)
+    /// at `bird_burst_speed` under the `Flying` integrator branch,
+    /// spending 2–3 observable ticks airborne instead of zero.
+    /// Arrival (containing tile) → `Idle` with alertness reset.
+    BurstFlight {
+        target_x: i32,
+        target_y: i32,
+    },
 }
 
 // ---------------------------------------------------------------------------
