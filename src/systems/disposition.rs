@@ -3091,7 +3091,6 @@ pub struct ChainStepReadContext<'w, 's> {
 struct ChainStepSnapshots {
     grooming: std::collections::HashMap<Entity, f32>,
     gender: std::collections::HashMap<Entity, Gender>,
-    cat_tile_counts: std::collections::HashMap<Position, u32>,
     /// 257 / 127 — `JointIntention { Courtship }.partner` per cat,
     /// when held. Pre-filtered to the Courtship practice during
     /// snapshot construction so the bias-reader call sites stay
@@ -3219,13 +3218,6 @@ pub fn resolve_disposition_chains(
             .map(|((e, _, _, _, _, _, _, _, _), (_, g, _, _, _, _, _, _))| (e, *g))
             .collect(),
         // Tile occupancy for anti-stacking jitter on PatrolTo arrival.
-        cat_tile_counts: {
-            let mut counts = std::collections::HashMap::new();
-            for ((_, _, _, pos, _, _, _, _, _), _) in &cats {
-                *counts.entry(*pos).or_insert(0) += 1;
-            }
-            counts
-        },
         // 257 / 127 — pre-loop snapshot of every cat's
         // `JointIntention { Courtship }.partner`. Pre-filtered by
         // practice == Courtship so the call sites stay practice-
@@ -4763,7 +4755,6 @@ fn dispatch_chain_step(
                 map,
                 &path_plan,
                 d,
-                &snaps.cat_tile_counts,
                 desired_velocity,
                 &constants.movement,
             );

@@ -15,10 +15,10 @@ _Last generated: 2026-07-05._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 117 |
+| Ready | 118 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **163** |
+| **Open total** | **164** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,11 +68,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (117)
+## Ready by cluster (118)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (32 ready, 5 blocked)
+### ai-substrate (33 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -106,6 +106,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
 - **[507](docs/open-work/tickets/507-recalibrate-social-perception-and-welfare-constants-against-undiluted-post-506-inputs-fulfillment-38pct-happiness-13pct-social-status-distress-live-for-the-first-time.md)** — Recalibrate social-perception and welfare constants against undiluted post-506 inputs (fulfillment -38pct, happiness -13pct, social_status_distress live for the first time) — _[ai-substrate] · added 2026-07-05_
 - **[509](docs/open-work/tickets/509-mating-conversion-margin-haseligiblemate-flickers-with-htn-abandon-maslow-pregate-zeroes-eligible-windows-courtship-stage-advance-falloff-9130-to-12-and-the-section-7-commitment-layer-reads-00-all-run.md)** — Mating conversion margin: HasEligibleMate flickers with HTN Abandon, Maslow pregate zeroes eligible windows, courtship stage-advance falloff 9130-to-12, and the section-7 commitment layer reads 0.0 all run — _[ai-substrate] · added 2026-07-05_
+- **[510](docs/open-work/tickets/510-trash-vs-drop-disposal-margin-is-a-1e-4-coin-flip-with-a-midden-present-midden-discipline-exists-only-as-an-rng-draw.md)** — Trash vs Drop disposal margin is a 1e-4 coin flip with a Midden present — midden discipline exists only as an RNG draw — _[ai-substrate] · added 2026-07-05_
 
 ### social-coordination (17 ready, 4 blocked)
 
@@ -338,7 +339,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (117)
+## Ready (118)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -457,6 +458,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[503](docs/open-work/tickets/503-patrol-score-wobbles-1-ulp-across-processes-of-the-same-binary-float-order-nondeterminism-in-the-patrol-scoring-path.md)** — Patrol score wobbles 1 ULP across processes of the same binary — float-order nondeterminism in the Patrol scoring path — _[ai-substrate] · added 2026-07-05_
 - **[507](docs/open-work/tickets/507-recalibrate-social-perception-and-welfare-constants-against-undiluted-post-506-inputs-fulfillment-38pct-happiness-13pct-social-status-distress-live-for-the-first-time.md)** — Recalibrate social-perception and welfare constants against undiluted post-506 inputs (fulfillment -38pct, happiness -13pct, social_status_distress live for the first time) — _[ai-substrate] · added 2026-07-05_
 - **[509](docs/open-work/tickets/509-mating-conversion-margin-haseligiblemate-flickers-with-htn-abandon-maslow-pregate-zeroes-eligible-windows-courtship-stage-advance-falloff-9130-to-12-and-the-section-7-commitment-layer-reads-00-all-run.md)** — Mating conversion margin: HasEligibleMate flickers with HTN Abandon, Maslow pregate zeroes eligible windows, courtship stage-advance falloff 9130-to-12, and the section-7 commitment layer reads 0.0 all run — _[ai-substrate] · added 2026-07-05_
+- **[510](docs/open-work/tickets/510-trash-vs-drop-disposal-margin-is-a-1e-4-coin-flip-with-a-midden-present-midden-discipline-exists-only-as-an-rng-draw.md)** — Trash vs Drop disposal margin is a 1e-4 coin flip with a Midden present — midden discipline exists only as an RNG draw — _[ai-substrate] · added 2026-07-05_
 
 ## Parked (12)
 

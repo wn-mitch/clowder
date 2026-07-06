@@ -203,7 +203,9 @@ pub static SCENARIO_TO_STORES: Scenario = Scenario {
     // tiles (~10-20 ticks) + DepositPrey (1 tick), but the cat may
     // commit to other plans first (Forage at hunger=0.55) before
     // PickingUp wins. The 200-tick budget absorbs that variance.
-    default_ticks: 200,
+    // 140 step 7 — 200 → 500 alongside the unit test's bump: arrivals
+    // walk the last tile and every leg carries the acceleration ramp.
+    default_ticks: 500,
     setup: setup_picking_up_to_stores,
     // ItemRetrieved fires on pickup; deposit success has no Feature
     // (only failure modes — DepositRejected / DepositFailedNoStore /
@@ -292,7 +294,10 @@ mod tests {
     /// wins L3 within the 200-tick budget.
     #[test]
     fn pickup_chain_lands_food_in_stores() {
-        let report = run(&SCENARIO_TO_STORES, None, Some(200), 13);
+        // 140 step 7 — 200 → 500: arrivals walk the last tile instead of
+        // snapping, and every leg carries the acceleration ramp; the
+        // full scavenge→travel→deposit chain lands ~tick 350-450 now.
+        let report = run(&SCENARIO_TO_STORES, None, Some(500), 13);
         assert!(
             report.final_food_capacity > 0.0,
             "Stores building should contribute capacity (>0); got {}",

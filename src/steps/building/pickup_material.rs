@@ -62,6 +62,8 @@ pub fn resolve_pickup_material(
     >,
     map: &TileMap,
     path_plan: &CatPathPlan<'_>,
+    desired: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
 ) -> StepOutcome<bool> {
     let Some(target) = target_entity else {
         return StepOutcome::unwitnessed(StepResult::Fail("no target for PickupMaterial".into()));
@@ -88,14 +90,8 @@ pub fn resolve_pickup_material(
 
     // Walk to the pile if not adjacent yet.
     if pos.distance_to(&item_pos) > 1.0 {
-        if cached_path.is_none() {
-            *cached_path = path_plan.find_full_path(*pos, item_pos, map);
-        }
-        if let Some(ref mut path) = cached_path {
-            if !path.is_empty() {
-                *pos = path.remove(0);
-            }
-        }
+        // 140 step 7 — desire-based approach over the smoothed corridor.
+        path_plan.desire_step_along_smoothed(pos, item_pos, cached_path, map, desired, movement);
         return StepOutcome::unwitnessed(StepResult::Continue);
     }
 
@@ -170,6 +166,7 @@ mod tests {
             With<BuildMaterialItem>,
         )>();
         let mut items = q.query_mut(world);
+        let mut desired = crate::components::physical::DesiredVelocity::default();
         resolve_pickup_material(
             target,
             cat_entity,
@@ -179,6 +176,8 @@ mod tests {
             &mut items,
             &map,
             &CatPathPlan::NoOverlay,
+            &mut desired,
+            &crate::resources::sim_constants::MovementConstants::default(),
         )
     }
 

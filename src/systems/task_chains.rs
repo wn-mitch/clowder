@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bevy_ecs::prelude::*;
 
 use crate::ai::CurrentAction;
@@ -33,6 +31,8 @@ pub fn resolve_task_chains(
             &mut Skills,
             &mut Needs,
             &mut crate::components::magic::Inventory,
+            // 140 step 7 — movement desire for migrated building steps.
+            &mut crate::components::physical::DesiredVelocity,
         ),
         (Without<Dead>, Without<Structure>),
     >,
@@ -48,6 +48,7 @@ pub fn resolve_task_chains(
     >,
     mut stored_items: Query<&mut StoredItems>,
     map: Res<TileMap>,
+    constants: Res<crate::resources::SimConstants>,
     time: Res<TimeState>,
     config: Res<SimConfig>,
     mut commands: Commands,
@@ -65,7 +66,7 @@ pub fn resolve_task_chains(
     // Count builders per construction site for cooperative bonus.
     let mut builders_per_site: std::collections::HashMap<Entity, usize> =
         std::collections::HashMap::new();
-    for (_, chain, _, _, _, _, _) in &cats {
+    for (_, chain, _, _, _, _, _, _) in &cats {
         if let Some(step) = chain.current() {
             if matches!(step.kind, StepKind::Construct) {
                 if let Some(target) = step.target_entity {
@@ -91,19 +92,18 @@ pub fn resolve_task_chains(
         .map(|(_, _, _, _, pos)| *pos)
         .collect();
 
-    // Snapshot tile occupancy for anti-stacking jitter on arrival.
-    let cat_tile_counts: HashMap<Position, u32> = {
-        let mut counts = HashMap::new();
-        for (_, _, _, pos, _, _, _) in &cats {
-            *counts.entry(*pos).or_insert(0) += 1;
-        }
-        counts
-    };
-
     let mut chains_to_remove: Vec<Entity> = Vec::new();
 
-    for (cat_entity, mut chain, mut current, mut pos, mut skills, _needs, mut inventory) in
-        &mut cats
+    for (
+        cat_entity,
+        mut chain,
+        mut current,
+        mut pos,
+        mut skills,
+        _needs,
+        mut inventory,
+        mut desired_velocity,
+    ) in &mut cats
     {
         let Some(step) = chain.current_mut() else {
             chains_to_remove.push(cat_entity);
@@ -169,7 +169,8 @@ pub fn resolve_task_chains(
                     cached,
                     &map,
                     &crate::ai::route_cost::CatPathPlan::NoOverlay,
-                    &cat_tile_counts,
+                    &mut desired_velocity,
+                    &constants.movement,
                 );
                 apply(outcome.result, &mut chain);
             }
@@ -213,6 +214,8 @@ pub fn resolve_task_chains(
                     &crate::ai::route_cost::CatPathPlan::NoOverlay,
                     &mut commands,
                     &mut colony_score,
+                    &mut desired_velocity,
+                    &constants.movement,
                 );
                 if matches!(outcome.result, crate::steps::StepResult::Advance) {
                     if let Some(ref mut act) = activation {
@@ -235,6 +238,8 @@ pub fn resolve_task_chains(
                     &mut buildings,
                     &map,
                     &crate::ai::route_cost::CatPathPlan::NoOverlay,
+                    &mut desired_velocity,
+                    &constants.movement,
                 );
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::BuildingRepaired);
                 apply(outcome.result, &mut chain);
@@ -254,6 +259,8 @@ pub fn resolve_task_chains(
                     &mut buildings,
                     &map,
                     &crate::ai::route_cost::CatPathPlan::NoOverlay,
+                    &mut desired_velocity,
+                    &constants.movement,
                 );
                 // Disposition-chain path is currently unscheduled (GOAP
                 // replaced it); if it's ever reinstated, wire the
@@ -309,6 +316,7 @@ mod tests {
 
     fn test_world() -> World {
         let mut world = World::new();
+        world.insert_resource(crate::resources::SimConstants::default());
         world.insert_resource(TileMap::new(20, 20, crate::resources::map::Terrain::Grass));
         world.insert_resource(FoodStores::default());
         world.insert_resource(TimeState {
@@ -347,12 +355,26 @@ mod tests {
                 Skills::default(),
                 Needs::default(),
                 crate::components::magic::Inventory::default(),
+                crate::components::physical::Velocity::default(),
+                crate::components::physical::DesiredVelocity::default(),
+                crate::components::movement_budget::MovementBudget::cat(),
             ))
             .id();
 
         let mut schedule = Schedule::default();
-        schedule.add_systems(resolve_task_chains);
-        schedule.run(&mut world);
+        schedule.add_systems(
+            (
+                resolve_task_chains,
+                crate::systems::movement::integrate_velocities,
+            )
+                .chain(),
+        );
+        // 140 step 6/7 — movement is velocity-integrated: the cat
+        // accelerates from rest, so give it a few ticks to cross a
+        // tile boundary (`distance_to` is tile-quantized).
+        for _ in 0..5 {
+            schedule.run(&mut world);
+        }
 
         let pos = *world.get::<Position>(cat).unwrap();
         assert!(
@@ -381,11 +403,20 @@ mod tests {
                 Skills::default(),
                 Needs::default(),
                 crate::components::magic::Inventory::default(),
+                crate::components::physical::Velocity::default(),
+                crate::components::physical::DesiredVelocity::default(),
+                crate::components::movement_budget::MovementBudget::cat(),
             ))
             .id();
 
         let mut schedule = Schedule::default();
-        schedule.add_systems(resolve_task_chains);
+        schedule.add_systems(
+            (
+                resolve_task_chains,
+                crate::systems::movement::integrate_velocities,
+            )
+                .chain(),
+        );
 
         for _ in 0..4 {
             schedule.run(&mut world);
@@ -435,10 +466,19 @@ mod tests {
             },
             Needs::default(),
             crate::components::magic::Inventory::default(),
+            crate::components::physical::Velocity::default(),
+            crate::components::physical::DesiredVelocity::default(),
+            crate::components::movement_budget::MovementBudget::cat(),
         ));
 
         let mut schedule = Schedule::default();
-        schedule.add_systems(resolve_task_chains);
+        schedule.add_systems(
+            (
+                resolve_task_chains,
+                crate::systems::movement::integrate_velocities,
+            )
+                .chain(),
+        );
         schedule.run(&mut world);
 
         let s = world.get::<Structure>(building).unwrap();
@@ -494,10 +534,19 @@ mod tests {
             Skills::default(),
             Needs::default(),
             crate::components::magic::Inventory::default(),
+            crate::components::physical::Velocity::default(),
+            crate::components::physical::DesiredVelocity::default(),
+            crate::components::movement_budget::MovementBudget::cat(),
         ));
 
         let mut schedule = Schedule::default();
-        schedule.add_systems(resolve_task_chains);
+        schedule.add_systems(
+            (
+                resolve_task_chains,
+                crate::systems::movement::integrate_velocities,
+            )
+                .chain(),
+        );
         schedule.run(&mut world);
 
         // Harvest should create real food items in the store.

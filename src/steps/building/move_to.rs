@@ -1,6 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
-use crate::ai::pathfinding::find_free_adjacent;
 use crate::ai::route_cost::CatPathPlan;
 use crate::components::physical::Position;
 use crate::resources::map::TileMap;
@@ -34,37 +31,40 @@ pub fn resolve_move_to(
     cached_path: &mut Option<Vec<Position>>,
     map: &TileMap,
     path_plan: &CatPathPlan<'_>,
-    cat_tile_counts: &HashMap<Position, u32>,
+    desired: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
 ) -> StepOutcome<()> {
     let Some(target) = target_position else {
         return StepOutcome::bare(StepResult::Fail("no target position for MoveTo".into()));
     };
     if pos.distance_to(&target) == 0.0 {
-        if cat_tile_counts.get(pos).copied().unwrap_or(0) > 1 {
-            let occupied: HashSet<Position> = cat_tile_counts
-                .iter()
-                .filter(|(_, &count)| count >= 1)
-                .map(|(p, _)| *p)
-                .collect();
-            if let Some(free) = find_free_adjacent(*pos, *pos, map, &occupied) {
-                if free != *pos {
-                    *pos = free;
-                }
-            }
-        }
+        // 140 step 7 — the arrival anti-stack jitter-teleport is
+        // RETIRED; co-located cats drift apart via the separation
+        // desire pass (`movement::apply_separation`) instead.
         return StepOutcome::bare(StepResult::Advance);
     }
     if cached_path.is_none() {
-        match path_plan.find_full_path(*pos, target, map) {
+        match path_plan.find_smoothed_path(*pos, target, map) {
             Some(path) => *cached_path = Some(path),
             None => return StepOutcome::bare(StepResult::Fail("no path to target".into())),
         }
     }
     if let Some(ref mut path) = cached_path {
+        while let Some(wp) = path.first().copied() {
+            if pos.0.distance(wp.0) <= movement.waypoint_arrival_radius {
+                path.remove(0);
+            } else {
+                break;
+            }
+        }
         if path.is_empty() {
             StepOutcome::bare(StepResult::Advance)
         } else {
-            *pos = path.remove(0);
+            desired.0 = Some(crate::ai::steering::seek(
+                pos.0,
+                path[0].0,
+                movement.cat_max_speed,
+            ));
             StepOutcome::bare(StepResult::Continue)
         }
     } else {

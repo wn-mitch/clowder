@@ -1,6 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
-use crate::ai::pathfinding::find_free_adjacent;
 use crate::ai::route_cost::CatPathPlan;
 use crate::components::physical::{Needs, Position};
 use crate::resources::map::TileMap;
@@ -39,7 +36,6 @@ pub fn resolve_patrol_to(
     map: &TileMap,
     path_plan: &CatPathPlan<'_>,
     d: &DispositionConstants,
-    cat_tile_counts: &HashMap<Position, u32>,
     // 140 step 6 — patrol expresses desire; the Chain-4 integrator
     // moves the cat. `cached_path` now holds the STRING-PULLED
     // waypoints (sparse tile centers), not the dense A* chain. The
@@ -52,7 +48,8 @@ pub fn resolve_patrol_to(
         return StepOutcome::bare(StepResult::Fail("no patrol target".into()));
     };
     if pos.distance_to(&target) == 0.0 {
-        jitter_if_stacked(pos, map, cat_tile_counts);
+        // 140 step 7 — arrival jitter-teleport RETIRED; co-located
+        // cats drift apart via `movement::apply_separation`.
         needs.safety = (needs.safety + d.patrol_arrival_safety_gain).min(1.0);
         return StepOutcome::bare(StepResult::Advance);
     }
@@ -74,7 +71,6 @@ pub fn resolve_patrol_to(
             }
         }
         if path.is_empty() {
-            jitter_if_stacked(pos, map, cat_tile_counts);
             needs.safety = (needs.safety + d.patrol_arrival_safety_gain).min(1.0);
             StepOutcome::bare(StepResult::Advance)
         } else {
@@ -89,20 +85,5 @@ pub fn resolve_patrol_to(
         }
     } else {
         StepOutcome::bare(StepResult::Continue)
-    }
-}
-
-fn jitter_if_stacked(pos: &mut Position, map: &TileMap, cat_tile_counts: &HashMap<Position, u32>) {
-    if cat_tile_counts.get(pos).copied().unwrap_or(0) > 1 {
-        let occupied: HashSet<Position> = cat_tile_counts
-            .iter()
-            .filter(|(_, &count)| count >= 1)
-            .map(|(p, _)| *p)
-            .collect();
-        if let Some(free) = find_free_adjacent(*pos, *pos, map, &occupied) {
-            if free != *pos {
-                *pos = free;
-            }
-        }
     }
 }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::pathfinding::{find_free_adjacent, find_path, step_toward};
+use crate::ai::pathfinding::{find_path, step_toward};
 use crate::ai::planner::actions::actions_for_disposition;
 use crate::ai::planner::goals::goal_for_disposition;
 use crate::ai::planner::{
@@ -3705,7 +3705,6 @@ struct MentorEffect {
 struct StepSnapshots {
     grooming: HashMap<Entity, f32>,
     gender: HashMap<Entity, Gender>,
-    cat_tile_counts: HashMap<Position, u32>,
     stores_positions: Vec<Position>,
     stores_entities: Vec<(Entity, Position)>,
     /// Ticket 177: per-tick snapshot of completed Midden buildings,
@@ -4337,16 +4336,6 @@ pub fn resolve_goap_plans(
                 )| { (e, *g) },
             )
             .collect(),
-        cat_tile_counts: {
-            // Ticket 427 Step 5 — pre-size to cat count (a cat-tile-count
-            // HashMap is bounded above by the number of cats).
-            let cat_count = cats.iter().count();
-            let mut counts = HashMap::with_capacity(cat_count);
-            for ((_, _, _, pos, _, _, _, _, _, _), _) in &cats {
-                *counts.entry(*pos).or_insert(0) += 1;
-            }
-            counts
-        },
         stores_positions,
         stores_entities,
         midden_entities,
@@ -6016,7 +6005,6 @@ fn dispatch_step_action(
                 &ec.map,
                 &path_plan,
                 &prey_params.exploration_map,
-                &snaps.cat_tile_counts,
                 &snaps.stores_positions,
                 &snaps.construction_positions,
                 &snaps.farm_positions,
@@ -6822,7 +6810,6 @@ fn dispatch_step_action(
                 &ec.map,
                 &path_plan,
                 d,
-                &snaps.cat_tile_counts,
                 desired_velocity,
                 &ec.constants.movement,
             )
@@ -6915,23 +6902,18 @@ fn dispatch_step_action(
             let fight_outcome = if let Some(target_pos) = target_pos_opt {
                 let dist = pos.chebyshev_distance(&target_pos);
                 if dist > 1 {
-                    if plan.step_state[step_idx].cached_path.is_none()
-                        || plan.step_state[step_idx]
-                            .cached_path
-                            .as_ref()
-                            .and_then(|p| p.last())
-                            .is_some_and(|last| *last != target_pos)
-                    {
-                        let path_plan = cat_path_plan!(target_pos);
-                        plan.step_state[step_idx].cached_path =
-                            path_plan.find_full_path(*pos, target_pos, &ec.map);
-                    }
-                    if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
-                        if let Some(next) = path.first().copied() {
-                            path.remove(0);
-                            *pos = next;
-                        }
-                    }
+                    // 140 step 7 — desire-based approach over the
+                    // smoothed corridor (staleness re-path when the
+                    // threat moved is inside the helper).
+                    let path_plan = cat_path_plan!(target_pos);
+                    path_plan.desire_step_along_smoothed(
+                        pos,
+                        target_pos,
+                        &mut plan.step_state[step_idx].cached_path,
+                        &ec.map,
+                        desired_velocity,
+                        &ec.constants.movement,
+                    );
                     crate::steps::StepOutcome::<bool>::unwitnessed(
                         crate::steps::StepResult::Continue,
                     )
@@ -7307,17 +7289,16 @@ fn dispatch_step_action(
             // Walk to ward placement target if one was set by the coordinator.
             if let Some(ward_target) = plan.ward_placement_pos {
                 if pos.chebyshev_distance(&ward_target) > 1 {
-                    if plan.step_state[step_idx].cached_path.is_none() {
-                        let path_plan = cat_path_plan!(ward_target);
-                        plan.step_state[step_idx].cached_path =
-                            path_plan.find_full_path(*pos, ward_target, &ec.map);
-                    }
-                    if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
-                        if let Some(next) = path.first().copied() {
-                            path.remove(0);
-                            *pos = next;
-                        }
-                    }
+                    // 140 step 7 — desire-based approach.
+                    let path_plan = cat_path_plan!(ward_target);
+                    path_plan.desire_step_along_smoothed(
+                        pos,
+                        ward_target,
+                        &mut plan.step_state[step_idx].cached_path,
+                        &ec.map,
+                        desired_velocity,
+                        &ec.constants.movement,
+                    );
                     crate::steps::StepResult::Continue
                 } else {
                     // 155: ward kind is determined by the L3-picked
@@ -7601,16 +7582,16 @@ fn dispatch_step_action(
             // Walk toward the target if we have one and we're not adjacent.
             if let Some(target) = plan.step_state[step_idx].target_position {
                 if pos.chebyshev_distance(&target) > 0 {
-                    if plan.step_state[step_idx].cached_path.is_none() {
-                        let path_plan = cat_path_plan!(target);
-                        plan.step_state[step_idx].cached_path =
-                            path_plan.find_full_path(*pos, target, &ec.map);
-                    }
-                    if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
-                        if !path.is_empty() {
-                            *pos = path.remove(0);
-                        }
-                    }
+                    // 140 step 7 — desire-based approach.
+                    let path_plan = cat_path_plan!(target);
+                    path_plan.desire_step_along_smoothed(
+                        pos,
+                        target,
+                        &mut plan.step_state[step_idx].cached_path,
+                        &ec.map,
+                        desired_velocity,
+                        &ec.constants.movement,
+                    );
                     crate::steps::StepResult::Continue
                 } else {
                     // Arrived: perform the cleanse.
@@ -7705,16 +7686,16 @@ fn dispatch_step_action(
 
                 if walking {
                     let target = plan.step_state[step_idx].target_position.unwrap();
-                    if plan.step_state[step_idx].cached_path.is_none() {
-                        let path_plan = cat_path_plan!(target);
-                        plan.step_state[step_idx].cached_path =
-                            path_plan.find_full_path(*pos, target, &ec.map);
-                    }
-                    if let Some(ref mut path) = plan.step_state[step_idx].cached_path {
-                        if !path.is_empty() {
-                            *pos = path.remove(0);
-                        }
-                    }
+                    // 140 step 7 — desire-based approach.
+                    let path_plan = cat_path_plan!(target);
+                    path_plan.desire_step_along_smoothed(
+                        pos,
+                        target,
+                        &mut plan.step_state[step_idx].cached_path,
+                        &ec.map,
+                        desired_velocity,
+                        &ec.constants.movement,
+                    );
                     crate::steps::StepResult::Continue
                 } else if ticks
                     >= ec
@@ -7814,6 +7795,8 @@ fn dispatch_step_action(
                 &path_plan,
                 commands,
                 &mut building_params.colony_score,
+                desired_velocity,
+                &ec.constants.movement,
             );
             if matches!(outcome.result, crate::steps::StepResult::Advance) {
                 if let Some(ref mut act) = narr.activation {
@@ -7867,6 +7850,8 @@ fn dispatch_step_action(
                 &mut building_params.buildings,
                 &ec.map,
                 &path_plan,
+                desired_velocity,
+                &ec.constants.movement,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::CropTended);
             // Mastery iter 2 + purpose new-thread: each tend tick
@@ -7941,6 +7926,8 @@ fn dispatch_step_action(
                 &mut building_params.material_items,
                 &ec.map,
                 &path_plan,
+                desired_velocity,
+                &ec.constants.movement,
             );
             outcome.record_if_witnessed(narr.activation.as_deref_mut(), Feature::MaterialPickedUp);
             outcome.result
@@ -8942,7 +8929,6 @@ fn resolve_travel_to(
     map: &TileMap,
     path_plan: &crate::ai::route_cost::CatPathPlan<'_>,
     exploration_map: &ExplorationMap,
-    cat_tile_counts: &HashMap<Position, u32>,
     stores_positions: &[Position],
     construction_positions: &[(Entity, Position)],
     farm_positions: &[Position],
@@ -9004,21 +8990,17 @@ fn resolve_travel_to(
     }
 
     if let Some(ref mut path) = state.cached_path {
-        if pos.chebyshev_distance(&target) <= 1 {
-            // Anti-stacking jitter (step 7 retires this teleport in
-            // favor of separation steering).
-            if cat_tile_counts.get(&target).copied().unwrap_or(0) > 1 {
-                let occupied: std::collections::HashSet<Position> = cat_tile_counts
-                    .keys()
-                    .filter(|p| cat_tile_counts[p] > 1)
-                    .copied()
-                    .collect();
-                if let Some(adj) = find_free_adjacent(target, *pos, map, &occupied) {
-                    *pos = adj;
-                }
-            } else {
-                *pos = target;
-            }
+        // 140 step 7 — arrival is CONTAINING-TILE EQUALITY (walked,
+        // not snapped). The legacy resolver advanced at chebyshev<=1
+        // and then TELEPORTED onto the target tile; same-tile
+        // consumers (PickUpItemFromGround, deposit interactions)
+        // depend on ending ON the tile, so the no-teleport equivalent
+        // is to keep seeking until the mover's containing tile IS the
+        // target tile (the final smoothed waypoint is the target
+        // center — the seek carries us there; Position Eq is
+        // tile-keyed). The stacked-jitter teleport stays retired —
+        // separation handles crowding.
+        if *pos == target {
             return crate::steps::StepResult::Advance;
         }
         // Pop waypoints the integrator has carried us within reach of.

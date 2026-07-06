@@ -125,6 +125,78 @@ pub fn integrate_velocities(
     }
 }
 
+/// 140 step 7 — personal-space desire pass. Replaces the retired
+/// jitter/arrival teleports (`jitter_if_stacked`, travel-arrival
+/// snap+jitter): cats standing inside each other's
+/// `movement.separation_radius` accumulate a `steering::separation`
+/// push that blends into their `DesiredVelocity` — idle stacked cats
+/// drift apart over a few ticks, traveling cats bow around each other,
+/// and nobody teleports.
+///
+/// Pair source is `NearPairCache` (already maintained event-driven,
+/// already restricted to cats + wildlife by 506); wildlife endpoints
+/// are skipped by the `DesiredVelocity` query miss until their species
+/// migrations land. Accumulation runs in BTreeMap pair order into a
+/// BTreeMap accumulator — deterministic float summation order.
+///
+/// Runs immediately BEFORE `integrate_velocities` in the Chain-4
+/// nested chain so the push lands in the same tick's integration.
+pub fn apply_separation(
+    cache: Res<crate::resources::near_pair_cache::NearPairCache>,
+    constants: Res<SimConstants>,
+    mut movers: Query<(&Position, &mut DesiredVelocity)>,
+    // Pairs with a DEPENDENT KITTEN endpoint are exempt: kitten
+    // stacking is prosocial substrate (nursing, feeding, cuddle
+    // piles). The first step-7 soak shoved feeding pairs apart every
+    // tick and starved two kittens (Duskkit-45 t1299805, Sparkkit-34
+    // t1310268, logs/tuned-42-60ab5916) — the kittens-are-cats
+    // sister-defect family.
+    kittens: Query<(), With<crate::components::kitten::KittenDependency>>,
+) {
+    let radius = constants.movement.separation_radius;
+    if radius <= f32::EPSILON {
+        return;
+    }
+    let max_speed = constants.movement.cat_max_speed;
+
+    // Accumulate pushes in deterministic (BTreeMap) order.
+    let mut pushes: std::collections::BTreeMap<Entity, bevy::math::Vec2> =
+        std::collections::BTreeMap::new();
+    for (&(a, b), _) in cache.pairs.iter() {
+        if kittens.contains(a) || kittens.contains(b) {
+            continue;
+        }
+        let (Ok((pa, _)), Ok((pb, _))) = (movers.get(a), movers.get(b)) else {
+            continue;
+        };
+        let (pa, pb) = (pa.0, pb.0);
+        if pa.distance(pb) >= radius {
+            continue;
+        }
+        let push_a = crate::ai::steering::separation(pa, &[pb], radius);
+        let push_b = crate::ai::steering::separation(pb, &[pa], radius);
+        *pushes.entry(a).or_insert(bevy::math::Vec2::ZERO) += push_a;
+        *pushes.entry(b).or_insert(bevy::math::Vec2::ZERO) += push_b;
+    }
+
+    for (entity, push) in pushes {
+        if push.length_squared() <= f32::EPSILON {
+            continue;
+        }
+        let Ok((_, mut desired)) = movers.get_mut(entity) else {
+            continue;
+        };
+        // Per-neighbor strength is already (radius - d) / radius in
+        // [0, 1]; scaling by max_speed makes a fully-overlapped cat
+        // want full-speed escape and a barely-touching one a nudge.
+        let blend = push.clamp_length_max(1.0) * max_speed;
+        desired.0 = Some(match desired.0 {
+            Some(d) => d + blend,
+            None => blend,
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252,6 +324,42 @@ mod tests {
             "ground mover must not tunnel through the x=8 wall; at {:?}",
             p.tile()
         );
+    }
+
+    #[test]
+    fn stacked_idle_cats_drift_apart_without_teleporting() {
+        let (mut world, schedule) = world_with_map();
+        // Two cats on the SAME tile center — the retired jitter case.
+        let a = spawn_mover(&mut world, Position::new(5, 5));
+        let b = spawn_mover(&mut world, Position::new(5, 5));
+        // Nudge b off exact coincidence so the push direction is
+        // defined by geometry, not the coincident +X fallback.
+        world.get_mut::<Position>(b).unwrap().0 += Vec2::new(0.05, 0.0);
+        world.insert_resource(crate::resources::near_pair_cache::NearPairCache::default());
+        {
+            let mut cache =
+                world.resource_mut::<crate::resources::near_pair_cache::NearPairCache>();
+            let key = crate::resources::near_pair_cache::normalize_pair(a, b);
+            cache.pairs.insert(key, 0.0);
+        }
+        let mut sep_schedule = Schedule::default();
+        sep_schedule.add_systems((apply_separation, integrate_velocities).chain());
+        let d0 = {
+            let pa = world.get::<Position>(a).unwrap().0;
+            let pb = world.get::<Position>(b).unwrap().0;
+            pa.distance(pb)
+        };
+        for _ in 0..8 {
+            sep_schedule.run(&mut world);
+        }
+        let pa = world.get::<Position>(a).unwrap().0;
+        let pb = world.get::<Position>(b).unwrap().0;
+        assert!(
+            pa.distance(pb) > d0 + 0.1,
+            "stacked cats should drift apart; d0={d0} d={}",
+            pa.distance(pb)
+        );
+        let _ = schedule;
     }
 
     #[test]

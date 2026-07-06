@@ -406,6 +406,49 @@ impl<'a> CatPathPlan<'a> {
         }
     }
 
+    /// 140 step 7 — shared desire-based approach step over a cached
+    /// smoothed corridor. Ensures `cached_path` holds this plan's
+    /// string-pulled waypoints toward `target` (recomputing when the
+    /// cache is empty or its goal is stale), pops waypoints inside
+    /// `movement.waypoint_arrival_radius`, and writes the seek desire
+    /// for the Chain-4 integrator. The caller keeps its own
+    /// arrival/adjacency semantics — this only handles the en-route
+    /// tick.
+    #[allow(clippy::too_many_arguments)]
+    pub fn desire_step_along_smoothed(
+        &self,
+        pos: &Position,
+        target: Position,
+        cached_path: &mut Option<Vec<Position>>,
+        map: &TileMap,
+        desired: &mut crate::components::physical::DesiredVelocity,
+        movement: &crate::resources::sim_constants::MovementConstants,
+    ) {
+        let stale = match cached_path {
+            None => true,
+            Some(p) => p.last().is_none_or(|last| *last != target),
+        };
+        if stale {
+            *cached_path = self.find_smoothed_path(*pos, target, map);
+        }
+        let Some(path) = cached_path else {
+            return; // no route — caller's watchdogs own the outcome
+        };
+        while let Some(wp) = path.first().copied() {
+            if pos.0.distance(wp.0) <= movement.waypoint_arrival_radius {
+                path.remove(0);
+            } else {
+                break;
+            }
+        }
+        let aim = path.first().copied().unwrap_or(target);
+        desired.0 = Some(crate::ai::steering::seek(
+            pos.0,
+            aim.0,
+            movement.cat_max_speed,
+        ));
+    }
+
     /// 140 step 6 — full route from `from` to `to`, string-pulled into
     /// sparse waypoints (`steering::smooth_path` under this plan's own
     /// cost surface). Waypoints are tile-center `Position`s of the

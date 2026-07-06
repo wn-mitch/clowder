@@ -52,6 +52,8 @@ pub fn resolve_repair(
     >,
     map: &TileMap,
     path_plan: &CatPathPlan<'_>,
+    desired: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
 ) -> StepOutcome<bool> {
     let Some(target) = target_entity else {
         return StepOutcome::unwitnessed(StepResult::Fail("no target for Repair".into()));
@@ -62,14 +64,15 @@ pub fn resolve_repair(
     };
 
     if pos.distance_to(building_pos) > 1.0 {
-        if cached_path.is_none() {
-            *cached_path = path_plan.find_full_path(*pos, *building_pos, map);
-        }
-        if let Some(ref mut path) = cached_path {
-            if !path.is_empty() {
-                *pos = path.remove(0);
-            }
-        }
+        // 140 step 7 — desire-based approach over the smoothed corridor.
+        path_plan.desire_step_along_smoothed(
+            pos,
+            *building_pos,
+            cached_path,
+            map,
+            desired,
+            movement,
+        );
         return StepOutcome::unwitnessed(StepResult::Continue);
     }
 

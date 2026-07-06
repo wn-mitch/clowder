@@ -1785,6 +1785,9 @@ impl Plugin for SimulationPlugin {
                     // emit_cat_moved_messages so CatMoved subscribers
                     // see post-move positions the same tick.
                     (
+                        // 140 step 7 — personal-space pass feeds the
+                        // integrator the same tick.
+                        systems::movement::apply_separation,
                         systems::movement::integrate_velocities,
                         systems::cat_movement::emit_cat_moved_messages,
                     )

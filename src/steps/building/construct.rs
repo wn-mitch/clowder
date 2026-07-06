@@ -65,6 +65,8 @@ pub fn resolve_construct(
     path_plan: &CatPathPlan<'_>,
     commands: &mut Commands,
     colony_score: &mut Option<ResMut<ColonyScore>>,
+    desired: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
 ) -> StepOutcome<()> {
     let Some(target) = target_entity else {
         return StepOutcome::bare(StepResult::Fail("no target for Construct".into()));
@@ -75,14 +77,15 @@ pub fn resolve_construct(
     };
 
     if pos.distance_to(building_pos) > 1.0 {
-        if cached_path.is_none() {
-            *cached_path = path_plan.find_full_path(*pos, *building_pos, map);
-        }
-        if let Some(ref mut path) = cached_path {
-            if !path.is_empty() {
-                *pos = path.remove(0);
-            }
-        }
+        // 140 step 7 — desire-based approach over the smoothed corridor.
+        path_plan.desire_step_along_smoothed(
+            pos,
+            *building_pos,
+            cached_path,
+            map,
+            desired,
+            movement,
+        );
         return StepOutcome::bare(StepResult::Continue);
     }
 
