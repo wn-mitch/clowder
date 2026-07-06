@@ -74,7 +74,15 @@ pub fn integrate_velocities(
             continue;
         };
 
-        vel.0 = crate::ai::steering::steer(vel.0, want, max_accel);
+        // 140 step 9 — airborne movers turn harder: `Flying` selects
+        // `hawk_max_accel` (hawks now; step 10's burst birds inherit).
+        // Ground movers share the uniform `max_accel`.
+        let accel = if flying.is_some() {
+            constants.movement.hawk_max_accel
+        } else {
+            max_accel
+        };
+        vel.0 = crate::ai::steering::steer(vel.0, want, accel);
         // Euclidean speed cap — with arbitrary headings an L∞ cap
         // would make ground speed direction-dependent (+41% at 45°).
         let max_speed = budget.per_tick.max(0.0);

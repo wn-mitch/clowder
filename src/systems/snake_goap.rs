@@ -273,10 +273,10 @@ pub fn snake_resolve_goap_plans(
             Entity,
             &mut SnakeGoapPlan,
             &mut SnakeState,
-            &mut Position,
+            &Position,
+            &mut crate::components::physical::DesiredVelocity,
             &mut SnakeAiPhase,
             &mut WildlifeAiState,
-            &mut crate::components::MovementBudget,
         ),
         (With<WildAnimal>, Without<Dead>),
     >,
@@ -290,7 +290,8 @@ pub fn snake_resolve_goap_plans(
     let prey_positions: Vec<Position> = prey.iter().map(|(_, p)| *p).collect();
     let prey_entities: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
 
-    for (snake_entity, mut plan, mut snake_state, mut pos, mut phase, mut ai_state, mut budget) in
+    let snake_speed = constants.movement.snake_max_speed;
+    for (snake_entity, mut plan, mut snake_state, pos, mut desired, mut phase, mut ai_state) in
         &mut snakes
     {
         if plan.is_exhausted() {
@@ -322,7 +323,7 @@ pub fn snake_resolve_goap_plans(
         let result = match current_step.action {
             SnakeGoapActionKind::SlideTo(_) => {
                 let outcome =
-                    snake_steps::resolve_slide_to(&mut pos, &mut budget, step_state, &map);
+                    snake_steps::resolve_slide_to(pos, &mut desired, snake_speed, step_state, &map);
                 outcome.result
             }
             SnakeGoapActionKind::SetAmbush => {
@@ -332,8 +333,9 @@ pub fn snake_resolve_goap_plans(
             }
             SnakeGoapActionKind::Strike => {
                 let outcome = snake_steps::resolve_strike(
-                    &mut pos,
-                    &mut budget,
+                    pos,
+                    &mut desired,
+                    snake_speed,
                     step_state,
                     &prey_entities,
                     sc.strike_range,
@@ -354,7 +356,8 @@ pub fn snake_resolve_goap_plans(
                 outcome.result
             }
             SnakeGoapActionKind::Retreat => {
-                let outcome = snake_steps::resolve_retreat(&mut pos, &mut budget, step_state, &map);
+                let outcome =
+                    snake_steps::resolve_retreat(pos, &mut desired, snake_speed, step_state, &map);
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::SnakeRetreated);
                 outcome.result
             }

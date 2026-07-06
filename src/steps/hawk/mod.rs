@@ -14,7 +14,7 @@
 use bevy_ecs::prelude::Entity;
 
 use crate::components::hawk_goap_plan::HawkStepState;
-use crate::components::physical::Position;
+use crate::components::physical::{DesiredVelocity, Position};
 use crate::resources::map::TileMap;
 use crate::steps::{StepOutcome, StepResult};
 
@@ -22,22 +22,24 @@ use crate::steps::{StepOutcome, StepResult};
 // Flight movement helper
 // ---------------------------------------------------------------------------
 
-/// Diagonal step toward `target`. Returns `true` once the hawk is within
-/// `arrival_dist` tiles. Ignores terrain — hawks fly. Caller is
-/// responsible for refreshing `target` when zone semantics change.
-///
-/// Tile-tactical Chebyshev on purpose (step-8 audit): this is a
-/// signum tile-stepper — one king-move per tick — so "tiles until
-/// arrival" IS Chebyshev until step 10 migrates hawks to burst-flight
-/// `DesiredVelocity`, which retires this helper.
-fn step_flying(pos: &mut Position, target: Position, arrival_dist: f32) -> bool {
-    if (pos.chebyshev_distance(&target) as f32) <= arrival_dist {
+/// 140 step 9 — express a straight-line flight desire toward `target`.
+/// Returns `true` once the hawk is within `arrival_dist` (world-space
+/// Euclidean — hawks carry `Flying`, so the Chain-4 integrator gives
+/// them a bounds-clamp-only continuous move at `hawk_max_speed`).
+/// Retires the pre-140 `step_flying` signum tile-stepper: resolvers
+/// write desire, `integrate_velocities` owns motion.
+fn desire_flight(
+    pos: &Position,
+    target: Position,
+    arrival_dist: f32,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
+) -> bool {
+    if pos.0.distance(target.0) <= arrival_dist {
         return true;
     }
-    let dx = (target.x() - pos.x()).signum();
-    let dy = (target.y() - pos.y()).signum();
-    pos.set_tile(pos.x() + dx, pos.y() + dy);
-    (pos.chebyshev_distance(&target) as f32) <= arrival_dist
+    desired.0 = Some(crate::ai::steering::seek(pos.0, target.0, max_speed));
+    false
 }
 
 /// Nearest map-edge position from `pos`. Used by `resolve_flee_sky` so
@@ -85,14 +87,16 @@ fn nearest_edge_target(pos: Position, map_width: i32, map_height: i32) -> Positi
 ///
 /// **Feature emission** — none.
 pub fn resolve_soar_to(
-    pos: &mut Position,
+    pos: &Position,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
     step_state: &mut HawkStepState,
     _map: &TileMap,
 ) -> StepOutcome<()> {
     let Some(target) = step_state.target_position else {
         return StepOutcome::bare(StepResult::Fail("no target position for SoarTo".into()));
     };
-    if step_flying(pos, target, 1.0) {
+    if desire_flight(pos, target, 1.0, desired, max_speed) {
         return StepOutcome::bare(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -168,7 +172,9 @@ pub fn resolve_spot_prey(
 /// **Feature emission** — caller passes `Feature::HawkDiveLanded`
 /// (Positive) to `record_if_witnessed`.
 pub fn resolve_dive_attack(
-    pos: &mut Position,
+    pos: &Position,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
     step_state: &mut HawkStepState,
     prey: &[(Entity, Position)],
     strike_range: f32,
@@ -180,7 +186,7 @@ pub fn resolve_dive_attack(
     else {
         return StepOutcome::unwitnessed(StepResult::Fail("no prey for dive".into()));
     };
-    if step_flying(pos, target_pos, strike_range) {
+    if desire_flight(pos, target_pos, strike_range, desired, max_speed) {
         return StepOutcome::witnessed_with(StepResult::Advance, target_entity);
     }
     step_state.ticks_elapsed += 1;
@@ -241,12 +247,14 @@ pub fn resolve_rest(step_state: &mut HawkStepState, ticks_to_rest: u64) -> StepO
 /// **Feature emission** — caller passes `Feature::HawkFled` (Positive)
 /// to `record_if_witnessed`.
 pub fn resolve_flee_sky(
-    pos: &mut Position,
+    pos: &Position,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
     step_state: &mut HawkStepState,
     map: &TileMap,
 ) -> StepOutcome<bool> {
     let target = nearest_edge_target(*pos, map.width, map.height);
-    if step_flying(pos, target, 2.0) {
+    if desire_flight(pos, target, 2.0, desired, max_speed) {
         return StepOutcome::witnessed(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -265,47 +273,54 @@ mod tests {
     use super::*;
     use crate::resources::map::Terrain;
 
+    const HAWK_SPEED: f32 = 1.0;
+
+    fn desired() -> DesiredVelocity {
+        DesiredVelocity::default()
+    }
+
     #[test]
     fn soar_advances_at_target() {
         let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(5, 5);
+        let pos = Position::new(5, 5);
+        let mut d = desired();
         let mut state = HawkStepState {
             target_position: Some(Position::new(5, 5)),
             ..HawkStepState::default()
         };
-        let outcome = resolve_soar_to(&mut pos, &mut state, &map);
+        let outcome = resolve_soar_to(&pos, &mut d, HAWK_SPEED, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Advance));
+        assert!(d.0.is_none(), "arrival must not express desire");
     }
 
     #[test]
     fn soar_fails_without_target() {
         let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(5, 5);
+        let pos = Position::new(5, 5);
+        let mut d = desired();
         let mut state = HawkStepState::default();
-        let outcome = resolve_soar_to(&mut pos, &mut state, &map);
+        let outcome = resolve_soar_to(&pos, &mut d, HAWK_SPEED, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Fail(_)));
     }
 
     #[test]
-    fn soar_moves_diagonally_then_advances() {
+    fn soar_expresses_straight_line_desire() {
+        // 140 step 9 — the signum tile-stepper is retired; soar writes
+        // a straight-line seek at hawk speed and the integrator (with
+        // `Flying`) owns motion. The (3,3) diagonal target must yield
+        // a normalized diagonal heading, not a king-move tile hop.
         let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(0, 0);
-        // Ticket 494 — target bumped from (2,2) to (3,3) to preserve
-        // the "tick 1 = Continue, tick 2 = Advance" semantic under the
-        // post-realignment Chebyshev `distance_to`. Under Chebyshev,
-        // (1,1) is already 1 step from (2,2) → step_flying's
-        // `arrival_dist = 1.0` arms immediately, collapsing the test.
-        // With target (3,3): tick 1 → (1,1), Chebyshev to (3,3) = 2 →
-        // Continue; tick 2 → (2,2), Chebyshev to (3,3) = 1 → Advance.
+        let pos = Position::new(0, 0);
+        let mut d = desired();
         let mut state = HawkStepState {
             target_position: Some(Position::new(3, 3)),
             ..HawkStepState::default()
         };
-        let o1 = resolve_soar_to(&mut pos, &mut state, &map);
-        assert!(matches!(o1.result, StepResult::Continue));
-        assert_eq!(pos, Position::new(1, 1));
-        let o2 = resolve_soar_to(&mut pos, &mut state, &map);
-        assert!(matches!(o2.result, StepResult::Advance));
+        let outcome = resolve_soar_to(&pos, &mut d, HAWK_SPEED, &mut state, &map);
+        assert!(matches!(outcome.result, StepResult::Continue));
+        let want = d.0.expect("desire expressed while soaring");
+        assert!((want.length() - HAWK_SPEED).abs() < 1e-5);
+        assert!((want.x - want.y).abs() < 1e-5, "45-degree heading toward (3,3)");
     }
 
     #[test]
@@ -330,19 +345,21 @@ mod tests {
 
     #[test]
     fn dive_attack_witnesses_when_arrived() {
-        let mut pos = Position::new(8, 5);
+        let pos = Position::new(8, 5);
+        let mut d = desired();
         let prey = vec![(Entity::from_bits(7), Position::new(8, 6))];
         let mut state = HawkStepState::default();
-        let outcome = resolve_dive_attack(&mut pos, &mut state, &prey, 1.0);
+        let outcome = resolve_dive_attack(&pos, &mut d, HAWK_SPEED, &mut state, &prey, 1.0);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert_eq!(outcome.witness, Some(Entity::from_bits(7)));
     }
 
     #[test]
     fn dive_attack_fails_without_prey() {
-        let mut pos = Position::new(5, 5);
+        let pos = Position::new(5, 5);
+        let mut d = desired();
         let mut state = HawkStepState::default();
-        let outcome = resolve_dive_attack(&mut pos, &mut state, &[], 2.0);
+        let outcome = resolve_dive_attack(&pos, &mut d, HAWK_SPEED, &mut state, &[], 2.0);
         assert!(matches!(outcome.result, StepResult::Fail(_)));
         assert!(outcome.witness.is_none());
     }
@@ -363,9 +380,10 @@ mod tests {
     #[test]
     fn flee_sky_witnesses_at_edge() {
         let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(1, 10);
+        let pos = Position::new(1, 10);
+        let mut d = desired();
         let mut state = HawkStepState::default();
-        let outcome = resolve_flee_sky(&mut pos, &mut state, &map);
+        let outcome = resolve_flee_sky(&pos, &mut d, HAWK_SPEED, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert!(outcome.witness);
     }

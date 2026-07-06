@@ -6,7 +6,7 @@
 
 use crate::ai::pathfinding::{find_path, CatPatrolDeterrentOverlay, WeightedOverlay};
 use crate::components::fox_goap_plan::FoxStepState;
-use crate::components::physical::Position;
+use crate::components::physical::{DesiredVelocity, Position};
 use crate::resources::map::TileMap;
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::CatPatrolDeterrentMap;
@@ -16,39 +16,68 @@ use crate::steps::StepResult;
 // Movement helper
 // ---------------------------------------------------------------------------
 
-/// Step one tile along a cached A* path toward `target`. Returns true once
-/// within `arrival_dist` of the target. Rebuilds path if cache empty.
+/// 140 step 9 — seek along a cached string-pulled corridor toward
+/// `target`, writing a `DesiredVelocity`; the Chain-4 integrator owns
+/// motion (fox speed cap `fox_max_speed`). Returns `true` once within
+/// `arrival_dist` (world-space Euclidean). Mirrors the cat-side
+/// `CatPathPlan::desire_step_along_smoothed`, with the fox's own
+/// overlay set.
 ///
-/// 256 R5 — the fox A* now reads `CatPatrolDeterrentMap` as a routing cost
+/// 256 R5 — the fox A* reads `CatPatrolDeterrentMap` as a routing cost
 /// overlay so foxes detour around active patrols instead of charging
-/// straight through them. Symmetric to the cat-side `FoxScentOverlay`
-/// (cats avoid fox-scent corridors). Foxes still don't read fox-scent or
-/// corruption — those overlays are cat-perception layers.
-pub fn step_toward(
-    pos: &mut Position,
+/// straight through them; the same overlay feeds `smooth_path`'s
+/// cost-aware raycast so string-pulling never shortcuts through a
+/// patrol corridor the router paid to avoid. Foxes still don't read
+/// fox-scent or corruption — those overlays are cat-perception layers.
+///
+/// The cache holds the *smoothed* waypoints (world-space `Position`s);
+/// it is rebuilt when empty or when its final waypoint no longer
+/// matches `target` (tile-keyed `Position` equality).
+pub fn desire_toward(
+    pos: &Position,
     target: Position,
     cached_path: &mut Option<Vec<Position>>,
     map: &TileMap,
     arrival_dist: f32,
     deterrent_map: &CatPatrolDeterrentMap,
     sc: &ScoringConstants,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
+    waypoint_arrival_radius: f32,
 ) -> bool {
-    if pos.distance_to(&target) <= arrival_dist {
+    if pos.0.distance(target.0) <= arrival_dist {
         return true;
     }
-    if cached_path.is_none() {
+    let stale = match cached_path {
+        None => true,
+        Some(p) => p.last().is_none_or(|last| *last != target),
+    };
+    if stale {
         let deterrent_overlay = CatPatrolDeterrentOverlay::new(deterrent_map, sc);
         let overlays = [WeightedOverlay::new(
             &deterrent_overlay,
             sc.cat_patrol_deterrent_overlay_weight,
         )];
-        *cached_path = find_path(*pos, target, map, &overlays);
+        *cached_path = find_path(*pos, target, map, &overlays).map(|path| {
+            crate::ai::steering::smooth_path(pos.world(), &path, map, &overlays)
+                .into_iter()
+                .map(Position)
+                .collect()
+        });
     }
-    if let Some(path) = cached_path {
-        if !path.is_empty() {
-            *pos = path.remove(0);
+    let Some(path) = cached_path else {
+        // No route — the caller's watchdog owns the outcome.
+        return false;
+    };
+    while let Some(wp) = path.first().copied() {
+        if pos.0.distance(wp.0) <= waypoint_arrival_radius {
+            path.remove(0);
+        } else {
+            break;
         }
     }
+    let aim = path.first().copied().unwrap_or(target);
+    desired.0 = Some(crate::ai::steering::seek(pos.0, aim.0, max_speed));
     false
 }
 
@@ -81,7 +110,9 @@ pub fn step_toward(
 /// Features are emitted from `src/systems/wildlife.rs` and
 /// related fox-ai systems.
 pub fn resolve_travel_to(
-    pos: &mut Position,
+    pos: &Position,
+    desired: &mut DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
     step_state: &mut FoxStepState,
     map: &TileMap,
     deterrent_map: &CatPatrolDeterrentMap,
@@ -90,7 +121,7 @@ pub fn resolve_travel_to(
     let Some(target) = step_state.target_position else {
         return StepResult::Fail("no target position for TravelTo".into());
     };
-    if step_toward(
+    if desire_toward(
         pos,
         target,
         &mut step_state.cached_path,
@@ -98,6 +129,9 @@ pub fn resolve_travel_to(
         1.0,
         deterrent_map,
         sc,
+        desired,
+        movement.fox_max_speed,
+        movement.waypoint_arrival_radius,
     ) {
         StepResult::Advance
     } else {
@@ -219,15 +253,18 @@ mod tests {
         let map = TileMap::new(20, 20, Terrain::Grass);
         let deterrent = CatPatrolDeterrentMap::default_map();
         let sc = ScoringConstants::default();
-        let mut pos = Position::new(5, 5);
+        let movement = crate::resources::sim_constants::MovementConstants::default();
+        let pos = Position::new(5, 5);
+        let mut d = DesiredVelocity::default();
         let mut state = FoxStepState {
             target_position: Some(Position::new(5, 5)),
             ..FoxStepState::default()
         };
         assert!(matches!(
-            resolve_travel_to(&mut pos, &mut state, &map, &deterrent, &sc),
+            resolve_travel_to(&pos, &mut d, &movement, &mut state, &map, &deterrent, &sc),
             StepResult::Advance
         ));
+        assert!(d.0.is_none(), "arrival must not express desire");
     }
 
     #[test]
@@ -235,10 +272,12 @@ mod tests {
         let map = TileMap::new(20, 20, Terrain::Grass);
         let deterrent = CatPatrolDeterrentMap::default_map();
         let sc = ScoringConstants::default();
-        let mut pos = Position::new(5, 5);
+        let movement = crate::resources::sim_constants::MovementConstants::default();
+        let pos = Position::new(5, 5);
+        let mut d = DesiredVelocity::default();
         let mut state = FoxStepState::default();
         assert!(matches!(
-            resolve_travel_to(&mut pos, &mut state, &map, &deterrent, &sc),
+            resolve_travel_to(&pos, &mut d, &movement, &mut state, &map, &deterrent, &sc),
             StepResult::Fail(_)
         ));
     }
@@ -256,23 +295,30 @@ mod tests {
         deterrent.deposit(5, 5, 1.0);
         let sc = ScoringConstants::default();
 
-        let mut pos = Position::new(0, 0);
+        let movement = crate::resources::sim_constants::MovementConstants::default();
+        let pos = Position::new(0, 0);
+        let mut d = DesiredVelocity::default();
         let mut cache = None;
-        // Take a step from (0, 0) toward (9, 9). With the deterrent
-        // bucket at (5..10, 5..10) saturated, the path should curve
-        // around it (or accept higher cost in fewer cells).
-        let _arrived = step_toward(
-            &mut pos,
+        // Express desire from (0, 0) toward (9, 9). With the deterrent
+        // bucket at (5..10, 5..10) saturated, the smoothed corridor
+        // should curve around it (or accept higher cost in fewer cells).
+        let _arrived = desire_toward(
+            &pos,
             Position::new(9, 9),
             &mut cache,
             &map,
             1.0,
             &deterrent,
             &sc,
+            &mut d,
+            movement.fox_max_speed,
+            movement.waypoint_arrival_radius,
         );
-        // The path was built; verify it's non-empty.
+        // The smoothed path was built; verify it's non-empty and a
+        // desire was expressed toward its first waypoint.
         assert!(cache.is_some(), "path should be built");
         let path = cache.as_ref().unwrap();
-        assert!(!path.is_empty(), "path should have steps");
+        assert!(!path.is_empty(), "smoothed path should have waypoints");
+        assert!(d.0.is_some(), "desire expressed while traveling");
     }
 }

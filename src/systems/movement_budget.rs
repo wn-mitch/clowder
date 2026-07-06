@@ -95,6 +95,13 @@ pub fn accumulate_movement_budget(
 /// Observer: insert species-default `MovementBudget` whenever a
 /// `WildAnimal` is added to an entity. Registered in
 /// `SimulationPlugin::build` via `app.add_observer`.
+///
+/// 140 step 9 — also the single author point for the fluid-movement
+/// component pair on wildlife (`Velocity` + `DesiredVelocity`; the
+/// species dispatchers REQUIRE `DesiredVelocity`, so a missing insert
+/// would silently drop the animal from its GOAP resolver query), and
+/// for the `Flying` marker on hawks (terrain-exempt integrator branch;
+/// step 10 extends `Flying` to prey birds at their own spawn author).
 pub fn on_wild_animal_added(
     add: On<Add, WildAnimal>,
     animals: Query<&WildAnimal>,
@@ -103,10 +110,16 @@ pub fn on_wild_animal_added(
 ) {
     let entity = add.entity;
     if let Ok(animal) = animals.get(entity) {
-        commands.entity(entity).insert(MovementBudget::for_species(
-            animal.species,
-            &constants.movement,
+        commands.entity(entity).insert((
+            MovementBudget::for_species(animal.species, &constants.movement),
+            crate::components::physical::Velocity::default(),
+            crate::components::physical::DesiredVelocity::default(),
         ));
+        if animal.species == crate::components::wildlife::WildSpecies::Hawk {
+            commands
+                .entity(entity)
+                .insert(crate::components::physical::Flying);
+        }
     }
 }
 

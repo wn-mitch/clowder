@@ -234,7 +234,8 @@ pub fn hawk_resolve_goap_plans(
             Entity,
             &mut HawkGoapPlan,
             &mut HawkState,
-            &mut Position,
+            &Position,
+            &mut crate::components::physical::DesiredVelocity,
             &mut HawkAiPhase,
             &mut WildlifeAiState,
         ),
@@ -250,7 +251,9 @@ pub fn hawk_resolve_goap_plans(
     let prey_positions: Vec<Position> = prey.iter().map(|(_, p)| *p).collect();
     let prey_entities: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
 
-    for (hawk_entity, mut plan, mut hawk_state, mut pos, mut phase, mut ai_state) in &mut hawks {
+    for (hawk_entity, mut plan, mut hawk_state, pos, mut desired, mut phase, mut ai_state) in
+        &mut hawks
+    {
         if plan.is_exhausted() {
             commands.entity(hawk_entity).remove::<HawkGoapPlan>();
             continue;
@@ -290,12 +293,18 @@ pub fn hawk_resolve_goap_plans(
         let step_state = plan.current_state_mut().unwrap();
         let result = match current_step.action {
             HawkGoapActionKind::SoarTo(_) => {
-                let outcome = hawk_steps::resolve_soar_to(&mut pos, step_state, &map);
+                let outcome = hawk_steps::resolve_soar_to(
+                    pos,
+                    &mut desired,
+                    constants.movement.hawk_max_speed,
+                    step_state,
+                    &map,
+                );
                 outcome.result
             }
             HawkGoapActionKind::SpotPrey => {
                 let outcome = hawk_steps::resolve_spot_prey(
-                    &pos,
+                    pos,
                     &prey_positions,
                     step_state,
                     hc.detection_range,
@@ -305,7 +314,9 @@ pub fn hawk_resolve_goap_plans(
             }
             HawkGoapActionKind::DiveAttack => {
                 let outcome = hawk_steps::resolve_dive_attack(
-                    &mut pos,
+                    pos,
+                    &mut desired,
+                    constants.movement.hawk_max_speed,
                     step_state,
                     &prey_entities,
                     hc.dive_range,
@@ -326,7 +337,13 @@ pub fn hawk_resolve_goap_plans(
                 outcome.result
             }
             HawkGoapActionKind::FleeSky => {
-                let outcome = hawk_steps::resolve_flee_sky(&mut pos, step_state, &map);
+                let outcome = hawk_steps::resolve_flee_sky(
+                    pos,
+                    &mut desired,
+                    constants.movement.hawk_max_speed,
+                    step_state,
+                    &map,
+                );
                 outcome.record_if_witnessed(activation.as_deref_mut(), Feature::HawkFled);
                 outcome.result
             }

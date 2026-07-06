@@ -567,7 +567,8 @@ pub fn fox_resolve_goap_plans(
             Entity,
             &mut FoxGoapPlan,
             &mut FoxState,
-            &mut Position,
+            &Position,
+            &mut crate::components::physical::DesiredVelocity,
             &mut FoxAiPhase,
             &mut WildlifeAiState,
             Option<&mut FoxHuntingBeliefs>,
@@ -599,8 +600,16 @@ pub fn fox_resolve_goap_plans(
     let cat_entities: Vec<(Entity, Position)> = cats.iter().map(|(e, p)| (e, *p)).collect();
     let active_confrontations: std::collections::HashSet<Entity> = confrontations.iter().collect();
 
-    for (fox_entity, mut plan, mut fox_state, mut pos, mut phase, mut ai_state, mut beliefs) in
-        &mut foxes
+    for (
+        fox_entity,
+        mut plan,
+        mut fox_state,
+        pos,
+        mut desired,
+        mut phase,
+        mut ai_state,
+        mut beliefs,
+    ) in &mut foxes
     {
         if plan.is_exhausted() {
             // Plan complete — remove so evaluator builds a fresh one.
@@ -665,7 +674,9 @@ pub fn fox_resolve_goap_plans(
                 }
                 let step_state = plan.current_state_mut().unwrap();
                 fox_steps::resolve_travel_to(
-                    &mut pos,
+                    pos,
+                    &mut desired,
+                    &constants.movement,
                     step_state,
                     &map,
                     &deterrent_map,

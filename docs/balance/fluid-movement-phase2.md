@@ -201,3 +201,37 @@ position history before treating a channel zero as a code regression.
 Seed-43 also flagged `ItemSourcedFromDenRaid` never-fired — cross-seed
 expectation noise on a chain-rare event (the landing gate is seed-42,
 which was clean); no action.
+
+## Iteration 4 — step 9: fox/hawk/snake desire migration (2026-07-06)
+
+### Changes
+- Fox `step_toward` → `desire_toward`: cached **smoothed** corridor
+  (string-pulled under the cat-patrol deterrent overlay — same overlay
+  feeds the smoothing cost ceiling, so pruning never shortcuts through
+  a patrol the router paid to avoid) + waypoint-pop seek at
+  `fox_max_speed`.
+- Hawk `step_flying` (signum tile-stepper) → `desire_flight`
+  straight-line seek; hawks get `Flying` at the spawn author point
+  (`on_wild_animal_added` — which now also authors
+  `Velocity`/`DesiredVelocity` for ALL wildlife, since the species
+  dispatchers require `DesiredVelocity` and a missing insert silently
+  drops the animal from its own resolver query).
+- Snake `step_slithering` → `desire_slither`: ticket-138 tick-skip
+  `try_spend_step` gate retired — continuous 0.5 speed via the
+  integrator cap, same average speed, no stutter.
+- Integrator wires the previously-inert `hawk_max_accel` via the
+  `Flying` branch (airborne movers turn harder; step-10 burst birds
+  inherit).
+- `wildlife_ai` (shadowfox legacy) untouched — step 11. It excludes
+  the three GOAP species (`Without<FoxState/HawkState/SnakeState>`),
+  so no double-move.
+
+### Hypothesis (gate: hypothesize)
+Same destinations, continuous motion. Hawk diagonal legs slow ~√2
+(Euclidean cap vs king-move tile hops) and hawks pay an accel ramp;
+snakes stop stuttering but average the same speed; foxes gain smoothed
+corridors. Predictions: HawkDiveLanded / SnakeStruckPrey / snake-
+inflicted injuries within ±10-ish% rate of the step-8 run where
+trajectory permits; smoke tests green; survival + continuity gates
+hold; zero fox/hawk/snake resolver-family timeout spikes (watchdogs
+absorb the accel ramp; soar watchdog 200 ticks ≫ map-diagonal at 1.0).

@@ -4,16 +4,17 @@
 //! and returns a [`StepOutcome<W>`]. Positive `Feature::*` emission MUST
 //! go through `record_if_witnessed` at the call site.
 //!
-//! Snakes move on land; movement here uses the same diagonal step shape
-//! as the hawk-side flight helper but is still semantically "slithering"
-//! — the resolver doesn't apply terrain costs because pathfinding for
-//! short snake distances is dominated by raw Manhattan and the GOAP
-//! system gates strike on adjacency rather than path length.
+//! Snakes move on land. 140 step 9 — resolvers express a straight-line
+//! `DesiredVelocity` toward the target; the Chain-4 integrator applies
+//! terrain passability (wall-slide) and the species speed cap
+//! (`snake_max_speed` 0.5 → continuous half-speed motion, replacing the
+//! pre-140 tick-skip `try_spend_step` gate: same average speed, no
+//! stutter). Short snake distances don't warrant A*+smoothing — the
+//! integrator's wall-slide handles the rare obstacle.
 
 use bevy_ecs::prelude::Entity;
 
-use crate::components::movement_budget::MovementBudget;
-use crate::components::physical::Position;
+use crate::components::physical::{DesiredVelocity, Position};
 use crate::components::snake_goap_plan::SnakeStepState;
 use crate::resources::map::TileMap;
 use crate::steps::{StepOutcome, StepResult};
@@ -22,29 +23,24 @@ use crate::steps::{StepOutcome, StepResult};
 // Ground-step helper
 // ---------------------------------------------------------------------------
 
-/// Diagonal step toward `target`. Returns `true` once within `arrival_dist`.
-///
-/// Ticket 138 — the step is gated on `budget.try_spend_step()`. A snake
-/// at `per_tick = 0.5` only successfully steps on every other tick; on
-/// other ticks the function returns "not arrived yet" without writing
-/// `pos`. A blocked step retains the accumulated budget — budget models
-/// physical translation capacity, not intent.
-fn step_slithering(
-    pos: &mut Position,
-    budget: &mut MovementBudget,
+/// 140 step 9 — express a slither desire toward `target`. Returns
+/// `true` once within `arrival_dist` (world-space Euclidean). The
+/// integrator moves the snake at `snake_max_speed` (0.5) continuously —
+/// the ticket-138 `try_spend_step` every-other-tick gate is retired
+/// (same average speed, no stutter); a blocked heading wall-slides in
+/// `integrate_velocities` instead of silently retaining budget.
+fn desire_slither(
+    pos: &Position,
     target: Position,
     arrival_dist: f32,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
 ) -> bool {
-    if pos.distance_to(&target) <= arrival_dist {
+    if pos.0.distance(target.0) <= arrival_dist {
         return true;
     }
-    if !budget.try_spend_step() {
-        return false;
-    }
-    let dx = (target.x() - pos.x()).signum();
-    let dy = (target.y() - pos.y()).signum();
-    pos.set_tile(pos.x() + dx, pos.y() + dy);
-    pos.distance_to(&target) <= arrival_dist
+    desired.0 = Some(crate::ai::steering::seek(pos.0, target.0, max_speed));
+    false
 }
 
 fn nearest_edge_target(pos: Position, map_width: i32, map_height: i32) -> Position {
@@ -83,15 +79,16 @@ fn nearest_edge_target(pos: Position, map_width: i32, map_height: i32) -> Positi
 ///
 /// **Feature emission** — none.
 pub fn resolve_slide_to(
-    pos: &mut Position,
-    budget: &mut MovementBudget,
+    pos: &Position,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
     step_state: &mut SnakeStepState,
     _map: &TileMap,
 ) -> StepOutcome<()> {
     let Some(target) = step_state.target_position else {
         return StepOutcome::bare(StepResult::Fail("no target position for SlideTo".into()));
     };
-    if step_slithering(pos, budget, target, 1.0) {
+    if desire_slither(pos, target, 1.0, desired, max_speed) {
         return StepOutcome::bare(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -158,8 +155,9 @@ pub fn resolve_set_ambush(
 /// **Feature emission** — caller passes `Feature::SnakeStruckPrey`
 /// (Positive) to `record_if_witnessed`.
 pub fn resolve_strike(
-    pos: &mut Position,
-    budget: &mut MovementBudget,
+    pos: &Position,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
     step_state: &mut SnakeStepState,
     prey: &[(Entity, Position)],
     strike_range: f32,
@@ -171,7 +169,7 @@ pub fn resolve_strike(
     else {
         return StepOutcome::unwitnessed(StepResult::Fail("no prey for strike".into()));
     };
-    if step_slithering(pos, budget, target_pos, strike_range) {
+    if desire_slither(pos, target_pos, strike_range, desired, max_speed) {
         return StepOutcome::witnessed_with(StepResult::Advance, target_entity);
     }
     step_state.ticks_elapsed += 1;
@@ -232,13 +230,14 @@ pub fn resolve_bask(step_state: &mut SnakeStepState, ticks_to_bask: u64) -> Step
 /// **Feature emission** — caller passes `Feature::SnakeRetreated`
 /// (Positive) to `record_if_witnessed`.
 pub fn resolve_retreat(
-    pos: &mut Position,
-    budget: &mut MovementBudget,
+    pos: &Position,
+    desired: &mut DesiredVelocity,
+    max_speed: f32,
     step_state: &mut SnakeStepState,
     map: &TileMap,
 ) -> StepOutcome<bool> {
     let target = nearest_edge_target(*pos, map.width, map.height);
-    if step_slithering(pos, budget, target, 2.0) {
+    if desire_slither(pos, target, 2.0, desired, max_speed) {
         return StepOutcome::witnessed(StepResult::Advance);
     }
     step_state.ticks_elapsed += 1;
@@ -255,98 +254,56 @@ pub fn resolve_retreat(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::wildlife::WildSpecies;
     use crate::resources::map::Terrain;
 
-    fn snake_budget() -> MovementBudget {
-        // Primed at 1.0 so tests that only step once exercise the
-        // "step succeeds when budget is full" path without needing to
-        // accumulate first.
-        MovementBudget {
-            accumulator: 1.0,
-            per_tick: crate::resources::sim_constants::MovementConstants::default()
-                .max_speed(WildSpecies::Snake),
-        }
+    const SNAKE_SPEED: f32 = 0.5;
+
+    fn desired() -> DesiredVelocity {
+        DesiredVelocity::default()
     }
 
     #[test]
     fn slide_advances_at_target() {
         let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(5, 5);
-        let mut budget = snake_budget();
+        let pos = Position::new(5, 5);
+        let mut d = desired();
         let mut state = SnakeStepState {
             target_position: Some(Position::new(5, 5)),
             ..SnakeStepState::default()
         };
-        let outcome = resolve_slide_to(&mut pos, &mut budget, &mut state, &map);
+        let outcome = resolve_slide_to(&pos, &mut d, SNAKE_SPEED, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Advance));
+        assert!(d.0.is_none(), "arrival must not express desire");
     }
 
     #[test]
     fn slide_fails_without_target() {
         let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(5, 5);
-        let mut budget = snake_budget();
+        let pos = Position::new(5, 5);
+        let mut d = desired();
         let mut state = SnakeStepState::default();
-        let outcome = resolve_slide_to(&mut pos, &mut budget, &mut state, &map);
+        let outcome = resolve_slide_to(&pos, &mut d, SNAKE_SPEED, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Fail(_)));
     }
 
     #[test]
-    fn slide_blocked_when_budget_underfull_retains_budget() {
-        // Snake at half-cadence with an empty accumulator can't step.
-        // The "blocked step retains budget" invariant: accumulator
-        // stays put, no position write.
+    fn slide_expresses_capped_desire_toward_target() {
+        // 140 step 9 — the tick-skip budget gate is retired: every
+        // resolve writes a desire at snake speed (0.5); continuous
+        // half-speed motion is the integrator's job now, so there is
+        // no every-other-tick stutter to assert.
         let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(5, 5);
-        let start_pos = pos;
-        let mut budget = MovementBudget {
-            accumulator: 0.5,
-            per_tick: 0.5,
-        };
+        let pos = Position::new(0, 0);
+        let mut d = desired();
         let mut state = SnakeStepState {
-            target_position: Some(Position::new(15, 15)),
+            target_position: Some(Position::new(10, 0)),
             ..SnakeStepState::default()
         };
-        let outcome = resolve_slide_to(&mut pos, &mut budget, &mut state, &map);
+        let outcome = resolve_slide_to(&pos, &mut d, SNAKE_SPEED, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Continue));
-        assert_eq!(pos, start_pos, "blocked step must not write Position");
-        assert!(
-            (budget.accumulator - 0.5).abs() < f32::EPSILON,
-            "blocked step must retain budget"
-        );
-    }
-
-    #[test]
-    fn half_cadence_steps_every_other_tick() {
-        // Snake at per_tick = 0.5 needs TWO accumulations per step
-        // (0.5 + 0.5 = 1.0). With one accumulate-then-resolve pair
-        // per tick, the position should advance on alternate ticks.
-        let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(0, 0);
-        let target = Position::new(10, 0);
-        let mut budget = MovementBudget::for_species(
-            WildSpecies::Snake,
-            &crate::resources::sim_constants::MovementConstants::default(),
-        );
-        let mut state = SnakeStepState {
-            target_position: Some(target),
-            ..SnakeStepState::default()
-        };
-        let mut step_ticks = Vec::new();
-        for tick in 0..6 {
-            let before = pos;
-            budget.accumulate();
-            let _ = resolve_slide_to(&mut pos, &mut budget, &mut state, &map);
-            if pos != before {
-                step_ticks.push(tick);
-            }
-        }
-        // Snake should step on alternate ticks (1, 3, 5) — the first
-        // accumulate brings the primed 0.5 to 1.0 (saturating cap),
-        // the resolve spends it; next tick accumulator climbs from
-        // 0.0 to 0.5 (no step); the tick after climbs to 1.0 (step).
-        assert_eq!(step_ticks, vec![0, 2, 4], "every-other-tick step pattern");
+        let want = d.0.expect("desire expressed while traveling");
+        assert!((want.length() - SNAKE_SPEED).abs() < 1e-5, "seek at snake speed");
+        assert!(want.x > 0.0 && want.y.abs() < 1e-5, "heading toward +x target");
     }
 
     #[test]
@@ -363,21 +320,21 @@ mod tests {
 
     #[test]
     fn strike_witnesses_in_range() {
-        let mut pos = Position::new(5, 5);
-        let mut budget = snake_budget();
+        let pos = Position::new(5, 5);
+        let mut d = desired();
         let prey = vec![(Entity::from_bits(11), Position::new(5, 6))];
         let mut state = SnakeStepState::default();
-        let outcome = resolve_strike(&mut pos, &mut budget, &mut state, &prey, 1.0);
+        let outcome = resolve_strike(&pos, &mut d, SNAKE_SPEED, &mut state, &prey, 1.0);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert_eq!(outcome.witness, Some(Entity::from_bits(11)));
     }
 
     #[test]
     fn strike_fails_without_prey() {
-        let mut pos = Position::new(5, 5);
-        let mut budget = snake_budget();
+        let pos = Position::new(5, 5);
+        let mut d = desired();
         let mut state = SnakeStepState::default();
-        let outcome = resolve_strike(&mut pos, &mut budget, &mut state, &[], 1.0);
+        let outcome = resolve_strike(&pos, &mut d, SNAKE_SPEED, &mut state, &[], 1.0);
         assert!(matches!(outcome.result, StepResult::Fail(_)));
     }
 
@@ -395,11 +352,22 @@ mod tests {
     #[test]
     fn retreat_witnesses_at_edge() {
         let map = TileMap::new(20, 20, Terrain::Grass);
-        let mut pos = Position::new(1, 10);
-        let mut budget = snake_budget();
+        let pos = Position::new(1, 10);
+        let mut d = desired();
         let mut state = SnakeStepState::default();
-        let outcome = resolve_retreat(&mut pos, &mut budget, &mut state, &map);
+        let outcome = resolve_retreat(&pos, &mut d, SNAKE_SPEED, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Advance));
         assert!(outcome.witness);
+    }
+
+    #[test]
+    fn retreat_expresses_desire_toward_edge_when_far() {
+        let map = TileMap::new(20, 20, Terrain::Grass);
+        let pos = Position::new(10, 10);
+        let mut d = desired();
+        let mut state = SnakeStepState::default();
+        let outcome = resolve_retreat(&pos, &mut d, SNAKE_SPEED, &mut state, &map);
+        assert!(matches!(outcome.result, StepResult::Continue));
+        assert!(d.0.is_some(), "mid-map snake must express retreat desire");
     }
 }
