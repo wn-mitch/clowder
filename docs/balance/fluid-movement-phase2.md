@@ -268,3 +268,36 @@ directions: walks out, cannot walk back in). Note for step 11:
 `wildlife_ai`'s shadowfox Fleeing arm has the same unchecked-terrain
 shape but shadowfoxes remain direct writers until step 11, so they
 can still walk out; close the hole when migrating.
+
+### Observation — soak 2 (`logs/tuned-42-f7ddfeda`): PASS
+- Foxes alive at every population sample (2/2 run-long, FoxDied 0,
+  FoxHuntedPrey 22 vs 19 baseline — feeding restored); ZERO deaths
+  run-wide; canaries green; never-fired clean; 123.8 tps.
+- Same-tick (1229900) rate check vs step-8: HawkDiveLanded 1250 vs
+  1273 (−1.8% ✓); SnakeAmbushed 291 vs 215; **SnakeStruckPrey 233 vs
+  415 (−44%, out of the ±10% band)** — the snake's every-other-tick
+  king-move hop averaged ~0.7 Euclidean-equivalent tiles/tick on
+  diagonals; the honest 0.5 cap + accel ramp is slower inside the
+  30-tick strike watchdog. This is the same verisimilitude-carried
+  diagonal re-baseline as cats/hawks, and the burst-strike answer is
+  step 12's sprint gait (`sprint_speed_mult` on pounce-class
+  resolvers — snake Strike included). Accepted with that ownership;
+  SnakeStruckPrey still fires 233× (no canary risk).
+- Trajectory-divergence note: retiring `fox_movement` removed
+  per-fox-per-tick RNG jitter draws, shifting the whole SimRng
+  stream — shadow_fox_spawn 2→10 (ambush deaths still 0),
+  FoxAvoidedCat 5262→1314, ward channels reshuffled
+  (avoidance 262 via the drives flee arm, sieges 0 this trajectory;
+  channel-alive proof stands on tuned-43-fdaf4152).
+
+### Concordance
+Concordant after one fix iteration, and the fix is the release's
+thesis working as intended: the integrator enforcing passability
+honestly EXPOSED a pre-existing lethal hole (terrain-unchecked flee
+writes) that the old teleporting stepper had been silently papering
+over. Two structural lessons: (1) when migrating a mover to
+desire-based motion, grep for EVERY other Position writer on that
+entity class first — the second writer is both a double-move and a
+potential strand-injector; (2) "the old code self-rescued by
+accident" is a failure mode of honest physics — pair every
+passability-enforcement change with an explicit strand-escape story.
