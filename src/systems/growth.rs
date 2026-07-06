@@ -230,6 +230,15 @@ pub fn update_kitten_cry_map(
 /// / mentorable. Reusing the Wean/Teach thresholds keeps the sub-stage
 /// boundaries aligned with the existing milestone-arc semantics.
 ///
+/// **Invariant (511):** every living umbrella-`Kitten` cat carries
+/// exactly one sub-stage marker. An age-Kitten *without*
+/// `KittenDependency` is an early graduate (rearing-arc maturity bumps
+/// outran the age clock; `tick_kitten_growth` removed the dependency at
+/// maturity 1.0) and reads `JuvenileKitten` until age enters Young.
+/// `scoring::current_cat_life_stage` relies on this — it has no
+/// umbrella-`Kitten` fallback, and a sub-stage gap empties the cat's
+/// DSE pool (silent Resting-until-starvation, see ticket 511).
+///
 /// Also authors the **`MentorableAge`** mentee-side gate marker
 /// (`JuvenileKitten ∨ Young ∨ Adult`) — Newborn / Eyes-open kittens
 /// cannot receive mentoring even though they're alive.
@@ -315,13 +324,31 @@ pub fn update_life_stage_markers(
             _ => {} // already has the correct life-stage marker — no-op
         }
 
-        // 450 sub-stage authoring. Kitten + KittenDependency present →
-        // exactly one of {Newborn, EyesOpen, Juvenile}; else none.
+        // 450 sub-stage authoring. Age-stage Kitten → exactly one of
+        // {Newborn, EyesOpen, Juvenile}; non-Kitten stages → all off.
+        //
+        // 511 — the dep-less Kitten arm is load-bearing: Wean/Teach
+        // advances bump `KittenDependency.maturity` ahead of the age
+        // clock (`maturity.max(threshold)` in the rearing-arc drain), so
+        // a reared kitten hits maturity 1.0 — and `tick_kitten_growth`
+        // removes `KittenDependency` — seasons before the age band
+        // leaves Kitten. Such an early graduate must stay
+        // `JuvenileKitten` until age rolls into Young. Before this arm,
+        // it lost all three sub-stage markers while keeping the umbrella
+        // `Kitten`, `current_cat_life_stage` returned `None` (it has no
+        // umbrella fallback by design), the DSE pool filtered to empty,
+        // and the L3 softmax's empty-pool fallthrough elected Resting
+        // every re-plan until the cat starved — with nothing in the L2
+        // trace, because the election it would have logged never ran.
+        // The sub-stage set is now exhaustive over living umbrella-
+        // Kitten cats.
         let (want_newborn, want_eyes_open, want_juvenile) = match (stage, dep) {
             (LifeStage::Kitten, Some(d)) if d.maturity < weaned => (true, false, false),
             (LifeStage::Kitten, Some(d)) if d.maturity < teach_done => (false, true, false),
-            (LifeStage::Kitten, Some(_)) => (false, false, true),
-            // No KittenDependency or non-Kitten life-stage → all three off.
+            // Post-teach dependents AND early graduates (dep removed at
+            // maturity 1.0 while age-stage still reads Kitten).
+            (LifeStage::Kitten, _) => (false, false, true),
+            // Non-Kitten life-stage → all three off.
             _ => (false, false, false),
         };
         toggle_marker(
@@ -627,6 +654,58 @@ mod tests {
         assert!(
             has_stage(&world, adult_born).2,
             "adult should still be Adult"
+        );
+    }
+
+    /// 511 — early-graduate hole. Wean/Teach maturity bumps let a reared
+    /// kitten hit maturity 1.0 (→ `tick_kitten_growth` removes
+    /// `KittenDependency`) seasons before the age band leaves Kitten.
+    /// The dep-less age-Kitten must keep `JuvenileKitten`: a sub-stage
+    /// gap makes `current_cat_life_stage` return `None`, which empties
+    /// the DSE pool and locks the cat into the empty-pool Resting
+    /// fallthrough until it starves.
+    #[test]
+    fn early_graduate_kitten_stays_juvenile() {
+        let (mut world, mut schedule) = setup();
+        // Born at tick 0, queried at season 2 (tick 55_000) — age-stage
+        // Kitten, maturity already post-teach via the rearing-arc bumps.
+        let cat = world
+            .spawn((
+                Age { born_tick: 0 },
+                KittenDependency {
+                    mother: None,
+                    father: None,
+                    maturity: 0.9,
+                    skills_learned: 2,
+                },
+            ))
+            .id();
+        world.resource_mut::<TimeState>().tick = 55_000;
+        schedule.run(&mut world);
+        assert!(world.entity(cat).contains::<markers::JuvenileKitten>());
+
+        // Maturity reaches 1.0 → `tick_kitten_growth` removes the
+        // dependency. Simulate the removal directly.
+        world.entity_mut(cat).remove::<KittenDependency>();
+        schedule.run(&mut world);
+        let em = world.entity(cat);
+        assert!(em.contains::<markers::Kitten>(), "age band still Kitten");
+        assert!(
+            em.contains::<markers::JuvenileKitten>(),
+            "early graduate must keep JuvenileKitten (511 starvation lock)"
+        );
+        assert!(em.contains::<markers::MentorableAge>());
+        assert!(!em.contains::<markers::NewbornKitten>());
+        assert!(!em.contains::<markers::EyesOpenKitten>());
+
+        // Age catches up — Young at season 4 clears the sub-stage.
+        world.resource_mut::<TimeState>().tick = 80_000;
+        schedule.run(&mut world);
+        let em = world.entity(cat);
+        assert!(em.contains::<markers::Young>());
+        assert!(
+            !em.contains::<markers::JuvenileKitten>(),
+            "sub-stage must clear once the age band enters Young"
         );
     }
 
