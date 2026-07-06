@@ -1189,15 +1189,20 @@ fn accumulate_urgencies(
     // --- Starvation (maslow 1) ---
     // 150 R5a: Eating is now the canonical "I'm fixing my hunger"
     // disposition; firing a Starvation urgency mid-Eating would just
-    // re-elect the same disposition. Resting stays excluded as a
-    // backstop (an old soak's saved state may still hold a Resting
-    // plan that addresses hunger via the legacy three-need recipe).
+    // re-elect the same disposition.
+    //
+    // 511 — Resting REMOVED from this exclusion. The old rationale
+    // ("a legacy Resting plan addresses hunger via the three-need
+    // recipe") is stale: Resting plans do not feed, and excluding
+    // them here — combined with the strictly-less-than Maslow-tier
+    // preemption below — let a Rest-looping cat ride hunger from
+    // sated to starvation with no interrupt (Duskkit-45,
+    // tickets 511; the kitten spent its critical window walking
+    // Resting travel legs, so step-level hunger-wakes in
+    // sleep/self_groom could not fire either).
     if !matches!(
         kind,
-        DispositionKind::Resting
-            | DispositionKind::Eating
-            | DispositionKind::Hunting
-            | DispositionKind::Foraging
+        DispositionKind::Eating | DispositionKind::Hunting | DispositionKind::Foraging
     ) && needs.hunger < d.starvation_interrupt_threshold
     {
         urgencies.needs.push(UrgentNeed {
@@ -4930,7 +4935,18 @@ pub fn resolve_goap_plans(
                     let current_maslow = plan.kind.maslow_tier();
                     // An urgency preempts only if its maslow tier is strictly
                     // lower (more fundamental) than the current plan's.
-                    if urgent.maslow_tier < current_maslow {
+                    //
+                    // 511 exception — Starvation-vs-Resting is a
+                    // tier-1-vs-tier-1 pair the strict comparison can
+                    // never break, and Resting plans self-perpetuate
+                    // through the held-intention replan path without
+                    // fresh elections: a resting cat could starve to
+                    // death un-interrupted. A starving body overrides
+                    // rest. (Generalizing equal-tier trade-offs is the
+                    // §7 commitment layer's job — ticket 509.)
+                    let starvation_breaks_rest = urgent.kind == UrgencyKind::Starvation
+                        && plan.kind == DispositionKind::Resting;
+                    if urgent.maslow_tier < current_maslow || starvation_breaks_rest {
                         // Preserve Hunt/Herbcraft guard for threats.
                         // 155: `Action::Herbcraft` retired; the three
                         // sub-actions (Gather/Remedy/SetWard) all carry
@@ -5100,7 +5116,15 @@ pub fn resolve_goap_plans(
                 // share a TODO to extract a `release_commitment`
                 // helper alongside the NoPlanPossible path that already
                 // duplicates the same gesture.
-                if fail_reason == "morale_break" {
+                // 511 — `starvation_override` rides the same release
+                // gesture: a starving body overrides the held
+                // commitment (Blind Resting can neither achieve nor
+                // drop while hunger prevents rest completion, and the
+                // urgency preempt only fires at Advance boundaries —
+                // the hunger-wake produces Fail boundaries). Dropping
+                // the disposition forces a real election where Eat
+                // wins at starvation scores.
+                if fail_reason == "morale_break" || fail_reason == "starvation_override" {
                     let strategy = crate::ai::commitment::strategy_for_disposition(plan.kind);
                     crate::ai::commitment::record_drop(
                         narr.activation.as_deref_mut(),

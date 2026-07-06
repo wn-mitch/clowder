@@ -32,9 +32,7 @@ pub fn resolve_self_groom(
     // Resting-family loop must not bridge a starving cat past its
     // election (see sleep.rs for the full mechanism).
     if needs.hunger < d.critical_hunger_interrupt_threshold {
-        return StepOutcome::bare(StepResult::Fail(
-            "grooming abandoned — critical hunger".into(),
-        ));
+        return StepOutcome::bare(StepResult::Fail("starvation_override".into()));
     }
     if ticks >= d.self_groom_duration {
         needs.temperature = (needs.temperature + d.self_groom_temperature_gain).min(1.0);
