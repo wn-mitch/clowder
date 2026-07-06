@@ -28,6 +28,14 @@ pub fn resolve_self_groom(
     grooming: Option<&mut GroomingCondition>,
     d: &DispositionConstants,
 ) -> StepOutcome<()> {
+    // 511 — same critical-hunger break as `resolve_sleep`: the
+    // Resting-family loop must not bridge a starving cat past its
+    // election (see sleep.rs for the full mechanism).
+    if needs.hunger < d.critical_hunger_interrupt_threshold {
+        return StepOutcome::bare(StepResult::Fail(
+            "grooming abandoned — critical hunger".into(),
+        ));
+    }
     if ticks >= d.self_groom_duration {
         needs.temperature = (needs.temperature + d.self_groom_temperature_gain).min(1.0);
         if let Some(g) = grooming {

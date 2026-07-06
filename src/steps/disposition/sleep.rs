@@ -34,6 +34,18 @@ pub fn resolve_sleep(
     tick: u64,
     d: &DispositionConstants,
 ) -> StepOutcome<()> {
+    // 511 — a starving body wakes up. Resting masks the Starvation
+    // urgency (tier-1-vs-tier-1 strict preemption can never break in,
+    // and the accumulation arm excludes Resting), and the
+    // held-intention replan path can re-derive Rest plans without a
+    // fresh L2 election — so a sleeping cat could ride hunger from
+    // sated to death without ever re-electing (Duskkit-45,
+    // logs/tuned-42-f05d6d04). Failing the step at critical hunger
+    // ends the plan through the normal failure path, which forces a
+    // real election where Eat dominates at hangry-saturated scores.
+    if needs.hunger < d.critical_hunger_interrupt_threshold {
+        return StepOutcome::bare(StepResult::Fail("woken by critical hunger".into()));
+    }
     needs.energy = (needs.energy + d.sleep_energy_per_tick).min(1.0);
     needs.temperature = (needs.temperature + d.sleep_temperature_per_tick).min(1.0);
     if ticks >= duration {
