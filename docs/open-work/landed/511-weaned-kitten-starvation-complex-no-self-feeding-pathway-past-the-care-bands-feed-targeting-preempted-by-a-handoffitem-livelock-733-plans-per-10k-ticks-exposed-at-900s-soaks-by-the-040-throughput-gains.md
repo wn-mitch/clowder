@@ -1,7 +1,7 @@
 ---
 id: 511
 title: Weaned-kitten starvation complex: no self-feeding pathway past the care bands, feed-targeting preempted by a HandoffItem livelock (733 plans per 10k ticks), exposed at 900s soaks by the 0.4.0 throughput gains
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 36a4fc08
+landed-on: 2026-07-06
 ---
 
 ## Why
@@ -94,3 +94,28 @@ step-7 landing soak re-run green.
   plans → 155 handoffs even in the HEALTHY baseline — chronic,
   pre-dates Phase II) re-homed to ticket 509's commitment-layer
   first-light (R3 there), evidence appended.
+- 2026-07-06 (root cause found): R2b + urgency/commitment fixes all
+  verified firing, yet Duskkit-45 still died at the identical tick —
+  the terminal lock was a FIFTH defect upstream of all of them: the
+  **early-graduate life-stage hole**. Wean/Teach advances bump
+  `KittenDependency.maturity` ahead of the age clock
+  (`maturity.max(threshold)`), so a reared kitten hits maturity 1.0
+  at age ~2.6 seasons; `tick_kitten_growth` removes
+  `KittenDependency`; `update_life_stage_markers` matched
+  `(LifeStage::Kitten, None)` → stripped all three sub-stage markers
+  while the age-band umbrella `Kitten` stayed; `current_cat_life_stage`
+  has no umbrella fallback → `None` → scoring skips EVERY DSE →
+  empty pool → L3 empty-pool fallthrough elects Resting with empty
+  `last_scores` on every re-plan. Evidence: Duskkit-45 elected
+  Foraging/Socializing (the juvenile pool — Forage is
+  `juvenile_and_up`) until tick ~1288150, then 399/400 plans Resting
+  to death; snapshot `life_stage: Kitten` throughout. "Elections
+  stopped" was the election running over zero candidates — a
+  silent-canary conjunction failure (`Kitten ∧ KittenDependency`
+  desyncs: one input age-driven, one event-driven). Fix: the
+  sub-stage match's Kitten arm now covers `dep = None` — early
+  graduates stay `JuvenileKitten` until age enters Young; sub-stage
+  set exhaustive over living umbrella-Kitten cats; unit test
+  `early_graduate_kitten_stays_juvenile`. Note R2b (juvenile Eat/Beg)
+  is what makes a post-graduate juvenile viable at all — without it
+  the restored elections would land in a pool with no feeding action.
