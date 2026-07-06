@@ -302,8 +302,14 @@ mod tests {
         let outcome = resolve_slide_to(&pos, &mut d, SNAKE_SPEED, &mut state, &map);
         assert!(matches!(outcome.result, StepResult::Continue));
         let want = d.0.expect("desire expressed while traveling");
-        assert!((want.length() - SNAKE_SPEED).abs() < 1e-5, "seek at snake speed");
-        assert!(want.x > 0.0 && want.y.abs() < 1e-5, "heading toward +x target");
+        assert!(
+            (want.length() - SNAKE_SPEED).abs() < 1e-5,
+            "seek at snake speed"
+        );
+        assert!(
+            want.x > 0.0 && want.y.abs() < 1e-5,
+            "heading toward +x target"
+        );
     }
 
     #[test]

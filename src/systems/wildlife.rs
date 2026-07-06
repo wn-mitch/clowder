@@ -3046,93 +3046,22 @@ pub fn fox_ai_decision(
 }
 
 // ---------------------------------------------------------------------------
-// fox_movement — handle fox-specific movement for FoxAiPhase states
+// fox_movement — RETIRED (140 step 9)
 // ---------------------------------------------------------------------------
-
-/// Move foxes according to their FoxAiPhase. Runs INSTEAD of wildlife_ai for
-/// entities with FoxState (which are excluded from wildlife_ai via Without filter).
-pub fn fox_movement(
-    mut foxes: Query<
-        (
-            &FoxAiPhase,
-            &mut Position,
-            &mut WildlifeAiState,
-            &mut crate::components::MovementBudget,
-        ),
-        With<FoxState>,
-    >,
-    map: Res<TileMap>,
-    mut rng: ResMut<SimRng>,
-    constants: Res<SimConstants>,
-) {
-    let _c = &constants.wildlife;
-    for (phase, mut pos, mut ai_state, mut budget) in &mut foxes {
-        match phase {
-            FoxAiPhase::Resting { .. } | FoxAiPhase::DenGuarding => {
-                // Don't move.
-            }
-            FoxAiPhase::PatrolTerritory { dx, dy } | FoxAiPhase::Dispersing { dx, dy } => {
-                let next = Position::new(pos.x() + dx, pos.y() + dy);
-                if map.in_bounds(next.x(), next.y())
-                    && is_patrol_terrain(map.get(next.x(), next.y()).terrain, WildSpecies::Fox)
-                {
-                    // Ticket 138 — gate on MovementBudget. Foxes are
-                    // at per_tick=1.0 today, so a no-op behaviorally;
-                    // wired structurally so future fox-cadence tuning
-                    // is parameter-only.
-                    if budget.try_spend_step() {
-                        *pos = next;
-                    }
-                } else {
-                    // Reverse and try.
-                    let rev = Position::new(pos.x() - dx, pos.y() - dy);
-                    if map.in_bounds(rev.x(), rev.y()) {
-                        if budget.try_spend_step() {
-                            *pos = rev;
-                        }
-                        *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
-                    }
-                }
-                // Jitter.
-                if rng.rng.random::<f32>() < constants.wildlife.patrol_jitter_chance {
-                    let new_dx = rng.rng.random_range(-1i32..=1);
-                    let new_dy = rng.rng.random_range(-1i32..=1);
-                    if new_dx != 0 || new_dy != 0 {
-                        *ai_state = WildlifeAiState::Patrolling {
-                            dx: new_dx,
-                            dy: new_dy,
-                        };
-                    }
-                }
-            }
-            FoxAiPhase::HuntingPrey { .. }
-            | FoxAiPhase::Returning { .. }
-            | FoxAiPhase::Raiding { .. }
-            | FoxAiPhase::ScentMarking
-            | FoxAiPhase::Confronting { .. } => {
-                // These all use WildlifeAiState::Stalking for movement.
-                // The stalking movement is: move one step toward target.
-                if let WildlifeAiState::Stalking { target_x, target_y } = *ai_state {
-                    let dx = (target_x - pos.x()).signum();
-                    let dy = (target_y - pos.y()).signum();
-                    let next = Position::new(pos.x() + dx, pos.y() + dy);
-                    if map.in_bounds(next.x(), next.y())
-                        && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
-                        && budget.try_spend_step()
-                    {
-                        *pos = next;
-                    }
-                }
-            }
-            FoxAiPhase::Fleeing { dx, dy } => {
-                let next = Position::new(pos.x() + dx, pos.y() + dy);
-                if map.in_bounds(next.x(), next.y()) && budget.try_spend_step() {
-                    *pos = next;
-                }
-            }
-        }
-    }
-}
+//
+// The legacy `fox_movement` system moved foxes per `FoxAiPhase` with
+// direct Position writes. Every moving fox phase is authored by the
+// fox GOAP dispatcher's phase mirror (`phase_for_action` covers all
+// travel-family actions, including juvenile Dispersing plans and the
+// hurt-flee FleeArea), so its writes were pure double-driving on top
+// of `fox_steps::desire_toward` — and its `Fleeing` arm wrote
+// Position with only an in-bounds check, marching injured foxes into
+// water. Pre-140 they self-rescued because `step_toward` teleported
+// onto the first (always-passable) A* waypoint; the Chain-4
+// integrator correctly refuses to cross impassable terrain, which
+// turned a water-stranded fox into a starvation death (seed-42
+// tuned-42-dc11ac39: both foxes dead in the NW lake by tick 1214400).
+// Decision layers write DesiredVelocity; the integrator owns motion.
 
 // ---------------------------------------------------------------------------
 // fox_confrontation_tick — resolve standoffs
@@ -3439,10 +3368,11 @@ pub fn fox_scent_tick(
 /// Mirrors `fox_scent_tick`'s shape (per-tick reader of `FoxState +
 /// FoxAiPhase + Position`, decay first then deposits). Deposits
 /// only fire when the fox is in `FoxAiPhase::PatrolTerritory` —
-/// actively patrolling and (per `fox_movement`) advancing into a
-/// new tile. `Resting`, `ScentMarking`, `DenGuarding`, and stalking
-/// phases are excluded so stationary or pinned foxes don't paint
-/// the corridor map.
+/// actively patrolling (moved by the GOAP travel resolvers' desire
+/// writes since 140 step 9) and advancing into a new tile.
+/// `Resting`, `ScentMarking`, `DenGuarding`, and stalking phases are
+/// excluded so stationary or pinned foxes don't paint the corridor
+/// map.
 ///
 /// The substrate is dormant in scoring at land
 /// (`ward_fox_approach_corridor_weight = 0.0`), but the populator

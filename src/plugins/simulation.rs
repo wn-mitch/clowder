@@ -1343,7 +1343,10 @@ impl Plugin for SimulationPlugin {
                             .chain(),
                         systems::wildlife::spawn_wildlife,
                         systems::wildlife::wildlife_ai,
-                        systems::wildlife::fox_movement,
+                        // 140 step 9 — `fox_movement` retired: fox motion is
+                        // desire-driven via the fox GOAP travel resolvers; the
+                        // legacy phase-mirror mover double-drove every travel
+                        // step and its Fleeing arm walked hurt foxes into water.
                         // Ticket 025 Phase 2 — per-species per-tick
                         // needs decay, scheduled as a nested sub-chain
                         // to keep the outer wildlife tuple at exactly

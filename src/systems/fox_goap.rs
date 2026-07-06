@@ -686,7 +686,7 @@ pub fn fox_resolve_goap_plans(
 
             FoxGoapActionKind::SearchPrey => {
                 // Simple completion: if prey is within detection range, advance.
-                if prey_positions.iter().any(|p| p.distance_to(&pos) <= 9.0) {
+                if prey_positions.iter().any(|p| p.distance_to(pos) <= 9.0) {
                     StepResult::Advance
                 } else {
                     let step_state = plan.current_state_mut().unwrap();
@@ -788,7 +788,7 @@ pub fn fox_resolve_goap_plans(
                     let target = cat_entities
                         .iter()
                         .filter(|(_, cp)| cp.distance_to(&dp) <= 5.0)
-                        .min_by_key(|(_, cp)| cp.tile_distance_squared(&pos))
+                        .min_by_key(|(_, cp)| cp.tile_distance_squared(pos))
                         .copied();
                     if let Some((cat_e, _)) = target {
                         commands.entity(fox_entity).insert(ActiveConfrontation {

@@ -320,7 +320,10 @@ mod tests {
         assert!(matches!(outcome.result, StepResult::Continue));
         let want = d.0.expect("desire expressed while soaring");
         assert!((want.length() - HAWK_SPEED).abs() < 1e-5);
-        assert!((want.x - want.y).abs() < 1e-5, "45-degree heading toward (3,3)");
+        assert!(
+            (want.x - want.y).abs() < 1e-5,
+            "45-degree heading toward (3,3)"
+        );
     }
 
     #[test]

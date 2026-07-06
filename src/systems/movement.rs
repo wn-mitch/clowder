@@ -109,6 +109,23 @@ pub fn integrate_velocities(
         }
 
         for _ in 0..n {
+            // Anti-strand hatch (140 step 9): a mover standing ON an
+            // impassable tile (legacy direct-writer walked it into
+            // water, scenario misplacement, terrain edit under its
+            // feet) must be able to walk out — every within-tile and
+            // adjacent-tile candidate also fails `passable`, so the
+            // normal branch would freeze it in place permanently
+            // (fox starvation, tuned-42-dc11ac39). While stranded,
+            // accept sub-steps unconditionally (bounds-clamped);
+            // normal passability resumes the moment it stands on
+            // legal ground.
+            if !passable(cur) {
+                cur = (cur + dv).clamp(
+                    bevy::math::Vec2::splat(0.5),
+                    bevy::math::Vec2::new(map.width as f32 - 0.5, map.height as f32 - 0.5),
+                );
+                continue;
+            }
             let cand = cur + dv;
             if passable(cand) {
                 cur = cand;
@@ -230,6 +247,38 @@ mod tests {
                 MovementBudget::cat(),
             ))
             .id()
+    }
+
+    /// 140 step 9 anti-strand hatch — a mover standing ON an
+    /// impassable tile (legacy direct-writer legacy, misplacement)
+    /// must be able to walk out toward a passable tile instead of
+    /// freezing forever (the tuned-42-dc11ac39 fox starvation).
+    #[test]
+    fn stranded_mover_walks_out_of_impassable_terrain() {
+        let (mut world, mut schedule) = world_with_map();
+        // Water at (5,5) — the mover stands in it; (6,5) is grass.
+        world.resource_mut::<TileMap>().set(5, 5, Terrain::Water);
+        let e = spawn_mover(&mut world, Position::new(5, 5));
+        world.get_mut::<DesiredVelocity>(e).unwrap().0 = Some(Vec2::new(1.0, 0.0));
+        // A few ticks: accel ramp (0.25/tick) then cross the tile
+        // boundary. Re-express the desire each tick like a resolver.
+        for _ in 0..6 {
+            world.get_mut::<DesiredVelocity>(e).unwrap().0 = Some(Vec2::new(1.0, 0.0));
+            schedule.run(&mut world);
+        }
+        let tile = world.get::<Position>(e).unwrap().tile();
+        assert!(
+            tile.0 >= 6,
+            "stranded mover must escape the water tile; still at {tile:?}"
+        );
+        // And normal passability resumes: pushing back toward the
+        // water is refused (wall-slide/stop), it stays on land.
+        for _ in 0..6 {
+            world.get_mut::<DesiredVelocity>(e).unwrap().0 = Some(Vec2::new(-1.0, 0.0));
+            schedule.run(&mut world);
+        }
+        let tile = world.get::<Position>(e).unwrap().tile();
+        assert_ne!(tile, (5, 5), "must not re-enter the water tile");
     }
 
     #[test]

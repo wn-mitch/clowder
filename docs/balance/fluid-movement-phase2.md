@@ -235,3 +235,36 @@ inflicted injuries within ±10-ish% rate of the step-8 run where
 trajectory permits; smoke tests green; survival + continuity gates
 hold; zero fox/hawk/snake resolver-family timeout spikes (watchdogs
 absorb the accel ramp; soar watchdog 200 ticks ≫ map-diagonal at 1.0).
+
+### Observation — soak 1 (`logs/tuned-42-dc11ac39`): FOX EXTINCTION
+Hard gates pass (zero cat deaths, canaries green), hawk/snake rates
+in band (HawkDiveLanded 1048 vs 1273, SnakeStruckPrey 318 vs 415,
+SnakeAmbushed up), but **both foxes dead by tick 1214400** (baseline:
+alive past 1305000). FoxHuntedPrey 19→4, FoxAvoidedCat 5262→35;
+Hunting replans on an exact 201-tick cadence (travel-timeout loop).
+Position drill: both foxes fled to (0,5)/(0,6) — **Water tiles** (NW
+lake, confirmed by seed-42 terrain probe) — and starved there.
+
+Root cause pair:
+1. **Entry** — the legacy `fox_movement` phase-mirror mover (a second
+   Position writer that double-drove every GOAP travel step) has a
+   `Fleeing` arm with an in-bounds check but NO terrain check;
+   cat-injured foxes (`fox_ai_decision` hurt-flee heads for a map
+   corner) marched straight into the lake.
+2. **No self-rescue** — pre-140 `step_toward` teleported onto the
+   first A* waypoint (always passable), silently rescuing stranded
+   movers; the integrator correctly refuses to cross impassable
+   terrain, so `passable()` failed on every sub-step INCLUDING
+   within-tile moves — a mover standing on impassable terrain was
+   frozen until starvation.
+
+Fixes: `fox_movement` RETIRED (every moving fox phase is authored by
+the GOAP dispatcher's phase mirror — juvenile dispersal included via
+the Dispersing disposition — so the mover was pure double-drive plus
+the lethal flee arm); integrator gains an **anti-strand hatch** (a
+mover on an impassable tile accepts sub-steps unconditionally,
+bounds-clamped, until it stands on legal ground — unit-tested both
+directions: walks out, cannot walk back in). Note for step 11:
+`wildlife_ai`'s shadowfox Fleeing arm has the same unchecked-terrain
+shape but shadowfoxes remain direct writers until step 11, so they
+can still walk out; close the hole when migrating.

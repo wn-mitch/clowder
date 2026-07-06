@@ -33,6 +33,7 @@ use crate::steps::StepResult;
 /// The cache holds the *smoothed* waypoints (world-space `Position`s);
 /// it is rebuilt when empty or when its final waypoint no longer
 /// matches `target` (tile-keyed `Position` equality).
+#[allow(clippy::too_many_arguments)]
 pub fn desire_toward(
     pos: &Position,
     target: Position,
