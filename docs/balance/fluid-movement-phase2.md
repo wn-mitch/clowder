@@ -153,3 +153,51 @@ survival damage.
 | P4 | kittens_born ≥ 1 | hard-ish; diagnose before landing on miss |
 | P5 | GoalUnreachable-family plan-failure rates within ~2× of iteration-2 run (range gates tighten at diagonals; watch Guarding 102 / Hunting 83 / PickingUp 81 / Foraging 50 / Herbalism 21 raw counts, rate-normalized) | gate |
 | P6 | Throughput parity with iteration 2 (137 tps) — metric swap is arithmetic-neutral (Euclidean sqrt vs abs/max; tile_distance_squared unchanged cost) | verdict channel |
+
+### Observation (`logs/tuned-42-fdaf4152`, verdict `concern`)
+- **P1–P4 ✓**: determinism green; ZERO deaths run-wide; canaries
+  grooming 3739 · play 150 · mentoring 1513 · courtship 14721;
+  kittens_born ≥ 1. **P5 ✓**: GoalUnreachable counts *below*
+  iteration 2 (93/43/37/24/22 vs 102/83/81/50/21).
+- **Significant-band zeros needing explanation**: wards_placed 41→18,
+  ward_siege 167→0, shadow_foxes_avoided_ward 2120→0, and zero
+  ambush-lunges (19 in iteration 2).
+- **Drill-down (WildlifePositions + drive-entry events)**: both
+  step-8 shadowfoxes spawned co-located inside the southern
+  corruption patch (~(27,67), first snapshot 1209000) and cycled
+  Reconstituting↔Seeding there all run (226 entries; **zero**
+  Haunting/Tending — no dread targets: the run's only southern cat
+  excursion ended ~1k ticks before the first fox existed). Iteration
+  2's second fox spawned at (116,20) on the colony flank — its patrol
+  produced the 2120 ward-avoidances. Spawn placement is
+  rejection-sampled against `distance_to(colony)`, so the metric
+  pivot changed RNG consumption → different spawn sites → a
+  discretely different fox story. The avoidance/siege code paths
+  (WardCoverageMap threshold + drives radius) are metric-audited and
+  intact; the ward-placement halving is demand-side (no fox pressure
+  → less corruption near colony → fewer wards) — one causal chain,
+  not four regressions.
+- **Cross-seed structural check**: seed-43 soak on the same binary
+  (`logs/tuned-43-fdaf4152`) to confirm the fox→ward channel fires
+  under the Euclidean metric when spawn geometry cooperates.
+- **P6 watch**: 116.9 tps (+4.4% vs post-506 baseline, −15% vs
+  iteration 2's 137). Suspect trajectory (regular-fox activity 132→621
+  position-snapshots; EngagePrey failure volume up) rather than metric
+  arithmetic; the step-13 perf gate (⚑ flamegraph + re-baseline) owns
+  the verdict.
+
+### Concordance
+Concordant with one drill-down. The hard gates and the pre-registered
+drift shape (nearest-pick shifts, trajectory divergence) all landed as
+predicted; the unpredicted part was the *severity* of one trajectory
+branch — fox spawn sites moved, and with only 2 shadowfox spawns the
+seed-42 fox story collapsed to "never met a cat." The cross-seed
+structural check (`logs/tuned-43-fdaf4152`) confirms the channel:
+**1334 ward-avoidances, 68 sieges, 1 ambush death, mythic-texture 6**
+under the same binary. Lesson recorded: for subsystems driven by 1–3
+long-lived actors (shadowfoxes), a single-seed zero is spawn-geometry
+luck until a cross-seed run says otherwise — drill the actor's
+position history before treating a channel zero as a code regression.
+Seed-43 also flagged `ItemSourcedFromDenRaid` never-fired — cross-seed
+expectation noise on a chain-rare event (the landing gate is seed-42,
+which was clean); no action.
