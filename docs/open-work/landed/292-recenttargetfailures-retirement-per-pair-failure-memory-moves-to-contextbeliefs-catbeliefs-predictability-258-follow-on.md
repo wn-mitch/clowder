@@ -1,7 +1,7 @@
 ---
 id: 292
 title: RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on)
-status: ready
+status: done
 cluster: belief-perception
 orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-07-07
 ---
 
 ## Why
@@ -76,3 +76,26 @@ Implementation order: emit-site additions first (substrate populates), tests pas
 
 - 2026-05-11: opened as 258 follow-on. Per-pair failure memory is one of three typed-failure proxies that 258's plan-agent audit identified as belief-substrate-redundant. Sibling proxies: 290 (RecentDispositionFailures), 293 (HuntingPriors), 294 (RecentAmbushMap).
 - 2026-05-19: accuracy audit pass — 258/261 (prerequisites) are landed; all file paths and Rust symbols verified; four-artifact methodology structure sound.
+- 2026-07-07: implemented as three commits — emit sites (5da9c48d:
+  `TargetActionFailed` variant + lifecycle emits + integrator arm,
+  first-person only, kind-routed cat→CatBeliefs /
+  wildlife→PredatorBeliefs / prey-corpse-structure unmodeled per the
+  505 ballast rule, `prior = 1.0` pinned for recovery), reader
+  cutover (3511e9a6: `target_predictability_signal` sensor, SEVEN
+  target DSEs — `bury_target` landed post-audit and joined the six —
+  input renamed `target_recent_failure` → `target_predictability`
+  for trace honesty, `Feature::TargetCooldownApplied` preserved),
+  deletion (ea55e329: component + prune system + spawn insert +
+  legacy sensor + `target_failure_cooldown_ticks` constant retired).
+  Design choice (a) taken as pre-registered; noted deltas: recovery
+  window 8000-tick linear → ~3000-tick convex EMA (mirrors 290), and
+  prey/corpse targets now permanently fail-open (churn-suppression
+  owned by 467/514 structural fixes; plan-failure canary is the
+  net). Four-artifact record:
+  `docs/balance/292-recent-target-failures-retirement.md`. Gate soak
+  `tuned-42-ea55e329`: all four predictions confirmed (survival +
+  continuity pass; TargetCooldownApplied 971× via the belief path;
+  the one new plan-failure spike is an early-run trajectory burst,
+  not a loop; tps at par). Hypothesize-sweep deviation recorded in
+  the balance doc's Concordance with the pivot-(b) watch signals.
+  LANDED.
