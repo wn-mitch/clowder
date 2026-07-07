@@ -83,8 +83,7 @@ use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::systems::plan_substrate::{
-    affiliation_signal, cooldown_curve, target_predictability_signal,
-    TARGET_PREDICTABILITY_INPUT,
+    affiliation_signal, cooldown_curve, target_predictability_signal, TARGET_PREDICTABILITY_INPUT,
 };
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
@@ -577,19 +576,31 @@ mod tests {
 
     #[test]
     fn socialize_target_dse_id_stable() {
-        assert_eq!(socialize_target_dse(&ScoringConstants::default()).id().0, "socialize_target");
+        assert_eq!(
+            socialize_target_dse(&ScoringConstants::default()).id().0,
+            "socialize_target"
+        );
     }
 
     #[test]
     fn socialize_target_dse_has_seven_axes() {
         // Tickets 073 + 078 — five legacy axes + cooldown (073) +
         // pairing intention (078) = seven.
-        assert_eq!(socialize_target_dse(&ScoringConstants::default()).per_target_considerations().len(), 7);
+        assert_eq!(
+            socialize_target_dse(&ScoringConstants::default())
+                .per_target_considerations()
+                .len(),
+            7
+        );
     }
 
     #[test]
     fn socialize_target_weights_sum_to_one() {
-        let sum: f32 = socialize_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
+        let sum: f32 = socialize_target_dse(&ScoringConstants::default())
+            .composition()
+            .weights
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
@@ -1099,7 +1110,9 @@ mod tests {
     #[test]
     fn resolver_returns_none_when_no_candidates_in_range() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -1128,7 +1141,9 @@ mod tests {
     #[test]
     fn resolver_picks_higher_fondness_all_else_equal() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend = Entity::from_raw_u32(2).unwrap();
         let stranger = Entity::from_raw_u32(3).unwrap();
@@ -1167,7 +1182,9 @@ mod tests {
     #[test]
     fn resolver_excludes_self() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         // Only self in the snapshot — must return None.
         let relationships = Relationships::default();
@@ -1199,7 +1216,9 @@ mod tests {
         // iter order (nondeterministic); the DSE picks the novel
         // stranger deterministically via the novelty axis.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let familiar = Entity::from_raw_u32(2).unwrap();
         let novel = Entity::from_raw_u32(3).unwrap();
@@ -1282,7 +1301,9 @@ mod tests {
         // the non-banished cat even when the banished cat would have
         // scored higher on every other axis.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let banished = Entity::from_raw_u32(2).unwrap();
         let normal = Entity::from_raw_u32(3).unwrap();
@@ -1340,7 +1361,9 @@ mod tests {
     #[test]
     fn resolver_penalizes_low_predictability_candidate_via_beliefs() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let flaky = Entity::from_raw_u32(2).unwrap();
         let steady = Entity::from_raw_u32(3).unwrap();
@@ -1464,7 +1487,10 @@ mod tests {
 
         // Truly tied distance (both Euclidean 1.0) so the affiliation
         // axis is load-bearing, not the spatial axis.
-        let cat_positions = vec![(liked, Position::new(1, 0)), (disliked, Position::new(0, 1))];
+        let cat_positions = vec![
+            (liked, Position::new(1, 0)),
+            (disliked, Position::new(0, 1)),
+        ];
         let out = resolve_socialize_target(
             &registry,
             cat,

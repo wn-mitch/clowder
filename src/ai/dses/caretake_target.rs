@@ -85,10 +85,19 @@ use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
+use crate::resources::action_affordances::{ActionAffordances, ActionKind};
+use crate::resources::sim_constants::ScoringConstants;
 
 pub const TARGET_KITTEN_HUNGER_INPUT: &str = "target_kitten_hunger";
 pub const TARGET_KINSHIP_INPUT: &str = "target_kinship";
 pub const TARGET_KITTEN_ISOLATION_INPUT: &str = "target_kitten_isolation";
+/// 264 — per-target `Affordance(FeedKitten, self, target)` read from
+/// substrate 261 (estimator: kitten hunger + my food proxy + bond +
+/// proximity). Caretake is the FeedKitten consumer — the hungry-kitten
+/// picker; the rearing-arc `dependent_kitten_target` has no ActionKind
+/// analog. `target_`-prefixed for the `score_target_consideration`
+/// routing reason (ticket 516).
+pub const TARGET_FEED_KITTEN_AFFORDANCE_INPUT: &str = "target_affordance_feed_kitten";
 
 /// Candidate-pool range in Manhattan tiles. Matches spec §6.4 row #9
 /// (range=12) and the pre-refactor `CARETAKE_RANGE` constant —
@@ -108,7 +117,14 @@ pub const KITTEN_HUNGER_THRESHOLD: f32 = 0.6;
 pub const ISOLATION_RADIUS: f32 = 3.0;
 
 /// §6.5.6 `Caretake` target-taking DSE factory.
-pub fn caretake_target_dse() -> TargetTakingDse {
+///
+/// 264: takes `&ScoringConstants` so the conditional
+/// `target_affordance_feed_kitten` axis is added only when
+/// `caretake_affordance_weight > 0.0`. At dormant default the
+/// composition is byte-identical to pre-264 (four axes); at non-zero
+/// weight the four base axes scale by `(1 − w)` so the WeightedSum
+/// stays at 1.0.
+pub fn caretake_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
     // §L2.10.7 distance axis: `(1 - cost)^1.5` via `Quadratic(exp=1.5,
     // divisor=-1, shift=1)`. Same explicit-inversion idiom as
     // ApplyRemedy / Mentor / Socialize ports.
@@ -134,30 +150,52 @@ pub fn caretake_target_dse() -> TargetTakingDse {
         intercept: 0.0,
     };
 
+    let mut considerations: Vec<Consideration> = vec![
+        Consideration::Spatial(SpatialConsideration::new(
+            "caretake_target_nearness",
+            LandmarkSource::TargetPosition,
+            CARETAKE_TARGET_RANGE,
+            nearness_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_KITTEN_HUNGER_INPUT,
+            hunger_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_KINSHIP_INPUT,
+            kinship_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_KITTEN_ISOLATION_INPUT,
+            isolation_curve,
+        )),
+    ];
+    let mut weights: Vec<f32> = vec![0.20, 0.40, 0.25, 0.15];
+    // 264: conditional affordance axis, dormant at 0.0.
+    let affordance_w = scoring.caretake_affordance_weight.clamp(0.0, 1.0);
+    if affordance_w > 0.0 {
+        let scale = 1.0 - affordance_w;
+        for w in &mut weights {
+            *w *= scale;
+        }
+        // 264: Affordance(FeedKitten, self, target) from substrate
+        // 261. Reads 0.0 for pairs the writer didn't populate this
+        // tick — the substrate's gate signal.
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_FEED_KITTEN_AFFORDANCE_INPUT,
+            Curve::Linear {
+                slope: 1.0,
+                intercept: 0.0,
+            },
+        )));
+        weights.push(affordance_w);
+    }
+
     TargetTakingDse {
         id: DseId("caretake_target"),
         candidate_query: caretake_candidate_query_doc,
-        per_target_considerations: vec![
-            Consideration::Spatial(SpatialConsideration::new(
-                "caretake_target_nearness",
-                LandmarkSource::TargetPosition,
-                CARETAKE_TARGET_RANGE,
-                nearness_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_KITTEN_HUNGER_INPUT,
-                hunger_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_KINSHIP_INPUT,
-                kinship_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_KITTEN_ISOLATION_INPUT,
-                isolation_curve,
-            )),
-        ],
-        composition: Composition::weighted_sum(vec![0.20, 0.40, 0.25, 0.15]),
+        per_target_considerations: considerations,
+        composition: Composition::weighted_sum(weights),
         aggregation: TargetAggregation::Best,
         intention: caretake_intention,
         required_stance: None,
@@ -211,6 +249,11 @@ pub fn resolve_caretake_target(
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
     parent_marker_active: bool,
+    // 264 — ActionAffordances resource for the conditional
+    // `target_affordance_feed_kitten` axis. Reads return `0.0` for any
+    // pair the writer didn't populate this tick; at dormant weight the
+    // axis is absent and the arm is never queried.
+    affordances: &ActionAffordances,
     // Ticket 427 Step 1 — pre-allocated scratch buffers.
     scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> CaretakeResolution {
@@ -313,6 +356,10 @@ pub fn resolve_caretake_target(
                 } else {
                     0.0
                 }
+            }
+            // 264 — Affordance(FeedKitten) substrate read.
+            TARGET_FEED_KITTEN_AFFORDANCE_INPUT => {
+                affordances.read(adult, target, ActionKind::FeedKitten)
             }
             _ => 0.0,
         }
@@ -445,28 +492,43 @@ mod tests {
 
     #[test]
     fn caretake_target_dse_id_stable() {
-        assert_eq!(caretake_target_dse().id().0, "caretake_target");
+        assert_eq!(
+            caretake_target_dse(&ScoringConstants::default()).id().0,
+            "caretake_target"
+        );
     }
 
     #[test]
     fn caretake_target_has_four_axes() {
-        assert_eq!(caretake_target_dse().per_target_considerations().len(), 4);
+        assert_eq!(
+            caretake_target_dse(&ScoringConstants::default())
+                .per_target_considerations()
+                .len(),
+            4
+        );
     }
 
     #[test]
     fn caretake_target_weights_sum_to_one() {
-        let sum: f32 = caretake_target_dse().composition().weights.iter().sum();
+        let sum: f32 = caretake_target_dse(&ScoringConstants::default())
+            .composition()
+            .weights
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-4, "weights sum {sum} ≠ 1.0");
     }
 
     #[test]
     fn caretake_target_uses_best_aggregation() {
-        assert_eq!(caretake_target_dse().aggregation(), TargetAggregation::Best);
+        assert_eq!(
+            caretake_target_dse(&ScoringConstants::default()).aggregation(),
+            TargetAggregation::Best
+        );
     }
 
     #[test]
     fn intention_is_kitten_fed_goal() {
-        let dse = caretake_target_dse();
+        let dse = caretake_target_dse(&ScoringConstants::default());
         let target = Entity::from_raw_u32(10).unwrap();
         let intention = (dse.intention)(target);
         match intention {
@@ -493,6 +555,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
@@ -503,7 +566,9 @@ mod tests {
     #[test]
     fn resolver_returns_default_with_empty_kittens() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let out = resolve_caretake_target(
             &registry,
@@ -514,6 +579,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
@@ -522,7 +588,9 @@ mod tests {
     #[test]
     fn resolver_skips_well_fed_kittens() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let kittens = vec![kitten(10, 1, 0, 0.9), kitten(11, 2, 0, 0.8)];
         let out = resolve_caretake_target(
@@ -534,6 +602,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
@@ -542,7 +611,9 @@ mod tests {
     #[test]
     fn resolver_filters_out_of_range() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         // Hungry but beyond CARETAKE_TARGET_RANGE (12).
         let kittens = vec![kitten(10, 50, 0, 0.1)];
@@ -555,6 +626,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
@@ -565,7 +637,9 @@ mod tests {
     #[test]
     fn picks_hungrier_kitten_when_distance_tied() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         // Both at distance 2; the Quadratic(2) hunger axis amplifies
         // the one with the bigger deficit.
@@ -582,6 +656,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(11).unwrap()));
@@ -593,7 +668,9 @@ mod tests {
         // via the Piecewise floor rather than 0. Adult still picks
         // this kitten (colony-raising pattern).
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let other = Entity::from_raw_u32(99).unwrap();
         let kittens = vec![kitten_with_parents(10, 1, 0, 0.2, Some(other), None)];
@@ -606,6 +683,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
@@ -619,7 +697,9 @@ mod tests {
         // distinguishes them. Own-kitten's kinship=1.0 beats
         // stranger's 0.6.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let kittens = vec![
             kitten_with_parents(10, 2, 0, 0.2, None, None), // stranger
@@ -634,6 +714,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(11).unwrap()));
@@ -646,7 +727,9 @@ mod tests {
         // But adult's own kitten is in range → `is_parent` still true,
         // so CaretakeDse's bloodline-override axis fires.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let kittens = vec![
             kitten_with_parents(10, 1, 0, 0.05, None, None), // stranger
@@ -661,6 +744,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
@@ -673,7 +757,9 @@ mod tests {
     #[test]
     fn closer_kitten_wins_when_hunger_equal() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let kittens = vec![
             kitten(10, 1, 0, 0.2), // dist 1
@@ -688,6 +774,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target, Some(Entity::from_raw_u32(10).unwrap()));
@@ -710,7 +797,9 @@ mod tests {
         // would collapse the test premise. (4,0) and (0,4)/(1,4) keep
         // Chebyshev parity for the lonely-vs-sibling distinction.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let shared_mother = Entity::from_raw_u32(99).unwrap();
         let kittens = vec![
@@ -729,6 +818,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
@@ -744,7 +834,9 @@ mod tests {
         // isolated. Second kitten at equal distance + hunger but no
         // parent adjacent → isolated. Axis favors the orphan-like one.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let mother = Entity::from_raw_u32(99).unwrap();
         let kittens = vec![
@@ -763,6 +855,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
@@ -777,7 +870,9 @@ mod tests {
     #[test]
     fn resolution_surfaces_target_parents() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let mother = Entity::from_raw_u32(20).unwrap();
         let father = Entity::from_raw_u32(30).unwrap();
@@ -798,6 +893,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out.target_mother, Some(mother));
@@ -808,7 +904,9 @@ mod tests {
     #[test]
     fn urgency_is_in_unit_range() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         // Worst-case: near-starving own kitten, adjacent, isolated.
         let kittens = vec![kitten_with_parents(10, 1, 0, 0.0, Some(adult), None)];
@@ -821,6 +919,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_some());
@@ -846,7 +945,9 @@ mod tests {
         // back to the closest hungry own-kitten and produces a target +
         // urgency > 0, clearing the scoring.rs:1308 gate.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         // Own kitten at distance 30 (>> CARETAKE_TARGET_RANGE = 12), hungry.
         let kittens = vec![kitten_with_parents(10, 30, 0, 0.2, Some(adult), None)];
@@ -861,6 +962,7 @@ mod tests {
             0,
             None,
             false,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(baseline.target.is_none());
@@ -877,6 +979,7 @@ mod tests {
             0,
             None,
             true,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(lifted.target, Some(Entity::from_raw_u32(10).unwrap()));
@@ -891,7 +994,9 @@ mod tests {
         // closer one (the only spatial signal we have when the per-tick
         // candidate pool is empty).
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let kittens = vec![
             // Father side, dist 25, hungry.
@@ -908,6 +1013,7 @@ mod tests {
             0,
             None,
             true,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
@@ -925,7 +1031,9 @@ mod tests {
         // tick by `update_kitten_cry_map` and read here after the
         // tick's feeding pass may have already lifted hunger).
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let kittens = vec![kitten_with_parents(10, 30, 0, 0.9, Some(adult), None)];
         let out = resolve_caretake_target(
@@ -937,6 +1045,7 @@ mod tests {
             0,
             None,
             true,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.target.is_none());
@@ -950,7 +1059,9 @@ mod tests {
         // candidate pool — the in-range path runs as before, fallback
         // only fires when in-range pool is empty.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(caretake_target_dse());
+        registry
+            .target_taking_dses
+            .push(caretake_target_dse(&ScoringConstants::default()));
         let adult = Entity::from_raw_u32(1).unwrap();
         let kittens = vec![
             kitten_with_parents(10, 1, 0, 0.05, None, None), // stranger, in-range, very hungry
@@ -965,6 +1076,7 @@ mod tests {
             0,
             None,
             true,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
@@ -976,5 +1088,66 @@ mod tests {
         // no own-kitten passed the in-range filter (out-of-range own
         // kitten isn't counted toward `any_parent_hit`).
         assert!(!out.is_parent);
+    }
+
+    // -----------------------------------------------------------------
+    // 264 — conditional affordance axis (dormant wire)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn affordance_axis_dormant_at_default() {
+        let s = ScoringConstants::default();
+        assert_eq!(s.caretake_affordance_weight, 0.0);
+        let dse = caretake_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 4);
+        assert!(dse.per_target_considerations().iter().all(|c| !matches!(
+            c,
+            crate::ai::considerations::Consideration::Scalar(sc)
+                if sc.name == TARGET_FEED_KITTEN_AFFORDANCE_INPUT
+        )));
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn affordance_axis_present_and_renormalized_when_active() {
+        let mut s = ScoringConstants::default();
+        s.caretake_affordance_weight = 0.2;
+        let dse = caretake_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 5);
+        assert_eq!(dse.composition().weights.len(), 5);
+        assert!((dse.composition().weights[4] - 0.2).abs() < 1e-6);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    /// 264 — affordance arm verified live: two kittens tied on
+    /// distance/hunger/kinship/isolation; the substrate-priced one
+    /// wins. Tied positions — ties break toward the LATER candidate,
+    /// so a dead fetch arm fails this test.
+    #[test]
+    fn caretake_reads_affordance_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.caretake_affordance_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(caretake_target_dse(&s));
+        let adult = Entity::from_raw_u32(1).unwrap();
+        let afforded = kitten(10, 1, 0, 0.2);
+        let unpriced = kitten(11, 0, 1, 0.2);
+        let mut affordances = ActionAffordances::default();
+        affordances.write(adult, afforded.entity, ActionKind::FeedKitten, 0.9);
+        let out = resolve_caretake_target(
+            &registry,
+            adult,
+            Position::new(0, 0),
+            &[afforded, unpriced],
+            &[],
+            0,
+            None,
+            false,
+            &affordances,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(out.target, Some(afforded.entity));
     }
 }

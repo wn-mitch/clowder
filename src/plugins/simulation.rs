@@ -57,7 +57,7 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
         .push(dses::mentor_target_dse(scoring));
     registry
         .target_taking_dses
-        .push(dses::caretake_target_dse());
+        .push(dses::caretake_target_dse(scoring));
     // 364: three sibling registrations for the rear_kitten HTN method's
     // primitive leaves. Maturity bands are mutually exclusive (Wean <
     // weaned ≤ Teach < teach_done ≤ Release), so at most one fires per
@@ -77,14 +77,16 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
         .push(dses::dependent_kitten_target::dependent_kitten_target_dse(
             crate::ai::Action::Release,
         ));
-    registry.target_taking_dses.push(dses::mate_target_dse(scoring));
+    registry
+        .target_taking_dses
+        .push(dses::mate_target_dse(scoring));
     registry.target_taking_dses.push(dses::build_target_dse());
     registry
         .target_taking_dses
         .push(dses::herbcraft_target_dse());
     registry
         .target_taking_dses
-        .push(dses::apply_remedy_target_dse());
+        .push(dses::apply_remedy_target_dse(scoring));
     registry.fox_dses.push(dses::fox_patrolling_dse(scoring));
     registry.fox_dses.push(dses::fox_hunting_dse(scoring));
     registry.fox_dses.push(dses::fox_raiding_dse());

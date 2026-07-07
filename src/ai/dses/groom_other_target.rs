@@ -490,7 +490,10 @@ mod tests {
 
     #[test]
     fn groom_other_target_dse_id_stable() {
-        assert_eq!(groom_other_target_dse(&ScoringConstants::default()).id().0, "groom_other_target");
+        assert_eq!(
+            groom_other_target_dse(&ScoringConstants::default()).id().0,
+            "groom_other_target"
+        );
     }
 
     #[test]
@@ -498,14 +501,20 @@ mod tests {
         // Ticket 073 added the cooldown axis (4 → 5); ticket 452 added
         // `target_grooming_deficit` (5 → 6).
         assert_eq!(
-            groom_other_target_dse(&ScoringConstants::default()).per_target_considerations().len(),
+            groom_other_target_dse(&ScoringConstants::default())
+                .per_target_considerations()
+                .len(),
             6
         );
     }
 
     #[test]
     fn groom_other_target_weights_sum_to_one() {
-        let sum: f32 = groom_other_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
+        let sum: f32 = groom_other_target_dse(&ScoringConstants::default())
+            .composition()
+            .weights
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
@@ -559,7 +568,9 @@ mod tests {
     #[test]
     fn resolver_returns_none_when_no_candidates_in_range() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -590,7 +601,9 @@ mod tests {
     #[test]
     fn resolver_excludes_self() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let relationships = Relationships::default();
         let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };
@@ -623,7 +636,9 @@ mod tests {
         // ended up in the candidate snapshot gets skipped rather than
         // scored. Matches the Mentor resolver's Skills-absence handling.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let orphan = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -657,7 +672,9 @@ mod tests {
         // the colder cat (larger warmth deficit) wins — this is the
         // axis `find_social_target` could not see.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let cold = Entity::from_raw_u32(2).unwrap();
         let warm = Entity::from_raw_u32(3).unwrap();
@@ -704,7 +721,9 @@ mod tests {
         // Weight on kinship is only 0.10 so the kin bias is a nudge,
         // but with all other axes tied it's the decider.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let kin = Entity::from_raw_u32(2).unwrap();
         let stranger = Entity::from_raw_u32(3).unwrap();
@@ -745,7 +764,9 @@ mod tests {
         // (Logistic ≈ 0.68); at dist=5 signal is 0.5 (Logistic
         // ≈ 0.004). Adjacent cat wins decisively.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let near_acquaintance = Entity::from_raw_u32(2).unwrap();
         let far_dearest = Entity::from_raw_u32(3).unwrap();
@@ -784,7 +805,9 @@ mod tests {
     #[test]
     fn fondness_dominates_when_warmth_and_distance_tied() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend = Entity::from_raw_u32(2).unwrap();
         let stranger = Entity::from_raw_u32(3).unwrap();
@@ -829,7 +852,9 @@ mod tests {
         // their linear gap. Encodes the §6.5.4 design intent that
         // "desperate-need amplifies outreach."
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let freezing = Entity::from_raw_u32(2).unwrap();
         let chilly = Entity::from_raw_u32(3).unwrap();
@@ -884,7 +909,9 @@ mod tests {
         // 0.12, the gap is (0.72 − 0.0025) × 0.12 ≈ 0.086 score —
         // decisive when all other axes tie. The dirty cat wins.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let dirty = Entity::from_raw_u32(2).unwrap();
         let clean = Entity::from_raw_u32(3).unwrap();
@@ -937,7 +964,9 @@ mod tests {
         // small enough that other ties dominate, but non-zero so the
         // axis fires.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let with_groom = Entity::from_raw_u32(2).unwrap();
         let absent_groom = Entity::from_raw_u32(3).unwrap();
@@ -993,7 +1022,9 @@ mod tests {
         // (signal=0.8) is ≈0.32 — a ~2× gap big enough to overcome
         // the 0.10 weight jitter room.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let adjacent = Entity::from_raw_u32(2).unwrap();
         let two_tiles = Entity::from_raw_u32(3).unwrap();
@@ -1040,7 +1071,9 @@ mod tests {
         // a non-groomed peer existing while the resolver still picks
         // the in-flight one.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let mid_groom = Entity::from_raw_u32(2).unwrap();
         let free_peer = Entity::from_raw_u32(3).unwrap();
@@ -1164,9 +1197,7 @@ mod tests {
         let mut s = ScoringConstants::default();
         s.groom_other_hostility_weight = 0.2;
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(groom_other_target_dse(&s));
+        registry.target_taking_dses.push(groom_other_target_dse(&s));
         let cat = Entity::from_raw_u32(1).unwrap();
         let hostile = Entity::from_raw_u32(2).unwrap();
         let calm = Entity::from_raw_u32(3).unwrap();
@@ -1220,9 +1251,7 @@ mod tests {
         let mut s = ScoringConstants::default();
         s.groom_other_affiliation_weight = 0.2;
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(groom_other_target_dse(&s));
+        registry.target_taking_dses.push(groom_other_target_dse(&s));
         let cat = Entity::from_raw_u32(1).unwrap();
         let bonded = Entity::from_raw_u32(2).unwrap();
         let stranger = Entity::from_raw_u32(3).unwrap();
@@ -1240,7 +1269,10 @@ mod tests {
 
         let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };
         let is_kin = |_: Entity, _: Entity| -> bool { false };
-        let cat_positions = vec![(bonded, Position::new(1, 0)), (stranger, Position::new(0, 1))];
+        let cat_positions = vec![
+            (bonded, Position::new(1, 0)),
+            (stranger, Position::new(0, 1)),
+        ];
         let out = resolve_groom_other_target(
             &registry,
             cat,
@@ -1270,9 +1302,7 @@ mod tests {
         let mut s = ScoringConstants::default();
         s.groom_other_affordance_weight = 0.2;
         let mut registry = DseRegistry::new();
-        registry
-            .target_taking_dses
-            .push(groom_other_target_dse(&s));
+        registry.target_taking_dses.push(groom_other_target_dse(&s));
         let cat = Entity::from_raw_u32(1).unwrap();
         let afforded = Entity::from_raw_u32(2).unwrap();
         let unpriced = Entity::from_raw_u32(3).unwrap();

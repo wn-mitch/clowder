@@ -305,9 +305,7 @@ pub fn resolve_mate_target(
             }
             // 264 — actor-subjective receptivity belief (0.5 neutral
             // for unmodeled partners).
-            TARGET_PERCEIVED_RECEPTIVITY_INPUT => {
-                perceived_receptivity_signal(cat_beliefs, target)
-            }
+            TARGET_PERCEIVED_RECEPTIVITY_INPUT => perceived_receptivity_signal(cat_beliefs, target),
             // 264 — Affordance(Mate) substrate read.
             TARGET_MATE_AFFORDANCE_INPUT => affordances.read(cat, target, ActionKind::Mate),
             _ => 0.0,
@@ -373,18 +371,30 @@ mod tests {
 
     #[test]
     fn mate_target_dse_id_stable() {
-        assert_eq!(mate_target_dse(&ScoringConstants::default()).id().0, "mate_target");
+        assert_eq!(
+            mate_target_dse(&ScoringConstants::default()).id().0,
+            "mate_target"
+        );
     }
 
     #[test]
     fn mate_target_has_four_axes() {
         // Ticket 073 — three legacy axes + the cooldown axis = four.
-        assert_eq!(mate_target_dse(&ScoringConstants::default()).per_target_considerations().len(), 4);
+        assert_eq!(
+            mate_target_dse(&ScoringConstants::default())
+                .per_target_considerations()
+                .len(),
+            4
+        );
     }
 
     #[test]
     fn mate_target_weights_sum_to_one() {
-        let sum: f32 = mate_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
+        let sum: f32 = mate_target_dse(&ScoringConstants::default())
+            .composition()
+            .weights
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
@@ -413,7 +423,9 @@ mod tests {
     #[test]
     fn resolver_excludes_non_bonded_candidates() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend_not_partner = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();
@@ -449,7 +461,9 @@ mod tests {
     #[test]
     fn resolver_picks_partners_bond_candidate() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let partner = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();
@@ -478,7 +492,9 @@ mod tests {
     #[test]
     fn resolver_picks_higher_romantic_when_both_partners() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let fond_partner = Entity::from_raw_u32(2).unwrap();
         let romantic_partner = Entity::from_raw_u32(3).unwrap();
@@ -521,7 +537,9 @@ mod tests {
         // fondness partners — the close one wins. Equal romantic +
         // fondness means the spatial axis is what separates them.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = Entity::from_raw_u32(2).unwrap();
         let far = Entity::from_raw_u32(3).unwrap();
@@ -557,7 +575,9 @@ mod tests {
     #[test]
     fn intention_is_pairing_activity() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let partner = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();
@@ -596,7 +616,9 @@ mod tests {
         // Partners with B; B is Mates with C. The resolver must skip
         // B as a target so A doesn't poach a Mates-locked partner.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mate_target_dse(&ScoringConstants::default()));
         let cat_a = Entity::from_raw_u32(1).unwrap();
         let cat_b = Entity::from_raw_u32(2).unwrap();
         let cat_c = Entity::from_raw_u32(3).unwrap();
@@ -640,7 +662,9 @@ mod tests {
         // selects B (the actor's own mate), and the new third-party gate
         // doesn't fire because B's only Mates bond is with A itself.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mate_target_dse(&ScoringConstants::default()));
         let cat_a = Entity::from_raw_u32(1).unwrap();
         let cat_b = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();

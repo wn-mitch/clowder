@@ -1903,6 +1903,16 @@ pub fn evaluate_and_plan(
             // step-resolution site (goap.rs: FeedKitten step).
             None,
             parent_marker_active,
+            // 264 dormant: the affordance axis is absent at weight 0.0
+            // so this argument is never read — an empty table keeps
+            // `evaluate_and_plan` free of a new Res<ActionAffordances>
+            // edge against `affordance_writer` (schedule-topology
+            // hazard, `learning_bevy_schedule_edge_perturbation`;
+            // verified on the 2026-07-07 gate soak). The live Res
+            // borrow lands with the step-20 activation commit, where
+            // the schedule edge is four-artifact-gated and scorer
+            // urgency must equal the dispatch-site pick.
+            &crate::resources::ActionAffordances::default(),
             &mut res.dse_scratchpad,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
@@ -7139,6 +7149,8 @@ fn dispatch_step_action(
                         ec.time.tick,
                         focal_hook,
                         parent_marker_active,
+                        // 264 — Affordance(FeedKitten) conditional-axis read.
+                        &ec.action_affordances,
                         &mut ec.dse_scratchpad,
                     )
                     .target;

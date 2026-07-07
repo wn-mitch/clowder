@@ -135,6 +135,25 @@ pub fn perceived_receptivity_signal(
     model.perceived_receptivity.value.clamp(0.0, 1.0)
 }
 
+/// 264 — Care belief-facet signal: the actor's own
+/// `CatBeliefs[target].perceived_injury_level` (`[0, 1]`). Fail-open
+/// at **0.0** — no beliefs component, no model, or a zero-strength
+/// facet mean "no belief of injury", so an unmodeled patient gets no
+/// triage lift (the perceived-severity analog of the raw
+/// `1 − health_fraction` deficit reading 0.0 for the unhurt).
+pub fn perceived_injury_signal(
+    cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
+    target: bevy_ecs::entity::Entity,
+) -> f32 {
+    let Some(model) = cat_beliefs.and_then(|b| b.models.get(&target)) else {
+        return 0.0;
+    };
+    if model.perceived_injury_level.strength <= 0.0 {
+        return 0.0;
+    }
+    model.perceived_injury_level.value.clamp(0.0, 1.0)
+}
+
 /// Build the canonical cooldown curve consumed by the
 /// `target_recent_failure` Consideration. Knots
 /// `[(0.0, 0.1), (1.0, 1.0)]`: a fresh failure scales the candidate's
@@ -308,6 +327,26 @@ mod tests {
             ..Default::default()
         };
         assert!((perceived_receptivity_signal(Some(&beliefs), entity(9)) - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn injury_signal_fails_open_at_zero() {
+        assert_eq!(perceived_injury_signal(None, entity(9)), 0.0);
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        beliefs.models.entry(entity(9)).or_default();
+        assert_eq!(perceived_injury_signal(Some(&beliefs), entity(9)), 0.0);
+    }
+
+    #[test]
+    fn injury_signal_reads_observed_facet() {
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let model = beliefs.models.entry(entity(9)).or_default();
+        model.perceived_injury_level = Facet {
+            value: 0.7,
+            strength: 0.9,
+            ..Default::default()
+        };
+        assert!((perceived_injury_signal(Some(&beliefs), entity(9)) - 0.7).abs() < 1e-6);
     }
 
     #[test]

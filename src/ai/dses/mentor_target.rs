@@ -396,24 +396,39 @@ mod tests {
 
     #[test]
     fn mentor_target_dse_id_stable() {
-        assert_eq!(mentor_target_dse(&ScoringConstants::default()).id().0, "mentor_target");
+        assert_eq!(
+            mentor_target_dse(&ScoringConstants::default()).id().0,
+            "mentor_target"
+        );
     }
 
     #[test]
     fn mentor_target_has_four_axes() {
         // Ticket 073 — three legacy axes + the cooldown axis = four.
-        assert_eq!(mentor_target_dse(&ScoringConstants::default()).per_target_considerations().len(), 4);
+        assert_eq!(
+            mentor_target_dse(&ScoringConstants::default())
+                .per_target_considerations()
+                .len(),
+            4
+        );
     }
 
     #[test]
     fn mentor_target_weights_sum_to_one() {
-        let sum: f32 = mentor_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
+        let sum: f32 = mentor_target_dse(&ScoringConstants::default())
+            .composition()
+            .weights
+            .iter()
+            .sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
     #[test]
     fn mentor_target_uses_best_aggregation() {
-        assert_eq!(mentor_target_dse(&ScoringConstants::default()).aggregation(), TargetAggregation::Best);
+        assert_eq!(
+            mentor_target_dse(&ScoringConstants::default()).aggregation(),
+            TargetAggregation::Best
+        );
     }
 
     #[test]
@@ -474,7 +489,9 @@ mod tests {
     #[test]
     fn resolver_returns_none_when_no_candidates_in_range() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -510,7 +527,9 @@ mod tests {
     #[test]
     fn resolver_excludes_self() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let relationships = Relationships::default();
         let self_skills = skills_with(0.9, 0.2);
@@ -538,7 +557,9 @@ mod tests {
     #[test]
     fn resolver_skips_candidates_without_skills() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let skillless = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -571,7 +592,9 @@ mod tests {
         // fix: the legacy `find_social_target` path picked by fondness
         // only and ignored skill entirely.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let novice = Entity::from_raw_u32(2).unwrap();
         let near_peer = Entity::from_raw_u32(3).unwrap();
@@ -624,7 +647,9 @@ mod tests {
         // contribution. Encodes the §6.5.3 design-intent that the
         // skill-gap axis is the dominant mentorship signal.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let novice = Entity::from_raw_u32(2).unwrap();
         let dear_peer = Entity::from_raw_u32(3).unwrap();
@@ -676,7 +701,9 @@ mod tests {
         // fondness — the closer one wins because the spatial axis
         // separates them.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
+        registry
+            .target_taking_dses
+            .push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = Entity::from_raw_u32(2).unwrap();
         let far = Entity::from_raw_u32(3).unwrap();

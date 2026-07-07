@@ -630,6 +630,9 @@ pub fn evaluate_dispositions(
             // step-resolution site, not here.
             None,
             parent_marker_active,
+            // 264 — unregistered path; the live affordance read
+            // happens at the GOAP scorer + dispatch sites.
+            &crate::resources::ActionAffordances::default(),
             &mut side_effects.dse_scratchpad,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
@@ -1531,6 +1534,9 @@ pub fn disposition_to_chain(
             // GOAP step-resolver site (goap.rs: FeedKitten step).
             None,
             false,
+            // 264 — same dead-code path; the live affordance read
+            // happens at the GOAP step-resolver site.
+            &crate::resources::ActionAffordances::default(),
             &mut res.dse_scratchpad,
         );
 
@@ -1679,6 +1685,10 @@ pub fn disposition_to_chain(
             // coverage for apply_remedy is tracked in the
             // §6.5 multi-focal follow-on.
             None,
+            // 264 — dead-code path (disposition_to_chain is
+            // unregistered); beliefs + affordances read as absent.
+            None,
+            &crate::resources::ActionAffordances::default(),
             &mut res.dse_scratchpad,
         );
         // §6.5.8: resolve work-site for Build. Replaces the
