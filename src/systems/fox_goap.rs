@@ -120,11 +120,13 @@ fn build_scoring_context<'a>(
     personality: &'a FoxPersonality,
     scoring: &'a ScoringConstants,
     fox_state: &FoxState,
+    fox_entity: Entity,
     fox_pos: Position,
     den_pos: Option<Position>,
     cat_positions: &[Position],
     store_positions: &[Position],
-    prey_positions: &[Position],
+    prey: &[(Entity, Position)],
+    affordances: &crate::resources::ActionAffordances,
     hunting_beliefs: Option<&FoxHuntingBeliefs>,
     exploration: Option<&crate::components::fox_spatial::FoxExplorationMap>,
     map_extent: (i32, i32),
@@ -136,9 +138,20 @@ fn build_scoring_context<'a>(
         .iter()
         .filter(|p| p.distance_to(&fox_pos) <= 6.0)
         .count();
-    let prey_nearby = prey_positions
-        .iter()
-        .any(|p| p.distance_to(&fox_pos) <= 9.0);
+    let prey_nearby = prey.iter().any(|(_, p)| p.distance_to(&fox_pos) <= 9.0);
+    // 265: best predation opportunity over prey in detection range —
+    // read by FoxHunting's conditional axis (dormant at 0.0).
+    let best_prey_predation_affordance = crate::resources::best_affordance_over_targets(
+        affordances,
+        fox_entity,
+        prey.iter()
+            .filter(|(_, p)| p.distance_to(&fox_pos) <= 9.0)
+            .map(|(e, _)| *e),
+        &[
+            crate::resources::ActionKind::Stalk,
+            crate::resources::ActionKind::Chase,
+        ],
+    );
     // Ticket 051: every fox DSE boolean field (`store_visible`,
     // `store_guarded`, `cat_threatening_den`, `has_cubs`,
     // `cubs_hungry`, `is_dispersing_juvenile`, `has_den`) migrated
@@ -184,6 +197,7 @@ fn build_scoring_context<'a>(
         carcass_scent_at_position: 0.0,
         local_threat_level: 0.0,
         local_exploration_coverage: 0.0,
+        best_prey_predation_affordance,
         befriended_ally,
         ticks_since_patrol,
         day_phase,
@@ -397,7 +411,10 @@ pub fn fox_evaluate_and_plan(
             Without<Dead>,
         ),
     >,
-    prey: Query<&Position, (With<crate::components::prey::PreyAnimal>, Without<FoxState>)>,
+    prey: Query<
+        (Entity, &Position),
+        (With<crate::components::prey::PreyAnimal>, Without<FoxState>),
+    >,
     stores: Query<
         &Position,
         (
@@ -433,9 +450,16 @@ pub fn fox_evaluate_and_plan(
 ) {
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
     let store_positions: Vec<Position> = stores.iter().copied().collect();
-    let prey_positions: Vec<Position> = prey.iter().copied().collect();
+    let prey_snapshot: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
     let day_phase = DayPhase::from_tick(time.tick, &config);
     let sc = &constants.scoring;
+    // 265: FoxHunting's conditional affordance axis ships dormant at
+    // weight 0.0, so the scalar is never read. The live
+    // `Res<ActionAffordances>` borrow is deferred to the step-21
+    // activation commit (same deferral as 264's caretake pre-check in
+    // goap.rs) — taking it here would add an unordered conflict edge
+    // against `affordance_writer`'s `ResMut`.
+    let affordances_dormant = crate::resources::ActionAffordances::default();
     // Ticket 014 §4 fox spatial batch — populate per-fox snapshot from
     // the authored ZSTs (StoreVisible / StoreGuarded / CatThreateningDen
     // / WardNearbyFox). The snapshot was empty before; it's wired up now
@@ -484,11 +508,13 @@ pub fn fox_evaluate_and_plan(
             personality,
             sc,
             fox_state,
+            fox_entity,
             *fox_pos,
             den_pos,
             &cat_positions,
             &store_positions,
-            &prey_positions,
+            &prey_snapshot,
+            &affordances_dormant,
             hunting_beliefs,
             exploration,
             (map.width, map.height),

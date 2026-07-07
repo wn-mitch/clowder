@@ -55,6 +55,11 @@ pub const HUNGER_INPUT: &str = "hunger_urgency";
 pub const PREY_NEARBY_INPUT: &str = "prey_nearby";
 pub const DAY_PHASE_INPUT: &str = "day_phase";
 pub const BOLDNESS_INPUT: &str = "boldness";
+/// 265: max `Affordance(Stalk|Chase, fox, prey)` over prey in
+/// detection range, from substrate 261. Populated by
+/// `fox_goap::build_scoring_context`; wildlife-vs-prey writer rows
+/// arrive with ticket 314.
+pub const PREY_AFFORDANCE_INPUT: &str = "best_prey_predation_affordance";
 
 /// §L2.10.7 fox Hunting range — Manhattan tiles for the
 /// prey-belief centroid anchor. 25 ≈ a long crepuscular hunt
@@ -106,31 +111,53 @@ impl FoxHuntingDse {
             post: PostOp::Invert,
         };
 
+        let mut considerations = vec![
+            Consideration::Scalar(ScalarConsideration::new(HUNGER_INPUT, hangry())),
+            Consideration::Scalar(ScalarConsideration::new(
+                PREY_NEARBY_INPUT,
+                Curve::Linear {
+                    slope: 1.0,
+                    intercept: 0.0,
+                },
+            )),
+            Consideration::Spatial(SpatialConsideration::new(
+                "fox_hunting_belief_distance",
+                LandmarkSource::Anchor(LandmarkAnchor::PreyBeliefCentroid),
+                FOX_HUNTING_BELIEF_RANGE,
+                belief_distance,
+            )),
+            Consideration::Scalar(ScalarConsideration::new(DAY_PHASE_INPUT, day_phase_curve)),
+            Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_floor)),
+        ];
+        // RtEO sum = 1.0. Same layout as the pre-port shape with
+        // the prey_belief scalar replaced by the spatial axis;
+        // weights unchanged because the new axis carries the same
+        // 'where is the prey' signal as the retired scalar.
+        let mut weights = vec![0.45, 0.10, 0.10, 0.10, 0.25];
+
+        // 265: conditional predation-affordance axis, dormant at 0.0
+        // (the 264 socialize_target shape). Base five scale by
+        // `(1 − extra)` so the WeightedSum stays at 1.0.
+        let affordance_w = scoring.fox_hunting_prey_affordance_weight.clamp(0.0, 1.0);
+        if affordance_w > 0.0 {
+            let scale = 1.0 - affordance_w;
+            for w in &mut weights {
+                *w *= scale;
+            }
+            considerations.push(Consideration::Scalar(ScalarConsideration::new(
+                PREY_AFFORDANCE_INPUT,
+                Curve::Linear {
+                    slope: 1.0,
+                    intercept: 0.0,
+                },
+            )));
+            weights.push(affordance_w);
+        }
+
         Self {
             id: DseId("fox_hunting"),
-            considerations: vec![
-                Consideration::Scalar(ScalarConsideration::new(HUNGER_INPUT, hangry())),
-                Consideration::Scalar(ScalarConsideration::new(
-                    PREY_NEARBY_INPUT,
-                    Curve::Linear {
-                        slope: 1.0,
-                        intercept: 0.0,
-                    },
-                )),
-                Consideration::Spatial(SpatialConsideration::new(
-                    "fox_hunting_belief_distance",
-                    LandmarkSource::Anchor(LandmarkAnchor::PreyBeliefCentroid),
-                    FOX_HUNTING_BELIEF_RANGE,
-                    belief_distance,
-                )),
-                Consideration::Scalar(ScalarConsideration::new(DAY_PHASE_INPUT, day_phase_curve)),
-                Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_floor)),
-            ],
-            // RtEO sum = 1.0. Same layout as the pre-port shape with
-            // the prey_belief scalar replaced by the spatial axis;
-            // weights unchanged because the new axis carries the same
-            // 'where is the prey' signal as the retired scalar.
-            composition: Composition::weighted_sum(vec![0.45, 0.10, 0.10, 0.10, 0.25]),
+            considerations,
+            composition: Composition::weighted_sum(weights),
             eligibility: EligibilityFilter::new(),
         }
     }
@@ -269,5 +296,36 @@ mod tests {
     fn fox_hunting_dse_boxed_registers() {
         let s = ScoringConstants::default();
         assert_eq!(fox_hunting_dse(&s).id().0, "fox_hunting");
+    }
+
+    #[test]
+    fn prey_affordance_axis_absent_at_default() {
+        // 265: weight ships at 0.0; the axis MUST NOT appear and the
+        // five-axis composition is byte-identical to pre-265.
+        let s = ScoringConstants::default();
+        assert_eq!(s.fox_hunting_prey_affordance_weight, 0.0);
+        let dse = FoxHuntingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 5);
+        assert!(dse.considerations().iter().all(|c| !matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == PREY_AFFORDANCE_INPUT
+        )));
+    }
+
+    #[test]
+    fn prey_affordance_axis_present_and_renormalized_when_active() {
+        let mut s = ScoringConstants::default();
+        s.fox_hunting_prey_affordance_weight = 0.2;
+        let dse = FoxHuntingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 6);
+        assert!(dse.considerations().iter().any(|c| matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == PREY_AFFORDANCE_INPUT
+        )));
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-4, "sum was {sum}");
+        // Base weights scaled by (1 - 0.2).
+        assert!((dse.composition().weights[0] - 0.45 * 0.8).abs() < 1e-4);
+        assert!((dse.composition().weights[5] - 0.2).abs() < 1e-4);
     }
 }

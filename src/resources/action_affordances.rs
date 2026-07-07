@@ -279,6 +279,30 @@ pub fn read_affordance(
     affordances.read(perceiver, target, kind)
 }
 
+/// 265: best affordance the perceiver holds against any of `targets`
+/// across the given `kinds`. Wildlife scorers are self-state DSEs (no
+/// per-target axis), so the target dimension collapses to a max at
+/// ctx-build time: "how good is my best predation opportunity right
+/// now". Returns `0.0` when no target/kind pair is populated — the
+/// substrate's gate signal, same contract as [`ActionAffordances::read`].
+///
+/// Callers pre-filter `targets` by detection range; this helper does
+/// not know about positions.
+pub fn best_affordance_over_targets(
+    affordances: &ActionAffordances,
+    perceiver: Entity,
+    targets: impl IntoIterator<Item = Entity>,
+    kinds: &[ActionKind],
+) -> f32 {
+    let mut best: f32 = 0.0;
+    for target in targets {
+        for &kind in kinds {
+            best = best.max(affordances.read(perceiver, target, kind));
+        }
+    }
+    best
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,6 +371,42 @@ mod tests {
         // ALL or this test fails. Matches the manual-enumeration
         // discipline.
         assert_eq!(ActionKind::ALL.len(), 21);
+    }
+
+    #[test]
+    fn best_affordance_over_targets_takes_max_across_pairs() {
+        let mut world = World::new();
+        let p = world.spawn_empty().id();
+        let t1 = world.spawn_empty().id();
+        let t2 = world.spawn_empty().id();
+        let mut a = ActionAffordances::default();
+        a.write(p, t1, ActionKind::Stalk, 0.3);
+        a.write(p, t1, ActionKind::Chase, 0.6);
+        a.write(p, t2, ActionKind::Stalk, 0.9);
+        let best =
+            best_affordance_over_targets(&a, p, [t1, t2], &[ActionKind::Stalk, ActionKind::Chase]);
+        assert!((best - 0.9).abs() < f32::EPSILON);
+        // Kind filter is respected: Chase-only ignores t2's Stalk 0.9.
+        let chase_only = best_affordance_over_targets(&a, p, [t1, t2], &[ActionKind::Chase]);
+        assert!((chase_only - 0.6).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn best_affordance_over_targets_empty_reads_zero() {
+        let mut world = World::new();
+        let p = world.spawn_empty().id();
+        let t = world.spawn_empty().id();
+        let a = ActionAffordances::default();
+        // Unpopulated substrate (the dormant-stage state) gates to 0.0.
+        assert_eq!(
+            best_affordance_over_targets(&a, p, [t], &[ActionKind::Strike]),
+            0.0
+        );
+        // No targets in range also gates to 0.0.
+        assert_eq!(
+            best_affordance_over_targets(&a, p, [], &[ActionKind::Strike]),
+            0.0
+        );
     }
 
     #[test]

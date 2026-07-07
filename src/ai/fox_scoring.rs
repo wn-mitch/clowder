@@ -66,6 +66,12 @@ pub struct FoxScoringContext<'a> {
     pub local_threat_level: f32,
     /// Exploration coverage around current position (from FoxExplorationMap).
     pub local_exploration_coverage: f32,
+    /// 265: max `Affordance(Stalk|Chase, fox, prey)` over prey in
+    /// detection range, from substrate 261. Read by FoxHunting's
+    /// conditional `best_prey_predation_affordance` axis (dormant at
+    /// `fox_hunting_prey_affordance_weight` 0.0). Wildlife-vs-prey
+    /// writer rows arrive with ticket 314; until then this reads 0.0.
+    pub best_prey_predation_affordance: f32,
 
     // --- §9.2 faction overlay ---
     /// Whether this fox carries the `BefriendedAlly` marker. Suppresses
@@ -213,6 +219,11 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
     m.insert(
         "carcass_scent_at_position",
         ctx.carcass_scent_at_position.clamp(0.0, 1.0),
+    );
+    // 265: predation-affordance read for FoxHunting's conditional axis.
+    m.insert(
+        crate::ai::dses::fox_hunting::PREY_AFFORDANCE_INPUT,
+        ctx.best_prey_predation_affordance.clamp(0.0, 1.0),
     );
     m
 }
@@ -550,6 +561,7 @@ mod tests {
             carcass_scent_at_position: 0.0,
             local_threat_level: 0.0,
             local_exploration_coverage: 0.0,
+            best_prey_predation_affordance: 0.0,
             befriended_ally: false,
             ticks_since_patrol: 0,
             day_phase: DayPhase::Night, // hunt-favorable default; tests override
@@ -896,6 +908,42 @@ mod tests {
         assert!(
             !has_raiding,
             "befriended fox should not raise Raiding even with store visible"
+        );
+    }
+
+    #[test]
+    fn hunting_reads_prey_affordance_when_axis_active() {
+        // 265: with the conditional axis active, a fox holding a live
+        // predation opportunity must outscore one with none, all else
+        // equal. Fails if the ctx-scalar key and the DSE input name
+        // drift apart (dead-arm guard — the scalar map's unwrap_or(0.0)
+        // would silently equalize the two scores).
+        let mut scoring = ScoringConstants::default();
+        scoring.fox_hunting_prey_affordance_weight = 0.2;
+        let needs = FoxNeeds {
+            hunger: 0.4,
+            health_fraction: 0.9,
+            territory_scent: 0.8,
+            den_security: 0.9,
+            cub_satiation: 1.0,
+            cub_safety: 1.0,
+        };
+        let personality = FoxPersonality::balanced();
+        let ctx_high = FoxScoringContext {
+            best_prey_predation_affordance: 1.0,
+            ..default_context(&needs, &personality, &scoring)
+        };
+        let ctx_zero = default_context(&needs, &personality, &scoring);
+        let registry = test_fox_registry(&scoring);
+        let modifiers = ModifierPipeline::new();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
+
+        let high = score_fox_dse_by_id("fox_hunting", &ctx_high, &inputs);
+        let zero = score_fox_dse_by_id("fox_hunting", &ctx_zero, &inputs);
+        assert!(
+            high > zero,
+            "affordance=1.0 must outscore affordance=0.0 when active (high={high}, zero={zero})"
         );
     }
 

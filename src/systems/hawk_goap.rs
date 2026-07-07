@@ -98,7 +98,7 @@ pub fn hawk_evaluate_and_plan(
             Without<Dead>,
         ),
     >,
-    prey: Query<&Position, (With<PreyAnimal>, Without<HawkState>)>,
+    prey: Query<(Entity, &Position), (With<PreyAnimal>, Without<HawkState>)>,
     mut rng: ResMut<SimRng>,
     time: Res<TimeState>,
     dse_registry: Res<DseRegistry>,
@@ -113,8 +113,16 @@ pub fn hawk_evaluate_and_plan(
 ) {
     let hc = &constants.hawk_ecology;
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
-    let prey_positions: Vec<Position> = prey.iter().copied().collect();
+    let prey_snapshot: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
+    let prey_positions: Vec<Position> = prey_snapshot.iter().map(|(_, p)| *p).collect();
     let markers = MarkerSnapshot::new();
+    // 265: HawkHunting's conditional affordance axis ships dormant at
+    // weight 0.0, so the scalar is never read. The live
+    // `Res<ActionAffordances>` borrow is deferred to the step-21
+    // activation commit (same deferral as 264's caretake pre-check in
+    // goap.rs) — taking it here would add an unordered conflict edge
+    // against `affordance_writer`'s `ResMut`.
+    let affordances_dormant = crate::resources::ActionAffordances::default();
 
     for (hawk_entity, hawk_state, hawk_pos, needs, personality) in &hawks {
         let _ = hawk_state; // reserved for §L2.10.7 anchors when wired
@@ -125,12 +133,27 @@ pub fn hawk_evaluate_and_plan(
         let prey_nearby = prey_positions
             .iter()
             .any(|p| p.distance_to(hawk_pos) <= hc.detection_range);
+        // 265: best predation opportunity over prey in detection range —
+        // read by HawkHunting's conditional axis (dormant at 0.0).
+        let best_prey_predation_affordance = crate::resources::best_affordance_over_targets(
+            &affordances_dormant,
+            hawk_entity,
+            prey_snapshot
+                .iter()
+                .filter(|(_, p)| p.distance_to(hawk_pos) <= hc.detection_range)
+                .map(|(e, _)| *e),
+            &[
+                crate::resources::ActionKind::Dive,
+                crate::resources::ActionKind::Chase,
+            ],
+        );
 
         let ctx = HawkScoringContext {
             needs,
             personality,
             prey_nearby,
             cats_nearby,
+            best_prey_predation_affordance,
             self_position: *hawk_pos,
             jitter_range: 0.05,
         };

@@ -109,7 +109,7 @@ pub fn snake_evaluate_and_plan(
             Without<Dead>,
         ),
     >,
-    prey: Query<&Position, (With<PreyAnimal>, Without<SnakeState>)>,
+    prey: Query<(Entity, &Position), (With<PreyAnimal>, Without<SnakeState>)>,
     mut rng: ResMut<SimRng>,
     time: Res<TimeState>,
     dse_registry: Res<DseRegistry>,
@@ -122,8 +122,16 @@ pub fn snake_evaluate_and_plan(
 ) {
     let sc = &constants.snake_ecology;
     let cat_positions: Vec<Position> = cats.iter().copied().collect();
-    let prey_positions: Vec<Position> = prey.iter().copied().collect();
+    let prey_snapshot: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
+    let prey_positions: Vec<Position> = prey_snapshot.iter().map(|(_, p)| *p).collect();
     let markers = MarkerSnapshot::new();
+    // 265: the SnakeAmbushing/SnakeForaging conditional affordance axes
+    // ship dormant at weight 0.0, so the scalars are never read. The
+    // live `Res<ActionAffordances>` borrow is deferred to the step-21
+    // activation commit (same deferral as 264's caretake pre-check in
+    // goap.rs) — taking it here would add an unordered conflict edge
+    // against `affordance_writer`'s `ResMut`.
+    let affordances_dormant = crate::resources::ActionAffordances::default();
 
     for (snake_entity, snake_state, snake_pos, needs, personality) in &snakes {
         let cats_nearby = cat_positions
@@ -138,6 +146,27 @@ pub fn snake_evaluate_and_plan(
         } else {
             false
         };
+        // 265: best strike/stalk opportunity over prey in detection
+        // range — read by the SnakeAmbushing/SnakeForaging conditional
+        // axes (dormant at 0.0).
+        let prey_in_range = || {
+            prey_snapshot
+                .iter()
+                .filter(|(_, p)| p.distance_to(snake_pos) <= sc.detection_range)
+                .map(|(e, _)| *e)
+        };
+        let best_prey_strike_affordance = crate::resources::best_affordance_over_targets(
+            &affordances_dormant,
+            snake_entity,
+            prey_in_range(),
+            &[crate::resources::ActionKind::Strike],
+        );
+        let best_prey_stalk_affordance = crate::resources::best_affordance_over_targets(
+            &affordances_dormant,
+            snake_entity,
+            prey_in_range(),
+            &[crate::resources::ActionKind::Stalk],
+        );
 
         let ctx = SnakeScoringContext {
             needs,
@@ -145,6 +174,8 @@ pub fn snake_evaluate_and_plan(
             prey_nearby,
             cats_nearby,
             on_warm_terrain,
+            best_prey_strike_affordance,
+            best_prey_stalk_affordance,
             self_position: *snake_pos,
             jitter_range: 0.05,
         };

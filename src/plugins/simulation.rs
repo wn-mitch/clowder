@@ -99,11 +99,11 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     // Ticket 025 Phase 2 — hawk + snake GOAP DSEs. Soaring is the
     // implicit hawk fallback (no DSE per Phase 1 design); the snake
     // fallback (Ambushing in scoring.rs) is registered as its own DSE.
-    registry.hawk_dses.push(dses::hawk_hunting_dse());
+    registry.hawk_dses.push(dses::hawk_hunting_dse(scoring));
     registry.hawk_dses.push(dses::hawk_fleeing_dse());
     registry.hawk_dses.push(dses::hawk_resting_dse());
-    registry.snake_dses.push(dses::snake_ambushing_dse());
-    registry.snake_dses.push(dses::snake_foraging_dse());
+    registry.snake_dses.push(dses::snake_ambushing_dse(scoring));
+    registry.snake_dses.push(dses::snake_foraging_dse(scoring));
     registry.snake_dses.push(dses::snake_fleeing_dse());
     registry.snake_dses.push(dses::snake_basking_dse());
 }

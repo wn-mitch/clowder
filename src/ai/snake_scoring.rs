@@ -102,6 +102,17 @@ pub struct SnakeScoringContext<'a> {
     pub cats_nearby: usize,
     /// Whether the snake is on warm terrain (rock, sun-exposed).
     pub on_warm_terrain: bool,
+    /// 265: max `Affordance(Strike, snake, prey)` over prey in
+    /// detection range, from substrate 261. Read by SnakeAmbushing's
+    /// conditional `best_prey_strike_affordance` axis (dormant at
+    /// `snake_ambush_strike_affordance_weight` 0.0). Wildlife-vs-prey
+    /// writer rows arrive with ticket 314; until then this reads 0.0.
+    pub best_prey_strike_affordance: f32,
+    /// 265: max `Affordance(Stalk, snake, prey)` over prey in
+    /// detection range. Read by SnakeForaging's conditional
+    /// `best_prey_stalk_affordance` axis (dormant at
+    /// `snake_forage_stalk_affordance_weight` 0.0).
+    pub best_prey_stalk_affordance: f32,
     pub self_position: Position,
     pub jitter_range: f32,
 }
@@ -136,6 +147,16 @@ fn snake_ctx_scalars(ctx: &SnakeScoringContext) -> HashMap<&'static str, f32> {
     m.insert(
         "on_warm_terrain",
         if ctx.on_warm_terrain { 1.0 } else { 0.0 },
+    );
+    // 265: predation-affordance reads for the SnakeAmbushing /
+    // SnakeForaging conditional axes.
+    m.insert(
+        crate::ai::dses::snake_ambushing::STRIKE_AFFORDANCE_INPUT,
+        ctx.best_prey_strike_affordance.clamp(0.0, 1.0),
+    );
+    m.insert(
+        crate::ai::dses::snake_foraging::STALK_AFFORDANCE_INPUT,
+        ctx.best_prey_stalk_affordance.clamp(0.0, 1.0),
     );
     m
 }
@@ -308,5 +329,70 @@ mod tests {
         let p = SnakePersonality::random(&mut rng);
         assert!(p.aggression >= 0.1 && p.aggression <= 0.9);
         assert!(p.patience >= 0.1 && p.patience <= 0.9);
+    }
+
+    #[test]
+    fn ambush_and_forage_read_prey_affordances_when_axes_active() {
+        // 265: with the conditional axes active, a snake holding a live
+        // strike/stalk opportunity must outscore one with none, all
+        // else equal. Fails if the ctx-scalar keys and the DSE input
+        // names drift apart (dead-arm guard).
+        let mut scoring = crate::resources::sim_constants::ScoringConstants::default();
+        scoring.snake_ambush_strike_affordance_weight = 0.25;
+        scoring.snake_forage_stalk_affordance_weight = 0.2;
+        let needs = SnakeNeeds {
+            hunger: 0.4,
+            health_fraction: 1.0,
+            warmth: 0.7,
+        };
+        let personality = SnakePersonality::default();
+        let base_ctx = |strike: f32, stalk: f32| SnakeScoringContext {
+            needs: &needs,
+            personality: &personality,
+            prey_nearby: true,
+            cats_nearby: 0,
+            on_warm_terrain: true,
+            best_prey_strike_affordance: strike,
+            best_prey_stalk_affordance: stalk,
+            self_position: Position::new(0, 0),
+            jitter_range: 0.0,
+        };
+
+        let mut registry = crate::ai::eval::DseRegistry::new();
+        registry
+            .snake_dses
+            .push(crate::ai::dses::snake_ambushing_dse(&scoring));
+        registry
+            .snake_dses
+            .push(crate::ai::dses::snake_foraging_dse(&scoring));
+        let modifier = crate::ai::eval::ModifierPipeline::default();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = EvalInputs {
+            cat: Entity::PLACEHOLDER,
+            tick: 0,
+            position: Position::new(0, 0),
+            dse_registry: &registry,
+            modifier_pipeline: &modifier,
+            markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
+            focal_cat: None,
+            focal_capture: None,
+        };
+
+        let ambush_high = score_snake_dse_by_id("snake_ambushing", &base_ctx(1.0, 0.0), &inputs);
+        let ambush_zero = score_snake_dse_by_id("snake_ambushing", &base_ctx(0.0, 0.0), &inputs);
+        assert!(
+            ambush_high > ambush_zero,
+            "strike affordance=1.0 must outscore 0.0 when active ({ambush_high} vs {ambush_zero})"
+        );
+
+        let forage_high = score_snake_dse_by_id("snake_foraging", &base_ctx(0.0, 1.0), &inputs);
+        let forage_zero = score_snake_dse_by_id("snake_foraging", &base_ctx(0.0, 0.0), &inputs);
+        assert!(
+            forage_high > forage_zero,
+            "stalk affordance=1.0 must outscore 0.0 when active ({forage_high} vs {forage_zero})"
+        );
     }
 }

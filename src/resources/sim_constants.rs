@@ -2908,6 +2908,32 @@ pub struct ScoringConstants {
     /// 261. Ships dormant at 0.0.
     #[serde(default = "default_apply_remedy_affordance_weight")]
     pub apply_remedy_affordance_weight: f32,
+    /// 265: weight on FoxHunting's conditional
+    /// `best_prey_predation_affordance` axis — max over prey in
+    /// detection range of `Affordance(Stalk|Chase, fox, prey)` from
+    /// substrate 261. Wildlife-vs-prey rows arrive with the 314 writer
+    /// extension; until then (and at weight 0.0) the scalar reads 0.0.
+    /// Ships dormant at 0.0.
+    #[serde(default = "default_fox_hunting_prey_affordance_weight")]
+    pub fox_hunting_prey_affordance_weight: f32,
+    /// 265: weight on HawkHunting's conditional
+    /// `best_prey_predation_affordance` axis — max over prey in
+    /// detection range of `Affordance(Dive|Chase, hawk, prey)`.
+    /// Ships dormant at 0.0.
+    #[serde(default = "default_hawk_hunting_prey_affordance_weight")]
+    pub hawk_hunting_prey_affordance_weight: f32,
+    /// 265: weight on SnakeAmbushing's conditional
+    /// `best_prey_strike_affordance` axis — max over prey in detection
+    /// range of `Affordance(Strike, snake, prey)`. Strike is
+    /// adjacency-gated in the writer, so this axis rewards holding an
+    /// ambush spot prey actually pass. Ships dormant at 0.0.
+    #[serde(default = "default_snake_ambush_strike_affordance_weight")]
+    pub snake_ambush_strike_affordance_weight: f32,
+    /// 265: weight on SnakeForaging's conditional
+    /// `best_prey_stalk_affordance` axis — max over prey in detection
+    /// range of `Affordance(Stalk, snake, prey)`. Ships dormant at 0.0.
+    #[serde(default = "default_snake_forage_stalk_affordance_weight")]
+    pub snake_forage_stalk_affordance_weight: f32,
     /// 263: bias magnitude on the Hunt resolver's `stalk_start` band
     /// threshold inside `resolve_engage_prey`. At bias `0.0` (default,
     /// dormant) the threshold is unchanged from the distance-keyed
@@ -3590,6 +3616,10 @@ impl Default for ScoringConstants {
             caretake_affordance_weight: default_caretake_affordance_weight(),
             apply_remedy_injury_belief_weight: default_apply_remedy_injury_belief_weight(),
             apply_remedy_affordance_weight: default_apply_remedy_affordance_weight(),
+            fox_hunting_prey_affordance_weight: default_fox_hunting_prey_affordance_weight(),
+            hawk_hunting_prey_affordance_weight: default_hawk_hunting_prey_affordance_weight(),
+            snake_ambush_strike_affordance_weight: default_snake_ambush_strike_affordance_weight(),
+            snake_forage_stalk_affordance_weight: default_snake_forage_stalk_affordance_weight(),
             hunt_stalk_chase_affordance_bias: default_hunt_stalk_chase_affordance_bias(),
             ward_ambush_anchor_weight: default_ward_ambush_anchor_weight(),
             ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
@@ -5315,6 +5345,30 @@ fn default_apply_remedy_injury_belief_weight() -> f32 {
 /// 264: ApplyRemedyTarget `affordance_care` axis weight. Ships
 /// dormant at 0.0; activation is plan step 20.
 fn default_apply_remedy_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 265: FoxHunting `best_prey_predation_affordance` axis weight.
+/// Ships dormant at 0.0; activation is plan step 21.
+fn default_fox_hunting_prey_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 265: HawkHunting `best_prey_predation_affordance` axis weight.
+/// Ships dormant at 0.0; activation is plan step 21.
+fn default_hawk_hunting_prey_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 265: SnakeAmbushing `best_prey_strike_affordance` axis weight.
+/// Ships dormant at 0.0; activation is plan step 21.
+fn default_snake_ambush_strike_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 265: SnakeForaging `best_prey_stalk_affordance` axis weight.
+/// Ships dormant at 0.0; activation is plan step 21.
+fn default_snake_forage_stalk_affordance_weight() -> f32 {
     0.0
 }
 

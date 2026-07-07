@@ -88,6 +88,12 @@ pub struct HawkScoringContext<'a> {
     pub prey_nearby: bool,
     /// Number of cats within threat range.
     pub cats_nearby: usize,
+    /// 265: max `Affordance(Dive|Chase, hawk, prey)` over prey in
+    /// detection range, from substrate 261. Read by HawkHunting's
+    /// conditional `best_prey_predation_affordance` axis (dormant at
+    /// `hawk_hunting_prey_affordance_weight` 0.0). Wildlife-vs-prey
+    /// writer rows arrive with ticket 314; until then this reads 0.0.
+    pub best_prey_predation_affordance: f32,
     /// Fox's current tile.
     pub self_position: Position,
     pub jitter_range: f32,
@@ -118,6 +124,11 @@ fn hawk_ctx_scalars(ctx: &HawkScoringContext) -> HashMap<&'static str, f32> {
     m.insert("patience", ctx.personality.patience.clamp(0.0, 1.0));
     m.insert("prey_nearby", if ctx.prey_nearby { 1.0 } else { 0.0 });
     m.insert("cats_nearby", ctx.cats_nearby as f32);
+    // 265: predation-affordance read for HawkHunting's conditional axis.
+    m.insert(
+        crate::ai::dses::hawk_hunting::PREY_AFFORDANCE_INPUT,
+        ctx.best_prey_predation_affordance.clamp(0.0, 1.0),
+    );
     m
 }
 
@@ -282,6 +293,7 @@ mod tests {
             personality: &personality,
             prey_nearby: false,
             cats_nearby: 0,
+            best_prey_predation_affordance: 0.0,
             self_position: Position::new(0, 0),
             jitter_range: 0.0,
         };
@@ -311,5 +323,56 @@ mod tests {
             .scores
             .iter()
             .any(|(k, _)| *k == HawkDispositionKind::Soaring));
+    }
+
+    #[test]
+    fn hunting_reads_prey_affordance_when_axis_active() {
+        // 265: with the conditional axis active, a hawk holding a live
+        // predation opportunity must outscore one with none, all else
+        // equal. Fails if the ctx-scalar key and the DSE input name
+        // drift apart (dead-arm guard).
+        let mut scoring = crate::resources::sim_constants::ScoringConstants::default();
+        scoring.hawk_hunting_prey_affordance_weight = 0.2;
+        let needs = HawkNeeds {
+            hunger: 0.5,
+            health_fraction: 1.0,
+        };
+        let personality = HawkPersonality::default();
+        let base_ctx = |affordance: f32| HawkScoringContext {
+            needs: &needs,
+            personality: &personality,
+            prey_nearby: true,
+            cats_nearby: 0,
+            best_prey_predation_affordance: affordance,
+            self_position: Position::new(0, 0),
+            jitter_range: 0.0,
+        };
+
+        let mut registry = crate::ai::eval::DseRegistry::new();
+        registry
+            .hawk_dses
+            .push(crate::ai::dses::hawk_hunting_dse(&scoring));
+        let modifier = crate::ai::eval::ModifierPipeline::default();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = EvalInputs {
+            cat: Entity::PLACEHOLDER,
+            tick: 0,
+            position: Position::new(0, 0),
+            dse_registry: &registry,
+            modifier_pipeline: &modifier,
+            markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
+            focal_cat: None,
+            focal_capture: None,
+        };
+
+        let high = score_hawk_dse_by_id("hawk_hunting", &base_ctx(1.0), &inputs);
+        let zero = score_hawk_dse_by_id("hawk_hunting", &base_ctx(0.0), &inputs);
+        assert!(
+            high > zero,
+            "affordance=1.0 must outscore affordance=0.0 when active (high={high}, zero={zero})"
+        );
     }
 }
