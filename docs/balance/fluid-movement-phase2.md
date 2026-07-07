@@ -655,6 +655,22 @@ out land attempts (368 → 288).
   −40%) → direction consistent with the hunting-economy lift, watch
   at step-13 re-baseline.
 
+### Idle re-run (`tuned-42-e330378a`, same binary lineage, no
+### concurrent builds)
+- Throughput 117 tps, **+4.5% vs baseline, band pass** — the −19.9%
+  on 861c9fe5 was contention from the release build + test suite
+  running alongside that soak, confirmed.
+- Longer coverage (~100k ticks) surfaced 2 ShadowFoxAmbush deaths
+  (Cricketkit-75 + Pebblekit-65, one ambush at (68–69, 9)) — within
+  the ≤ 10 hard gate; survival + continuity canaries pass.
+- Ward channel on full coverage runs HOT, not cold: sieges 273 vs
+  baseline 163 (+67%), ward-avoidances 3553 vs 2142 (+66%) — the
+  861c9fe5 "-36%" read was a coverage artifact of the shorter run.
+  Ticket 513's trajectory-fragility framing holds from the other
+  side: the channel swings ±60% across trajectory families.
+- MentorCat canary identical (1111 — the incapacitation window sits
+  inside both runs' spans). Ticket 514 owns it.
+
 ### Concordance
 Concordant on all four pre-registered predictions. The step-12 gate
 (aggregate ≥ 22.3%) passes 2.9× over on the tandem lineage
