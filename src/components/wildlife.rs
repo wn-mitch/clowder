@@ -105,7 +105,18 @@ pub enum BehaviorType {
 // ---------------------------------------------------------------------------
 
 /// Marks an entity as a wild animal with species-specific behavior.
+///
+/// 265: requires [`CatBeliefs`](crate::components::beliefs::CatBeliefs)
+/// — every wildlife entity carries its own mental models of cats, the
+/// wildlife-symmetric half of the 258 belief substrate ("fox decides
+/// this cat will kill me if I don't fight" from the same substrate
+/// cats read). The required-component contract covers every spawn
+/// site (edge-spawn, world-gen, den breeding, corruption spawn) at
+/// compile time instead of per-site insertion. Integrated + decayed by
+/// `belief_integrator`'s wildlife witness pass; read (dormant) by the
+/// wildlife fleeing DSEs' `perceived_cat_threat` axes.
 #[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[require(crate::components::beliefs::CatBeliefs)]
 pub struct WildAnimal {
     pub species: WildSpecies,
     pub behavior: BehaviorType,

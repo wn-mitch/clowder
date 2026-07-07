@@ -243,6 +243,34 @@ pub struct CatBeliefs {
     pub models: HashMap<Entity, MentalModel>,
 }
 
+/// 265: max `perceived_violence_capability` the perceiver believes of
+/// any of `targets`, from its own [`CatBeliefs`] models. Wildlife-side
+/// threat sensor — the symmetric peer of the cat-side
+/// [`PredatorBeliefs`] violence read. Strength-gated: a fully-decayed
+/// facet (strength ≤ 0) contributes nothing. Unmodeled targets (not
+/// yet implanted by `belief_integrator` Pass B) and absent beliefs
+/// read 0.0 — no evidence, no fear beyond what the implant pass has
+/// already seeded.
+///
+/// Callers pre-filter `targets` by detection range; this helper does
+/// not know about positions.
+pub fn max_perceived_violence(
+    beliefs: Option<&CatBeliefs>,
+    targets: impl IntoIterator<Item = Entity>,
+) -> f32 {
+    let Some(beliefs) = beliefs else { return 0.0 };
+    let mut max: f32 = 0.0;
+    for target in targets {
+        if let Some(model) = beliefs.models.get(&target) {
+            let facet = &model.perceived_violence_capability;
+            if facet.strength > 0.0 {
+                max = max.max(facet.value.clamp(0.0, 1.0));
+            }
+        }
+    }
+    max
+}
+
 /// Per-cat mental models of bucketed locations. Fully serializable — keys
 /// are stable across saves.
 #[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -402,5 +430,56 @@ mod tests {
         assert_eq!(m.evidence_count, 0);
         assert!(m.candidates.is_empty());
         assert_eq!(m.perceived_violence_capability.value, 0.0);
+    }
+
+    #[test]
+    fn max_perceived_violence_takes_max_over_modeled_targets() {
+        let mut world = bevy_ecs::world::World::new();
+        let a = world.spawn_empty().id();
+        let b = world.spawn_empty().id();
+        let unmodeled = world.spawn_empty().id();
+        let mut beliefs = CatBeliefs::default();
+        beliefs.models.insert(
+            a,
+            MentalModel {
+                perceived_violence_capability: Facet::from_prior(0.4),
+                ..MentalModel::default()
+            },
+        );
+        beliefs.models.insert(
+            b,
+            MentalModel {
+                perceived_violence_capability: Facet::from_prior(0.8),
+                ..MentalModel::default()
+            },
+        );
+        let max = max_perceived_violence(Some(&beliefs), [a, b, unmodeled]);
+        assert!((max - 0.8).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn max_perceived_violence_gates_on_strength_and_absence() {
+        let mut world = bevy_ecs::world::World::new();
+        let a = world.spawn_empty().id();
+        let mut beliefs = CatBeliefs::default();
+        // Fully-decayed facet (strength 0) contributes nothing even
+        // with a high stale value.
+        beliefs.models.insert(
+            a,
+            MentalModel {
+                perceived_violence_capability: Facet {
+                    value: 0.9,
+                    prior: 0.5,
+                    strength: 0.0,
+                    ..Facet::default()
+                },
+                ..MentalModel::default()
+            },
+        );
+        assert_eq!(max_perceived_violence(Some(&beliefs), [a]), 0.0);
+        // Absent component fails open to 0.0 (no evidence, no fear).
+        assert_eq!(max_perceived_violence(None, [a]), 0.0);
+        // No targets in range reads 0.0.
+        assert_eq!(max_perceived_violence(Some(&beliefs), []), 0.0);
     }
 }

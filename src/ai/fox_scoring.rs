@@ -72,6 +72,12 @@ pub struct FoxScoringContext<'a> {
     /// `fox_hunting_prey_affordance_weight` 0.0). Wildlife-vs-prey
     /// writer rows arrive with ticket 314; until then this reads 0.0.
     pub best_prey_predation_affordance: f32,
+    /// 265: max `CatBeliefs[cat].perceived_violence_capability` over
+    /// cats in avoidance range — the fox's own belief about how
+    /// dangerous the cats around it are. Read by FoxFleeing's
+    /// conditional `perceived_cat_threat` axis (dormant at
+    /// `fox_flee_cat_violence_belief_weight` 0.0).
+    pub perceived_cat_threat: f32,
 
     // --- §9.2 faction overlay ---
     /// Whether this fox carries the `BefriendedAlly` marker. Suppresses
@@ -224,6 +230,11 @@ fn fox_ctx_scalars(ctx: &FoxScoringContext) -> HashMap<&'static str, f32> {
     m.insert(
         crate::ai::dses::fox_hunting::PREY_AFFORDANCE_INPUT,
         ctx.best_prey_predation_affordance.clamp(0.0, 1.0),
+    );
+    // 265: cat-violence belief read for FoxFleeing's conditional axis.
+    m.insert(
+        crate::ai::dses::fox_fleeing::PERCEIVED_CAT_THREAT_INPUT,
+        ctx.perceived_cat_threat.clamp(0.0, 1.0),
     );
     m
 }
@@ -562,6 +573,7 @@ mod tests {
             local_threat_level: 0.0,
             local_exploration_coverage: 0.0,
             best_prey_predation_affordance: 0.0,
+            perceived_cat_threat: 0.0,
             befriended_ally: false,
             ticks_since_patrol: 0,
             day_phase: DayPhase::Night, // hunt-favorable default; tests override
@@ -592,7 +604,7 @@ mod tests {
         let mut r = DseRegistry::new();
         r.fox_dses.push(fox_hunting_dse(scoring));
         r.fox_dses.push(fox_raiding_dse());
-        r.fox_dses.push(fox_fleeing_dse());
+        r.fox_dses.push(fox_fleeing_dse(scoring));
         r.fox_dses.push(fox_avoiding_dse());
         r.fox_dses.push(fox_den_defense_dse());
         r.fox_dses.push(fox_resting_dse(scoring));
@@ -944,6 +956,42 @@ mod tests {
         assert!(
             high > zero,
             "affordance=1.0 must outscore affordance=0.0 when active (high={high}, zero={zero})"
+        );
+    }
+
+    #[test]
+    fn fleeing_reads_perceived_cat_threat_when_axis_active() {
+        // 265: with the conditional belief axis active, a fox that
+        // believes the cats around it are killers must score Fleeing
+        // higher than one holding no such belief, all else equal.
+        // Dead-arm guard: fails if the ctx-scalar key and the DSE
+        // input name drift apart.
+        let mut scoring = ScoringConstants::default();
+        scoring.fox_flee_cat_violence_belief_weight = 0.2;
+        let needs = FoxNeeds {
+            hunger: 0.5,
+            health_fraction: 0.4, // passes the outer flee gate
+            territory_scent: 0.5,
+            den_security: 0.5,
+            cub_satiation: 1.0,
+            cub_safety: 1.0,
+        };
+        let personality = FoxPersonality::balanced();
+        let ctx_high = FoxScoringContext {
+            perceived_cat_threat: 1.0,
+            ..default_context(&needs, &personality, &scoring)
+        };
+        let ctx_zero = default_context(&needs, &personality, &scoring);
+        let registry = test_fox_registry(&scoring);
+        let modifiers = ModifierPipeline::new();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = test_eval_inputs(&registry, &modifiers, &markers);
+
+        let high = score_fox_dse_by_id("fox_fleeing", &ctx_high, &inputs);
+        let zero = score_fox_dse_by_id("fox_fleeing", &ctx_zero, &inputs);
+        assert!(
+            high > zero,
+            "believed threat=1.0 must outscore 0.0 when active (high={high}, zero={zero})"
         );
     }
 

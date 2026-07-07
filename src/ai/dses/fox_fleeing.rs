@@ -25,10 +25,17 @@ use crate::ai::curves::{piecewise, Curve, PostOp};
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
+use crate::resources::sim_constants::ScoringConstants;
 
 pub const HEALTH_DEFICIT_INPUT: &str = "health_deficit";
 pub const CATS_NEARBY_INPUT: &str = "cats_nearby";
 pub const BOLDNESS_INPUT: &str = "boldness";
+/// 265: max `CatBeliefs[cat].perceived_violence_capability` over cats
+/// in avoidance range — the fox's own belief about how dangerous the
+/// cats around it are (implanted from `cat_perceived_by_fox`, updated
+/// by witnessed Attack/Hunt evidence). Populated by
+/// `fox_goap::build_scoring_context`.
+pub const PERCEIVED_CAT_THREAT_INPUT: &str = "perceived_cat_threat";
 
 /// §L2.10.7 fox Fleeing range — Manhattan tiles for the
 /// nearest-map-edge anchor. 30 ≈ map half-extent (120/2 ≈ 60, but
@@ -44,7 +51,7 @@ pub struct FoxFleeingDse {
 }
 
 impl FoxFleeingDse {
-    pub fn new() -> Self {
+    pub fn new(scoring: &ScoringConstants) -> Self {
         // Health-deficit Logistic: inflection at 0.5 matches the old
         // hardcoded `health_fraction < 0.5` gate.
         let health_curve = Curve::Logistic {
@@ -78,33 +85,52 @@ impl FoxFleeingDse {
             }),
             post: PostOp::Invert,
         };
+        let mut considerations = vec![
+            Consideration::Scalar(ScalarConsideration::new(HEALTH_DEFICIT_INPUT, health_curve)),
+            Consideration::Scalar(ScalarConsideration::new(CATS_NEARBY_INPUT, cats_curve)),
+            Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_curve)),
+            Consideration::Spatial(SpatialConsideration::new(
+                "fox_fleeing_edge_distance",
+                LandmarkSource::Anchor(LandmarkAnchor::NearestMapEdge),
+                FOX_FLEEING_EDGE_RANGE,
+                edge_distance,
+            )),
+        ];
+        // RtEO sum = 1.0. Health deficit still dominates (panic
+        // when injured); cats-nearby escalates; boldness modulates.
+        // Edge-distance at 0.20 mirrors the §L2.10.7 spatial-axis
+        // weight precedent. Original three weights renormalized
+        // by ×0.80 to make room.
+        let mut weights = vec![0.36, 0.20, 0.24, 0.20];
+
+        // 265: conditional belief axis, dormant at 0.0 (the 264
+        // socialize_target shape). Base four scale by `(1 − extra)`
+        // so the WeightedSum stays at 1.0. Where `cats_nearby` counts
+        // bodies, this axis weighs what the fox *believes* about them
+        // — a coordinator it watched win fights reads hotter than two
+        // strange kittens.
+        let belief_w = scoring.fox_flee_cat_violence_belief_weight.clamp(0.0, 1.0);
+        if belief_w > 0.0 {
+            let scale = 1.0 - belief_w;
+            for w in &mut weights {
+                *w *= scale;
+            }
+            considerations.push(Consideration::Scalar(ScalarConsideration::new(
+                PERCEIVED_CAT_THREAT_INPUT,
+                Curve::Linear {
+                    slope: 1.0,
+                    intercept: 0.0,
+                },
+            )));
+            weights.push(belief_w);
+        }
+
         Self {
             id: DseId("fox_fleeing"),
-            considerations: vec![
-                Consideration::Scalar(ScalarConsideration::new(HEALTH_DEFICIT_INPUT, health_curve)),
-                Consideration::Scalar(ScalarConsideration::new(CATS_NEARBY_INPUT, cats_curve)),
-                Consideration::Scalar(ScalarConsideration::new(BOLDNESS_INPUT, boldness_curve)),
-                Consideration::Spatial(SpatialConsideration::new(
-                    "fox_fleeing_edge_distance",
-                    LandmarkSource::Anchor(LandmarkAnchor::NearestMapEdge),
-                    FOX_FLEEING_EDGE_RANGE,
-                    edge_distance,
-                )),
-            ],
-            // RtEO sum = 1.0. Health deficit still dominates (panic
-            // when injured); cats-nearby escalates; boldness modulates.
-            // Edge-distance at 0.20 mirrors the §L2.10.7 spatial-axis
-            // weight precedent. Original three weights renormalized
-            // by ×0.80 to make room.
-            composition: Composition::weighted_sum(vec![0.36, 0.20, 0.24, 0.20]),
+            considerations,
+            composition: Composition::weighted_sum(weights),
             eligibility: EligibilityFilter::new(),
         }
-    }
-}
-
-impl Default for FoxFleeingDse {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -135,8 +161,8 @@ impl Dse for FoxFleeingDse {
     }
 }
 
-pub fn fox_fleeing_dse() -> Box<dyn Dse> {
-    Box::new(FoxFleeingDse::new())
+pub fn fox_fleeing_dse(scoring: &ScoringConstants) -> Box<dyn Dse> {
+    Box::new(FoxFleeingDse::new(scoring))
 }
 
 #[cfg(test)]
@@ -145,18 +171,21 @@ mod tests {
 
     #[test]
     fn fox_fleeing_id_stable() {
-        assert_eq!(FoxFleeingDse::new().id().0, "fox_fleeing");
+        let s = ScoringConstants::default();
+        assert_eq!(FoxFleeingDse::new(&s).id().0, "fox_fleeing");
     }
 
     #[test]
     fn fox_fleeing_has_four_axes() {
         // §L2.10.7: health + cats_nearby + boldness + edge_distance.
-        assert_eq!(FoxFleeingDse::new().considerations().len(), 4);
+        let s = ScoringConstants::default();
+        assert_eq!(FoxFleeingDse::new(&s).considerations().len(), 4);
     }
 
     #[test]
     fn fox_fleeing_uses_nearest_map_edge_anchor() {
-        let dse = FoxFleeingDse::new();
+        let s = ScoringConstants::default();
+        let dse = FoxFleeingDse::new(&s);
         let spatial = dse
             .considerations()
             .iter()
@@ -176,27 +205,31 @@ mod tests {
 
     #[test]
     fn fox_fleeing_weights_sum_to_one() {
-        let sum: f32 = FoxFleeingDse::new().composition().weights.iter().sum();
+        let s = ScoringConstants::default();
+        let sum: f32 = FoxFleeingDse::new(&s).composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
     #[test]
     fn fox_fleeing_is_weighted_sum() {
         use crate::ai::composition::CompositionMode;
+        let s = ScoringConstants::default();
         assert_eq!(
-            FoxFleeingDse::new().composition().mode,
+            FoxFleeingDse::new(&s).composition().mode,
             CompositionMode::WeightedSum
         );
     }
 
     #[test]
     fn fox_fleeing_maslow_tier_is_one() {
-        assert_eq!(FoxFleeingDse::new().maslow_tier(), 1);
+        let s = ScoringConstants::default();
+        assert_eq!(FoxFleeingDse::new(&s).maslow_tier(), 1);
     }
 
     #[test]
     fn cats_nearby_steps_at_two() {
-        let dse = FoxFleeingDse::new();
+        let s = ScoringConstants::default();
+        let dse = FoxFleeingDse::new(&s);
         let c = match &dse.considerations()[1] {
             Consideration::Scalar(sc) => &sc.curve,
             _ => panic!("expected scalar"),
@@ -210,7 +243,8 @@ mod tests {
 
     #[test]
     fn boldness_damped_invert() {
-        let dse = FoxFleeingDse::new();
+        let s = ScoringConstants::default();
+        let dse = FoxFleeingDse::new(&s);
         let c = match &dse.considerations()[2] {
             Consideration::Scalar(sc) => &sc.curve,
             _ => panic!("expected scalar"),
@@ -219,5 +253,31 @@ mod tests {
         // boldness=1 → inner=0.5 → invert=0.5.
         assert!((c.evaluate(0.0) - 1.0).abs() < 1e-4);
         assert!((c.evaluate(1.0) - 0.5).abs() < 1e-4);
+    }
+
+    #[test]
+    fn cat_threat_axis_absent_at_default() {
+        // 265: weight ships at 0.0; the axis MUST NOT appear and the
+        // four-axis composition is byte-identical to pre-265.
+        let s = ScoringConstants::default();
+        assert_eq!(s.fox_flee_cat_violence_belief_weight, 0.0);
+        let dse = FoxFleeingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 4);
+        assert!(dse.considerations().iter().all(|c| !matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == PERCEIVED_CAT_THREAT_INPUT
+        )));
+    }
+
+    #[test]
+    fn cat_threat_axis_present_and_renormalized_when_active() {
+        let mut s = ScoringConstants::default();
+        s.fox_flee_cat_violence_belief_weight = 0.2;
+        let dse = FoxFleeingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 5);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-4, "sum was {sum}");
+        assert!((dse.composition().weights[0] - 0.36 * 0.8).abs() < 1e-4);
+        assert!((dse.composition().weights[4] - 0.2).abs() < 1e-4);
     }
 }

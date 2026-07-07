@@ -94,6 +94,12 @@ pub struct HawkScoringContext<'a> {
     /// `hawk_hunting_prey_affordance_weight` 0.0). Wildlife-vs-prey
     /// writer rows arrive with ticket 314; until then this reads 0.0.
     pub best_prey_predation_affordance: f32,
+    /// 265: max `CatBeliefs[cat].perceived_violence_capability` over
+    /// cats in avoidance range — the hawk's own belief about how
+    /// dangerous the cats around it are. Read by HawkFleeing's
+    /// conditional `perceived_cat_threat` axis (dormant at
+    /// `hawk_flee_cat_violence_belief_weight` 0.0).
+    pub perceived_cat_threat: f32,
     /// Fox's current tile.
     pub self_position: Position,
     pub jitter_range: f32,
@@ -128,6 +134,11 @@ fn hawk_ctx_scalars(ctx: &HawkScoringContext) -> HashMap<&'static str, f32> {
     m.insert(
         crate::ai::dses::hawk_hunting::PREY_AFFORDANCE_INPUT,
         ctx.best_prey_predation_affordance.clamp(0.0, 1.0),
+    );
+    // 265: cat-violence belief read for HawkFleeing's conditional axis.
+    m.insert(
+        crate::ai::dses::hawk_fleeing::PERCEIVED_CAT_THREAT_INPUT,
+        ctx.perceived_cat_threat.clamp(0.0, 1.0),
     );
     m
 }
@@ -294,6 +305,7 @@ mod tests {
             prey_nearby: false,
             cats_nearby: 0,
             best_prey_predation_affordance: 0.0,
+            perceived_cat_threat: 0.0,
             self_position: Position::new(0, 0),
             jitter_range: 0.0,
         };
@@ -344,6 +356,7 @@ mod tests {
             prey_nearby: true,
             cats_nearby: 0,
             best_prey_predation_affordance: affordance,
+            perceived_cat_threat: 0.0,
             self_position: Position::new(0, 0),
             jitter_range: 0.0,
         };
@@ -373,6 +386,57 @@ mod tests {
         assert!(
             high > zero,
             "affordance=1.0 must outscore affordance=0.0 when active (high={high}, zero={zero})"
+        );
+    }
+
+    #[test]
+    fn fleeing_reads_perceived_cat_threat_when_axis_active() {
+        // 265: dead-arm guard for HawkFleeing's belief axis — a hawk
+        // that believes the cats around it are killers must score
+        // Fleeing higher than one holding no such belief.
+        let mut scoring = crate::resources::sim_constants::ScoringConstants::default();
+        scoring.hawk_flee_cat_violence_belief_weight = 0.2;
+        let needs = HawkNeeds {
+            hunger: 0.8,
+            health_fraction: 0.4,
+        };
+        let personality = HawkPersonality::default();
+        let base_ctx = |threat: f32| HawkScoringContext {
+            needs: &needs,
+            personality: &personality,
+            prey_nearby: false,
+            cats_nearby: 2,
+            best_prey_predation_affordance: 0.0,
+            perceived_cat_threat: threat,
+            self_position: Position::new(0, 0),
+            jitter_range: 0.0,
+        };
+
+        let mut registry = crate::ai::eval::DseRegistry::new();
+        registry
+            .hawk_dses
+            .push(crate::ai::dses::hawk_fleeing_dse(&scoring));
+        let modifier = crate::ai::eval::ModifierPipeline::default();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = EvalInputs {
+            cat: Entity::PLACEHOLDER,
+            tick: 0,
+            position: Position::new(0, 0),
+            dse_registry: &registry,
+            modifier_pipeline: &modifier,
+            markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
+            focal_cat: None,
+            focal_capture: None,
+        };
+
+        let high = score_hawk_dse_by_id("hawk_fleeing", &base_ctx(1.0), &inputs);
+        let zero = score_hawk_dse_by_id("hawk_fleeing", &base_ctx(0.0), &inputs);
+        assert!(
+            high > zero,
+            "believed threat=1.0 must outscore 0.0 when active (high={high}, zero={zero})"
         );
     }
 }

@@ -96,12 +96,13 @@ pub fn snake_evaluate_and_plan(
             &Position,
             &SnakeNeeds,
             &SnakePersonality,
+            Option<&crate::components::beliefs::CatBeliefs>,
         ),
         (With<WildAnimal>, Without<SnakeGoapPlan>, Without<Dead>),
     >,
     map: Res<TileMap>,
     cats: Query<
-        &Position,
+        (Entity, &Position),
         (
             Without<WildAnimal>,
             Without<SnakeState>,
@@ -121,7 +122,7 @@ pub fn snake_evaluate_and_plan(
     >,
 ) {
     let sc = &constants.snake_ecology;
-    let cat_positions: Vec<Position> = cats.iter().copied().collect();
+    let cat_snapshot: Vec<(Entity, Position)> = cats.iter().map(|(e, p)| (e, *p)).collect();
     let prey_snapshot: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
     let prey_positions: Vec<Position> = prey_snapshot.iter().map(|(_, p)| *p).collect();
     let markers = MarkerSnapshot::new();
@@ -133,11 +134,21 @@ pub fn snake_evaluate_and_plan(
     // against `affordance_writer`'s `ResMut`.
     let affordances_dormant = crate::resources::ActionAffordances::default();
 
-    for (snake_entity, snake_state, snake_pos, needs, personality) in &snakes {
-        let cats_nearby = cat_positions
+    for (snake_entity, snake_state, snake_pos, needs, personality, cat_beliefs) in &snakes {
+        let cats_nearby = cat_snapshot
             .iter()
-            .filter(|p| p.distance_to(snake_pos) <= sc.detection_range)
+            .filter(|(_, p)| p.distance_to(snake_pos) <= sc.detection_range)
             .count();
+        // 265: the snake's own belief about how dangerous the cats in
+        // detection range are — read by SnakeFleeing's conditional
+        // `perceived_cat_threat` axis (dormant at 0.0).
+        let perceived_cat_threat = crate::components::beliefs::max_perceived_violence(
+            cat_beliefs,
+            cat_snapshot
+                .iter()
+                .filter(|(_, p)| p.distance_to(snake_pos) <= sc.detection_range)
+                .map(|(e, _)| *e),
+        );
         let prey_nearby = prey_positions
             .iter()
             .any(|p| p.distance_to(snake_pos) <= sc.detection_range);
@@ -176,6 +187,7 @@ pub fn snake_evaluate_and_plan(
             on_warm_terrain,
             best_prey_strike_affordance,
             best_prey_stalk_affordance,
+            perceived_cat_threat,
             self_position: *snake_pos,
             jitter_range: 0.05,
         };

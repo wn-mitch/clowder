@@ -85,12 +85,19 @@ pub fn sync_hawk_needs(mut hawks: Query<(&HawkState, &Health, &mut HawkNeeds), W
 pub fn hawk_evaluate_and_plan(
     mut commands: Commands,
     hawks: Query<
-        (Entity, &HawkState, &Position, &HawkNeeds, &HawkPersonality),
+        (
+            Entity,
+            &HawkState,
+            &Position,
+            &HawkNeeds,
+            &HawkPersonality,
+            Option<&crate::components::beliefs::CatBeliefs>,
+        ),
         (With<WildAnimal>, Without<HawkGoapPlan>, Without<Dead>),
     >,
     map: Res<TileMap>,
     cats: Query<
-        &Position,
+        (Entity, &Position),
         (
             Without<WildAnimal>,
             Without<HawkState>,
@@ -112,7 +119,7 @@ pub fn hawk_evaluate_and_plan(
     >,
 ) {
     let hc = &constants.hawk_ecology;
-    let cat_positions: Vec<Position> = cats.iter().copied().collect();
+    let cat_snapshot: Vec<(Entity, Position)> = cats.iter().map(|(e, p)| (e, *p)).collect();
     let prey_snapshot: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
     let prey_positions: Vec<Position> = prey_snapshot.iter().map(|(_, p)| *p).collect();
     let markers = MarkerSnapshot::new();
@@ -124,12 +131,22 @@ pub fn hawk_evaluate_and_plan(
     // against `affordance_writer`'s `ResMut`.
     let affordances_dormant = crate::resources::ActionAffordances::default();
 
-    for (hawk_entity, hawk_state, hawk_pos, needs, personality) in &hawks {
+    for (hawk_entity, hawk_state, hawk_pos, needs, personality, cat_beliefs) in &hawks {
         let _ = hawk_state; // reserved for §L2.10.7 anchors when wired
-        let cats_nearby = cat_positions
+        let cats_nearby = cat_snapshot
             .iter()
-            .filter(|p| p.distance_to(hawk_pos) <= hc.cat_avoidance_range)
+            .filter(|(_, p)| p.distance_to(hawk_pos) <= hc.cat_avoidance_range)
             .count();
+        // 265: the hawk's own belief about how dangerous the cats in
+        // avoidance range are — read by HawkFleeing's conditional
+        // `perceived_cat_threat` axis (dormant at 0.0).
+        let perceived_cat_threat = crate::components::beliefs::max_perceived_violence(
+            cat_beliefs,
+            cat_snapshot
+                .iter()
+                .filter(|(_, p)| p.distance_to(hawk_pos) <= hc.cat_avoidance_range)
+                .map(|(e, _)| *e),
+        );
         let prey_nearby = prey_positions
             .iter()
             .any(|p| p.distance_to(hawk_pos) <= hc.detection_range);
@@ -154,6 +171,7 @@ pub fn hawk_evaluate_and_plan(
             prey_nearby,
             cats_nearby,
             best_prey_predation_affordance,
+            perceived_cat_threat,
             self_position: *hawk_pos,
             jitter_range: 0.05,
         };

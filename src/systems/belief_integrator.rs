@@ -79,9 +79,17 @@ pub fn integrate_beliefs(
             &mut ColonyReservesBelief,
             &mut ShelterBeliefs,
         ),
-        Without<Dead>,
+        (Without<Dead>, Without<WildAnimal>),
     >,
     wildlife: Query<(Entity, &Position, &WildAnimal), Without<Dead>>,
+    // 265: wildlife witnesses — every WildAnimal carries CatBeliefs
+    // (required component) holding its own mental models of cats.
+    // Disjoint from the cat `witnesses` query via the paired
+    // `With<WildAnimal>` / `Without<WildAnimal>` filters.
+    mut wildlife_witnesses: Query<
+        (Entity, &Position, &WildAnimal, &mut CatBeliefs),
+        (With<WildAnimal>, Without<Dead>),
+    >,
 ) {
     let tick = time.tick;
     let cfg = &constants.beliefs;
@@ -98,6 +106,12 @@ pub fn integrate_beliefs(
     let cat_set: std::collections::HashSet<Entity> = witnesses.iter().map(|(e, ..)| e).collect();
     let wildlife_set: std::collections::HashSet<Entity> =
         wildlife.iter().map(|(e, ..)| e).collect();
+    // 265: cat positions for the wildlife implant pass (Pass B seeds a
+    // wildlife witness's model of each cat in range with the
+    // species-perceiver violence prior, symmetric to the cat-side
+    // PredatorBeliefs implant below).
+    let cat_positions: Vec<(Entity, Position)> =
+        witnesses.iter().map(|(e, p, ..)| (e, *p)).collect();
 
     // ---- Pass A — Observation -----------------------------------------
     for ev in events.read() {
@@ -140,6 +154,16 @@ pub fn integrate_beliefs(
                 &mut reserves,
                 &mut shelter,
             );
+        }
+
+        // 265: wildlife witnesses integrate the violence-relevant
+        // subset (Attack + Hunt by cat actors) into their own
+        // CatBeliefs. Same range gate as cat witnesses.
+        for (witness_ent, witness_pos, _, mut cat_models) in wildlife_witnesses.iter_mut() {
+            if range_gated && !within_range(witness_pos, &pos) {
+                continue;
+            }
+            apply_wildlife_observation(ev, witness_ent, tick, cfg, &cat_set, &mut cat_models);
         }
     }
 
@@ -184,6 +208,33 @@ pub fn integrate_beliefs(
         decay_models(&mut preds.models, tick, cfg, period);
         decay_models(&mut contexts.models, tick, cfg, period);
         decay_reserves(&mut reserves.reserves, cfg);
+    }
+
+    // ---- Pass B (265) — wildlife Implant + Forgetting ------------------
+    // Symmetric to the cat pass above: a wildlife witness's first
+    // encounter with a cat seeds its model with the species-perceiver
+    // violence prior ("this snake instinctively fears cats"), and its
+    // CatBeliefs decay on the same stagger discipline.
+    for (witness_ent, witness_pos, wild, mut cat_models) in wildlife_witnesses.iter_mut() {
+        if (witness_ent.index_u32() as u64) % period != tick_phase {
+            continue;
+        }
+
+        for (cat_ent, cat_pos) in &cat_positions {
+            if !within_range(witness_pos, cat_pos) {
+                continue;
+            }
+            cat_models.models.entry(*cat_ent).or_insert_with(|| {
+                let prior = cat_violence_prior_perceived_by(priors, wild.species);
+                MentalModel {
+                    perceived_violence_capability: Facet::from_prior(prior),
+                    last_updated_tick: tick,
+                    ..MentalModel::default()
+                }
+            });
+        }
+
+        decay_models(&mut cat_models.models, tick, cfg, period);
     }
 }
 
@@ -294,6 +345,98 @@ fn species_violence_prior(priors: &SpeciesViolencePriors, species: WildSpecies) 
         WildSpecies::Hawk => priors.hawk,
         WildSpecies::Snake => priors.snake,
         WildSpecies::ShadowFox => priors.shadow_fox,
+    }
+}
+
+/// 265: how dangerous a cat looks to a given wildlife perceiver species
+/// — the wildlife-perceiver rows of the violence-prior table, implanted
+/// into a wildlife entity's `CatBeliefs` on first encounter.
+fn cat_violence_prior_perceived_by(priors: &SpeciesViolencePriors, species: WildSpecies) -> f32 {
+    match species {
+        WildSpecies::Fox => priors.cat_perceived_by_fox,
+        WildSpecies::Hawk => priors.cat_perceived_by_hawk,
+        WildSpecies::Snake => priors.cat_perceived_by_snake,
+        WildSpecies::ShadowFox => priors.cat_perceived_by_shadow_fox,
+    }
+}
+
+/// 265: wildlife-witness observation path. Wildlife model only cats and
+/// only the violence-relevant channels — witnessed `Attack` (a cat
+/// fighting is direct violence evidence) and `Hunt` (a successful
+/// hunter is a capable killer). The full cat-side channel set
+/// (affiliation, receptivity, reserves, shelter…) is deliberately NOT
+/// mirrored: wildlife have no social/economic stake in the colony, and
+/// the ticket-505 ballast lesson says unread entries are pure decay
+/// load.
+fn apply_wildlife_observation(
+    ev: &WitnessableEvent,
+    witness: Entity,
+    tick: u64,
+    cfg: &BeliefsConstants,
+    cat_set: &std::collections::HashSet<Entity>,
+    cat_models: &mut CatBeliefs,
+) {
+    match ev {
+        WitnessableEvent::Attack {
+            actor,
+            target,
+            severity,
+            ..
+        } => {
+            if !cat_set.contains(actor) {
+                return;
+            }
+            let model = cat_models.models.entry(*actor).or_default();
+            update_facet(
+                &mut model.perceived_violence_capability,
+                *severity,
+                tick,
+                &cfg.perceived_violence_capability,
+            );
+            update_facet(
+                &mut model.recency_of_threat_cue,
+                OBSERVED_MAX,
+                tick,
+                &cfg.recency_of_threat_cue,
+            );
+            // Aggression directed at the witness itself is hostility
+            // evidence; a cat fighting some other creature is not.
+            if *target == witness {
+                update_facet(
+                    &mut model.perceived_hostility,
+                    *severity,
+                    tick,
+                    &cfg.perceived_hostility,
+                );
+            }
+            model.last_updated_tick = tick;
+            model.evidence_count = model.evidence_count.saturating_add(1);
+        }
+
+        WitnessableEvent::Hunt {
+            hunter, success, ..
+        } => {
+            if !cat_set.contains(hunter) {
+                return;
+            }
+            let observed = if *success {
+                OBSERVED_MAX
+            } else {
+                OBSERVED_FAIL
+            };
+            let model = cat_models.models.entry(*hunter).or_default();
+            update_facet(
+                &mut model.perceived_violence_capability,
+                observed,
+                tick,
+                &cfg.perceived_violence_capability,
+            );
+            model.last_updated_tick = tick;
+            model.evidence_count = model.evidence_count.saturating_add(1);
+        }
+
+        // Every other channel is cat-side only (see fn rustdoc).
+        _ => {}
     }
 }
 
@@ -1235,6 +1378,161 @@ mod tests {
         assert_eq!(
             model.perceived_violence_capability.last_source,
             EvidenceKind::Implant
+        );
+    }
+
+    // 265 — wildlife-witness coverage: implant, observation subset,
+    // range gate.
+
+    #[test]
+    fn wildlife_implant_seeds_cat_violence_prior_on_first_encounter() {
+        let (mut world, mut schedule) = test_world(0);
+        let cat = spawn_cat(&mut world, Position::new(0, 0));
+        let snake = spawn_wildlife(&mut world, WildSpecies::Snake, Position::new(2, 0));
+
+        let period = SimConstants::default().beliefs.decay_stagger_period;
+        for _ in 0..(period + 1) {
+            schedule.run(&mut world);
+            let mut time = world.resource_mut::<TimeState>();
+            time.tick += 1;
+        }
+
+        // The snake carries CatBeliefs via WildAnimal's required
+        // component and Pass B implanted the perceiver-row prior.
+        let beliefs = world
+            .get::<CatBeliefs>(snake)
+            .expect("WildAnimal requires CatBeliefs");
+        let model = beliefs
+            .models
+            .get(&cat)
+            .expect("wildlife should seed a cat model on first encounter");
+        let expected = SimConstants::default()
+            .beliefs
+            .species_violence_priors
+            .cat_perceived_by_snake;
+        assert!(
+            (model.perceived_violence_capability.value - expected).abs() < 1e-5,
+            "snake's cat prior should be {expected}; got {}",
+            model.perceived_violence_capability.value
+        );
+        assert_eq!(
+            model.perceived_violence_capability.last_source,
+            EvidenceKind::Implant
+        );
+    }
+
+    #[test]
+    fn wildlife_witness_integrates_cat_attack() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let victim = spawn_cat(&mut world, Position::new(11, 10));
+        let fox = spawn_wildlife(&mut world, WildSpecies::Fox, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Attack {
+            actor,
+            target: victim,
+            position: Position::new(10, 10),
+            severity: 0.8,
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let beliefs = world.get::<CatBeliefs>(fox).unwrap();
+        let model = beliefs
+            .models
+            .get(&actor)
+            .expect("fox should hold belief about the attacking cat");
+        assert!(
+            model.perceived_violence_capability.value > 0.0,
+            "witnessed Attack should lift violence capability; got {}",
+            model.perceived_violence_capability.value
+        );
+        assert!(model.recency_of_threat_cue.value > 0.0);
+        // Aggression was against another cat, not the fox — no
+        // hostility-toward-me evidence.
+        assert_eq!(model.perceived_hostility.value, 0.0);
+        assert_eq!(
+            model.perceived_violence_capability.last_source,
+            EvidenceKind::Observation
+        );
+        // The victim is not modeled — wildlife track only the
+        // violence-relevant actor channels.
+        assert!(!beliefs.models.contains_key(&victim));
+    }
+
+    #[test]
+    fn wildlife_witness_attack_on_self_lifts_hostility() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let fox = spawn_wildlife(&mut world, WildSpecies::Fox, Position::new(11, 10));
+
+        world.write_message(WitnessableEvent::Attack {
+            actor,
+            target: fox,
+            position: Position::new(10, 10),
+            severity: 0.6,
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let beliefs = world.get::<CatBeliefs>(fox).unwrap();
+        let model = beliefs.models.get(&actor).expect("fox models its attacker");
+        assert!(
+            model.perceived_hostility.value > 0.0,
+            "attack on the witness itself is hostility evidence"
+        );
+    }
+
+    #[test]
+    fn out_of_range_wildlife_witness_does_not_update() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(0, 0));
+        let victim = spawn_cat(&mut world, Position::new(1, 0));
+        let far_fox = spawn_wildlife(&mut world, WildSpecies::Fox, Position::new(50, 50));
+
+        world.write_message(WitnessableEvent::Attack {
+            actor,
+            target: victim,
+            position: Position::new(0, 0),
+            severity: 0.8,
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let beliefs = world.get::<CatBeliefs>(far_fox).unwrap();
+        assert!(
+            beliefs.models.is_empty(),
+            "out-of-range wildlife witnesses should not update beliefs"
+        );
+    }
+
+    #[test]
+    fn wildlife_witness_integrates_cat_hunt_success() {
+        let (mut world, mut schedule) = test_world(100);
+        let hunter = spawn_cat(&mut world, Position::new(10, 10));
+        let hawk = spawn_wildlife(&mut world, WildSpecies::Hawk, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Hunt {
+            hunter,
+            prey_kind: crate::components::prey::PreyKind::Rabbit,
+            position: Position::new(10, 10),
+            success: true,
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let beliefs = world.get::<CatBeliefs>(hawk).unwrap();
+        let model = beliefs
+            .models
+            .get(&hunter)
+            .expect("hawk should model a successful hunter");
+        assert!(
+            model.perceived_violence_capability.value > 0.0,
+            "witnessed successful hunt is violence-capability evidence"
         );
     }
 

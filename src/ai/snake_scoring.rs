@@ -113,6 +113,12 @@ pub struct SnakeScoringContext<'a> {
     /// `best_prey_stalk_affordance` axis (dormant at
     /// `snake_forage_stalk_affordance_weight` 0.0).
     pub best_prey_stalk_affordance: f32,
+    /// 265: max `CatBeliefs[cat].perceived_violence_capability` over
+    /// cats in detection range — the snake's own belief about how
+    /// dangerous the cats around it are. Read by SnakeFleeing's
+    /// conditional `perceived_cat_threat` axis (dormant at
+    /// `snake_flee_cat_violence_belief_weight` 0.0).
+    pub perceived_cat_threat: f32,
     pub self_position: Position,
     pub jitter_range: f32,
 }
@@ -157,6 +163,11 @@ fn snake_ctx_scalars(ctx: &SnakeScoringContext) -> HashMap<&'static str, f32> {
     m.insert(
         crate::ai::dses::snake_foraging::STALK_AFFORDANCE_INPUT,
         ctx.best_prey_stalk_affordance.clamp(0.0, 1.0),
+    );
+    // 265: cat-violence belief read for SnakeFleeing's conditional axis.
+    m.insert(
+        crate::ai::dses::snake_fleeing::PERCEIVED_CAT_THREAT_INPUT,
+        ctx.perceived_cat_threat.clamp(0.0, 1.0),
     );
     m
 }
@@ -354,6 +365,7 @@ mod tests {
             on_warm_terrain: true,
             best_prey_strike_affordance: strike,
             best_prey_stalk_affordance: stalk,
+            perceived_cat_threat: 0.0,
             self_position: Position::new(0, 0),
             jitter_range: 0.0,
         };
@@ -393,6 +405,60 @@ mod tests {
         assert!(
             forage_high > forage_zero,
             "stalk affordance=1.0 must outscore 0.0 when active ({forage_high} vs {forage_zero})"
+        );
+    }
+
+    #[test]
+    fn fleeing_reads_perceived_cat_threat_when_axis_active() {
+        // 265: dead-arm guard for SnakeFleeing's belief axis — a snake
+        // that believes the cats around it are killers must score
+        // Fleeing higher than one holding no such belief.
+        let mut scoring = crate::resources::sim_constants::ScoringConstants::default();
+        scoring.snake_flee_cat_violence_belief_weight = 0.2;
+        let needs = SnakeNeeds {
+            hunger: 0.8,
+            health_fraction: 0.4,
+            warmth: 0.7,
+        };
+        let personality = SnakePersonality::default();
+        let base_ctx = |threat: f32| SnakeScoringContext {
+            needs: &needs,
+            personality: &personality,
+            prey_nearby: false,
+            cats_nearby: 1,
+            on_warm_terrain: true,
+            best_prey_strike_affordance: 0.0,
+            best_prey_stalk_affordance: 0.0,
+            perceived_cat_threat: threat,
+            self_position: Position::new(0, 0),
+            jitter_range: 0.0,
+        };
+
+        let mut registry = crate::ai::eval::DseRegistry::new();
+        registry
+            .snake_dses
+            .push(crate::ai::dses::snake_fleeing_dse(&scoring));
+        let modifier = crate::ai::eval::ModifierPipeline::default();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = EvalInputs {
+            cat: Entity::PLACEHOLDER,
+            tick: 0,
+            position: Position::new(0, 0),
+            dse_registry: &registry,
+            modifier_pipeline: &modifier,
+            markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
+            focal_cat: None,
+            focal_capture: None,
+        };
+
+        let high = score_snake_dse_by_id("snake_fleeing", &base_ctx(1.0), &inputs);
+        let zero = score_snake_dse_by_id("snake_fleeing", &base_ctx(0.0), &inputs);
+        assert!(
+            high > zero,
+            "believed threat=1.0 must outscore 0.0 when active (high={high}, zero={zero})"
         );
     }
 }

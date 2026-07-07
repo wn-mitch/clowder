@@ -90,7 +90,7 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry.fox_dses.push(dses::fox_patrolling_dse(scoring));
     registry.fox_dses.push(dses::fox_hunting_dse(scoring));
     registry.fox_dses.push(dses::fox_raiding_dse());
-    registry.fox_dses.push(dses::fox_fleeing_dse());
+    registry.fox_dses.push(dses::fox_fleeing_dse(scoring));
     registry.fox_dses.push(dses::fox_avoiding_dse());
     registry.fox_dses.push(dses::fox_den_defense_dse());
     registry.fox_dses.push(dses::fox_resting_dse(scoring));
@@ -100,11 +100,11 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     // implicit hawk fallback (no DSE per Phase 1 design); the snake
     // fallback (Ambushing in scoring.rs) is registered as its own DSE.
     registry.hawk_dses.push(dses::hawk_hunting_dse(scoring));
-    registry.hawk_dses.push(dses::hawk_fleeing_dse());
+    registry.hawk_dses.push(dses::hawk_fleeing_dse(scoring));
     registry.hawk_dses.push(dses::hawk_resting_dse());
     registry.snake_dses.push(dses::snake_ambushing_dse(scoring));
     registry.snake_dses.push(dses::snake_foraging_dse(scoring));
-    registry.snake_dses.push(dses::snake_fleeing_dse());
+    registry.snake_dses.push(dses::snake_fleeing_dse(scoring));
     registry.snake_dses.push(dses::snake_basking_dse());
 }
 

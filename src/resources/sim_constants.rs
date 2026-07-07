@@ -2934,6 +2934,22 @@ pub struct ScoringConstants {
     /// range of `Affordance(Stalk, snake, prey)`. Ships dormant at 0.0.
     #[serde(default = "default_snake_forage_stalk_affordance_weight")]
     pub snake_forage_stalk_affordance_weight: f32,
+    /// 265: weight on FoxFleeing's conditional `perceived_cat_threat`
+    /// axis — max over cats in avoidance range of the fox's own
+    /// `CatBeliefs[cat].perceived_violence_capability` facet (implanted
+    /// from `cat_perceived_by_fox` on first encounter, updated by
+    /// witnessed Attack/Hunt evidence). The wildlife-symmetric peer of
+    /// the cat-side PredatorBeliefs read. Ships dormant at 0.0.
+    #[serde(default = "default_fox_flee_cat_violence_belief_weight")]
+    pub fox_flee_cat_violence_belief_weight: f32,
+    /// 265: weight on HawkFleeing's conditional `perceived_cat_threat`
+    /// axis. Ships dormant at 0.0.
+    #[serde(default = "default_hawk_flee_cat_violence_belief_weight")]
+    pub hawk_flee_cat_violence_belief_weight: f32,
+    /// 265: weight on SnakeFleeing's conditional `perceived_cat_threat`
+    /// axis. Ships dormant at 0.0.
+    #[serde(default = "default_snake_flee_cat_violence_belief_weight")]
+    pub snake_flee_cat_violence_belief_weight: f32,
     /// 263: bias magnitude on the Hunt resolver's `stalk_start` band
     /// threshold inside `resolve_engage_prey`. At bias `0.0` (default,
     /// dormant) the threshold is unchanged from the distance-keyed
@@ -3620,6 +3636,9 @@ impl Default for ScoringConstants {
             hawk_hunting_prey_affordance_weight: default_hawk_hunting_prey_affordance_weight(),
             snake_ambush_strike_affordance_weight: default_snake_ambush_strike_affordance_weight(),
             snake_forage_stalk_affordance_weight: default_snake_forage_stalk_affordance_weight(),
+            fox_flee_cat_violence_belief_weight: default_fox_flee_cat_violence_belief_weight(),
+            hawk_flee_cat_violence_belief_weight: default_hawk_flee_cat_violence_belief_weight(),
+            snake_flee_cat_violence_belief_weight: default_snake_flee_cat_violence_belief_weight(),
             hunt_stalk_chase_affordance_bias: default_hunt_stalk_chase_affordance_bias(),
             ward_ambush_anchor_weight: default_ward_ambush_anchor_weight(),
             ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
@@ -5369,6 +5388,24 @@ fn default_snake_ambush_strike_affordance_weight() -> f32 {
 /// 265: SnakeForaging `best_prey_stalk_affordance` axis weight.
 /// Ships dormant at 0.0; activation is plan step 21.
 fn default_snake_forage_stalk_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 265: FoxFleeing `perceived_cat_threat` axis weight. Ships dormant
+/// at 0.0; activation is plan step 21.
+fn default_fox_flee_cat_violence_belief_weight() -> f32 {
+    0.0
+}
+
+/// 265: HawkFleeing `perceived_cat_threat` axis weight. Ships dormant
+/// at 0.0; activation is plan step 21.
+fn default_hawk_flee_cat_violence_belief_weight() -> f32 {
+    0.0
+}
+
+/// 265: SnakeFleeing `perceived_cat_threat` axis weight. Ships dormant
+/// at 0.0; activation is plan step 21.
+fn default_snake_flee_cat_violence_belief_weight() -> f32 {
     0.0
 }
 
@@ -8927,6 +8964,28 @@ pub struct SpeciesViolencePriors {
     pub snake: f32,
     /// Apex threat — instilled at world-gen for narrative weight.
     pub shadow_fox: f32,
+    /// 265: wildlife-perceiver rows — how dangerous a CAT looks to each
+    /// wildlife species, implanted into the wildlife entity's own
+    /// `CatBeliefs` model on first encounter (`belief_integrator`
+    /// Pass B, symmetric to the cat-side `PredatorBeliefs` implant).
+    /// Facets are populated-but-unread until the step-21 activation
+    /// lifts the wildlife fleeing DSEs' `perceived_cat_threat` weights.
+    ///
+    /// A lone cat is a real fight risk to a fox; a mobbed fox loses.
+    #[serde(default = "default_cat_perceived_by_fox")]
+    pub cat_perceived_by_fox: f32,
+    /// Cats rarely threaten a hawk on the wing; ground encounters are
+    /// avoidable at will.
+    #[serde(default = "default_cat_perceived_by_hawk")]
+    pub cat_perceived_by_hawk: f32,
+    /// Cats are practiced snake-killers — highest wildlife-perceiver
+    /// prior.
+    #[serde(default = "default_cat_perceived_by_snake")]
+    pub cat_perceived_by_snake: f32,
+    /// Apex predator — cats read as prey more than threat (wards, not
+    /// cats, repel it). Consumers land with ticket 310.
+    #[serde(default = "default_cat_perceived_by_shadow_fox")]
+    pub cat_perceived_by_shadow_fox: f32,
 }
 
 impl Default for SpeciesViolencePriors {
@@ -8937,8 +8996,32 @@ impl Default for SpeciesViolencePriors {
             hawk: 0.6,
             snake: 0.4,
             shadow_fox: 0.95,
+            cat_perceived_by_fox: default_cat_perceived_by_fox(),
+            cat_perceived_by_hawk: default_cat_perceived_by_hawk(),
+            cat_perceived_by_snake: default_cat_perceived_by_snake(),
+            cat_perceived_by_shadow_fox: default_cat_perceived_by_shadow_fox(),
         }
     }
+}
+
+/// 265: cat violence prior as perceived by foxes.
+fn default_cat_perceived_by_fox() -> f32 {
+    0.5
+}
+
+/// 265: cat violence prior as perceived by hawks.
+fn default_cat_perceived_by_hawk() -> f32 {
+    0.3
+}
+
+/// 265: cat violence prior as perceived by snakes.
+fn default_cat_perceived_by_snake() -> f32 {
+    0.65
+}
+
+/// 265: cat violence prior as perceived by shadow foxes.
+fn default_cat_perceived_by_shadow_fox() -> f32 {
+    0.2
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
