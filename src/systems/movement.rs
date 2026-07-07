@@ -76,13 +76,23 @@ pub fn integrate_velocities(
 
         // 140 step 9 — airborne movers turn harder: `Flying` selects
         // `hawk_max_accel` (hawks now; step 10's burst birds inherit).
-        // Ground movers share the uniform `max_accel`.
-        let accel = if flying.is_some() {
+        // Ground movers share the uniform `max_accel`, scaled by gait
+        // (step 12): a sprint desire (magnitude above the species base
+        // speed) accelerates proportionally harder — real-cat sprints
+        // are explosive (top speed in ~3 strides), and the pre-140
+        // chase kinematics the catch economy is tuned against had NO
+        // ramp at all. Walk-gait desires keep the smooth 0.25 ramp.
+        let base_accel = if flying.is_some() {
             constants.movement.hawk_max_accel
         } else {
             max_accel
         };
-        vel.0 = crate::ai::steering::steer(vel.0, want, accel);
+        let gait_ratio = if budget.per_tick > f32::EPSILON {
+            (want.length() / budget.per_tick).max(1.0)
+        } else {
+            1.0
+        };
+        vel.0 = crate::ai::steering::steer(vel.0, want, base_accel * gait_ratio);
         // Euclidean speed cap — with arbitrary headings an L∞ cap
         // would make ground speed direction-dependent (+41% at 45°).
         // 140 step 12 — terrain costs SPEED: the cap is scaled by the
