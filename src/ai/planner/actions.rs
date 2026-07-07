@@ -37,9 +37,22 @@ pub fn travel_actions(distances: &ZoneDistances) -> Vec<GoapActionDef> {
 /// `Flee` umbrella `cat_path_plan!`s to that tile; `HoldUntilSafe`
 /// hysteresis-waits `flee_hold_ticks` before incrementing trips.
 ///
-/// The chain is ordered via the search-state predicate
-/// `FleeTargetPicked(bool)`. No `TravelTo` leg is needed — `Flee`
-/// itself does the travel via the same machinery `TravelTo` would.
+/// The chain is ordered via two search-state predicates:
+/// `FleeTargetPicked(bool)` (Pick → rest) and `FledThisPlan(bool)`
+/// (Flee → Hold). No `TravelTo` leg is needed — `Flee` itself does
+/// the travel via the same machinery `TravelTo` would.
+///
+/// 140 step 10 (fix) — `Flee` originally had NO effects, so A* always
+/// found the cheaper `[PickFleeTarget, HoldUntilSafe]` two-step plan
+/// and the travel leg was never included in ANY Fleeing plan since
+/// 230 landed: "fleeing" cats picked a flee target, never walked to
+/// it, and hysteresis-held AT the threat (tuned-42-f7e4be8f — four
+/// cats serially killed at one shadowfox camp, each pinned through
+/// 500-tick HoldUntilSafe timeouts). `HoldUntilSafe` now REQUIRES
+/// `FledThisPlan(true)`, which only `Flee` provides — the travel leg
+/// is load-bearing in the A* chain, enforced by the planner test
+/// `fleeing_plan_includes_the_flee_travel_leg`.
+///
 /// Costs are kept low (1/2/1) because Fleeing is a tier-1 acute-survival
 /// disposition that should outcompete anything but other tier-1 plans
 /// when the modifier ramp lifts it.
@@ -54,16 +67,23 @@ pub fn fleeing_actions() -> Vec<GoapActionDef> {
         GoapActionDef {
             kind: GoapActionKind::Flee,
             cost: 2,
-            preconditions: vec![StatePredicate::FleeTargetPicked(true)],
-            effects: vec![],
+            preconditions: vec![
+                StatePredicate::FleeTargetPicked(true),
+                StatePredicate::FledThisPlan(false),
+            ],
+            effects: vec![StateEffect::SetFledThisPlan(true)],
         },
         GoapActionDef {
             kind: GoapActionKind::HoldUntilSafe,
             cost: 1,
-            preconditions: vec![StatePredicate::FleeTargetPicked(true)],
+            preconditions: vec![
+                StatePredicate::FleeTargetPicked(true),
+                StatePredicate::FledThisPlan(true),
+            ],
             effects: vec![
                 StateEffect::IncrementTrips,
                 StateEffect::SetFleeTargetPicked(false),
+                StateEffect::SetFledThisPlan(false),
             ],
         },
     ]
@@ -1549,6 +1569,7 @@ mod tests {
             farm_tended: false,
             materials_delivered_this_plan: false,
             flee_target_picked: false,
+            fled_this_plan: false,
             has_free_slot_this_plan: false,
             has_craft_inputs_this_plan: false,
         }
@@ -1648,6 +1669,30 @@ mod tests {
             }
         }
         d
+    }
+
+    /// 140 step 10 (fix) — the Flee travel leg must be load-bearing:
+    /// A* would otherwise plan `[PickFleeTarget, HoldUntilSafe]` (Flee
+    /// had no effects) and fleeing cats never moved — pinned at the
+    /// threat through 500-tick hold timeouts (tuned-42-f7e4be8f, four
+    /// serial deaths at one shadowfox camp).
+    #[test]
+    fn fleeing_plan_includes_the_flee_travel_leg() {
+        let start = default_state();
+        let goal = GoalState {
+            predicates: vec![StatePredicate::TripsAtLeast(1)],
+        };
+        let plan = plan!(start, &fleeing_actions(), &goal, 10, 200).expect("fleeing must plan");
+        let kinds: Vec<_> = plan.iter().map(|p| p.action).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                GoapActionKind::PickFleeTarget,
+                GoapActionKind::Flee,
+                GoapActionKind::HoldUntilSafe,
+            ],
+            "Flee travel leg must sit between Pick and Hold"
+        );
     }
 
     #[test]

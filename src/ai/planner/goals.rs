@@ -141,6 +141,7 @@ mod tests {
             farm_tended: false,
             materials_delivered_this_plan: false,
             flee_target_picked: false,
+            fled_this_plan: false,
             has_free_slot_this_plan: false,
             has_craft_inputs_this_plan: false,
         }

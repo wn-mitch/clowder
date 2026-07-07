@@ -15,10 +15,10 @@ _Last generated: 2026-07-06._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 118 |
+| Ready | 119 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **164** |
+| **Open total** | **165** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (118)
+## Ready by cluster (119)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -226,6 +226,10 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
 
+### balance (1 ready)
+
+- **[512](docs/open-work/tickets/512-remote-starvation-eats-spatial-discount-floor-loses-every-softmax-to-resting-under-critical-hunger-no-desperation-lever-lifts-the-distance-discount-as-hunger-goes-critical.md)** — remote starvation: Eat's spatial discount floor loses every softmax to Resting under critical hunger — no desperation lever lifts the distance discount as hunger goes critical — _[balance] · added 2026-07-06_
+
 ## Ready by initiative (82 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
@@ -339,7 +343,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (118)
+## Ready (119)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -459,6 +463,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[507](docs/open-work/tickets/507-recalibrate-social-perception-and-welfare-constants-against-undiluted-post-506-inputs-fulfillment-38pct-happiness-13pct-social-status-distress-live-for-the-first-time.md)** — Recalibrate social-perception and welfare constants against undiluted post-506 inputs (fulfillment -38pct, happiness -13pct, social_status_distress live for the first time) — _[ai-substrate] · added 2026-07-05_
 - **[509](docs/open-work/tickets/509-mating-conversion-margin-haseligiblemate-flickers-with-htn-abandon-maslow-pregate-zeroes-eligible-windows-courtship-stage-advance-falloff-9130-to-12-and-the-section-7-commitment-layer-reads-00-all-run.md)** — Mating conversion margin: HasEligibleMate flickers with HTN Abandon, Maslow pregate zeroes eligible windows, courtship stage-advance falloff 9130-to-12, and the section-7 commitment layer reads 0.0 all run — _[ai-substrate] · added 2026-07-05_
 - **[510](docs/open-work/tickets/510-trash-vs-drop-disposal-margin-is-a-1e-4-coin-flip-with-a-midden-present-midden-discipline-exists-only-as-an-rng-draw.md)** — Trash vs Drop disposal margin is a 1e-4 coin flip with a Midden present — midden discipline exists only as an RNG draw — _[ai-substrate] · added 2026-07-05_
+- **[512](docs/open-work/tickets/512-remote-starvation-eats-spatial-discount-floor-loses-every-softmax-to-resting-under-critical-hunger-no-desperation-lever-lifts-the-distance-discount-as-hunger-goes-critical.md)** — remote starvation: Eat's spatial discount floor loses every softmax to Resting under critical hunger — no desperation lever lifts the distance discount as hunger goes critical — _[balance] · added 2026-07-06_
 
 ## Parked (12)
 

@@ -211,6 +211,15 @@ pub struct PlannerState {
     /// Cleared by `HoldUntilSafe`'s `IncrementTrips` so the cat can
     /// re-pick on a subsequent re-plan if a fresh threat appears.
     pub flee_target_picked: bool,
+    /// 140 step 10 (fix) — search-state flag: true iff a `Flee`
+    /// travel leg has been simulated earlier in this A* expansion.
+    /// `HoldUntilSafe` requires it. Without this flag `Flee` had no
+    /// effects, so A* always found the cheaper
+    /// `[PickFleeTarget, HoldUntilSafe]` plan and the travel leg was
+    /// NEVER planned — "fleeing" cats picked a flee target and then
+    /// held position AT the threat until the hold timed out (lethal
+    /// at shadowfox camps; see tuned-42-f7e4be8f, 4 injury deaths).
+    pub fled_this_plan: bool,
     /// Search-state only (ticket 231): `true` iff a `DropItem` step
     /// has been simulated earlier in *this* A* expansion. Pair with
     /// `HasMarker(HasFreeSlot::KEY)` as alternate preconditions on the
@@ -488,6 +497,10 @@ pub enum StatePredicate {
     /// simulated a `PickFleeTarget` step earlier in this A* expansion.
     /// Used by `Flee` and `HoldUntilSafe` to enforce chain ordering.
     FleeTargetPicked(bool),
+    /// 140 step 10 (fix): true iff the planner has simulated a `Flee`
+    /// travel leg earlier in this A* expansion. `HoldUntilSafe`
+    /// requires it so the travel leg is load-bearing in the chain.
+    FledThisPlan(bool),
     /// Ticket 231: search-state predicate. True iff the planner has
     /// simulated a `DropItem` step earlier in this A* expansion.
     /// Pair with `HasMarker(HasFreeSlot::KEY)` as alternate
@@ -521,6 +534,7 @@ impl StatePredicate {
             Self::MaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan == *v,
             Self::HasMarker(name) => ctx.markers.has(name, ctx.entity),
             Self::FleeTargetPicked(v) => state.flee_target_picked == *v,
+            Self::FledThisPlan(v) => state.fled_this_plan == *v,
             Self::HasFreeSlotThisPlan(v) => state.has_free_slot_this_plan == *v,
             Self::HasCraftInputsThisPlan(v) => state.has_craft_inputs_this_plan == *v,
         }
@@ -545,6 +559,9 @@ pub enum StateEffect {
     /// the chain ordering predicate `FleeTargetPicked(true)` evaluates
     /// in subsequent A* expansions.
     SetFleeTargetPicked(bool),
+    /// 140 step 10 (fix): set the search-state `fled_this_plan` flag —
+    /// `Flee`'s effect, required by `HoldUntilSafe`.
+    SetFledThisPlan(bool),
     /// Ticket 231: set the search-state `has_free_slot_this_plan`
     /// flag, applied by the DropItem-as-prefix action in pickup-class
     /// plans so the substrate-vs-plan-path Construct precedent
@@ -573,6 +590,7 @@ impl StateEffect {
             Self::IncrementTrips => state.trips_done += 1,
             Self::SetMaterialsDeliveredThisPlan(v) => state.materials_delivered_this_plan = *v,
             Self::SetFleeTargetPicked(v) => state.flee_target_picked = *v,
+            Self::SetFledThisPlan(v) => state.fled_this_plan = *v,
             Self::SetHasFreeSlotThisPlan(v) => state.has_free_slot_this_plan = *v,
             Self::SetHasCraftInputsThisPlan(v) => state.has_craft_inputs_this_plan = *v,
         }
@@ -910,6 +928,7 @@ mod tests {
             farm_tended: false,
             materials_delivered_this_plan: false,
             flee_target_picked: false,
+            fled_this_plan: false,
             has_free_slot_this_plan: false,
             has_craft_inputs_this_plan: false,
         }

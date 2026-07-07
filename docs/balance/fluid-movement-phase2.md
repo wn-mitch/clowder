@@ -330,3 +330,36 @@ cat 1.0 — the gap grows, cats shouldn't close it); ground-prey kill
 rates within ±10-ish% (escape-speed contrast preserved via the cap
 fold); hunt-success in band; survival + continuity canaries hold;
 DenRaided / prey-population dynamics not distorted.
+
+### Observation — soak 1 (`logs/tuned-42-f7e4be8f`): FAIL (5 deaths)
+Continuity pass; survival FAIL: Starvation 1 + four injury deaths
+(ShadowFoxAmbush 2, WildlifeCombat 1, FoxConfrontation 1). Drills:
+
+1. **The four injury deaths — one shadowfox camp.** Nettle pinned at
+   (76,29) taking a lunge every ~48 ticks for 1,000+ ticks through TWO
+   full 500-tick HoldUntilSafe timeouts; Basil/Calcifer died at the
+   same tiles days later; max at a second camp. Root cause is a
+   **pre-existing planner bug live since ticket 230**: the `Flee`
+   action had `effects: []`, so A* always found the cheaper
+   `[PickFleeTarget, HoldUntilSafe]` two-step plan — the flee TRAVEL
+   leg has never been part of any Fleeing plan (verified: 2-step shape
+   in every healthy baseline run). "Fleeing" cats picked a flee target
+   and then hysteresis-held AT the threat. The step-6 desire-based
+   flee resolver was dead code in Fleeing plans. FIXED: new
+   `FledThisPlan` search-state predicate/effect; `Flee` provides it,
+   `HoldUntilSafe` requires it; planner test pins the 3-step shape.
+   (Why only lethal now: trajectory parked a shadowfox camp inside a
+   hunting ground — cats kept electing Hunting back into range, and
+   each Fleeing response held them in the kill zone.)
+2. **Starvation (Hazelkit-3)** — remote-geometry sibling of 511:
+   juvenile wandered to (107,8) (~77 tiles from stores), and Eat's
+   `stores_distance` ClampMin(0.1) floor made feeding unwinnable
+   against Resting in the distress-sharpened softmax (276/300 final
+   plans Resting; colony food 88–100% throughout; elections + 511
+   starvation_override all functioning). Opened **ticket 512**
+   (desperation-modifier direction, layer-walk complete). Not
+   step-10 code: the discount shape predates Phase II; the walkabout
+   trajectory exposed it. Landing rule recorded in 512: if the re-soak
+   still shows Starvation>0, 512-R3 blocks step 10.
+3. Prey-side predictions couldn't be scored against this trajectory
+   (colony spent the run bleeding); re-scored on the re-soak.

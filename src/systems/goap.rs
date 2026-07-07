@@ -11007,6 +11007,10 @@ fn build_planner_state(
         // `PickFleeTarget` is the first step in `fleeing_actions()`,
         // and `Flee` / `HoldUntilSafe` are gated on it.
         flee_target_picked: false,
+        // 140 step 10 (fix): the Flee travel leg hasn't run yet;
+        // `HoldUntilSafe` requires `FledThisPlan(true)` so A* must
+        // include `Flee` between Pick and Hold.
+        fled_this_plan: false,
         // 231: pickup-class plans always start without a planned drop;
         // the substrate-path variant of pickup actions reads
         // `HasFreeSlot` (the marker) and the plan-path variant reads
