@@ -7,7 +7,7 @@ orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-13
 parked: null
-blocked-by: [314]
+blocked-by: [314, 516]
 supersedes: []
 related-systems: []
 related-balance: []
@@ -69,3 +69,4 @@ Blocked-by 263 (lands the substrate axes dormant) and 314 (extends ActionAfforda
 
 - 2026-05-13: opened as 263 activation follow-on. Owns the four-artifact methodology that 263 deferred.
 - 2026-05-19: accuracy audit pass — blocked-by 314 is open ready (not landed); 263 is landed; four-artifact methodology discipline is sound; frame-diff and canary scoping correct.
+- 2026-07-07: re-blocked on 516 — `hunt_best_predation_affordance` routes to the no-op fetch_self under the current `target_`-prefix dispatch, so activating it before 516's routing fix would soak-verify a null axis.
