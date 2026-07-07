@@ -363,3 +363,36 @@ Continuity pass; survival FAIL: Starvation 1 + four injury deaths
    still shows Starvation>0, 512-R3 blocks step 10.
 3. Prey-side predictions couldn't be scored against this trajectory
    (colony spent the run bleeding); re-scored on the re-soak.
+
+### Observation — soak 2 (`logs/tuned-42-44d3ecfb`): PASS
+- **ZERO deaths run-wide**; canaries green (grooming 3413 · play 126
+  · mentoring 3839 · courtship 16350); never-fired clean; 117.3 tps.
+- Prey ecosystem stable: live prey pinned at 245 all run in BOTH runs
+  (den replenishment holds populations at cap — kill-rate changes
+  cannot cascade into collapse at current predation levels).
+- Cat hunt-success 22.3% (1628 attempts / 363 kills) vs 27.5%
+  pre-step-10 — direction consistent with honest prey escape speeds
+  (flee cap preserves rabbit 2.0 contrast); both sides of the change
+  sit below the 30–50% biology target whose restoration step 12's
+  gait/pursuit work explicitly owns (+5–15% predicted there).
+- **Watch item — HawkDiveLanded 1250 → 3360 (+169%)**: ground prey no
+  longer hop a full tile per graze cadence, so hawks fail fewer dives
+  (prey drift less between spot and dive). Prey cannot perceive
+  aerial predators AT ALL (pre-existing — `try_detect_cat` is the
+  only detection channel), so this is texture-scale for now (capped
+  populations absorb it); the honest fix is prey aerial-threat
+  perception, which belongs to Phase V's living-world work (351/310
+  seam). Recorded for the step-22-25 planning pass.
+- Fleeing plans now carry the travel leg (3-step shape in this run's
+  PlanCreated stream); no cat held position at a predator camp.
+
+### Concordance
+Concordant after one fix iteration. The injury-death cluster was a
+230-era planner bug (travel leg never planned) that only honest
+movement + a hostile trajectory could expose; the fix is structural
+(load-bearing effect + pinned planner test), not parameter tuning.
+The starvation was the 512 remote-geometry gap — did not recur on
+this trajectory; 512 proceeds as an independent balance ticket per
+the landing rule. Prey-side drift is bounded by den-cap dynamics;
+the two watch items (hunt-success below biology band, hawk dive
+inflation) have named owners (step 12, Phase V).
