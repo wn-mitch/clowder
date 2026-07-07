@@ -1,7 +1,8 @@
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::Schedule;
 
-use clowder::components::mental::{Memory, MemoryEntry, MemoryType};
+use clowder::components::beliefs::{bucket_position, Facet, LocationBeliefs};
+use clowder::components::mental::MemoryType;
 use clowder::components::physical::Position;
 use clowder::resources::colony_knowledge::ColonyKnowledge;
 use clowder::resources::narrative::{NarrativeLog, NarrativeTier};
@@ -24,36 +25,29 @@ fn setup_world(tick: u64) -> (World, Schedule) {
     (world, schedule)
 }
 
-fn make_memory(event_type: MemoryType, x: i32, y: i32, strength: f32) -> MemoryEntry {
-    MemoryEntry {
-        event_type,
-        location: Some(Position::new(x, y)),
-        involved: vec![],
-        tick: 0,
-        strength,
-        firsthand: true,
-    }
+/// A cat holding one strong threat belief at `(x, y)`'s bucket. 291 —
+/// promotion derives from `LocationBeliefs` agreement, not `Memory`
+/// carrier counts; these tests migrated with the cutover, preserving
+/// their original intent (promotion at / below the quorum).
+fn spawn_cat_with_threat_belief(world: &mut World, x: i32, y: i32, value: f32) -> Entity {
+    let mut locs = LocationBeliefs::default();
+    let model = locs.models.entry(bucket_position(x, y)).or_default();
+    model.recency_of_threat_cue = Facet {
+        value,
+        strength: 0.9,
+        ..Default::default()
+    };
+    world.spawn(locs).id()
 }
 
-fn spawn_cat_with_memories(world: &mut World, entries: Vec<MemoryEntry>) -> Entity {
-    let mut memory = Memory::default();
-    for e in entries {
-        memory.remember(e);
-    }
-    world.spawn(memory).id()
-}
-
-/// When 3+ cats share the same memory (type + approximate location), it
-/// promotes to colony knowledge.
+/// When 3+ cats agree on a threat belief at a bucket, it promotes to
+/// colony knowledge.
 #[test]
 fn knowledge_promotes_at_threshold() {
     let (mut world, mut schedule) = setup_world(500);
 
     for _ in 0..3 {
-        spawn_cat_with_memories(
-            &mut world,
-            vec![make_memory(MemoryType::ThreatSeen, 10, 10, 0.8)],
-        );
+        spawn_cat_with_threat_belief(&mut world, 10, 10, 0.8);
     }
 
     schedule.run(&mut world);
@@ -62,18 +56,16 @@ fn knowledge_promotes_at_threshold() {
     assert_eq!(knowledge.entries.len(), 1);
     assert_eq!(knowledge.entries[0].event_type, MemoryType::ThreatSeen);
     assert_eq!(knowledge.entries[0].carrier_count, 3);
+    assert_eq!(knowledge.entries[0].witnesses.len(), 3);
 }
 
-/// Colony knowledge is not promoted below the threshold.
+/// Colony knowledge is not promoted below the agreement quorum.
 #[test]
 fn knowledge_does_not_promote_below_threshold() {
     let (mut world, mut schedule) = setup_world(500);
 
     for _ in 0..2 {
-        spawn_cat_with_memories(
-            &mut world,
-            vec![make_memory(MemoryType::ThreatSeen, 10, 10, 0.8)],
-        );
+        spawn_cat_with_threat_belief(&mut world, 10, 10, 0.8);
     }
 
     schedule.run(&mut world);
@@ -98,6 +90,7 @@ fn knowledge_lost_when_carriers_gone() {
                 location: Some(bucketed),
                 strength: 0.8,
                 carrier_count: 3,
+                witnesses: vec![],
             });
     }
 

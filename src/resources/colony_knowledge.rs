@@ -14,10 +14,20 @@ pub struct KnowledgeEntry {
     pub event_type: MemoryType,
     /// Bucketed location (rounded to nearest 5 tiles).
     pub location: Option<Position>,
-    /// Knowledge strength in `[0.0, 1.0]`. Decays very slowly.
+    /// Knowledge strength in `[0.0, 1.0]`. 291 — the agreed mean facet
+    /// VALUE of the witness set at the last derivation scan (was: avg
+    /// memory strength with per-tick decay).
     pub strength: f32,
-    /// Number of living cats who hold a matching individual memory.
+    /// Number of living cats whose beliefs agree on this entry (291 —
+    /// was: count of cats holding a matching individual memory).
     pub carrier_count: u32,
+    /// 291 — the cats whose agreeing mental models derived this entry,
+    /// for citable narrative ("Whisker, Cedar, and Mallow all agree the
+    /// den at (10,15) is dangerous") and the false-belief scenario's
+    /// witness-chain assertion. Not serialized anywhere today; raw
+    /// `Entity` ids don't survive saves and the derivation rebuilds
+    /// every `scan_interval` ticks regardless.
+    pub witnesses: Vec<bevy_ecs::entity::Entity>,
 }
 
 // ---------------------------------------------------------------------------
@@ -35,6 +45,12 @@ pub struct ColonyKnowledge {
     /// preventing the same "colony has forgotten X" message from spamming the log
     /// when knowledge is repeatedly promoted and decayed.
     pub recently_forgotten: HashMap<String, u64>,
+    /// 291 / 258 exit criteria — cumulative measured belief-divergence:
+    /// per derivation scan, each `(bucket, facet)` group that met the
+    /// strength quorum but failed value agreement contributes
+    /// `scan_interval` ticks. Emitted as the
+    /// `belief_divergence_duration_ticks` footer field.
+    pub divergence_duration_ticks: u64,
 }
 
 impl ColonyKnowledge {
@@ -127,6 +143,7 @@ mod tests {
             location: Some(bucketed),
             strength: 0.5,
             carrier_count: 3,
+            witnesses: vec![],
         });
 
         assert!(ck.has_entry(MemoryType::ThreatSeen, &Some(bucketed)));
@@ -145,12 +162,14 @@ mod tests {
             location: Some(pos_a),
             strength: 0.5,
             carrier_count: 3,
+            witnesses: vec![],
         });
         ck.entries.push(KnowledgeEntry {
             event_type: MemoryType::ThreatSeen,
             location: Some(pos_b),
             strength: 0.8,
             carrier_count: 5,
+            witnesses: vec![],
         });
 
         assert_eq!(ck.find_entry(MemoryType::ThreatSeen, &Some(pos_b)), Some(1));
@@ -164,6 +183,7 @@ mod tests {
             location: Some(Position::new(50, 10)),
             strength: 0.5,
             carrier_count: 3,
+            witnesses: vec![],
         };
         let desc = knowledge_description(&entry);
         assert!(desc.contains("danger"), "expected 'danger', got: {desc}");

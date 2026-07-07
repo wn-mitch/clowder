@@ -724,6 +724,12 @@ pub fn emit_headless_footer(world: &mut World) -> String {
         "shadow_foxes_avoided_ward_total": feature_count(Feature::ShadowFoxAvoidedWard),
         "ward_siege_started_total": feature_count(Feature::WardSiegeStarted),
         "shadow_fox_spawn_total": feature_count(Feature::ShadowFoxSpawn),
+        // 291 / 258 exit criteria — cumulative ticks x groups where a
+        // strength-quorum of cats actively DISAGREED about a location
+        // facet (the belief-divergence window the derivation measures).
+        "belief_divergence_duration_ticks": world
+            .resource::<crate::resources::colony_knowledge::ColonyKnowledge>()
+            .divergence_duration_ticks,
         "anxiety_interrupt_total": feature_count(Feature::AnxietyInterrupt),
         "positive_features_active": positive_features_active,
         "positive_features_total": positive_features_total,

@@ -7677,19 +7677,42 @@ impl Default for PreyByproductConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KnowledgeConstants {
-    pub decay_per_tick: f32,
-    pub promotion_threshold: u32,
+    /// Ticks between colony-knowledge derivation scans. 291 — the
+    /// derivation replaced the legacy per-tick decay + Memory scan;
+    /// entry strength now tracks live belief state at each scan.
     pub scan_interval: u64,
+    /// Cooldown on re-narrating "the colony has forgotten X" for the
+    /// same description, preventing promote/dissolve cycle spam.
     pub forgotten_cooldown: u64,
+    /// 291 — how many cats must agree (facet values mutually within
+    /// `agreement_epsilon` of the group median) for a belief to
+    /// promote to colony knowledge. Successor to the retired
+    /// carrier-count `promotion_threshold` (same default, 3).
+    pub agreement_quorum: u32,
+    /// 291 — max distance from the group median a cat's facet value
+    /// may sit while still counting toward the agreement quorum.
+    pub agreement_epsilon: f32,
+    /// 291 — minimum facet STRENGTH (evidence confidence) for a cat's
+    /// belief to count toward the quorum at all. Filters barely-formed
+    /// or nearly-forgotten beliefs out of the consensus.
+    pub promotion_strength: f32,
+    /// 291 — minimum agreed facet VALUE for promotion. A quorum
+    /// agreeing "nothing notable here" (decayed values near 0) is
+    /// consensus about absence — not knowledge worth an entry, and
+    /// without this floor it would churn phantom near-zero entries
+    /// through the promote/forget narrative.
+    pub min_promotion_value: f32,
 }
 
 impl Default for KnowledgeConstants {
     fn default() -> Self {
         Self {
-            decay_per_tick: 0.0001,
-            promotion_threshold: 3,
             scan_interval: 500,
             forgotten_cooldown: 1000,
+            agreement_quorum: 3,
+            agreement_epsilon: 0.2,
+            promotion_strength: 0.3,
+            min_promotion_value: 0.05,
         }
     }
 }
