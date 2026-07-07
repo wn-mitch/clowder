@@ -15,10 +15,10 @@ _Last generated: 2026-07-07._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 118 |
+| Ready | 119 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **164** |
+| **Open total** | **165** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (118)
+## Ready by cluster (119)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -163,10 +163,10 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _[belief-perception] · added 2026-05-08_
 - **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _[belief-perception] · added 2026-05-08_
 - **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
-- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
+- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · added 2026-05-26_
 
-### combat-threat (8 ready, 2 blocked)
+### combat-threat (9 ready, 2 blocked)
 
 - **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[combat-threat] · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[combat-threat] · added 2026-05-02_
@@ -176,6 +176,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[287](docs/open-work/tickets/287-move-boldness-out-of-fleedse-cp-axes-onto-a-boldnessfleemodulation-modifier-271-r3-structural-follow-on.md)** — Move boldness out of FleeDse CP axes onto a BoldnessFleeModulation modifier (271 R3 structural follow-on) — _[combat-threat] · added 2026-05-11_
 - **[289](docs/open-work/tickets/289-engagethreat-retry-cooldown-after-morale-break-suppress-immediate-guarding-re-election-under-active-fight-directive.md)** — EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive — _[combat-threat] · added 2026-05-11_
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
+- **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 
 ### wildlife (8 ready, 1 blocked)
 
@@ -306,7 +307,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _[belief-perception] · added 2026-05-08_
 - **[280](docs/open-work/tickets/280-mental-model-of-partner-jointintention-compose-127-with-258-c3-mental-models.md)** — Mental model of partner JointIntention (compose 127 with 258 C3 mental models) — _[social-coordination] · added 2026-05-11_
 - **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
-- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
+- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · added 2026-05-26_
 
 ### generational-continuity (8 open, 6 landed)
@@ -343,7 +344,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (118)
+## Ready (119)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -398,7 +399,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[302](docs/open-work/tickets/302-investigate-just-soak-vs-just-sweep-non-determinism-on-identical-seedbinary.md)** — investigate just soak vs just sweep non-determinism on identical seed/binary — _[process-discipline] · added 2026-05-12_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
-- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · added 2026-05-12_
+- **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
 - **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · added 2026-05-13_
@@ -463,6 +464,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[512](docs/open-work/tickets/512-remote-starvation-eats-spatial-discount-floor-loses-every-softmax-to-resting-under-critical-hunger-no-desperation-lever-lifts-the-distance-discount-as-hunger-goes-critical.md)** — remote starvation: Eat's spatial discount floor loses every softmax to Resting under critical hunger — no desperation lever lifts the distance discount as hunger goes critical — _[balance] · added 2026-07-06_
 - **[513](docs/open-work/tickets/513-shadowfox-colony-pressure-channel-fading-under-fluid-movement-drives-softmax-self-anchors-on-remote-corruption-reconstituting-seeding-loop-scent-shell-repels-at-fine-granularity-wardsiegehaunting-interactions-zero-on-both-gate-seeds.md)** — shadowfox colony-pressure channel fading under fluid movement: drives softmax self-anchors on remote corruption (Reconstituting-Seeding loop), scent shell repels at fine granularity, ward/siege/haunting interactions zero on both gate seeds — _[wildlife] · added 2026-07-06_
 - **[514](docs/open-work/tickets/514-mentor-churn-mentor-target-elects-incapacitated-mentees-the-step-entry-alive-gate-then-rejects-1111-mentorcat-plan-failures-per-soak-on-incapacitation-heavy-trajectories.md)** — mentor churn: mentor_target elects Incapacitated mentees the step-entry alive-gate then rejects — 1111 MentorCat plan failures per soak on incapacitation-heavy trajectories — _[planning-substrate] · added 2026-07-07_
+- **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 
 ## Parked (12)
 

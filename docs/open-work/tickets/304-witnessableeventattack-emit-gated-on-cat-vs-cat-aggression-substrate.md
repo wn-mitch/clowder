@@ -7,13 +7,17 @@ orchestration: substrate-sensitive
 initiative: [full-sensory-perception]
 added: 2026-05-12
 parked: null
-blocked-by: []
+blocked-by: [515]
 supersedes: []
 related-systems: []
 related-balance: []
 landed-at: null
 landed-on: null
 ---
+
+<!-- 2026-07-08: re-blocked on 515 per the 0.4.0 plan step-16 descope
+ceremony — the cat-vs-cat aggression substrate now has its own ticket
+(0.5.0 target); 304 wires the Attack emit once it lands. -->
 
 ## Why
 
