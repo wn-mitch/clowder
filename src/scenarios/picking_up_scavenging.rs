@@ -243,7 +243,7 @@ mod tests {
     /// edge nudges without changing what the scenario tests.
     #[test]
     fn picking_up_wins_with_ground_food_present() {
-        let report = run(&SCENARIO, None, Some(60), 42);
+        let report = run(&SCENARIO, None, Some(120), 42);
         let item_retrieved = report
             .feature_counts
             .get("ItemRetrieved")
@@ -266,7 +266,10 @@ mod tests {
     /// resolver never executed.
     #[test]
     fn pick_up_resolver_actually_executes() {
-        let report = run(&SCENARIO, None, Some(60), 42);
+        // 140 step 12 — gait desires shift movement one tick later and
+        // ramp under max_accel; the 60-tick budget left no slack (same
+        // shape as the step-6 30->60 bump).
+        let report = run(&SCENARIO, None, Some(120), 42);
         assert!(
             report.final_focal_inventory_count >= 1,
             "focal cat must end with ≥1 inventory slot used (proves PickUp resolver ran); \

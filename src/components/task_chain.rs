@@ -33,6 +33,12 @@ pub struct TaskStep {
     /// Waypoints are consumed front-to-back each tick.
     #[serde(skip)]
     pub cached_path: Option<Vec<Position>>,
+    /// 140 step 12 — position when this step last resolved, for
+    /// desire-based progress detection (the integrator moves after
+    /// the resolver; compare world-space > 0.05 tiles). Sibling of
+    /// `StepExecutionState::last_observed_position`.
+    #[serde(skip)]
+    pub last_observed_position: Option<Position>,
 }
 
 impl TaskStep {
@@ -43,6 +49,7 @@ impl TaskStep {
             target_position: None,
             target_entity: None,
             cached_path: None,
+            last_observed_position: None,
         }
     }
 

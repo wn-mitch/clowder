@@ -576,7 +576,10 @@ pub fn fox_resolve_goap_plans(
         (With<WildAnimal>, Without<Dead>),
     >,
     mut dens: Query<(Entity, &mut FoxDen, &Position), Without<FoxState>>,
-    prey: Query<&Position, (With<crate::components::prey::PreyAnimal>, Without<FoxState>)>,
+    prey: Query<
+        (&Position, &crate::components::physical::Velocity),
+        (With<crate::components::prey::PreyAnimal>, Without<FoxState>),
+    >,
     stores: Query<
         &Position,
         (
@@ -596,7 +599,11 @@ pub fn fox_resolve_goap_plans(
     mut activation: Option<ResMut<SystemActivation>>,
 ) {
     let store_positions: Vec<Position> = stores.iter().copied().collect();
-    let prey_positions: Vec<Position> = prey.iter().copied().collect();
+    let prey_positions: Vec<Position> = prey.iter().map(|(p, _)| *p).collect();
+    // 140 step 12 — live (position, velocity) snapshot for StalkPrey's
+    // per-tick lead-interception re-aim.
+    let prey_kinematics: Vec<(Position, bevy::math::Vec2)> =
+        prey.iter().map(|(p, v)| (*p, v.0)).collect();
     let cat_entities: Vec<(Entity, Position)> = cats.iter().map(|(e, p)| (e, *p)).collect();
     let active_confrontations: std::collections::HashSet<Entity> = confrontations.iter().collect();
 
@@ -673,15 +680,58 @@ pub fn fox_resolve_goap_plans(
                     };
                 }
                 let step_state = plan.current_state_mut().unwrap();
-                fox_steps::resolve_travel_to(
-                    pos,
-                    &mut desired,
-                    &constants.movement,
-                    step_state,
-                    &map,
-                    &deterrent_map,
-                    &constants.scoring,
-                )
+                // 140 step 12 — StalkPrey pursues the nearest LIVE prey
+                // with lead interception instead of walking to the
+                // stale plan-time snapshot: re-aim every tick at the
+                // closest prey's predicted position. Out-of-range (no
+                // prey within twice the search radius) falls through to
+                // the corridor travel toward the planned hunting ground.
+                if matches!(current_step.action, FoxGoapActionKind::StalkPrey) {
+                    if let Some((pp, pv)) = prey_kinematics
+                        .iter()
+                        .min_by_key(|(pp, _)| pos.tile_distance_squared(pp))
+                        .copied()
+                        .filter(|(pp, _)| pos.distance_to(pp) <= 18.0)
+                    {
+                        desired.0 = Some(crate::ai::steering::pursue(
+                            pos.0,
+                            pp.0,
+                            pv,
+                            constants.movement.fox_max_speed,
+                            4.0,
+                        ));
+                        if pos.distance_to(&pp) <= 1.5 {
+                            StepResult::Advance
+                        } else {
+                            step_state.ticks_elapsed += 1;
+                            if step_state.ticks_elapsed > 200 {
+                                StepResult::Fail("stalk timeout".into())
+                            } else {
+                                StepResult::Continue
+                            }
+                        }
+                    } else {
+                        fox_steps::resolve_travel_to(
+                            pos,
+                            &mut desired,
+                            &constants.movement,
+                            step_state,
+                            &map,
+                            &deterrent_map,
+                            &constants.scoring,
+                        )
+                    }
+                } else {
+                    fox_steps::resolve_travel_to(
+                        pos,
+                        &mut desired,
+                        &constants.movement,
+                        step_state,
+                        &map,
+                        &deterrent_map,
+                        &constants.scoring,
+                    )
+                }
             }
 
             FoxGoapActionKind::SearchPrey => {

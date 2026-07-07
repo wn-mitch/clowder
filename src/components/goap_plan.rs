@@ -207,6 +207,14 @@ pub struct StepExecutionState {
     /// observation; remains `Some` for the lifetime of this `StepExecutionState`.
     #[serde(default)]
     pub attempt_start_distance: Option<i32>,
+    /// 140 step 12 — the cat's position when this step last resolved.
+    /// Desire-based resolvers can't observe their own movement inside
+    /// one call (the integrator moves AFTER the resolver), so stuck
+    /// detection compares against the previous tick's position in
+    /// world space (`> 0.05` tiles = progress). `#[serde(skip)]`:
+    /// recomputed on first resolve after load.
+    #[serde(skip)]
+    pub last_observed_position: Option<Position>,
 }
 
 /// Internal phase tracking for complex actions.

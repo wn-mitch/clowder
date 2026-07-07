@@ -335,7 +335,10 @@ pub fn snake_resolve_goap_plans(
                 let outcome = snake_steps::resolve_strike(
                     pos,
                     &mut desired,
-                    snake_speed,
+                    // 140 step 12 — the strike is a burst: sprint gait
+                    // restores the pre-140 lunge contrast the honest
+                    // 0.5 cap took away (step-9 concordance note).
+                    snake_speed * constants.movement.sprint_speed_mult,
                     step_state,
                     &prey_entities,
                     sc.strike_range,

@@ -450,3 +450,37 @@ floor did its job — one seed's zero was luck (step 8), two seeds'
 zeros forced the layer walk that separated "this landing broke it"
 from "the ecology has been drifting since step 8 and this landing's
 trajectory finished it."
+
+## Iteration 7 — step 12: gaits + pursuit + terrain speed (2026-07-06)
+
+### Changes
+- **Gait layer**: resolvers encode gait in the desire magnitude; the
+  integrator ceiling becomes `per_tick × sprint_speed_mult × terrain`
+  (walk desires still travel at base — the cap binds only above the
+  desire magnitude; `escape_viability`'s per_tick read keeps base
+  semantics). Hunt stalk 0.4×, approach/search/forage walk 1.0×,
+  chase/flee sprint 1.4×, snake Strike sprint (restores the lunge
+  contrast step 9's honest 0.5 cap took — the −44% SnakeStruckPrey
+  re-baseline's named owner).
+- **Pursuit**: cat chase and fox StalkPrey use
+  `pursue(target_pos, target_vel)` lead interception (≤4 ticks of
+  aim-ahead); fox StalkPrey re-aims at the nearest LIVE prey each tick
+  (≤18 tiles) instead of walking to the stale plan-time snapshot.
+- **Terrain speed**: integrator scales the cap by the current tile's
+  movement-cost bucket (grass 1.0 / light forest 0.8 / dense forest
+  0.6 / rock 0.5; new tunables). Terrain finally costs speed, not just
+  route preference. Flying exempt.
+- Hunt arms (goap.rs + the disposition-chain mirror), SearchPrey and
+  ForageItem wanders, and the travel-fallback arm are all desire-based
+  now; stuck detection moved to world-space progress deltas
+  (`last_observed_position`, > 0.05 tiles) since the integrator moves
+  after the resolver.
+
+### Predictions (pre-registered, four-artifact)
+| # | Prediction | Band |
+|---|---|---|
+| P1 | Hunt success rate rises from 22.3% toward the 30–50% biology band (+5–15% predicted by the plan: interception + gait contrast) | gate channel |
+| P2 | SnakeStruckPrey recovers toward the pre-step-9 rate (415-era) — sprint strike restores the lunge | mechanism |
+| P3 | Survival + continuity canaries hold; Starvation == 0; ShadowFoxAmbush ≤ 10; never-fired == 0 | hard gate |
+| P4 | Flee survival: injury deaths stay 0 (sprint flee widens the gap the step-10 flee-leg fix opened) | hard-ish |
+| P5 | Throughput within noise (one terrain lookup per mover per tick) | verdict channel |

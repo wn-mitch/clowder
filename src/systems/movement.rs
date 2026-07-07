@@ -85,7 +85,34 @@ pub fn integrate_velocities(
         vel.0 = crate::ai::steering::steer(vel.0, want, accel);
         // Euclidean speed cap — with arbitrary headings an L∞ cap
         // would make ground speed direction-dependent (+41% at 45°).
-        let max_speed = budget.per_tick.max(0.0);
+        // 140 step 12 — terrain costs SPEED: the cap is scaled by the
+        // mover's current containing tile's movement-cost bucket
+        // (grass 1.0, light forest 0.8, dense forest 0.6, rock 0.5).
+        // Flying movers skip this (their branch below ignores terrain
+        // entirely). Sampling the CURRENT tile (not per-sub-step)
+        // keeps the cost one lookup per mover per tick — sub-tile
+        // boundary error is at most one tick of mismatched multiplier.
+        let terrain_mult = if flying.is_some() {
+            1.0
+        } else {
+            let (tx, ty) = pos.tile();
+            if map.in_bounds(tx, ty) {
+                constants
+                    .movement
+                    .terrain_speed_mult(map.get(tx, ty).terrain.movement_cost())
+            } else {
+                1.0
+            }
+        };
+        // 140 step 12 — gait headroom: `per_tick` is the species BASE
+        // (walk) speed; resolvers encode gait in the desire magnitude
+        // (stalk 0.4×, walk 1.0×, sprint 1.4×), so the hard ceiling is
+        // base × sprint. Walk-gait desires still travel at base speed
+        // (steer approaches the desired magnitude; the cap only binds
+        // above it) and `escape_viability`'s per_tick read keeps its
+        // base-speed semantics.
+        let max_speed =
+            budget.per_tick.max(0.0) * constants.movement.sprint_speed_mult.max(1.0) * terrain_mult;
         let speed = vel.0.length();
         if speed > max_speed && speed > f32::EPSILON {
             vel.0 *= max_speed / speed;
@@ -318,8 +345,19 @@ mod tests {
             schedule.run(&mut world);
         }
         let v = world.get::<Velocity>(e).unwrap().0;
-        // Clamped to MovementBudget::cat().per_tick = 1.0, never above.
-        assert!((v.length() - 1.0).abs() < 1e-4, "v = {v:?}");
+        // 140 step 12 — the hard ceiling is base × sprint_speed_mult
+        // (gait headroom): a desire above the ceiling clamps to it.
+        let ceiling =
+            MovementBudget::cat().per_tick * SimConstants::default().movement.sprint_speed_mult;
+        assert!((v.length() - ceiling).abs() < 1e-4, "v = {v:?}");
+        // A walk-gait desire (magnitude = base speed) is NOT lifted to
+        // the ceiling — the cap only binds above the desire magnitude.
+        for _ in 0..10 {
+            world.get_mut::<DesiredVelocity>(e).unwrap().0 = Some(Vec2::new(-1.0, 0.0));
+            schedule.run(&mut world);
+        }
+        let v = world.get::<Velocity>(e).unwrap().0;
+        assert!((v.length() - 1.0).abs() < 1e-4, "walk gait v = {v:?}");
     }
 
     #[test]

@@ -74,6 +74,17 @@ pub struct MovementConstants {
     /// this many tiles from the position the current path was planned
     /// against.
     pub path_recompute_target_drift_tiles: f32,
+    /// 140 step 12 — terrain ground-speed multipliers, sampled by the
+    /// integrator from the mover's CURRENT containing tile
+    /// (`Terrain::movement_cost()` buckets). Terrain finally costs
+    /// SPEED, not just route preference: dense forest slows a sprint,
+    /// rock slows a slither. `Flying` movers are exempt (bounds-clamp
+    /// branch). cost 1 (grass/sand/buildings) → full speed.
+    pub terrain_speed_mult_cost2: f32,
+    /// cost 2 (light forest / mud / garden / special tiles).
+    pub terrain_speed_mult_cost3: f32,
+    /// cost 3 (dense forest).
+    pub terrain_speed_mult_cost4: f32,
 }
 
 impl Default for MovementConstants {
@@ -94,6 +105,9 @@ impl Default for MovementConstants {
             waypoint_arrival_radius: 0.6,
             path_recompute_min_ticks: 8,
             path_recompute_target_drift_tiles: 3.0,
+            terrain_speed_mult_cost2: 0.8,
+            terrain_speed_mult_cost3: 0.6,
+            terrain_speed_mult_cost4: 0.5,
         }
     }
 }
@@ -109,6 +123,21 @@ impl MovementConstants {
             WildSpecies::Hawk => self.hawk_max_speed,
             WildSpecies::ShadowFox => self.shadowfox_max_speed,
             WildSpecies::Snake => self.snake_max_speed,
+        }
+    }
+
+    /// 140 step 12 — ground-speed multiplier for a terrain movement
+    /// cost. Buckets rather than a formula so each knob is
+    /// independently tunable (and visible to `just explain`).
+    /// Impassable costs never reach the integrator's speed path (the
+    /// passability check rejects them first) — return the slowest
+    /// bucket defensively.
+    pub fn terrain_speed_mult(&self, movement_cost: u32) -> f32 {
+        match movement_cost {
+            0 | 1 => 1.0,
+            2 => self.terrain_speed_mult_cost2,
+            3 => self.terrain_speed_mult_cost3,
+            _ => self.terrain_speed_mult_cost4,
         }
     }
 }

@@ -3966,7 +3966,16 @@ pub fn resolve_goap_plans(
             Without<WildAnimal>,
         ),
     >,
-    mut prey_query: Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
+    mut prey_query: Query<
+        (
+            Entity,
+            &Position,
+            &PreyConfig,
+            &mut PreyState,
+            &crate::components::physical::Velocity,
+        ),
+        With<PreyAnimal>,
+    >,
     mut stores_query: Query<&mut StoredItems>,
     items_query: Query<&Item, Without<crate::components::items::BuildMaterialItem>>,
     mut unchained_skills: Query<&mut Skills, (Without<GoapPlan>, Without<Structure>)>,
@@ -5857,7 +5866,16 @@ fn dispatch_step_action(
     relationships: &mut Relationships,
     narr: &mut NarrativeEmitter,
     rng: &mut SimRng,
-    prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
+    prey_query: &mut Query<
+        (
+            Entity,
+            &Position,
+            &PreyConfig,
+            &mut PreyState,
+            &crate::components::physical::Velocity,
+        ),
+        With<PreyAnimal>,
+    >,
     stores_query: &mut Query<&mut StoredItems>,
     items_query: &Query<
         &Item,
@@ -6064,6 +6082,8 @@ fn dispatch_step_action(
                 &mut plan.step_state[step_idx],
                 ticks,
                 pos,
+                desired_velocity,
+                &ec.constants.movement,
                 cat_loc_beliefs,
                 prey_query,
                 den_query,
@@ -6124,6 +6144,8 @@ fn dispatch_step_action(
                 &mut plan.step_state[step_idx],
                 ticks,
                 pos,
+                desired_velocity,
+                &ec.constants.movement,
                 inventory,
                 wearables,
                 skills,
@@ -6205,6 +6227,8 @@ fn dispatch_step_action(
             &mut plan.step_state[step_idx],
             ticks,
             pos,
+            desired_velocity,
+            &ec.constants.movement,
             inventory,
             skills,
             &ec.map,
@@ -9042,19 +9066,27 @@ fn resolve_travel_to(
             movement.cat_max_speed,
         ));
     } else {
-        // No path found — step toward target directly via the same
-        // `CatPathPlan` (gradient-walk's `next_step` falls back to
-        // greedy `step_toward` under the AStarFallback / NoOverlay
-        // arms; 228).
-        let before = *pos;
+        // No path found — desire toward the gradient-walk next step
+        // (`next_step` falls back to greedy `step_toward` under the
+        // AStarFallback / NoOverlay arms; 228). 140 step 12: was the
+        // last direct Position write in this resolver.
+        let mut expressed = false;
         if let Some(next) = path_plan.next_step(*pos, target, map) {
-            *pos = next;
+            if next != *pos {
+                desired.0 = Some(crate::ai::steering::seek(
+                    pos.0,
+                    next.0,
+                    movement.cat_max_speed,
+                ));
+                expressed = true;
+            }
         }
         if pos.chebyshev_distance(&target) <= 1 {
             return crate::steps::StepResult::Advance;
         }
-        // Early exit: pathfinding found no path and greedy step made no progress.
-        if *pos == before {
+        // Early exit: no route AND no desire expressed — count toward
+        // the stuck watchdog.
+        if !expressed {
             state.no_move_ticks += 1;
         } else {
             state.no_move_ticks = 0;
@@ -9081,11 +9113,23 @@ fn resolve_search_prey(
     state: &mut StepExecutionState,
     ticks: u64,
     pos: &mut Position,
+    // 140 step 12 — search wander expresses a walk-gait desire.
+    desired_velocity: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
     // 293: the cat's own per-bucket prey-yield beliefs. `None` for
     // cats spawned without a `LocationBeliefs` component (test setups
     // pre-258); the search step still works using wind / patrol_dir.
     loc_beliefs: Option<&crate::components::beliefs::LocationBeliefs>,
-    prey_query: &Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
+    prey_query: &Query<
+        (
+            Entity,
+            &Position,
+            &PreyConfig,
+            &mut PreyState,
+            &crate::components::physical::Velocity,
+        ),
+        With<PreyAnimal>,
+    >,
     den_query: &Query<(Entity, &PreyDen, &Position), Without<PreyAnimal>>,
     inventory: &mut Inventory,
     skills: &mut Skills,
@@ -9254,18 +9298,31 @@ fn resolve_search_prey(
     if dx == 0 && dy == 0 {
         dx = 1;
     }
-    let before = *pos;
-    for _ in 0..d.search_speed {
-        *pos = patrol_move(pos, dx, dy, map);
-    }
-    // If stuck at terrain edge, randomize direction to escape.
-    if *pos == before {
+    // 140 step 12 — search wander is a desire toward the patrol_move
+    // tile at walk gait (`search_speed` multi-hop collapses into the
+    // speed cap). Direction randomizes when the aimed tile is the
+    // cat's own (terrain-cornered — patrol_move returned `*pos`).
+    let aim = patrol_move(pos, dx, dy, map);
+    if aim == *pos {
         state.patrol_dir = (
             rng.rng.random_range(-1i32..=1),
             rng.rng.random_range(-1i32..=1),
         );
         let (ndx, ndy) = state.patrol_dir;
-        *pos = patrol_move(pos, ndx, ndy, map);
+        let retry = patrol_move(pos, ndx, ndy, map);
+        if retry != *pos {
+            desired_velocity.0 = Some(crate::ai::steering::seek(
+                pos.0,
+                retry.0,
+                movement.cat_max_speed,
+            ));
+        }
+    } else {
+        desired_velocity.0 = Some(crate::ai::steering::seek(
+            pos.0,
+            aim.0,
+            movement.cat_max_speed,
+        ));
     }
 
     // Visual detection → §6.5.5 hunt-target DSE. Replaces the
@@ -9277,7 +9334,7 @@ fn resolve_search_prey(
     // alertness together.
     let visible: Vec<crate::ai::dses::hunt_target::PreyCandidate> = prey_query
         .iter()
-        .filter(|(_, pp, _, _)| {
+        .filter(|(_, pp, _, _, _)| {
             crate::systems::sensing::observer_sees_at(
                 crate::components::SensorySpecies::Cat,
                 *pos,
@@ -9288,7 +9345,7 @@ fn resolve_search_prey(
             )
         })
         .map(
-            |(e, pp, pc, ps)| crate::ai::dses::hunt_target::PreyCandidate {
+            |(e, pp, pc, ps, _)| crate::ai::dses::hunt_target::PreyCandidate {
                 entity: e,
                 position: *pp,
                 kind: pc.kind,
@@ -9356,12 +9413,12 @@ fn resolve_search_prey(
         let source = Position::new(sx, sy);
         prey_query
             .iter()
-            .min_by_key(|(_, pp, _, _)| source.tile_distance_squared(pp))
+            .min_by_key(|(_, pp, _, _, _)| source.tile_distance_squared(pp))
     } else {
         None
     };
 
-    if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
+    if let Some((prey_entity, prey_pos_ref, _, _, _)) = scented_prey {
         state.target_entity = Some(prey_entity);
         // 293: substrate-only scent detection. Integrator's
         // `HuntScentDetected` arm lifts the actor's
@@ -9371,8 +9428,8 @@ fn resolve_search_prey(
                 actor: _cat_entity,
                 prey_kind: prey_query
                     .iter()
-                    .find(|(e, _, _, _)| *e == prey_entity)
-                    .map(|(_, _, cfg, _)| cfg.kind)
+                    .find(|(e, _, _, _, _)| *e == prey_entity)
+                    .map(|(_, _, cfg, _, _)| cfg.kind)
                     .unwrap_or(crate::components::prey::PreyKind::Mouse),
                 position: *prey_pos_ref,
                 tick: time.tick,
@@ -9423,6 +9480,12 @@ fn resolve_search_prey(
 // ===========================================================================
 // Helper: resolve EngagePrey (transplanted from HuntPrey stalk/chase/pounce)
 // ===========================================================================
+
+/// 140 step 12 — cap on `pursue`'s lead prediction during a chase, in
+/// ticks. Bounds the aim-ahead so a distant fast prey doesn't produce
+/// an absurd intercept point through a wall; ~4 ticks of lead at
+/// sprint speed is a whisker-guided correction, not clairvoyance.
+const CHASE_MAX_LEAD_TICKS: f32 = 4.0;
 
 /// Ticket 149 — emit a `HuntAttempt` event and record `Feature::HuntAttempted`
 /// for the never-fired canary. Called from every terminal return path of
@@ -9506,12 +9569,25 @@ fn resolve_engage_prey(
     state: &mut StepExecutionState,
     ticks: u64,
     pos: &mut Position,
+    // 140 step 12 — hunt arms express gait desires (stalk 0.4× /
+    // approach 1.0× / chase sprint 1.4× pursue); the integrator moves.
+    desired_velocity: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
     inventory: &mut Inventory,
     // Ticket 017 — worn equip slots. Read for the weapon-strike bonus;
     // mutated to remove a wielded bone weapon when it snaps on a miss.
     wearables: &mut crate::components::equipment::WearableSlots,
     skills: &mut Skills,
-    prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
+    prey_query: &mut Query<
+        (
+            Entity,
+            &Position,
+            &PreyConfig,
+            &mut PreyState,
+            &crate::components::physical::Velocity,
+        ),
+        With<PreyAnimal>,
+    >,
     prey_params: &mut PreyHuntParams,
     map: &TileMap,
     scoring: &crate::resources::sim_constants::ScoringConstants,
@@ -9566,7 +9642,8 @@ fn resolve_engage_prey(
         return crate::steps::StepResult::Fail("no prey target for engage".into());
     };
 
-    let Ok((_, prey_pos, prey_cfg, prey_state)) = prey_query.get(target_entity) else {
+    let Ok((_, prey_pos, prey_cfg, prey_state, prey_velocity)) = prey_query.get(target_entity)
+    else {
         // Prey despawned between ticks. Real abandonment of an in-flight
         // attempt iff `attempt_start_distance` was already captured on a
         // prior tick — emit with placeholders since species/position are
@@ -9595,6 +9672,15 @@ fn resolve_engage_prey(
     };
 
     let prey_pos = *prey_pos;
+    // 140 step 12 — live prey velocity for `pursue` lead interception.
+    let prey_vel = prey_velocity.0;
+    // Desire-based stuck detection: the integrator moves AFTER this
+    // resolver, so progress is observed one tick late via the stored
+    // previous position (world-space; > 0.05 tiles counts as moving).
+    let moved_since_last = state
+        .last_observed_position
+        .is_none_or(|prev| pos.0.distance(prev.0) > 0.05);
+    state.last_observed_position = Some(*pos);
     let prey_is_fleeing = matches!(prey_state.ai_state, PreyAiState::Fleeing { .. });
     let prey_awareness = prey_state.ai_state;
     let catch_mod = prey_cfg.catch_difficulty;
@@ -10035,7 +10121,7 @@ fn resolve_engage_prey(
                     None,
                 );
             }
-            if let Ok((_, _, _, mut prey_st)) = prey_query.get_mut(target_entity) {
+            if let Ok((_, _, _, mut prey_st, _)) = prey_query.get_mut(target_entity) {
                 prey_st.ai_state = PreyAiState::Fleeing {
                     from: cat_entity,
                     toward: None,
@@ -10086,14 +10172,21 @@ fn resolve_engage_prey(
     } else if dist <= stalk_start {
         if prey_is_fleeing {
             // === CHASE ===
-            let mut moved = false;
-            for _ in 0..d.chase_speed {
-                if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
-                    *pos = next;
-                    moved = true;
-                }
-            }
-            if moved {
+            // 140 step 12 — sprint-gait lead interception. The
+            // `chase_speed` step_toward loop is retired: the desire is
+            // a `pursue` toward the prey's PREDICTED position (its
+            // live Velocity read from the query), capped at
+            // `cat_max_speed × sprint_speed_mult` by the integrator.
+            // Obstacles are the integrator's wall-slide problem — a
+            // sprint is a straight line, not a corridor walk.
+            desired_velocity.0 = Some(crate::ai::steering::pursue(
+                pos.0,
+                prey_pos.0,
+                prey_vel,
+                movement.cat_max_speed * movement.sprint_speed_mult,
+                CHASE_MAX_LEAD_TICKS,
+            ));
+            if moved_since_last {
                 state.no_move_ticks = 0;
             } else {
                 state.no_move_ticks += 1;
@@ -10147,15 +10240,21 @@ fn resolve_engage_prey(
             // tremor map, so prey can't alert on the cat's motion
             // alone — only sight at close range remains.
             current_action.action = Action::Stalk;
-            let mut moved = false;
+            // 140 step 12 — stalk gait: overlay-aware next step (the
+            // A*-first `step_toward` keeps threat/fox-scent routing)
+            // expressed as a desire at `stalk_speed_mult` (~0.4) — the
+            // slow sinuous approach replaces tick-gated stalking.
             if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
-                *pos = next;
-                moved = true;
+                desired_velocity.0 = Some(crate::ai::steering::seek(
+                    pos.0,
+                    next.0,
+                    movement.cat_max_speed * movement.stalk_speed_mult,
+                ));
             }
             if personality.anxiety > d.anxiety_spook_threshold
                 && rng.rng.random::<f32>() < d.anxiety_spook_chance
             {
-                if let Ok((_, _, _, mut prey_st)) = prey_query.get_mut(target_entity) {
+                if let Ok((_, _, _, mut prey_st, _)) = prey_query.get_mut(target_entity) {
                     prey_st.ai_state = PreyAiState::Fleeing {
                         from: cat_entity,
                         toward: None,
@@ -10179,7 +10278,7 @@ fn resolve_engage_prey(
                 );
                 return crate::steps::StepResult::Fail("anxiety spooked prey".into());
             }
-            if moved {
+            if moved_since_last {
                 state.no_move_ticks = 0;
             } else {
                 state.no_move_ticks += 1;
@@ -10205,24 +10304,20 @@ fn resolve_engage_prey(
         }
     } else {
         // === APPROACH ===
-        let mut moved = false;
-        for _ in 0..d.approach_speed {
-            // Greedy step_toward returns None in a concave-terrain local-minimum
-            // (rustdoc on `step_toward`). Without a fallback the cat freezes for
-            // `chase_stuck_ticks` and bails. A few specific map tiles on any
-            // given seed catch many repeated hunt attempts at the same trap —
-            // see ticket 465. Fall back to A* once; take just the next step.
-            let next = step_toward(pos, &prey_pos, map, &cat_overlays).or_else(|| {
-                find_path(*pos, prey_pos, map, &cat_overlays).and_then(|p| p.into_iter().next())
-            });
-            if let Some(next) = next {
-                *pos = next;
-                moved = true;
-            } else {
-                break;
-            }
+        // 140 step 12 — walk-gait desire toward the overlay-aware next
+        // step (A*-first `step_toward`, greedy fallback per 465; the
+        // `approach_speed` multi-hop loop collapses into the speed cap).
+        let next = step_toward(pos, &prey_pos, map, &cat_overlays).or_else(|| {
+            find_path(*pos, prey_pos, map, &cat_overlays).and_then(|p| p.into_iter().next())
+        });
+        if let Some(next) = next {
+            desired_velocity.0 = Some(crate::ai::steering::seek(
+                pos.0,
+                next.0,
+                movement.cat_max_speed,
+            ));
         }
-        if moved {
+        if moved_since_last {
             state.no_move_ticks = 0;
         } else {
             state.no_move_ticks += 1;
@@ -10264,6 +10359,9 @@ fn resolve_forage_item(
     state: &mut StepExecutionState,
     ticks: u64,
     pos: &mut Position,
+    // 140 step 12 — forage wander expresses a walk-gait desire.
+    desired_velocity: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
     inventory: &mut Inventory,
     skills: &mut Skills,
     map: &TileMap,
@@ -10298,7 +10396,17 @@ fn resolve_forage_item(
             dx = 1;
         }
     }
-    *pos = patrol_move(pos, dx, dy, map);
+    // 140 step 12 — forage wander expresses a walk-gait desire; the
+    // yield roll below reads the CURRENT tile (where the cat actually
+    // stands), same as pre-140 semantics one tick shifted.
+    let aim = patrol_move(pos, dx, dy, map);
+    if aim != *pos {
+        desired_velocity.0 = Some(crate::ai::steering::seek(
+            pos.0,
+            aim.0,
+            movement.cat_max_speed,
+        ));
+    }
 
     if map.in_bounds(pos.x(), pos.y()) {
         let tile = map.get(pos.x(), pos.y());

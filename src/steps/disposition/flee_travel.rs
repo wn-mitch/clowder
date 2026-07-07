@@ -94,7 +94,9 @@ pub fn resolve_flee_travel(
         desired.0 = Some(crate::ai::steering::seek(
             pos.0,
             aim.0,
-            movement.cat_max_speed,
+            // 140 step 12 — flee is a sprint (gait contrast with the
+            // pursuing threat is the survival margin).
+            movement.cat_max_speed * movement.sprint_speed_mult,
         ));
         false
     };

@@ -3167,7 +3167,16 @@ pub fn resolve_disposition_chains(
             Without<PreyDen>,
         ),
     >,
-    mut prey_query: Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
+    mut prey_query: Query<
+        (
+            Entity,
+            &Position,
+            &PreyConfig,
+            &mut PreyState,
+            &crate::components::physical::Velocity,
+        ),
+        With<PreyAnimal>,
+    >,
     mut stores_query: Query<&mut StoredItems>,
     items_query: Query<
         &Item,
@@ -3702,7 +3711,16 @@ fn dispatch_chain_step(
     gender: &Gender,
     grooming: Option<&mut crate::components::grooming::GroomingCondition>,
     fulfillment_opt: &mut Option<Mut<crate::components::fulfillment::Fulfillment>>,
-    prey_query: &mut Query<(Entity, &Position, &PreyConfig, &mut PreyState), With<PreyAnimal>>,
+    prey_query: &mut Query<
+        (
+            Entity,
+            &Position,
+            &PreyConfig,
+            &mut PreyState,
+            &crate::components::physical::Velocity,
+        ),
+        With<PreyAnimal>,
+    >,
     stores_query: &mut Query<&mut StoredItems>,
     items_query: &Query<
         &Item,
@@ -3767,7 +3785,9 @@ fn dispatch_chain_step(
 
             if let Some(target_entity) = step.target_entity {
                 // We have a locked target — check if it still exists.
-                let Ok((_, prey_pos, prey_cfg, prey_state)) = prey_query.get(target_entity) else {
+                let Ok((_, prey_pos, prey_cfg, prey_state, prey_velocity)) =
+                    prey_query.get(target_entity)
+                else {
                     step.target_entity = None;
                     return;
                 };
@@ -4019,7 +4039,7 @@ fn dispatch_chain_step(
                         }
                     } else {
                         // Pounce failed — prey bolts.
-                        if let Ok((_, _, _, mut prey_st)) = prey_query.get_mut(target_entity) {
+                        if let Ok((_, _, _, mut prey_st, _)) = prey_query.get_mut(target_entity) {
                             prey_st.ai_state = PreyAiState::Fleeing {
                                 from: cat_entity,
                                 toward: None,
@@ -4086,28 +4106,41 @@ fn dispatch_chain_step(
                         }
                     }
                 } else if dist <= stalk_start {
-                    let mut moved = false;
+                    // 140 step 12 — gait desires (chain-executor mirror
+                    // of `goap.rs::resolve_engage_prey`): chase = sprint
+                    // pursue with live prey velocity; stalk = overlay-
+                    // aware step at stalk gait. Progress detection via
+                    // world-space delta against the last observed
+                    // position (the integrator moves after this system).
+                    let moved = step
+                        .last_observed_position
+                        .is_none_or(|prev| pos.0.distance(prev.0) > 0.05);
+                    step.last_observed_position = Some(*pos);
                     if prey_is_fleeing {
-                        // === CHASE === sprint burst.
-                        for _ in 0..d.chase_speed {
-                            if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
-                                *pos = next;
-                                moved = true;
-                            }
-                        }
+                        // === CHASE === sprint pursue.
+                        desired_velocity.0 = Some(crate::ai::steering::pursue(
+                            pos.0,
+                            prey_pos.0,
+                            prey_velocity.0,
+                            constants.movement.cat_max_speed * constants.movement.sprint_speed_mult,
+                            4.0,
+                        ));
                     } else {
-                        // === STALK === Deliberate approach, 1 tile/tick.
-                        // Cats are agile ambush predators — they close quickly
-                        // while relying on stealth to avoid detection.
+                        // === STALK === slow sinuous approach at stalk gait.
                         if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
-                            *pos = next;
-                            moved = true;
+                            desired_velocity.0 = Some(crate::ai::steering::seek(
+                                pos.0,
+                                next.0,
+                                constants.movement.cat_max_speed
+                                    * constants.movement.stalk_speed_mult,
+                            ));
                         }
                         // Anxiety check: nervous cat spooks prey.
                         if personality.anxiety > d.anxiety_spook_threshold
                             && rng.rng.random::<f32>() < d.anxiety_spook_chance
                         {
-                            if let Ok((_, _, _, mut prey_st)) = prey_query.get_mut(target_entity) {
+                            if let Ok((_, _, _, mut prey_st, _)) = prey_query.get_mut(target_entity)
+                            {
                                 prey_st.ai_state = PreyAiState::Fleeing {
                                     from: cat_entity,
                                     toward: None,
@@ -4122,13 +4155,18 @@ fn dispatch_chain_step(
                         step.target_entity = None;
                     }
                 } else {
-                    // === APPROACH === Trot toward scented prey.
-                    let mut moved = false;
-                    for _ in 0..d.approach_speed {
-                        if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
-                            *pos = next;
-                            moved = true;
-                        }
+                    // === APPROACH === walk-gait desire toward the
+                    // overlay-aware next step.
+                    let moved = step
+                        .last_observed_position
+                        .is_none_or(|prev| pos.0.distance(prev.0) > 0.05);
+                    step.last_observed_position = Some(*pos);
+                    if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
+                        desired_velocity.0 = Some(crate::ai::steering::seek(
+                            pos.0,
+                            next.0,
+                            constants.movement.cat_max_speed,
+                        ));
                     }
                     if dist > d.approach_give_up_distance.round() as i32 || (!moved && ticks > 10) {
                         step.target_entity = None;
@@ -4169,7 +4207,7 @@ fn dispatch_chain_step(
                 // Visual detection: spot nearby prey within 15 tiles.
                 let visible_prey = prey_query
                     .iter()
-                    .filter(|(_, pp, _, _)| {
+                    .filter(|(_, pp, _, _, _)| {
                         crate::systems::sensing::observer_sees_at(
                             crate::components::SensorySpecies::Cat,
                             *pos,
@@ -4179,9 +4217,9 @@ fn dispatch_chain_step(
                             d.search_visual_detection_range,
                         )
                     })
-                    .min_by_key(|(_, pp, _, _)| pos.tile_distance_squared(pp));
+                    .min_by_key(|(_, pp, _, _, _)| pos.tile_distance_squared(pp));
 
-                if let Some((prey_entity, _prey_pos_ref, _, _)) = visible_prey {
+                if let Some((prey_entity, _prey_pos_ref, _, _, _)) = visible_prey {
                     step.target_entity = Some(prey_entity);
                 } else {
                     // Scan for prey scent via PreyScentMaps (ticket 062 —
@@ -4205,12 +4243,12 @@ fn dispatch_chain_step(
                         let source = Position::new(sx, sy);
                         prey_query
                             .iter()
-                            .min_by_key(|(_, pp, _, _)| source.tile_distance_squared(pp))
+                            .min_by_key(|(_, pp, _, _, _)| source.tile_distance_squared(pp))
                     } else {
                         None
                     };
 
-                    if let Some((prey_entity, prey_pos_ref, _, _)) = scented_prey {
+                    if let Some((prey_entity, prey_pos_ref, _, _, _)) = scented_prey {
                         step.target_entity = Some(prey_entity);
                         // 293: substrate-only scent detection. Integrator's
                         // `HuntScentDetected` arm lifts the witness's own
@@ -4220,8 +4258,8 @@ fn dispatch_chain_step(
                                 actor: cat_entity,
                                 prey_kind: prey_query
                                     .iter()
-                                    .find(|(e, _, _, _)| *e == prey_entity)
-                                    .map(|(_, _, cfg, _)| cfg.kind)
+                                    .find(|(e, _, _, _, _)| *e == prey_entity)
+                                    .map(|(_, _, cfg, _, _)| cfg.kind)
                                     .unwrap_or(crate::components::prey::PreyKind::Mouse),
                                 position: *prey_pos_ref,
                                 tick: time.tick,
