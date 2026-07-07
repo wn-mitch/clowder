@@ -396,3 +396,31 @@ this trajectory; 512 proceeds as an independent balance ticket per
 the landing rule. Prey-side drift is bounded by den-cap dynamics;
 the two watch items (hunt-success below biology band, hawk dive
 inflation) have named owners (step 12, Phase V).
+
+## Iteration 6 — step 11: wildlife_ai (shadowfox legacy) + 310 seam (2026-07-06)
+
+### Changes
+- All nine wildlife_ai movement arms (Patrolling fwd/rev, Circling,
+  Fleeing, EncirclingWard orbit, Stalking, Reconstituting, Tending,
+  Haunting, Seeding) → `DesiredVelocity` heading writes at
+  `max_speed(species)`; every tile-grid decision read (ward-coverage
+  and cat-scent lookahead on the tile ahead, patrol-terrain and
+  wildlife-passability checks on the aimed tile) stays, per the epic
+  constraint. `budget.try_spend_step()` direct writes retired.
+- The Fleeing arm's terrain-unchecked Position write — the fox-lake
+  strand class flagged at step 9 — is structurally closed: the desire
+  is still terrain-unchecked (pre-140 parity) but the integrator's
+  passability + wall-slide own collision now.
+- `wildlife.rs` Manhattan nearest-cat pick (siege→stalk provocation)
+  → `tile_distance_squared` (metric-consistent with step 8).
+- Module rustdoc carries the 310 contract: decision layers write
+  `DesiredVelocity` via steering, never `Position`;
+  `MovementBudget.per_tick` is the speed cap.
+
+### Hypothesis (gate: hypothesize)
+ShadowFoxAmbush ≤ 10 holds; ward-avoidance/siege rates within ±10-ish%
+where the trajectory permits (channel-alive floor: avoidance > 0 OR a
+cross-seed check as in step 8); shadowfox corruption-deposit trails
+continue (Reconstituting/Seeding cycles observable); canaries +
+survival gates hold. Trajectory divergence expected (jitter RNG reads
+unchanged but movement timing shifts every encounter).

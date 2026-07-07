@@ -52,13 +52,25 @@ pub struct DetectionCooldowns {
 /// `*State` markers) still uses this legacy `Circling`/`Waiting`
 /// state machine.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
+/// ## Movement contract (140 step 11 / ticket 310 seam)
+///
+/// Decision layers write [`DesiredVelocity`] via steering — never
+/// `Position`; `MovementBudget.per_tick` is the speed cap the Chain-4
+/// integrator enforces. Every arm keeps its **tile-grid decision
+/// reads** (ward-coverage / cat-scent lookahead samples the tile ahead
+/// along the heading; patrol-terrain and wildlife-passability checks
+/// gate the aimed tile) per the epic constraint — only the *motion*
+/// is continuous. The pre-140 `budget.try_spend_step()` direct writes
+/// are retired; the integrator's wall-slide + anti-strand hatch own
+/// collision (the old Fleeing arm's terrain-unchecked write — the
+/// fox-lake strand class — is structurally closed by this migration).
 pub fn wildlife_ai(
     mut query: Query<
         (
             &WildAnimal,
-            &mut Position,
+            &Position,
+            &mut crate::components::physical::DesiredVelocity,
             &mut WildlifeAiState,
-            &mut crate::components::MovementBudget,
             Has<ShadowFoxDrives>,
         ),
         (Without<FoxState>, Without<HawkState>, Without<SnakeState>),
@@ -98,7 +110,8 @@ pub fn wildlife_ai(
         .map(|(w, p)| (*p, w.repel_radius() * ward_multiplier))
         .collect();
 
-    for (animal, mut pos, mut ai_state, mut budget, is_shadow_fox) in &mut query {
+    for (animal, pos, mut desired, mut ai_state, is_shadow_fox) in &mut query {
+        let species_speed = constants.movement.max_speed(animal.species);
         match *ai_state {
             WildlifeAiState::Patrolling { dx, dy } => {
                 // 260: shadow-fox orthogonal-axis avoidance.
@@ -144,23 +157,16 @@ pub fn wildlife_ai(
                 if map.in_bounds(next.x(), next.y())
                     && is_patrol_terrain(map.get(next.x(), next.y()).terrain, animal.species)
                 {
-                    // Ticket 138 — gate every step on MovementBudget.
-                    // At per_tick=1.0 (current default for all
-                    // wildlife_ai consumers — shadow-fox + legacy
-                    // critters) this is a no-op behaviorally;
-                    // structural so future per-species cadence is
-                    // parameter-only.
-                    if budget.try_spend_step() {
-                        *pos = next;
-                    }
+                    desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                 } else {
-                    // Reverse direction and try the other way.
+                    // Reverse direction and try the other way (patrol
+                    // terrain isn't required on the reverse tile —
+                    // pre-140 parity; the integrator still refuses
+                    // impassable ground).
                     let rev = Position::new(pos.x() - dx, pos.y() - dy);
                     if map.in_bounds(rev.x(), rev.y()) {
                         *ai_state = WildlifeAiState::Patrolling { dx: -dx, dy: -dy };
-                        if budget.try_spend_step() {
-                            *pos = rev;
-                        }
+                        desired.0 = Some(crate::ai::steering::seek(pos.0, rev.0, species_speed));
                     }
                     // If neither works, stay put (cornered).
                 }
@@ -178,15 +184,14 @@ pub fn wildlife_ai(
                 let target_x = center_x + (angle.cos() * radius) as i32;
                 let target_y = center_y + (angle.sin() * radius) as i32;
 
-                // Move one step toward the circle target.
+                // Desire one heading-step toward the circle target.
                 let dx = (target_x - pos.x()).signum();
                 let dy = (target_y - pos.y()).signum();
                 let next = Position::new(pos.x() + dx, pos.y() + dy);
                 if map.in_bounds(next.x(), next.y())
                     && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
-                    && budget.try_spend_step()
                 {
-                    *pos = next;
+                    desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                 }
             }
             WildlifeAiState::Waiting => {
@@ -194,10 +199,14 @@ pub fn wildlife_ai(
             }
             WildlifeAiState::Fleeing { dx, dy } => {
                 let next = Position::new(pos.x() + dx, pos.y() + dy);
-                if map.in_bounds(next.x(), next.y()) && budget.try_spend_step() {
-                    *pos = next;
+                if map.in_bounds(next.x(), next.y()) {
+                    // Terrain-unchecked heading desire — pre-140 this
+                    // arm WROTE the position unchecked (the fox-lake
+                    // strand class); the integrator's passability +
+                    // wall-slide now own collision, so a fleeing
+                    // animal skirts water instead of entering it.
+                    desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                 }
-                // If we'd go off-map, despawn is handled by cleanup_wildlife.
             }
             WildlifeAiState::EncirclingWard {
                 ward_x,
@@ -229,9 +238,11 @@ pub fn wildlife_ai(
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
                 } else if cat_nearby {
                     // Aggression: siege provokes confrontation.
+                    // 140 step 8/11 — Manhattan nearest-pick retired;
+                    // tile-Euclidean² matches the `distance_to` metric.
                     if let Some(cat_pos) = cat_positions
                         .iter()
-                        .min_by_key(|cp| (cp.x() - pos.x()).abs() + (cp.y() - pos.y()).abs())
+                        .min_by_key(|cp| pos.tile_distance_squared(cp))
                     {
                         *ai_state = WildlifeAiState::Stalking {
                             target_x: cat_pos.x(),
@@ -256,9 +267,8 @@ pub fn wildlife_ai(
                     let next = Position::new(pos.x() + dx, pos.y() + dy);
                     if map.in_bounds(next.x(), next.y())
                         && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
-                        && budget.try_spend_step()
                     {
-                        *pos = next;
+                        desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                     }
 
                     // Deposit siege corruption at 3x normal rate.
@@ -285,16 +295,14 @@ pub fn wildlife_ai(
                     }
                 }
 
-                // Move one step toward the target cat.
+                // Desire one heading-step toward the target cat.
                 let dx = (target_x - pos.x()).signum();
                 let dy = (target_y - pos.y()).signum();
                 let next = Position::new(pos.x() + dx, pos.y() + dy);
                 if map.in_bounds(next.x(), next.y())
                     && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
                 {
-                    if budget.try_spend_step() {
-                        *pos = next;
-                    }
+                    desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                 } else {
                     // Can't reach target, revert to patrolling.
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
@@ -316,9 +324,8 @@ pub fn wildlife_ai(
                     let next = Position::new(pos.x() + dx, pos.y() + dy);
                     if map.in_bounds(next.x(), next.y())
                         && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
-                        && budget.try_spend_step()
                     {
-                        *pos = next;
+                        desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                     }
                 }
             }
@@ -348,9 +355,8 @@ pub fn wildlife_ai(
                 let next = Position::new(pos.x() + dx, pos.y() + dy);
                 if map.in_bounds(next.x(), next.y())
                     && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
-                    && budget.try_spend_step()
                 {
-                    *pos = next;
+                    desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                 }
                 // The corruption deposit happens via the existing
                 // shadow-fox-step deposit further down — keeps
@@ -388,9 +394,8 @@ pub fn wildlife_ai(
                 let next = Position::new(pos.x() + step_dx, pos.y() + step_dy);
                 if map.in_bounds(next.x(), next.y())
                     && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
-                    && budget.try_spend_step()
                 {
-                    *pos = next;
+                    desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                 }
             }
             WildlifeAiState::Seeding {
@@ -404,9 +409,8 @@ pub fn wildlife_ai(
                 let next = Position::new(pos.x() + dx, pos.y() + dy);
                 if map.in_bounds(next.x(), next.y())
                     && map.get(next.x(), next.y()).terrain.is_wildlife_passable()
-                    && budget.try_spend_step()
                 {
-                    *pos = next;
+                    desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                 }
             }
         }
@@ -3434,7 +3438,9 @@ mod tests {
         world.insert_resource(CatScentMap::default());
 
         let mut schedule = Schedule::default();
-        schedule.add_systems(wildlife_ai);
+        // 140 step 11 — wildlife_ai writes desire; the integrator
+        // moves. Chain them like the production schedule.
+        schedule.add_systems((wildlife_ai, crate::systems::movement::integrate_velocities).chain());
         (world, schedule)
     }
 
@@ -3459,6 +3465,10 @@ mod tests {
                     species,
                     &crate::resources::sim_constants::MovementConstants::default(),
                 ),
+                // 140 step 11 — the fluid-movement pair the observer
+                // authors in production.
+                crate::components::physical::Velocity::default(),
+                crate::components::physical::DesiredVelocity::default(),
             ))
             .id()
     }
@@ -3473,7 +3483,11 @@ mod tests {
             WildlifeAiState::Patrolling { dx: 1, dy: 0 },
         );
 
-        schedule.run(&mut world);
+        // 140 step 11 — desire-driven movement ramps at max_accel per
+        // tick; give the accel ramp a few ticks to cross a tile edge.
+        for _ in 0..4 {
+            schedule.run(&mut world);
+        }
 
         let pos = *world.get::<Position>(entity).unwrap();
         // Fox should have moved (either forward or jittered).
@@ -3513,7 +3527,10 @@ mod tests {
             },
         );
 
-        schedule.run(&mut world);
+        // 140 step 11 — accel-ramp runway (see fox test).
+        for _ in 0..4 {
+            schedule.run(&mut world);
+        }
 
         let pos = *world.get::<Position>(entity).unwrap();
         // Hawk should have moved from start (circling).
