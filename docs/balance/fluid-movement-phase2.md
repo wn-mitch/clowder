@@ -424,3 +424,29 @@ cross-seed check as in step 8); shadowfox corruption-deposit trails
 continue (Reconstituting/Seeding cycles observable); canaries +
 survival gates hold. Trajectory divergence expected (jitter RNG reads
 unchanged but movement timing shifts every encounter).
+
+### Observation (`tuned-42-a961e2b0` + cross-seed `tuned-43-a961e2b0`)
+- Hard gates: ZERO deaths on BOTH seeds; never-fired clean; canaries
+  green; 116.4 tps (seed-42).
+- Reconstituting/Seeding cycles alive (46/46 and 68/70). ShadowFox
+  ambush deaths 0 ≤ 10. Scent-avoidance 118 → 8554 on seed-42 — the
+  fox paces the colony scent shell at integrator granularity (each
+  near-shell tick re-triggers the reversal check); the shell logic
+  itself is tile-grid-identical to pre-140.
+- **Channel-alive floor FAILED**: ward avoidance/sieges/hauntings zero
+  on both seeds (seed-43 had 1334/68/27 on the step-8 binary). Layer
+  walk shows a systemic pressure-economy drift, not a step-11 defect:
+  the drives softmax self-anchors on the fox's own corruption trail
+  (Reconstituting target = its own deposits) while dread needs ≤12-tile
+  cat proximity the scent shell prevents — both mechanisms pre-date
+  step 11; fluid-movement trajectories now park every fox in the
+  remote-camp regime. **Ticket 513** (full evidence table + mechanism)
+  tracks restoration; the plan's Phase V living-world steps own it.
+
+### Concordance
+Hard-gate concordant; texture-channel discordant with a named systemic
+cause and a Phase-V owner. Methodological note: the channel-alive
+floor did its job — one seed's zero was luck (step 8), two seeds'
+zeros forced the layer walk that separated "this landing broke it"
+from "the ecology has been drifting since step 8 and this landing's
+trajectory finished it."
