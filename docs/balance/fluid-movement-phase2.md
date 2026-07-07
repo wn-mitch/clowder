@@ -681,3 +681,72 @@ question deliberately NOT tuned here: 63.7% sits ABOVE the 30–50%
 biology band — that calibration is Phase V's hunt-success-biology
 ticket, and it should be tuned against an honest attempt
 denominator, which only now exists.
+
+## Iteration 9 — step 13: budget retirement + A* throttle + render lerp (2026-07-07)
+
+### Changes (commit 7c6a368a)
+- `MovementBudget` slimmed to the speed cap (`per_tick`);
+  accumulator / `try_spend_step` / per-tick `accumulate` pass
+  deleted (all spend-callers were retired by steps 6–12). Save-load
+  lazy-inserts survive as `insert_missing_movement_components`.
+- `throttled_step_toward`: hunt approach/stalk arms cache the A*
+  route per step, recomputing only on target drift > 3 tiles, age ≥
+  8 ticks, or consumption (constants `path_recompute_*`, live since
+  step 5, now consumed). Was: full A* per resolver tick per hunting
+  cat.
+- Render: velocity movers interpolate continuous world positions
+  linearly (129's per-tick smoothstep pulsed constant glides; the
+  5-tile snap threshold read every sprint tick as a teleport);
+  non-movers keep tile-center smoothstep.
+- Last three tile-jump movers migrated to desires (disposition
+  SEARCH + ForageItem wander arms, `resolve_apply_remedy` approach
+  leg). Sweep confirms the integrator is the sole mover-Position
+  author; remaining `set_tile` sites are target-scratch clamps.
+
+### Predictions (pre-registered, before the gate soak)
+| # | Prediction | Band |
+|---|---|---|
+| P1 | Throughput ≥ Phase-I baseline 112 tps (plan gate: net-neutral-or-better; the 467 idle run sat at 117) | hard-ish |
+| P2 | Hunt economy holds: aggregate success within ±10pp of 63.7%, fish ≥ 30%; the 8-tick path staleness must not resurrect stuck-outs | gate channel |
+| P3 | Survival + continuity canaries hold; trajectory diverges from e330378a (throttling changes movement micro-decisions by design) but RATES stay in-band | hard gate |
+| P4 | Flamegraph: no new hot frames pre → post | mechanism |
+
+P4 already observed at commit time: hot-set shares all drifted DOWN
+(evaluate_and_plan 21.6 → 20.6%, try_detect_cat 21.1 → 18.3%,
+flood_dijkstra 16.9 → 15.7%), no new entrants
+(`logs/flamegraphs/42-39196a938eb8` pre vs `42-7c6a368a6d86` post).
+
+### Observation (`tuned-42-7c6a368a`, uncontended gate soak)
+- **P1 CONFIRMED**: 112.2 tps vs the 112.0 Phase-I baseline — the
+  plan's net-neutral-or-better gate passes exactly at par, with the
+  step-12/467 behavioral load aboard. Full 100.9k-tick coverage.
+- **P3 CONFIRMED**: survival + continuity pass; one FoxConfrontation
+  death (new-nonzero, within gates). The MentorCat plan-failure
+  canary did NOT fire on this trajectory (0 vs 1111) — no long
+  incapacitation window occurred; ticket 514's structural defect
+  stands regardless.
+- **P2 DISCORDANT in the direction of more honesty**: 704 attempts /
+  583 kills / **82.8%** (fish 95 / 56 / 58.9%), outside the ±10pp
+  band. Mechanism (verified from the outcome table, not guessed):
+  `lost_during_approach` collapsed 420 → 20 — a hunting cat with a
+  cached route ALWAYS has an aim between A* recomputes, so the
+  `no_move_ticks` stuck watchdog stopped firing and attempts now run
+  to natural conclusions (mean duration 22 → 87t;
+  `lost_during_chase` 0 → 60 as chases actually happen; kill rate
+  per-tick DROPPED 10.0 → 5.8/1k — fewer, longer, more decisive
+  hunts). Second dose of the 467 honesty mechanism, not an economy
+  buff.
+- Colony drift rides the food economy: kittens_born +100%, happiness
+  +33%, structures_built −33% (hunting crowds out building —
+  Phase V biology-band calibration owns the predation share).
+  Founder dispersion cuddle-puddle → 490, pre-existing.
+
+### Concordance
+P1/P3/P4 concordant; P2 discordant with a verified benign mechanism
+(the prediction under-modeled how much churn the stuck watchdog was
+still contributing). Phase II closes: every mover is desire-based,
+the integrator is the sole mover-Position author, budget spend
+machinery is deleted, perf is at Phase-I par with the whole fluid
+stack aboard. `tuned-42-7c6a368a` promoted as the post-Phase-II
+baseline. The 30–50% hunt-success biology band (now at 82.8% on an
+honest denominator) is Phase V's opening calibration target.
