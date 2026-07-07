@@ -75,3 +75,21 @@ Hypothesis: with `agreement_quorum=3`, `agreement_epsilon=0.2`, `promotion_stren
 
 - 2026-05-11: opened as 258 follow-on. The pre-258 carrier-count promotion stays load-bearing until this lands; the per-cat substrate sits adjacent. Clean cutover (no dual-write window) per 258's plan-agent recommendation.
 - 2026-05-19: accuracy audit pass — 258 (blocker) is landed; all file paths, Rust symbols, and design doc references verified; four-artifact methodology scope is sound.
+- 2026-07-08: implemented and landed. Derivation + cutover in one
+  commit (b83466cb — the planned two-commit split collapsed; the
+  derive fn never shipped alongside the legacy scan);
+  colony_knowledge_false_belief scenario (d94c282f) pins the false-
+  consensus-with-witness-chain capability and the contested-bucket
+  divergence accounting. Facet mapping covers exactly the scoring
+  readers (ThreatSeen ← recency_of_threat_cue, ResourceFound ←
+  prey_yield); six narrative-only MemoryTypes retired. Gate soak
+  tuned-42-d94c282f: hard gates pass; promoted volume 73 → 12
+  decomposed (15 retired-type lines designed-out; ThreatSeen 37 → 1
+  because threat cues are fast-decay BY DESIGN — colony threat
+  knowledge is now a short consensus window while persistence lives
+  in per-cat belief reads; ResourceFound 1 → 10 richer). Divergence
+  footer = 0 on a healthy colony (machinery proven in scenario) —
+  it is the instrument for future C2 gossip epidemics. Named
+  follow-on if Phase IV/V wants persistent colony threat memory: a
+  slow-timescale "remembered danger" facet, NOT a wider gate. Full
+  record: docs/balance/291-colony-knowledge-derivation.md.
