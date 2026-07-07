@@ -58,10 +58,12 @@ pub struct MovementConstants {
     /// the rabbit's flee cap (`prey_ground_max_speed × flee_speed` =
     /// 2.0) or fleeing rabbits are UNCATCHABLE (soak tuned-42-2af8c34d:
     /// hunt success 22.3% → 15.1%, `lost prey during approach` 2183).
-    /// Real-cat anchor: ~13.3 m/s sprint vs ~10 m/s rabbit ≈ 1.33
-    /// ratio over the rabbit, i.e. 2.4× the 1.0 cat base with catch
-    /// margin carried by `catch_difficulty`. Endurance is bounded by
-    /// `chase_limit_*`, not a stamina model.
+    /// Set to 3.0 = pre-140 parity: the legacy hunt kinematics were
+    /// `chase_speed = approach_speed = 3` tiles/tick, and the whole
+    /// detection/alertness/catch economy was tuned against them
+    /// (2.4 under-shot: tuned-42-32e46f09 hunt success 9.5%). Real-cat
+    /// sanity: sprint ≈ 9× walking pace IRL, so 3× is conservative.
+    /// Endurance is bounded by `chase_limit_*`, not a stamina model.
     pub sprint_speed_mult: f32,
     /// Personal-space radius (tiles) for `steering::separation` —
     /// replaces the jitter-teleport anti-stacking hacks (plan step 7).
@@ -108,7 +110,7 @@ impl Default for MovementConstants {
             max_accel: 0.25,
             hawk_max_accel: 0.5,
             stalk_speed_mult: 0.4,
-            sprint_speed_mult: 2.4,
+            sprint_speed_mult: 3.0,
             separation_radius: 0.6,
             waypoint_arrival_radius: 0.6,
             path_recompute_min_ticks: 8,

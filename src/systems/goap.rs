@@ -10247,10 +10247,19 @@ fn resolve_engage_prey(
             let stalk_aim = step_toward(pos, &prey_pos, map, &cat_overlays)
                 .map(|next| next.0)
                 .unwrap_or(prey_pos.0);
+            // Base-speed stalk — pre-140 parity. The 0.4× stalk gait
+            // looked ethological but broke the tuned detection economy:
+            // prey alertness accumulates per tick, so a 2.5×-longer
+            // stalk window let prey spot the cat before pounce range
+            // (hunt success 22% → 9.5% across two gait soaks). Cats
+            // are ambush predators that close QUICKLY under stealth —
+            // the tremor discount (Action::Stalk ≈ 0.2×) is the
+            // stealth, not slowness. `stalk_speed_mult` stays a knob
+            // for a future re-tune of the whole detection economy.
             desired_velocity.0 = Some(crate::ai::steering::seek(
                 pos.0,
                 stalk_aim,
-                movement.cat_max_speed * movement.stalk_speed_mult,
+                movement.cat_max_speed,
             ));
             if personality.anxiety > d.anxiety_spook_threshold
                 && rng.rng.random::<f32>() < d.anxiety_spook_chance

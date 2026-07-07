@@ -338,26 +338,42 @@ mod tests {
 
     #[test]
     fn velocity_persists_and_reaches_speed_cap() {
-        let (mut world, mut schedule) = world_with_map();
+        // A 60-tile runway: the accel ramp to the sprint ceiling
+        // (0.25/tick → 12 ticks) covers ~19.5 tiles before topping out,
+        // which overruns the shared 20-tile test map.
+        let mut world = World::new();
+        world.insert_resource(TileMap::new(60, 20, Terrain::Grass));
+        world.insert_resource(SimConstants::default());
+        let mut schedule = Schedule::default();
+        schedule.add_systems(integrate_velocities);
         let e = spawn_mover(&mut world, Position::new(2, 5));
-        for _ in 0..10 {
+        let mut peak: f32 = 0.0;
+        for _ in 0..16 {
             world.get_mut::<DesiredVelocity>(e).unwrap().0 = Some(Vec2::new(5.0, 0.0));
             schedule.run(&mut world);
+            peak = peak.max(world.get::<Velocity>(e).unwrap().0.length());
         }
-        let v = world.get::<Velocity>(e).unwrap().0;
         // 140 step 12 — the hard ceiling is base × sprint_speed_mult
         // (gait headroom): a desire above the ceiling clamps to it.
         let ceiling =
             MovementBudget::cat().per_tick * SimConstants::default().movement.sprint_speed_mult;
-        assert!((v.length() - ceiling).abs() < 1e-4, "v = {v:?}");
+        assert!((peak - ceiling).abs() < 1e-4, "peak = {peak}");
         // A walk-gait desire (magnitude = base speed) is NOT lifted to
         // the ceiling — the cap only binds above the desire magnitude.
+        // Start from rest (steer would otherwise spend ~16 ticks
+        // reversing the sprint momentum and the peak would sample the
+        // deceleration tail).
+        world.get_mut::<Velocity>(e).unwrap().0 = Vec2::ZERO;
+        let mut walk_peak: f32 = 0.0;
         for _ in 0..10 {
             world.get_mut::<DesiredVelocity>(e).unwrap().0 = Some(Vec2::new(-1.0, 0.0));
             schedule.run(&mut world);
+            walk_peak = walk_peak.max(world.get::<Velocity>(e).unwrap().0.length());
         }
-        let v = world.get::<Velocity>(e).unwrap().0;
-        assert!((v.length() - 1.0).abs() < 1e-4, "walk gait v = {v:?}");
+        assert!(
+            (walk_peak - 1.0).abs() < 1e-4,
+            "walk gait peak = {walk_peak}"
+        );
     }
 
     #[test]

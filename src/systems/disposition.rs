@@ -4130,10 +4130,12 @@ fn dispatch_chain_step(
                         let stalk_aim = step_toward(pos, &prey_pos, map, &cat_overlays)
                             .map(|next| next.0)
                             .unwrap_or(prey_pos.0);
+                        // Base-speed stalk — pre-140 parity (see the
+                        // goap.rs stalk arm rationale).
                         desired_velocity.0 = Some(crate::ai::steering::seek(
                             pos.0,
                             stalk_aim,
-                            constants.movement.cat_max_speed * constants.movement.stalk_speed_mult,
+                            constants.movement.cat_max_speed,
                         ));
                         // Anxiety check: nervous cat spooks prey.
                         if personality.anxiety > d.anxiety_spook_threshold
