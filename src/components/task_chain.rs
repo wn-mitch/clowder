@@ -33,6 +33,11 @@ pub struct TaskStep {
     /// Waypoints are consumed front-to-back each tick.
     #[serde(skip)]
     pub cached_path: Option<Vec<Position>>,
+    /// 140 step 13 — tick `cached_path` was computed at, for the
+    /// hunt-arm recompute throttle. Sibling of
+    /// `StepExecutionState::cached_path_tick`.
+    #[serde(skip)]
+    pub cached_path_tick: u64,
     /// 140 step 12 — position when this step last resolved, for
     /// desire-based progress detection (the integrator moves after
     /// the resolver; compare world-space > 0.05 tiles). Sibling of
@@ -49,6 +54,7 @@ impl TaskStep {
             target_position: None,
             target_entity: None,
             cached_path: None,
+            cached_path_tick: 0,
             last_observed_position: None,
         }
     }

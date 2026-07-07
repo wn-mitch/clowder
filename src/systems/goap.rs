@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use bevy_ecs::prelude::*;
 use rand::Rng;
 
-use crate::ai::pathfinding::{find_path, step_toward};
 use crate::ai::planner::actions::actions_for_disposition;
 use crate::ai::planner::goals::goal_for_disposition;
 use crate::ai::planner::{
@@ -7536,6 +7535,8 @@ fn dispatch_step_action(
                 inventory,
                 &ec.map,
                 &path_plan,
+                desired_velocity,
+                &ec.constants.movement,
                 commands,
                 &mut narr.log,
                 ec.time.tick,
@@ -10307,9 +10308,23 @@ fn resolve_engage_prey(
             // water, the integrator refused every sub-step, and the
             // stalk stuck-out ("stuck while stalking", 1099 of 1104 in
             // the step-12 iter-4 soak were fish).
-            let stalk_aim = step_toward(pos, &nav_target, map, &cat_overlays)
-                .map(|next| next.0)
-                .unwrap_or(nav_target.0);
+            // 140 step 13 — throttled: the A* route is cached on the
+            // step and recomputed only on target drift / age, not
+            // every resolver tick.
+            let stalk_aim = crate::ai::pathfinding::throttled_step_toward(
+                pos,
+                &nav_target,
+                map,
+                &cat_overlays,
+                &mut state.cached_path,
+                &mut state.cached_path_tick,
+                time.tick,
+                movement.path_recompute_min_ticks,
+                movement.path_recompute_target_drift_tiles,
+                movement.waypoint_arrival_radius,
+            )
+            .map(|next| next.0)
+            .unwrap_or(nav_target.0);
             // Base-speed stalk — pre-140 parity. The 0.4× stalk gait
             // looked ethological but broke the tuned detection economy:
             // prey alertness accumulates per tick, so a 2.5×-longer
@@ -10384,9 +10399,22 @@ fn resolve_engage_prey(
         // shore tile, so A* actually engages (find_path refuses
         // impassable destinations) and routes around the concave
         // obstacles the greedy fallback used to strand on.
-        let next = step_toward(pos, &nav_target, map, &cat_overlays).or_else(|| {
-            find_path(*pos, nav_target, map, &cat_overlays).and_then(|p| p.into_iter().next())
-        });
+        // 140 step 13 — throttled: replaces both the per-tick
+        // `step_toward` A* and the redundant explicit `find_path`
+        // fallback (the throttle's cache IS that path, kept across
+        // ticks and recomputed only on target drift / age).
+        let next = crate::ai::pathfinding::throttled_step_toward(
+            pos,
+            &nav_target,
+            map,
+            &cat_overlays,
+            &mut state.cached_path,
+            &mut state.cached_path_tick,
+            time.tick,
+            movement.path_recompute_min_ticks,
+            movement.path_recompute_target_drift_tiles,
+            movement.waypoint_arrival_radius,
+        );
         if let Some(next) = next {
             // Sprint-gait close (pre-140 approach was 3 tiles/tick;
             // a walk-gait approach let prey drift out of range —

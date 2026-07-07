@@ -194,6 +194,14 @@ pub struct StepExecutionState {
     /// Pre-computed A* path for movement steps.
     #[serde(skip)]
     pub cached_path: Option<Vec<Position>>,
+    /// 140 step 13 — tick `cached_path` was computed at, for the
+    /// hunt-arm recompute throttle (`throttled_step_toward`): a
+    /// cached path is followed until the target drifts >
+    /// `path_recompute_target_drift_tiles` from its endpoint or
+    /// `path_recompute_min_ticks` elapse. Serde-skipped alongside
+    /// `cached_path` — an age without its path is meaningless.
+    #[serde(skip)]
+    pub cached_path_tick: u64,
     /// Internal phase for multi-phase actions (e.g., EngagePrey).
     pub phase: StepPhase,
     /// Patrol direction for hunt/forage search patterns.

@@ -1300,17 +1300,16 @@ impl Plugin for SimulationPlugin {
                     systems::magic::update_corruption_landmarks,
                     systems::magic::spawn_shadow_fox_from_corruption,
                     (
-                        // Ticket 138 — per-tick accumulator pass for
-                        // every entity's `MovementBudget`. Sits before
-                        // every wildlife / cat step-site so consumers
-                        // spend a freshly-ticked budget within the
-                        // same tick. Per-tick discipline justified
-                        // under `docs/systems/ecs-rules.md`'s "decay"
-                        // carve-out — continuous accumulator, not an
-                        // event-driven transition. Also serves as the
-                        // lazy-insert path for save-loaded entities
-                        // missing the component (pre-138 saves).
-                        systems::movement_budget::accumulate_movement_budget,
+                        // 140 step 13 — save-load lazy-insert pass
+                        // (pre-138 saves lack `MovementBudget`;
+                        // pre-140 saves lack `Velocity` /
+                        // `DesiredVelocity`). The ticket-138 per-tick
+                        // accumulator loop that used to live here is
+                        // retired with the accumulator itself; the
+                        // remaining `Without<…>` queries are
+                        // archetype-pruned to empty after the first
+                        // tick, so the steady-state cost is nil.
+                        systems::movement_budget::insert_missing_movement_components,
                         // Ticket 023 shadow-fox decision sub-chain —
                         // grouped to keep the wildlife `.chain()` under
                         // Bevy's 20-element limit while preserving

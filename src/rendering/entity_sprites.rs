@@ -672,9 +672,16 @@ pub fn swap_seasonal_building_sprites(
 
 /// Snapshot current Position into PreviousPosition before the simulation tick
 /// advances positions. Runs in FixedUpdate before all simulation systems.
+///
+/// 140 step 13 — copies the CONTINUOUS world position (pre-13 this
+/// tile-quantized via `set_tile`, which was lossless when every mover
+/// sat on tile centers; velocity movers now occupy sub-tile positions
+/// and the render interpolation needs the true previous point).
+/// Tile-stepped entities still snapshot their tile center — their
+/// `Position` *is* the tile center.
 pub fn snapshot_previous_positions(mut query: Query<(&Position, &mut PreviousPosition)>) {
     for (pos, mut prev) in &mut query {
-        prev.set_tile(pos.x(), pos.y());
+        prev.0 = pos.0;
     }
 }
 
@@ -723,13 +730,25 @@ fn smoothstep(t: f32) -> f32 {
 }
 
 /// Sync Position → RenderPosition → Transform for all entities. The
-/// per-frame interpolation reads `RenderTickProgress`, applies a
-/// smoothstep ease-in/out (ticket 129's curve choice — linear was
-/// the pre-129 default), writes the result to `RenderPosition`, and
-/// then composes per-entity layout offsets (item-stack columns,
-/// non-item hash-deterministic sub-tile jitter) into
-/// `Transform.translation`. Tile texture index and z-layer reads
-/// elsewhere still use `Position` (containing tile).
+/// per-frame interpolation reads `RenderTickProgress` and writes the
+/// result to `RenderPosition`, then composes per-entity layout
+/// offsets (item-stack columns, non-item hash-deterministic sub-tile
+/// jitter) into `Transform.translation`. Tile texture index and
+/// z-layer reads elsewhere still use `Position` (containing tile).
+///
+/// Two interpolation regimes (140 step 13):
+///
+/// - **Velocity movers** (`Has<Velocity>` — cats, wildlife, prey):
+///   LINEAR interpolation over the CONTINUOUS world positions. The
+///   integrator produces constant-rate displacement; ticket 129's
+///   per-tick smoothstep re-eased every tick of a constant glide
+///   into a slow-fast-slow pulse, and the tile-quantized endpoints
+///   both stair-stepped sub-tile motion and tripped the snap
+///   threshold on every sprint tick (3+ tiles/tick reads as a
+///   teleport under a tile metric).
+/// - **Everything else** (items, non-mover sprites): the ticket-129
+///   tile-center smoothstep, unchanged — a discrete hop between tile
+///   centers genuinely looks better eased.
 #[allow(clippy::type_complexity)]
 pub fn sync_entity_positions(
     map: Res<TileMap>,
@@ -742,6 +761,7 @@ pub fn sync_entity_positions(
             &mut RenderPosition,
             &mut Transform,
             Option<&ItemDisplaySlot>,
+            Has<crate::components::physical::Velocity>,
         ),
         With<EntitySpriteMarker>,
     >,
@@ -749,18 +769,33 @@ pub fn sync_entity_positions(
     let world_px = TILE_PX * TILE_SCALE;
     let map_h = map.height as f32;
     let smoothed = smoothstep(progress.0);
+    let linear = progress.0.clamp(0.0, 1.0);
 
-    for (entity, pos, prev, mut render_pos, mut transform, display_slot) in &mut query {
-        let (curr_x, curr_y) = grid_to_world(pos, map_h, world_px);
-
+    for (entity, pos, prev, mut render_pos, mut transform, display_slot, is_velocity_mover) in
+        &mut query
+    {
         // Snap directly for large jumps (spawn, teleport) — skip
-        // interpolation. Threshold of 5 grid cells matches pre-129
-        // behavior; sub-tile interpolation only makes sense for
-        // tick-by-tick step movement.
-        let dist = (pos.x() - prev.x()).unsigned_abs() + (pos.y() - prev.y()).unsigned_abs();
-        let (x, y) = if dist > 5 {
-            (curr_x, curr_y)
+        // interpolation. 5-tile threshold matches pre-129 behavior;
+        // measured in continuous world space so a sprint tick
+        // (~3 tiles) interpolates instead of snapping.
+        let jump = pos.0.distance(prev.0);
+        let (x, y) = if jump > 5.0 {
+            if is_velocity_mover {
+                world_to_render(pos.0, map_h, world_px)
+            } else {
+                grid_to_world(pos, map_h, world_px)
+            }
+        } else if is_velocity_mover {
+            // Continuous world-space endpoints, linear parameter —
+            // constant velocity renders as constant motion.
+            let (curr_x, curr_y) = world_to_render(pos.0, map_h, world_px);
+            let (prev_x, prev_y) = world_to_render(prev.0, map_h, world_px);
+            (
+                prev_x + (curr_x - prev_x) * linear,
+                prev_y + (curr_y - prev_y) * linear,
+            )
         } else {
+            let (curr_x, curr_y) = grid_to_world(pos, map_h, world_px);
             let prev_x = prev.x() as f32 * world_px;
             let prev_y = (map_h - 1.0 - prev.y() as f32) * world_px;
             (
@@ -799,6 +834,18 @@ pub fn sync_entity_positions(
 fn grid_to_world(pos: &Position, map_height: f32, world_px: f32) -> (f32, f32) {
     let x = pos.x() as f32 * world_px;
     let y = (map_height - 1.0 - pos.y() as f32) * world_px;
+    (x, y)
+}
+
+/// Continuous world-coordinate variant of [`grid_to_world`] (140 step
+/// 13 — velocity movers render their true sub-tile position). The
+/// `-0.5` recenters tile-center world coords (`set_tile` stores
+/// `x + 0.5`) onto the same pixel origin `grid_to_world` produces for
+/// integer tiles, so a mover resting at a tile center renders exactly
+/// where a tile-stepped entity on that tile would.
+fn world_to_render(world: bevy::math::Vec2, map_height: f32, world_px: f32) -> (f32, f32) {
+    let x = (world.x - 0.5) * world_px;
+    let y = (map_height - 0.5 - world.y) * world_px;
     (x, y)
 }
 

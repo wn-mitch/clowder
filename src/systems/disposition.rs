@@ -4,7 +4,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::system::SystemParam;
 use rand::Rng;
 
-use crate::ai::pathfinding::{find_free_adjacent, step_toward};
+use crate::ai::pathfinding::find_free_adjacent;
 use crate::ai::scoring::{score_actions, ScoringContext};
 use crate::ai::{Action, CurrentAction};
 use crate::components::building::{
@@ -4142,9 +4142,22 @@ fn dispatch_chain_step(
                         // === STALK === slow sinuous approach at stalk gait.
                         // 467 — aim at the vantage (shore tile for fish;
                         // the prey tile itself for land prey).
-                        let stalk_aim = step_toward(pos, &nav_target, map, &cat_overlays)
-                            .map(|next| next.0)
-                            .unwrap_or(nav_target.0);
+                        // 140 step 13 — throttled A* (mirror of the
+                        // goap.rs stalk arm).
+                        let stalk_aim = crate::ai::pathfinding::throttled_step_toward(
+                            pos,
+                            &nav_target,
+                            map,
+                            &cat_overlays,
+                            &mut step.cached_path,
+                            &mut step.cached_path_tick,
+                            time.tick,
+                            constants.movement.path_recompute_min_ticks,
+                            constants.movement.path_recompute_target_drift_tiles,
+                            constants.movement.waypoint_arrival_radius,
+                        )
+                        .map(|next| next.0)
+                        .unwrap_or(nav_target.0);
                         // Base-speed stalk — pre-140 parity (see the
                         // goap.rs stalk arm rationale).
                         desired_velocity.0 = Some(crate::ai::steering::seek(
@@ -4180,7 +4193,20 @@ fn dispatch_chain_step(
                     step.last_observed_position = Some(*pos);
                     // 467 — navigate to the vantage so A* engages for
                     // impassable-tile prey (mirror of the goap.rs arm).
-                    if let Some(next) = step_toward(pos, &nav_target, map, &cat_overlays) {
+                    // 140 step 13 — throttled A* (mirror of the goap.rs
+                    // approach arm).
+                    if let Some(next) = crate::ai::pathfinding::throttled_step_toward(
+                        pos,
+                        &nav_target,
+                        map,
+                        &cat_overlays,
+                        &mut step.cached_path,
+                        &mut step.cached_path_tick,
+                        time.tick,
+                        constants.movement.path_recompute_min_ticks,
+                        constants.movement.path_recompute_target_drift_tiles,
+                        constants.movement.waypoint_arrival_radius,
+                    ) {
                         // Sprint-gait close (mirror of the goap.rs arm).
                         desired_velocity.0 = Some(crate::ai::steering::seek(
                             pos.0,
@@ -4219,9 +4245,17 @@ fn dispatch_chain_step(
                 if dx == 0 && dy == 0 {
                     dx = 1;
                 }
-                // Trot while searching to cover ground.
-                for _ in 0..d.search_speed {
-                    *pos = patrol_move(pos, dx, dy, map);
+                // 140 step 13 — search wander is a desire toward the
+                // patrol_move tile at base speed (mirror of
+                // `resolve_search_prey`; the `search_speed` multi-hop
+                // tile-jump collapses into the integrator's speed cap).
+                let aim = patrol_move(pos, dx, dy, map);
+                if aim != *pos {
+                    desired_velocity.0 = Some(crate::ai::steering::seek(
+                        pos.0,
+                        aim.0,
+                        constants.movement.cat_max_speed,
+                    ));
                 }
 
                 // 467 — reachability gate (mirror of resolve_search_prey):
@@ -4392,7 +4426,17 @@ fn dispatch_chain_step(
                     dx = 1;
                 }
             }
-            *pos = patrol_move(pos, dx, dy, map);
+            // 140 step 13 — forage wander expresses a walk-gait desire
+            // (mirror of `resolve_forage_item`); the yield check below
+            // reads the containing tile per tick as before.
+            let aim = patrol_move(pos, dx, dy, map);
+            if aim != *pos {
+                desired_velocity.0 = Some(crate::ai::steering::seek(
+                    pos.0,
+                    aim.0,
+                    constants.movement.cat_max_speed,
+                ));
+            }
 
             // Check current tile for forage yield.
             if map.in_bounds(pos.x(), pos.y()) {

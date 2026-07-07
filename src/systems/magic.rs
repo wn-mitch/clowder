@@ -774,6 +774,9 @@ pub fn resolve_magic_task_chains(
             &mut TaskChain,
             &mut CurrentAction,
             &mut Position,
+            // 140 step 13 — the ApplyRemedy approach leg expresses a
+            // desire instead of tile-jumping the cached path.
+            &mut crate::components::physical::DesiredVelocity,
             &mut Skills,
             &mut Inventory,
             &mut Mood,
@@ -815,6 +818,7 @@ pub fn resolve_magic_task_chains(
         mut chain,
         mut current,
         mut pos,
+        mut desired_velocity,
         mut skills,
         mut inventory,
         mut mood,
@@ -961,6 +965,8 @@ pub fn resolve_magic_task_chains(
                     &mut inventory,
                     &map,
                     &crate::ai::route_cost::CatPathPlan::NoOverlay,
+                    &mut desired_velocity,
+                    &constants.movement,
                     &mut commands,
                     &mut log,
                     time.tick,

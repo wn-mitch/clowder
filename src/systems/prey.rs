@@ -1453,10 +1453,7 @@ mod tests {
         (
             crate::components::physical::Velocity::default(),
             crate::components::physical::DesiredVelocity::default(),
-            crate::components::MovementBudget {
-                accumulator: per_tick,
-                per_tick,
-            },
+            crate::components::MovementBudget { per_tick },
         )
     }
 

@@ -621,6 +621,85 @@ pub fn greedy_step_toward(
 }
 
 // ---------------------------------------------------------------------------
+// Throttled step-toward (140 step 13 — A* recompute throttling)
+// ---------------------------------------------------------------------------
+
+/// [`step_toward`] with a per-step path cache and a recompute
+/// throttle. Pre-step-13 the hunt approach/stalk arms ran a full A*
+/// **every resolver tick** toward a mostly-stationary target (a
+/// grazing mouse wiggles a tile at a time; a fish never moves) — the
+/// single largest avoidable per-tick cost the fluid-movement
+/// migration left behind. This wrapper computes the A* route once and
+/// follows it, recomputing only when:
+///
+/// - the cache is empty or fully consumed;
+/// - the target has drifted more than `drift_tiles` (world-space
+///   Euclidean) from the cached route's endpoint; or
+/// - the cache is older than `min_ticks`.
+///
+/// Waypoints are popped front-to-back within
+/// `waypoint_arrival_radius`; the first surviving waypoint is the
+/// returned aim. When A* has no route (impassable / unreachable
+/// target) the cache stays empty and the call falls through to
+/// [`greedy_step_toward`] each tick — bit-for-bit the pre-throttle
+/// fallback behavior, and cheap.
+///
+/// Contract preserved from [`step_toward`]: returns `None` when
+/// `from == to` and `None` when every greedy option is blocked (the
+/// entity is stuck) — callers' stuck watchdogs need no changes.
+#[allow(clippy::too_many_arguments)]
+pub fn throttled_step_toward(
+    from: &Position,
+    to: &Position,
+    map: &TileMap,
+    overlays: &[WeightedOverlay<'_>],
+    cached_path: &mut Option<Vec<Position>>,
+    cached_path_tick: &mut u64,
+    now: u64,
+    min_ticks: u32,
+    drift_tiles: f32,
+    waypoint_arrival_radius: f32,
+) -> Option<Position> {
+    if from == to {
+        *cached_path = None;
+        return None;
+    }
+
+    let stale = match cached_path {
+        None => true,
+        Some(p) => {
+            p.is_empty()
+                || p.last()
+                    .is_none_or(|end| end.0.distance(to.0) > drift_tiles)
+                || now.saturating_sub(*cached_path_tick) >= u64::from(min_ticks)
+        }
+    };
+    if stale {
+        *cached_path = find_path(*from, *to, map, overlays);
+        *cached_path_tick = now;
+    }
+
+    if let Some(path) = cached_path {
+        while let Some(wp) = path.first().copied() {
+            if from.0.distance(wp.0) <= waypoint_arrival_radius {
+                path.remove(0);
+            } else {
+                break;
+            }
+        }
+        if let Some(&aim) = path.first() {
+            return Some(aim);
+        }
+        // Route fully consumed but target not reached (it moved
+        // within the drift tolerance) — drop the cache so next tick
+        // recomputes, and fall through greedy for this tick.
+        *cached_path = None;
+    }
+
+    greedy_step_toward(from, to, map, overlays)
+}
+
+// ---------------------------------------------------------------------------
 // Hunt vantage (ticket 467 — shoreline pounce)
 // ---------------------------------------------------------------------------
 
@@ -1187,6 +1266,157 @@ mod tests {
             Some(Position::new(6, 5)),
             "only (6,5) should be passable and unoccupied"
         );
+    }
+
+    // -----------------------------------------------------------------
+    // throttled_step_toward (140 step 13 — A* recompute throttling)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn throttled_follows_cached_route_without_recompute() {
+        let map = open_map();
+        let from = Position::new(0, 0);
+        let to = Position::new(6, 0);
+        // Seed a deliberately-detoured cache whose endpoint matches the
+        // target: if the helper recomputed, it would aim (1,0)-ish; if
+        // it follows the cache, it aims the detour waypoint (0,1).
+        let mut cache = Some(vec![Position::new(0, 1), Position::new(6, 0)]);
+        let mut tick = 100;
+        let aim = throttled_step_toward(
+            &from,
+            &to,
+            &map,
+            &[],
+            &mut cache,
+            &mut tick,
+            102,
+            8,
+            3.0,
+            0.35,
+        );
+        assert_eq!(
+            aim,
+            Some(Position::new(0, 1)),
+            "fresh in-tolerance cache must be followed, not recomputed"
+        );
+    }
+
+    #[test]
+    fn throttled_recomputes_on_target_drift() {
+        let map = open_map();
+        let from = Position::new(0, 0);
+        // Cache endpoint (6,0) vs live target (6,5): drift 5 > 3.0.
+        let mut cache = Some(vec![Position::new(0, 1), Position::new(6, 0)]);
+        let mut tick = 100;
+        let aim = throttled_step_toward(
+            &from,
+            &Position::new(6, 5),
+            &map,
+            &[],
+            &mut cache,
+            &mut tick,
+            101,
+            8,
+            3.0,
+            0.35,
+        );
+        assert_eq!(tick, 101, "recompute must restamp the cache tick");
+        let aim = aim.expect("open map must route");
+        assert_ne!(
+            aim,
+            Position::new(0, 1),
+            "drifted cache must be recomputed, not followed"
+        );
+    }
+
+    #[test]
+    fn throttled_recomputes_on_age() {
+        let map = open_map();
+        let from = Position::new(0, 0);
+        let to = Position::new(6, 0);
+        let mut cache = Some(vec![Position::new(0, 1), Position::new(6, 0)]);
+        let mut tick = 100;
+        // Age 8 >= min_ticks 8 — must recompute despite matching endpoint.
+        let aim = throttled_step_toward(
+            &from,
+            &to,
+            &map,
+            &[],
+            &mut cache,
+            &mut tick,
+            108,
+            8,
+            3.0,
+            0.35,
+        );
+        assert_eq!(tick, 108);
+        assert_ne!(aim, Some(Position::new(0, 1)));
+    }
+
+    #[test]
+    fn throttled_pops_reached_waypoints() {
+        let map = open_map();
+        // Standing on the first waypoint's tile center — it must pop
+        // and the next waypoint becomes the aim.
+        let from = Position::new(2, 0);
+        let to = Position::new(6, 0);
+        let mut cache = Some(vec![
+            Position::new(2, 0),
+            Position::new(3, 0),
+            Position::new(6, 0),
+        ]);
+        let mut tick = 100;
+        let aim = throttled_step_toward(
+            &from,
+            &to,
+            &map,
+            &[],
+            &mut cache,
+            &mut tick,
+            101,
+            8,
+            3.0,
+            0.35,
+        );
+        assert_eq!(aim, Some(Position::new(3, 0)));
+    }
+
+    #[test]
+    fn throttled_none_when_from_equals_to() {
+        let map = open_map();
+        let p = Position::new(3, 3);
+        let mut cache = Some(vec![Position::new(3, 3)]);
+        let mut tick = 0;
+        assert_eq!(
+            throttled_step_toward(&p, &p, &map, &[], &mut cache, &mut tick, 1, 8, 3.0, 0.35),
+            None
+        );
+        assert!(cache.is_none(), "arrival clears the cache");
+    }
+
+    #[test]
+    fn throttled_falls_back_greedy_for_unroutable_target() {
+        // Water target: find_path refuses, cache stays unusable, greedy
+        // presses toward it — step_toward contract preserved.
+        let mut map = open_map();
+        map.set(6, 0, Terrain::Water);
+        let from = Position::new(0, 0);
+        let to = Position::new(6, 0);
+        let mut cache = None;
+        let mut tick = 0;
+        let aim = throttled_step_toward(
+            &from,
+            &to,
+            &map,
+            &[],
+            &mut cache,
+            &mut tick,
+            1,
+            8,
+            3.0,
+            0.35,
+        );
+        assert_eq!(aim, Some(Position::new(1, 0)));
     }
 
     // -----------------------------------------------------------------

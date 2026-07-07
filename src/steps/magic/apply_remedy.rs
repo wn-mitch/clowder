@@ -57,23 +57,43 @@ pub fn resolve_apply_remedy(
     inventory: &mut Inventory,
     map: &TileMap,
     path_plan: &CatPathPlan<'_>,
+    // 140 step 13 — the approach leg expresses a walk-gait desire
+    // (was the last `*pos = path.remove(0)` tile-jump mover).
+    desired: &mut crate::components::physical::DesiredVelocity,
+    movement: &crate::resources::sim_constants::MovementConstants,
     commands: &mut Commands,
     log: &mut NarrativeLog,
     tick: u64,
     m: &MagicConstants,
 ) -> (StepResult, Option<(Entity, Entity, f32)>) {
-    // Move to patient if not adjacent.
+    // Move to patient if not adjacent (same cached-smoothed-path +
+    // seek pattern as `resolve_move_to`).
     if let Some(target_pos) = target_position {
         if pos.chebyshev_distance(&target_pos) > 1 {
             if cached_path.is_none() {
-                match path_plan.find_full_path(*pos, target_pos, map) {
+                match path_plan.find_smoothed_path(*pos, target_pos, map) {
                     Some(path) => *cached_path = Some(path),
                     None => return (StepResult::Fail("no path to patient".into()), None),
                 }
             }
             if let Some(ref mut path) = cached_path {
-                if !path.is_empty() {
-                    *pos = path.remove(0);
+                while let Some(wp) = path.first().copied() {
+                    if pos.0.distance(wp.0) <= movement.waypoint_arrival_radius {
+                        path.remove(0);
+                    } else {
+                        break;
+                    }
+                }
+                if let Some(&wp) = path.first() {
+                    desired.0 = Some(crate::ai::steering::seek(
+                        pos.0,
+                        wp.0,
+                        movement.cat_max_speed,
+                    ));
+                } else {
+                    // Route consumed but still not adjacent (patient
+                    // moved) — recompute next tick.
+                    *cached_path = None;
                 }
             }
             return (StepResult::Continue, None);
@@ -137,6 +157,8 @@ mod tests {
         let mut skills = Skills::default();
         let mut inventory = Inventory::default();
         let mut cached_path = None;
+        let mut desired = crate::components::physical::DesiredVelocity::default();
+        let movement = crate::resources::sim_constants::MovementConstants::default();
         let cat = world.spawn_empty().id();
 
         let mut commands = state.get_mut(&mut world);
@@ -152,6 +174,8 @@ mod tests {
             &mut inventory,
             &map,
             &CatPathPlan::NoOverlay,
+            &mut desired,
+            &movement,
             &mut commands,
             &mut log,
             100,
@@ -179,6 +203,8 @@ mod tests {
         // (and not after) inventory consumption.
         inventory.add_item(RemedyKind::HealingPoultice.to_item_kind());
         let mut cached_path = None;
+        let mut desired = crate::components::physical::DesiredVelocity::default();
+        let movement = crate::resources::sim_constants::MovementConstants::default();
         let cat = world.spawn_empty().id();
         let patient = world.spawn_empty().id();
 
@@ -195,6 +221,8 @@ mod tests {
             &mut inventory,
             &map,
             &CatPathPlan::NoOverlay,
+            &mut desired,
+            &movement,
             &mut commands,
             &mut log,
             100,
@@ -222,6 +250,8 @@ mod tests {
         let mut skills = Skills::default();
         let mut inventory = Inventory::default();
         let mut cached_path = None;
+        let mut desired = crate::components::physical::DesiredVelocity::default();
+        let movement = crate::resources::sim_constants::MovementConstants::default();
         let cat = world.spawn_empty().id();
 
         let mut commands = state.get_mut(&mut world);
@@ -237,6 +267,8 @@ mod tests {
             &mut inventory,
             &map,
             &CatPathPlan::NoOverlay,
+            &mut desired,
+            &movement,
             &mut commands,
             &mut log,
             100,
@@ -262,6 +294,8 @@ mod tests {
         let mut inventory = Inventory::default();
         inventory.add_item(RemedyKind::HealingPoultice.to_item_kind());
         let mut cached_path = None;
+        let mut desired = crate::components::physical::DesiredVelocity::default();
+        let movement = crate::resources::sim_constants::MovementConstants::default();
         let cat = world.spawn_empty().id();
         let patient = world.spawn_empty().id();
 
@@ -278,6 +312,8 @@ mod tests {
             &mut inventory,
             &map,
             &CatPathPlan::NoOverlay,
+            &mut desired,
+            &movement,
             &mut commands,
             &mut log,
             100,
@@ -306,6 +342,8 @@ mod tests {
         // Empty inventory — no prepared remedy to apply.
         let mut inventory = Inventory::default();
         let mut cached_path = None;
+        let mut desired = crate::components::physical::DesiredVelocity::default();
+        let movement = crate::resources::sim_constants::MovementConstants::default();
         let cat = world.spawn_empty().id();
         let patient = world.spawn_empty().id();
 
@@ -322,6 +360,8 @@ mod tests {
             &mut inventory,
             &map,
             &CatPathPlan::NoOverlay,
+            &mut desired,
+            &movement,
             &mut commands,
             &mut log,
             100,

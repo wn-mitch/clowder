@@ -428,10 +428,7 @@ mod tests {
                 Velocity::default(),
                 DesiredVelocity::default(),
                 // Burst-speed budget (bird escape profile).
-                MovementBudget {
-                    accumulator: 3.0,
-                    per_tick: 3.0,
-                },
+                MovementBudget { per_tick: 3.0 },
             ))
             .id();
         for _ in 0..6 {
@@ -496,10 +493,7 @@ mod tests {
                 Position::new(6, 5),
                 Velocity::default(),
                 DesiredVelocity::default(),
-                MovementBudget {
-                    accumulator: 3.0,
-                    per_tick: 3.0,
-                },
+                MovementBudget { per_tick: 3.0 },
                 Flying,
             ))
             .id();
