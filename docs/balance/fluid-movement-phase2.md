@@ -484,3 +484,49 @@ trajectory finished it."
 | P3 | Survival + continuity canaries hold; Starvation == 0; ShadowFoxAmbush ≤ 10; never-fired == 0 | hard gate |
 | P4 | Flee survival: injury deaths stay 0 (sprint flee widens the gap the step-10 flee-leg fix opened) | hard-ish |
 | P5 | Throughput within noise (one terrain lookup per mover per tick) | verdict channel |
+
+### Observation — FOUR soak iterations, P1 refuted in an unexpected direction
+
+| Iter | Kinematics | Hunt success | Attempts | Kills | Run |
+|---|---|---|---|---|---|
+| pre-12 (step 10) | step_toward hops: stalk 1, approach 3, chase 3 t/t | **22.3%** | 1628 | 363 | 44d3ecfb |
+| 1 | stalk 0.4×, approach 1.0×, chase pursue 1.4× | 15.1% | 3344 | 506 | 2af8c34d |
+| 2 | + sprint 2.4, approach sprints | 9.5% | 4240 | 404 | 32e46f09 |
+| 3 | sprint 3.0, stalk back to 1.0 | 16.5% | 2716 | 448 | 425a8d17 |
+| 4 | + gait-scaled accel (sprint launches at 0.75/tick) | 7.8% | 4359 | 339 | b26f5407 |
+
+Every iteration passes survival hard gates (deaths 0–2, all within
+ShadowFoxAmbush/wildlife-combat allowances; canaries green; never-fired
+clean). But P1 is refuted with an INVERSE speed–success correlation:
+the two slow-launch iterations (1, 3) score ~15–16%, the two
+fast-launch iterations (2, 4) score ~8–10%, and attempts inflate with
+cat speed while kills stay flat-to-down. Faster cats hunt WORSE — the
+opposite of the interception hypothesis. Candidate mechanisms, all
+UNVERIFIED (this is where the next session starts, with focal hunt
+traces via `/diagnose-run` — not more constant-guessing):
+- **Tremor area-alert cascade**: a sprinting cat deposits ~1.8× tremor,
+  alerting every prey in radius; each spooked target becomes another
+  doomed attempt (attempt inflation) and other cats' stalks break.
+- **Pounce-band geometry**: pounce arms when `dist <= pounce_range`
+  (2–3), sampled pre-integration; a 3.0-speed cat may overshoot
+  through the band between resolver ticks, converting would-be pounces
+  into chase misses (`quarry bolts` → flee → re-attempt).
+- **Attempt accounting**: `KilledAndReplanned`/`seeking another
+  target` loops may multiply attempts at high speed, making the RATE
+  drop partly an artifact while absolute kills (506 → 339 across
+  iterations) still show a real decline from iter 1 → 4.
+
+Side observations: ward channel violently alive again on this
+trajectory family (avoidances 8235, sieges 706 — 4× baseline;
+mythic-texture 4) — ticket 513's "dead channel" downgraded to
+"trajectory-fragile"; tps 117–125 throughout.
+
+### Concordance (interim — step 12 NOT landed)
+Discordant on the headline prediction, concordant on hard gates. Four
+iterations is the close-the-clade boundary: the remaining work is a
+DIAGNOSIS (instrument one hunt end-to-end: detection tick, alert
+radius effects, pounce-band crossing, attempt lifecycle) rather than
+a fifth constant guess. Step-12 code stays committed locally
+(terrain speed, pursuit, desire-based hunt arms, and gait plumbing
+are sound and test-green); the landing gate is hunt success ≥ the
+pre-step-12 22.3% with survival gates held.
