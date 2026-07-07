@@ -74,6 +74,46 @@ pub fn target_predictability_signal(
     model.predictability.value.clamp(0.0, 1.0)
 }
 
+/// 264 — social belief-facet signal: the actor's own
+/// `CatBeliefs[target].affiliation_history`, mapped from the facet's
+/// native `[-1, 1]` range onto the consideration-curve `[0, 1]` domain
+/// (`(v + 1) / 2`). Neutral-open on every missing layer — no beliefs
+/// component, no model of this target, or an affiliation facet with
+/// zero strength all return **0.5** (the mapped image of the 0.0
+/// neutral prior), so unmodeled strangers are neither lifted nor
+/// penalized relative to the axis midpoint.
+pub fn affiliation_signal(
+    cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
+    target: bevy_ecs::entity::Entity,
+) -> f32 {
+    let Some(model) = cat_beliefs.and_then(|b| b.models.get(&target)) else {
+        return 0.5;
+    };
+    if model.affiliation_history.strength <= 0.0 {
+        return 0.5;
+    }
+    ((model.affiliation_history.value + 1.0) * 0.5).clamp(0.0, 1.0)
+}
+
+/// 264 — social belief-facet signal: the actor's own
+/// `CatBeliefs[target].perceived_hostility` (fast aggressive-intent
+/// read, `[0, 1]`). Fail-open at **0.0** — no beliefs component, no
+/// model, or a zero-strength facet mean "no perceived hostility", so
+/// consumers with an inverted curve apply no penalty to unmodeled
+/// targets.
+pub fn perceived_hostility_signal(
+    cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
+    target: bevy_ecs::entity::Entity,
+) -> f32 {
+    let Some(model) = cat_beliefs.and_then(|b| b.models.get(&target)) else {
+        return 0.0;
+    };
+    if model.perceived_hostility.strength <= 0.0 {
+        return 0.0;
+    }
+    model.perceived_hostility.value.clamp(0.0, 1.0)
+}
+
 /// Build the canonical cooldown curve consumed by the
 /// `target_recent_failure` Consideration. Knots
 /// `[(0.0, 0.1), (1.0, 1.0)]`: a fresh failure scales the candidate's
@@ -195,6 +235,58 @@ mod tests {
             target_predictability_signal(Some(&beliefs), None, entity(9)),
             1.0
         );
+    }
+
+    // -----------------------------------------------------------------
+    // affiliation_signal / perceived_hostility_signal (264 dormant wire)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn affiliation_signal_neutral_open_without_model_or_strength() {
+        assert_eq!(affiliation_signal(None, entity(9)), 0.5);
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        assert_eq!(affiliation_signal(Some(&beliefs), entity(9)), 0.5);
+        // Model exists but affiliation facet never observed (strength 0).
+        beliefs.models.entry(entity(9)).or_default();
+        assert_eq!(affiliation_signal(Some(&beliefs), entity(9)), 0.5);
+    }
+
+    #[test]
+    fn affiliation_signal_maps_native_range_onto_unit_interval() {
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let model = beliefs.models.entry(entity(9)).or_default();
+        model.affiliation_history = Facet {
+            value: -1.0,
+            strength: 1.0,
+            ..Default::default()
+        };
+        assert_eq!(affiliation_signal(Some(&beliefs), entity(9)), 0.0);
+        let model = beliefs.models.entry(entity(9)).or_default();
+        model.affiliation_history.value = 1.0;
+        assert_eq!(affiliation_signal(Some(&beliefs), entity(9)), 1.0);
+        let model = beliefs.models.entry(entity(9)).or_default();
+        model.affiliation_history.value = 0.0;
+        assert_eq!(affiliation_signal(Some(&beliefs), entity(9)), 0.5);
+    }
+
+    #[test]
+    fn hostility_signal_fails_open_at_zero() {
+        assert_eq!(perceived_hostility_signal(None, entity(9)), 0.0);
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        beliefs.models.entry(entity(9)).or_default();
+        assert_eq!(perceived_hostility_signal(Some(&beliefs), entity(9)), 0.0);
+    }
+
+    #[test]
+    fn hostility_signal_reads_observed_facet() {
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let model = beliefs.models.entry(entity(9)).or_default();
+        model.perceived_hostility = Facet {
+            value: 0.8,
+            strength: 0.9,
+            ..Default::default()
+        };
+        assert!((perceived_hostility_signal(Some(&beliefs), entity(9)) - 0.8).abs() < 1e-6);
     }
 
     #[test]

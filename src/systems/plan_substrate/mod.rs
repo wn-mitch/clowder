@@ -48,8 +48,8 @@ pub mod target;
 pub use disposition::record_disposition_switch;
 pub use lifecycle::{abandon_plan, record_step_failure, try_preempt, PreemptKind, PreemptOutcome};
 pub use sensors::{
-    cooldown_curve, disposition_cooldown_signal, target_predictability_signal,
-    update_prev_safety_deficit,
+    affiliation_signal, cooldown_curve, disposition_cooldown_signal, perceived_hostility_signal,
+    target_predictability_signal, update_prev_safety_deficit,
 };
 pub use target::{
     carry_target_forward, expire_reservations, release_target, require_alive_and_unreserved_filter,

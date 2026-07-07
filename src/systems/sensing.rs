@@ -959,6 +959,13 @@ pub fn update_target_existence_markers(
             None,
             None,
             None,
+            // 264 — existence-check passes an empty affordance table
+            // (same rationale as the cooldown skip above): WeightedSum
+            // scores can't empty the candidate set, so `.is_some()` is
+            // affordance-invariant, and skipping the Res keeps this
+            // system under its SystemParam pressure. The GOAP-side
+            // resolver call reads the live resource.
+            &crate::resources::ActionAffordances::default(),
             &mut dse_scratchpad,
         )
         .is_some();
@@ -1906,7 +1913,9 @@ mod tests {
         let mut registry = DseRegistry::default();
         registry
             .target_taking_dses
-            .push(crate::ai::dses::socialize_target_dse());
+            .push(crate::ai::dses::socialize_target_dse(
+                &crate::resources::sim_constants::ScoringConstants::default(),
+            ));
         world.insert_resource(registry);
         // Ticket 427 Step 1 — `update_target_existence_markers` now
         // reaches `DseTargetScratchpad` for the per-cat

@@ -6346,6 +6346,8 @@ fn dispatch_step_action(
                         ec.cat_beliefs.get(cat_entity).ok(),
                         ec.exec_predator_beliefs.get(cat_entity).ok(),
                         narr.activation.as_deref_mut(),
+                        // 264 — Affordance(Socialize) conditional-axis read.
+                        &ec.action_affordances,
                         &mut ec.dse_scratchpad,
                     );
             }
@@ -6486,6 +6488,8 @@ fn dispatch_step_action(
                         ec.cat_beliefs.get(cat_entity).ok(),
                         ec.exec_predator_beliefs.get(cat_entity).ok(),
                         narr.activation.as_deref_mut(),
+                        // 264 — Affordance(GroomOther) conditional-axis read.
+                        &ec.action_affordances,
                         &mut ec.dse_scratchpad,
                         Some(&snaps.currently_groomed),
                     );

@@ -1569,6 +1569,10 @@ pub fn disposition_to_chain(
             None,
             None,
             None,
+            // 264 — same dead-code path; the live affordance read
+            // happens at the GOAP step-resolver site. Empty table is
+            // argmax-safe at dormant weight (axis absent).
+            &crate::resources::ActionAffordances::default(),
             &mut res.dse_scratchpad,
         );
         let mate_target = crate::ai::dses::mate_target::resolve_mate_target(
@@ -1639,6 +1643,9 @@ pub fn disposition_to_chain(
             None,
             None,
             None,
+            // 264 — same dead-code path; the live affordance read
+            // happens at the GOAP step-resolver site.
+            &crate::resources::ActionAffordances::default(),
             &mut res.dse_scratchpad,
             // 487 follow-on — chain pre-pick doesn't have the
             // dispatch-time `currently_groomed` set available. The

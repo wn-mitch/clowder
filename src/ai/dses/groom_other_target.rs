@@ -89,16 +89,33 @@ use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
+use crate::resources::action_affordances::{ActionAffordances, ActionKind};
 use crate::resources::relationships::Relationships;
+use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::systems::plan_substrate::{
-    cooldown_curve, target_predictability_signal, TARGET_PREDICTABILITY_INPUT,
+    affiliation_signal, cooldown_curve, perceived_hostility_signal, target_predictability_signal,
+    TARGET_PREDICTABILITY_INPUT,
 };
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_WARMTH_DEFICIT_INPUT: &str = "target_warmth_deficit";
 pub const TARGET_GROOMING_DEFICIT_INPUT: &str = "target_grooming_deficit";
 pub const TARGET_KINSHIP_INPUT: &str = "target_kinship";
+/// 264 — actor's own `CatBeliefs[target].affiliation_history`, mapped
+/// `[-1, 1] → [0, 1]` by [`affiliation_signal`] (0.5 = neutral /
+/// unmodeled).
+pub const TARGET_AFFILIATION_INPUT: &str = "target_affiliation";
+/// 264 — actor's own `CatBeliefs[target].perceived_hostility`
+/// (`[0, 1]`, 0.0 fail-open for unmodeled targets). Fed raw; the
+/// consideration curve inverts so high perceived hostility
+/// deprioritizes the grooming candidate.
+pub const TARGET_PERCEIVED_HOSTILITY_INPUT: &str = "target_perceived_hostility";
+/// 264 — per-target `Affordance(GroomOther, self, target)` read from
+/// substrate 261. `target_`-prefixed for the same
+/// `score_target_consideration` routing reason as
+/// `socialize_target::TARGET_SOCIALIZE_AFFORDANCE_INPUT` (ticket 516).
+pub const TARGET_GROOM_OTHER_AFFORDANCE_INPUT: &str = "target_affordance_groom_other";
 
 /// Candidate-pool range in Manhattan tiles. Matches `SOCIALIZE_TARGET_RANGE`
 /// / `MENTOR_TARGET_RANGE` (10) so Groom-other inherits the same social
@@ -107,7 +124,14 @@ pub const TARGET_KINSHIP_INPUT: &str = "target_kinship";
 pub const GROOM_OTHER_TARGET_RANGE: f32 = 10.0;
 
 /// §6.5.4 `Groom` (other) target-taking DSE factory.
-pub fn groom_other_target_dse() -> TargetTakingDse {
+///
+/// 264: takes `&ScoringConstants` so the conditional belief +
+/// affordance axes (`target_affiliation`, `target_perceived_hostility`,
+/// `affordance_groom_other`) are added only when their weights are
+/// non-zero. At dormant defaults the composition is byte-identical to
+/// pre-264 (six axes); at non-zero weights the six base axes scale by
+/// `(1 − Σ extras)` so the WeightedSum stays at 1.0.
+pub fn groom_other_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
     let linear = Curve::Linear {
         slope: 1.0,
         intercept: 0.0,
@@ -150,60 +174,111 @@ pub fn groom_other_target_dse() -> TargetTakingDse {
         knots: vec![(0.0, 0.5), (0.999, 0.5), (1.0, 1.0)],
     };
 
+    let mut considerations: Vec<Consideration> = vec![
+        Consideration::Spatial(SpatialConsideration::new(
+            "groom_other_target_nearness",
+            LandmarkSource::TargetPosition,
+            GROOM_OTHER_TARGET_RANGE,
+            nearness_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_FONDNESS_INPUT,
+            linear.clone(),
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_WARMTH_DEFICIT_INPUT,
+            warmth_curve,
+        )),
+        // Ticket 452 — `target_grooming_deficit`. Decomposes target
+        // selection so coat condition is a first-class signal.
+        // Newborn `GroomingCondition(0.15)` (set in pregnancy.rs's
+        // `NEWBORN_GROOMING`) amplifies maternal-grooming lift.
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_GROOMING_DEFICIT_INPUT,
+            grooming_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_KINSHIP_INPUT,
+            kinship_curve,
+        )),
+        // Ticket 073 — recently-failed target cooldown (audit gap #2).
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_PREDICTABILITY_INPUT,
+            cooldown_curve(),
+        )),
+    ];
+    // WeightedSum matches the social-family (Socialize / Mate /
+    // Mentor) convention. CompensatedProduct would null a
+    // non-kin-but-beloved target via the 0.5 kinship signal
+    // passing through multiplicative gating — the spec intent is
+    // a small additive bias, not a gate.
+    // Ticket 452 redistribution: legacy `warmth_deficit` weight
+    // 0.24 halved to 0.12 to seat `grooming_deficit` at 0.12 with
+    // matching shape — both are target-need axes with equal
+    // weight. Other weights unchanged (×4/5 of original four-axis
+    // 0.30/0.30/0.30/0.10 ratios, with cooldown at 1/5).
+    let mut weights: Vec<f32> = vec![
+        0.30 * 4.0 / 5.0,       // nearness     = 0.24
+        0.30 * 4.0 / 5.0,       // fondness     = 0.24
+        0.30 * 4.0 / 5.0 / 2.0, // warmth_deficit   = 0.12
+        0.30 * 4.0 / 5.0 / 2.0, // grooming_deficit = 0.12
+        0.10 * 4.0 / 5.0,       // kinship      = 0.08
+        1.0 / 5.0,              // recent_failure = 0.20
+    ];
+    // 264: conditional belief + affordance axes, dormant at 0.0
+    // (hunt_target's `hunt_best_predation_weight` shape). Base six
+    // scale by `(1 − Σ extras)`; axes push in documented order
+    // (affiliation, hostility, affordance).
+    let affiliation_w = scoring.groom_other_affiliation_weight.clamp(0.0, 1.0);
+    let hostility_w = scoring.groom_other_hostility_weight.clamp(0.0, 1.0);
+    let affordance_w = scoring.groom_other_affordance_weight.clamp(0.0, 1.0);
+    let extra_w = (affiliation_w + hostility_w + affordance_w).clamp(0.0, 1.0);
+    if extra_w > 0.0 {
+        let scale = 1.0 - extra_w;
+        for w in &mut weights {
+            *w *= scale;
+        }
+    }
+    if affiliation_w > 0.0 {
+        // 264: actor-subjective affiliation belief (sensor owns the
+        // [-1,1] → [0,1] mapping; 0.5 = neutral / unmodeled).
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_AFFILIATION_INPUT,
+            linear.clone(),
+        )));
+        weights.push(affiliation_w);
+    }
+    if hostility_w > 0.0 {
+        // 264: perceived hostility through an inverted Linear — high
+        // hostility → low score ("don't groom the cat that just
+        // hissed at you"). Unmodeled targets read 0.0 → inverted 1.0
+        // → no penalty (fail-open).
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_PERCEIVED_HOSTILITY_INPUT,
+            Curve::Composite {
+                inner: Box::new(linear.clone()),
+                post: PostOp::Invert,
+            },
+        )));
+        weights.push(hostility_w);
+    }
+    if affordance_w > 0.0 {
+        // 264: Affordance(GroomOther, self, target) from substrate 261
+        // (estimator: proximity + bond + low-hostility + my social
+        // need). Reads 0.0 for pairs the writer didn't populate this
+        // tick — the substrate's gate signal.
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_GROOM_OTHER_AFFORDANCE_INPUT,
+            linear,
+        )));
+        weights.push(affordance_w);
+    }
+
     TargetTakingDse {
         id: DseId("groom_other_target"),
         candidate_query: groom_other_candidate_query_doc,
-        per_target_considerations: vec![
-            Consideration::Spatial(SpatialConsideration::new(
-                "groom_other_target_nearness",
-                LandmarkSource::TargetPosition,
-                GROOM_OTHER_TARGET_RANGE,
-                nearness_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_FONDNESS_INPUT,
-                linear.clone(),
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_WARMTH_DEFICIT_INPUT,
-                warmth_curve,
-            )),
-            // Ticket 452 — `target_grooming_deficit`. Decomposes target
-            // selection so coat condition is a first-class signal.
-            // Newborn `GroomingCondition(0.15)` (set in pregnancy.rs's
-            // `NEWBORN_GROOMING`) amplifies maternal-grooming lift.
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_GROOMING_DEFICIT_INPUT,
-                grooming_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_KINSHIP_INPUT,
-                kinship_curve,
-            )),
-            // Ticket 073 — recently-failed target cooldown (audit gap #2).
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_PREDICTABILITY_INPUT,
-                cooldown_curve(),
-            )),
-        ],
-        // WeightedSum matches the social-family (Socialize / Mate /
-        // Mentor) convention. CompensatedProduct would null a
-        // non-kin-but-beloved target via the 0.5 kinship signal
-        // passing through multiplicative gating — the spec intent is
-        // a small additive bias, not a gate.
-        // Ticket 452 redistribution: legacy `warmth_deficit` weight
-        // 0.24 halved to 0.12 to seat `grooming_deficit` at 0.12 with
-        // matching shape — both are target-need axes with equal
-        // weight. Other weights unchanged (×4/5 of original four-axis
-        // 0.30/0.30/0.30/0.10 ratios, with cooldown at 1/5).
-        composition: Composition::weighted_sum(vec![
-            0.30 * 4.0 / 5.0,       // nearness     = 0.24
-            0.30 * 4.0 / 5.0,       // fondness     = 0.24
-            0.30 * 4.0 / 5.0 / 2.0, // warmth_deficit   = 0.12
-            0.30 * 4.0 / 5.0 / 2.0, // grooming_deficit = 0.12
-            0.10 * 4.0 / 5.0,       // kinship      = 0.08
-            1.0 / 5.0,              // recent_failure = 0.20
-        ]),
+        per_target_considerations: considerations,
+        composition: Composition::weighted_sum(weights),
         aggregation: TargetAggregation::Best,
         intention: groom_other_intention,
         required_stance: None,
@@ -266,6 +341,11 @@ pub fn resolve_groom_other_target(
     cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
     predator_beliefs: Option<&crate::components::beliefs::PredatorBeliefs>,
     activation: Option<&mut SystemActivation>,
+    // 264 — ActionAffordances resource for the conditional
+    // `affordance_groom_other` axis. Reads return `0.0` for any pair
+    // the writer didn't populate this tick; at dormant weight the
+    // axis is absent and the arm is never queried.
+    affordances: &ActionAffordances,
     // Ticket 427 Step 1 — pre-allocated scratch buffers.
     scratch: &mut crate::resources::DseTargetScratchpad,
     // 487 follow-on — peers currently mid-`GroomOther` (groomer and
@@ -338,6 +418,16 @@ pub fn resolve_groom_other_target(
                 }
                 signal
             }
+            // 264 — actor-subjective affiliation belief (0.5 neutral
+            // for unmodeled targets).
+            TARGET_AFFILIATION_INPUT => affiliation_signal(cat_beliefs, target),
+            // 264 — raw perceived hostility; the consideration curve
+            // inverts (0.0 fail-open → no penalty).
+            TARGET_PERCEIVED_HOSTILITY_INPUT => perceived_hostility_signal(cat_beliefs, target),
+            // 264 — Affordance(GroomOther) substrate read.
+            TARGET_GROOM_OTHER_AFFORDANCE_INPUT => {
+                affordances.read(cat, target, ActionKind::GroomOther)
+            }
             _ => 0.0,
         }
     };
@@ -400,7 +490,7 @@ mod tests {
 
     #[test]
     fn groom_other_target_dse_id_stable() {
-        assert_eq!(groom_other_target_dse().id().0, "groom_other_target");
+        assert_eq!(groom_other_target_dse(&ScoringConstants::default()).id().0, "groom_other_target");
     }
 
     #[test]
@@ -408,28 +498,28 @@ mod tests {
         // Ticket 073 added the cooldown axis (4 → 5); ticket 452 added
         // `target_grooming_deficit` (5 → 6).
         assert_eq!(
-            groom_other_target_dse().per_target_considerations().len(),
+            groom_other_target_dse(&ScoringConstants::default()).per_target_considerations().len(),
             6
         );
     }
 
     #[test]
     fn groom_other_target_weights_sum_to_one() {
-        let sum: f32 = groom_other_target_dse().composition().weights.iter().sum();
+        let sum: f32 = groom_other_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
     #[test]
     fn groom_other_target_uses_best_aggregation() {
         assert_eq!(
-            groom_other_target_dse().aggregation(),
+            groom_other_target_dse(&ScoringConstants::default()).aggregation(),
             TargetAggregation::Best
         );
     }
 
     #[test]
     fn intention_is_allogroom_activity() {
-        let dse = groom_other_target_dse();
+        let dse = groom_other_target_dse(&ScoringConstants::default());
         let target = Entity::from_raw_u32(10).unwrap();
         let intention = (dse.intention)(target);
         match intention {
@@ -459,6 +549,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -468,7 +559,7 @@ mod tests {
     #[test]
     fn resolver_returns_none_when_no_candidates_in_range() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -489,6 +580,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -498,7 +590,7 @@ mod tests {
     #[test]
     fn resolver_excludes_self() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let relationships = Relationships::default();
         let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };
@@ -518,6 +610,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -530,7 +623,7 @@ mod tests {
         // ended up in the candidate snapshot gets skipped rather than
         // scored. Matches the Mentor resolver's Skills-absence handling.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let orphan = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -551,6 +644,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -563,7 +657,7 @@ mod tests {
         // the colder cat (larger warmth deficit) wins — this is the
         // axis `find_social_target` could not see.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let cold = Entity::from_raw_u32(2).unwrap();
         let warm = Entity::from_raw_u32(3).unwrap();
@@ -598,6 +692,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -609,7 +704,7 @@ mod tests {
         // Weight on kinship is only 0.10 so the kin bias is a nudge,
         // but with all other axes tied it's the decider.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let kin = Entity::from_raw_u32(2).unwrap();
         let stranger = Entity::from_raw_u32(3).unwrap();
@@ -635,6 +730,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -649,7 +745,7 @@ mod tests {
         // (Logistic ≈ 0.68); at dist=5 signal is 0.5 (Logistic
         // ≈ 0.004). Adjacent cat wins decisively.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let near_acquaintance = Entity::from_raw_u32(2).unwrap();
         let far_dearest = Entity::from_raw_u32(3).unwrap();
@@ -678,6 +774,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -687,7 +784,7 @@ mod tests {
     #[test]
     fn fondness_dominates_when_warmth_and_distance_tied() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend = Entity::from_raw_u32(2).unwrap();
         let stranger = Entity::from_raw_u32(3).unwrap();
@@ -716,6 +813,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -731,7 +829,7 @@ mod tests {
         // their linear gap. Encodes the §6.5.4 design intent that
         // "desperate-need amplifies outreach."
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let freezing = Entity::from_raw_u32(2).unwrap();
         let chilly = Entity::from_raw_u32(3).unwrap();
@@ -768,6 +866,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -785,7 +884,7 @@ mod tests {
         // 0.12, the gap is (0.72 − 0.0025) × 0.12 ≈ 0.086 score —
         // decisive when all other axes tie. The dirty cat wins.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let dirty = Entity::from_raw_u32(2).unwrap();
         let clean = Entity::from_raw_u32(3).unwrap();
@@ -820,6 +919,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -837,7 +937,7 @@ mod tests {
         // small enough that other ties dominate, but non-zero so the
         // axis fires.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let with_groom = Entity::from_raw_u32(2).unwrap();
         let absent_groom = Entity::from_raw_u32(3).unwrap();
@@ -877,6 +977,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -892,7 +993,7 @@ mod tests {
         // (signal=0.8) is ≈0.32 — a ~2× gap big enough to overcome
         // the 0.10 weight jitter room.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let adjacent = Entity::from_raw_u32(2).unwrap();
         let two_tiles = Entity::from_raw_u32(3).unwrap();
@@ -921,6 +1022,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -938,7 +1040,7 @@ mod tests {
         // a non-groomed peer existing while the resolver still picks
         // the in-flight one.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(groom_other_target_dse());
+        registry.target_taking_dses.push(groom_other_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let mid_groom = Entity::from_raw_u32(2).unwrap();
         let free_peer = Entity::from_raw_u32(3).unwrap();
@@ -976,6 +1078,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             None,
         );
@@ -999,9 +1102,211 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
             Some(&in_flight),
         );
         assert_eq!(filtered, Some(free_peer));
+    }
+
+    // -----------------------------------------------------------------
+    // 264 — conditional belief + affordance axes (dormant wire)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn belief_affordance_axes_dormant_at_default() {
+        // 264: all three weights ship at 0.0; the axes MUST NOT appear
+        // and the six-axis composition is byte-identical to pre-264.
+        let s = ScoringConstants::default();
+        assert_eq!(s.groom_other_affiliation_weight, 0.0);
+        assert_eq!(s.groom_other_hostility_weight, 0.0);
+        assert_eq!(s.groom_other_affordance_weight, 0.0);
+        let dse = groom_other_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 6);
+        assert!(dse.per_target_considerations().iter().all(|c| !matches!(
+            c,
+            Consideration::Scalar(sc)
+                if sc.name == TARGET_AFFILIATION_INPUT
+                    || sc.name == TARGET_PERCEIVED_HOSTILITY_INPUT
+                    || sc.name == TARGET_GROOM_OTHER_AFFORDANCE_INPUT
+        )));
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn belief_affordance_axes_present_and_renormalized_when_active() {
+        // 264: at non-zero weights the axes appear in documented order
+        // (affiliation, hostility, affordance) and the base six scale
+        // by (1 - 0.3) so the WeightedSum stays at 1.0.
+        let mut s = ScoringConstants::default();
+        s.groom_other_affiliation_weight = 0.1;
+        s.groom_other_hostility_weight = 0.1;
+        s.groom_other_affordance_weight = 0.1;
+        let dse = groom_other_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 9);
+        assert_eq!(dse.composition().weights.len(), 9);
+        assert!((dse.composition().weights[6] - 0.1).abs() < 1e-6);
+        assert!((dse.composition().weights[7] - 0.1).abs() < 1e-6);
+        assert!((dse.composition().weights[8] - 0.1).abs() < 1e-6);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    /// 264 — ticket microexperiment `groom_skips_high_hostility_target`
+    /// at the resolver layer: with the hostility axis active, a
+    /// candidate the actor believes hostile loses to an unmodeled peer
+    /// tied on every other axis. Kills the silent-inert trap on the
+    /// `TARGET_PERCEIVED_HOSTILITY_INPUT` fetch arm — a missing arm
+    /// would read 0.0 (inverted 1.0) for both and fail on the tie.
+    #[test]
+    fn groom_skips_high_hostility_target_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.groom_other_hostility_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&s));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let hostile = Entity::from_raw_u32(2).unwrap();
+        let calm = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, hostile).fondness = 0.5;
+        relationships.get_or_insert(cat, calm).fondness = 0.5;
+
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let m = beliefs.models.entry(hostile).or_default();
+        m.perceived_hostility = crate::components::beliefs::Facet {
+            value: 0.9,
+            strength: 1.0,
+            ..Default::default()
+        };
+
+        let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };
+        let is_kin = |_: Entity, _: Entity| -> bool { false };
+        let cat_positions = vec![(hostile, Position::new(1, 0)), (calm, Position::new(0, 1))];
+        let out = resolve_groom_other_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
+            &is_kin,
+            &relationships,
+            0,
+            None,
+            Some(&beliefs),
+            None,
+            None,
+            &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
+            None,
+        );
+        assert_eq!(
+            out,
+            Some(calm),
+            "perceived-hostile candidate must lose when the hostility axis is live"
+        );
+    }
+
+    /// 264 — affiliation arm verified live in isolation: only the
+    /// affiliation weight is active; the believed-bonded candidate
+    /// beats an unmodeled peer tied on every other axis (tied
+    /// positions — ties break toward the LATER candidate, so a dead
+    /// arm fails this test).
+    #[test]
+    fn affiliation_arm_reads_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.groom_other_affiliation_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&s));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let bonded = Entity::from_raw_u32(2).unwrap();
+        let stranger = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, bonded).fondness = 0.5;
+        relationships.get_or_insert(cat, stranger).fondness = 0.5;
+
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let m = beliefs.models.entry(bonded).or_default();
+        m.affiliation_history = crate::components::beliefs::Facet {
+            value: 0.9,
+            strength: 1.0,
+            ..Default::default()
+        };
+
+        let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };
+        let is_kin = |_: Entity, _: Entity| -> bool { false };
+        let cat_positions = vec![(bonded, Position::new(1, 0)), (stranger, Position::new(0, 1))];
+        let out = resolve_groom_other_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
+            &is_kin,
+            &relationships,
+            0,
+            None,
+            Some(&beliefs),
+            None,
+            None,
+            &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
+            None,
+        );
+        assert_eq!(out, Some(bonded));
+    }
+
+    /// 264 — affordance arm verified live in isolation: only the
+    /// affordance weight is active; the substrate-priced candidate
+    /// beats the unpriced one at tied positions.
+    #[test]
+    fn affordance_arm_reads_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.groom_other_affordance_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry
+            .target_taking_dses
+            .push(groom_other_target_dse(&s));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let afforded = Entity::from_raw_u32(2).unwrap();
+        let unpriced = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, afforded).fondness = 0.5;
+        relationships.get_or_insert(cat, unpriced).fondness = 0.5;
+
+        let mut affordances = ActionAffordances::default();
+        affordances.write(cat, afforded, ActionKind::GroomOther, 0.9);
+
+        let temperature_lookup = |_: Entity| -> Option<f32> { Some(0.5) };
+        let is_kin = |_: Entity, _: Entity| -> bool { false };
+        let cat_positions = vec![
+            (afforded, Position::new(1, 0)),
+            (unpriced, Position::new(0, 1)),
+        ];
+        let out = resolve_groom_other_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &temperature_lookup,
+            &(|_: Entity| -> Option<f32> { None }) as &dyn Fn(Entity) -> Option<f32>,
+            &is_kin,
+            &relationships,
+            0,
+            None,
+            None,
+            None,
+            None,
+            &affordances,
+            &mut crate::resources::DseTargetScratchpad::default(),
+            None,
+        );
+        assert_eq!(out, Some(afforded));
     }
 }

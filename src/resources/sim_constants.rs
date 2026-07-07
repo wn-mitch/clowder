@@ -2820,6 +2820,94 @@ pub struct ScoringConstants {
     /// without dominating the yield + pursuit-cost signal.
     #[serde(default = "default_hunt_alertness_tolerance_weight")]
     pub hunt_alertness_tolerance_weight: f32,
+    /// 264: weight on SocializeTarget's conditional `target_affiliation`
+    /// axis — reads the actor's own `CatBeliefs[target].affiliation_history`
+    /// facet (substrate 258), mapped `[-1, 1] → [0, 1]` with a 0.5
+    /// neutral default for unmodeled / zero-strength targets. The
+    /// asymmetric per-perceiver belief that supersedes the symmetric
+    /// `Relationships.fondness` read at activation (substrate first,
+    /// legacy axis retires second — pillar 2). WeightedSum: the seven
+    /// base axes scale by `(1 − Σ 264 extras)` when non-zero. Ships
+    /// dormant at 0.0; activation is plan step 20 (four-artifact).
+    #[serde(default = "default_socialize_affiliation_weight")]
+    pub socialize_affiliation_weight: f32,
+    /// 264: weight on SocializeTarget's conditional
+    /// `affordance_socialize` axis — reads `Affordance(Socialize,
+    /// self, target)` from substrate 261 (estimator: proximity +
+    /// affiliation + low hostility + receptivity). Ships dormant at
+    /// 0.0; activation is plan step 20.
+    #[serde(default = "default_socialize_affordance_weight")]
+    pub socialize_affordance_weight: f32,
+    /// 264: weight on GroomOtherTarget's conditional
+    /// `target_affiliation` axis — same read + mapping as
+    /// `socialize_affiliation_weight`. Ships dormant at 0.0.
+    #[serde(default = "default_groom_other_affiliation_weight")]
+    pub groom_other_affiliation_weight: f32,
+    /// 264: weight on GroomOtherTarget's conditional
+    /// `target_perceived_hostility` axis — reads
+    /// `CatBeliefs[target].perceived_hostility` (fast aggressive-intent
+    /// read, distinct from slow affiliation) through an inverted
+    /// Linear curve so high perceived hostility deprioritizes the
+    /// grooming candidate ("don't groom the cat that just hissed at
+    /// you"). Unmodeled targets read 0.0 hostility → no penalty
+    /// (fail-open). Ships dormant at 0.0.
+    #[serde(default = "default_groom_other_hostility_weight")]
+    pub groom_other_hostility_weight: f32,
+    /// 264: weight on GroomOtherTarget's conditional
+    /// `affordance_groom_other` axis — reads `Affordance(GroomOther,
+    /// self, target)` from substrate 261. Ships dormant at 0.0.
+    #[serde(default = "default_groom_other_affordance_weight")]
+    pub groom_other_affordance_weight: f32,
+    /// 264: weight on MateTarget's conditional
+    /// `target_perceived_receptivity` axis — reads
+    /// `CatBeliefs[target].perceived_receptivity` (is the partner open
+    /// to courtship *right now*, distinct from long-run bond). The
+    /// downstream lever on the 126/027 Mate supply-chain problem:
+    /// low-receptivity partners stop winning the pick and oscillating.
+    /// Unmodeled targets read a 0.5 neutral prior. Ships dormant at
+    /// 0.0; activation must verify the 027 Mate-cadence canary.
+    #[serde(default = "default_mate_receptivity_weight")]
+    pub mate_receptivity_weight: f32,
+    /// 264: weight on MateTarget's conditional `affordance_mate` axis —
+    /// reads `Affordance(Mate, self, target)` from substrate 261
+    /// (estimator: fertility proxy + bond + receptivity + proximity).
+    /// Ships dormant at 0.0.
+    #[serde(default = "default_mate_affordance_weight")]
+    pub mate_affordance_weight: f32,
+    /// 264: weight on MentorTarget's conditional `affordance_mentor`
+    /// axis — reads `Affordance(Mentor, self, target)` from substrate
+    /// 261 (estimator: bond + receptivity + my condition + proximity).
+    /// Mentor gets no direct belief axis — receptivity lives at the
+    /// affordance layer per the Hunt architectural rule (263). Ships
+    /// dormant at 0.0.
+    #[serde(default = "default_mentor_affordance_weight")]
+    pub mentor_affordance_weight: f32,
+    /// 264: weight on CaretakeTarget's conditional
+    /// `affordance_feed_kitten` axis — reads `Affordance(FeedKitten,
+    /// self, target)` from substrate 261 (estimator: kitten hunger +
+    /// my food proxy + bond + proximity). Caretake is the FeedKitten
+    /// consumer (the hungry-kitten picker); the rearing-arc
+    /// `dependent_kitten_target` has no ActionKind analog and stays
+    /// unwired. Ships dormant at 0.0.
+    #[serde(default = "default_caretake_affordance_weight")]
+    pub caretake_affordance_weight: f32,
+    /// 264: weight on ApplyRemedyTarget's conditional
+    /// `target_perceived_injury` axis — reads the actor's own
+    /// `CatBeliefs[patient].perceived_injury_level` facet through the
+    /// same convex Quadratic(2) as the raw `target_injury` axis.
+    /// ApplyRemedy is the `Care` consumer (261 estimator table:
+    /// `perceived_injury_level + bond`) — it owns the only raw-HP
+    /// target read (`1 − health.current/health.max`), which this
+    /// belief axis supersedes at activation (raw axis retires second,
+    /// pillar 2). Unmodeled patients read 0.0 (no belief of injury →
+    /// no triage lift). Ships dormant at 0.0.
+    #[serde(default = "default_apply_remedy_injury_belief_weight")]
+    pub apply_remedy_injury_belief_weight: f32,
+    /// 264: weight on ApplyRemedyTarget's conditional `affordance_care`
+    /// axis — reads `Affordance(Care, self, target)` from substrate
+    /// 261. Ships dormant at 0.0.
+    #[serde(default = "default_apply_remedy_affordance_weight")]
+    pub apply_remedy_affordance_weight: f32,
     /// 263: bias magnitude on the Hunt resolver's `stalk_start` band
     /// threshold inside `resolve_engage_prey`. At bias `0.0` (default,
     /// dormant) the threshold is unchanged from the distance-keyed
@@ -3491,6 +3579,17 @@ impl Default for ScoringConstants {
             patrol_threat_recency_weight: default_patrol_threat_recency_weight(),
             hunt_best_predation_weight: default_hunt_best_predation_weight(),
             hunt_alertness_tolerance_weight: default_hunt_alertness_tolerance_weight(),
+            socialize_affiliation_weight: default_socialize_affiliation_weight(),
+            socialize_affordance_weight: default_socialize_affordance_weight(),
+            groom_other_affiliation_weight: default_groom_other_affiliation_weight(),
+            groom_other_hostility_weight: default_groom_other_hostility_weight(),
+            groom_other_affordance_weight: default_groom_other_affordance_weight(),
+            mate_receptivity_weight: default_mate_receptivity_weight(),
+            mate_affordance_weight: default_mate_affordance_weight(),
+            mentor_affordance_weight: default_mentor_affordance_weight(),
+            caretake_affordance_weight: default_caretake_affordance_weight(),
+            apply_remedy_injury_belief_weight: default_apply_remedy_injury_belief_weight(),
+            apply_remedy_affordance_weight: default_apply_remedy_affordance_weight(),
             hunt_stalk_chase_affordance_bias: default_hunt_stalk_chase_affordance_bias(),
             ward_ambush_anchor_weight: default_ward_ambush_anchor_weight(),
             ward_recency_anchor_weight: default_ward_recency_anchor_weight(),
@@ -5146,6 +5245,76 @@ fn default_hunt_alertness_tolerance_weight() -> f32 {
 /// Ships dormant at 0.0; activation in a follow-on (recommended
 /// 0.25 → ±25% width swing under maximum affordance asymmetry).
 fn default_hunt_stalk_chase_affordance_bias() -> f32 {
+    0.0
+}
+
+/// 264: SocializeTarget `target_affiliation` belief-axis weight.
+/// Ships dormant at 0.0; activation is plan step 20 (four-artifact).
+fn default_socialize_affiliation_weight() -> f32 {
+    0.0
+}
+
+/// 264: SocializeTarget `affordance_socialize` axis weight. Ships
+/// dormant at 0.0; activation is plan step 20.
+fn default_socialize_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 264: GroomOtherTarget `target_affiliation` belief-axis weight.
+/// Ships dormant at 0.0; activation is plan step 20.
+fn default_groom_other_affiliation_weight() -> f32 {
+    0.0
+}
+
+/// 264: GroomOtherTarget `target_perceived_hostility` belief-axis
+/// weight (inverted curve — high hostility deprioritizes). Ships
+/// dormant at 0.0; activation is plan step 20.
+fn default_groom_other_hostility_weight() -> f32 {
+    0.0
+}
+
+/// 264: GroomOtherTarget `affordance_groom_other` axis weight. Ships
+/// dormant at 0.0; activation is plan step 20.
+fn default_groom_other_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 264: MateTarget `target_perceived_receptivity` belief-axis weight.
+/// Ships dormant at 0.0; activation is plan step 20 and must verify
+/// the 027 Mate-cadence canary.
+fn default_mate_receptivity_weight() -> f32 {
+    0.0
+}
+
+/// 264: MateTarget `affordance_mate` axis weight. Ships dormant at
+/// 0.0; activation is plan step 20.
+fn default_mate_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 264: MentorTarget `affordance_mentor` axis weight. Ships dormant
+/// at 0.0; activation is plan step 20.
+fn default_mentor_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 264: CaretakeTarget `affordance_feed_kitten` axis weight. Ships
+/// dormant at 0.0; activation is plan step 20.
+fn default_caretake_affordance_weight() -> f32 {
+    0.0
+}
+
+/// 264: ApplyRemedyTarget `target_perceived_injury` belief-axis
+/// weight (Care consumer — supersedes the raw-HP `target_injury`
+/// axis at activation). Ships dormant at 0.0; activation is plan
+/// step 20.
+fn default_apply_remedy_injury_belief_weight() -> f32 {
+    0.0
+}
+
+/// 264: ApplyRemedyTarget `affordance_care` axis weight. Ships
+/// dormant at 0.0; activation is plan step 20.
+fn default_apply_remedy_affordance_weight() -> f32 {
     0.0
 }
 

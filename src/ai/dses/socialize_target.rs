@@ -78,16 +78,32 @@ use crate::ai::target_dse::{
 };
 use crate::components::joint_intention::PracticeKind;
 use crate::components::physical::Position;
+use crate::resources::action_affordances::{ActionAffordances, ActionKind};
 use crate::resources::relationships::{BondType, Relationships};
+use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::systems::plan_substrate::{
-    cooldown_curve, target_predictability_signal, TARGET_PREDICTABILITY_INPUT,
+    affiliation_signal, cooldown_curve, target_predictability_signal,
+    TARGET_PREDICTABILITY_INPUT,
 };
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_NOVELTY_INPUT: &str = "target_novelty";
 pub const TARGET_SPECIES_COMPAT_INPUT: &str = "target_species_compat";
 pub const TARGET_PARTNER_BOND_INPUT: &str = "target_partner_bond";
+/// 264 — actor's own `CatBeliefs[target].affiliation_history`, mapped
+/// `[-1, 1] → [0, 1]` by [`affiliation_signal`] (0.5 = neutral /
+/// unmodeled). The asymmetric per-perceiver belief that supersedes the
+/// symmetric `Relationships.fondness` read at activation.
+pub const TARGET_AFFILIATION_INPUT: &str = "target_affiliation";
+/// 264 — per-target `Affordance(Socialize, self, target)` read from
+/// substrate 261. `target_`-prefixed (NOT the canonical
+/// `affordance_socialize` key) because `score_target_consideration`
+/// routes scalar names to the target-scoped fetcher only under the
+/// `target_` prefix — un-prefixed names fall through to the no-op
+/// `fetch_self` stub and read a silent 0.0 (the defect class ticket
+/// 516 audits across hunt's prey_* axes and 263's affordance key).
+pub const TARGET_SOCIALIZE_AFFORDANCE_INPUT: &str = "target_affordance_socialize";
 /// Re-export of the canonical key from `plan_substrate` so call sites
 /// in this module read a single name. Ticket 072 publishes the
 /// canonical constant; ticket 078 wires the consideration here.
@@ -101,7 +117,15 @@ pub const SOCIALIZE_TARGET_RANGE: f32 = 10.0;
 
 /// §6.5.1 `Socialize` target-taking DSE factory. Produces a
 /// [`TargetTakingDse`] consumable by `add_target_taking_dse`.
-pub fn socialize_target_dse() -> TargetTakingDse {
+///
+/// 264: takes `&ScoringConstants` so the conditional belief +
+/// affordance axes (`target_affiliation`, `affordance_socialize`) are
+/// added only when their weights are non-zero. At dormant defaults
+/// (0.0 / 0.0) the composition is byte-identical to pre-264 (seven
+/// axes). At non-zero weights the seven base axes scale by
+/// `(1 − Σ extras)` so the WeightedSum stays at 1.0 — uniform scaling
+/// preserves argmax on ticks where the new axes read uniformly.
+pub fn socialize_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
     // §L2.10.7 distance axis: `Quadratic(exp=2, divisor=-1, shift=1)`
     // evaluates `(1 - cost)²`, preserving the legacy `nearness²`
     // shape — same explicit-inversion idiom as Mentor and ApplyRemedy
@@ -133,62 +157,103 @@ pub fn socialize_target_dse() -> TargetTakingDse {
         knots: vec![(0.0, 0.0), (0.499, 0.0), (0.5, 1.0), (1.0, 1.0)],
     };
 
+    let mut considerations: Vec<Consideration> = vec![
+        Consideration::Spatial(SpatialConsideration::new(
+            "socialize_target_nearness",
+            LandmarkSource::TargetPosition,
+            SOCIALIZE_TARGET_RANGE,
+            nearness_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_FONDNESS_INPUT,
+            linear.clone(),
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_NOVELTY_INPUT,
+            linear.clone(),
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_SPECIES_COMPAT_INPUT,
+            species_cliff,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_PARTNER_BOND_INPUT,
+            linear.clone(),
+        )),
+        // Ticket 073 — recently-failed target cooldown. `Piecewise`
+        // 0.0 → 0.1, 1.0 → 1.0 multiplies a fresh-failure
+        // candidate's contribution down to ~10% of no-failure value.
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_PREDICTABILITY_INPUT,
+            cooldown_curve(),
+        )),
+        // Ticket 078 — Pairing Intention coherence. Cliff curve
+        // lifts the L2-elected partner's score to 1.0; non-partners
+        // see 0.0. Replaces the 027b post-IAUS pin in `bond_score`.
+        Consideration::Scalar(ScalarConsideration::new(
+            PAIRING_INTENTION_INPUT,
+            intention_cliff,
+        )),
+    ];
+    // WeightedSum matches the pre-refactor resolver's linear mixer
+    // (`fondness × w1 + (1 - familiarity) × w2`). CompensatedProduct
+    // would gate any low axis (a 0.0 novelty nulls the candidate
+    // entirely) which over-punishes familiar-but-beloved partners.
+    // Original five weights [0.20, 0.28, 0.20, 0.12, 0.20] sum to
+    // 1.0. Tickets 073 + 078 add two new axes (cooldown 1/6 ≈
+    // 0.1667, pairing intention 0.10), so the originals scale by
+    // (1 - 1/6 - 0.10) = 0.7333. Final 7-axis composition sums to
+    // 1.0 within fp tolerance.
+    let mut weights: Vec<f32> = vec![
+        0.20 * 0.7333,
+        0.28 * 0.7333,
+        0.20 * 0.7333,
+        0.12 * 0.7333,
+        0.20 * 0.7333,
+        1.0 / 6.0,
+        0.10,
+    ];
+    // 264: conditional belief + affordance axes, dormant at 0.0
+    // (hunt_target's `hunt_best_predation_weight` shape). Base seven
+    // scale by `(1 − Σ extras)` so the sum stays at 1.0.
+    let affiliation_w = scoring.socialize_affiliation_weight.clamp(0.0, 1.0);
+    let affordance_w = scoring.socialize_affordance_weight.clamp(0.0, 1.0);
+    let extra_w = (affiliation_w + affordance_w).clamp(0.0, 1.0);
+    if extra_w > 0.0 {
+        let scale = 1.0 - extra_w;
+        for w in &mut weights {
+            *w *= scale;
+        }
+    }
+    if affiliation_w > 0.0 {
+        // 264: actor-subjective affiliation belief. Linear over the
+        // `[0, 1]`-mapped facet (0.5 = neutral / unmodeled) — the
+        // sensor owns the range mapping, the curve is a pass-through.
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_AFFILIATION_INPUT,
+            linear.clone(),
+        )));
+        weights.push(affiliation_w);
+    }
+    if affordance_w > 0.0 {
+        // 264: Affordance(Socialize, self, target) from substrate 261.
+        // The writer's estimator composes proximity + affiliation +
+        // low-hostility + receptivity; the DSE-side read is one
+        // pass-through Linear. Reads 0.0 for pairs the writer didn't
+        // populate this tick (out of sensing range) — the substrate's
+        // gate signal.
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_SOCIALIZE_AFFORDANCE_INPUT,
+            linear,
+        )));
+        weights.push(affordance_w);
+    }
+
     TargetTakingDse {
         id: DseId("socialize_target"),
         candidate_query: socialize_candidate_query_doc,
-        per_target_considerations: vec![
-            Consideration::Spatial(SpatialConsideration::new(
-                "socialize_target_nearness",
-                LandmarkSource::TargetPosition,
-                SOCIALIZE_TARGET_RANGE,
-                nearness_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_FONDNESS_INPUT,
-                linear.clone(),
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_NOVELTY_INPUT,
-                linear.clone(),
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_SPECIES_COMPAT_INPUT,
-                species_cliff,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(TARGET_PARTNER_BOND_INPUT, linear)),
-            // Ticket 073 — recently-failed target cooldown. `Piecewise`
-            // 0.0 → 0.1, 1.0 → 1.0 multiplies a fresh-failure
-            // candidate's contribution down to ~10% of no-failure value.
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_PREDICTABILITY_INPUT,
-                cooldown_curve(),
-            )),
-            // Ticket 078 — Pairing Intention coherence. Cliff curve
-            // lifts the L2-elected partner's score to 1.0; non-partners
-            // see 0.0. Replaces the 027b post-IAUS pin in `bond_score`.
-            Consideration::Scalar(ScalarConsideration::new(
-                PAIRING_INTENTION_INPUT,
-                intention_cliff,
-            )),
-        ],
-        // WeightedSum matches the pre-refactor resolver's linear mixer
-        // (`fondness × w1 + (1 - familiarity) × w2`). CompensatedProduct
-        // would gate any low axis (a 0.0 novelty nulls the candidate
-        // entirely) which over-punishes familiar-but-beloved partners.
-        // Original five weights [0.20, 0.28, 0.20, 0.12, 0.20] sum to
-        // 1.0. Tickets 073 + 078 add two new axes (cooldown 1/6 ≈
-        // 0.1667, pairing intention 0.10), so the originals scale by
-        // (1 - 1/6 - 0.10) = 0.7333. Final 7-axis composition sums to
-        // 1.0 within fp tolerance.
-        composition: Composition::weighted_sum(vec![
-            0.20 * 0.7333,
-            0.28 * 0.7333,
-            0.20 * 0.7333,
-            0.12 * 0.7333,
-            0.20 * 0.7333,
-            1.0 / 6.0,
-            0.10,
-        ]),
+        per_target_considerations: considerations,
+        composition: Composition::weighted_sum(weights),
         aggregation: TargetAggregation::Best,
         intention: socialize_intention,
         // §9.3 Socialize accepts `Same | Ally`. Migrated from the
@@ -303,6 +368,12 @@ pub fn resolve_socialize_target(
     // Pass `None` from dead-code disposition.rs paths and from tests
     // that don't care.
     activation: Option<&mut SystemActivation>,
+    // 264 — ActionAffordances resource for the conditional
+    // `affordance_socialize` axis. Reads return `0.0` for any
+    // `(cat, target, kind)` the writer didn't populate this tick,
+    // which is also the dormant-axis outcome (axis absent at weight
+    // 0.0, so the arm is never queried).
+    affordances: &ActionAffordances,
     // Ticket 427 Step 1 — pre-allocated scratch buffers. The wrapper
     // writes into `scratch.entities` / `scratch.positions` instead of
     // allocating per call; capacity persists across cat-ticks.
@@ -397,6 +468,14 @@ pub fn resolve_socialize_target(
             // `1.0` iff `target` is the cat's
             // `JointIntention { Courtship }.partner`; `0.0` otherwise.
             PAIRING_INTENTION_INPUT if joint_partner == Some(target) => 1.0,
+            // 264 — actor-subjective affiliation belief (0.5 neutral
+            // for unmodeled targets; sensor owns the [-1,1] → [0,1]
+            // mapping).
+            TARGET_AFFILIATION_INPUT => affiliation_signal(cat_beliefs, target),
+            // 264 — Affordance(Socialize) substrate read.
+            TARGET_SOCIALIZE_AFFORDANCE_INPUT => {
+                affordances.read(cat, target, ActionKind::Socialize)
+            }
             _ => 0.0,
         }
     };
@@ -498,19 +577,19 @@ mod tests {
 
     #[test]
     fn socialize_target_dse_id_stable() {
-        assert_eq!(socialize_target_dse().id().0, "socialize_target");
+        assert_eq!(socialize_target_dse(&ScoringConstants::default()).id().0, "socialize_target");
     }
 
     #[test]
     fn socialize_target_dse_has_seven_axes() {
         // Tickets 073 + 078 — five legacy axes + cooldown (073) +
         // pairing intention (078) = seven.
-        assert_eq!(socialize_target_dse().per_target_considerations().len(), 7);
+        assert_eq!(socialize_target_dse(&ScoringConstants::default()).per_target_considerations().len(), 7);
     }
 
     #[test]
     fn socialize_target_weights_sum_to_one() {
-        let sum: f32 = socialize_target_dse().composition().weights.iter().sum();
+        let sum: f32 = socialize_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
@@ -526,7 +605,7 @@ mod tests {
         // shrunken fraction of the pre-073 score plus a constant 1/6.
         // The renormalization just shifts the dynamic range; argmax is
         // preserved (verified by the orthogonal pick-stability tests).
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let weights = &dse.composition().weights;
         let pre_073 = [0.20_f32, 0.28, 0.20, 0.12, 0.20];
         for (i, &pre) in pre_073.iter().enumerate() {
@@ -559,7 +638,7 @@ mod tests {
     #[test]
     fn socialize_target_uses_best_aggregation() {
         assert_eq!(
-            socialize_target_dse().aggregation(),
+            socialize_target_dse(&ScoringConstants::default()).aggregation(),
             TargetAggregation::Best
         );
     }
@@ -568,7 +647,7 @@ mod tests {
     fn picks_argmax_when_fondness_dominates() {
         // Two equally near, equally novel, equally cat candidates —
         // fondness decides the winner.
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend = Entity::from_raw_u32(10).unwrap();
         let acquaintance = Entity::from_raw_u32(11).unwrap();
@@ -607,7 +686,7 @@ mod tests {
         // fondness is tied but novelty differs, the legacy path is
         // undefined (tie-break by iter order); the DSE picks the
         // novel partner, breaking the tie deterministically.
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let novel_stranger = Entity::from_raw_u32(10).unwrap();
         let familiar_friend = Entity::from_raw_u32(11).unwrap();
@@ -673,7 +752,7 @@ mod tests {
         // through the score economy. The mechanism is preserved
         // (Intention partner wins ceteris paribus) but expressed as
         // an IAUS axis with full traceability.
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let intended = Entity::from_raw_u32(10).unwrap();
         let other_friend = Entity::from_raw_u32(11).unwrap();
@@ -746,7 +825,7 @@ mod tests {
         // *delta* between Intention and non-Intention scores for the
         // same Friends-bonded peer is what the pin governed and is
         // what we preserve.
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let intended = Entity::from_raw_u32(10).unwrap();
         let ctx = test_ctx(cat);
@@ -821,7 +900,7 @@ mod tests {
         // `retires_silent_divergence_vs_fondness_only`) with the
         // intention axis stuck at 0 across all candidates: the
         // novel-stranger pick must hold.
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let novel_stranger = Entity::from_raw_u32(10).unwrap();
         let familiar_friend = Entity::from_raw_u32(11).unwrap();
@@ -863,7 +942,7 @@ mod tests {
         // has 0.4 fondness, the stranger has 0.6, both equally near /
         // novel / cat. Without the bond bias the stranger wins; with
         // the 0.20 weight × 0.5 (Friends scalar) the friend wins.
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend = Entity::from_raw_u32(10).unwrap();
         let stranger = Entity::from_raw_u32(11).unwrap();
@@ -902,7 +981,7 @@ mod tests {
         // Graduated bond scalar (Partners=1.0, Friends=0.5) means the
         // partners-bonded cat outscores the friends-bonded one ceteris
         // paribus — keeps a paired cat oriented toward the deeper bond.
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend = Entity::from_raw_u32(10).unwrap();
         let partner = Entity::from_raw_u32(11).unwrap();
@@ -943,7 +1022,7 @@ mod tests {
         // Confirms the bond axis is a bias, not an override — a
         // beloved-but-unbonded peer still wins over a barely-liked
         // friend, matching the spec's "additive bias not gate" intent.
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend = Entity::from_raw_u32(10).unwrap();
         let beloved_stranger = Entity::from_raw_u32(11).unwrap();
@@ -979,7 +1058,7 @@ mod tests {
 
     #[test]
     fn empty_candidates_yield_no_target() {
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let ctx = test_ctx(cat);
         let fetch_self = |_: &str, _: Entity| 0.0;
@@ -1011,6 +1090,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -1019,7 +1099,7 @@ mod tests {
     #[test]
     fn resolver_returns_none_when_no_candidates_in_range() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse());
+        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -1039,6 +1119,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -1047,7 +1128,7 @@ mod tests {
     #[test]
     fn resolver_picks_higher_fondness_all_else_equal() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse());
+        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend = Entity::from_raw_u32(2).unwrap();
         let stranger = Entity::from_raw_u32(3).unwrap();
@@ -1077,6 +1158,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(friend));
@@ -1085,7 +1167,7 @@ mod tests {
     #[test]
     fn resolver_excludes_self() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse());
+        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         // Only self in the snapshot — must return None.
         let relationships = Relationships::default();
@@ -1104,6 +1186,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -1116,7 +1199,7 @@ mod tests {
         // iter order (nondeterministic); the DSE picks the novel
         // stranger deterministically via the novelty axis.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse());
+        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let familiar = Entity::from_raw_u32(2).unwrap();
         let novel = Entity::from_raw_u32(3).unwrap();
@@ -1145,6 +1228,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(novel));
@@ -1152,7 +1236,7 @@ mod tests {
 
     #[test]
     fn intention_is_socialize_activity() {
-        let dse = socialize_target_dse();
+        let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let target = Entity::from_raw_u32(10).unwrap();
         let ctx = test_ctx(cat);
@@ -1181,7 +1265,7 @@ mod tests {
     #[test]
     fn socialize_target_stance_requirement_is_same_or_ally() {
         use crate::ai::faction::FactionStance;
-        let req = socialize_target_dse()
+        let req = socialize_target_dse(&ScoringConstants::default())
             .required_stance
             .expect("§9.3 binding must populate required_stance");
         assert!(req.accepts(FactionStance::Same));
@@ -1198,7 +1282,7 @@ mod tests {
         // the non-banished cat even when the banished cat would have
         // scored higher on every other axis.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse());
+        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let banished = Entity::from_raw_u32(2).unwrap();
         let normal = Entity::from_raw_u32(3).unwrap();
@@ -1239,6 +1323,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
@@ -1255,7 +1340,7 @@ mod tests {
     #[test]
     fn resolver_penalizes_low_predictability_candidate_via_beliefs() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(socialize_target_dse());
+        registry.target_taking_dses.push(socialize_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let flaky = Entity::from_raw_u32(2).unwrap();
         let steady = Entity::from_raw_u32(3).unwrap();
@@ -1291,6 +1376,7 @@ mod tests {
             Some(&beliefs),
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(
@@ -1298,5 +1384,157 @@ mod tests {
             Some(steady),
             "fresh-failure predictability (0.0) must cool the flaky candidate below the steady one"
         );
+    }
+
+    // -----------------------------------------------------------------
+    // 264 — conditional belief + affordance axes (dormant wire)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn belief_affordance_axes_dormant_at_default() {
+        // 264: both weights ship at 0.0; the axes MUST NOT appear and
+        // the seven-axis composition is byte-identical to pre-264.
+        let s = ScoringConstants::default();
+        assert_eq!(s.socialize_affiliation_weight, 0.0);
+        assert_eq!(s.socialize_affordance_weight, 0.0);
+        let dse = socialize_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 7);
+        assert!(dse.per_target_considerations().iter().all(|c| !matches!(
+            c,
+            Consideration::Scalar(sc)
+                if sc.name == TARGET_AFFILIATION_INPUT
+                    || sc.name == TARGET_SOCIALIZE_AFFORDANCE_INPUT
+        )));
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn belief_affordance_axes_present_and_renormalized_when_active() {
+        // 264: at non-zero weights both axes appear (affiliation then
+        // affordance, in that documented order) and the base seven
+        // scale by (1 - 0.2) so the WeightedSum stays at 1.0.
+        let mut s = ScoringConstants::default();
+        s.socialize_affiliation_weight = 0.1;
+        s.socialize_affordance_weight = 0.1;
+        let dse = socialize_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 9);
+        assert_eq!(dse.composition().weights.len(), 9);
+        assert!((dse.composition().weights[7] - 0.1).abs() < 1e-6);
+        assert!((dse.composition().weights[8] - 0.1).abs() < 1e-6);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    /// 264 — ticket microexperiment `socialize_picks_high_affiliation_partner`
+    /// at the resolver layer: with the affiliation axis active, two
+    /// otherwise-identical candidates split on the actor's OWN
+    /// affiliation belief. Also kills the silent-inert trap — a missing
+    /// `TARGET_AFFILIATION_INPUT` fetch arm would read 0.0 for both and
+    /// this test would fail on the tie.
+    #[test]
+    fn resolver_picks_high_affiliation_partner_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.socialize_affiliation_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(socialize_target_dse(&s));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let liked = Entity::from_raw_u32(2).unwrap();
+        let disliked = Entity::from_raw_u32(3).unwrap();
+
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, liked).fondness = 0.5;
+        relationships.get_or_insert(cat, liked).familiarity = 0.5;
+        relationships.get_or_insert(cat, disliked).fondness = 0.5;
+        relationships.get_or_insert(cat, disliked).familiarity = 0.5;
+
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let m = beliefs.models.entry(liked).or_default();
+        m.affiliation_history = crate::components::beliefs::Facet {
+            value: 0.9,
+            strength: 1.0,
+            ..Default::default()
+        };
+        let m = beliefs.models.entry(disliked).or_default();
+        m.affiliation_history = crate::components::beliefs::Facet {
+            value: -0.9,
+            strength: 1.0,
+            ..Default::default()
+        };
+
+        // Truly tied distance (both Euclidean 1.0) so the affiliation
+        // axis is load-bearing, not the spatial axis.
+        let cat_positions = vec![(liked, Position::new(1, 0)), (disliked, Position::new(0, 1))];
+        let out = resolve_socialize_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
+            0,
+            None,
+            None,
+            Some(&beliefs),
+            None,
+            None,
+            &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(
+            out,
+            Some(liked),
+            "positive affiliation belief must beat negative when the axis is live"
+        );
+    }
+
+    /// 264 — with the affordance axis active, a candidate the substrate
+    /// prices as highly-afforded beats an unpriced one. Kills the
+    /// silent-inert trap on the `AFFORDANCE_SOCIALIZE_INPUT` fetch arm.
+    #[test]
+    fn resolver_reads_socialize_affordance_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.socialize_affordance_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(socialize_target_dse(&s));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let afforded = Entity::from_raw_u32(2).unwrap();
+        let unpriced = Entity::from_raw_u32(3).unwrap();
+
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, afforded).fondness = 0.5;
+        relationships.get_or_insert(cat, afforded).familiarity = 0.5;
+        relationships.get_or_insert(cat, unpriced).fondness = 0.5;
+        relationships.get_or_insert(cat, unpriced).familiarity = 0.5;
+
+        let mut affordances = ActionAffordances::default();
+        affordances.write(cat, afforded, ActionKind::Socialize, 0.9);
+
+        // Truly tied distance so the affordance axis is load-bearing.
+        // Ties break toward the LATER candidate, so a dead fetch arm
+        // (silent 0.0 for both) hands the win to `unpriced` and fails.
+        let cat_positions = vec![
+            (afforded, Position::new(1, 0)),
+            (unpriced, Position::new(0, 1)),
+        ];
+        let out = resolve_socialize_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            &affordances,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(out, Some(afforded));
     }
 }
