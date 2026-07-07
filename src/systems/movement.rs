@@ -258,7 +258,11 @@ mod tests {
 
     fn world_with_map() -> (World, Schedule) {
         let mut world = World::new();
-        world.insert_resource(TileMap::new(20, 20, Terrain::Grass));
+        // 60 wide: the sprint accel ramp (0.25/tick to the 3.0 ceiling)
+        // covers ~19.5 tiles before topping out — a 20-tile map ends
+        // mid-ramp. Height stays 20 (the wall/water-column tests build
+        // full-height barriers with it).
+        world.insert_resource(TileMap::new(60, 20, Terrain::Grass));
         world.insert_resource(SimConstants::default());
         let mut schedule = Schedule::default();
         schedule.add_systems(integrate_velocities);
@@ -338,15 +342,10 @@ mod tests {
 
     #[test]
     fn velocity_persists_and_reaches_speed_cap() {
-        // A 60-tile runway: the accel ramp to the sprint ceiling
-        // (0.25/tick → 12 ticks) covers ~19.5 tiles before topping out,
-        // which overruns the shared 20-tile test map.
-        let mut world = World::new();
-        world.insert_resource(TileMap::new(60, 20, Terrain::Grass));
-        world.insert_resource(SimConstants::default());
-        let mut schedule = Schedule::default();
-        schedule.add_systems(integrate_velocities);
+        let (mut world, mut schedule) = world_with_map();
         let e = spawn_mover(&mut world, Position::new(2, 5));
+        // Track the PEAK speed over the ramp (0.25/tick → 12 ticks to
+        // the 3.0 ceiling).
         let mut peak: f32 = 0.0;
         for _ in 0..16 {
             world.get_mut::<DesiredVelocity>(e).unwrap().0 = Some(Vec2::new(5.0, 0.0));
@@ -504,8 +503,9 @@ mod tests {
             "flier should cross the wall; at {:?}",
             p.tile()
         );
+        let max_x = world.resource::<TileMap>().width as f32 - 0.5;
         assert!(
-            p.0.x <= 19.5 + 1e-4,
+            p.0.x <= max_x + 1e-4,
             "flier must stay inside map bounds; at {:?}",
             p.0
         );
