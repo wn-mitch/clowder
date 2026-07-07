@@ -53,7 +53,15 @@ pub struct MovementConstants {
     pub hawk_max_accel: f32,
     /// Hunt stalk-phase speed multiplier (slow sinuous approach).
     pub stalk_speed_mult: f32,
-    /// Pounce / flee sprint multiplier.
+    /// Chase / flee / strike sprint multiplier over the species base
+    /// speed. 140 step-12 gate tune: 1.4 → 2.4 — the ceiling must beat
+    /// the rabbit's flee cap (`prey_ground_max_speed × flee_speed` =
+    /// 2.0) or fleeing rabbits are UNCATCHABLE (soak tuned-42-2af8c34d:
+    /// hunt success 22.3% → 15.1%, `lost prey during approach` 2183).
+    /// Real-cat anchor: ~13.3 m/s sprint vs ~10 m/s rabbit ≈ 1.33
+    /// ratio over the rabbit, i.e. 2.4× the 1.0 cat base with catch
+    /// margin carried by `catch_difficulty`. Endurance is bounded by
+    /// `chase_limit_*`, not a stamina model.
     pub sprint_speed_mult: f32,
     /// Personal-space radius (tiles) for `steering::separation` —
     /// replaces the jitter-teleport anti-stacking hacks (plan step 7).
@@ -100,7 +108,7 @@ impl Default for MovementConstants {
             max_accel: 0.25,
             hawk_max_accel: 0.5,
             stalk_speed_mult: 0.4,
-            sprint_speed_mult: 1.4,
+            sprint_speed_mult: 2.4,
             separation_radius: 0.6,
             waypoint_arrival_radius: 0.6,
             path_recompute_min_ticks: 8,

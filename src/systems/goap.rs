@@ -10244,13 +10244,14 @@ fn resolve_engage_prey(
             // A*-first `step_toward` keeps threat/fox-scent routing)
             // expressed as a desire at `stalk_speed_mult` (~0.4) — the
             // slow sinuous approach replaces tick-gated stalking.
-            if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
-                desired_velocity.0 = Some(crate::ai::steering::seek(
-                    pos.0,
-                    next.0,
-                    movement.cat_max_speed * movement.stalk_speed_mult,
-                ));
-            }
+            let stalk_aim = step_toward(pos, &prey_pos, map, &cat_overlays)
+                .map(|next| next.0)
+                .unwrap_or(prey_pos.0);
+            desired_velocity.0 = Some(crate::ai::steering::seek(
+                pos.0,
+                stalk_aim,
+                movement.cat_max_speed * movement.stalk_speed_mult,
+            ));
             if personality.anxiety > d.anxiety_spook_threshold
                 && rng.rng.random::<f32>() < d.anxiety_spook_chance
             {
@@ -10311,10 +10312,13 @@ fn resolve_engage_prey(
             find_path(*pos, prey_pos, map, &cat_overlays).and_then(|p| p.into_iter().next())
         });
         if let Some(next) = next {
+            // Sprint-gait close (pre-140 approach was 3 tiles/tick;
+            // a walk-gait approach let prey drift out of range —
+            // tuned-42-2af8c34d).
             desired_velocity.0 = Some(crate::ai::steering::seek(
                 pos.0,
                 next.0,
-                movement.cat_max_speed,
+                movement.cat_max_speed * movement.sprint_speed_mult,
             ));
         }
         if moved_since_last {

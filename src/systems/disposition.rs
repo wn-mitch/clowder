@@ -4127,14 +4127,14 @@ fn dispatch_chain_step(
                         ));
                     } else {
                         // === STALK === slow sinuous approach at stalk gait.
-                        if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
-                            desired_velocity.0 = Some(crate::ai::steering::seek(
-                                pos.0,
-                                next.0,
-                                constants.movement.cat_max_speed
-                                    * constants.movement.stalk_speed_mult,
-                            ));
-                        }
+                        let stalk_aim = step_toward(pos, &prey_pos, map, &cat_overlays)
+                            .map(|next| next.0)
+                            .unwrap_or(prey_pos.0);
+                        desired_velocity.0 = Some(crate::ai::steering::seek(
+                            pos.0,
+                            stalk_aim,
+                            constants.movement.cat_max_speed * constants.movement.stalk_speed_mult,
+                        ));
                         // Anxiety check: nervous cat spooks prey.
                         if personality.anxiety > d.anxiety_spook_threshold
                             && rng.rng.random::<f32>() < d.anxiety_spook_chance
@@ -4162,10 +4162,11 @@ fn dispatch_chain_step(
                         .is_none_or(|prev| pos.0.distance(prev.0) > 0.05);
                     step.last_observed_position = Some(*pos);
                     if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
+                        // Sprint-gait close (mirror of the goap.rs arm).
                         desired_velocity.0 = Some(crate::ai::steering::seek(
                             pos.0,
                             next.0,
-                            constants.movement.cat_max_speed,
+                            constants.movement.cat_max_speed * constants.movement.sprint_speed_mult,
                         ));
                     }
                     if dist > d.approach_give_up_distance.round() as i32 || (!moved && ticks > 10) {
