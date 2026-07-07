@@ -8,17 +8,17 @@
 > fresh. See `CLAUDE.md` §"Long-horizon coordination" for the request-time
 > checklist and maintenance rules.
 
-_Last generated: 2026-07-06._
+_Last generated: 2026-07-07._
 
 ## Summary
 
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 120 |
+| Ready | 121 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **166** |
+| **Open total** | **167** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (120)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -231,6 +231,10 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 - **[512](docs/open-work/tickets/512-remote-starvation-eats-spatial-discount-floor-loses-every-softmax-to-resting-under-critical-hunger-no-desperation-lever-lifts-the-distance-discount-as-hunger-goes-critical.md)** — remote starvation: Eat's spatial discount floor loses every softmax to Resting under critical hunger — no desperation lever lifts the distance discount as hunger goes critical — _[balance] · added 2026-07-06_
 
+### planning-substrate (1 ready)
+
+- **[514](docs/open-work/tickets/514-mentor-churn-mentor-target-elects-incapacitated-mentees-the-step-entry-alive-gate-then-rejects-1111-mentorcat-plan-failures-per-soak-on-incapacitation-heavy-trajectories.md)** — mentor churn: mentor_target elects Incapacitated mentees the step-entry alive-gate then rejects — 1111 MentorCat plan failures per soak on incapacitation-heavy trajectories — _[planning-substrate] · added 2026-07-07_
+
 ## Ready by initiative (82 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
@@ -344,7 +348,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (120)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -466,6 +470,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[510](docs/open-work/tickets/510-trash-vs-drop-disposal-margin-is-a-1e-4-coin-flip-with-a-midden-present-midden-discipline-exists-only-as-an-rng-draw.md)** — Trash vs Drop disposal margin is a 1e-4 coin flip with a Midden present — midden discipline exists only as an RNG draw — _[ai-substrate] · added 2026-07-05_
 - **[512](docs/open-work/tickets/512-remote-starvation-eats-spatial-discount-floor-loses-every-softmax-to-resting-under-critical-hunger-no-desperation-lever-lifts-the-distance-discount-as-hunger-goes-critical.md)** — remote starvation: Eat's spatial discount floor loses every softmax to Resting under critical hunger — no desperation lever lifts the distance discount as hunger goes critical — _[balance] · added 2026-07-06_
 - **[513](docs/open-work/tickets/513-shadowfox-colony-pressure-channel-fading-under-fluid-movement-drives-softmax-self-anchors-on-remote-corruption-reconstituting-seeding-loop-scent-shell-repels-at-fine-granularity-wardsiegehaunting-interactions-zero-on-both-gate-seeds.md)** — shadowfox colony-pressure channel fading under fluid movement: drives softmax self-anchors on remote corruption (Reconstituting-Seeding loop), scent shell repels at fine granularity, ward/siege/haunting interactions zero on both gate seeds — _[wildlife] · added 2026-07-06_
+- **[514](docs/open-work/tickets/514-mentor-churn-mentor-target-elects-incapacitated-mentees-the-step-entry-alive-gate-then-rejects-1111-mentorcat-plan-failures-per-soak-on-incapacitation-heavy-trajectories.md)** — mentor churn: mentor_target elects Incapacitated mentees the step-entry alive-gate then rejects — 1111 MentorCat plan failures per soak on incapacitation-heavy trajectories — _[planning-substrate] · added 2026-07-07_
 
 ## Parked (12)
 

@@ -604,3 +604,64 @@ out land attempts (368 → 288).
   (~98%) at one stroke; 467-B (shoreline-pounce resolver) preserves
   fish in the cat food chain; both remove the churn. Decision is
   values-based and reserved for the user per the ticket.
+
+## Iteration 8 — 467-B shoreline-pounce vantage (2026-07-07)
+
+### Changes (user chose B)
+- `pathfinding::hunt_vantage()` — hunt navigation target: the prey
+  tile for land prey; the nearest passable tile within the pounce
+  band for impassable-tile prey; `None` (uncatchable) for mid-lake
+  fish. Stalk/approach arms in both executors aim at the vantage, so
+  A* engages (passable target) and the greedy shoreline / concave-
+  obstacle strand class dies.
+- Election-side reachability gate on all four target-selection paths
+  (visual DSE + scent lock, goap + disposition sides); first-tick
+  `Abandoned("prey unreachable (no pounce vantage)")` fail-fast
+  behind it.
+- Verification substrate: 6 `hunt_vantage` unit tests +
+  `fish_shoreline_pounce` scenario (offshore fish killed from the
+  bank, mid-lake fish never elected; first Fish-species scenario).
+
+### Predictions (pre-registered)
+| # | Prediction | Result |
+|---|---|---|
+| P1 | Fish attempts collapse (~4071 → catchable-only) | **CONFIRMED** 215 |
+| P2 | Fish success ≥ 30% (ticket 467's own gate) | **CONFIRMED** 44.7% |
+| P3 | Aggregate hunt success ≥ 22.3% step-12 gate | **CONFIRMED** 63.7% |
+| P4 | Survival + continuity canaries hold | **CONFIRMED** both pass |
+
+### Observation (`tuned-42-861c9fe5`, step-12 iter-4 code + 467)
+- 1266 attempts / 807 kills / 63.7% (vs 4359 / 339 / 7.8% iter-4;
+  1628 / 363 / 22.3% step-10 gate; 1673 / 399 / 23.8% pre-Phase-II).
+  Tick-normalized kill rate 2.53× baseline (runs are wall-clock-
+  capped; this run covers 80.7k ticks vs baseline 100.8k).
+- Fish: 215 attempts, 96 kills (44.7%); birds newly killable (14 vs
+  0 baseline). Mean start_distance jumped 15.9 → 43.8: with the
+  omnipresent unreachable near-lake fish out of the candidate set,
+  scent locks commit to remoter land prey — fewer, longer, far more
+  successful hunts.
+- Prey ecosystem HOLDS under 2.53× predation (sub-agent audit):
+  populations pinned at carrying capacity all run, den respawn
+  absorbs the rate, end-fill 88% vs baseline 99.9% (healthy deeper
+  drawdown), 2 dens lost vs baseline 1, zero dens exhausted.
+- Verdict `concern`, hard gates all pass. Concern lines and owners:
+  MentorCat-Incapacitated plan-failure canary 694× → **ticket 514**
+  (pre-existing: 434 already in iter-4 with zero 467 code; election/
+  execution eligibility split, same shape as 467); ward-channel
+  drift → 513 (trajectory-fragile, known); founder dispersion → 490
+  (known); throughput −19.9% → contention-suspect (release build +
+  full test suite ran concurrently with the soak), idle re-run in
+  flight; colony_score drift (fulfillment +57%, structures_built
+  −40%) → direction consistent with the hunting-economy lift, watch
+  at step-13 re-baseline.
+
+### Concordance
+Concordant on all four pre-registered predictions. The step-12 gate
+(aggregate ≥ 22.3%) passes 2.9× over on the tandem lineage
+(step-12 gait code + 467), with the iter-4 soak (b26f5407) as the
+inter-ticket attribution point per the pair-baseline discipline:
+step-12 alone = 7.8% (467 churn amplified), +467 = 63.7%. One open
+question deliberately NOT tuned here: 63.7% sits ABOVE the 30–50%
+biology band — that calibration is Phase V's hunt-success-biology
+ticket, and it should be tuned against an honest attempt
+denominator, which only now exists.
