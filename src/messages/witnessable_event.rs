@@ -115,6 +115,29 @@ pub enum WitnessableEvent {
         position: Position,
         tick: u64,
     },
+    /// A cat's plan step failed against a specific target entity (the
+    /// target fled, died, was rejected at step entry, or otherwise
+    /// refused to cooperate). Self-observation: the ACTOR learns the
+    /// *target's* predictability — `CatBeliefs[target].predictability`
+    /// (or `PredatorBeliefs[target]` for wildlife targets) EMAs toward
+    /// fail. Third parties don't learn from someone else's silent step
+    /// failure (no observable cue) — same convention as
+    /// [`SelfPlanFailed`](Self::SelfPlanFailed), whose
+    /// disposition-keyed shape this mirrors target-keyed.
+    ///
+    /// Ticket 292 — the EMA successor to the retired
+    /// `RecentTargetFailures` `(action, target)` map. `action` is
+    /// carried for the ticket's pre-registered granularity pivot
+    /// (`EnvironmentalContextKey::ActionExecution`) but unread by the
+    /// v1 integrator arm — the new substrate is deliberately
+    /// target-keyed (design choice (a)).
+    TargetActionFailed {
+        actor: Entity,
+        action: crate::ai::planner::GoapActionKind,
+        target: Entity,
+        position: Position,
+        tick: u64,
+    },
     /// A cat dropped a reserve-kind herb (thornbriar / remedy-herb) into a
     /// Stores building. Updates witnesses' `ColonyReservesBelief` for the
     /// matching `ResourceKind` — the depositor's contribution is authoritative

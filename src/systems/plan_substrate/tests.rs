@@ -103,6 +103,9 @@ fn record_step_failure_matches_inline_body() {
         PlanFailureReason::Other,
         None,
         None,
+        None,
+        Entity::from_raw_u32(1).unwrap(),
+        Position::new(0, 0),
         0,
     );
 
@@ -123,6 +126,9 @@ fn record_step_failure_preserves_existing_entries() {
         PlanFailureReason::Other,
         None,
         None,
+        None,
+        Entity::from_raw_u32(1).unwrap(),
+        Position::new(0, 0),
         0,
     );
 
@@ -153,6 +159,9 @@ fn abandon_plan_matches_inline_body() {
         None,
         None,
         None,
+        None,
+        Entity::from_raw_u32(1).unwrap(),
+        Position::new(0, 0),
         0,
     );
 

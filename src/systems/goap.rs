@@ -5194,6 +5194,9 @@ pub fn resolve_goap_plans(
                         None,
                         None,
                         recent_failures.as_deref_mut(),
+                        Some(&mut narr.witnessable),
+                        cat_entity,
+                        *pos,
                         ec.time.tick,
                     );
                     plans_to_remove.push((
@@ -5231,6 +5234,9 @@ pub fn resolve_goap_plans(
                         crate::components::PlanFailureReason::Other,
                         failed_target,
                         recent_failures.as_deref_mut(),
+                        Some(&mut narr.witnessable),
+                        cat_entity,
+                        *pos,
                         ec.time.tick,
                     );
                 }
@@ -5391,6 +5397,9 @@ pub fn resolve_goap_plans(
                             abandon_action,
                             abandon_target,
                             recent_failures.as_deref_mut(),
+                            Some(&mut narr.witnessable),
+                            cat_entity,
+                            *pos,
                             ec.time.tick,
                         );
                         plans_to_remove.push((
@@ -5432,6 +5441,9 @@ pub fn resolve_goap_plans(
                         abandon_action,
                         abandon_target,
                         recent_failures.as_deref_mut(),
+                        Some(&mut narr.witnessable),
+                        cat_entity,
+                        *pos,
                         ec.time.tick,
                     );
                     plans_to_remove.push((

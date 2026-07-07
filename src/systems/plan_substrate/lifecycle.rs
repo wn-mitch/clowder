@@ -37,17 +37,43 @@ use crate::components::{
 /// `_reason` is unused today; ticket 075's `CommitmentTenure` Modifier
 /// will branch on it (e.g., demote disposition tenure on
 /// `PlanFailureReason::Resource` failures).
+///
+/// **Ticket 292 (emit phase)** — when `target` is known, also emits
+/// `WitnessableEvent::TargetActionFailed` so the C3 belief substrate
+/// EMAs the actor's predictability-model of the target. Dual-write
+/// with the legacy `RecentTargetFailures` record until 292's reader
+/// cutover retires the map; `witnessable: None` callers (tests, the
+/// legacy chain path) skip the emit.
+#[allow(clippy::too_many_arguments)]
 pub fn record_step_failure(
     plan: &mut GoapPlan,
     action: GoapActionKind,
     _reason: PlanFailureReason,
     target: Option<Entity>,
     recent: Option<&mut RecentTargetFailures>,
+    witnessable: Option<
+        &mut bevy_ecs::message::MessageWriter<crate::messages::witnessable_event::WitnessableEvent>,
+    >,
+    actor: Entity,
+    position: Position,
     tick: u64,
 ) {
     plan.failed_actions.insert(action);
-    if let (Some(target), Some(recent)) = (target, recent) {
-        recent.record(action, target, tick);
+    if let Some(target) = target {
+        if let Some(recent) = recent {
+            recent.record(action, target, tick);
+        }
+        if let Some(w) = witnessable {
+            w.write(
+                crate::messages::witnessable_event::WitnessableEvent::TargetActionFailed {
+                    actor,
+                    action,
+                    target,
+                    position,
+                    tick,
+                },
+            );
+        }
     }
 }
 
@@ -82,6 +108,12 @@ pub fn record_step_failure(
 /// `action` is the planner action whose target is being recorded —
 /// callers pass the current step's `action.kind`. `tick` is the
 /// current sim tick.
+///
+/// **Ticket 292 (emit phase)** — same `TargetActionFailed` emit as
+/// [`record_step_failure`]: the plan-destruction record is the second
+/// writer site the legacy `RecentTargetFailures` map had, so the
+/// belief substrate mirrors it.
+#[allow(clippy::too_many_arguments)]
 pub fn abandon_plan(
     current: &mut CurrentAction,
     _plan: &mut GoapPlan,
@@ -89,11 +121,29 @@ pub fn abandon_plan(
     action: Option<GoapActionKind>,
     target: Option<Entity>,
     recent: Option<&mut RecentTargetFailures>,
+    witnessable: Option<
+        &mut bevy_ecs::message::MessageWriter<crate::messages::witnessable_event::WitnessableEvent>,
+    >,
+    actor: Entity,
+    position: Position,
     tick: u64,
 ) -> AbandonedPlanState {
     current.ticks_remaining = 0;
-    if let (Some(action), Some(target), Some(recent)) = (action, target, recent) {
-        recent.record(action, target, tick);
+    if let (Some(action), Some(target)) = (action, target) {
+        if let Some(recent) = recent {
+            recent.record(action, target, tick);
+        }
+        if let Some(w) = witnessable {
+            w.write(
+                crate::messages::witnessable_event::WitnessableEvent::TargetActionFailed {
+                    actor,
+                    action,
+                    target,
+                    position,
+                    tick,
+                },
+            );
+        }
     }
     AbandonedPlanState
 }
@@ -252,6 +302,9 @@ mod tests {
             PlanFailureReason::Other,
             Some(target),
             Some(&mut recent),
+            None,
+            entity(1),
+            Position::new(0, 0),
             500,
         );
         assert!(plan.failed_actions.contains(&GoapActionKind::SocializeWith));
@@ -271,6 +324,9 @@ mod tests {
             PlanFailureReason::Other,
             None,
             Some(&mut recent),
+            None,
+            entity(1),
+            Position::new(0, 0),
             500,
         );
         assert!(plan.failed_actions.contains(&GoapActionKind::TravelTo(
@@ -293,6 +349,9 @@ mod tests {
             Some(GoapActionKind::SocializeWith),
             Some(target),
             Some(&mut recent),
+            None,
+            entity(1),
+            Position::new(0, 0),
             900,
         );
         assert_eq!(current.ticks_remaining, 0);
@@ -314,6 +373,9 @@ mod tests {
             None,
             None,
             None,
+            None,
+            entity(1),
+            Position::new(0, 0),
             0,
         );
         assert_eq!(current.ticks_remaining, 0);

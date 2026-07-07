@@ -87,6 +87,18 @@ pub fn integrate_beliefs(
     let cfg = &constants.beliefs;
     let shelter_cfg = &constants.shelter_beliefs;
 
+    // 292 — entity-kind routing sets for `TargetActionFailed`. A failed
+    // step's target can be a cat, a wildlife predator, prey, a corpse,
+    // or a structure; only the first two have per-entity mental-model
+    // homes (`CatBeliefs` / `PredatorBeliefs`). Membership is decided
+    // here (component truth) rather than trusted from the emitter —
+    // and anything in neither set is deliberately NOT modeled, per the
+    // ticket-505 ballast lesson (prey/corpse churn must not accumulate
+    // decay-load entries).
+    let cat_set: std::collections::HashSet<Entity> = witnesses.iter().map(|(e, ..)| e).collect();
+    let wildlife_set: std::collections::HashSet<Entity> =
+        wildlife.iter().map(|(e, ..)| e).collect();
+
     // ---- Pass A — Observation -----------------------------------------
     for ev in events.read() {
         // 374: shelter den-state events (DenDamaged / DenRepaired /
@@ -119,6 +131,8 @@ pub fn integrate_beliefs(
                 tick,
                 cfg,
                 shelter_cfg,
+                &cat_set,
+                &wildlife_set,
                 &mut cats,
                 &mut locs,
                 &mut preds,
@@ -233,6 +247,7 @@ fn event_position(ev: &WitnessableEvent) -> Position {
         | WitnessableEvent::ConspecificStartle { position, .. }
         | WitnessableEvent::AmbientShock { position, .. }
         | WitnessableEvent::SelfPlanFailed { position, .. }
+        | WitnessableEvent::TargetActionFailed { position, .. }
         | WitnessableEvent::ReserveDeposited { position, .. }
         | WitnessableEvent::ReserveConsumed { position, .. }
         | WitnessableEvent::InventoryObserved { position, .. }
@@ -289,9 +304,13 @@ fn apply_observation(
     tick: u64,
     cfg: &BeliefsConstants,
     shelter_cfg: &ShelterBeliefConstants,
+    // 292 — entity-kind routing for `TargetActionFailed` (see the
+    // set construction in `integrate_beliefs`).
+    cat_set: &std::collections::HashSet<Entity>,
+    wildlife_set: &std::collections::HashSet<Entity>,
     cats: &mut CatBeliefs,
     locs: &mut LocationBeliefs,
-    _preds: &mut PredatorBeliefs,
+    preds: &mut PredatorBeliefs,
     contexts: &mut ContextBeliefs,
     reserves: &mut ColonyReservesBelief,
     shelter: &mut ShelterBeliefs,
@@ -589,6 +608,46 @@ fn apply_observation(
                 predictability: Facet::from_prior(1.0),
                 ..MentalModel::default()
             });
+            update_facet(
+                &mut model.predictability,
+                OBSERVED_FAIL,
+                tick,
+                &cfg.predictability,
+            );
+            model.last_updated_tick = tick;
+            model.evidence_count = model.evidence_count.saturating_add(1);
+        }
+
+        WitnessableEvent::TargetActionFailed { actor, target, .. } => {
+            // Self-observation: only the actor learns from its own step
+            // failure — a third party sees no cue (same convention as
+            // SelfPlanFailed above). The learning is about the TARGET:
+            // "this entity is unreliable for my purposes."
+            if *actor != witness {
+                return;
+            }
+            // Route by entity kind, decided from component truth. Prey,
+            // corpses, and structures have no per-entity mental-model
+            // home — deliberately unmodeled (505 ballast lesson); their
+            // failure memory is the ticket's pre-registered pivot (b)
+            // if the hypothesize pass shows the loss matters.
+            let model = if cat_set.contains(target) {
+                cats.models.entry(*target).or_default()
+            } else if wildlife_set.contains(target) {
+                preds.models.entry(*target).or_default()
+            } else {
+                return;
+            };
+            // The cooldown must RECOVER toward "reliable" between
+            // failures: pin the facet's decay target to 1.0 regardless
+            // of which arm created the model — the struct-default
+            // prior (0.0) would make a single failure a permanent
+            // verdict (290's `from_prior(1.0)` seeding, restated for a
+            // facet other arms may have touched first). With
+            // predictability's `learning_rate = 1.0`, the update below
+            // snaps value to OBSERVED_FAIL from any starting point, so
+            // only the recovery target needs pinning.
+            model.predictability.prior = 1.0;
             update_facet(
                 &mut model.predictability,
                 OBSERVED_FAIL,
@@ -1730,6 +1789,127 @@ mod tests {
             model.predictability.value < 1.0,
             "400 ticks is not long enough for full recovery toward prior=1.0; got {}",
             model.predictability.value
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // 292 — TargetActionFailed target-keyed predictability
+    //
+    // The target-keyed sibling of the 290 block above: the ACTOR's own
+    // failure against a target EMAs the actor's model of the TARGET.
+    // These pin the shape the cutover sensor
+    // (`target_cooldown_signal`) will read.
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn target_action_failed_drops_actor_model_of_cat_target() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let target = spawn_cat(&mut world, Position::new(11, 10));
+
+        world.write_message(WitnessableEvent::TargetActionFailed {
+            actor,
+            action: crate::ai::planner::GoapActionKind::SocializeWith,
+            target,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        let model = world
+            .get::<CatBeliefs>(actor)
+            .unwrap()
+            .models
+            .get(&target)
+            .expect("actor should hold a model of the failed target");
+        assert!(
+            model.predictability.value < 0.05,
+            "failure must snap the target's predictability toward 0; got {}",
+            model.predictability.value
+        );
+        assert_eq!(
+            model.predictability.prior, 1.0,
+            "recovery target must be pinned to reliable (1.0)"
+        );
+
+        // First-person only: the TARGET (an in-range witness of the
+        // event) must NOT learn anything from the actor's silent
+        // failure — no model of the actor appears.
+        assert!(
+            !world
+                .get::<CatBeliefs>(target)
+                .unwrap()
+                .models
+                .contains_key(&actor),
+            "third parties must not learn from someone else's step failure"
+        );
+    }
+
+    #[test]
+    fn target_action_failed_routes_wildlife_target_to_predator_beliefs() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let fox = spawn_wildlife(&mut world, WildSpecies::Fox, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::TargetActionFailed {
+            actor,
+            action: crate::ai::planner::GoapActionKind::EngageThreat,
+            target: fox,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        assert!(
+            !world
+                .get::<CatBeliefs>(actor)
+                .unwrap()
+                .models
+                .contains_key(&fox),
+            "wildlife targets must not leak into CatBeliefs (505 ballast rule)"
+        );
+        let model = world
+            .get::<PredatorBeliefs>(actor)
+            .unwrap()
+            .models
+            .get(&fox)
+            .expect("wildlife target routes to PredatorBeliefs");
+        assert!(model.predictability.value < 0.05);
+        assert_eq!(model.predictability.prior, 1.0);
+    }
+
+    #[test]
+    fn target_action_failed_ignores_unmodeled_target_kinds() {
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        // A bare entity (stands in for prey / corpse / structure —
+        // anything in neither the cat nor the wildlife set).
+        let prey = world.spawn(Position::new(11, 10)).id();
+
+        world.write_message(WitnessableEvent::TargetActionFailed {
+            actor,
+            action: crate::ai::planner::GoapActionKind::EngagePrey,
+            target: prey,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+        schedule.run(&mut world);
+
+        assert!(
+            !world
+                .get::<CatBeliefs>(actor)
+                .unwrap()
+                .models
+                .contains_key(&prey),
+            "unmodeled target kinds must not create CatBeliefs entries"
+        );
+        assert!(
+            !world
+                .get::<PredatorBeliefs>(actor)
+                .unwrap()
+                .models
+                .contains_key(&prey),
+            "unmodeled target kinds must not create PredatorBeliefs entries"
         );
     }
 
