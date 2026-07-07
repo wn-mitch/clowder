@@ -52,7 +52,9 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
         .target_taking_dses
         .push(dses::groom_other_target_dse(scoring));
     registry.target_taking_dses.push(dses::bury_target_dse());
-    registry.target_taking_dses.push(dses::mentor_target_dse());
+    registry
+        .target_taking_dses
+        .push(dses::mentor_target_dse(scoring));
     registry
         .target_taking_dses
         .push(dses::caretake_target_dse());
@@ -75,7 +77,7 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
         .push(dses::dependent_kitten_target::dependent_kitten_target_dse(
             crate::ai::Action::Release,
         ));
-    registry.target_taking_dses.push(dses::mate_target_dse());
+    registry.target_taking_dses.push(dses::mate_target_dse(scoring));
     registry.target_taking_dses.push(dses::build_target_dse());
     registry
         .target_taking_dses

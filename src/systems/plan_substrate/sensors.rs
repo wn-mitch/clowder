@@ -114,6 +114,27 @@ pub fn perceived_hostility_signal(
     model.perceived_hostility.value.clamp(0.0, 1.0)
 }
 
+/// 264 — social belief-facet signal: the actor's own
+/// `CatBeliefs[target].perceived_receptivity` (is the partner open to
+/// affiliative overtures *right now*, `[0, 1]`). Neutral-open at
+/// **0.5** — no beliefs component, no model, or a zero-strength facet
+/// mean "receptivity unknown", so unmodeled partners are neither
+/// lifted nor penalized relative to the axis midpoint (a 0.0 default
+/// would bias Mate away from never-observed partners, which is the
+/// 027 supply-chain failure mode this axis exists to relieve).
+pub fn perceived_receptivity_signal(
+    cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
+    target: bevy_ecs::entity::Entity,
+) -> f32 {
+    let Some(model) = cat_beliefs.and_then(|b| b.models.get(&target)) else {
+        return 0.5;
+    };
+    if model.perceived_receptivity.strength <= 0.0 {
+        return 0.5;
+    }
+    model.perceived_receptivity.value.clamp(0.0, 1.0)
+}
+
 /// Build the canonical cooldown curve consumed by the
 /// `target_recent_failure` Consideration. Knots
 /// `[(0.0, 0.1), (1.0, 1.0)]`: a fresh failure scales the candidate's
@@ -267,6 +288,26 @@ mod tests {
         let model = beliefs.models.entry(entity(9)).or_default();
         model.affiliation_history.value = 0.0;
         assert_eq!(affiliation_signal(Some(&beliefs), entity(9)), 0.5);
+    }
+
+    #[test]
+    fn receptivity_signal_neutral_open_without_model_or_strength() {
+        assert_eq!(perceived_receptivity_signal(None, entity(9)), 0.5);
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        beliefs.models.entry(entity(9)).or_default();
+        assert_eq!(perceived_receptivity_signal(Some(&beliefs), entity(9)), 0.5);
+    }
+
+    #[test]
+    fn receptivity_signal_reads_observed_facet() {
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let model = beliefs.models.entry(entity(9)).or_default();
+        model.perceived_receptivity = Facet {
+            value: 0.2,
+            strength: 0.9,
+            ..Default::default()
+        };
+        assert!((perceived_receptivity_signal(Some(&beliefs), entity(9)) - 0.2).abs() < 1e-6);
     }
 
     #[test]

@@ -56,14 +56,26 @@ use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
+use crate::resources::action_affordances::{ActionAffordances, ActionKind};
 use crate::resources::relationships::{BondType, Relationships};
+use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::systems::plan_substrate::{
-    cooldown_curve, target_predictability_signal, TARGET_PREDICTABILITY_INPUT,
+    cooldown_curve, perceived_receptivity_signal, target_predictability_signal,
+    TARGET_PREDICTABILITY_INPUT,
 };
 
 pub const TARGET_ROMANTIC_INPUT: &str = "target_romantic";
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
+/// 264 — actor's own `CatBeliefs[target].perceived_receptivity`
+/// (`[0, 1]`, 0.5 neutral-open for unmodeled partners). The downstream
+/// lever on the 126/027 Mate supply-chain problem: low-receptivity
+/// partners stop winning the pick and oscillating.
+pub const TARGET_PERCEIVED_RECEPTIVITY_INPUT: &str = "target_perceived_receptivity";
+/// 264 — per-target `Affordance(Mate, self, target)` read from
+/// substrate 261. `target_`-prefixed for the
+/// `score_target_consideration` routing reason (ticket 516).
+pub const TARGET_MATE_AFFORDANCE_INPUT: &str = "target_affordance_mate";
 
 /// Candidate-pool range for Mate partner selection. Mate's spec
 /// template range is 1 (adjacency), but candidate gathering needs a
@@ -73,7 +85,15 @@ pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const MATE_TARGET_RANGE: f32 = 10.0;
 
 /// §6.5.2 `Mate` target-taking DSE factory.
-pub fn mate_target_dse() -> TargetTakingDse {
+///
+/// 264: takes `&ScoringConstants` so the conditional belief +
+/// affordance axes (`target_perceived_receptivity`, `affordance_mate`)
+/// are added only when their weights are non-zero. At dormant defaults
+/// the composition is byte-identical to pre-264 (four axes); at
+/// non-zero weights the four base axes scale by `(1 − Σ extras)` so
+/// the WeightedSum stays at 1.0. Activation must verify the 027
+/// Mate-cadence canary.
+pub fn mate_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
     let linear = Curve::Linear {
         slope: 1.0,
         intercept: 0.0,
@@ -91,35 +111,75 @@ pub fn mate_target_dse() -> TargetTakingDse {
         post: PostOp::Invert,
     };
 
+    let mut considerations: Vec<Consideration> = vec![
+        Consideration::Spatial(SpatialConsideration::new(
+            "mate_target_nearness",
+            LandmarkSource::TargetPosition,
+            MATE_TARGET_RANGE,
+            nearness_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_ROMANTIC_INPUT,
+            linear.clone(),
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_FONDNESS_INPUT,
+            linear.clone(),
+        )),
+        // Ticket 073 — recently-failed target cooldown (audit gap #2).
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_PREDICTABILITY_INPUT,
+            cooldown_curve(),
+        )),
+    ];
+    // Original three weights (0.1875/0.5/0.3125) renormalized
+    // ×(3/4) to make room for the cooldown axis at 1/4. Sums to 1.0.
+    let mut weights: Vec<f32> = vec![
+        0.1875 * 3.0 / 4.0,
+        0.5 * 3.0 / 4.0,
+        0.3125 * 3.0 / 4.0,
+        1.0 / 4.0,
+    ];
+    // 264: conditional belief + affordance axes, dormant at 0.0
+    // (hunt_target's `hunt_best_predation_weight` shape). Base four
+    // scale by `(1 − Σ extras)`; axes push in documented order
+    // (receptivity, affordance).
+    let receptivity_w = scoring.mate_receptivity_weight.clamp(0.0, 1.0);
+    let affordance_w = scoring.mate_affordance_weight.clamp(0.0, 1.0);
+    let extra_w = (receptivity_w + affordance_w).clamp(0.0, 1.0);
+    if extra_w > 0.0 {
+        let scale = 1.0 - extra_w;
+        for w in &mut weights {
+            *w *= scale;
+        }
+    }
+    if receptivity_w > 0.0 {
+        // 264: actor-subjective receptivity belief (0.5 neutral-open
+        // — a 0.0 default would bias against never-observed partners,
+        // the exact 027 failure mode this axis relieves).
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_PERCEIVED_RECEPTIVITY_INPUT,
+            linear.clone(),
+        )));
+        weights.push(receptivity_w);
+    }
+    if affordance_w > 0.0 {
+        // 264: Affordance(Mate, self, target) from substrate 261
+        // (estimator: fertility proxy + bond + receptivity +
+        // proximity). Reads 0.0 for pairs the writer didn't populate
+        // this tick — the substrate's gate signal.
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_MATE_AFFORDANCE_INPUT,
+            linear,
+        )));
+        weights.push(affordance_w);
+    }
+
     TargetTakingDse {
         id: DseId("mate_target"),
         candidate_query: mate_candidate_query_doc,
-        per_target_considerations: vec![
-            Consideration::Spatial(SpatialConsideration::new(
-                "mate_target_nearness",
-                LandmarkSource::TargetPosition,
-                MATE_TARGET_RANGE,
-                nearness_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_ROMANTIC_INPUT,
-                linear.clone(),
-            )),
-            Consideration::Scalar(ScalarConsideration::new(TARGET_FONDNESS_INPUT, linear)),
-            // Ticket 073 — recently-failed target cooldown (audit gap #2).
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_PREDICTABILITY_INPUT,
-                cooldown_curve(),
-            )),
-        ],
-        // Original three weights (0.1875/0.5/0.3125) renormalized
-        // ×(3/4) to make room for the cooldown axis at 1/4. Sums to 1.0.
-        composition: Composition::weighted_sum(vec![
-            0.1875 * 3.0 / 4.0,
-            0.5 * 3.0 / 4.0,
-            0.3125 * 3.0 / 4.0,
-            1.0 / 4.0,
-        ]),
+        per_target_considerations: considerations,
+        composition: Composition::weighted_sum(weights),
         aggregation: TargetAggregation::Best,
         intention: mate_intention,
         required_stance: None,
@@ -172,6 +232,11 @@ pub fn resolve_mate_target(
     predator_beliefs: Option<&crate::components::beliefs::PredatorBeliefs>,
     // Activation tracker for `Feature::TargetCooldownApplied`.
     activation: Option<&mut SystemActivation>,
+    // 264 — ActionAffordances resource for the conditional
+    // `affordance_mate` axis. Reads return `0.0` for any pair the
+    // writer didn't populate this tick; at dormant weight the axis is
+    // absent and the arm is never queried.
+    affordances: &ActionAffordances,
     // Ticket 427 Step 1 — pre-allocated scratch buffers.
     scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
@@ -238,6 +303,13 @@ pub fn resolve_mate_target(
                 }
                 signal
             }
+            // 264 — actor-subjective receptivity belief (0.5 neutral
+            // for unmodeled partners).
+            TARGET_PERCEIVED_RECEPTIVITY_INPUT => {
+                perceived_receptivity_signal(cat_beliefs, target)
+            }
+            // 264 — Affordance(Mate) substrate read.
+            TARGET_MATE_AFFORDANCE_INPUT => affordances.read(cat, target, ActionKind::Mate),
             _ => 0.0,
         }
     };
@@ -301,18 +373,18 @@ mod tests {
 
     #[test]
     fn mate_target_dse_id_stable() {
-        assert_eq!(mate_target_dse().id().0, "mate_target");
+        assert_eq!(mate_target_dse(&ScoringConstants::default()).id().0, "mate_target");
     }
 
     #[test]
     fn mate_target_has_four_axes() {
         // Ticket 073 — three legacy axes + the cooldown axis = four.
-        assert_eq!(mate_target_dse().per_target_considerations().len(), 4);
+        assert_eq!(mate_target_dse(&ScoringConstants::default()).per_target_considerations().len(), 4);
     }
 
     #[test]
     fn mate_target_weights_sum_to_one() {
-        let sum: f32 = mate_target_dse().composition().weights.iter().sum();
+        let sum: f32 = mate_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
@@ -332,6 +404,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -340,7 +413,7 @@ mod tests {
     #[test]
     fn resolver_excludes_non_bonded_candidates() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse());
+        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let friend_not_partner = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();
@@ -364,6 +437,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         // Friends bond doesn't pass the filter — even with romantic=0.9,
@@ -375,7 +449,7 @@ mod tests {
     #[test]
     fn resolver_picks_partners_bond_candidate() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse());
+        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let partner = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();
@@ -395,6 +469,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(partner));
@@ -403,7 +478,7 @@ mod tests {
     #[test]
     fn resolver_picks_higher_romantic_when_both_partners() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse());
+        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let fond_partner = Entity::from_raw_u32(2).unwrap();
         let romantic_partner = Entity::from_raw_u32(3).unwrap();
@@ -430,6 +505,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         // Romantic weight (0.5) dominates fondness weight (0.3125),
@@ -445,7 +521,7 @@ mod tests {
         // fondness partners — the close one wins. Equal romantic +
         // fondness means the spatial axis is what separates them.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse());
+        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = Entity::from_raw_u32(2).unwrap();
         let far = Entity::from_raw_u32(3).unwrap();
@@ -472,6 +548,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close));
@@ -480,7 +557,7 @@ mod tests {
     #[test]
     fn intention_is_pairing_activity() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse());
+        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let partner = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();
@@ -500,11 +577,12 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(winner, Some(partner));
         // Verify Intention factory produces Pairing activity.
-        let dse = mate_target_dse();
+        let dse = mate_target_dse(&ScoringConstants::default());
         let intention = (dse.intention)(partner);
         match intention {
             Intention::Activity { kind, .. } => assert_eq!(kind, ActivityKind::Pairing),
@@ -518,7 +596,7 @@ mod tests {
         // Partners with B; B is Mates with C. The resolver must skip
         // B as a target so A doesn't poach a Mates-locked partner.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse());
+        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
         let cat_a = Entity::from_raw_u32(1).unwrap();
         let cat_b = Entity::from_raw_u32(2).unwrap();
         let cat_c = Entity::from_raw_u32(3).unwrap();
@@ -546,6 +624,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(
@@ -561,7 +640,7 @@ mod tests {
         // selects B (the actor's own mate), and the new third-party gate
         // doesn't fire because B's only Mates bond is with A itself.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mate_target_dse());
+        registry.target_taking_dses.push(mate_target_dse(&ScoringConstants::default()));
         let cat_a = Entity::from_raw_u32(1).unwrap();
         let cat_b = Entity::from_raw_u32(2).unwrap();
         let mut relationships = Relationships::default();
@@ -582,8 +661,147 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(cat_b));
+    }
+
+    // -----------------------------------------------------------------
+    // 264 — conditional belief + affordance axes (dormant wire)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn belief_affordance_axes_dormant_at_default() {
+        let s = ScoringConstants::default();
+        assert_eq!(s.mate_receptivity_weight, 0.0);
+        assert_eq!(s.mate_affordance_weight, 0.0);
+        let dse = mate_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 4);
+        assert!(dse.per_target_considerations().iter().all(|c| !matches!(
+            c,
+            Consideration::Scalar(sc)
+                if sc.name == TARGET_PERCEIVED_RECEPTIVITY_INPUT
+                    || sc.name == TARGET_MATE_AFFORDANCE_INPUT
+        )));
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn belief_affordance_axes_present_and_renormalized_when_active() {
+        let mut s = ScoringConstants::default();
+        s.mate_receptivity_weight = 0.15;
+        s.mate_affordance_weight = 0.1;
+        let dse = mate_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 6);
+        assert_eq!(dse.composition().weights.len(), 6);
+        assert!((dse.composition().weights[4] - 0.15).abs() < 1e-6);
+        assert!((dse.composition().weights[5] - 0.1).abs() < 1e-6);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    /// 264 — ticket microexperiment `mate_skips_low_receptivity_partner`
+    /// at the resolver layer: two Partners-bonded candidates tied on
+    /// romantic/fondness/distance; the one the actor believes
+    /// receptive wins over the one believed unreceptive. Kills the
+    /// silent-inert trap on the receptivity fetch arm.
+    #[test]
+    fn mate_prefers_receptive_partner_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.mate_receptivity_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(mate_target_dse(&s));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let receptive = Entity::from_raw_u32(2).unwrap();
+        let unreceptive = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        for partner in [receptive, unreceptive] {
+            let r = relationships.get_or_insert(cat, partner);
+            r.fondness = 0.5;
+            r.romantic = 0.5;
+            r.bond = Some(BondType::Partners);
+        }
+
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let m = beliefs.models.entry(receptive).or_default();
+        m.perceived_receptivity = crate::components::beliefs::Facet {
+            value: 0.9,
+            strength: 1.0,
+            ..Default::default()
+        };
+        let m = beliefs.models.entry(unreceptive).or_default();
+        m.perceived_receptivity = crate::components::beliefs::Facet {
+            value: 0.1,
+            strength: 1.0,
+            ..Default::default()
+        };
+
+        let cat_positions = vec![
+            (receptive, Position::new(1, 0)),
+            (unreceptive, Position::new(0, 1)),
+        ];
+        let out = resolve_mate_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            0,
+            None,
+            Some(&beliefs),
+            None,
+            None,
+            &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(
+            out,
+            Some(receptive),
+            "believed-receptive partner must beat believed-unreceptive when the axis is live"
+        );
+    }
+
+    /// 264 — affordance arm verified live: the substrate-priced
+    /// partner beats the unpriced one when the axis is active.
+    #[test]
+    fn mate_reads_affordance_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.mate_affordance_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(mate_target_dse(&s));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let afforded = Entity::from_raw_u32(2).unwrap();
+        let unpriced = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        for partner in [afforded, unpriced] {
+            let r = relationships.get_or_insert(cat, partner);
+            r.fondness = 0.5;
+            r.romantic = 0.5;
+            r.bond = Some(BondType::Partners);
+        }
+        let mut affordances = ActionAffordances::default();
+        affordances.write(cat, afforded, ActionKind::Mate, 0.9);
+
+        let cat_positions = vec![
+            (afforded, Position::new(1, 0)),
+            (unpriced, Position::new(0, 1)),
+        ];
+        let out = resolve_mate_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            0,
+            None,
+            None,
+            None,
+            None,
+            &affordances,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(out, Some(afforded));
     }
 }

@@ -65,7 +65,9 @@ use crate::ai::target_dse::{
 };
 use crate::components::physical::Position;
 use crate::components::skills::Skills;
+use crate::resources::action_affordances::{ActionAffordances, ActionKind};
 use crate::resources::relationships::Relationships;
+use crate::resources::sim_constants::ScoringConstants;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::systems::plan_substrate::{
     cooldown_curve, target_predictability_signal, TARGET_PREDICTABILITY_INPUT,
@@ -73,6 +75,10 @@ use crate::systems::plan_substrate::{
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
 pub const TARGET_SKILL_GAP_INPUT: &str = "target_skill_gap";
+/// 264 — per-target `Affordance(Mentor, self, target)` read from
+/// substrate 261. `target_`-prefixed for the
+/// `score_target_consideration` routing reason (ticket 516).
+pub const TARGET_MENTOR_AFFORDANCE_INPUT: &str = "target_affordance_mentor";
 
 /// Candidate-pool range in Manhattan tiles. Matches `SOCIALIZE_TARGET_RANGE`
 /// / `MATE_TARGET_RANGE` (10) to preserve outer-gate semantics —
@@ -82,7 +88,15 @@ pub const TARGET_SKILL_GAP_INPUT: &str = "target_skill_gap";
 pub const MENTOR_TARGET_RANGE: f32 = 10.0;
 
 /// §6.5.3 `Mentor` target-taking DSE factory.
-pub fn mentor_target_dse() -> TargetTakingDse {
+///
+/// 264: takes `&ScoringConstants` so the conditional
+/// `affordance_mentor` axis is added only when
+/// `mentor_affordance_weight > 0.0`. Mentor gets no direct belief
+/// axis — receptivity composes at the affordance layer per the Hunt
+/// architectural rule (263). At dormant default the composition is
+/// byte-identical to pre-264 (four axes); at non-zero weight the four
+/// base axes scale by `(1 − w)` so the WeightedSum stays at 1.0.
+pub fn mentor_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
     // §L2.10.7 distance axis: `Quadratic(exp=2, divisor=-1, shift=1)`
     // evaluates `((cost - 1) / -1).max(0).powf(2) = (1 - cost)²`,
     // exactly preserving the legacy `nearness² = (1 - dist/range)²`
@@ -108,44 +122,64 @@ pub fn mentor_target_dse() -> TargetTakingDse {
         midpoint: 0.4,
     };
 
+    let mut considerations: Vec<Consideration> = vec![
+        Consideration::Spatial(SpatialConsideration::new(
+            "mentor_target_nearness",
+            LandmarkSource::TargetPosition,
+            MENTOR_TARGET_RANGE,
+            nearness_curve,
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_FONDNESS_INPUT,
+            linear.clone(),
+        )),
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_SKILL_GAP_INPUT,
+            skill_gap_curve,
+        )),
+        // Ticket 073 — recently-failed target cooldown (audit gap #2).
+        Consideration::Scalar(ScalarConsideration::new(
+            TARGET_PREDICTABILITY_INPUT,
+            cooldown_curve(),
+        )),
+    ];
+    // WeightedSum matches the social-family pattern (Socialize /
+    // Mate). CompensatedProduct would gate any low axis — a
+    // near-distance-but-low-fondness apprentice would score 0,
+    // which over-punishes mentorship of strangers. The skill-gap
+    // axis's weight (0.5) is dominant by design: gap is the
+    // defining mentorship signal per §6.5.3.
+    // Original three weights (0.25/0.25/0.5) renormalized ×(3/4)
+    // to make room for the cooldown axis at 1/4. Sums to 1.0.
+    let mut weights: Vec<f32> = vec![
+        0.25 * 3.0 / 4.0,
+        0.25 * 3.0 / 4.0,
+        0.5 * 3.0 / 4.0,
+        1.0 / 4.0,
+    ];
+    // 264: conditional affordance axis, dormant at 0.0.
+    let affordance_w = scoring.mentor_affordance_weight.clamp(0.0, 1.0);
+    if affordance_w > 0.0 {
+        let scale = 1.0 - affordance_w;
+        for w in &mut weights {
+            *w *= scale;
+        }
+        // 264: Affordance(Mentor, self, target) from substrate 261
+        // (estimator: bond + receptivity + my condition + proximity).
+        // Reads 0.0 for pairs the writer didn't populate this tick —
+        // the substrate's gate signal.
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
+            TARGET_MENTOR_AFFORDANCE_INPUT,
+            linear,
+        )));
+        weights.push(affordance_w);
+    }
+
     TargetTakingDse {
         id: DseId("mentor_target"),
         candidate_query: mentor_candidate_query_doc,
-        per_target_considerations: vec![
-            Consideration::Spatial(SpatialConsideration::new(
-                "mentor_target_nearness",
-                LandmarkSource::TargetPosition,
-                MENTOR_TARGET_RANGE,
-                nearness_curve,
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_FONDNESS_INPUT,
-                linear.clone(),
-            )),
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_SKILL_GAP_INPUT,
-                skill_gap_curve,
-            )),
-            // Ticket 073 — recently-failed target cooldown (audit gap #2).
-            Consideration::Scalar(ScalarConsideration::new(
-                TARGET_PREDICTABILITY_INPUT,
-                cooldown_curve(),
-            )),
-        ],
-        // WeightedSum matches the social-family pattern (Socialize /
-        // Mate). CompensatedProduct would gate any low axis — a
-        // near-distance-but-low-fondness apprentice would score 0,
-        // which over-punishes mentorship of strangers. The skill-gap
-        // axis's weight (0.5) is dominant by design: gap is the
-        // defining mentorship signal per §6.5.3.
-        // Original three weights (0.25/0.25/0.5) renormalized ×(3/4)
-        // to make room for the cooldown axis at 1/4. Sums to 1.0.
-        composition: Composition::weighted_sum(vec![
-            0.25 * 3.0 / 4.0,
-            0.25 * 3.0 / 4.0,
-            0.5 * 3.0 / 4.0,
-            1.0 / 4.0,
-        ]),
+        per_target_considerations: considerations,
+        composition: Composition::weighted_sum(weights),
         aggregation: TargetAggregation::Best,
         intention: mentor_intention,
         required_stance: None,
@@ -228,6 +262,11 @@ pub fn resolve_mentor_target(
     cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
     predator_beliefs: Option<&crate::components::beliefs::PredatorBeliefs>,
     activation: Option<&mut SystemActivation>,
+    // 264 — ActionAffordances resource for the conditional
+    // `affordance_mentor` axis. Reads return `0.0` for any pair the
+    // writer didn't populate this tick; at dormant weight the axis is
+    // absent and the arm is never queried.
+    affordances: &ActionAffordances,
     // Ticket 427 Step 1 — pre-allocated scratch buffers.
     scratch: &mut crate::resources::DseTargetScratchpad,
 ) -> Option<Entity> {
@@ -285,6 +324,8 @@ pub fn resolve_mentor_target(
                 }
                 signal
             }
+            // 264 — Affordance(Mentor) substrate read.
+            TARGET_MENTOR_AFFORDANCE_INPUT => affordances.read(cat, target, ActionKind::Mentor),
             _ => 0.0,
         }
     };
@@ -355,24 +396,24 @@ mod tests {
 
     #[test]
     fn mentor_target_dse_id_stable() {
-        assert_eq!(mentor_target_dse().id().0, "mentor_target");
+        assert_eq!(mentor_target_dse(&ScoringConstants::default()).id().0, "mentor_target");
     }
 
     #[test]
     fn mentor_target_has_four_axes() {
         // Ticket 073 — three legacy axes + the cooldown axis = four.
-        assert_eq!(mentor_target_dse().per_target_considerations().len(), 4);
+        assert_eq!(mentor_target_dse(&ScoringConstants::default()).per_target_considerations().len(), 4);
     }
 
     #[test]
     fn mentor_target_weights_sum_to_one() {
-        let sum: f32 = mentor_target_dse().composition().weights.iter().sum();
+        let sum: f32 = mentor_target_dse(&ScoringConstants::default()).composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4);
     }
 
     #[test]
     fn mentor_target_uses_best_aggregation() {
-        assert_eq!(mentor_target_dse().aggregation(), TargetAggregation::Best);
+        assert_eq!(mentor_target_dse(&ScoringConstants::default()).aggregation(), TargetAggregation::Best);
     }
 
     #[test]
@@ -424,6 +465,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -432,7 +474,7 @@ mod tests {
     #[test]
     fn resolver_returns_none_when_no_candidates_in_range() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse());
+        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let far = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -459,6 +501,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -467,7 +510,7 @@ mod tests {
     #[test]
     fn resolver_excludes_self() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse());
+        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let relationships = Relationships::default();
         let self_skills = skills_with(0.9, 0.2);
@@ -486,6 +529,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -494,7 +538,7 @@ mod tests {
     #[test]
     fn resolver_skips_candidates_without_skills() {
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse());
+        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let skillless = Entity::from_raw_u32(2).unwrap();
         let relationships = Relationships::default();
@@ -514,6 +558,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
@@ -526,7 +571,7 @@ mod tests {
         // fix: the legacy `find_social_target` path picked by fondness
         // only and ignored skill entirely.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse());
+        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let novice = Entity::from_raw_u32(2).unwrap();
         let near_peer = Entity::from_raw_u32(3).unwrap();
@@ -565,6 +610,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(novice));
@@ -578,7 +624,7 @@ mod tests {
         // contribution. Encodes the §6.5.3 design-intent that the
         // skill-gap axis is the dominant mentorship signal.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse());
+        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let novice = Entity::from_raw_u32(2).unwrap();
         let dear_peer = Entity::from_raw_u32(3).unwrap();
@@ -616,6 +662,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(novice));
@@ -629,7 +676,7 @@ mod tests {
         // fondness — the closer one wins because the spatial axis
         // separates them.
         let mut registry = DseRegistry::new();
-        registry.target_taking_dses.push(mentor_target_dse());
+        registry.target_taking_dses.push(mentor_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let close = Entity::from_raw_u32(2).unwrap();
         let far = Entity::from_raw_u32(3).unwrap();
@@ -668,6 +715,7 @@ mod tests {
             None,
             None,
             None,
+            &ActionAffordances::default(),
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert_eq!(out, Some(close));
@@ -675,12 +723,98 @@ mod tests {
 
     #[test]
     fn intention_is_mentor_activity() {
-        let dse = mentor_target_dse();
+        let dse = mentor_target_dse(&ScoringConstants::default());
         let target = Entity::from_raw_u32(10).unwrap();
         let intention = (dse.intention)(target);
         match intention {
             Intention::Activity { kind, .. } => assert_eq!(kind, ActivityKind::Mentor),
             other => panic!("expected Activity intention, got {other:?}"),
         }
+    }
+
+    // -----------------------------------------------------------------
+    // 264 — conditional affordance axis (dormant wire)
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn affordance_axis_dormant_at_default() {
+        let s = ScoringConstants::default();
+        assert_eq!(s.mentor_affordance_weight, 0.0);
+        let dse = mentor_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 4);
+        assert!(dse.per_target_considerations().iter().all(|c| !matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == TARGET_MENTOR_AFFORDANCE_INPUT
+        )));
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn affordance_axis_present_and_renormalized_when_active() {
+        let mut s = ScoringConstants::default();
+        s.mentor_affordance_weight = 0.2;
+        let dse = mentor_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 5);
+        assert_eq!(dse.composition().weights.len(), 5);
+        assert!((dse.composition().weights[4] - 0.2).abs() < 1e-6);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    /// 264 — affordance arm verified live: with equal skill gaps and
+    /// fondness, the substrate-priced apprentice beats the unpriced
+    /// one. Kills the silent-inert trap on the `AFFORDANCE_MENTOR_INPUT`
+    /// fetch arm.
+    #[test]
+    fn mentor_reads_affordance_when_axis_active() {
+        let mut s = ScoringConstants::default();
+        s.mentor_affordance_weight = 0.2;
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(mentor_target_dse(&s));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let afforded = Entity::from_raw_u32(2).unwrap();
+        let unpriced = Entity::from_raw_u32(3).unwrap();
+        let mut relationships = Relationships::default();
+        relationships.get_or_insert(cat, afforded).fondness = 0.5;
+        relationships.get_or_insert(cat, unpriced).fondness = 0.5;
+
+        let self_skills = skills_with(0.9, 0.2);
+        let novice_skills = skills_with(0.1, 0.1);
+        let a_skills = novice_skills.clone();
+        let b_skills = novice_skills.clone();
+        let skills_lookup = move |e: Entity| -> Option<Skills> {
+            if e == afforded {
+                Some(a_skills.clone())
+            } else if e == unpriced {
+                Some(b_skills.clone())
+            } else {
+                None
+            }
+        };
+        let mut affordances = ActionAffordances::default();
+        affordances.write(cat, afforded, ActionKind::Mentor, 0.9);
+
+        let cat_positions = vec![
+            (afforded, Position::new(1, 0)),
+            (unpriced, Position::new(0, 1)),
+        ];
+        let out = resolve_mentor_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &self_skills,
+            &skills_lookup,
+            &relationships,
+            0,
+            None,
+            None,
+            None,
+            None,
+            &affordances,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(out, Some(afforded));
     }
 }

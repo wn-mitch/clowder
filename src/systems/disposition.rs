@@ -1588,6 +1588,9 @@ pub fn disposition_to_chain(
             None,
             None,
             None,
+            // 264 — same dead-code path; the live affordance read
+            // happens at the GOAP step-resolver site.
+            &crate::resources::ActionAffordances::default(),
             &mut res.dse_scratchpad,
         );
         // §6.5.3: resolve the mentor target-taking DSE. Skill-gap is the
@@ -1613,6 +1616,9 @@ pub fn disposition_to_chain(
             None,
             None,
             None,
+            // 264 — same dead-code path; the live affordance read
+            // happens at the GOAP step-resolver site.
+            &crate::resources::ActionAffordances::default(),
             &mut res.dse_scratchpad,
         );
         // §6.5.4: resolve the groom-other target-taking DSE. Adds
