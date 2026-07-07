@@ -15,10 +15,10 @@ _Last generated: 2026-07-07._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 119 |
+| Ready | 118 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **165** |
+| **Open total** | **164** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,10 +40,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.92_
-- **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · score 0.91_
+- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.91_
 - **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.91_
-- **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · score 0.90_
+- **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · score 0.91_
+- **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · score 0.90_
 
 ## Epic progress (8)
 
@@ -52,7 +52,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
 | **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 29 | 16 | 13 (0 / 10 / 3 / 0) | `▰▰▰▰▰▰▱▱▱▱` 55% |
-| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 11 | 22 (1 / 14 / 5 / 2) | `▰▰▰▱▱▱▱▱▱▱` 33% |
+| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 12 | 21 (1 / 13 / 5 / 2) | `▰▰▰▰▱▱▱▱▱▱` 36% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 | **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 27 | 21 | 6 (0 / 3 / 1 / 2) | `▰▰▰▰▰▰▰▰▱▱` 78% |
@@ -68,11 +68,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (119)
+## Ready by cluster (118)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (33 ready, 5 blocked)
+### ai-substrate (32 ready, 5 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -85,7 +85,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
 - **[264](docs/open-work/tickets/264-social-dse-consumers-wire-belief-affordance-axes-socialize-groomother-mate-mentor-care-feedkitten.md)** — Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten) — _[ai-substrate] · added 2026-05-10_
 - **[286](docs/open-work/tickets/286-lower-threatproximityadrenalineflee-viability-threshold-so-cornered-cats-receive-flee-lift.md)** — Lower ThreatProximityAdrenalineFlee viability threshold so cornered cats receive flee_lift — _[ai-substrate] · added 2026-05-11_
-- **[291](docs/open-work/tickets/291-colonyknowledge-restructure-promotion-via-mental-model-agreement-replaces-carrier-count-threshold-258-follow-on.md)** — ColonyKnowledge restructure — promotion-via-mental-model-agreement replaces carrier-count threshold (258 follow-on) — _[ai-substrate] · added 2026-05-11_
 - **[314](docs/open-work/tickets/314-extend-actionaffordances-writer-to-cover-cat-vs-prey-stalkchasepounce-263-follow-on.md)** — extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on — _[ai-substrate] · added 2026-05-13_
 - **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
 - **[373](docs/open-work/tickets/373-denworkshop-food-retrieval-broaden-eat-substrate-beyond-stores-only.md)** — Den/Workshop food retrieval — broaden eat substrate beyond Stores-only — _[ai-substrate] · added 2026-05-16_
@@ -344,7 +343,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (119)
+## Ready (118)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -396,7 +395,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[286](docs/open-work/tickets/286-lower-threatproximityadrenalineflee-viability-threshold-so-cornered-cats-receive-flee-lift.md)** — Lower ThreatProximityAdrenalineFlee viability threshold so cornered cats receive flee_lift — _[ai-substrate] · added 2026-05-11_
 - **[287](docs/open-work/tickets/287-move-boldness-out-of-fleedse-cp-axes-onto-a-boldnessfleemodulation-modifier-271-r3-structural-follow-on.md)** — Move boldness out of FleeDse CP axes onto a BoldnessFleeModulation modifier (271 R3 structural follow-on) — _[combat-threat] · added 2026-05-11_
 - **[289](docs/open-work/tickets/289-engagethreat-retry-cooldown-after-morale-break-suppress-immediate-guarding-re-election-under-active-fight-directive.md)** — EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive — _[combat-threat] · added 2026-05-11_
-- **[291](docs/open-work/tickets/291-colonyknowledge-restructure-promotion-via-mental-model-agreement-replaces-carrier-count-threshold-258-follow-on.md)** — ColonyKnowledge restructure — promotion-via-mental-model-agreement replaces carrier-count threshold (258 follow-on) — _[ai-substrate] · added 2026-05-11_
 - **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[302](docs/open-work/tickets/302-investigate-just-soak-vs-just-sweep-non-determinism-on-identical-seedbinary.md)** — investigate just soak vs just sweep non-determinism on identical seed/binary — _[process-discipline] · added 2026-05-12_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
@@ -503,7 +501,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[372](docs/open-work/tickets/372-phase-5-elevated-cat-craft-generational-tapestry-shrine-cairn-bone-lattice-lantern-pigment-deepened-textile-multi-cat-nesting-alcove-kitten-cradle-basket-016-phase-5-triple-gated.md)** — Phase 5 elevated cat-craft — Generational Tapestry, Shrine-Cairn, Bone-Lattice Lantern, Pigment-Deepened Textile, Multi-Cat Nesting Alcove, Kitten-Cradle Basket (016 Phase 5, triple-gated) — _[items-crafting] · blocked-by 371 · added 2026-05-16_
 - **[378](docs/open-work/tickets/378-colony-material-demand-axis-perceivable-material-need-substrate-foodstores-twin-for-crafting-materials.md)** — colony material-demand axis: perceivable material-need substrate (FoodStores twin for crafting materials) — _[ai-perception] · blocked-by 376 · added 2026-05-16_
 - **[386](docs/open-work/tickets/386-phase-2-knowledge-implantation-procedure-ryan-listing-371-port.md)** — Phase-2 knowledge implantation procedure (Ryan Listing 37.1 port) — _[belief-perception] · blocked-by 385 · added 2026-05-16_
-- **[388](docs/open-work/tickets/388-colonyknowledge-pre-seeding-from-generated-history.md)** — ColonyKnowledge pre-seeding from generated history — _[belief-perception] · blocked-by 385, 291 · added 2026-05-16_
+- **[388](docs/open-work/tickets/388-colonyknowledge-pre-seeding-from-generated-history.md)** — ColonyKnowledge pre-seeding from generated history — _[belief-perception] · blocked-by 385 · added 2026-05-16_
 - **[390](docs/open-work/tickets/390-fate-seeded-prophecy-from-generated-history.md)** — Fate-seeded prophecy from generated history — _[magic-mythic] · blocked-by 388 · added 2026-05-16_
 - **[391](docs/open-work/tickets/391-narrative-template-historical-reference-pre-sim-figures-cited-in-first-sim-week.md)** — Narrative-template historical reference (pre-sim figures cited in first sim-week) — _[magic-mythic] · blocked-by 387, 388 · added 2026-05-16_
 - **[393](docs/open-work/tickets/393-c4-coordinator-dynastic-seeding-pre-sim-leadership-patterns-produce-t0-coordinator-backstory.md)** — C4 coordinator dynastic seeding (pre-sim leadership patterns produce t=0 coordinator + backstory) — _[social-coordination] · blocked-by 057 · added 2026-05-16_
@@ -513,14 +511,15 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (377)
+## Landed archive (378)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-07 (12)
+### 2026-07 (13)
 
 - **[467](docs/open-work/landed/467-fish-on-water-hunt-shoreline-pounce-resolver-or-cat-eligibility-cut.md)** — Fish-on-water hunt — shoreline-pounce resolver or cat eligibility cut _(2026-07-07)_
 - **[292](docs/open-work/landed/292-recenttargetfailures-retirement-per-pair-failure-memory-moves-to-contextbeliefs-catbeliefs-predictability-258-follow-on.md)** — RecentTargetFailures retirement — per-pair failure memory moves to ContextBeliefs / CatBeliefs predictability (258 follow-on) _(2026-07-07)_
+- **[291](docs/open-work/landed/291-colonyknowledge-restructure-promotion-via-mental-model-agreement-replaces-carrier-count-threshold-258-follow-on.md)** — ColonyKnowledge restructure — promotion-via-mental-model-agreement replaces carrier-count threshold (258 follow-on) _(2026-07-07)_
 - **[511](docs/open-work/landed/511-weaned-kitten-starvation-complex-no-self-feeding-pathway-past-the-care-bands-feed-targeting-preempted-by-a-handoffitem-livelock-733-plans-per-10k-ticks-exposed-at-900s-soaks-by-the-040-throughput-gains.md)** — Weaned-kitten starvation complex: no self-feeding pathway past the care bands, feed-targeting preempted by a HandoffItem livelock (733 plans per 10k ticks), exposed at 900s soaks by the 0.4.0 throughput gains _(2026-07-06)_
 - **[508](docs/open-work/landed/508-cat-routing-is-threat-belief-blind-locationbeliefs-threat-cues-never-feed-path-overlays-six-serial-deaths-at-the-shadowfox-haunting-ground-under-a-star-first-stepping-493.md)** — Cat routing is threat-belief-blind — LocationBeliefs threat cues never feed path overlays; six serial deaths at the shadowfox haunting ground under A-star-first stepping (493) _(2026-07-05)_
 - **[506](docs/open-work/landed/506-nearpaircache-admits-prey-and-items-26k-of-26k-pairs-are-non-cat-social-pipeline-does-x800-phantom-work-and-cats-accrue-meaningless-prey-familiarity-480-child.md)** — NearPairCache admits prey and items — 26k of 26k pairs are non-cat; social pipeline does x800 phantom work and cats accrue meaningless prey familiarity (480 child) _(2026-07-05)_

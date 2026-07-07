@@ -8,7 +8,7 @@ block: worldgen-prehistory
 initiative: [generational-continuity, mythic-texture, worldgen-prehistory]
 added: 2026-05-16
 parked: null
-blocked-by: [385, 291]
+blocked-by: [385]
 supersedes: []
 related-systems: []
 related-balance: []

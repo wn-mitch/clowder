@@ -1,7 +1,7 @@
 ---
 id: 291
 title: ColonyKnowledge restructure — promotion-via-mental-model-agreement replaces carrier-count threshold (258 follow-on)
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: pending
+landed-on: 2026-07-07
 ---
 
 ## Why
