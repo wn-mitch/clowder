@@ -8,7 +8,9 @@
 
 use std::collections::HashMap;
 
-use clowder::scenarios::{self, fish_shoreline_pounce, kitten_cry, runner};
+use clowder::scenarios::{
+    self, colony_knowledge_false_belief, fish_shoreline_pounce, kitten_cry, runner,
+};
 
 /// Drift-control smoke test: every registered scenario must run for at
 /// least one tick without panicking. Catches the "build_new_world starts
@@ -170,5 +172,58 @@ fn fish_shoreline_pounce_kills_shore_fish_and_spares_mid_lake_fish() {
         "expected exactly the shore fish dead and the mid-lake fish alive; \
          2 = shoreline freeze regressed (no kill), 0 = the mid-lake fish was \
          somehow reachable (reachability gate broken)"
+    );
+}
+
+/// Ticket 291 — false-belief promotion with a citable witness chain,
+/// at full-app integration (real schedule; belief decay running).
+/// The three-cat false consensus about a safe meadow MUST promote
+/// (substrate does not gate truth) and carry all three believers as
+/// witnesses; the contested bucket (one alarmed cat vs two calm)
+/// MUST stay out and register measured divergence.
+#[test]
+fn colony_knowledge_false_belief_promotes_with_witness_chain() {
+    use clowder::components::mental::MemoryType;
+    use clowder::resources::colony_knowledge::ColonyKnowledge;
+
+    let mut app = runner::build_scenario_app(42, &colony_knowledge_false_belief::SCENARIO, "Rumor");
+    app.update(); // Startup — scenario setup plants the beliefs.
+    for _ in 0..colony_knowledge_false_belief::SCENARIO.default_ticks {
+        app.update();
+    }
+
+    let world = app.world_mut();
+    let knowledge = world.resource::<ColonyKnowledge>();
+    let false_bucket =
+        ColonyKnowledge::bucket_position(&clowder::components::physical::Position::new(
+            colony_knowledge_false_belief::FALSE_THREAT_POS.0,
+            colony_knowledge_false_belief::FALSE_THREAT_POS.1,
+        ));
+    let entry = knowledge
+        .entries
+        .iter()
+        .find(|e| e.event_type == MemoryType::ThreatSeen && e.location == Some(false_bucket))
+        .expect("the false consensus must promote — substrate does not gate truth");
+    assert_eq!(
+        entry.witnesses.len(),
+        3,
+        "the promoted entry must cite its three believers"
+    );
+
+    let contested_bucket =
+        ColonyKnowledge::bucket_position(&clowder::components::physical::Position::new(
+            colony_knowledge_false_belief::CONTESTED_POS.0,
+            colony_knowledge_false_belief::CONTESTED_POS.1,
+        ));
+    assert!(
+        !knowledge
+            .entries
+            .iter()
+            .any(|e| e.location == Some(contested_bucket)),
+        "the contested bucket must not promote"
+    );
+    assert!(
+        knowledge.divergence_duration_ticks > 0,
+        "the contested bucket must register measured divergence"
     );
 }

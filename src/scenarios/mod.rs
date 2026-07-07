@@ -28,6 +28,7 @@
 pub mod affordance_substrate;
 pub mod belief_affordance_dse_consumers;
 pub mod chokepoint_defense_isthmus;
+pub mod colony_knowledge_false_belief;
 pub mod colony_reserves_belief;
 pub mod disposal_dispatch;
 pub mod disposal_election;
@@ -256,6 +257,8 @@ pub const ALL: &[&Scenario] = &[
     // resulting low-reserve state via stagger-tick InventoryObserved
     // broadcasts; `HasLowWardReserve` marker fires.
     &colony_reserves_belief::SCENARIO,
+    // 291 — false consensus promotes; contested bucket does not.
+    &colony_knowledge_false_belief::SCENARIO,
     // 374 — ShelterBeliefs substrate first-light. Four-phase
     // lifecycle (claim, damage, siege, siege broken) drives each
     // sub-axis through its full update path; the lifecycle test
