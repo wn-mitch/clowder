@@ -530,3 +530,77 @@ a fifth constant guess. Step-12 code stays committed locally
 (terrain speed, pursuit, desire-based hunt arms, and gait plumbing
 are sound and test-green); the landing gate is hunt success ≥ the
 pre-step-12 22.3% with survival gates held.
+
+### Diagnosis (2026-07-06) — the inverse correlation is fish churn; hunting is fine
+
+Frame-by-frame trace of the iter-4 run against the step-10 gate run
+AND the pre-Phase-II promoted baseline. All three candidate mechanisms
+above are REFUTED as primary; the defect is ticket 467's fish-on-water
+structural break, and gait only changed its churn cadence.
+
+**Species split (the whole story):**
+
+| Run | Total | Fish att. | Fish succ. | Land att. | Land succ. | Aggregate |
+|---|---|---|---|---|---|---|
+| pre-Phase-II baseline (3e4f7caf) | 1673 | 1305 | 3.1% | 368 | ~97% | 23.8% |
+| step-10 gate (44d3ecfb) | 1628 | 1295 | 2.8% | 333 | 98.2% | 22.3% |
+| step-12 iter 4 (b26f5407) | 4359 | 4071 | 1.4% | 288 | 98.3% | 7.8% |
+
+Land hunting (mouse/rat/rabbit/bird) is ~98% successful in every run
+and was untouched by all four gait iterations. Fish hunting has been
+~3% since BEFORE Phase II (ticket 467, opened 2026-05-25, documents
+it post-465). "Hunt success %" was never a hunting-quality metric —
+it is the dilution ratio between perfect land hunts and a
+permanently-broken fish-churn loop. The inverse speed–success
+correlation is fully explained: sprint gait shortens the
+elect → freeze → timeout → re-elect cycle, so faster cats log more
+doomed fish attempts per hour (1295 → 4071), inflating the
+denominator. P1's 22.3% gate target was gating on an artifact.
+
+**Mechanical frame-by-frame (Simba, iter-4 run, ticks 1246619–1246787
+— three consecutive attempts on the same fish at (52–53, 21)):**
+
+1. Fish tiles are Water (`movement_cost = u32::MAX`).
+   `find_path` (pathfinding.rs:320) refuses impassable TARGETS
+   outright, so the A* leg of `step_toward` never engages for any
+   fish — every fish approach runs on the legacy greedy fallback.
+2. Attempt 1 (1246619→1246648): Simba pinned at (31,10) beside camp
+   structures. Greedy's three candidates toward the fish blocked →
+   `step_toward` returns None → approach arm expresses NO desire →
+   cat stands still. `no_move_ticks` hits `chase_stuck_ticks` (10) →
+   "stuck during approach". Concave-obstacle freeze ON LAND, 22
+   tiles from the water.
+3. Attempt 2 (1246703→1246730): greedy works over open ground —
+   Simba sprints 16 tiles to the NW shore (44,19) — then every
+   candidate toward the fish is Water → None → shoreline freeze →
+   watchdog kills it at +27t.
+4. Attempt 3 (1246771→1246787, d0=11): already at the shore; freezes
+   immediately; fails in 16t. Re-elects; hunger 0.68 keeps Hunt
+   winning; the fish never moves (`FleeStrategy::Stationary`,
+   `approach_give_up_distance` 60 never trips for a target 20 tiles
+   out). Loop cadence is bounded ONLY by travel time + the 10-tick
+   watchdog — which is exactly what sprint gait accelerated.
+5. The stalk arm's direct-seek fallback doesn't help: the desire
+   points into Water, the integrator refuses every sub-step,
+   position never changes → "stuck while stalking" (1104 events,
+   1099 of them fish).
+
+Every layer is individually correct (find_path refusing impassable
+targets, greedy stranding at minima per its doc contract, the
+integrator refusing Water, the watchdog aborting motionless hunts);
+the composition is a cat frozen at a lake ~10 ticks per attempt,
+4071 times per soak. Real kill decline across Phase II + step 12 is
+modest and secondary (399 → 363 → 339): lakeside freeze time crowds
+out land attempts (368 → 288).
+
+**Consequences:**
+- Step-12's gait/pursuit/terrain code has no hunting defect to fix.
+  The landing gate "aggregate ≥ 22.3%" is re-specified as: land-prey
+  success ≥ 95%, survival gates + canaries held, and the fish
+  question routed to ticket 467 (its A/B/C design call is now
+  load-bearing for the 0.4.0 economy, no longer "rare-treat
+  texture" — option C's cost tripled with fluid movement).
+- 467-A (eligibility cut) would make the aggregate metric honest
+  (~98%) at one stroke; 467-B (shoreline-pounce resolver) preserves
+  fish in the cat food chain; both remove the churn. Decision is
+  values-based and reserved for the user per the ticket.

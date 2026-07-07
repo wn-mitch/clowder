@@ -82,3 +82,19 @@ values-based (texture vs cleanliness vs effort).
 - 2026-05-25: opened from 465's outcome. 438 of 579 remaining stuck
   events are Fish (78.9%). Substrate-correct fix is unclear (A / B / C
   is a design call); blocked on user input.
+- 2026-07-06: promoted from texture question to **step-12 (140)
+  landing blocker**. The fluid-movement gait work made cats cycle the
+  elect → freeze-at-shore → 10-tick watchdog → re-elect loop ~3×
+  faster: fish attempts 1295 → 4071 per soak (93.4% of ALL hunt
+  attempts, success 1.4%), collapsing the aggregate hunt-success
+  metric 22.3% → 7.8% while land-prey success sat untouched at 98.3%.
+  Zapruder trace + full species-split tables in
+  `docs/balance/fluid-movement-phase2.md` (step-12 Diagnosis section).
+  New mechanical detail: the freeze also fires on LAND — `find_path`
+  refuses the impassable Water TARGET, so fish approaches never get
+  A* and the greedy fallback strands on concave obstacles (observed:
+  Simba pinned beside camp structures 22 tiles from the water).
+  Option C's cost is no longer static — it scales with movement
+  speed, and 0.4.0 ships fluid movement. A and B both also need a
+  fail-fast guard: whichever lands, an unreachable hunt target should
+  abandon in ~1 tick, not burn `chase_stuck_ticks` (10) per attempt.
