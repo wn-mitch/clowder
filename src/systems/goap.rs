@@ -3934,11 +3934,6 @@ pub fn resolve_goap_plans(
                 &mut Memory,
                 &mut PendingUrgencies,
                 Option<&mut crate::components::fulfillment::Fulfillment>,
-                // Ticket 073 — per-cat recently-failed target memory.
-                // Optional because the component is lazy-inserted on
-                // first failure (cats that never fail a target don't
-                // pay for the HashMap allocation).
-                Option<&mut crate::components::RecentTargetFailures>,
                 // Ticket 228 — per-cat route-cost field, inserted at
                 // replan in `evaluate_and_plan`. Optional because cats
                 // that haven't replanned yet (or whose component was
@@ -4339,10 +4334,9 @@ pub fn resolve_goap_plans(
         grooming: cats
             .iter()
             .map(
-                |(
-                    (e, _, _, _, _, _, _, _, _, _),
-                    (_, _, g, _, _, _, _, _, _, _, _, _, _, _, _),
-                )| { (e, g.as_ref().map_or(0.8, |g| g.0)) },
+                |((e, _, _, _, _, _, _, _, _, _), (_, _, g, _, _, _, _, _, _, _, _, _, _, _))| {
+                    (e, g.as_ref().map_or(0.8, |g| g.0))
+                },
             )
             .collect(),
         // Gender snapshot for §7.M.7.4's `resolve_mate_with` partner lookup —
@@ -4351,10 +4345,9 @@ pub fn resolve_goap_plans(
         gender: cats
             .iter()
             .map(
-                |(
-                    (e, _, _, _, _, _, _, _, _, _),
-                    (g, _, _, _, _, _, _, _, _, _, _, _, _, _, _),
-                )| { (e, *g) },
+                |((e, _, _, _, _, _, _, _, _, _), (g, _, _, _, _, _, _, _, _, _, _, _, _, _))| {
+                    (e, *g)
+                },
             )
             .collect(),
         stores_positions,
@@ -4409,7 +4402,7 @@ pub fn resolve_goap_plans(
         },
         injured_cat_positions: cats
             .iter()
-            .filter(|(_, (_, _, _, _, health, _, _, _, _, _, _, _, _, _, _))| {
+            .filter(|(_, (_, _, _, _, health, _, _, _, _, _, _, _, _, _))| {
                 health.current < health.max
             })
             .map(|((e, _, _, pos, _, _, _, _, _, _), _)| (e, *pos))
@@ -4442,10 +4435,9 @@ pub fn resolve_goap_plans(
         cat_grooming: cats
             .iter()
             .filter_map(
-                |(
-                    (e, _, _, _, _, _, _, _, _, _),
-                    (_, _, gc, _, _, _, _, _, _, _, _, _, _, _, _),
-                )| { gc.map(|g| (e, g.0)) },
+                |((e, _, _, _, _, _, _, _, _, _), (_, _, gc, _, _, _, _, _, _, _, _, _, _, _))| {
+                    gc.map(|g| (e, g.0))
+                },
             )
             .collect(),
         // §6.5.4 kinship lookup — `(kitten_entity) → (mother, father)`.
@@ -4546,7 +4538,6 @@ pub fn resolve_goap_plans(
             mut memory,
             mut urgencies,
             mut fulfillment_opt,
-            mut recent_failures,
             route_cost_field,
             body_model,
             mut recent_crafts,
@@ -5032,7 +5023,6 @@ pub fn resolve_goap_plans(
                                 &mut plan,
                                 &mut current,
                                 preempt_kind,
-                                None, // RecentTargetFailures lands in 073
                             );
                             // Force GoapPlan removal this tick so
                             // `evaluate_and_plan` (which filters
@@ -5200,7 +5190,6 @@ pub fn resolve_goap_plans(
                         crate::components::AbandonReason::MoraleBreak,
                         None,
                         None,
-                        recent_failures.as_deref_mut(),
                         Some(&mut narr.witnessable),
                         cat_entity,
                         *pos,
@@ -5222,25 +5211,11 @@ pub fn resolve_goap_plans(
                 let failed_action = plan.current().map(|s| s.action);
                 let failed_target = plan.current_state().and_then(|s| s.target_entity);
                 if let Some(action) = failed_action {
-                    // Ticket 073 — lazy-insert `RecentTargetFailures` on
-                    // first failure for save-loaded cats that pre-date
-                    // the component (the live-spawn bundle adds it for
-                    // every new cat). The mutation lands next tick
-                    // because Commands buffer until apply; that's
-                    // acceptable since the cooldown signal degrades
-                    // gracefully (single-tick miss vs the 8000-tick
-                    // cooldown window).
-                    if recent_failures.is_none() && failed_target.is_some() {
-                        commands
-                            .entity(cat_entity)
-                            .insert(crate::components::RecentTargetFailures::default());
-                    }
                     crate::systems::plan_substrate::record_step_failure(
                         &mut plan,
                         action,
                         crate::components::PlanFailureReason::Other,
                         failed_target,
-                        recent_failures.as_deref_mut(),
                         Some(&mut narr.witnessable),
                         cat_entity,
                         *pos,
@@ -5392,18 +5367,12 @@ pub fn resolve_goap_plans(
                         // before the plan's `failed_actions` set is destroyed.
                         let abandon_action = failed_action;
                         let abandon_target = failed_target;
-                        if recent_failures.is_none() && abandon_target.is_some() {
-                            commands
-                                .entity(cat_entity)
-                                .insert(crate::components::RecentTargetFailures::default());
-                        }
                         let _abandoned = crate::systems::plan_substrate::abandon_plan(
                             &mut current,
                             &mut plan,
                             crate::components::AbandonReason::ReplanCap,
                             abandon_action,
                             abandon_target,
-                            recent_failures.as_deref_mut(),
                             Some(&mut narr.witnessable),
                             cat_entity,
                             *pos,
@@ -5436,18 +5405,12 @@ pub fn resolve_goap_plans(
                     // Ticket 073 — same memory-bridge as the ReplanCap branch.
                     let abandon_action = failed_action;
                     let abandon_target = failed_target;
-                    if recent_failures.is_none() && abandon_target.is_some() {
-                        commands
-                            .entity(cat_entity)
-                            .insert(crate::components::RecentTargetFailures::default());
-                    }
                     let _abandoned = crate::systems::plan_substrate::abandon_plan(
                         &mut current,
                         &mut plan,
                         crate::components::AbandonReason::NoPlanPossible,
                         abandon_action,
                         abandon_target,
-                        recent_failures.as_deref_mut(),
                         Some(&mut narr.witnessable),
                         cat_entity,
                         *pos,
@@ -5604,7 +5567,7 @@ pub fn resolve_goap_plans(
     // Deferred grooming restorations — apply grooming condition delta and
     // §7.W social_warmth delta to the groomed target.
     for groom in accum.grooming_restorations {
-        if let Ok((_, (_, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _, _, _))) =
+        if let Ok((_, (_, _, grooming, _, _, _, _, _, _, fulfillment, _, _, _, _))) =
             cats.get_mut(groom.target)
         {
             if let Some(mut g) = grooming {
@@ -6142,7 +6105,6 @@ fn dispatch_step_action(
                 &mut plan.step_state,
                 step_idx,
                 &ec.target_validity,
-                None, // RecentTargetFailures lands in 073
             );
             // 477 — focal-cat resolver-trace sink for the equipment
             // weapon-strike read. Built from `ec`'s focal-trace resources
@@ -8375,7 +8337,6 @@ fn dispatch_step_action(
                 &mut plan.step_state,
                 step_idx,
                 &ec.target_validity,
-                None,
             );
             let target_for_plan = plan.step_state[step_idx].target_position.unwrap_or(*pos);
             let path_plan = cat_path_plan!(target_for_plan);

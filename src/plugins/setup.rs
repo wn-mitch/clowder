@@ -117,12 +117,6 @@ pub fn cat_bundle(
             crate::components::SensorySpecies::Cat,
             crate::components::SensorySignature::CAT,
             // Ticket 073 — per-cat recently-failed target memory.
-            // Bundle insertion ensures `resolve_goap_plans`'s
-            // `Option<&mut RecentTargetFailures>` resolves to
-            // `Some` for live-spawned cats. Save-loaded cats
-            // (pre-073 saves) get the lazy-insert path on first
-            // failure.
-            crate::components::RecentTargetFailures::default(),
             // Ticket 108 — per-cat snapshot of last tick's
             // `safety_deficit` for the `ThreatProximityAdrenaline`
             // derivative. Default 0.0 matches a freshly-spawned cat

@@ -13,7 +13,7 @@
 //!   0.1, recovering linearly to 1.0 over the cooldown window.
 //! - [`prune_recent_target_failures`] — chain-2a maintenance system
 //!   that bounds per-cat map size by expiring entries older than
-//!   `target_failure_cooldown_ticks`.
+//!   the `belief_facets.predictability` decay tunables (292).
 //!
 //! ## Architectural guardrail
 //!
@@ -28,49 +28,12 @@
 use bevy_ecs::prelude::*;
 
 use crate::ai::curves::Curve;
-use crate::ai::planner::GoapActionKind;
 use crate::components::beliefs::{ContextBeliefs, EnvironmentalContextKey};
 #[cfg(test)]
 use crate::components::beliefs::{Facet, MentalModel};
 use crate::components::physical::Dead;
 use crate::components::physical::Needs;
-use crate::components::{DispositionKind, PrevSafetyDeficit, RecentTargetFailures};
-use crate::resources::sim_constants::SimConstants;
-
-/// Compute the recently-failed-target signal for a given
-/// `(action, target)` lookup.
-///
-/// Semantics: **1.0 = no penalty**, **0.0 = full penalty (just
-/// failed)**. Scoring is fail-open — a missing `RecentTargetFailures`
-/// component (cat that never hit a target failure) returns 1.0, as
-/// does a missing entry or an expired one.
-///
-/// Linear ramp: at `age = 0` returns 0.0; at `age >= cooldown_ticks`
-/// returns 1.0; otherwise `age / cooldown_ticks`. Defensive against
-/// `cooldown_ticks == 0` (returns 1.0 — a zero-cooldown means "no
-/// memory", and the consideration should be a no-op).
-pub fn target_recent_failure_age_normalized(
-    recent: Option<&RecentTargetFailures>,
-    action: GoapActionKind,
-    target: Entity,
-    now: u64,
-    cooldown_ticks: u64,
-) -> f32 {
-    if cooldown_ticks == 0 {
-        return 1.0;
-    }
-    let Some(recent) = recent else {
-        return 1.0;
-    };
-    let Some(failed_tick) = recent.last_failure_tick(action, target) else {
-        return 1.0;
-    };
-    let age = now.saturating_sub(failed_tick);
-    if age >= cooldown_ticks {
-        return 1.0;
-    }
-    (age as f32 / cooldown_ticks as f32).clamp(0.0, 1.0)
-}
+use crate::components::{DispositionKind, PrevSafetyDeficit};
 
 /// 292 — belief-substrate target-cooldown signal: the successor to
 /// [`target_recent_failure_age_normalized`]. Reads the actor's OWN
@@ -126,32 +89,6 @@ pub fn cooldown_curve() -> Curve {
 // ---------------------------------------------------------------------------
 // prune_recent_target_failures — chain 2a decay-batch maintenance system
 // ---------------------------------------------------------------------------
-
-/// Bound per-cat `RecentTargetFailures` map size by expiring entries
-/// older than `target_failure_cooldown_ticks`. Slotted into chain 2a's
-/// decay batch alongside `decay_grooming` / `decay_exploration` so the
-/// substrate-owned per-cat data structures all share a single
-/// passive-decay lane.
-///
-/// Skipped on `Dead` cats (the pruner is a per-tick visit; a freshly-
-/// dead cat's component will be cleaned up by `cleanup_dead`).
-pub fn prune_recent_target_failures(
-    constants: Res<SimConstants>,
-    time: Res<crate::resources::time::TimeState>,
-    mut query: Query<&mut RecentTargetFailures, Without<Dead>>,
-) {
-    let cooldown = constants.planning_substrate.target_failure_cooldown_ticks;
-    if cooldown == 0 {
-        return;
-    }
-    let now = time.tick;
-    for mut recent in &mut query {
-        if recent.is_empty() {
-            continue;
-        }
-        let _removed = recent.prune_expired(now, cooldown);
-    }
-}
 
 // ---------------------------------------------------------------------------
 // disposition_cooldown_signal — ticket 123 (290 reader cutover from RDF)
@@ -230,133 +167,64 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // target_recent_failure_age_normalized
+    // target_predictability_signal (292 — belief successor)
     // -----------------------------------------------------------------
 
     #[test]
-    fn sensor_returns_one_when_no_recent_failures_component() {
-        // Fail-open: a cat with no `RecentTargetFailures` component
-        // gets the full no-penalty signal.
-        let s = target_recent_failure_age_normalized(
-            None,
-            GoapActionKind::SocializeWith,
-            entity(10),
-            1000,
-            8000,
-        );
-        assert_eq!(s, 1.0);
+    fn predictability_signal_fails_open_without_components() {
+        assert_eq!(target_predictability_signal(None, None, entity(9)), 1.0);
     }
 
     #[test]
-    fn sensor_returns_one_when_no_entry_for_pair() {
-        let recent = RecentTargetFailures::default();
-        let s = target_recent_failure_age_normalized(
-            Some(&recent),
-            GoapActionKind::SocializeWith,
-            entity(10),
-            1000,
-            8000,
+    fn predictability_signal_fails_open_without_model() {
+        let beliefs = crate::components::beliefs::CatBeliefs::default();
+        assert_eq!(
+            target_predictability_signal(Some(&beliefs), None, entity(9)),
+            1.0
         );
-        assert_eq!(s, 1.0);
     }
 
     #[test]
-    fn sensor_returns_zero_at_fresh_failure() {
-        let mut recent = RecentTargetFailures::default();
-        let target = entity(10);
-        recent.record(GoapActionKind::SocializeWith, target, 1000);
-        let s = target_recent_failure_age_normalized(
-            Some(&recent),
-            GoapActionKind::SocializeWith,
-            target,
-            1000, // age = 0
-            8000,
+    fn predictability_signal_fails_open_on_zero_strength_facet() {
+        // A model created by other event arms (Attack/Groom) whose
+        // predictability facet was never observed: strength 0 →
+        // fail-open, NOT "value 0.0 = fresh failure".
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        beliefs.models.entry(entity(9)).or_default();
+        assert_eq!(
+            target_predictability_signal(Some(&beliefs), None, entity(9)),
+            1.0
         );
-        assert_eq!(s, 0.0);
     }
 
     #[test]
-    fn sensor_returns_one_at_full_cooldown_age() {
-        let mut recent = RecentTargetFailures::default();
-        let target = entity(10);
-        recent.record(GoapActionKind::SocializeWith, target, 1000);
-        // age = 8000 → fully expired → 1.0
-        let s = target_recent_failure_age_normalized(
-            Some(&recent),
-            GoapActionKind::SocializeWith,
-            target,
-            9000,
-            8000,
+    fn predictability_signal_reads_snapped_facet_as_fresh_failure() {
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let model = beliefs.models.entry(entity(9)).or_default();
+        model.predictability = crate::components::beliefs::Facet {
+            value: 0.0,
+            prior: 1.0,
+            strength: 1.0,
+            ..Default::default()
+        };
+        assert_eq!(
+            target_predictability_signal(Some(&beliefs), None, entity(9)),
+            0.0
         );
-        assert_eq!(s, 1.0);
     }
 
     #[test]
-    fn sensor_returns_half_at_midpoint() {
-        // Spec contract: sensor returns `(now - failed_tick) /
-        // cooldown_ticks` clamped to `[0, 1]`.
-        let mut recent = RecentTargetFailures::default();
-        let target = entity(10);
-        recent.record(GoapActionKind::SocializeWith, target, 1000);
-        // age = 4000, cooldown = 8000 → 0.5
-        let s = target_recent_failure_age_normalized(
-            Some(&recent),
-            GoapActionKind::SocializeWith,
-            target,
-            5000,
-            8000,
-        );
-        assert!((s - 0.5).abs() < 1e-6, "expected 0.5, got {}", s);
-    }
-
-    #[test]
-    fn sensor_clamps_age_beyond_cooldown_to_one() {
-        let mut recent = RecentTargetFailures::default();
-        let target = entity(10);
-        recent.record(GoapActionKind::SocializeWith, target, 1000);
-        // age = 50_000, cooldown = 8000 → 1.0 (saturation)
-        let s = target_recent_failure_age_normalized(
-            Some(&recent),
-            GoapActionKind::SocializeWith,
-            target,
-            51_000,
-            8000,
-        );
-        assert_eq!(s, 1.0);
-    }
-
-    #[test]
-    fn sensor_handles_zero_cooldown_defensively() {
-        // Zero cooldown means "no memory" — sensor returns 1.0 (no
-        // penalty) regardless of recorded failures, so the
-        // consideration becomes a no-op.
-        let mut recent = RecentTargetFailures::default();
-        let target = entity(10);
-        recent.record(GoapActionKind::SocializeWith, target, 1000);
-        let s = target_recent_failure_age_normalized(
-            Some(&recent),
-            GoapActionKind::SocializeWith,
-            target,
-            1000,
-            0,
-        );
-        assert_eq!(s, 1.0);
-    }
-
-    #[test]
-    fn sensor_distinguishes_action_kinds() {
-        let mut recent = RecentTargetFailures::default();
-        let target = entity(10);
-        recent.record(GoapActionKind::SocializeWith, target, 1000);
-        // Same target, different action → no entry → 1.0
-        let s = target_recent_failure_age_normalized(
-            Some(&recent),
-            GoapActionKind::GroomOther,
-            target,
-            1500,
-            8000,
-        );
-        assert_eq!(s, 1.0);
+    fn predictability_signal_reads_wildlife_from_predator_beliefs() {
+        let mut preds = crate::components::beliefs::PredatorBeliefs::default();
+        let model = preds.models.entry(entity(7)).or_default();
+        model.predictability = crate::components::beliefs::Facet {
+            value: 0.4,
+            prior: 1.0,
+            strength: 0.8,
+            ..Default::default()
+        };
+        let signal = target_predictability_signal(None, Some(&preds), entity(7));
+        assert!((signal - 0.4).abs() < 1e-6);
     }
 
     // -----------------------------------------------------------------

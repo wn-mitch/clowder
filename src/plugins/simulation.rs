@@ -1643,10 +1643,6 @@ impl Plugin for SimulationPlugin {
                         // Ticket 080 — clear `Reserved` markers whose
                         // `expires_tick` has lapsed.
                         crate::systems::plan_substrate::expire_reservations,
-                        // Ticket 073 — bound per-cat `RecentTargetFailures`
-                        // map size by expiring entries older than
-                        // `target_failure_cooldown_ticks`.
-                        systems::plan_substrate::sensors::prune_recent_target_failures,
                         systems::needs::eat_from_inventory,
                         systems::needs::decay_exploration,
                         systems::needs::stamp_passive_exploration,

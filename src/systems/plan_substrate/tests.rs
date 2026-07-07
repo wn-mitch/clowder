@@ -103,7 +103,6 @@ fn record_step_failure_matches_inline_body() {
         PlanFailureReason::Other,
         None,
         None,
-        None,
         Entity::from_raw_u32(1).unwrap(),
         Position::new(0, 0),
         0,
@@ -124,7 +123,6 @@ fn record_step_failure_preserves_existing_entries() {
         &mut plan,
         GoapActionKind::SearchPrey,
         PlanFailureReason::Other,
-        None,
         None,
         None,
         Entity::from_raw_u32(1).unwrap(),
@@ -156,7 +154,6 @@ fn abandon_plan_matches_inline_body() {
         &mut new_current,
         &mut new_plan,
         AbandonReason::ReplanCap,
-        None,
         None,
         None,
         None,
@@ -199,7 +196,6 @@ fn try_preempt_threat_flee_matches_inline_body() {
         &mut new_plan,
         &mut new_current,
         PreemptKind::ThreatFlee { flee_target },
-        None,
     );
 
     assert_eq!(outcome, PreemptOutcome::Preempted);
@@ -225,12 +221,7 @@ fn try_preempt_non_threat_matches_inline_body_resets_ticks_remaining() {
     old_current.ticks_remaining = 0;
 
     // New API:
-    let outcome = try_preempt(
-        &mut new_plan,
-        &mut new_current,
-        PreemptKind::NonThreat,
-        None,
-    );
+    let outcome = try_preempt(&mut new_plan, &mut new_current, PreemptKind::NonThreat);
 
     assert_eq!(outcome, PreemptOutcome::Preempted);
     assert_eq!(
@@ -252,12 +243,7 @@ fn try_preempt_threat_without_position_still_resets_ticks_remaining() {
     let mut current = fresh_current();
     current.action = Action::Hunt;
 
-    let outcome = try_preempt(
-        &mut plan,
-        &mut current,
-        PreemptKind::ThreatWithoutPosition,
-        None,
-    );
+    let outcome = try_preempt(&mut plan, &mut current, PreemptKind::ThreatWithoutPosition);
 
     assert_eq!(outcome, PreemptOutcome::Preempted);
     assert_eq!(current.ticks_remaining, 0);
@@ -291,7 +277,7 @@ fn carry_target_forward_matches_inline_body_when_unset() {
     }
 
     // New API:
-    let result = carry_target_forward(&mut new_steps, step_idx, &validity, None);
+    let result = carry_target_forward(&mut new_steps, step_idx, &validity);
 
     assert_eq!(new_steps[step_idx].target_entity, Some(prior_target));
     assert_eq!(
@@ -311,7 +297,7 @@ fn carry_target_forward_preserves_existing_target() {
     steps[0].target_entity = Some(prior);
     steps[1].target_entity = Some(already);
 
-    let result = carry_target_forward(&mut steps, 1, &validity, None);
+    let result = carry_target_forward(&mut steps, 1, &validity);
 
     // Existing target_entity is not overwritten.
     assert_eq!(steps[1].target_entity, Some(already));
@@ -323,7 +309,7 @@ fn carry_target_forward_at_step_zero_is_noop() {
     let validity = target::InMemoryValidity::new();
     let mut steps = [StepExecutionState::default()];
 
-    let result = carry_target_forward(&mut steps, 0, &validity, None);
+    let result = carry_target_forward(&mut steps, 0, &validity);
 
     assert_eq!(steps[0].target_entity, None);
     assert_eq!(result, None);
@@ -396,7 +382,7 @@ fn carry_target_forward_drops_dead_prior_target() {
     let mut steps = [StepExecutionState::default(), StepExecutionState::default()];
     steps[0].target_entity = Some(dead_target);
 
-    let result = carry_target_forward(&mut steps, 1, &validity, None);
+    let result = carry_target_forward(&mut steps, 1, &validity);
     assert_eq!(
         result, None,
         "dead prior target must not propagate; caller replans"

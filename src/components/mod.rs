@@ -38,7 +38,6 @@ pub mod pregnancy;
 pub mod prev_safety_deficit;
 pub mod prey;
 pub mod recent_crafts;
-pub mod recent_target_failures;
 pub mod recipe;
 pub mod reserved;
 pub mod route_cost_field;
@@ -106,7 +105,6 @@ pub use prey::{
     DenRaided, FleeStrategy, PreyAiState, PreyAnimal, PreyConfig, PreyDen, PreyDensity, PreyKilled,
     PreyKind, PreyState,
 };
-pub use recent_target_failures::RecentTargetFailures;
 pub use recipe::{
     CraftedItem, DisciplineKind, ItemDestination, Recipe, RecipeDuration, RecipeId, RecipeInput,
     RecipeOutput, StationRequirement,

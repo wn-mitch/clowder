@@ -14,7 +14,6 @@ use crate::components::goap_plan::StepExecutionState;
 use crate::components::markers::{Banished, Incapacitated, NewbornKitten};
 use crate::components::physical::Dead;
 use crate::components::reserved::Reserved;
-use crate::components::RecentTargetFailures;
 
 // ---------------------------------------------------------------------------
 // Target validity (074)
@@ -210,7 +209,6 @@ pub fn carry_target_forward<V: TargetValidity + ?Sized>(
     step_state: &mut [StepExecutionState],
     step_idx: usize,
     validity: &V,
-    recent: Option<&mut RecentTargetFailures>,
 ) -> Option<Entity> {
     if step_state[step_idx].target_entity.is_none() && step_idx > 0 {
         if let Some(prior) = step_state[step_idx - 1].target_entity {
@@ -230,7 +228,6 @@ pub fn carry_target_forward<V: TargetValidity + ?Sized>(
                     // model isn't yet committed by 073's parallel work;
                     // the `None` return alone is enough to trigger
                     // replan via the caller's failure path.
-                    let _ = recent;
                 }
             }
         }

@@ -9,9 +9,7 @@ use bevy_ecs::prelude::*;
 use crate::ai::planner::GoapActionKind;
 use crate::ai::{Action, CurrentAction};
 use crate::components::physical::Position;
-use crate::components::{
-    AbandonReason, AbandonedPlanState, GoapPlan, PlanFailureReason, RecentTargetFailures,
-};
+use crate::components::{AbandonReason, AbandonedPlanState, GoapPlan, PlanFailureReason};
 
 // ---------------------------------------------------------------------------
 // record_step_failure
@@ -50,7 +48,6 @@ pub fn record_step_failure(
     action: GoapActionKind,
     _reason: PlanFailureReason,
     target: Option<Entity>,
-    recent: Option<&mut RecentTargetFailures>,
     witnessable: Option<
         &mut bevy_ecs::message::MessageWriter<crate::messages::witnessable_event::WitnessableEvent>,
     >,
@@ -60,9 +57,6 @@ pub fn record_step_failure(
 ) {
     plan.failed_actions.insert(action);
     if let Some(target) = target {
-        if let Some(recent) = recent {
-            recent.record(action, target, tick);
-        }
         if let Some(w) = witnessable {
             w.write(
                 crate::messages::witnessable_event::WitnessableEvent::TargetActionFailed {
@@ -120,7 +114,6 @@ pub fn abandon_plan(
     _reason: AbandonReason,
     action: Option<GoapActionKind>,
     target: Option<Entity>,
-    recent: Option<&mut RecentTargetFailures>,
     witnessable: Option<
         &mut bevy_ecs::message::MessageWriter<crate::messages::witnessable_event::WitnessableEvent>,
     >,
@@ -130,9 +123,6 @@ pub fn abandon_plan(
 ) -> AbandonedPlanState {
     current.ticks_remaining = 0;
     if let (Some(action), Some(target)) = (action, target) {
-        if let Some(recent) = recent {
-            recent.record(action, target, tick);
-        }
         if let Some(w) = witnessable {
             w.write(
                 crate::messages::witnessable_event::WitnessableEvent::TargetActionFailed {
@@ -214,7 +204,6 @@ pub fn try_preempt(
     plan: &mut GoapPlan,
     current: &mut CurrentAction,
     kind: PreemptKind,
-    _recent: Option<&mut RecentTargetFailures>,
 ) -> PreemptOutcome {
     if let PreemptKind::ThreatFlee { flee_target } = kind {
         current.action = Action::Flee;
@@ -292,38 +281,30 @@ mod tests {
     }
 
     #[test]
-    fn record_step_failure_writes_recent_when_target_known() {
+    fn record_step_failure_inserts_failed_action() {
         let mut plan = fresh_plan();
-        let mut recent = RecentTargetFailures::default();
         let target = entity(10);
         record_step_failure(
             &mut plan,
             GoapActionKind::SocializeWith,
             PlanFailureReason::Other,
             Some(target),
-            Some(&mut recent),
             None,
             entity(1),
             Position::new(0, 0),
             500,
         );
         assert!(plan.failed_actions.contains(&GoapActionKind::SocializeWith));
-        assert_eq!(
-            recent.last_failure_tick(GoapActionKind::SocializeWith, target),
-            Some(500)
-        );
     }
 
     #[test]
-    fn record_step_failure_skips_recent_when_no_target() {
+    fn record_step_failure_handles_no_target() {
         let mut plan = fresh_plan();
-        let mut recent = RecentTargetFailures::default();
         record_step_failure(
             &mut plan,
             GoapActionKind::TravelTo(crate::ai::planner::PlannerZone::Stores),
             PlanFailureReason::Other,
             None,
-            Some(&mut recent),
             None,
             entity(1),
             Position::new(0, 0),
@@ -332,15 +313,13 @@ mod tests {
         assert!(plan.failed_actions.contains(&GoapActionKind::TravelTo(
             crate::ai::planner::PlannerZone::Stores
         )));
-        assert!(recent.is_empty());
     }
 
     #[test]
-    fn abandon_plan_writes_recent_when_action_and_target_known() {
+    fn abandon_plan_resets_ticks_with_action_and_target() {
         let mut current = CurrentAction::default();
         current.ticks_remaining = u64::MAX;
         let mut plan = fresh_plan();
-        let mut recent = RecentTargetFailures::default();
         let target = entity(10);
         let _ = abandon_plan(
             &mut current,
@@ -348,17 +327,12 @@ mod tests {
             AbandonReason::ReplanCap,
             Some(GoapActionKind::SocializeWith),
             Some(target),
-            Some(&mut recent),
             None,
             entity(1),
             Position::new(0, 0),
             900,
         );
         assert_eq!(current.ticks_remaining, 0);
-        assert_eq!(
-            recent.last_failure_tick(GoapActionKind::SocializeWith, target),
-            Some(900)
-        );
     }
 
     #[test]
@@ -370,7 +344,6 @@ mod tests {
             &mut current,
             &mut plan,
             AbandonReason::NoPlanPossible,
-            None,
             None,
             None,
             None,

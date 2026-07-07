@@ -8505,19 +8505,16 @@ pub struct PlanningSubstrateConstants {
     /// ≈ 1 in-sim hour at the 1000-ticks-per-day scale; tuneable
     /// post-soak per ticket Out-of-scope.
     pub reservation_ttl_ticks: u64,
-    /// Ticket 073 — how long an `(action, target)` failure penalty
-    /// persists on a cat's `RecentTargetFailures` map. Default `8000`
-    /// ≈ 2 sim-hours at the 1000-ticks-per-day scale; conservative
-    /// per ticket 073's Out-of-scope note. Quarterly
-    /// `just rebuild-sensitivity-map` will re-tune.
-    pub target_failure_cooldown_ticks: u64,
 }
+
+// 292 — `target_failure_cooldown_ticks` (073) retired with the
+// `RecentTargetFailures` map; the target-cooldown recovery window is
+// governed by `belief_facets.predictability` decay tunables now.
 
 impl Default for PlanningSubstrateConstants {
     fn default() -> Self {
         Self {
             reservation_ttl_ticks: 600,
-            target_failure_cooldown_ticks: 8000,
         }
     }
 }

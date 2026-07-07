@@ -2271,7 +2271,7 @@ mod tests {
         // (PairingDropped) for the §7.M L2 PairingActivity layer.
         // Ticket 080 added 1 Neutral (ReservationContended) for the
         // resource-reservation substrate. Ticket 073 added 1 Neutral
-        // (TargetCooldownApplied) for the RecentTargetFailures cooldown.
+        // (TargetCooldownApplied) for the target-predictability cooldown (292).
         // Ticket 104 added 1 Positive (HideFreezeFired) for the
         // Hide/Freeze valence — Phase-1 dormant via the HideEligible
         // gate, but already classified.
