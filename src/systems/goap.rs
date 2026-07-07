@@ -638,6 +638,14 @@ pub struct ExecutorContext<'w, 's> {
     /// `belief_integrator` writer runs in a separate Chain block
     /// earlier in the tick.
     pub location_beliefs: Query<'w, 's, &'static crate::components::beliefs::LocationBeliefs>,
+    /// 292 — read-only `CatBeliefs` / `PredatorBeliefs` lookups for the
+    /// `target_predictability` consideration on the seven target-taking
+    /// DSEs (the belief successor to the retired `RecentTargetFailures`
+    /// cooldown). Disjoint from the cats query for the same reason as
+    /// `location_beliefs` — read-only on components `belief_integrator`
+    /// writes once per tick before scoring.
+    pub cat_beliefs: Query<'w, 's, &'static crate::components::beliefs::CatBeliefs>,
+    pub exec_predator_beliefs: Query<'w, 's, &'static crate::components::beliefs::PredatorBeliefs>,
     pub time: Res<'w, TimeState>,
     pub time_scale: Res<'w, crate::resources::time::TimeScale>,
     pub constants: Res<'w, SimConstants>,
@@ -4914,7 +4922,6 @@ pub fn resolve_goap_plans(
             &mut magic_params,
             &snaps,
             &mut accum,
-            recent_failures.as_deref(),
             route_cost_field,
             body_model,
             recent_crafts.as_deref_mut(),
@@ -5900,10 +5907,6 @@ fn dispatch_step_action(
     magic_params: &mut MagicResolverParams,
     snaps: &StepSnapshots,
     accum: &mut StepAccumulators,
-    // Ticket 073 — per-cat recently-failed target memory. Threaded
-    // through `dispatch_step_action` so the six target-DSE branches
-    // can pass the cooldown sensor input into their resolvers.
-    recent_failures: Option<&crate::components::RecentTargetFailures>,
     // Ticket 228 — per-cat route-cost field component (inserted at
     // replan by `evaluate_and_plan`). Threaded so the `cat_path_plan!`
     // macro can construct `CatPathPlan::Field` when fresh, falling
@@ -6119,10 +6122,8 @@ fn dispatch_step_action(
                 &|e: Entity| stance_overlays_from_query(faction_overlay_q, e),
                 is_focal,
                 ec.focal_capture.as_deref(),
-                recent_failures,
-                ec.constants
-                    .planning_substrate
-                    .target_failure_cooldown_ticks,
+                ec.cat_beliefs.get(cat_entity).ok(),
+                ec.exec_predator_beliefs.get(cat_entity).ok(),
                 &ec.action_affordances,
                 &mut ec.dse_scratchpad,
             )
@@ -6380,10 +6381,8 @@ fn dispatch_step_action(
                         ec.time.tick,
                         focal_hook,
                         joint_partner,
-                        recent_failures,
-                        ec.constants
-                            .planning_substrate
-                            .target_failure_cooldown_ticks,
+                        ec.cat_beliefs.get(cat_entity).ok(),
+                        ec.exec_predator_beliefs.get(cat_entity).ok(),
                         narr.activation.as_deref_mut(),
                         &mut ec.dse_scratchpad,
                     );
@@ -6522,10 +6521,8 @@ fn dispatch_step_action(
                         relationships,
                         ec.time.tick,
                         focal_hook,
-                        recent_failures,
-                        ec.constants
-                            .planning_substrate
-                            .target_failure_cooldown_ticks,
+                        ec.cat_beliefs.get(cat_entity).ok(),
+                        ec.exec_predator_beliefs.get(cat_entity).ok(),
                         narr.activation.as_deref_mut(),
                         &mut ec.dse_scratchpad,
                         Some(&snaps.currently_groomed),
@@ -6668,10 +6665,8 @@ fn dispatch_step_action(
                         relationships,
                         ec.time.tick,
                         focal_hook,
-                        recent_failures,
-                        ec.constants
-                            .planning_substrate
-                            .target_failure_cooldown_ticks,
+                        ec.cat_beliefs.get(cat_entity).ok(),
+                        ec.exec_predator_beliefs.get(cat_entity).ok(),
                         narr.activation.as_deref_mut(),
                         &mut ec.dse_scratchpad,
                     );
@@ -6780,10 +6775,8 @@ fn dispatch_step_action(
                         relationships,
                         ec.time.tick,
                         focal_hook,
-                        recent_failures,
-                        ec.constants
-                            .planning_substrate
-                            .target_failure_cooldown_ticks,
+                        ec.cat_beliefs.get(cat_entity).ok(),
+                        ec.exec_predator_beliefs.get(cat_entity).ok(),
                         narr.activation.as_deref_mut(),
                         &mut ec.dse_scratchpad,
                     );
@@ -6940,10 +6933,8 @@ fn dispatch_step_action(
                     &stance_overlays,
                     ec.time.tick,
                     focal_hook,
-                    recent_failures,
-                    ec.constants
-                        .planning_substrate
-                        .target_failure_cooldown_ticks,
+                    ec.cat_beliefs.get(cat_entity).ok(),
+                    ec.exec_predator_beliefs.get(cat_entity).ok(),
                     narr.activation.as_deref_mut(),
                     &mut ec.dse_scratchpad,
                 );
@@ -7036,10 +7027,8 @@ fn dispatch_step_action(
                         relationships,
                         ec.time.tick,
                         focal_hook,
-                        recent_failures,
-                        ec.constants
-                            .planning_substrate
-                            .target_failure_cooldown_ticks,
+                        ec.cat_beliefs.get(cat_entity).ok(),
+                        ec.exec_predator_beliefs.get(cat_entity).ok(),
                         narr.activation.as_deref_mut(),
                         &mut ec.dse_scratchpad,
                     );
@@ -9173,8 +9162,8 @@ fn resolve_search_prey(
     // sensor input) and the cooldown window in ticks. Caller pulls
     // `recent_failures.as_deref()` from the cats query and the cooldown
     // ticks from `SimConstants::planning_substrate`.
-    recent_failures: Option<&crate::components::RecentTargetFailures>,
-    cooldown_ticks: u64,
+    cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
+    predator_beliefs: Option<&crate::components::beliefs::PredatorBeliefs>,
     // 263: ActionAffordances resource for the hunt-target 5th
     // per-target axis (`hunt_best_predation_affordance`). Threaded
     // from `ColonyContext.action_affordances` at the
@@ -9406,8 +9395,8 @@ fn resolve_search_prey(
             stance_overlays,
             time.tick,
             focal_hook,
-            recent_failures,
-            cooldown_ticks,
+            cat_beliefs,
+            predator_beliefs,
             // No activation tracker threaded through this helper today;
             // the cooldown application still applies via the IAUS axis,
             // just no `Feature::TargetCooldownApplied` count from the

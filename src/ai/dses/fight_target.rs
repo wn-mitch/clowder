@@ -76,16 +76,14 @@ use crate::ai::curves::{Curve, PostOp};
 use crate::ai::dse::{CommitmentStrategy, DseId, EvalCtx, GoalState, Intention};
 use crate::ai::eval::DseRegistry;
 use crate::ai::faction::StanceRequirement;
-use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::physical::Position;
 use crate::components::wildlife::WildSpecies;
-use crate::components::RecentTargetFailures;
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::systems::plan_substrate::{
-    cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
+    cooldown_curve, target_predictability_signal, TARGET_PREDICTABILITY_INPUT,
 };
 
 pub const TARGET_THREAT_INPUT: &str = "target_threat";
@@ -179,7 +177,7 @@ pub fn fight_target_dse() -> TargetTakingDse {
             // Lark's 91× `EngageThreat` failures came from re-picking
             // the same blocker. The cooldown axis breaks the loop.
             Consideration::Scalar(ScalarConsideration::new(
-                TARGET_RECENT_FAILURE_INPUT,
+                TARGET_PREDICTABILITY_INPUT,
                 cooldown_curve(),
             )),
         ],
@@ -306,8 +304,11 @@ pub fn resolve_fight_target(
     tick: u64,
     focal_hook: Option<FocalTargetHook<'_>>,
     // Ticket 073 — per-cat recently-failed target memory.
-    recent: Option<&RecentTargetFailures>,
-    cooldown_ticks: u64,
+    // 292 — the actor's own belief-state about candidates; the
+    // `target_predictability` axis penalizes targets whose
+    // predictability facet a recent `TargetActionFailed` snapped low.
+    cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
+    predator_beliefs: Option<&crate::components::beliefs::PredatorBeliefs>,
     activation: Option<&mut SystemActivation>,
     // Ticket 427 Step 1 — pre-allocated scratch buffers.
     scratch: &mut crate::resources::DseTargetScratchpad,
@@ -398,14 +399,8 @@ pub fn resolve_fight_target(
             // `target_`-absent convention — the target-scoped fetcher
             // receives it regardless and returns the precomputed scalar.
             ALLY_PROXIMITY_INPUT => ally_score,
-            TARGET_RECENT_FAILURE_INPUT => {
-                let signal = target_recent_failure_age_normalized(
-                    recent,
-                    GoapActionKind::EngageThreat,
-                    target,
-                    tick,
-                    cooldown_ticks,
-                );
+            TARGET_PREDICTABILITY_INPUT => {
+                let signal = target_predictability_signal(cat_beliefs, predator_beliefs, target);
                 if signal < 1.0 {
                     cooldown_was_applied.set(true);
                 }
@@ -598,7 +593,7 @@ mod tests {
             0,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -623,7 +618,7 @@ mod tests {
             0,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -649,7 +644,7 @@ mod tests {
             0,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -677,7 +672,7 @@ mod tests {
             0,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -715,7 +710,7 @@ mod tests {
             0,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -745,7 +740,7 @@ mod tests {
             0,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -789,7 +784,7 @@ mod tests {
             0,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );

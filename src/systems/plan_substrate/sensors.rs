@@ -72,6 +72,45 @@ pub fn target_recent_failure_age_normalized(
     (age as f32 / cooldown_ticks as f32).clamp(0.0, 1.0)
 }
 
+/// 292 — belief-substrate target-cooldown signal: the successor to
+/// [`target_recent_failure_age_normalized`]. Reads the actor's OWN
+/// mental model of `target` — `CatBeliefs` for cat targets,
+/// `PredatorBeliefs` for wildlife — whose `predictability` facet the
+/// `belief_integrator` snaps to 0.0 on `TargetActionFailed` and
+/// passively decays back toward `prior = 1.0`.
+///
+/// Semantics preserved from the legacy sensor: **1.0 = no penalty**,
+/// **0.0 = fresh failure**, fail-open on every missing layer — no
+/// beliefs component, no model of this target, or a predictability
+/// facet with zero strength (a model created by other event arms
+/// whose predictability was never observed) all return 1.0.
+///
+/// Action-agnostic by design (ticket 292 choice (a)): failing to
+/// mentor cat-X now also cools socializing with cat-X for the
+/// recovery window. The pre-registered pivot (b) re-keys on
+/// `EnvironmentalContextKey::ActionExecution` if the hypothesize
+/// pass shows the granularity loss matters. Prey / corpse /
+/// structure targets have no belief home (505 ballast rule) and
+/// read permanently fail-open — their churn-suppression is owned by
+/// structural fixes (467 reachability gate, 514 eligibility) rather
+/// than memory.
+pub fn target_predictability_signal(
+    cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
+    predator_beliefs: Option<&crate::components::beliefs::PredatorBeliefs>,
+    target: bevy_ecs::entity::Entity,
+) -> f32 {
+    let model = cat_beliefs
+        .and_then(|b| b.models.get(&target))
+        .or_else(|| predator_beliefs.and_then(|b| b.models.get(&target)));
+    let Some(model) = model else {
+        return 1.0;
+    };
+    if model.predictability.strength <= 0.0 {
+        return 1.0;
+    }
+    model.predictability.value.clamp(0.0, 1.0)
+}
+
 /// Build the canonical cooldown curve consumed by the
 /// `target_recent_failure` Consideration. Knots
 /// `[(0.0, 0.1), (1.0, 1.0)]`: a fresh failure scales the candidate's

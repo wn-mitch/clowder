@@ -957,7 +957,7 @@ pub fn update_target_existence_markers(
             // the GOAP-side resolver call applies the cooldown when it
             // matters.
             None,
-            0,
+            None,
             None,
             &mut dse_scratchpad,
         )

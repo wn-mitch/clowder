@@ -73,17 +73,15 @@ use crate::ai::curves::Curve;
 use crate::ai::dse::{ActivityKind, CommitmentStrategy, DseId, EvalCtx, Intention, Termination};
 use crate::ai::eval::DseRegistry;
 use crate::ai::faction::StanceRequirement;
-use crate::ai::planner::GoapActionKind;
 use crate::ai::target_dse::{
     evaluate_target_taking, FocalTargetHook, TargetAggregation, TargetTakingDse,
 };
 use crate::components::joint_intention::PracticeKind;
 use crate::components::physical::Position;
-use crate::components::RecentTargetFailures;
 use crate::resources::relationships::{BondType, Relationships};
 use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::systems::plan_substrate::{
-    cooldown_curve, target_recent_failure_age_normalized, TARGET_RECENT_FAILURE_INPUT,
+    cooldown_curve, target_predictability_signal, TARGET_PREDICTABILITY_INPUT,
 };
 
 pub const TARGET_FONDNESS_INPUT: &str = "target_fondness";
@@ -162,7 +160,7 @@ pub fn socialize_target_dse() -> TargetTakingDse {
             // 0.0 → 0.1, 1.0 → 1.0 multiplies a fresh-failure
             // candidate's contribution down to ~10% of no-failure value.
             Consideration::Scalar(ScalarConsideration::new(
-                TARGET_RECENT_FAILURE_INPUT,
+                TARGET_PREDICTABILITY_INPUT,
                 cooldown_curve(),
             )),
             // Ticket 078 — Pairing Intention coherence. Cliff curve
@@ -290,10 +288,13 @@ pub fn resolve_socialize_target(
     joint_partner: Option<Entity>,
     // Ticket 073 — per-cat recently-failed target memory. `None` for
     // cats without the component (lazy-inserted on first failure);
-    // when `Some`, the `TARGET_RECENT_FAILURE_INPUT` axis penalizes
+    // when `Some`, the `TARGET_PREDICTABILITY_INPUT` axis penalizes
     // recently-failed candidates via the cooldown curve.
-    recent: Option<&RecentTargetFailures>,
-    cooldown_ticks: u64,
+    // 292 — the actor's own belief-state about candidates; the
+    // `target_predictability` axis penalizes targets whose
+    // predictability facet a recent `TargetActionFailed` snapped low.
+    cat_beliefs: Option<&crate::components::beliefs::CatBeliefs>,
+    predator_beliefs: Option<&crate::components::beliefs::PredatorBeliefs>,
     // Activation tracker for `Feature::JointBiasApplied { Courtship }` and
     // `Feature::TargetCooldownApplied`. Fires when the IAUS pick ==
     // `joint_partner` AND the underlying bond score was < 1.0
@@ -385,14 +386,8 @@ pub fn resolve_socialize_target(
             // class here; curve-cliff gates on ≥ 0.5.
             TARGET_SPECIES_COMPAT_INPUT => 1.0,
             TARGET_PARTNER_BOND_INPUT => bond_score(relationships, cat, target),
-            TARGET_RECENT_FAILURE_INPUT => {
-                let signal = target_recent_failure_age_normalized(
-                    recent,
-                    GoapActionKind::SocializeWith,
-                    target,
-                    tick,
-                    cooldown_ticks,
-                );
+            TARGET_PREDICTABILITY_INPUT => {
+                let signal = target_predictability_signal(cat_beliefs, predator_beliefs, target);
                 if signal < 1.0 {
                     cooldown_was_applied.set(true);
                 }
@@ -1014,7 +1009,7 @@ mod tests {
             None,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -1042,7 +1037,7 @@ mod tests {
             None,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -1080,7 +1075,7 @@ mod tests {
             None,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -1107,7 +1102,7 @@ mod tests {
             None,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -1148,7 +1143,7 @@ mod tests {
             None,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -1242,7 +1237,7 @@ mod tests {
             None,
             None,
             None,
-            8000,
+            None,
             None,
             &mut crate::resources::DseTargetScratchpad::default(),
         );
@@ -1250,6 +1245,58 @@ mod tests {
             out,
             Some(normal),
             "banished candidate should be filtered; resolver picks the non-banished cat"
+        );
+    }
+
+    /// 292 — the belief-driven cooldown end-to-end: a candidate whose
+    /// predictability the actor's own `TargetActionFailed` snapped to
+    /// 0.0 loses to an otherwise-weaker candidate, exactly as the
+    /// legacy `RecentTargetFailures` cooldown made it lose.
+    #[test]
+    fn resolver_penalizes_low_predictability_candidate_via_beliefs() {
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(socialize_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let flaky = Entity::from_raw_u32(2).unwrap();
+        let steady = Entity::from_raw_u32(3).unwrap();
+
+        let mut relationships = Relationships::default();
+        // The flaky cat would win comfortably on fondness alone.
+        relationships.get_or_insert(cat, flaky).fondness = 0.9;
+        relationships.get_or_insert(cat, flaky).familiarity = 0.5;
+        relationships.get_or_insert(cat, steady).fondness = 0.3;
+        relationships.get_or_insert(cat, steady).familiarity = 0.5;
+
+        let mut beliefs = crate::components::beliefs::CatBeliefs::default();
+        let model = beliefs.models.entry(flaky).or_default();
+        model.predictability = crate::components::beliefs::Facet {
+            value: 0.0,
+            prior: 1.0,
+            strength: 1.0,
+            ..Default::default()
+        };
+
+        let cat_positions = vec![(flaky, Position::new(2, 0)), (steady, Position::new(2, 1))];
+        let out = resolve_socialize_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &cat_positions,
+            &relationships,
+            &crate::ai::faction::FactionRelations::canonical(),
+            &|_| crate::ai::faction::StanceOverlays::default(),
+            0,
+            None,
+            None,
+            Some(&beliefs),
+            None,
+            None,
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(
+            out,
+            Some(steady),
+            "fresh-failure predictability (0.0) must cool the flaky candidate below the steady one"
         );
     }
 }

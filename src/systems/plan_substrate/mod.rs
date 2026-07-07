@@ -49,7 +49,7 @@ pub use disposition::record_disposition_switch;
 pub use lifecycle::{abandon_plan, record_step_failure, try_preempt, PreemptKind, PreemptOutcome};
 pub use sensors::{
     cooldown_curve, disposition_cooldown_signal, prune_recent_target_failures,
-    target_recent_failure_age_normalized, update_prev_safety_deficit,
+    target_predictability_signal, target_recent_failure_age_normalized, update_prev_safety_deficit,
 };
 pub use target::{
     carry_target_forward, expire_reservations, release_target, require_alive_and_unreserved_filter,
@@ -68,6 +68,14 @@ pub use target::{
 
 /// 073 — `RecentTargetFailures` Consideration on all 6 target DSEs.
 pub const TARGET_RECENT_FAILURE_INPUT: &str = "target_recent_failure";
+
+/// 292 — the belief-substrate successor input. Same consumer contract
+/// as `TARGET_RECENT_FAILURE_INPUT` (1.0 = no penalty, 0.0 = fresh
+/// failure; `cooldown_curve` maps it to a score multiplier) but the
+/// signal reads `CatBeliefs / PredatorBeliefs[target].predictability`
+/// via `sensors::target_predictability_signal` instead of the retired
+/// `RecentTargetFailures` `(action, target)` map.
+pub const TARGET_PREDICTABILITY_INPUT: &str = "target_predictability";
 
 /// 123 / 290 — Disposition-cooldown Consideration on the six
 /// failure-prone cat-action DSEs (Hunting, Foraging, Crafting,

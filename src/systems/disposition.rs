@@ -1567,7 +1567,7 @@ pub fn disposition_to_chain(
             // Ticket 073 — same dead-code path; cooldown lookup happens
             // at the GOAP step-resolver site, not here.
             None,
-            0,
+            None,
             None,
             &mut res.dse_scratchpad,
         );
@@ -1582,7 +1582,7 @@ pub fn disposition_to_chain(
             // GOAP step-resolver site (goap.rs: MateWith step).
             None,
             None,
-            0,
+            None,
             None,
             &mut res.dse_scratchpad,
         );
@@ -1607,7 +1607,7 @@ pub fn disposition_to_chain(
             // GOAP step-resolver site (goap.rs: MentorWith step).
             None,
             None,
-            0,
+            None,
             None,
             &mut res.dse_scratchpad,
         );
@@ -1637,7 +1637,7 @@ pub fn disposition_to_chain(
             // the GOAP step-resolver site (goap.rs: GroomOther step).
             None,
             None,
-            0,
+            None,
             None,
             &mut res.dse_scratchpad,
             // 487 follow-on — chain pre-pick doesn't have the
