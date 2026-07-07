@@ -9332,6 +9332,21 @@ fn resolve_search_prey(
     // the Rabbit delivers 1.3× food value. §6.1 Partial fix: the DSE
     // scores distance (quadratic falloff), species yield, and
     // alertness together.
+    // 467 — reachability gate: a prey on an impassable tile with no
+    // passable tile inside this cat's pounce band (mid-lake fish) is
+    // structurally uncatchable and must never be elected — pre-467
+    // these candidates won on yield/nearness, froze the hunter at the
+    // shoreline for `chase_stuck_ticks`, and re-elected on a rotating
+    // cast of equally-unreachable fish (93% of all hunt attempts in
+    // the step-12 gate soaks). Mirrors the engage-side pounce_range
+    // personality split so election and execution agree on the band.
+    let pounce_range: i32 = if personality.patience > 0.7 {
+        d.pounce_range_patient as i32
+    } else if personality.patience < 0.3 {
+        d.pounce_range_impatient as i32
+    } else {
+        d.pounce_range_default as i32
+    };
     let visible: Vec<crate::ai::dses::hunt_target::PreyCandidate> = prey_query
         .iter()
         .filter(|(_, pp, _, _, _)| {
@@ -9343,6 +9358,9 @@ fn resolve_search_prey(
                 crate::components::SensorySignature::PREY,
                 d.search_visual_detection_range,
             )
+        })
+        .filter(|(_, pp, _, _, _)| {
+            crate::ai::pathfinding::hunt_vantage(pos, pp, pounce_range, map).is_some()
         })
         .map(
             |(e, pp, pc, ps, _)| crate::ai::dses::hunt_target::PreyCandidate {
@@ -9413,6 +9431,12 @@ fn resolve_search_prey(
         let source = Position::new(sx, sy);
         prey_query
             .iter()
+            // 467 — same reachability gate as the visual path: never
+            // lock a scent-resolved target the cat has no pounce
+            // vantage for.
+            .filter(|(_, pp, _, _, _)| {
+                crate::ai::pathfinding::hunt_vantage(pos, pp, pounce_range, map).is_some()
+            })
             .min_by_key(|(_, pp, _, _, _)| source.tile_distance_squared(pp))
     } else {
         None
@@ -9811,6 +9835,39 @@ fn resolve_engage_prey(
         d.pounce_range_impatient as i32
     } else {
         d.pounce_range_default as i32
+    };
+
+    // 467 — shoreline-pounce vantage. Prey on an impassable tile (fish
+    // on Water) can't be navigated to directly; the stalk/approach arms
+    // below aim at the nearest passable tile within pounce range of the
+    // prey instead, and the pounce covers the water gap. Land prey pass
+    // through unchanged (`hunt_vantage` returns the prey tile). A prey
+    // with NO passable tile in its pounce band (mid-lake fish) is
+    // structurally uncatchable: fail fast on the first engage tick —
+    // never burn the `chase_stuck_ticks` watchdog frozen at the shore.
+    // The Fail routes through `record_step_failure`, so the 073 target
+    // cooldown also suppresses immediate re-election. (This branch is
+    // belt-and-suspenders: `resolve_search_prey` filters vantage-less
+    // candidates at election, so it fires only for targets locked
+    // through older save state or non-DSE paths.)
+    let Some(nav_target) = crate::ai::pathfinding::hunt_vantage(pos, &prey_pos, pounce_range, map)
+    else {
+        record_hunt_attempt(
+            event_log.as_deref_mut(),
+            narr.activation.as_deref_mut(),
+            Some(&mut narr.witnessable),
+            &name.0,
+            cat_entity,
+            species_name,
+            prey_kind,
+            prey_pos,
+            HuntOutcome::Abandoned,
+            time.tick,
+            ticks,
+            start_distance,
+            Some("prey unreachable (no pounce vantage)".into()),
+        );
+        return crate::steps::StepResult::Fail("prey unreachable".into());
     };
 
     if dist <= pounce_range {
@@ -10244,9 +10301,15 @@ fn resolve_engage_prey(
             // A*-first `step_toward` keeps threat/fox-scent routing)
             // expressed as a desire at `stalk_speed_mult` (~0.4) — the
             // slow sinuous approach replaces tick-gated stalking.
-            let stalk_aim = step_toward(pos, &prey_pos, map, &cat_overlays)
+            // 467 — aim at `nav_target` (the shore vantage for
+            // impassable-tile prey; the prey tile itself for land
+            // prey). Pre-467 the direct-seek fallback pointed INTO the
+            // water, the integrator refused every sub-step, and the
+            // stalk stuck-out ("stuck while stalking", 1099 of 1104 in
+            // the step-12 iter-4 soak were fish).
+            let stalk_aim = step_toward(pos, &nav_target, map, &cat_overlays)
                 .map(|next| next.0)
-                .unwrap_or(prey_pos.0);
+                .unwrap_or(nav_target.0);
             // Base-speed stalk — pre-140 parity. The 0.4× stalk gait
             // looked ethological but broke the tuned detection economy:
             // prey alertness accumulates per tick, so a 2.5×-longer
@@ -10317,8 +10380,12 @@ fn resolve_engage_prey(
         // 140 step 12 — walk-gait desire toward the overlay-aware next
         // step (A*-first `step_toward`, greedy fallback per 465; the
         // `approach_speed` multi-hop loop collapses into the speed cap).
-        let next = step_toward(pos, &prey_pos, map, &cat_overlays).or_else(|| {
-            find_path(*pos, prey_pos, map, &cat_overlays).and_then(|p| p.into_iter().next())
+        // 467 — navigate to `nav_target`: for fish this is a passable
+        // shore tile, so A* actually engages (find_path refuses
+        // impassable destinations) and routes around the concave
+        // obstacles the greedy fallback used to strand on.
+        let next = step_toward(pos, &nav_target, map, &cat_overlays).or_else(|| {
+            find_path(*pos, nav_target, map, &cat_overlays).and_then(|p| p.into_iter().next())
         });
         if let Some(next) = next {
             // Sprint-gait close (pre-140 approach was 3 tiles/tick;

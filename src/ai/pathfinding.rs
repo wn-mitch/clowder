@@ -621,6 +621,71 @@ pub fn greedy_step_toward(
 }
 
 // ---------------------------------------------------------------------------
+// Hunt vantage (ticket 467 — shoreline pounce)
+// ---------------------------------------------------------------------------
+
+/// Resolve the navigation target for a hunt on `prey`.
+///
+/// Ticket 467 — a hunt target standing on an impassable tile (fish on
+/// Water) cannot be navigated to directly: [`find_path`] refuses
+/// impassable destinations, so pre-467 every fish approach fell to the
+/// greedy fallback, which strands at the shoreline (or any concave
+/// land obstacle en route) and freezes until the `chase_stuck_ticks`
+/// watchdog aborts the attempt — 93% of all hunt attempts in the
+/// 140 step-12 gate soaks were this loop.
+///
+/// The vantage reframes the target: the cat hunts FROM the nearest
+/// passable tile within `range` (Chebyshev — the pounce arms' tactical
+/// metric) of the prey, and the pounce itself covers the remaining
+/// water gap. Returns:
+///
+/// - `Some(*prey)` when the prey tile is passable — land prey,
+///   navigation unchanged;
+/// - `Some(vantage)` for an impassable-tile prey with at least one
+///   passable in-bounds tile in the pounce band — the candidate
+///   nearest `from` (fixed row-major scan order breaks ties, so the
+///   pick is deterministic);
+/// - `None` when the band holds no passable tile (mid-lake fish) —
+///   the hunt is structurally impossible; callers must skip the
+///   candidate at election or fail fast at engage, never burn the
+///   stuck watchdog.
+pub fn hunt_vantage(
+    from: &Position,
+    prey: &Position,
+    range: i32,
+    map: &TileMap,
+) -> Option<Position> {
+    if !map.in_bounds(prey.x(), prey.y()) {
+        return None;
+    }
+    if map.get(prey.x(), prey.y()).terrain.is_passable() {
+        return Some(*prey);
+    }
+
+    let range = range.max(1);
+    let mut best: Option<(Position, i32)> = None;
+    for dy in -range..=range {
+        for dx in -range..=range {
+            let nx = prey.x() + dx;
+            let ny = prey.y() + dy;
+            if !map.in_bounds(nx, ny) {
+                continue;
+            }
+            if !map.get(nx, ny).terrain.is_passable() {
+                continue;
+            }
+            let candidate = Position::new(nx, ny);
+            let d = from.tile_distance_squared(&candidate);
+            // Strict `<` — first candidate in scan order wins ties.
+            if best.as_ref().is_none_or(|&(_, bd)| d < bd) {
+                best = Some((candidate, d));
+            }
+        }
+    }
+    best.map(|(p, _)| p)
+}
+
+// ---------------------------------------------------------------------------
 // Anti-stacking: find a free adjacent tile
 // ---------------------------------------------------------------------------
 
@@ -1122,5 +1187,89 @@ mod tests {
             Some(Position::new(6, 5)),
             "only (6,5) should be passable and unoccupied"
         );
+    }
+
+    // -----------------------------------------------------------------
+    // hunt_vantage (ticket 467 — shoreline pounce)
+    // -----------------------------------------------------------------
+
+    /// Lake helper: water rectangle [x0..=x1] × [y0..=y1] on grass.
+    fn map_with_lake(x0: i32, y0: i32, x1: i32, y1: i32) -> TileMap {
+        let mut map = open_map();
+        for y in y0..=y1 {
+            for x in x0..=x1 {
+                map.set(x, y, Terrain::Water);
+            }
+        }
+        map
+    }
+
+    #[test]
+    fn vantage_for_land_prey_is_the_prey_tile() {
+        let map = open_map();
+        let cat = Position::new(0, 0);
+        let prey = Position::new(7, 4);
+        assert_eq!(hunt_vantage(&cat, &prey, 2, &map), Some(prey));
+    }
+
+    #[test]
+    fn vantage_for_offshore_fish_is_the_nearest_shore_tile() {
+        // Lake spans x=5..=12; fish 1 tile in at (5,5); cat west of it.
+        let map = map_with_lake(5, 0, 12, 19);
+        let cat = Position::new(0, 5);
+        let fish = Position::new(5, 5);
+        let v = hunt_vantage(&cat, &fish, 2, &map).expect("shore vantage must exist");
+        // Nearest passable tile to the cat within Chebyshev 2 of the
+        // fish: the band spans x 3..=7, water starts at x=5, and the
+        // cat sits due west — (3,5) at distance² 9 beats every x=4
+        // candidate (16+).
+        assert_eq!(v, Position::new(3, 5));
+        assert!(map.get(v.x(), v.y()).terrain.is_passable());
+        assert!(v.chebyshev_distance(&fish) <= 2);
+    }
+
+    #[test]
+    fn vantage_none_for_mid_lake_fish() {
+        // Fish at (9,10): every tile within Chebyshev 2 is water.
+        let map = map_with_lake(5, 0, 12, 19);
+        let fish = Position::new(9, 10);
+        assert_eq!(hunt_vantage(&Position::new(0, 10), &fish, 2, &map), None);
+    }
+
+    #[test]
+    fn vantage_is_deterministic_on_ties() {
+        // Cat due north of a fish one tile into a lake's north edge:
+        // several bank tiles tie on distance; row-major scan order must
+        // produce the same pick every call.
+        let map = map_with_lake(0, 10, 19, 19);
+        let cat = Position::new(9, 5);
+        let fish = Position::new(9, 10);
+        let first = hunt_vantage(&cat, &fish, 2, &map);
+        for _ in 0..5 {
+            assert_eq!(hunt_vantage(&cat, &fish, 2, &map), first);
+        }
+        let v = first.expect("north-bank vantage must exist");
+        assert!(map.get(v.x(), v.y()).terrain.is_passable());
+        assert!(v.chebyshev_distance(&fish) <= 2);
+    }
+
+    #[test]
+    fn vantage_none_for_out_of_bounds_prey() {
+        let map = open_map();
+        assert_eq!(
+            hunt_vantage(&Position::new(0, 0), &Position::new(25, 25), 2, &map),
+            None
+        );
+    }
+
+    #[test]
+    fn vantage_respects_a_minimum_range_of_one() {
+        // range=0 would make an impassable-tile prey always None even
+        // when the cat could pounce from an adjacent bank tile; the
+        // helper clamps to 1.
+        let map = map_with_lake(5, 5, 5, 5); // single water tile
+        let fish = Position::new(5, 5);
+        let v = hunt_vantage(&Position::new(0, 5), &fish, 0, &map);
+        assert_eq!(v, Some(Position::new(4, 5)));
     }
 }

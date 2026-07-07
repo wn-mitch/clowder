@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use clowder::scenarios::{self, kitten_cry, runner};
+use clowder::scenarios::{self, fish_shoreline_pounce, kitten_cry, runner};
 
 /// Drift-control smoke test: every registered scenario must run for at
 /// least one tick without panicking. Catches the "build_new_world starts
@@ -149,4 +149,26 @@ fn pre_bonus_equals_pre_penalty_across_all_scenarios() {
             }
         }
     }
+}
+
+/// Ticket 467 — shoreline-pounce structural verification. The scenario
+/// world holds exactly two fish: one a tile offshore (bank vantage
+/// inside the pounce band → catchable) and one mid-lake (no passable
+/// tile within any pounce band → must never be elected). A healthy
+/// build kills exactly the shore fish; a pre-467 build kills neither
+/// (the approach freezes at the shoreline until the stuck watchdog
+/// aborts, on repeat), and an over-eager fix that drops the
+/// reachability gate would produce visible churn on the mid-lake fish
+/// without ever changing the count — which is why the count-based
+/// assertion pairs with the `hunt_vantage` unit tests rather than
+/// replacing them.
+#[test]
+fn fish_shoreline_pounce_kills_shore_fish_and_spares_mid_lake_fish() {
+    let report = runner::run(&fish_shoreline_pounce::SCENARIO, None, None, 42);
+    assert_eq!(
+        report.final_prey_count, 1,
+        "expected exactly the shore fish dead and the mid-lake fish alive; \
+         2 = shoreline freeze regressed (no kill), 0 = the mid-lake fish was \
+         somehow reachable (reachability gate broken)"
+    );
 }

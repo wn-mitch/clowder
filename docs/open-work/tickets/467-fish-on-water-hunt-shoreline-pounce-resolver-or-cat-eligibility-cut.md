@@ -98,3 +98,28 @@ values-based (texture vs cleanliness vs effort).
   speed, and 0.4.0 ships fluid movement. A and B both also need a
   fail-fast guard: whichever lands, an unreachable hunt target should
   abandon in ~1 tick, not burn `chase_stuck_ticks` (10) per attempt.
+- 2026-07-06: **user chose B (shoreline-pounce)**. Implemented as:
+  (1) `pathfinding::hunt_vantage(from, prey, pounce_range, map)` —
+  nearest passable tile within the pounce band of the prey; the prey
+  tile itself for land prey; `None` for mid-lake fish. (2) Engage
+  arms (goap.rs `resolve_engage_prey` + the disposition-chain mirror)
+  stalk/approach toward the vantage — a passable target, so A*
+  engages and the greedy shoreline/concave-obstacle strand class
+  dies. Pounce still gates on Chebyshev dist-to-prey ≤ pounce_range
+  and covers the water gap; the kill path was always range-capable.
+  (3) Election gate: both target-selection paths (visual DSE
+  candidates + scent lock, goap and disposition sides) drop
+  candidates with no vantage. (4) Fail-fast: engage aborts
+  `Abandoned("prey unreachable (no pounce vantage)")` on tick 1 for
+  vantage-less targets (belt-and-suspenders behind the election
+  gate), feeding the 073 target cooldown. Verification: 6
+  `hunt_vantage` unit tests + `fish_shoreline_pounce` scenario
+  (offshore fish killed via bank vantage, mid-lake fish never
+  elected — first Fish-species scenario coverage). Found and fixed
+  en route: scenario worlds without a Stores structure silently fail
+  ALL Hunting/Foraging planning as `GoalUnreachable` (why
+  `hunt_acquisition`'s "kills within ~30 ticks" doc had drifted —
+  its cat never hunts; my scenario spawns a Stores). Landing gate:
+  seed-42 soak — expect fish attempts to collapse toward genuinely
+  catchable near-shore elections, aggregate hunt success to become
+  the ~land number, survival gates + canaries held.

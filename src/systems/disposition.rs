@@ -3827,6 +3827,19 @@ fn dispatch_chain_step(
                     d.pounce_range_default.round() as i32
                 };
 
+                // 467 — shoreline-pounce vantage (chain-executor mirror
+                // of `goap.rs::resolve_engage_prey`): stalk/approach aim
+                // at the nearest passable tile within pounce range of
+                // the prey; a prey with no such tile (mid-lake fish) is
+                // structurally uncatchable — drop the lock immediately
+                // instead of freezing out the 10-tick stuck check.
+                let Some(nav_target) =
+                    crate::ai::pathfinding::hunt_vantage(pos, &prey_pos, pounce_range, map)
+                else {
+                    step.target_entity = None;
+                    return;
+                };
+
                 if dist <= pounce_range {
                     // === POUNCE ===
                     let awareness_base = match prey_awareness {
@@ -4127,9 +4140,11 @@ fn dispatch_chain_step(
                         ));
                     } else {
                         // === STALK === slow sinuous approach at stalk gait.
-                        let stalk_aim = step_toward(pos, &prey_pos, map, &cat_overlays)
+                        // 467 — aim at the vantage (shore tile for fish;
+                        // the prey tile itself for land prey).
+                        let stalk_aim = step_toward(pos, &nav_target, map, &cat_overlays)
                             .map(|next| next.0)
-                            .unwrap_or(prey_pos.0);
+                            .unwrap_or(nav_target.0);
                         // Base-speed stalk — pre-140 parity (see the
                         // goap.rs stalk arm rationale).
                         desired_velocity.0 = Some(crate::ai::steering::seek(
@@ -4163,7 +4178,9 @@ fn dispatch_chain_step(
                         .last_observed_position
                         .is_none_or(|prev| pos.0.distance(prev.0) > 0.05);
                     step.last_observed_position = Some(*pos);
-                    if let Some(next) = step_toward(pos, &prey_pos, map, &cat_overlays) {
+                    // 467 — navigate to the vantage so A* engages for
+                    // impassable-tile prey (mirror of the goap.rs arm).
+                    if let Some(next) = step_toward(pos, &nav_target, map, &cat_overlays) {
                         // Sprint-gait close (mirror of the goap.rs arm).
                         desired_velocity.0 = Some(crate::ai::steering::seek(
                             pos.0,
@@ -4207,6 +4224,16 @@ fn dispatch_chain_step(
                     *pos = patrol_move(pos, dx, dy, map);
                 }
 
+                // 467 — reachability gate (mirror of resolve_search_prey):
+                // never lock a target the cat has no pounce vantage for.
+                let pounce_range: i32 = if personality.patience > 0.7 {
+                    d.pounce_range_patient.round() as i32
+                } else if personality.patience < 0.3 {
+                    d.pounce_range_impatient.round() as i32
+                } else {
+                    d.pounce_range_default.round() as i32
+                };
+
                 // Visual detection: spot nearby prey within 15 tiles.
                 let visible_prey = prey_query
                     .iter()
@@ -4219,6 +4246,9 @@ fn dispatch_chain_step(
                             crate::components::SensorySignature::PREY,
                             d.search_visual_detection_range,
                         )
+                    })
+                    .filter(|(_, pp, _, _, _)| {
+                        crate::ai::pathfinding::hunt_vantage(pos, pp, pounce_range, map).is_some()
                     })
                     .min_by_key(|(_, pp, _, _, _)| pos.tile_distance_squared(pp));
 
@@ -4246,6 +4276,11 @@ fn dispatch_chain_step(
                         let source = Position::new(sx, sy);
                         prey_query
                             .iter()
+                            // 467 — same reachability gate as the visual path.
+                            .filter(|(_, pp, _, _, _)| {
+                                crate::ai::pathfinding::hunt_vantage(pos, pp, pounce_range, map)
+                                    .is_some()
+                            })
                             .min_by_key(|(_, pp, _, _, _)| source.tile_distance_squared(pp))
                     } else {
                         None

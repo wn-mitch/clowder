@@ -42,6 +42,7 @@ pub mod exploration_ranging;
 pub mod farm_herb_demand;
 pub mod farming_cycle;
 pub mod festering_wound;
+pub mod fish_shoreline_pounce;
 pub mod flee_calibration;
 pub mod flee_commitment;
 pub mod fondness_kitten_imprint;
@@ -120,6 +121,9 @@ pub const ALL: &[&Scenario] = &[
     &wildlife_fight::SCENARIO,
     &fondness_kitten_imprint::SCENARIO,
     &hunt_acquisition::SCENARIO,
+    // 467 — shoreline-pounce vantage: offshore fish catchable from the
+    // bank; mid-lake fish excluded from the candidate set.
+    &fish_shoreline_pounce::SCENARIO,
     // 477 — equipment weapon-strike bonus surfaces in the resolver trace.
     &equipment_weapon_strike::SCENARIO,
     // 477 — cloak visual-mask surfaces in the resolver trace.
