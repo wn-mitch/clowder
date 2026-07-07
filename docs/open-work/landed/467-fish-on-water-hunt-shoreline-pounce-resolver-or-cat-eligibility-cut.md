@@ -11,7 +11,7 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: pending
+landed-at: 861c9fe5
 landed-on: 2026-07-07
 ---
 
