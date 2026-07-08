@@ -1327,7 +1327,7 @@ impl Plugin for SimulationPlugin {
                             // inside the existing wildlife `.chain()` block
                             // to avoid creating a new top-level schedule edge
                             // (ticket 061 precedent).
-                            systems::wildlife::shadowfox_coherence_tick,
+                            systems::shadow_fox_ai::shadowfox_coherence_tick,
                             // Ticket 023 Phase B — motivation tick re-elects
                             // each shadow-fox's WildlifeAiState every
                             // `shadow_fox_motivation_tick_cadence` ticks
@@ -1336,7 +1336,7 @@ impl Plugin for SimulationPlugin {
                             // assigned a state it can't act on, and before
                             // `wildlife_ai` so the new state takes effect
                             // immediately.
-                            systems::wildlife::shadowfox_motivation_tick,
+                            systems::shadow_fox_ai::shadowfox_motivation_tick,
                             // Ticket 023 Phase C — haunting-drain runs every
                             // tick to apply per-tick mood/safety drain on
                             // nearby cats and to tick the haunting-to-stalk
@@ -1344,11 +1344,11 @@ impl Plugin for SimulationPlugin {
                             // (which writes the Haunting state) and before
                             // wildlife_ai (which executes the orbit-at-edge
                             // movement).
-                            systems::wildlife::shadowfox_haunting_drain,
+                            systems::shadow_fox_ai::shadowfox_haunting_drain,
                         )
                             .chain(),
                         systems::wildlife::spawn_wildlife,
-                        systems::wildlife::wildlife_ai,
+                        systems::shadow_fox_ai::wildlife_ai,
                         // 140 step 9 — `fox_movement` retired: fox motion is
                         // desire-driven via the fox GOAP travel resolvers; the
                         // legacy phase-mirror mover double-drove every travel
@@ -1399,7 +1399,7 @@ impl Plugin for SimulationPlugin {
                         systems::wildlife::predator_hunt_prey,
                         systems::wildlife::carcass_decay,
                         systems::wildlife::carcass_scent_tick,
-                        systems::wildlife::predator_stalk_cats,
+                        systems::shadow_fox_ai::predator_stalk_cats,
                         // Hawk + snake lifecycle (starvation death +
                         // age tick + HawkDied/SnakeDied messages).
                         // Sub-chain to stay within the 20-tuple limit

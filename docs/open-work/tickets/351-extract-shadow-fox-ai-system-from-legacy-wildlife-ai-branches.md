@@ -16,25 +16,86 @@ landed-on: null
 ---
 
 ## Why
-One paragraph: what problem does this ticket exist to solve.
+
+The fox (025), hawk, and snake cutovers moved every other wild species onto
+dedicated GOAP loops (`fox_goap.rs` / `hawk_goap.rs` / `snake_goap.rs`), but the
+shadow-fox's entire decision stack still lives inside `wildlife.rs` under
+legacy names that no longer describe what runs through them: `wildlife_ai`'s
+query excludes `FoxState` / `HawkState` / `SnakeState`, so **only shadow-foxes
+flow through it in production**, and `predator_stalk_cats` filters
+`With<ShadowFoxDrives>` — also shadow-fox-only. Ticket 310 (shadow-fox
+satiation/den/ambush-memory/DSE stages) needs a clearly-bounded home to grow
+in; landing those stages into a 3.7k-line mixed file under misleading system
+names would repeat the pre-025 fox mess. This ticket is the pure code-motion
+precursor: move the shadow-fox stack to `src/systems/shadow_fox_ai.rs` with a
+byte-identical gate, so 310's behavior stages start from clean frame-diff
+attribution.
 
 ## Scope
-- Concrete deliverable 1
-- Concrete deliverable 2
+
+- New `src/systems/shadow_fox_ai.rs` containing, moved verbatim from
+  `wildlife.rs`:
+  - `wildlife_ai` (legacy `Circling`/`Waiting` state machine + 023 Phase B/C
+    motivation states; shadow-fox-only in production per the query filters)
+    and its private helper `is_patrol_terrain` (sole caller).
+  - `shadowfox_coherence_tick`, `shadowfox_motivation_tick`,
+    `shadowfox_haunting_drain`, and the private helper `same_motivation_kind`
+    (023 Phases A–C).
+  - `predator_stalk_cats` (shadow-fox stalk → ambush chain).
+  - The tests that exercise the moved systems: the three `wildlife_ai`
+    state-machine tests plus their `setup_world` / `spawn_animal` helpers
+    (used by nothing else), and the two coherence tests plus their helpers.
+- Registration path updates in `SimulationPlugin::build`
+  (`src/plugins/simulation.rs`): `systems::wildlife::X` →
+  `systems::shadow_fox_ai::X` for the five moved systems, **in place within
+  the existing `.chain()` blocks** — no reordering, no new schedule edges
+  (ticket 061 precedent: an unordered sibling perturbs Bevy's topological
+  sort on seed-42).
+- `pub mod shadow_fox_ai;` in `src/systems/mod.rs`; prune imports left
+  unused in `wildlife.rs`.
 
 ## Out of scope
-- What this ticket explicitly does NOT cover.
+
+- Any behavior change whatsoever — the gate is byte-identity (485 precedent).
+- Renaming the moved systems (`wildlife_ai` keeps its name in the new file;
+  a rename ships with 310's first behavior stage so frame-diff attribution
+  stays clean here).
+- Ticket 310's stages (satiation drive, den+retreat, ambush memory,
+  DSE-shaped scoring, ward-repel snapshot retirement).
+- Splitting the remaining `wildlife.rs` (spawning, threat detection,
+  carcasses, fox lifecycle/confrontation/raid legacy paths).
 
 ## Current state
-What's in flight, what's been landed toward this, what's next. Preserve context
-from prior session notes here so a cold-session read gets up to speed fast.
+
+Audit (2026-07-08, pre-extraction): `wildlife.rs` is 3,734 lines. Shadow-fox
+decision stack spans `wildlife_ai` + `is_patrol_terrain` (lines 41–457),
+`shadowfox_coherence_tick` / `shadowfox_motivation_tick` /
+`shadowfox_haunting_drain` / `same_motivation_kind` / `predator_stalk_cats`
+(contiguous block, lines 1083–1932), plus two test clusters. `DetectionCooldowns`
+stays (used by `spawn_wildlife` / `detect_threats`, which remain). All external
+references to the moved systems are the five registrations in
+`simulation.rs`; scenario files mention the names in comments only.
 
 ## Approach
-Implementation notes. For large tickets, link to `docs/systems/*.md` rather than
-duplicating design content.
+
+Pure mechanical cut: move the two source regions and two test clusters
+verbatim (content-anchored script, not retyping); assemble imports for the
+new module; update the five registration paths in place; prune `wildlife.rs`
+imports the compiler flags as unused. No logic edits, no comment rewrites
+beyond nothing-at-all.
 
 ## Verification
-How to prove this is done (tests, canaries, balance reports, focal-cat replays).
+
+- Full test suite green (moved tests run from their new module).
+- `just check` green (substrate-stub / silent-canary / fmt / clippy).
+- **Byte-identical event stream** in the common tick range vs the previous
+  accepted run (`logs/tuned-42-9eb6e7ed`, the step-21 gate-3 1800s stream):
+  900s `just soak-trace 42 Simba 900` at the extraction commit, then the 485
+  python stream-diff (header excluded — commit hash and GIT_DIRTY differ by
+  construction). Any non-identical line fails the gate; there is no
+  "concordant drift" escape hatch for code motion.
+- `just verdict` on the gate run (hard gates + continuity canaries) as the
+  standard sanity net.
 
 ## Related work
 
@@ -48,3 +109,4 @@ How to prove this is done (tests, canaries, balance reports, focal-cat replays).
 <!-- linkages:end -->
 ## Log
 - 2026-05-19: accuracy audit — INCOMPLETE TEMPLATE: ticket body contains template placeholder text. Ticket was opened on 2026-05-15 but never filled in. [needs-review] for completion or status change.
+- 2026-07-08: template filled (release-plan step 22 pre-work). Audit finding that sharpens the scope: `wildlife_ai` and `predator_stalk_cats` are not "shadowfox branches inside shared systems" — post-cutover both are shadow-fox-only in production (query filters exclude all three `*State` species; `With<ShadowFoxDrives>` gates the stalk loop), so this is whole-system motion, not branch surgery. Extraction proceeding this session; gate is byte-identity vs `logs/tuned-42-9eb6e7ed` (485 precedent).

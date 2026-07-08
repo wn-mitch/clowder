@@ -131,6 +131,7 @@ pub mod pregnancy;
 pub mod preservation;
 pub mod prey;
 pub mod sensing;
+pub mod shadow_fox_ai;
 pub mod shelter_beliefs;
 pub mod snake_goap;
 pub mod snapshot;
