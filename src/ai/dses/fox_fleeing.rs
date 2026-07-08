@@ -103,9 +103,11 @@ impl FoxFleeingDse {
         // by ×0.80 to make room.
         let mut weights = vec![0.36, 0.20, 0.24, 0.20];
 
-        // 265: conditional belief axis, dormant at 0.0 (the 264
-        // socialize_target shape). Base four scale by `(1 − extra)`
-        // so the WeightedSum stays at 1.0. Where `cats_nearby` counts
+        // 265: conditional belief axis (the 264 socialize_target
+        // shape), active at first-light 0.10 since plan step 21;
+        // zeroing the weight rebuilds the pre-265 shape. Base four
+        // scale by `(1 − extra)` so the WeightedSum stays at 1.0.
+        // Where `cats_nearby` counts
         // bodies, this axis weighs what the fox *believes* about them
         // — a coordinator it watched win fights reads hotter than two
         // strange kittens.
@@ -178,7 +180,11 @@ mod tests {
     #[test]
     fn fox_fleeing_has_four_axes() {
         // §L2.10.7: health + cats_nearby + boldness + edge_distance.
-        let s = ScoringConstants::default();
+        // Pinned via the explicitly-zeroed 265 weight (config-override
+        // escape hatch); at active defaults the conditional
+        // `perceived_cat_threat` axis makes five.
+        let mut s = ScoringConstants::default();
+        s.fox_flee_cat_violence_belief_weight = 0.0;
         assert_eq!(FoxFleeingDse::new(&s).considerations().len(), 4);
     }
 
@@ -256,17 +262,34 @@ mod tests {
     }
 
     #[test]
-    fn cat_threat_axis_absent_at_default() {
-        // 265: weight ships at 0.0; the axis MUST NOT appear and the
-        // four-axis composition is byte-identical to pre-265.
-        let s = ScoringConstants::default();
-        assert_eq!(s.fox_flee_cat_violence_belief_weight, 0.0);
+    fn cat_threat_axis_absent_when_zeroed() {
+        // 265 activation: zeroing the weight (config-override escape
+        // hatch) MUST rebuild the pre-265 four-axis composition
+        // byte-identically.
+        let mut s = ScoringConstants::default();
+        s.fox_flee_cat_violence_belief_weight = 0.0;
         let dse = FoxFleeingDse::new(&s);
         assert_eq!(dse.considerations().len(), 4);
         assert!(dse.considerations().iter().all(|c| !matches!(
             c,
             Consideration::Scalar(sc) if sc.name == PERCEIVED_CAT_THREAT_INPUT
         )));
+    }
+
+    #[test]
+    fn cat_threat_axis_active_at_default() {
+        // 265 activation (plan step 21): first-light 0.10. The axis
+        // is present at defaults and the base four renormalize.
+        let s = ScoringConstants::default();
+        assert_eq!(s.fox_flee_cat_violence_belief_weight, 0.10);
+        let dse = FoxFleeingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 5);
+        assert!(dse.considerations().iter().any(|c| matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == PERCEIVED_CAT_THREAT_INPUT
+        )));
+        assert!((dse.composition().weights[0] - 0.36 * 0.9).abs() < 1e-4);
+        assert!((dse.composition().weights[4] - 0.10).abs() < 1e-4);
     }
 
     #[test]

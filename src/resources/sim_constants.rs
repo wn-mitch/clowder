@@ -2916,9 +2916,8 @@ pub struct ScoringConstants {
     /// 265: weight on FoxHunting's conditional
     /// `best_prey_predation_affordance` axis — max over prey in
     /// detection range of `Affordance(Stalk|Chase, fox, prey)` from
-    /// substrate 261. Wildlife-vs-prey rows arrive with the 314 writer
-    /// extension; until then (and at weight 0.0) the scalar reads 0.0.
-    /// Ships dormant at 0.0.
+    /// substrate 261, fed by the 314 wildlife-vs-prey writer rows.
+    /// Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_fox_hunting_prey_affordance_weight")]
     pub fox_hunting_prey_affordance_weight: f32,
     /// 265: weight on HawkHunting's conditional
@@ -2944,9 +2943,19 @@ pub struct ScoringConstants {
     /// `CatBeliefs[cat].perceived_violence_capability` facet (implanted
     /// from `cat_perceived_by_fox` on first encounter, updated by
     /// witnessed Attack/Hunt evidence). The wildlife-symmetric peer of
-    /// the cat-side PredatorBeliefs read. Ships dormant at 0.0.
+    /// the cat-side PredatorBeliefs read. Activated 2026-07-08 at
+    /// first-light 0.10.
     #[serde(default = "default_fox_flee_cat_violence_belief_weight")]
     pub fox_flee_cat_violence_belief_weight: f32,
+    /// 265 activation: `perceived_cat_threat` level at which FoxFleeing
+    /// becomes *eligible* for a healthy, un-outnumbered fox (the legacy
+    /// outer gate is `health < 0.5 || cats_nearby >= 2`; this adds the
+    /// belief clause). Sits well above the 0.5 `cat_perceived_by_fox`
+    /// implant prior so instinct alone never trips it — only witnessed
+    /// Attack/Hunt evidence does. Inert while
+    /// `fox_flee_cat_violence_belief_weight` is 0.0.
+    #[serde(default = "default_fox_flee_belief_eligibility_threshold")]
+    pub fox_flee_belief_eligibility_threshold: f32,
     /// 265: weight on HawkFleeing's conditional `perceived_cat_threat`
     /// axis. Ships dormant at 0.0.
     #[serde(default = "default_hawk_flee_cat_violence_belief_weight")]
@@ -3642,6 +3651,7 @@ impl Default for ScoringConstants {
             snake_ambush_strike_affordance_weight: default_snake_ambush_strike_affordance_weight(),
             snake_forage_stalk_affordance_weight: default_snake_forage_stalk_affordance_weight(),
             fox_flee_cat_violence_belief_weight: default_fox_flee_cat_violence_belief_weight(),
+            fox_flee_belief_eligibility_threshold: default_fox_flee_belief_eligibility_threshold(),
             hawk_flee_cat_violence_belief_weight: default_hawk_flee_cat_violence_belief_weight(),
             snake_flee_cat_violence_belief_weight: default_snake_flee_cat_violence_belief_weight(),
             hunt_stalk_chase_affordance_bias: default_hunt_stalk_chase_affordance_bias(),
@@ -5385,9 +5395,9 @@ fn default_apply_remedy_affordance_weight() -> f32 {
 }
 
 /// 265: FoxHunting `best_prey_predation_affordance` axis weight.
-/// Ships dormant at 0.0; activation is plan step 21.
+/// Activated 2026-07-08 at first-light 0.10 (plan step 21).
 fn default_fox_hunting_prey_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 265: HawkHunting `best_prey_predation_affordance` axis weight.
@@ -5408,10 +5418,18 @@ fn default_snake_forage_stalk_affordance_weight() -> f32 {
     0.0
 }
 
-/// 265: FoxFleeing `perceived_cat_threat` axis weight. Ships dormant
-/// at 0.0; activation is plan step 21.
+/// 265: FoxFleeing `perceived_cat_threat` axis weight. Activated
+/// 2026-07-08 at first-light 0.10 (plan step 21).
 fn default_fox_flee_cat_violence_belief_weight() -> f32 {
-    0.0
+    0.10
+}
+
+/// 265 activation: FoxFleeing belief-eligibility threshold. 0.75 sits
+/// above the 0.5 implant prior (instinct never trips it) and below the
+/// ~0.9 EMA plateau a fox reaches after witnessing repeated cat
+/// violence.
+fn default_fox_flee_belief_eligibility_threshold() -> f32 {
+    0.75
 }
 
 /// 265: HawkFleeing `perceived_cat_threat` axis weight. Ships dormant

@@ -409,8 +409,18 @@ pub fn score_fox_dispositions(
 
     // Fleeing: §2.3 WS of health_deficit + cats_nearby (Piecewise
     // step at 2+) + boldness (damped invert). Outer gate preserves
-    // the original `health < 0.5 || cats_nearby >= 2` precondition.
-    if needs.health_fraction < 0.5 || ctx.cats_nearby >= 2 {
+    // the original `health < 0.5 || cats_nearby >= 2` precondition,
+    // extended by 265's activation with a belief clause: a fox that
+    // *believes* a nearby cat is deadly (witnessed Attack/Hunt
+    // evidence pushing `perceived_violence_capability` past the
+    // eligibility threshold) may flee even healthy and un-outnumbered.
+    // Without the clause the conditional belief axis is election-dead
+    // in the single-cat case — the naked-AND silencing shape from the
+    // silent-canary convention. Keyed off the axis weight so the
+    // zeroed-weight escape hatch restores the legacy gate exactly.
+    let belief_flee_eligible = ctx.scoring.fox_flee_cat_violence_belief_weight > 0.0
+        && ctx.perceived_cat_threat >= ctx.scoring.fox_flee_belief_eligibility_threshold;
+    if needs.health_fraction < 0.5 || ctx.cats_nearby >= 2 || belief_flee_eligible {
         let score = score_fox_dse_by_id("fox_fleeing", ctx, inputs);
         if score > 0.0 {
             scores.push((FoxDispositionKind::Fleeing, score + jitter(rng, j)));
@@ -992,6 +1002,64 @@ mod tests {
         assert!(
             high > zero,
             "believed threat=1.0 must outscore 0.0 when active (high={high}, zero={zero})"
+        );
+    }
+
+    #[test]
+    fn believed_threat_makes_fleeing_eligible_for_healthy_lone_fox() {
+        // 265 activation: the legacy outer gate (`health < 0.5 ||
+        // cats_nearby >= 2`) kept Fleeing out of the election pool for
+        // a healthy fox facing ONE cat — leaving the belief axis
+        // election-dead in exactly the "this cat will kill me" case.
+        // The belief clause opens the gate when perceived threat
+        // clears the eligibility threshold AND the axis is active;
+        // zeroing the axis weight restores the legacy gate exactly.
+        let needs = FoxNeeds {
+            hunger: 0.5,
+            health_fraction: 1.0, // fails the legacy health arm
+            territory_scent: 0.5,
+            den_security: 0.5,
+            cub_satiation: 1.0,
+            cub_safety: 1.0,
+        };
+        let personality = FoxPersonality::balanced();
+        let modifiers = ModifierPipeline::new();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+
+        let scored_fleeing = |scoring: &ScoringConstants, threat: f32| -> bool {
+            let mut ctx = default_context(&needs, &personality, scoring);
+            ctx.cats_nearby = 1; // fails the legacy outnumbered arm
+            ctx.perceived_cat_threat = threat;
+            let registry = test_fox_registry(scoring);
+            let inputs = test_eval_inputs(&registry, &modifiers, &markers);
+            let result = score_fox_dispositions(&ctx, &inputs, &mut rand::rng());
+            result
+                .scores
+                .iter()
+                .any(|(k, _)| *k == FoxDispositionKind::Fleeing)
+        };
+
+        let active = ScoringConstants::default();
+        assert!(
+            active.fox_flee_cat_violence_belief_weight > 0.0,
+            "precondition: axis active at default"
+        );
+        assert!(
+            scored_fleeing(&active, 0.9),
+            "belief above threshold must make Fleeing eligible"
+        );
+        assert!(
+            !scored_fleeing(&active, 0.5),
+            "the implant-prior level (0.5) must NOT trip the gate — \
+             instinct alone never makes a healthy lone fox flee"
+        );
+
+        let mut zeroed = ScoringConstants::default();
+        zeroed.fox_flee_cat_violence_belief_weight = 0.0;
+        assert!(
+            !scored_fleeing(&zeroed, 0.9),
+            "with the axis zeroed (escape hatch) the legacy gate must \
+             be restored exactly — no belief eligibility"
         );
     }
 

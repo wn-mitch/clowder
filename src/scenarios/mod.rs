@@ -78,6 +78,7 @@ pub mod smoking_chain_complete;
 pub mod smoking_chain_eligibility;
 pub mod surrounded_colony;
 pub mod ward_placement;
+pub mod wildlife_belief_affordance_activation;
 pub mod wildlife_fight;
 pub mod wounded_cat_no_pickup;
 
@@ -292,6 +293,10 @@ pub const ALL: &[&Scenario] = &[
     &belief_affordance_dse_consumers::SCENARIO_PATROL_AVOIDS_HIGH_THREAT_SECTOR,
     &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_STALK_FOR_OBLIVIOUS_PREY,
     &belief_affordance_dse_consumers::SCENARIO_HUNT_PICKS_CHASE_FOR_ALERTED_PREY,
+    // 265 (plan step 21) — wildlife-side consumer activation scenarios.
+    // Election-level assertions: the activated wildlife axes must move
+    // L3 outcomes, not just populate substrate reads.
+    &wildlife_belief_affordance_activation::SCENARIO_FOX_BELIEF_HIGH_VIOLENCE,
     &play_engagement_cues::SCENARIO_PLAY_ENGAGEMENT_CUES,
     // 472 — festering-wound substrate. Preloads Ashitaka with a
     // WoundKind::Festering on FrontRightPaw and asserts (a) the wound

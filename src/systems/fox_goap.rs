@@ -141,7 +141,7 @@ fn build_scoring_context<'a>(
         .count();
     // 265: the fox's own belief about how dangerous the cats in
     // avoidance range are — read by FoxFleeing's conditional
-    // `perceived_cat_threat` axis (dormant at 0.0).
+    // `perceived_cat_threat` axis (active since plan step 21).
     let perceived_cat_threat = crate::components::beliefs::max_perceived_violence(
         cat_beliefs,
         cats.iter()
@@ -150,7 +150,8 @@ fn build_scoring_context<'a>(
     );
     let prey_nearby = prey.iter().any(|(_, p)| p.distance_to(&fox_pos) <= 9.0);
     // 265: best predation opportunity over prey in detection range —
-    // read by FoxHunting's conditional axis (dormant at 0.0).
+    // read by FoxHunting's conditional axis (active since plan
+    // step 21), fed by the 314 wildlife-vs-prey writer rows.
     let best_prey_predation_affordance = crate::resources::best_affordance_over_targets(
         affordances,
         fox_entity,
@@ -438,6 +439,12 @@ pub fn fox_evaluate_and_plan(
     time: Res<TimeState>,
     constants: Res<SimConstants>,
     config: Res<SimConfig>,
+    // 265 activation (plan step 21): live substrate borrow for the
+    // FoxHunting prey-affordance axis. Read-only — the writer's
+    // `ResMut` in `affordance_writer` keeps exclusive access; this
+    // read edge is the byte-neutral class established by the 265
+    // control ladder (same shape as 264's scorer-side borrow).
+    affordances: Res<crate::resources::ActionAffordances>,
     // Ticket 427 Step 3 — bundled to free a param slot for the new
     // planner scratch arena (held inside this bundle as a Local).
     mut scoring: FoxPlanScoring,
@@ -464,13 +471,6 @@ pub fn fox_evaluate_and_plan(
     let prey_snapshot: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
     let day_phase = DayPhase::from_tick(time.tick, &config);
     let sc = &constants.scoring;
-    // 265: FoxHunting's conditional affordance axis ships dormant at
-    // weight 0.0, so the scalar is never read. The live
-    // `Res<ActionAffordances>` borrow is deferred to the step-21
-    // activation commit (same deferral as 264's caretake pre-check in
-    // goap.rs) — taking it here would add an unordered conflict edge
-    // against `affordance_writer`'s `ResMut`.
-    let affordances_dormant = crate::resources::ActionAffordances::default();
     // Ticket 014 §4 fox spatial batch — populate per-fox snapshot from
     // the authored ZSTs (StoreVisible / StoreGuarded / CatThreateningDen
     // / WardNearbyFox). The snapshot was empty before; it's wired up now
@@ -534,7 +534,7 @@ pub fn fox_evaluate_and_plan(
             &cat_snapshot,
             &store_positions,
             &prey_snapshot,
-            &affordances_dormant,
+            &affordances,
             cat_beliefs,
             hunting_beliefs,
             exploration,
