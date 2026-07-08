@@ -748,6 +748,17 @@ pub fn shadowfox_motivation_tick(
         } else {
             0.0
         };
+        // Eligibility, not just weight: hunger stands for election only
+        // when its own pressure clears the floor. The four 023 drives
+        // are benign at near-zero pressure (their states walk somewhere
+        // and pace), so softmax temperature spread electing one is
+        // harmless churn — but hunger elects Stalking, and the first
+        // S1 gate soak showed the spread electing it at satiation 0.98
+        // (pressure ~2e-5) whenever *another* drive opened the floor,
+        // producing sub-cooldown ambush waves on a single cat. A fed
+        // predator may not stand for the hunt election at all.
+        let hunger_eligible =
+            hunger_active && hunger_pressure >= c.shadow_fox_motivation_min_pressure;
 
         // Store the latest pressures on the component for trace observability.
         drives.resonance = resonance_pressure;
@@ -770,15 +781,15 @@ pub fn shadowfox_motivation_tick(
         }
 
         // ---- Softmax with jitter ----
-        // 310 S1 — the score list is 4 or 5 entries depending on the
-        // hunger weight; index 4, when present, is the hunger drive.
+        // 310 S1 — the score list is 4 or 5 entries; index 4, when
+        // present, is the hunger drive (eligibility-gated above).
         let mut scores = vec![
             coherence_pressure,
             resonance_pressure,
             dread_pressure,
             entropy_pressure,
         ];
-        if hunger_active {
+        if hunger_eligible {
             scores.push(hunger_pressure);
         }
         for s in scores.iter_mut() {
@@ -1729,6 +1740,61 @@ mod tests {
                 .unwrap_or(0),
             0,
             "no hunger-hunt Feature may fire with the axis zeroed",
+        );
+    }
+
+    #[test]
+    fn hunger_below_floor_never_elected_under_softmax_spread() {
+        // First S1 gate-soak regression: with another drive holding the
+        // pressure floor open and a *wide* softmax temperature, the
+        // near-zero hunger candidate must not be electable at all —
+        // the gate is eligibility, not score.
+        let (mut world, mut schedule) = setup_motivation_world();
+        {
+            let mut constants = world.resource_mut::<crate::resources::SimConstants>();
+            constants.wildlife.shadow_fox_motivation_jitter = 0.0;
+            // Wide temperature: without the eligibility gate a 5th
+            // candidate at ~0 pressure wins ≈ 1/5 of elections.
+            constants.wildlife.shadow_fox_motivation_softmax_temp = 10.0;
+        }
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
+        // Nearly sated: hunger pressure (1 − 0.98)² × 0.10 ≈ 4e-6,
+        // far below the 0.05 floor.
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.98;
+        // A dread-pressured cat opens the floor: negative mood + full
+        // safety deficit, isolated (no allies).
+        world.spawn((
+            Position::new(8, 5),
+            Mood {
+                valence: -1.0,
+                ..Default::default()
+            },
+            Needs::default(),
+            crate::components::prev_safety_deficit::PrevSafetyDeficit(1.0),
+        ));
+
+        for round in 0..100 {
+            schedule.run(&mut world);
+            let state = world.get::<WildlifeAiState>(entity).unwrap().clone();
+            assert!(
+                !matches!(state, WildlifeAiState::Stalking { .. }),
+                "sub-floor hunger candidate elected Stalking on round {round}",
+            );
+            // Re-arm for the next election (Haunting is the expected
+            // winner; the guard skips Stalking/EncirclingWard only).
+            *world.get_mut::<WildlifeAiState>(entity).unwrap() =
+                WildlifeAiState::Patrolling { dx: 1, dy: 0 };
+            world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.98;
+        }
+        let activation = world.resource::<SystemActivation>();
+        assert_eq!(
+            activation
+                .counts
+                .get(&Feature::ShadowFoxHungerHuntEntered)
+                .copied()
+                .unwrap_or(0),
+            0,
+            "no hunger-hunt election may fire below the pressure floor",
         );
     }
 
