@@ -1,7 +1,7 @@
 ---
 id: 314
 title: extend ActionAffordances writer to cover cat-vs-prey (Stalk/Chase/Pounce) — 263 follow-on
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 919ae1a8
+landed-on: 2026-07-07
 ---
 
 ## Why
@@ -68,3 +68,4 @@ Substrates 258 + 261 + 263 (this ticket's parent) all landed. The cat-vs-prey ga
 
 - 2026-05-13: opened as 263 follow-on after the cat-vs-prey gap surfaced during 263 implementation. Blocks 315's activation methodology.
 - 2026-05-19: accuracy audit pass — 263/261 (prerequisites) are landed; affordance_writer.rs verified at correct line ranges; scenario structure sound.
+- 2026-07-07: **landed** (plan step 19; commit 919ae1a8, single commit — the prey-belief implant writer and its affordance-heuristic reader ship together). Scope grew per the release plan beyond the ticket's original cat-vs-prey slice: (1) `write_cat_vs_prey` — Stalk/Chase/Pounce from proximity, cover, health, and the prey's own `alertness` scalar (cats deliberately do NOT model prey in `CatBeliefs` — 505 ballast lesson; alertness is the honest observable), plus the Phase-II real speed ratio (`cat_max_speed × sprint_speed_mult` vs effective prey flee speed). Alertness *feeds* Chase and starves Stalk/Pounce — flushed prey is run down, unaware prey is stalked. (2) `write_wildlife_vs_prey` — per-species kind subsets identical to the vs-cat table (Fox Stalk+Chase, Hawk Dive+Chase, Snake Strike+Stalk, ShadowFox Ambush+Stalk+Chase), feeding the 265 dormant `best_prey_*` DSE axes that activate at plan step 21. (3) `write_prey_perceiver` — Bolt (head start, believed threat lethality from implanted `PredatorBeliefs`, escape speed ratio, alertness) + ScatterGroup (same-kind group census taken only when a threat is in range); weights pre-existed in `AffordancesConstants::prey_side`; DSE consumers arrive with 266. (4) `#[require(PredatorBeliefs)]` on `PreyAnimal` + integrator prey Pass-B implant from 5 new `SpeciesViolencePriors` prey-perceiver rows (cat 0.9 / fox 0.8 / hawk 0.85 / snake 0.6 / shadow_fox 0.9); no Pass-A observation subset for prey. The two 263 hunt scenarios graduated from writer-gap 0.0 smoke to behavioural assertions (Stalk > Chase oblivious; Chase > Stalk alerted/fleeing) and pass end-to-end. Gate: null-drift **proven by first-check byte-identity** — `tuned-42-919ae1a8` reproduces the accepted `tuned-42-54e4d22e` (Cooking-family) stream bit-exactly for its full 337,761-line body; the +5 priors fields flipped the reversible seed-42 constants pivot back to Cooking, exactly as the 265 record's model predicts (`docs/balance/314-dormant-wire-null-drift.md`). Zero control soaks needed. 315 unblocked from 314 (remains blocked on 516).
