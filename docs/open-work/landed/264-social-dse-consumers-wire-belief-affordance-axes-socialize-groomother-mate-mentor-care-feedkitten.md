@@ -1,7 +1,7 @@
 ---
 id: 264
 title: Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten)
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 24100dbc
+landed-on: 2026-07-08
 ---
 
 ## Why
@@ -85,3 +85,4 @@ For each of the 6 social DSEs (`socialize_target.rs`, `groom_other.rs` + `groom_
 - 2026-05-10: opened sibling-to-258. Wires Belief + Affordance into existing per-target social DSEs. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
 - 2026-05-19: accuracy audit pass — no blockers; social DSE files (socialize_target, groom_other, mate, mentor, care, feed_kitten) verified in src/ai/dses/; landed sister ticket 263 confirmed.
 - 2026-07-09: dormant wire landed (plan step 17; commits c6541129 / 6259af51 / 27adcaaa). All six consumers wired at weight 0.0 with conditional-axis renormalization (hunt/263 shape): Socialize (affiliation + affordance), GroomOther (affiliation + inverted perceived_hostility + affordance), Mate (perceived_receptivity + affordance), Mentor (affordance only — receptivity composes at the affordance layer), Care→**apply_remedy_target** (perceived_injury belief + affordance; supersedes the raw-HP `target_injury` axis at activation), FeedKitten→**caretake_target** (affordance). Consumer mapping follows 261's estimator table, not the original scope's file guesses. New belief sensors in plan_substrate with documented fail-open/neutral-open defaults. All affordance input keys are `target_`-prefixed — the canonical `affordance_*` keys route to the no-op fetch_self in target-taking DSEs (defect ticket **516**, which also found hunt's prey_yield/prey_calm/tolerance axes dead in production; 315 re-blocked). Null-drift gate satisfied by byte-identity to a 6-dummy-field perturbation control (`docs/balance/264-dormant-wire-null-drift.md`). Remaining scope = per-DSE activations (plan step 20), ordered Socialize → GroomOther → Mate (027 canary) → Mentor/Care/FeedKitten, each four-artifact + frame-diff; the activation commit also lands the scorer-side live ActionAffordances borrow (schedule edge, deliberately deferred).
+- 2026-07-08: **activations landed — ticket closed** (plan step 20; commits 01c450c7 Socialize + live scorer-side `Res<ActionAffordances>` borrow, 4340d12a GroomOther, 140de5fd Mate, 24100dbc Mentor/Caretake/ApplyRemedy). First-light weights: 0.10 per axis (Mate receptivity 0.12; ApplyRemedy injury belief at the raw axis's full 8/14 slot). Each commit gate-soaked 900s and verdicted against the previous accepted stream (per-commit attribution), frame-diffed, four-artifact recorded in `docs/balance/264-social-activation.md`. Highlights: the partner-concentration signature landed as designed — `social_warmth.stdev` fell 40% (Socialize) then 68% (GroomOther) with min +20% each; GroomOther compounded into bonds_formed +41% and a kitten boom (3→7, pop 8→14); Mate was trajectory-quiet (+1% courtship — receptivity mostly agrees with the bond/pairing-intention axes at this colony size; its job is the oscillation veto) with the 027 cadence canary green; the ApplyRemedy raw-HP `target_injury` axis RETIRED (pillar 2 — belief triage: cats treat witnessed/cued injury, not the HP bar; `raw_hp_invisible_at_active_default` pins the contract, zeroing the weight is the escape hatch that rebuilds the legacy shape byte-identically). Honest-perception cost manifested as remedy demand-over-supply ("missing remedy in inventory" 4→17/run, deaths_injury DOWN 2→1) rather than under-treatment. Watch-items rolled to the step-24 baseline re-promote: fulfillment trend, 490 cuddle-puddle windows (8→20 with warmth concentration), herb supply pressure. The symmetric `Relationships.fondness` axis stays until the belief axis has soak history; `dependent_kitten_target` (Wean/Teach/Release) remains unwired (no ActionKind analog).

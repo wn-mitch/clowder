@@ -2841,7 +2841,8 @@ pub struct ScoringConstants {
     pub socialize_affordance_weight: f32,
     /// 264: weight on GroomOtherTarget's conditional
     /// `target_affiliation` axis — same read + mapping as
-    /// `socialize_affiliation_weight`. Ships dormant at 0.0.
+    /// `socialize_affiliation_weight`. Activated 2026-07-08 at
+    /// first-light 0.10 (plan step 20).
     #[serde(default = "default_groom_other_affiliation_weight")]
     pub groom_other_affiliation_weight: f32,
     /// 264: weight on GroomOtherTarget's conditional
@@ -2851,12 +2852,13 @@ pub struct ScoringConstants {
     /// Linear curve so high perceived hostility deprioritizes the
     /// grooming candidate ("don't groom the cat that just hissed at
     /// you"). Unmodeled targets read 0.0 hostility → no penalty
-    /// (fail-open). Ships dormant at 0.0.
+    /// (fail-open). Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_groom_other_hostility_weight")]
     pub groom_other_hostility_weight: f32,
     /// 264: weight on GroomOtherTarget's conditional
     /// `affordance_groom_other` axis — reads `Affordance(GroomOther,
-    /// self, target)` from substrate 261. Ships dormant at 0.0.
+    /// self, target)` from substrate 261. Activated 2026-07-08 at
+    /// first-light 0.10.
     #[serde(default = "default_groom_other_affordance_weight")]
     pub groom_other_affordance_weight: f32,
     /// 264: weight on MateTarget's conditional
@@ -2865,22 +2867,23 @@ pub struct ScoringConstants {
     /// to courtship *right now*, distinct from long-run bond). The
     /// downstream lever on the 126/027 Mate supply-chain problem:
     /// low-receptivity partners stop winning the pick and oscillating.
-    /// Unmodeled targets read a 0.5 neutral prior. Ships dormant at
-    /// 0.0; activation must verify the 027 Mate-cadence canary.
+    /// Unmodeled targets read a 0.5 neutral prior. Activated
+    /// 2026-07-08 at first-light 0.12; the gate verified the 027
+    /// Mate-cadence canary.
     #[serde(default = "default_mate_receptivity_weight")]
     pub mate_receptivity_weight: f32,
     /// 264: weight on MateTarget's conditional `affordance_mate` axis —
     /// reads `Affordance(Mate, self, target)` from substrate 261
     /// (estimator: fertility proxy + bond + receptivity + proximity).
-    /// Ships dormant at 0.0.
+    /// Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_mate_affordance_weight")]
     pub mate_affordance_weight: f32,
     /// 264: weight on MentorTarget's conditional `affordance_mentor`
     /// axis — reads `Affordance(Mentor, self, target)` from substrate
     /// 261 (estimator: bond + receptivity + my condition + proximity).
     /// Mentor gets no direct belief axis — receptivity lives at the
-    /// affordance layer per the Hunt architectural rule (263). Ships
-    /// dormant at 0.0.
+    /// affordance layer per the Hunt architectural rule (263).
+    /// Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_mentor_affordance_weight")]
     pub mentor_affordance_weight: f32,
     /// 264: weight on CaretakeTarget's conditional
@@ -2889,7 +2892,7 @@ pub struct ScoringConstants {
     /// my food proxy + bond + proximity). Caretake is the FeedKitten
     /// consumer (the hungry-kitten picker); the rearing-arc
     /// `dependent_kitten_target` has no ActionKind analog and stays
-    /// unwired. Ships dormant at 0.0.
+    /// unwired. Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_caretake_affordance_weight")]
     pub caretake_affordance_weight: f32,
     /// 264: weight on ApplyRemedyTarget's conditional
@@ -2899,14 +2902,15 @@ pub struct ScoringConstants {
     /// ApplyRemedy is the `Care` consumer (261 estimator table:
     /// `perceived_injury_level + bond`) — it owns the only raw-HP
     /// target read (`1 − health.current/health.max`), which this
-    /// belief axis supersedes at activation (raw axis retires second,
-    /// pillar 2). Unmodeled patients read 0.0 (no belief of injury →
-    /// no triage lift). Ships dormant at 0.0.
+    /// belief axis SUPERSEDED at the 2026-07-08 activation (raw axis
+    /// retired from the default composition, pillar 2; the belief
+    /// axis holds the full 8/14 triage slot). Unmodeled patients read
+    /// 0.0 — no belief of injury → no triage lift.
     #[serde(default = "default_apply_remedy_injury_belief_weight")]
     pub apply_remedy_injury_belief_weight: f32,
     /// 264: weight on ApplyRemedyTarget's conditional `affordance_care`
     /// axis — reads `Affordance(Care, self, target)` from substrate
-    /// 261. Ships dormant at 0.0.
+    /// 261. Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_apply_remedy_affordance_weight")]
     pub apply_remedy_affordance_weight: f32,
     /// 265: weight on FoxHunting's conditional
