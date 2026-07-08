@@ -101,11 +101,13 @@ pub struct PatientCandidate {
 ///
 /// 264: takes `&ScoringConstants` so the conditional belief +
 /// affordance axes (`target_perceived_injury`, `target_affordance_care`)
-/// are added only when their weights are non-zero. At dormant defaults
-/// the composition is byte-identical to pre-264 (three axes); at
-/// non-zero weights the three base axes scale by `(1 − Σ extras)` so
-/// the WeightedSum stays at 1.0. At activation the belief axis
-/// supersedes the raw-HP `target_injury` read (which then retires).
+/// are added only when their weights are non-zero. Activated at
+/// step 20 (2026-07-08): the belief axis holds the raw axis's full
+/// 8/14 triage slot and the raw-HP `target_injury` axis is retired
+/// from the default composition — it is only built when the belief
+/// weight is zeroed (config-override escape hatch, byte-identical to
+/// the pre-264 three-axis shape). Remaining base axes renormalize to
+/// `(1 − Σ extras)` so the WeightedSum stays at 1.0.
 pub fn apply_remedy_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
     // §L2.10.7 distance axis: `Quadratic(exp=1.5, divisor=-1, shift=1)`
     // evaluates `((cost - 1) / -1).max(0).powf(1.5) = (1 - cost)^1.5`,
@@ -130,44 +132,57 @@ pub fn apply_remedy_target_dse(scoring: &ScoringConstants) -> TargetTakingDse {
         intercept: 0.5,
     };
 
-    let mut considerations: Vec<Consideration> = vec![
-        Consideration::Spatial(SpatialConsideration::new(
+    let injury_belief_w = scoring.apply_remedy_injury_belief_weight.clamp(0.0, 1.0);
+    let affordance_w = scoring.apply_remedy_affordance_weight.clamp(0.0, 1.0);
+
+    let mut considerations: Vec<Consideration> =
+        vec![Consideration::Spatial(SpatialConsideration::new(
             "apply_remedy_target_nearness",
             LandmarkSource::TargetPosition,
             APPLY_REMEDY_TARGET_RANGE,
             nearness_curve,
-        )),
-        Consideration::Scalar(ScalarConsideration::new(
+        ))];
+    // Base weights are `[3, 8, 3] / 14` (distance / injury / kinship)
+    // — the spec-renormalized distribution computed to f32 precision
+    // so the RtEO invariant sum-to-1.0 assertion in
+    // `Composition::compose` holds.
+    let mut weights: Vec<f32> = vec![3.0 / 14.0];
+    // 264 step-20 activation: the belief axis SUPERSEDES the raw-HP
+    // `target_injury` read (pillar 2 — substrate first, hack second).
+    // When `injury_belief_w > 0.0` the raw axis is not built at all;
+    // the belief axis takes the triage slot at the configured weight
+    // (shipped default: the raw axis's full 8/14). Zeroing the weight
+    // is the config-override escape hatch that restores the legacy
+    // three-axis god-eye composition byte-identically.
+    if injury_belief_w <= 0.0 {
+        considerations.push(Consideration::Scalar(ScalarConsideration::new(
             TARGET_INJURY_INPUT,
             injury_curve.clone(),
-        )),
-        Consideration::Scalar(ScalarConsideration::new(
-            TARGET_KINSHIP_INPUT,
-            kinship_curve,
-        )),
-    ];
-    // Weights are `[3, 8, 3] / 14` — the spec-renormalized
-    // distribution computed to f32 precision so the RtEO
-    // invariant sum-to-1.0 assertion in `Composition::compose`
-    // holds.
-    let mut weights: Vec<f32> = vec![3.0 / 14.0, 8.0 / 14.0, 3.0 / 14.0];
-    // 264: conditional belief + affordance axes, dormant at 0.0. Base
-    // three scale by `(1 − Σ extras)`; axes push in documented order
-    // (perceived injury, affordance).
-    let injury_belief_w = scoring.apply_remedy_injury_belief_weight.clamp(0.0, 1.0);
-    let affordance_w = scoring.apply_remedy_affordance_weight.clamp(0.0, 1.0);
+        )));
+        weights.push(8.0 / 14.0);
+    }
+    considerations.push(Consideration::Scalar(ScalarConsideration::new(
+        TARGET_KINSHIP_INPUT,
+        kinship_curve,
+    )));
+    weights.push(3.0 / 14.0);
+    // Renormalize whatever base remains to `1 − Σ extras` so the
+    // WeightedSum stays at 1.0 across both shapes.
     let extra_w = (injury_belief_w + affordance_w).clamp(0.0, 1.0);
     if extra_w > 0.0 {
-        let scale = 1.0 - extra_w;
+        let base_sum: f32 = weights.iter().sum();
+        let scale = (1.0 - extra_w) / base_sum.max(f32::EPSILON);
         for w in &mut weights {
             *w *= scale;
         }
     }
     if injury_belief_w > 0.0 {
         // 264: perceived injury through the same convex Quadratic(2)
-        // as the raw axis — it's the same "severity amplifies triage"
+        // as the raw axis — the same "severity amplifies triage"
         // shape, sourced from the actor's belief instead of the
-        // patient's HP bar.
+        // patient's HP bar. Unmodeled patients read 0.0: a healer
+        // only triages injuries they have witnessed (or that gossip /
+        // festering-wound cues have taught them about).
         considerations.push(Consideration::Scalar(ScalarConsideration::new(
             TARGET_PERCEIVED_INJURY_INPUT,
             injury_curve,
@@ -350,6 +365,17 @@ mod tests {
         }
     }
 
+    /// Pre-264 constants: the two step-20-activated axes zeroed so
+    /// raw-HP-axis behavioral tests and exact-shape assertions keep
+    /// pinning the legacy three-axis god-eye composition (the
+    /// config-override escape hatch).
+    fn pre_264_scoring() -> ScoringConstants {
+        let mut s = ScoringConstants::default();
+        s.apply_remedy_injury_belief_weight = 0.0;
+        s.apply_remedy_affordance_weight = 0.0;
+        s
+    }
+
     #[test]
     fn apply_remedy_target_dse_id_stable() {
         assert_eq!(
@@ -360,8 +386,11 @@ mod tests {
 
     #[test]
     fn apply_remedy_target_has_three_axes() {
+        // Legacy shape — pinned via the zeroed-weights escape hatch;
+        // the active default is the four-axis belief-triage shape
+        // (see `active_default_is_belief_triage_shape`).
         assert_eq!(
-            apply_remedy_target_dse(&ScoringConstants::default())
+            apply_remedy_target_dse(&pre_264_scoring())
                 .per_target_considerations()
                 .len(),
             3
@@ -456,7 +485,7 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry
             .target_taking_dses
-            .push(apply_remedy_target_dse(&ScoringConstants::default()));
+            .push(apply_remedy_target_dse(&pre_264_scoring()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let severe = patient(2, 3, 0, 0.3);
         let mild = patient(3, 0, 3, 0.95);
@@ -487,7 +516,7 @@ mod tests {
         let mut registry = DseRegistry::new();
         registry
             .target_taking_dses
-            .push(apply_remedy_target_dse(&ScoringConstants::default()));
+            .push(apply_remedy_target_dse(&pre_264_scoring()));
         let cat = Entity::from_raw_u32(1).unwrap();
         let critical_far = patient(2, 10, 0, 0.2);
         let mild_near = patient(3, 1, 0, 0.9);
@@ -584,10 +613,12 @@ mod tests {
     // -----------------------------------------------------------------
 
     #[test]
-    fn belief_affordance_axes_dormant_at_default() {
-        let s = ScoringConstants::default();
-        assert_eq!(s.apply_remedy_injury_belief_weight, 0.0);
-        assert_eq!(s.apply_remedy_affordance_weight, 0.0);
+    fn belief_affordance_axes_absent_when_zeroed() {
+        // 264 conditional-axis contract: zeroing the belief weight
+        // restores the legacy three-axis composition (raw target_injury
+        // back in its 8/14 slot) byte-identically — the config-override
+        // escape hatch and the shape the dormant-wire gate proved.
+        let s = pre_264_scoring();
         let dse = apply_remedy_target_dse(&s);
         assert_eq!(dse.per_target_considerations().len(), 3);
         assert!(dse.per_target_considerations().iter().all(|c| !matches!(
@@ -601,17 +632,76 @@ mod tests {
     }
 
     #[test]
-    fn belief_affordance_axes_present_and_renormalized_when_active() {
+    fn belief_affordance_axes_present_and_raw_axis_retired_when_active() {
+        // Step-20 supersession: any non-zero belief weight replaces the
+        // raw target_injury axis entirely — four axes (nearness,
+        // kinship, belief, affordance), base pair renormalized to
+        // (1 − Σ extras).
         let mut s = ScoringConstants::default();
         s.apply_remedy_injury_belief_weight = 0.2;
         s.apply_remedy_affordance_weight = 0.1;
         let dse = apply_remedy_target_dse(&s);
-        assert_eq!(dse.per_target_considerations().len(), 5);
-        assert_eq!(dse.composition().weights.len(), 5);
-        assert!((dse.composition().weights[3] - 0.2).abs() < 1e-6);
-        assert!((dse.composition().weights[4] - 0.1).abs() < 1e-6);
-        let sum: f32 = dse.composition().weights.iter().sum();
+        assert_eq!(dse.per_target_considerations().len(), 4);
+        assert!(dse.per_target_considerations().iter().all(|c| !matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == TARGET_INJURY_INPUT
+        )));
+        let weights = &dse.composition().weights;
+        assert!((weights[2] - 0.2).abs() < 1e-6);
+        assert!((weights[3] - 0.1).abs() < 1e-6);
+        // Base pair: (3/14) × (0.7 / (6/14)) = 0.35 each.
+        assert!((weights[0] - 0.35).abs() < 1e-5);
+        assert!((weights[1] - 0.35).abs() < 1e-5);
+        let sum: f32 = weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    #[test]
+    fn active_default_is_belief_triage_shape() {
+        // Shipped defaults (2026-07-08): belief axis at the raw axis\'s
+        // full 8/14 triage slot, affordance at 0.10, raw axis retired.
+        let s = ScoringConstants::default();
+        assert!((s.apply_remedy_injury_belief_weight - 8.0 / 14.0).abs() < 1e-6);
+        assert!((s.apply_remedy_affordance_weight - 0.10).abs() < 1e-6);
+        let dse = apply_remedy_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 4);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn raw_hp_invisible_at_active_default() {
+        // The supersession\'s behavioral contract: with no injury
+        // beliefs about either patient, raw HP difference no longer
+        // moves the pick. Tied positions; ties break toward the LATER
+        // candidate — pre-supersession the severe patient won on the
+        // raw axis, post-supersession the tie stands and the later
+        // candidate wins. (Cats must WITNESS injury to triage it.)
+        let mut registry = DseRegistry::new();
+        registry
+            .target_taking_dses
+            .push(apply_remedy_target_dse(&ScoringConstants::default()));
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let severe = patient(2, 1, 0, 0.3);
+        let mild_later = patient(3, 0, 1, 0.95);
+        let is_kin = |_: Entity, _: Entity| -> bool { false };
+        let out = resolve_apply_remedy_target(
+            &registry,
+            cat,
+            Position::new(0, 0),
+            &[severe, mild_later],
+            &is_kin,
+            0,
+            None,
+            None,
+            &ActionAffordances::default(),
+            &mut crate::resources::DseTargetScratchpad::default(),
+        );
+        assert_eq!(
+            out,
+            Some(mild_later.entity),
+            "raw HP must be invisible without a belief — tie breaks to the later candidate"
+        );
     }
 
     /// 264 — ticket microexperiment `care_targets_perceived_injury` at

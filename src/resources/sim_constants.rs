@@ -5348,30 +5348,36 @@ fn default_mate_affordance_weight() -> f32 {
     0.10
 }
 
-/// 264: MentorTarget `affordance_mentor` axis weight. Ships dormant
-/// at 0.0; activation is plan step 20.
+/// 264: MentorTarget `affordance_mentor` axis weight. Activated
+/// 2026-07-08 (plan step 20, first-light 0.10).
 fn default_mentor_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
-/// 264: CaretakeTarget `affordance_feed_kitten` axis weight. Ships
-/// dormant at 0.0; activation is plan step 20.
+/// 264: CaretakeTarget `affordance_feed_kitten` axis weight.
+/// Activated 2026-07-08 (plan step 20, first-light 0.10; the scorer
+/// pre-check in `evaluate_and_plan` reads the live resource since the
+/// Socialize-activation commit, so the urgency argmax equals the
+/// dispatch-site pick).
 fn default_caretake_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 264: ApplyRemedyTarget `target_perceived_injury` belief-axis
-/// weight (Care consumer — supersedes the raw-HP `target_injury`
-/// axis at activation). Ships dormant at 0.0; activation is plan
-/// step 20.
+/// weight (Care consumer). Activated 2026-07-08 (plan step 20) at the
+/// raw-HP `target_injury` axis's full 8/14 triage slot — the belief
+/// axis SUPERSEDES the raw axis, which retires from the composition
+/// whenever this weight is non-zero (pillar 2: substrate first, hack
+/// second). Cats now triage from witnessed/believed injury, not the
+/// patient's HP bar.
 fn default_apply_remedy_injury_belief_weight() -> f32 {
-    0.0
+    8.0 / 14.0
 }
 
-/// 264: ApplyRemedyTarget `affordance_care` axis weight. Ships
-/// dormant at 0.0; activation is plan step 20.
+/// 264: ApplyRemedyTarget `affordance_care` axis weight. Activated
+/// 2026-07-08 (plan step 20, first-light 0.10).
 fn default_apply_remedy_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 265: FoxHunting `best_prey_predation_affordance` axis weight.

@@ -490,6 +490,14 @@ mod tests {
 
     // -- Factory shape --------------------------------------------------------
 
+    /// Pre-264 constants: the step-20-activated axis zeroed so
+    /// exact-shape assertions keep pinning the legacy composition.
+    fn pre_264_scoring() -> ScoringConstants {
+        let mut s = ScoringConstants::default();
+        s.caretake_affordance_weight = 0.0;
+        s
+    }
+
     #[test]
     fn caretake_target_dse_id_stable() {
         assert_eq!(
@@ -501,7 +509,7 @@ mod tests {
     #[test]
     fn caretake_target_has_four_axes() {
         assert_eq!(
-            caretake_target_dse(&ScoringConstants::default())
+            caretake_target_dse(&pre_264_scoring())
                 .per_target_considerations()
                 .len(),
             4
@@ -1095,9 +1103,11 @@ mod tests {
     // -----------------------------------------------------------------
 
     #[test]
-    fn affordance_axis_dormant_at_default() {
-        let s = ScoringConstants::default();
-        assert_eq!(s.caretake_affordance_weight, 0.0);
+    fn affordance_axis_absent_when_zeroed() {
+        // 264 conditional-axis contract: at 0.0 the axis MUST NOT
+        // appear — the config-override escape hatch and the shape the
+        // dormant-wire null-drift gate proved.
+        let s = pre_264_scoring();
         let dse = caretake_target_dse(&s);
         assert_eq!(dse.per_target_considerations().len(), 4);
         assert!(dse.per_target_considerations().iter().all(|c| !matches!(
@@ -1119,6 +1129,21 @@ mod tests {
         assert!((dse.composition().weights[4] - 0.2).abs() < 1e-6);
         let sum: f32 = dse.composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    #[test]
+    fn affordance_axis_active_at_default() {
+        // Step-20 activation (2026-07-08): first-light 0.10 is the
+        // shipped default — five axes, base four scaled ×0.9. The
+        // scorer pre-check in evaluate_and_plan reads the live
+        // resource, so the urgency argmax equals the dispatch pick.
+        let s = ScoringConstants::default();
+        assert!((s.caretake_affordance_weight - 0.10).abs() < 1e-6);
+        let dse = caretake_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 5);
+        assert!((dse.composition().weights[4] - 0.10).abs() < 1e-6);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
     }
 
     /// 264 — affordance arm verified live: two kittens tied on
