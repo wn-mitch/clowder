@@ -1,7 +1,7 @@
 ---
 id: 265
 title: Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox)
-status: ready
+status: done
 cluster: wildlife
 orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 9eb6e7ed
+landed-on: 2026-07-08
 ---
 
 ## Why
@@ -85,3 +85,4 @@ Also wires species-specific predation actions (Dive on Hawk, Strike on Snake, Am
 - 2026-05-10: opened sibling-to-258. Wires Belief + Affordance into wildlife DSE catalog symmetrically. Species clash now happens because both sides perceive the substrate honestly. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
 - 2026-05-19: accuracy audit pass — no blockers; wildlife DSE files (fox_*, hawk_*, snake_*, shadowfox_*) audit deferred to implementation per ticket scope; related work references verified.
 - 2026-07-07: **dormant wire landed** (plan step 18; commits 453cc3f7 + 04a9d223). Audit result: fox has 9 dedicated DSEs; hawk 3 (hunting/fleeing/resting); snake 4 (ambushing/foraging/fleeing/basking); **shadowfox has no DSEs** (inline drives) — its slice moves to ticket 310 per the release plan. Commit 1: conditional prey-affordance axes at weight 0.0 on FoxHunting (`Stalk|Chase`), HawkHunting (`Dive|Chase`), SnakeAmbushing (`Strike`), SnakeForaging (`Stalk`) via new `best_affordance_over_targets` helper; wildlife-vs-prey writer rows arrive with 314 (step 19). Commit 2: `#[require(CatBeliefs)]` on WildAnimal (compile-time coverage of all spawn sites), belief_integrator wildlife witness pass (Attack: violence+threat-cue, hostility only when witness is the target; Hunt: violence), Pass-B implant from four new `SpeciesViolencePriors` perceiver rows (cat_perceived_by_fox 0.5 / hawk 0.3 / snake 0.65 / shadow_fox 0.2) + stagger decay, and dormant `perceived_cat_threat` axes on the three fleeing DSEs via the new `max_perceived_violence` sensor. Gate: null-drift **proven by byte-identity** — the 900s gate stream reproduces the pre-264 `tuned-42-d94c282f` reference bit-exactly for the full 194k-line overlap (`docs/balance/265-dormant-wire-null-drift.md`; the 264-record saturation claim is corrected there). Remaining for step 21 (activation, four-artifact): per-species weight lifts; live `Res<ActionAffordances>` borrows in the three wildlife evaluate systems (deferred schedule edge); the 505-flagged `FleeFrom→PredatorBeliefs` witness write (behavior-priced); `wildlife_species_clash` / `fox_belief_high_violence_capability_cat` / `hawk_dive_affordance_aerial_cover` scenarios. Affordance reads for wildlife Flee/Fight have no writer estimators yet — extend `write_wildlife_vs_cat` only if activation tuning needs them.
+- 2026-07-08: **activations landed — ticket closed** (plan step 21; commits ea638840 fox / f72f4e32 hawk+snake / 9eb6e7ed FleeFrom→PredatorBeliefs + scenarios; record `docs/balance/265-wildlife-activation.md`). All 7 weights lifted to first-light 0.10; live `Res<ActionAffordances>` borrows in the three wildlife evaluate systems (byte-neutral read-edge class per the dormant-wire control ladder). Structural find during scenario work: the fox/hawk Fleeing outer gates (`health<0.5 || cats_nearby>=2`) silenced the belief axis for healthy lone-cat encounters — fixed with belief-eligibility clauses (`fox/hawk_flee_belief_eligibility_threshold` 0.75, inert at zeroed weight; snake's `>=1` gate needed none). The 505-flagged FleeFrom threat write landed in `PredatorBeliefs` at new `FLEE_CUE_OBSERVED_VALUE` 0.75 (wildlife-gated via component truth, third-party witnesses only — fleeing is not self-confirming; no new ballast class since Implant already models those entries). Three scenarios landed: `fox_belief_high_violence_capability_cat` (believer/skeptic twin geometry), `hawk_dive_affordance_aerial_cover` (live Ward, not setup stamp — coverage map rebuilds per tick), `wildlife_species_clash` (full observation channel, zero stamped beliefs; fox threat reads are range-gated ≤6 vs witness range 10 — distance 5 is the working band). Gate 1 mechanism signature: cat-side "lost prey during approach" −93% / "target Despawned" +55% — foxes now take prey with real stalk/chase affordance. Gate 3 tripped the never-fired canary (KnowledgePromoted 0× at 900s) — resolved as chain-rare re-timing: mechanism structurally verified (LocationBeliefs-only input, all tests + false-belief scenario green), fired on the 1800s window. Watch-item rolled to step-24 re-promote: KnowledgePromoted cadence under wildlife prey-competition. Wildlife Flee/Fight writer estimators not needed at first light (write_wildlife_vs_cat extension deferred until tuning demands it).
