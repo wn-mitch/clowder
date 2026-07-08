@@ -298,6 +298,7 @@ pub const ALL: &[&Scenario] = &[
     // L3 outcomes, not just populate substrate reads.
     &wildlife_belief_affordance_activation::SCENARIO_FOX_BELIEF_HIGH_VIOLENCE,
     &wildlife_belief_affordance_activation::SCENARIO_HAWK_DIVE_AERIAL_COVER,
+    &wildlife_belief_affordance_activation::SCENARIO_WILDLIFE_SPECIES_CLASH,
     &play_engagement_cues::SCENARIO_PLAY_ENGAGEMENT_CUES,
     // 472 — festering-wound substrate. Preloads Ashitaka with a
     // WoundKind::Festering on FrontRightPaw and asserts (a) the wound

@@ -69,6 +69,16 @@ const OBSERVED_HALF: f32 = 0.5;
 /// `record_catch` (+0.15) ≈ 1/3 of the catch lift.
 const SCENT_OBSERVED_VALUE: f32 = 0.65;
 
+/// 265 activation: EMA observed-value for the FleeFrom
+/// witness-learns-threat-is-violent write into `PredatorBeliefs`.
+/// Watching a colony-mate run from something is real but indirect
+/// evidence of its violence — above neutral (0.5), below a witnessed
+/// Attack (`OBSERVED_MAX`), same in-between class as
+/// `SCENT_OBSERVED_VALUE`. Also sits at the fox/hawk flee-eligibility
+/// threshold, so flee cues alone can propagate fear to the edge of
+/// eligibility but witnessed violence is needed to push past it.
+const FLEE_CUE_OBSERVED_VALUE: f32 = 0.75;
+
 #[allow(clippy::type_complexity)]
 pub fn integrate_beliefs(
     time: Res<TimeState>,
@@ -669,7 +679,10 @@ fn apply_observation(
         }
 
         WitnessableEvent::FleeFrom {
-            fleer, position, ..
+            fleer,
+            threat,
+            position,
+            ..
         } => {
             if *fleer != witness {
                 let fleer_model = cats.models.entry(*fleer).or_default();
@@ -682,20 +695,29 @@ fn apply_observation(
                 fleer_model.last_updated_tick = tick;
                 fleer_model.evidence_count = fleer_model.evidence_count.saturating_add(1);
             }
-            // Ticket 505 — NO belief write keyed on `threat` here.
-            // `threat` is a wildlife entity (sourced from
-            // `ec.wildlife.iter().min_by_key(...)` at the goap.rs
-            // FleeFrom emitter), and the pre-505 arm inserted it into
-            // the cat-keyed `cats.models` — where no reader ever
-            // looked it up (threat violence-capability is read from
-            // `PredatorBeliefs`). Wildlife churn accumulated 300-700
-            // ballast entries per cat that Pass B decayed 9 facets
-            // each per stagger (14.1% self CPU at the post-504
-            // flamegraph). The substrate-correct home for a
-            // witness-learns-threat-is-violent signal is
-            // `PredatorBeliefs` — that write lands with the 265
-            // wildlife-belief wiring (behavior-changing, priced
-            // there), not in this perf knife.
+            // Ticket 505 kept the threat write OUT of the cat-keyed
+            // `cats.models` (wildlife churn there was pure decay
+            // ballast — 300-700 unread entries per cat, 14.1% self
+            // CPU). 265's activation lands it in the home 505 named:
+            // `PredatorBeliefs`, which the flee/patrol consumers
+            // actually read and whose wildlife entries the Implant
+            // pass already creates — so no new ballast class. Gated
+            // on `wildlife_set` membership (component truth, not the
+            // emitter's word) per the 292 routing discipline, and on
+            // third-party witnesses only: the fleer's own flee
+            // decision derives FROM its beliefs, and a self-write
+            // would make fleeing self-confirming.
+            if *fleer != witness && wildlife_set.contains(threat) {
+                let threat_model = preds.models.entry(*threat).or_default();
+                update_facet(
+                    &mut threat_model.perceived_violence_capability,
+                    FLEE_CUE_OBSERVED_VALUE,
+                    tick,
+                    &cfg.perceived_violence_capability,
+                );
+                threat_model.last_updated_tick = tick;
+                threat_model.evidence_count = threat_model.evidence_count.saturating_add(1);
+            }
             let ctx_model = contexts
                 .models
                 .entry(EnvironmentalContextKey::HereNow)
@@ -1821,12 +1843,13 @@ mod tests {
     }
 
     /// Ticket 505: FleeFrom lifts the FLEER's predictability on
-    /// witnesses, and writes NOTHING keyed on the threat entity —
-    /// `threat` is wildlife (nearest-wildlife at the goap emitter) and
-    /// the pre-505 arm leaked it into the cat-keyed map as unread
-    /// decay ballast (300-700 entries per cat at soak scale). The
-    /// witness-learns-threat-violence signal lands on
-    /// `PredatorBeliefs` with the 265 wiring, not here.
+    /// witnesses, and writes NOTHING keyed on the threat entity into
+    /// the cat-keyed map — the pre-505 arm leaked wildlife threats
+    /// into `cats.models` as unread decay ballast (300-700 entries
+    /// per cat at soak scale). The 265 activation landed the
+    /// witness-learns-threat-violence signal on `PredatorBeliefs`
+    /// (wildlife-gated — see the sibling test below); a CAT-keyed
+    /// threat still writes nowhere.
     #[test]
     fn flee_from_event_lifts_fleer_predictability_only() {
         let (mut world, mut schedule) = test_world(100);
@@ -1857,6 +1880,63 @@ mod tests {
             "FleeFrom must not create a CatBeliefs entry keyed on the threat \
              (wildlife ballast — ticket 505)"
         );
+        let preds = world.get::<PredatorBeliefs>(witness).unwrap();
+        assert!(
+            !preds.models.contains_key(&threat),
+            "a cat-keyed threat must not create a PredatorBeliefs entry \
+             either — the 265 write is wildlife-gated"
+        );
+    }
+
+    /// 265 activation: the substrate-correct home 505 pointed at —
+    /// a third-party witness watching a colony-mate flee a WILDLIFE
+    /// threat lifts its `PredatorBeliefs` violence model of that
+    /// threat toward `FLEE_CUE_OBSERVED_VALUE`. The fleer itself gets
+    /// no write (fleeing must not be self-confirming).
+    #[test]
+    fn flee_from_wildlife_threat_lifts_witness_predator_belief() {
+        let (mut world, mut schedule) = test_world(100);
+        let fleer = spawn_cat(&mut world, Position::new(10, 10));
+        let witness = spawn_cat(&mut world, Position::new(12, 10));
+        let fox = world
+            .spawn((
+                WildAnimal::new(WildSpecies::Fox),
+                Position::new(11, 10),
+                crate::components::physical::Health::default(),
+            ))
+            .id();
+
+        world.write_message(WitnessableEvent::FleeFrom {
+            fleer,
+            threat: fox,
+            position: Position::new(10, 10),
+            tick: 100,
+        });
+
+        schedule.run(&mut world);
+
+        let preds = world.get::<PredatorBeliefs>(witness).unwrap();
+        let model = preds
+            .models
+            .get(&fox)
+            .expect("witness must hold a PredatorBeliefs entry on the fox threat");
+        assert!(
+            model.perceived_violence_capability.value > 0.0
+                && model.perceived_violence_capability.strength > 0.0,
+            "flee cue must lift the witness's violence model of the threat"
+        );
+
+        // The fleer's own PredatorBeliefs may hold an IMPLANT-seeded
+        // entry (Pass B runs on its stagger tick), but the flee cue
+        // itself must not have counted as evidence for the fleer.
+        if let Some(fleer_preds) = world.get::<PredatorBeliefs>(fleer) {
+            if let Some(m) = fleer_preds.models.get(&fox) {
+                assert_eq!(
+                    m.evidence_count, 0,
+                    "the fleer's own flee must not self-confirm as observation evidence"
+                );
+            }
+        }
     }
 
     // 261 — perceived_hostility + perceived_receptivity emit-site coverage.

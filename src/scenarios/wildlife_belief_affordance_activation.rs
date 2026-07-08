@@ -187,6 +187,79 @@ fn setup_hawk_dive_aerial_cover(world: &mut World, seed: u64) {
     ));
 }
 
+// ---------------------------------------------------------------------------
+// Variant 3 — species clash: mutual substrate perception, no director
+// ---------------------------------------------------------------------------
+
+/// Cat and fox two tiles apart. The fox watches the cat win a long,
+/// brutal fight (16 witnessed max-severity Attack events — at the
+/// `slow()` 0.1 learning rate that pushes `perceived_violence_
+/// capability` from a cold-start 0.0 to ≈0.82, past the 0.75
+/// flee-eligibility threshold) — NO stamped beliefs anywhere; this
+/// variant exercises the full observation channel. The cat's side of
+/// the clash is the Pass-B implant seeding its `PredatorBeliefs` on
+/// its stagger tick (period 20, hence the 25-tick run). The fox backs
+/// off via its own scoring; nothing outside the substrate touches the
+/// outcome.
+/// Fox watches from Manhattan 5 — inside `WITNESS_RANGE` (10) so the
+/// Attack events integrate, AND inside the fox's 6-tile threat-read
+/// radius (both `cats_nearby` and the `perceived_cat_threat` belief
+/// read are range-gated at ≤6 in `build_scoring_context` — a fox
+/// beyond that never feels the threat at all). Not adjacent, so the
+/// cats don't engage it in melee and the injury arm of the Fleeing
+/// gate stays cold — the back-off must be attributable to the belief.
+const CLASH_CAT_POS: Position = Position::new(24, 20);
+const CLASH_VICTIM_POS: Position = Position::new(23, 20);
+const CLASH_FOX_POS: Position = Position::new(29, 20);
+
+pub static SCENARIO_WILDLIFE_SPECIES_CLASH: Scenario = Scenario {
+    name: "wildlife_species_clash",
+    default_focal: "Sentinel",
+    default_ticks: 25,
+    setup: setup_wildlife_species_clash,
+    expected_features: &[],
+};
+
+fn setup_wildlife_species_clash(world: &mut World, seed: u64) {
+    init_scenario_world(world, seed);
+
+    // Same wiring-not-tuning overrides as the fox-belief variant: the
+    // belief axis carries enough weight to decide the election, and
+    // near-argmax selection removes roll noise.
+    {
+        let mut constants = world.resource_mut::<crate::resources::sim_constants::SimConstants>();
+        constants.scoring.fox_flee_cat_violence_belief_weight = 0.5;
+        constants.scoring.fox_softmax_temperature = 0.02;
+    }
+
+    let sentinel = spawn_cat(
+        world,
+        CatPreset::adult("Sentinel", CLASH_CAT_POS).with_marker(MarkerKind::Adult),
+    );
+    let casualty = spawn_cat(
+        world,
+        CatPreset::adult("Casualty", CLASH_VICTIM_POS).with_marker(MarkerKind::Adult),
+    );
+
+    // Fox spawned WITHOUT DesiredVelocity: the resolver skips it, so
+    // it holds position (keeping the implant geometry stable) while
+    // its adopted plan kind stays queryable.
+    spawn_scenario_fox(world, CLASH_FOX_POS);
+
+    // The witnessed fight. All within WITNESS_RANGE (10) of the fox.
+    for _ in 0..16 {
+        world.write_message(
+            crate::messages::witnessable_event::WitnessableEvent::Attack {
+                actor: sentinel,
+                target: casualty,
+                position: CLASH_CAT_POS,
+                severity: 1.0,
+                tick: 0,
+            },
+        );
+    }
+}
+
 fn stamp_cat_violence_belief(
     world: &mut World,
     fox: bevy_ecs::entity::Entity,
@@ -299,6 +372,85 @@ mod tests {
         assert!(
             dive_open > dive_covered,
             "open ground must out-afford ward cover: open={dive_open} covered={dive_covered}"
+        );
+    }
+
+    #[test]
+    fn species_clash_mutual_perception_and_substrate_backoff() {
+        use crate::components::beliefs::PredatorBeliefs;
+        use crate::components::identity::Name;
+
+        let mut app = build_scenario_app(42, &SCENARIO_WILDLIFE_SPECIES_CLASH, "Sentinel");
+        app.update();
+
+        let (sentinel, fox) = {
+            let world = app.world_mut();
+            let sentinel = {
+                let mut q = world.query::<(Entity, &Name)>();
+                q.iter(world)
+                    .find(|(_, n)| n.0 == "Sentinel")
+                    .map(|(e, _)| e)
+                    .expect("Sentinel not found")
+            };
+            let fox = {
+                let mut q = world.query::<(Entity, &WildAnimal)>();
+                q.iter(world)
+                    .find(|(_, w)| w.species == WildSpecies::Fox)
+                    .map(|(e, _)| e)
+                    .expect("fox not found")
+            };
+            (sentinel, fox)
+        };
+
+        // Plans execute and exhaust (short step lists), so any single
+        // tick can catch the fox between plans — capture the FIRST
+        // adopted plan kind across the run instead.
+        let mut first_kind: Option<FoxDispositionKind> = None;
+        for _ in 0..25 {
+            app.update();
+            if first_kind.is_none() {
+                first_kind = app.world_mut().get::<FoxGoapPlan>(fox).map(|p| p.kind);
+            }
+        }
+        let world = app.world_mut();
+
+        // Fox side: the observation channel (16 witnessed attacks)
+        // must have pushed its violence model of Sentinel past the
+        // flee-eligibility threshold — no stamping anywhere.
+        let fox_beliefs = world
+            .get::<CatBeliefs>(fox)
+            .expect("WildAnimal requires CatBeliefs");
+        let model = fox_beliefs
+            .models
+            .get(&sentinel)
+            .expect("fox must hold a violence model of the cat it watched fight");
+        assert!(
+            model.perceived_violence_capability.value >= 0.75,
+            "16 witnessed max-severity attacks at learning_rate 0.1 must \
+             clear the 0.75 eligibility threshold; got {}",
+            model.perceived_violence_capability.value
+        );
+
+        // Cat side: the Pass-B implant must have seeded its
+        // PredatorBeliefs model of the fox within one stagger period.
+        let cat_preds = world
+            .get::<PredatorBeliefs>(sentinel)
+            .expect("cats carry PredatorBeliefs");
+        assert!(
+            cat_preds.models.contains_key(&fox),
+            "cat must hold an implanted PredatorBeliefs model of the fox"
+        );
+
+        // Back-off: the fox's own scoring elects a retreat disposition
+        // (Fleeing via the belief clause, or Avoiding — both are
+        // substrate-side back-offs; no director touched anything).
+        let kind = first_kind.expect("fox never adopted a plan during the run");
+        assert!(
+            matches!(
+                kind,
+                FoxDispositionKind::Fleeing | FoxDispositionKind::Avoiding
+            ),
+            "fox that watched the cat win a brutal fight must back off; got {kind:?}"
         );
     }
 
