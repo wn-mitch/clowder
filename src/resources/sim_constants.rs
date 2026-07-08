@@ -5314,22 +5314,23 @@ fn default_socialize_affordance_weight() -> f32 {
 }
 
 /// 264: GroomOtherTarget `target_affiliation` belief-axis weight.
-/// Ships dormant at 0.0; activation is plan step 20.
+/// Activated 2026-07-08 (plan step 20, first-light 0.10).
 fn default_groom_other_affiliation_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 264: GroomOtherTarget `target_perceived_hostility` belief-axis
-/// weight (inverted curve — high hostility deprioritizes). Ships
-/// dormant at 0.0; activation is plan step 20.
+/// weight (inverted curve — high hostility deprioritizes: "don't
+/// groom the cat that just hissed at you"). Activated 2026-07-08
+/// (plan step 20, first-light 0.10).
 fn default_groom_other_hostility_weight() -> f32 {
-    0.0
+    0.10
 }
 
-/// 264: GroomOtherTarget `affordance_groom_other` axis weight. Ships
-/// dormant at 0.0; activation is plan step 20.
+/// 264: GroomOtherTarget `affordance_groom_other` axis weight.
+/// Activated 2026-07-08 (plan step 20, first-light 0.10).
 fn default_groom_other_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 264: MateTarget `target_perceived_receptivity` belief-axis weight.

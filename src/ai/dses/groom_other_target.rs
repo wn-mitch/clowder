@@ -488,6 +488,20 @@ pub fn resolve_groom_other_target(
 mod tests {
     use super::*;
 
+    /// Pre-264 constants: the three step-20-activated axes zeroed so
+    /// exact-shape assertions keep pinning the legacy six-axis
+    /// composition. Behavioral argmax tests stay on
+    /// `ScoringConstants::default()` — the active axes read uniform
+    /// values through the test fetchers, and uniform scaling
+    /// preserves argmax.
+    fn pre_264_scoring() -> ScoringConstants {
+        let mut s = ScoringConstants::default();
+        s.groom_other_affiliation_weight = 0.0;
+        s.groom_other_hostility_weight = 0.0;
+        s.groom_other_affordance_weight = 0.0;
+        s
+    }
+
     #[test]
     fn groom_other_target_dse_id_stable() {
         assert_eq!(
@@ -501,7 +515,7 @@ mod tests {
         // Ticket 073 added the cooldown axis (4 → 5); ticket 452 added
         // `target_grooming_deficit` (5 → 6).
         assert_eq!(
-            groom_other_target_dse(&ScoringConstants::default())
+            groom_other_target_dse(&pre_264_scoring())
                 .per_target_considerations()
                 .len(),
             6
@@ -1147,13 +1161,12 @@ mod tests {
     // -----------------------------------------------------------------
 
     #[test]
-    fn belief_affordance_axes_dormant_at_default() {
-        // 264: all three weights ship at 0.0; the axes MUST NOT appear
-        // and the six-axis composition is byte-identical to pre-264.
-        let s = ScoringConstants::default();
-        assert_eq!(s.groom_other_affiliation_weight, 0.0);
-        assert_eq!(s.groom_other_hostility_weight, 0.0);
-        assert_eq!(s.groom_other_affordance_weight, 0.0);
+    fn belief_affordance_axes_absent_when_zeroed() {
+        // 264 conditional-axis contract: at 0.0 the axes MUST NOT
+        // appear and the six-axis composition is byte-identical to
+        // pre-264 — the config-override escape hatch and the shape
+        // the dormant-wire null-drift gate proved.
+        let s = pre_264_scoring();
         let dse = groom_other_target_dse(&s);
         assert_eq!(dse.per_target_considerations().len(), 6);
         assert!(dse.per_target_considerations().iter().all(|c| !matches!(
@@ -1168,20 +1181,24 @@ mod tests {
     }
 
     #[test]
-    fn belief_affordance_axes_present_and_renormalized_when_active() {
-        // 264: at non-zero weights the axes appear in documented order
+    fn belief_affordance_axes_active_at_default() {
+        // Step-20 activation (2026-07-08): first-light 0.10 × 3 are
+        // the shipped defaults — the axes appear in documented order
         // (affiliation, hostility, affordance) and the base six scale
-        // by (1 - 0.3) so the WeightedSum stays at 1.0.
-        let mut s = ScoringConstants::default();
-        s.groom_other_affiliation_weight = 0.1;
-        s.groom_other_hostility_weight = 0.1;
-        s.groom_other_affordance_weight = 0.1;
+        // by (1 − 0.3) so the WeightedSum stays at 1.0.
+        let s = ScoringConstants::default();
+        assert_eq!(s.groom_other_affiliation_weight, 0.10);
+        assert_eq!(s.groom_other_hostility_weight, 0.10);
+        assert_eq!(s.groom_other_affordance_weight, 0.10);
         let dse = groom_other_target_dse(&s);
         assert_eq!(dse.per_target_considerations().len(), 9);
         assert_eq!(dse.composition().weights.len(), 9);
         assert!((dse.composition().weights[6] - 0.1).abs() < 1e-6);
         assert!((dse.composition().weights[7] - 0.1).abs() < 1e-6);
         assert!((dse.composition().weights[8] - 0.1).abs() < 1e-6);
+        // Base axes carry the (1 − 0.3) renormalization (nearness
+        // 0.24 → 0.168).
+        assert!((dse.composition().weights[0] - 0.24 * 0.7).abs() < 1e-6);
         let sum: f32 = dse.composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
     }
