@@ -75,6 +75,13 @@ steps 18–19 (265/314) also add constants and should be judged the same
 way — and since the artifact saturates, their streams may
 byte-compare directly against `tuned-42-54e4d22e`.
 
+**Correction (step 18):** the saturation claim proved wrong — the
+pivot is *reversible*, and 265's gate stream snapped back to the
+pre-264 `tuned-42-d94c282f` trajectory bit-exactly. See
+`265-dormant-wire-null-drift.md` for the amended methodology
+(byte-compare against every accepted reference before building dummy
+controls).
+
 Run inventory kept under `logs/`: `tuned-42-d8cec959-control`
 (reproducibility control), `tuned-42-d8cec959-dummy6` (inert
 perturbation control), `tuned-42-c6541129-full` / `tuned-42-6259af51`
