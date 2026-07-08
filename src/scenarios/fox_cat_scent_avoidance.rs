@@ -84,7 +84,12 @@ fn setup(world: &mut World, seed: u64) {
         FOX_START,
         crate::components::physical::Health::default(),
         WildlifeAiState::Patrolling { dx: -1, dy: 0 },
-        crate::components::wildlife::ShadowFoxDrives::newly_manifested(0.9),
+        crate::components::wildlife::ShadowFoxDrives::newly_manifested(
+            0.9,
+            crate::resources::SimConstants::default()
+                .wildlife
+                .shadow_fox_satiation_at_spawn,
+        ),
         crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
         crate::components::SensorySignature::WILDLIFE,
     ));

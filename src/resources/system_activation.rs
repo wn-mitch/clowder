@@ -246,6 +246,12 @@ pub enum Feature {
     /// motivation tick promoted the haunt to Stalking (the existing
     /// pre-023 combat-approach path).
     ShadowFoxHauntingEscalated,
+    /// Ticket 310 S1 — the hunger drive (fifth motivation-softmax
+    /// input, `(1 − satiation)² × shadow_fox_hunger_drive_weight`)
+    /// won the election and the shadow-fox entered Stalking toward
+    /// the nearest scanned cat — a goal-directed hunt, distinct from
+    /// the legacy 5%/tick stalk roll in `predator_stalk_cats`.
+    ShadowFoxHungerHuntEntered,
     DirectiveDelivered,
     // --- Hawk ecology (ticket 025 Phase 2) ---
     /// A hawk spotted prey within detection range. Witness: yes/no per
@@ -882,6 +888,7 @@ impl Feature {
         Feature::ShadowFoxSeedingEntered,
         Feature::ShadowFoxHaunting,
         Feature::ShadowFoxHauntingEscalated,
+        Feature::ShadowFoxHungerHuntEntered,
         Feature::DirectiveDelivered,
         // Hawk ecology (ticket 025 Phase 2). All four "trunk" positives
         // ship dormant via `expected_to_fire_per_soak() => false` in
@@ -1285,6 +1292,9 @@ impl Feature {
             // psychological pressure.
             Feature::ShadowFoxHaunting => Neutral,
             Feature::ShadowFoxHauntingEscalated => Neutral,
+            // 310 S1 — hunger-elected Stalking is a state transition;
+            // the harm, if any, is the downstream Ambush event.
+            Feature::ShadowFoxHungerHuntEntered => Neutral,
             Feature::CommitmentDropTriggered => Neutral,
             Feature::CommitmentDropBlind => Neutral,
             Feature::CommitmentDropSingleMinded => Neutral,
@@ -1346,6 +1356,12 @@ impl Feature {
             // shadow-foxes off vulnerable targets.
             Feature::ShadowFoxHaunting => false,
             Feature::ShadowFoxHauntingEscalated => false,
+            // 310 S1 — new-Feature default per the 1:1 sibling rule:
+            // false until a seed-42 soak observes ≥1 firing (hunger
+            // wins only when satiation has decayed with a cat in scan
+            // radius and no stronger drive pressured — plausibly rare
+            // per soak at first-light weight 0.10).
+            Feature::ShadowFoxHungerHuntEntered => false,
             Feature::FateAwakened => false,
             Feature::SpiritCommunion => false,
             Feature::ShadowFoxAvoidedWard => false,
@@ -1894,6 +1910,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ShadowFoxHauntingEntered => "ShadowFoxHauntingEntered",
         Feature::ShadowFoxSeedingEntered => "ShadowFoxSeedingEntered",
         Feature::ShadowFoxHaunting => "ShadowFoxHaunting",
+        Feature::ShadowFoxHungerHuntEntered => "ShadowFoxHungerHuntEntered",
         Feature::ShadowFoxHauntingEscalated => "ShadowFoxHauntingEscalated",
         Feature::DirectiveDelivered => "DirectiveDelivered",
         // Ticket 025 Phase 2 — hawk/snake GOAP.
@@ -2229,7 +2246,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 168;
+        const EXPECTED_VARIANT_COUNT: usize = 169;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2385,9 +2402,14 @@ mod tests {
         // ItemSourcedFromHarvestCarcass, ItemSourcedFromForageIngredient)
         // promoting the three Source-shaped sites 429 deferred. All ship
         // `expected_to_fire_per_soak() => true`.
+        // Ticket 310 S1: +1 Neutral (ShadowFoxHungerHuntEntered) for the
+        // hunger-drive Stalking election (state transition, not harm).
+        // Ships `expected_to_fire_per_soak() => false` per the
+        // new-Feature default; the shadowfox_hunger_hunt_cycle scenario
+        // hosts its firing assertion.
         assert_eq!(positive, 99);
         assert_eq!(negative, 25);
-        assert_eq!(neutral, 44);
+        assert_eq!(neutral, 45);
     }
 
     #[test]
@@ -2509,7 +2531,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            44
+            45
         );
     }
 

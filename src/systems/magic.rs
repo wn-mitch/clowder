@@ -736,6 +736,7 @@ pub fn spawn_shadow_fox_from_corruption(
                     // populated each motivation tick (Phase B).
                     crate::components::wildlife::ShadowFoxDrives::newly_manifested(
                         corruption_at_spawn,
+                        constants.wildlife.shadow_fox_satiation_at_spawn,
                     ),
                     Health::default(),
                     crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),

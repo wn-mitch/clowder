@@ -6327,6 +6327,50 @@ pub struct WildlifeConstants {
     /// should range farther than the other drives.
     #[serde(default = "default_shadow_fox_frontier_detection_range")]
     pub shadow_fox_frontier_detection_range: f32,
+
+    // ----- Ticket 310 S1: satiation drive -----
+    /// `ShadowFoxDrives.satiation` at spawn. Corruption births a
+    /// shadow-fox part-hungry: below the stalk-suppression threshold
+    /// (so it is not born suppressed) but far from starving (so the
+    /// hunger drive engages only after some cadence decay). Default
+    /// `0.5`.
+    #[serde(default = "default_shadow_fox_satiation_at_spawn")]
+    pub shadow_fox_satiation_at_spawn: f32,
+    /// Satiation gained from a successful cat ambush (clamped to 1.0).
+    /// Default `0.8` — one cat is nearly a full meal; the fed
+    /// shadow-fox drops out of stalk eligibility for
+    /// `(gain + threshold − 1) / decay_per_cadence` cadences.
+    #[serde(default = "default_shadow_fox_satiation_gain_ambush")]
+    pub shadow_fox_satiation_gain_ambush: f32,
+    /// Satiation gained from a prey-animal kill in
+    /// `predator_hunt_prey` (clamped to 1.0). Default `0.4` — prey is
+    /// half a meal; two kills roughly match one ambush, giving the
+    /// prey ecology real weight as an alternative to cat predation.
+    #[serde(default = "default_shadow_fox_satiation_gain_prey_kill")]
+    pub shadow_fox_satiation_gain_prey_kill: f32,
+    /// Satiation decay applied once per motivation cadence
+    /// (`shadow_fox_motivation_tick_cadence`, default 16 ticks).
+    /// Default `0.001` — full-to-starving in ~16k ticks, so a fed
+    /// shadow-fox stays out of the hunt for thousands of ticks
+    /// instead of re-rolling stalks the moment its ambush cooldown
+    /// expires (the pre-310 "pinball" cadence).
+    #[serde(default = "default_shadow_fox_satiation_decay_per_cadence")]
+    pub shadow_fox_satiation_decay_per_cadence: f32,
+    /// Satiation at or above which `predator_stalk_cats` skips the
+    /// legacy 5%/tick stalk roll — a fed predator doesn't hunt.
+    /// Default `0.7`: post-ambush satiation (+0.8) sits above it;
+    /// spawn satiation (0.5) sits below.
+    #[serde(default = "default_shadow_fox_stalk_satiation_threshold")]
+    pub shadow_fox_stalk_satiation_threshold: f32,
+    /// Weight on the hunger pressure `(1 − satiation)²` entering the
+    /// 023 motivation softmax as the fifth drive (winner elects
+    /// Stalking toward the nearest scanned cat). `0.0` restores the
+    /// four-drive softmax byte-exactly (the fifth score and its
+    /// jitter draw are skipped entirely — conditional-axis pattern).
+    /// First-light default `0.10` per the release-plan activation
+    /// discipline.
+    #[serde(default = "default_shadow_fox_hunger_drive_weight")]
+    pub shadow_fox_hunger_drive_weight: f32,
 }
 
 impl Default for WildlifeConstants {
@@ -6404,8 +6448,39 @@ impl Default for WildlifeConstants {
             shadow_fox_haunting_feature_cadence: default_shadow_fox_haunting_feature_cadence(),
             shadow_fox_haunting_escalation_ticks: default_shadow_fox_haunting_escalation_ticks(),
             shadow_fox_frontier_detection_range: default_shadow_fox_frontier_detection_range(),
+            shadow_fox_satiation_at_spawn: default_shadow_fox_satiation_at_spawn(),
+            shadow_fox_satiation_gain_ambush: default_shadow_fox_satiation_gain_ambush(),
+            shadow_fox_satiation_gain_prey_kill: default_shadow_fox_satiation_gain_prey_kill(),
+            shadow_fox_satiation_decay_per_cadence: default_shadow_fox_satiation_decay_per_cadence(
+            ),
+            shadow_fox_stalk_satiation_threshold: default_shadow_fox_stalk_satiation_threshold(),
+            shadow_fox_hunger_drive_weight: default_shadow_fox_hunger_drive_weight(),
         }
     }
+}
+
+fn default_shadow_fox_satiation_at_spawn() -> f32 {
+    0.5
+}
+
+fn default_shadow_fox_satiation_gain_ambush() -> f32 {
+    0.8
+}
+
+fn default_shadow_fox_satiation_gain_prey_kill() -> f32 {
+    0.4
+}
+
+fn default_shadow_fox_satiation_decay_per_cadence() -> f32 {
+    0.001
+}
+
+fn default_shadow_fox_stalk_satiation_threshold() -> f32 {
+    0.7
+}
+
+fn default_shadow_fox_hunger_drive_weight() -> f32 {
+    0.10
 }
 
 fn default_shadow_fox_motivation_tick_cadence() -> u64 {

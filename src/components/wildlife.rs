@@ -243,13 +243,36 @@ pub struct ShadowFoxDrives {
     /// attribution (does this shadow-fox arise from heavy-corruption
     /// substrate vs marginal-threshold spawn).
     pub origin_corruption: f32,
+    /// Ticket 310 S1 — fullness from recent kills. 0.0 = starving,
+    /// 1.0 = fully sated. Rises on a successful cat ambush
+    /// (`shadow_fox_satiation_gain_ambush`) or prey kill
+    /// (`shadow_fox_satiation_gain_prey_kill`); decays each motivation
+    /// cadence (`shadow_fox_satiation_decay_per_cadence`). Hunger
+    /// pressure `(1 - satiation)²` is the fifth input to the 023
+    /// motivation softmax, and satiation ≥
+    /// `shadow_fox_stalk_satiation_threshold` suppresses the legacy
+    /// 5%/tick stalk roll in `predator_stalk_cats` — a fed predator
+    /// doesn't hunt. Pre-310 saves lack the field; deserializes to a
+    /// neutral mid-scale value.
+    #[serde(default = "default_satiation_for_pre_310_saves")]
+    pub satiation: f32,
+}
+
+/// Serde backfill for `ShadowFoxDrives.satiation` on pre-310 saves: a
+/// mid-life shadow-fox of unknown feeding history loads at neutral 0.5 —
+/// neither immediately hunting nor stalk-suppressed.
+fn default_satiation_for_pre_310_saves() -> f32 {
+    0.5
 }
 
 impl ShadowFoxDrives {
     /// Spawn a freshly-manifested shadow-fox with full coherence and no
     /// motivational pressure yet. Phase B will populate drives on the
-    /// motivation tick.
-    pub fn newly_manifested(origin_corruption: f32) -> Self {
+    /// motivation tick. `satiation_at_spawn` comes from
+    /// `wildlife.shadow_fox_satiation_at_spawn` (310 S1) — corruption
+    /// births them part-hungry, so the hunt drive engages only after
+    /// some decay.
+    pub fn newly_manifested(origin_corruption: f32, satiation_at_spawn: f32) -> Self {
         Self {
             coherence: 1.0,
             resonance: 0.0,
@@ -257,6 +280,7 @@ impl ShadowFoxDrives {
             entropy: 0.0,
             age_ticks: 0,
             origin_corruption,
+            satiation: satiation_at_spawn,
         }
     }
 }

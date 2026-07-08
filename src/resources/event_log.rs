@@ -446,6 +446,15 @@ pub enum EventKind {
         location: (i32, i32),
         frontier: (i32, i32),
     },
+    /// Ticket 310 S1 — the hunger drive won the motivation softmax and
+    /// the shadow-fox entered Stalking toward the nearest scanned cat.
+    /// `satiation` is the value at election time (pressure is
+    /// `(1 − satiation)² × shadow_fox_hunger_drive_weight`).
+    ShadowFoxHungerHuntEntered {
+        location: (i32, i32),
+        target: (i32, i32),
+        satiation: f32,
+    },
 
     // -------------------------------------------------------------------
     // Continuity-canary events (§11.3 — "Emit events for: grooming fires,

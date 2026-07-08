@@ -451,6 +451,8 @@ pub fn predator_hunt_prey(
     mut fox_states: Query<&mut FoxState>,
     mut hawk_states: Query<&mut HawkState>,
     mut snake_states: Query<&mut SnakeState>,
+    // 310 S1 — shadow-fox prey kills feed the satiation drive.
+    mut shadowfox_drives: Query<&mut crate::components::wildlife::ShadowFoxDrives>,
     mut rng: ResMut<SimRng>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
@@ -567,6 +569,15 @@ pub fn predator_hunt_prey(
                     if let Ok(mut snake_state) = snake_states.get_mut(pred_entity) {
                         snake_state.satiation_ticks = satiation_strike_kill;
                         snake_state.hunger = (snake_state.hunger - 0.4).max(0.0);
+                    }
+                    // 310 S1 — shadow-fox satiation parallels the
+                    // fox/hawk/snake branches: prey kills feed the
+                    // drive that gates cat-stalk eligibility, giving
+                    // the prey ecology real weight as an alternative
+                    // to cat predation.
+                    if let Ok(mut drives) = shadowfox_drives.get_mut(pred_entity) {
+                        drives.satiation =
+                            (drives.satiation + c.shadow_fox_satiation_gain_prey_kill).min(1.0);
                     }
 
                     // Rate-limited logging.

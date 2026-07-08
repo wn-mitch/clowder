@@ -73,6 +73,7 @@ pub mod preset;
 pub mod prey_byproduct_spawn;
 pub mod route_cost_decision;
 pub mod runner;
+pub mod shadowfox_hunger_hunt_cycle;
 pub mod shelter_belief_security;
 pub mod smoking_chain_complete;
 pub mod smoking_chain_eligibility;
@@ -299,6 +300,11 @@ pub const ALL: &[&Scenario] = &[
     &wildlife_belief_affordance_activation::SCENARIO_FOX_BELIEF_HIGH_VIOLENCE,
     &wildlife_belief_affordance_activation::SCENARIO_HAWK_DIVE_AERIAL_COVER,
     &wildlife_belief_affordance_activation::SCENARIO_WILDLIFE_SPECIES_CLASH,
+    // 310 S1 — hunger-hunt cycle: starving shadow-fox elects Stalking
+    // through the motivation softmax, ambushes, feeds past the
+    // stalk-suppression threshold, and stays out of the hunt for the
+    // rest of the run. Hosts the ShadowFoxHungerHuntEntered assertion.
+    &shadowfox_hunger_hunt_cycle::SCENARIO,
     &play_engagement_cues::SCENARIO_PLAY_ENGAGEMENT_CUES,
     // 472 — festering-wound substrate. Preloads Ashitaka with a
     // WoundKind::Festering on FrontRightPaw and asserts (a) the wound
