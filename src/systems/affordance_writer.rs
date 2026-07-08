@@ -8,7 +8,7 @@
 //!
 //! # Perceiver classes
 //!
-//! v1 supports two perceiver classes:
+//! Three perceiver classes:
 //!
 //! - **Cats** — entities with `CatBeliefs` + `PredatorBeliefs`. Cats can
 //!   afford every cat-applicable action (16 of the 21 kinds): the
@@ -17,16 +17,26 @@
 //!   Hiss), and the social six (Socialize / GroomOther / Mate / Mentor /
 //!   Care / FeedKitten). Cat heuristics compose belief facets from the
 //!   258 substrate with spatial reads (distance, ward coverage).
+//!   Cat-vs-prey rows (314) cover the predation trio only; the belief
+//!   slot is the prey's own `alertness` scalar — cats deliberately do
+//!   NOT model prey entities in `CatBeliefs` (ticket-505 ballast
+//!   lesson), and alertness is the honest observable ("is it aware of
+//!   me?"). An alerted prey suppresses Stalk and *elevates* Chase —
+//!   the stalk option is spent once the target is flushed, and chase
+//!   success is decided by the (now-real, Phase II) speed ratio.
 //! - **Wildlife predators** — `WildAnimal`-tagged entities. Each species
 //!   gates a tight subset: Fox → Stalk + Chase; Hawk → Dive + Chase;
-//!   Snake → Strike + Stalk; ShadowFox → Ambush + Stalk + Chase. Wildlife
-//!   has no belief substrate in v1, so the heuristics fall back to
-//!   spatial-only inputs (distance, target_health, fox_scent_at_position).
-//!
-//! Prey-side affordances (`Bolt`, `ScatterGroup`) are not written in v1 —
-//! prey has its own AI in `src/systems/prey.rs` without a perception
-//! substrate. The kinds exist in [`ActionKind`] so consumer tickets can
-//! extend the writer to prey perceivers without revising the enum.
+//!   Snake → Strike + Stalk; ShadowFox → Ambush + Stalk + Chase — the
+//!   same subset against cat and prey targets (314 adds the prey rows;
+//!   they feed the 265 dormant `best_prey_*_affordance` DSE axes).
+//!   Wildlife heuristics are spatial + alertness (their belief
+//!   substrate, `CatBeliefs` on `WildAnimal`, models cats only).
+//! - **Prey** (314) — `PreyAnimal`-tagged entities. Two kinds: `Bolt`
+//!   (solo escape — head start, escape speed ratio, believed threat
+//!   lethality from the prey's implanted `PredatorBeliefs`, reaction
+//!   readiness) and `ScatterGroup` (group flush — requires same-kind
+//!   neighbors). No DSE consumers until ticket 266 (prey-side AI);
+//!   rows are behaviorally dormant.
 //!
 //! # Behavior-neutral at land
 //!
@@ -51,9 +61,16 @@ use bevy_ecs::prelude::*;
 use crate::components::beliefs::{CatBeliefs, MentalModel, PredatorBeliefs};
 use crate::components::identity::Species;
 use crate::components::physical::{Dead, Health, Needs, Position};
+use crate::components::prey::{PreyAnimal, PreyConfig, PreyKind, PreyState};
 use crate::components::wildlife::{WildAnimal, WildSpecies};
-use crate::resources::sim_constants::AffordanceWeights;
+use crate::resources::sim_constants::{AffordanceWeights, MovementConstants};
 use crate::resources::{ActionAffordances, ActionKind, FoxScentMap, SimConstants, WardCoverageMap};
+
+/// Same-kind neighbor count at which the `ScatterGroup` heuristic's
+/// group input saturates to 1.0. Structural shape parameter (like the
+/// integrator's `WITNESS_RANGE`), not a balance knob — the tunable
+/// weights live in `AffordancesConstants::prey_side`.
+const SCATTER_GROUP_SATURATION: f32 = 4.0;
 
 // ---------------------------------------------------------------------------
 // Snapshot types
@@ -81,6 +98,20 @@ struct WildSnapshot {
     health_fraction: f32,
 }
 
+/// 314: compact per-prey snapshot. `flee_speed` is the effective
+/// escape speed in tiles/tick from the Phase-II movement constants —
+/// `prey_ground_max_speed × PreyConfig::flee_speed` for ground prey,
+/// `bird_burst_speed` for birds (escape is burst flight), and 0.0 for
+/// fish (`flee_speed` 0 — they don't bolt).
+struct PreySnapshot {
+    entity: Entity,
+    position: Position,
+    kind: PreyKind,
+    alertness: f32,
+    health_fraction: f32,
+    flee_speed: f32,
+}
+
 // ---------------------------------------------------------------------------
 // System
 // ---------------------------------------------------------------------------
@@ -103,10 +134,26 @@ pub fn affordance_writer(
         (With<Species>, Without<Dead>),
     >,
     wildlife: Query<(Entity, &Position, &WildAnimal, &Health), Without<Dead>>,
+    // 314: prey rows. `&PredatorBeliefs` is read-only here (the cat
+    // query reads it too — shared read access, no conflict) and
+    // guaranteed present via PreyAnimal's required component.
+    prey: Query<
+        (
+            Entity,
+            &Position,
+            &PreyConfig,
+            &PreyState,
+            &Health,
+            &PredatorBeliefs,
+        ),
+        (With<PreyAnimal>, Without<Dead>),
+    >,
 ) {
     affordances.clear();
     let cfg = &constants.affordances;
+    let movement = &constants.movement;
     let sensing = cfg.sensing_range.max(1.0);
+    let cat_chase_speed = movement.cat_max_speed * movement.sprint_speed_mult;
 
     // Collect cat snapshots + side-table belief refs so the pair loop can
     // read the perceiver's belief Components without re-querying.
@@ -137,6 +184,25 @@ pub fn affordance_writer(
             threat_power: animal.threat_power,
             health_fraction: (health.current / health.max.max(f32::EPSILON)).clamp(0.0, 1.0),
         });
+    }
+
+    let mut prey_snaps: Vec<PreySnapshot> = Vec::with_capacity(prey.iter().count());
+    let mut prey_beliefs_by_entity: std::collections::HashMap<Entity, &PredatorBeliefs> =
+        std::collections::HashMap::new();
+    for (entity, pos, config, state, health, threat_beliefs) in prey.iter() {
+        let flee_speed = match config.kind {
+            PreyKind::Bird => movement.bird_burst_speed,
+            _ => movement.prey_ground_max_speed * config.flee_speed as f32,
+        };
+        prey_snaps.push(PreySnapshot {
+            entity,
+            position: *pos,
+            kind: config.kind,
+            alertness: state.alertness.clamp(0.0, 1.0),
+            health_fraction: (health.current / health.max.max(f32::EPSILON)).clamp(0.0, 1.0),
+            flee_speed,
+        });
+        prey_beliefs_by_entity.insert(entity, threat_beliefs);
     }
 
     // ---- Cat perceivers -----------------------------------------------------
@@ -182,6 +248,21 @@ pub fn affordance_writer(
                 &mut affordances,
             );
         }
+
+        // vs prey targets (314)
+        for target in &prey_snaps {
+            if perceiver.position.distance_to(&target.position) > sensing {
+                continue;
+            }
+            write_cat_vs_prey(
+                perceiver,
+                target,
+                cat_chase_speed,
+                cfg,
+                &ward_coverage,
+                &mut affordances,
+            );
+        }
     }
 
     // ---- Wildlife perceivers -----------------------------------------------
@@ -191,6 +272,78 @@ pub fn affordance_writer(
                 continue;
             }
             write_wildlife_vs_cat(perceiver, target, cfg, &ward_coverage, &mut affordances);
+        }
+
+        // vs prey targets (314) — feeds the 265 dormant DSE axes
+        // (best_prey_predation / strike / stalk affordance reads).
+        for target in &prey_snaps {
+            if perceiver.position.distance_to(&target.position) > sensing {
+                continue;
+            }
+            write_wildlife_vs_prey(
+                perceiver,
+                target,
+                wildlife_chase_speed(movement, perceiver.species),
+                cfg,
+                &ward_coverage,
+                &mut affordances,
+            );
+        }
+    }
+
+    // ---- Prey perceivers (314) ----------------------------------------------
+    // Threat set = cats + wildlife. The same-kind group census for
+    // ScatterGroup is only taken for prey that actually have an
+    // in-range threat — most prey are nowhere near one on a given
+    // tick, so the O(prey²) census cost is paid rarely.
+    for perceiver in &prey_snaps {
+        let Some(&threat_beliefs) = prey_beliefs_by_entity.get(&perceiver.entity) else {
+            continue;
+        };
+
+        let mut threats: Vec<(Entity, &Position, f32)> = Vec::new();
+        for c in &cat_snaps {
+            if perceiver.position.distance_to(&c.position) <= sensing {
+                threats.push((c.entity, &c.position, cat_chase_speed));
+            }
+        }
+        for w in &wild_snaps {
+            if perceiver.position.distance_to(&w.position) <= sensing {
+                threats.push((
+                    w.entity,
+                    &w.position,
+                    wildlife_chase_speed(movement, w.species),
+                ));
+            }
+        }
+        if threats.is_empty() {
+            continue;
+        }
+
+        let group_neighbors = prey_snaps
+            .iter()
+            .filter(|p| {
+                p.entity != perceiver.entity
+                    && p.kind == perceiver.kind
+                    && perceiver.position.distance_to(&p.position) <= sensing
+            })
+            .count();
+        let group_factor = (group_neighbors as f32 / SCATTER_GROUP_SATURATION).clamp(0.0, 1.0);
+
+        for (threat_ent, threat_pos, threat_chase_speed) in threats {
+            let perceived_violence = facet(threat_beliefs.models.get(&threat_ent), |m| {
+                m.perceived_violence_capability.value
+            });
+            write_prey_perceiver(
+                perceiver,
+                threat_ent,
+                threat_pos,
+                threat_chase_speed,
+                perceived_violence,
+                group_factor,
+                cfg,
+                &mut affordances,
+            );
         }
     }
 }
@@ -235,6 +388,33 @@ fn composite(w: &AffordanceWeights, c1: f32, c2: f32, c3: f32, c4: f32) -> f32 {
         0.0
     } else {
         raw
+    }
+}
+
+/// 314: normalized speed ratio `mine / (mine + theirs)` in `[0, 1]` —
+/// 0.5 at parity, → 1.0 as `mine` dominates, 0.0 when `mine` is zero
+/// (a fish "bolting" from a cat). Both zero (degenerate) → neutral 0.5.
+/// The Phase-II movement rework made both sides real tiles/tick
+/// numbers, so this is a genuine interception-geometry input rather
+/// than a placeholder.
+fn speed_ratio(mine: f32, theirs: f32) -> f32 {
+    let denom = mine + theirs;
+    if denom <= f32::EPSILON {
+        0.5
+    } else {
+        (mine / denom).clamp(0.0, 1.0)
+    }
+}
+
+/// 314: steady-state chase speed for a wildlife species, from the
+/// Phase-II movement constants. (Cats sprint at
+/// `cat_max_speed × sprint_speed_mult`; wildlife chase at max speed.)
+fn wildlife_chase_speed(movement: &MovementConstants, species: WildSpecies) -> f32 {
+    match species {
+        WildSpecies::Fox => movement.fox_max_speed,
+        WildSpecies::Hawk => movement.hawk_max_speed,
+        WildSpecies::Snake => movement.snake_max_speed,
+        WildSpecies::ShadowFox => movement.shadowfox_max_speed,
     }
 }
 
@@ -711,6 +891,231 @@ fn write_wildlife_vs_cat(
 }
 
 // ---------------------------------------------------------------------------
+// Cat perceiver × prey target (314)
+// ---------------------------------------------------------------------------
+
+/// The predation trio against a prey animal. The belief slot is the
+/// prey's own `alertness` scalar — cats deliberately do NOT model prey
+/// in `CatBeliefs` (ticket-505 ballast lesson), and alertness is the
+/// honest observable ("is it aware of me?"). Alertness cuts Stalk and
+/// Pounce (the ambush forms are spent once the target is watching)
+/// and *feeds* Chase (a flushed target is run down; success is the
+/// speed ratio's business). All non-predation kinds write 0.0 — cats
+/// don't flee from mice.
+fn write_cat_vs_prey(
+    perceiver: &CatSnapshot,
+    target: &PreySnapshot,
+    chase_speed: f32,
+    cfg: &crate::resources::sim_constants::AffordancesConstants,
+    ward: &WardCoverageMap,
+    affordances: &mut ActionAffordances,
+) {
+    let prox = proximity_feature(&perceiver.position, &target.position, cfg.sensing_range);
+    let cover_self = cover_at(&perceiver.position, ward);
+    let my_health = perceiver.health_fraction;
+    let alertness = target.alertness;
+    let speed_advantage = speed_ratio(chase_speed, target.flee_speed);
+
+    // Default-zero every kind so prey rows are uniform with cat and
+    // wildlife rows (consumer code can iterate ActionKind::ALL safely).
+    for kind in ActionKind::ALL {
+        affordances.write(perceiver.entity, target.entity, kind, 0.0);
+    }
+
+    let pred = &cfg.predation;
+    affordances.write(
+        perceiver.entity,
+        target.entity,
+        ActionKind::Stalk,
+        composite(&pred.stalk, prox, cover_self, my_health, 1.0 - alertness),
+    );
+    affordances.write(
+        perceiver.entity,
+        target.entity,
+        ActionKind::Chase,
+        composite(&pred.chase, prox, alertness, my_health, speed_advantage),
+    );
+    affordances.write(
+        perceiver.entity,
+        target.entity,
+        ActionKind::Pounce,
+        composite(&pred.pounce, prox, cover_self, 1.0 - alertness, my_health),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Wildlife perceiver × prey target (314)
+// ---------------------------------------------------------------------------
+
+/// Per-species predation subset against prey — the same subset each
+/// species affords against cats (Fox → Stalk + Chase; Hawk → Dive +
+/// Chase; Snake → Strike + Stalk; ShadowFox → Ambush + Stalk + Chase).
+/// These rows feed the 265 dormant wildlife-DSE axes
+/// (`best_prey_predation_affordance` / `best_prey_strike_affordance` /
+/// `best_prey_stalk_affordance`), which activate at plan step 21.
+/// Alertness replaces the vs-cat heuristics' belief/health slots where
+/// it is the sharper signal — prey health is almost always full, but
+/// alertness genuinely separates an ambushable target from a lost one.
+fn write_wildlife_vs_prey(
+    perceiver: &WildSnapshot,
+    target: &PreySnapshot,
+    chase_speed: f32,
+    cfg: &crate::resources::sim_constants::AffordancesConstants,
+    ward: &WardCoverageMap,
+    affordances: &mut ActionAffordances,
+) {
+    let prox = proximity_feature(&perceiver.position, &target.position, cfg.sensing_range);
+    let cover_self = cover_at(&perceiver.position, ward);
+    let cover_at_target = cover_at(&target.position, ward);
+    let my_health = perceiver.health_fraction;
+    let alertness = target.alertness;
+    let speed_advantage = speed_ratio(chase_speed, target.flee_speed);
+
+    for kind in ActionKind::ALL {
+        affordances.write(perceiver.entity, target.entity, kind, 0.0);
+    }
+
+    let pred = &cfg.predation;
+    match perceiver.species {
+        WildSpecies::Fox => {
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Stalk,
+                composite(&pred.stalk, prox, cover_self, my_health, 1.0 - alertness),
+            );
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Chase,
+                composite(&pred.chase, prox, my_health, speed_advantage, 0.5),
+            );
+        }
+        WildSpecies::Hawk => {
+            // Dive — unaware prey in open ground is the raptor's shot.
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Dive,
+                composite(
+                    &pred.dive,
+                    prox,
+                    1.0 - cover_at_target,
+                    my_health,
+                    1.0 - alertness,
+                ),
+            );
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Chase,
+                composite(&pred.chase, prox, my_health, speed_advantage, 0.5),
+            );
+        }
+        WildSpecies::Snake => {
+            // Strike — adjacency-gated, and only meaningful against an
+            // unaware target (an alerted mouse is already out of reach).
+            let strike_prox = if perceiver.position.chebyshev_distance(&target.position) <= 1 {
+                1.0
+            } else {
+                0.0
+            };
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Strike,
+                composite(&pred.strike, strike_prox, 1.0 - alertness, my_health, 0.5),
+            );
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Stalk,
+                composite(&pred.stalk, prox, cover_self, my_health, 1.0 - alertness),
+            );
+        }
+        WildSpecies::ShadowFox => {
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Ambush,
+                composite(
+                    &pred.ambush,
+                    cover_self,
+                    1.0 - cover_at_target,
+                    my_health,
+                    prox,
+                ),
+            );
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Stalk,
+                composite(&pred.stalk, prox, cover_self, my_health, 1.0 - alertness),
+            );
+            affordances.write(
+                perceiver.entity,
+                target.entity,
+                ActionKind::Chase,
+                composite(&pred.chase, prox, my_health, speed_advantage, 0.5),
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Prey perceiver × threat target (314)
+// ---------------------------------------------------------------------------
+
+/// Prey-side escape affordances against one in-range threat (cat or
+/// wildlife). `Bolt` composes head start (inverse proximity), the
+/// believed lethality of the threat (the prey's implanted
+/// `PredatorBeliefs` prior — the substrate reader for the 314 implant
+/// pass), the real escape-speed ratio, and reaction readiness
+/// (alertness). `ScatterGroup` requires same-kind neighbors and peaks
+/// when the threat is close — the flush works by confusion, not
+/// distance. No DSE consumers until ticket 266.
+#[allow(clippy::too_many_arguments)]
+fn write_prey_perceiver(
+    perceiver: &PreySnapshot,
+    threat: Entity,
+    threat_pos: &Position,
+    threat_chase_speed: f32,
+    perceived_violence: f32,
+    group_factor: f32,
+    cfg: &crate::resources::sim_constants::AffordancesConstants,
+    affordances: &mut ActionAffordances,
+) {
+    let prox = proximity_feature(&perceiver.position, threat_pos, cfg.sensing_range);
+    let escape_ratio = speed_ratio(perceiver.flee_speed, threat_chase_speed);
+    let alertness = perceiver.alertness;
+    let my_health = perceiver.health_fraction;
+
+    for kind in ActionKind::ALL {
+        affordances.write(perceiver.entity, threat, kind, 0.0);
+    }
+
+    let ps = &cfg.prey_side;
+    affordances.write(
+        perceiver.entity,
+        threat,
+        ActionKind::Bolt,
+        composite(
+            &ps.bolt,
+            1.0 - prox,
+            perceived_violence,
+            escape_ratio,
+            alertness,
+        ),
+    );
+    affordances.write(
+        perceiver.entity,
+        threat,
+        ActionKind::ScatterGroup,
+        composite(&ps.scatter_group, group_factor, prox, alertness, my_health),
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -752,6 +1157,30 @@ mod tests {
     fn spawn_wild(world: &mut World, species: WildSpecies, pos: Position) -> Entity {
         world
             .spawn((WildAnimal::new(species), pos, Health::default()))
+            .id()
+    }
+
+    // 314: PreyAnimal's required component supplies PredatorBeliefs.
+    fn spawn_prey(world: &mut World, pos: Position, alertness: f32) -> Entity {
+        let config = PreyConfig {
+            kind: PreyKind::Mouse,
+            name: "test-mouse",
+            item_kind: crate::components::items::ItemKind::RawMouse,
+            flee_speed: 1,
+            graze_cadence: 10,
+            alert_radius: 6.0,
+            freeze_ticks: 2,
+            catch_difficulty: 0.5,
+            flee_strategy: crate::components::prey::FleeStrategy::Standard,
+            flee_duration: 40,
+            habitat: &[],
+        };
+        let state = PreyState {
+            alertness,
+            ..PreyState::default()
+        };
+        world
+            .spawn((PreyAnimal, config, state, Health::default(), pos))
             .id()
     }
 
@@ -830,6 +1259,109 @@ mod tests {
         assert!(
             ambush > 0.0,
             "ShadowFox in covered position vs cat in open should afford Ambush; got {ambush}"
+        );
+    }
+
+    // 314 — cat-vs-prey, wildlife-vs-prey, and prey-perceiver rows.
+
+    #[test]
+    fn cat_vs_prey_predation_trio_populates_nonpredation_zero() {
+        let (mut world, mut schedule) = test_world();
+        let cat = spawn_cat(&mut world, Position::new(10, 10));
+        let mouse = spawn_prey(&mut world, Position::new(12, 10), 0.0);
+        schedule.run(&mut world);
+        let a = world.resource::<ActionAffordances>();
+        assert!(a.read(cat, mouse, ActionKind::Stalk) > 0.0);
+        assert!(a.read(cat, mouse, ActionKind::Chase) > 0.0);
+        assert!(a.read(cat, mouse, ActionKind::Pounce) > 0.0);
+        // Cats don't flee from, socialize with, or species-gate onto mice.
+        assert_eq!(a.read(cat, mouse, ActionKind::Flee), 0.0);
+        assert_eq!(a.read(cat, mouse, ActionKind::Socialize), 0.0);
+        assert_eq!(a.read(cat, mouse, ActionKind::Dive), 0.0);
+    }
+
+    #[test]
+    fn cat_vs_prey_stalk_chase_flip_on_alertness() {
+        // Oblivious prey → Stalk out-affords Chase; alerted prey →
+        // Chase out-affords Stalk. This is the shape the graduated 263
+        // hunt scenarios assert end-to-end.
+        let (mut world, mut schedule) = test_world();
+        let cat = spawn_cat(&mut world, Position::new(10, 10));
+        let oblivious = spawn_prey(&mut world, Position::new(14, 10), 0.0);
+        let alerted = spawn_prey(&mut world, Position::new(10, 14), 0.95);
+        schedule.run(&mut world);
+        let a = world.resource::<ActionAffordances>();
+        assert!(
+            a.read(cat, oblivious, ActionKind::Stalk) > a.read(cat, oblivious, ActionKind::Chase),
+            "oblivious prey: Stalk should out-afford Chase"
+        );
+        assert!(
+            a.read(cat, alerted, ActionKind::Chase) > a.read(cat, alerted, ActionKind::Stalk),
+            "alerted prey: Chase should out-afford Stalk"
+        );
+    }
+
+    #[test]
+    fn fox_vs_prey_writes_species_subset_only() {
+        let (mut world, mut schedule) = test_world();
+        let fox = spawn_wild(&mut world, WildSpecies::Fox, Position::new(11, 10));
+        let mouse = spawn_prey(&mut world, Position::new(12, 10), 0.0);
+        schedule.run(&mut world);
+        let a = world.resource::<ActionAffordances>();
+        assert!(a.read(fox, mouse, ActionKind::Stalk) > 0.0);
+        assert!(a.read(fox, mouse, ActionKind::Chase) > 0.0);
+        assert_eq!(a.read(fox, mouse, ActionKind::Dive), 0.0);
+        assert_eq!(a.read(fox, mouse, ActionKind::Pounce), 0.0);
+        assert_eq!(a.read(fox, mouse, ActionKind::Strike), 0.0);
+    }
+
+    #[test]
+    fn hawk_and_snake_vs_prey_species_kinds() {
+        let (mut world, mut schedule) = test_world();
+        let hawk = spawn_wild(&mut world, WildSpecies::Hawk, Position::new(8, 10));
+        let snake = spawn_wild(&mut world, WildSpecies::Snake, Position::new(11, 10));
+        let mouse = spawn_prey(&mut world, Position::new(10, 10), 0.0);
+        schedule.run(&mut world);
+        let a = world.resource::<ActionAffordances>();
+        assert!(
+            a.read(hawk, mouse, ActionKind::Dive) > 0.0,
+            "hawk's Dive on unaware open-ground prey should be eligible"
+        );
+        // Snake adjacent (chebyshev 1) → Strike gate open.
+        assert!(
+            a.read(snake, mouse, ActionKind::Strike) > 0.0,
+            "adjacent snake should afford Strike on unaware prey"
+        );
+        assert!(a.read(snake, mouse, ActionKind::Stalk) > 0.0);
+        assert_eq!(a.read(snake, mouse, ActionKind::Chase), 0.0);
+    }
+
+    #[test]
+    fn prey_bolt_populates_and_scatter_scales_with_group() {
+        let (mut world, mut schedule) = test_world();
+        // Two spatially-separate clusters (> sensing_range apart) so
+        // the lone mouse genuinely has zero same-kind neighbors.
+        let cat = spawn_cat(&mut world, Position::new(12, 10));
+        let lone = spawn_prey(&mut world, Position::new(10, 10), 0.5);
+        let far_cat = spawn_cat(&mut world, Position::new(42, 40));
+        let grouped = spawn_prey(&mut world, Position::new(40, 40), 0.5);
+        spawn_prey(&mut world, Position::new(41, 40), 0.5);
+        spawn_prey(&mut world, Position::new(40, 41), 0.5);
+        schedule.run(&mut world);
+        let a = world.resource::<ActionAffordances>();
+        let bolt = a.read(lone, cat, ActionKind::Bolt);
+        assert!(
+            bolt > 0.0,
+            "prey with an in-range cat should afford Bolt; got {bolt}"
+        );
+        // Prey rows are perceiver-side only for escape kinds; the prey
+        // affords no predation against its threat.
+        assert_eq!(a.read(lone, cat, ActionKind::Stalk), 0.0);
+        let scatter_grouped = a.read(grouped, far_cat, ActionKind::ScatterGroup);
+        let scatter_lone = a.read(lone, cat, ActionKind::ScatterGroup);
+        assert!(
+            scatter_grouped > scatter_lone,
+            "ScatterGroup must scale with same-kind neighbors; grouped {scatter_grouped} vs lone {scatter_lone}"
         );
     }
 

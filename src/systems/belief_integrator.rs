@@ -12,7 +12,12 @@
 //!   [`PredatorBeliefs`] entries from `SpeciesViolencePriors` for any
 //!   nearby wildlife (Implant), and (2) decay every facet toward its
 //!   `prior` value across all four belief Components (Forgetting on
-//!   `strength` → 0 entries are removed).
+//!   `strength` → 0 entries are removed). Wildlife (265) and prey
+//!   (314) run symmetric Pass-B loops on the same stagger discipline:
+//!   wildlife implant cat models into their `CatBeliefs` from the
+//!   wildlife-perceiver prior rows; prey implant threat models (cats
+//!   AND wildlife) into their `PredatorBeliefs` from the
+//!   prey-perceiver rows. Prey get no Pass-A observation subset.
 //!
 //! Substrate-only as of 258 — no consumers read facets yet. The four
 //! v1 scenarios under `src/scenarios/` assert the EMA + decay shapes
@@ -28,6 +33,7 @@ use crate::components::beliefs::{
 };
 use crate::components::magic::{Inventory, ResourceKind};
 use crate::components::physical::{Dead, Position};
+use crate::components::prey::PreyAnimal;
 use crate::components::wildlife::{WildAnimal, WildSpecies};
 use crate::messages::witnessable_event::WitnessableEvent;
 use crate::resources::sim_constants::{
@@ -79,7 +85,7 @@ pub fn integrate_beliefs(
             &mut ColonyReservesBelief,
             &mut ShelterBeliefs,
         ),
-        (Without<Dead>, Without<WildAnimal>),
+        (Without<Dead>, Without<WildAnimal>, Without<PreyAnimal>),
     >,
     wildlife: Query<(Entity, &Position, &WildAnimal), Without<Dead>>,
     // 265: wildlife witnesses — every WildAnimal carries CatBeliefs
@@ -89,6 +95,19 @@ pub fn integrate_beliefs(
     mut wildlife_witnesses: Query<
         (Entity, &Position, &WildAnimal, &mut CatBeliefs),
         (With<WildAnimal>, Without<Dead>),
+    >,
+    // 314: prey witnesses — every PreyAnimal carries PredatorBeliefs
+    // (required component) holding its models of encountered threats,
+    // cats and wildlife alike. Implant + Forgetting only — prey get
+    // NO Pass-A observation subset: their threat picture is instinct
+    // (implanted priors) plus decay, and unread observation channels
+    // would be pure ballast (ticket-505 lesson). Disjoint from the
+    // cat `witnesses` query (which also holds `&mut PredatorBeliefs`)
+    // via the paired `With<PreyAnimal>` / `Without<PreyAnimal>`
+    // filters.
+    mut prey_witnesses: Query<
+        (Entity, &Position, &mut PredatorBeliefs),
+        (With<PreyAnimal>, Without<Dead>),
     >,
 ) {
     let tick = time.tick;
@@ -236,6 +255,48 @@ pub fn integrate_beliefs(
 
         decay_models(&mut cat_models.models, tick, cfg, period);
     }
+
+    // ---- Pass B (314) — prey Implant + Forgetting ----------------------
+    // A prey's first encounter with a threat (cat or wildlife) seeds
+    // its PredatorBeliefs with the prey-perceiver instinct prior. The
+    // affordance writer's prey-side `Bolt` heuristic reads the
+    // resulting `perceived_violence_capability` facet each tick; DSE
+    // consumers arrive with ticket 266.
+    for (witness_ent, witness_pos, mut threat_models) in prey_witnesses.iter_mut() {
+        if (witness_ent.index_u32() as u64) % period != tick_phase {
+            continue;
+        }
+
+        for (cat_ent, cat_pos) in &cat_positions {
+            if !within_range(witness_pos, cat_pos) {
+                continue;
+            }
+            threat_models
+                .models
+                .entry(*cat_ent)
+                .or_insert_with(|| MentalModel {
+                    perceived_violence_capability: Facet::from_prior(priors.cat_perceived_by_prey),
+                    last_updated_tick: tick,
+                    ..MentalModel::default()
+                });
+        }
+
+        for (wl_ent, wl_pos, wl) in wildlife.iter() {
+            if !within_range(witness_pos, wl_pos) {
+                continue;
+            }
+            threat_models.models.entry(wl_ent).or_insert_with(|| {
+                let prior = violence_prior_perceived_by_prey(priors, wl.species);
+                MentalModel {
+                    perceived_violence_capability: Facet::from_prior(prior),
+                    last_updated_tick: tick,
+                    ..MentalModel::default()
+                }
+            });
+        }
+
+        decay_models(&mut threat_models.models, tick, cfg, period);
+    }
 }
 
 /// 308: per-cat stagger broadcast of the cat's current inventory contents.
@@ -357,6 +418,20 @@ fn cat_violence_prior_perceived_by(priors: &SpeciesViolencePriors, species: Wild
         WildSpecies::Hawk => priors.cat_perceived_by_hawk,
         WildSpecies::Snake => priors.cat_perceived_by_snake,
         WildSpecies::ShadowFox => priors.cat_perceived_by_shadow_fox,
+    }
+}
+
+/// 314: how dangerous a wildlife species looks to prey — the
+/// prey-perceiver rows of the violence-prior table, implanted into a
+/// prey entity's `PredatorBeliefs` on first encounter. (The cat row
+/// is read directly as `priors.cat_perceived_by_prey` at the call
+/// site — cats aren't a `WildSpecies`.)
+fn violence_prior_perceived_by_prey(priors: &SpeciesViolencePriors, species: WildSpecies) -> f32 {
+    match species {
+        WildSpecies::Fox => priors.fox_perceived_by_prey,
+        WildSpecies::Hawk => priors.hawk_perceived_by_prey,
+        WildSpecies::Snake => priors.snake_perceived_by_prey,
+        WildSpecies::ShadowFox => priors.shadow_fox_perceived_by_prey,
     }
 }
 
@@ -1533,6 +1608,121 @@ mod tests {
         assert!(
             model.perceived_violence_capability.value > 0.0,
             "witnessed successful hunt is violence-capability evidence"
+        );
+    }
+
+    // 314 — prey-witness coverage: implant of cat + wildlife threat
+    // priors, and no Pass-A observation channel.
+
+    fn spawn_prey(world: &mut World, position: Position) -> Entity {
+        // PreyAnimal's required component adds PredatorBeliefs.
+        world
+            .spawn((
+                crate::components::prey::PreyAnimal,
+                position,
+                Health::default(),
+            ))
+            .id()
+    }
+
+    #[test]
+    fn prey_implant_seeds_cat_and_wildlife_threat_priors() {
+        let (mut world, mut schedule) = test_world(0);
+        let cat = spawn_cat(&mut world, Position::new(0, 0));
+        let fox = spawn_wildlife(&mut world, WildSpecies::Fox, Position::new(3, 0));
+        let mouse = spawn_prey(&mut world, Position::new(1, 1));
+
+        let period = SimConstants::default().beliefs.decay_stagger_period;
+        for _ in 0..(period + 1) {
+            schedule.run(&mut world);
+            let mut time = world.resource_mut::<TimeState>();
+            time.tick += 1;
+        }
+
+        let beliefs = world
+            .get::<PredatorBeliefs>(mouse)
+            .expect("PreyAnimal requires PredatorBeliefs");
+        let priors = SimConstants::default().beliefs.species_violence_priors;
+        let cat_model = beliefs
+            .models
+            .get(&cat)
+            .expect("prey should seed a cat threat model on first encounter");
+        assert!(
+            (cat_model.perceived_violence_capability.value - priors.cat_perceived_by_prey).abs()
+                < 1e-5,
+            "prey's cat prior should be {}; got {}",
+            priors.cat_perceived_by_prey,
+            cat_model.perceived_violence_capability.value
+        );
+        assert_eq!(
+            cat_model.perceived_violence_capability.last_source,
+            EvidenceKind::Implant
+        );
+        let fox_model = beliefs
+            .models
+            .get(&fox)
+            .expect("prey should seed a fox threat model on first encounter");
+        assert!(
+            (fox_model.perceived_violence_capability.value - priors.fox_perceived_by_prey).abs()
+                < 1e-5,
+            "prey's fox prior should be {}; got {}",
+            priors.fox_perceived_by_prey,
+            fox_model.perceived_violence_capability.value
+        );
+    }
+
+    #[test]
+    fn prey_witness_has_no_observation_channel() {
+        // An Attack witnessed in range must NOT create or update prey
+        // models — prey run Pass B only (instinct priors + decay). The
+        // implant entry the pass seeds carries EvidenceKind::Implant,
+        // never Observation.
+        let (mut world, mut schedule) = test_world(100);
+        let actor = spawn_cat(&mut world, Position::new(10, 10));
+        let victim = spawn_cat(&mut world, Position::new(11, 10));
+        let mouse = spawn_prey(&mut world, Position::new(12, 10));
+
+        world.write_message(WitnessableEvent::Attack {
+            actor,
+            target: victim,
+            position: Position::new(10, 10),
+            severity: 0.8,
+            tick: 100,
+        });
+
+        // Single tick: Pass A runs for cat/wildlife witnesses; the
+        // prey's stagger phase may or may not land, but Observation
+        // evidence must never appear either way.
+        schedule.run(&mut world);
+
+        let beliefs = world.get::<PredatorBeliefs>(mouse).unwrap();
+        for model in beliefs.models.values() {
+            assert_eq!(
+                model.perceived_violence_capability.last_source,
+                EvidenceKind::Implant,
+                "prey models must only carry implanted priors, not observations"
+            );
+        }
+    }
+
+    #[test]
+    fn out_of_range_prey_gets_no_implants() {
+        let (mut world, mut schedule) = test_world(0);
+        spawn_cat(&mut world, Position::new(0, 0));
+        spawn_wildlife(&mut world, WildSpecies::Hawk, Position::new(1, 0));
+        let far_mouse = spawn_prey(&mut world, Position::new(50, 50));
+
+        let period = SimConstants::default().beliefs.decay_stagger_period;
+        for _ in 0..(period + 1) {
+            schedule.run(&mut world);
+            let mut time = world.resource_mut::<TimeState>();
+            time.tick += 1;
+        }
+
+        let beliefs = world.get::<PredatorBeliefs>(far_mouse).unwrap();
+        assert!(
+            beliefs.models.is_empty(),
+            "threats beyond WITNESS_RANGE must not implant"
         );
     }
 

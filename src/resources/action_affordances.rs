@@ -107,7 +107,8 @@ pub enum ActionKind {
     /// Provide food to a dependent kitten.
     FeedKitten,
 
-    // --- Prey-side (no AI today; substrate populates for future consumers) ---
+    // --- Prey-side (written by 314's prey-perceiver rows; DSE consumers
+    // arrive with ticket 266's prey-side AI) ---
     /// Sprint flight along the lowest-cost escape route.
     Bolt,
     /// Disrupt herd cohesion to scatter a predator's target lock.
@@ -115,7 +116,7 @@ pub enum ActionKind {
 }
 
 impl ActionKind {
-    /// All 22 variants in declaration order. Useful for the writer's
+    /// All 21 variants in declaration order. Useful for the writer's
     /// per-tick rebuild loop and for test enumeration.
     pub const ALL: [ActionKind; 21] = [
         ActionKind::Stalk,

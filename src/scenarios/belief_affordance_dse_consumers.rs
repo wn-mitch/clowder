@@ -18,21 +18,19 @@
 //! |-----------------------------------------------|-------------------------------------------------------------------|
 //! | `flee_belief_high_violence_capability`        | `Affordance(Flee, cat, fox)` populates; substrate sees the belief |
 //! | `patrol_avoids_high_threat_sector`            | `LocationBeliefs.recency_of_threat_cue` round-trips into ScoringContext  |
-//! | `hunt_picks_stalk_for_oblivious_prey`         | Plumbing smoke for the Hunt 5th axis read path (see writer gap)   |
-//! | `hunt_picks_chase_for_alerted_prey`           | Plumbing smoke for the Hunt 5th axis read path (see writer gap)   |
+//! | `hunt_picks_stalk_for_oblivious_prey`         | Cat-vs-prey rows populate; Stalk > Chase for oblivious prey       |
+//! | `hunt_picks_chase_for_alerted_prey`           | Cat-vs-prey rows populate; Chase > Stalk for alerted/fleeing prey |
 //!
-//! **Writer gap (cat-vs-prey).** Substrate 261's writer covers
-//! `cat-vs-cat` and `cat-vs-wildlife` (Fox / Hawk / Snake / ShadowFox)
-//! but NOT `cat-vs-prey` — `PreyAnimal` is a distinct marker from
-//! `WildAnimal`, and the writer's wildlife query excludes it. The two
-//! Hunt scenarios assert the consumer plumbing returns the substrate's
-//! "no entry" gate signal of `0.0` without panicking; behavioural
-//! assertions (Stalk > Chase for low-alertness prey) graduate when a
-//! follow-on extends the writer to cover cat-vs-prey Stalk / Chase /
-//! Pounce. The Hunt per-target axis (`hunt_best_predation_weight`) and
-//! the resolver phase-bias (`hunt_stalk_chase_affordance_bias`) ship
-//! dormant and remain meaningful no-ops at land regardless of the
-//! writer-coverage gap.
+//! **Writer gap (cat-vs-prey) — CLOSED by ticket 314.** Substrate
+//! 261's writer originally covered `cat-vs-cat` and `cat-vs-wildlife`
+//! but not `cat-vs-prey`; the two Hunt scenarios asserted the honest
+//! `0.0` gate signal. 314 extended the writer (`write_cat_vs_prey`,
+//! Stalk / Chase / Pounce composed from proximity, cover, health, and
+//! the prey's own `alertness` scalar), and the assertions graduated to
+//! the behavioural shape claims below. The Hunt per-target axis
+//! (`hunt_best_predation_weight`) and the resolver phase-bias
+//! (`hunt_stalk_chase_affordance_bias`) remain dormant — activation is
+//! ticket 315's four-artifact job.
 
 use bevy_ecs::world::World;
 
@@ -297,18 +295,13 @@ mod tests {
     }
 
     #[test]
-    fn hunt_predation_affordance_plumbing_smoke_oblivious() {
-        // 263 plumbing smoke: substrate 261's writer covers
-        // cat-vs-cat and cat-vs-wildlife (Fox / Hawk / Snake /
-        // ShadowFox) but NOT cat-vs-prey today (`PreyAnimal` is a
-        // distinct marker from `WildAnimal`; the writer's wildlife
-        // query excludes it). The Hunt per-target axis's read path
-        // therefore returns 0.0 for `(cat, mouse, Stalk|Chase|Pounce)`
-        // until a substrate-extension follow-on populates cat-vs-prey.
-        // This test asserts the plumbing returns f32 without panicking
-        // and the substrate's "no entry written" gate signal of 0.0
-        // is honest. When the writer extension lands, assertions
-        // graduate to "Stalk > Chase for low-alertness prey".
+    fn hunt_picks_stalk_for_oblivious_prey_behavioural() {
+        // Graduated from the 263 "writer gap" plumbing smoke by ticket
+        // 314: `write_cat_vs_prey` now populates the predation trio.
+        // An oblivious (low-alertness) mouse suppresses nothing in the
+        // Stalk composition (`1 - alertness` slot near 1.0) while the
+        // Chase composition's alertness slot sits near 0.0 — Stalk
+        // must out-afford Chase.
         let mut app = run_scenario_ticks(&SCENARIO_HUNT_PICKS_STALK_FOR_OBLIVIOUS_PREY, 4);
         let world = app.world_mut();
         let probe = cat_by_name(world, FOCAL_NAME);
@@ -316,34 +309,39 @@ mod tests {
         let stalk = read_affordance(world, probe, prey, ActionKind::Stalk);
         let chase = read_affordance(world, probe, prey, ActionKind::Chase);
         let pounce = read_affordance(world, probe, prey, ActionKind::Pounce);
-        assert_eq!(
-            stalk, 0.0,
-            "cat-vs-prey Stalk not yet populated by writer (follow-on); got {stalk}"
+        assert!(
+            stalk > 0.0,
+            "cat-vs-prey Stalk must populate for an in-range mouse; got {stalk}"
         );
-        assert_eq!(
-            chase, 0.0,
-            "cat-vs-prey Chase not yet populated; got {chase}"
+        assert!(
+            pounce > 0.0,
+            "cat-vs-prey Pounce must populate for an in-range mouse; got {pounce}"
         );
-        assert_eq!(
-            pounce, 0.0,
-            "cat-vs-prey Pounce not yet populated; got {pounce}"
+        assert!(
+            stalk > chase,
+            "oblivious prey: Stalk ({stalk}) should out-afford Chase ({chase})"
         );
     }
 
     #[test]
-    fn hunt_predation_affordance_plumbing_smoke_alerted() {
-        // Mirror of the oblivious-prey case. Asserts the plumbing
-        // returns 0.0 (writer-gap signal) for a fleeing prey too,
-        // confirming the gap is across prey state, not specific to
-        // an alertness band. Graduates with the same follow-on.
+    fn hunt_picks_chase_for_alerted_prey_behavioural() {
+        // Graduated mirror: the near-saturated alertness of a fleeing
+        // mouse feeds Chase (flushed prey is run down — interception
+        // geometry, not stealth) and starves Stalk's `1 - alertness`
+        // slot. Chase must out-afford Stalk.
         let mut app = run_scenario_ticks(&SCENARIO_HUNT_PICKS_CHASE_FOR_ALERTED_PREY, 4);
         let world = app.world_mut();
         let probe = cat_by_name(world, FOCAL_NAME);
         let prey = prey_entity(world);
+        let stalk = read_affordance(world, probe, prey, ActionKind::Stalk);
         let chase = read_affordance(world, probe, prey, ActionKind::Chase);
-        assert_eq!(
-            chase, 0.0,
-            "cat-vs-prey Chase not yet populated by writer (follow-on); got {chase}"
+        assert!(
+            chase > 0.0,
+            "cat-vs-prey Chase must populate for an in-range mouse; got {chase}"
+        );
+        assert!(
+            chase > stalk,
+            "alerted prey: Chase ({chase}) should out-afford Stalk ({stalk})"
         );
     }
 }

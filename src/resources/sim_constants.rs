@@ -8986,6 +8986,31 @@ pub struct SpeciesViolencePriors {
     /// cats, repel it). Consumers land with ticket 310.
     #[serde(default = "default_cat_perceived_by_shadow_fox")]
     pub cat_perceived_by_shadow_fox: f32,
+    /// 314: prey-perceiver rows — how dangerous each threat species
+    /// looks to prey, implanted into the prey entity's
+    /// `PredatorBeliefs` on first encounter (`belief_integrator`
+    /// Pass B, symmetric to the cat- and wildlife-side implants).
+    /// Read by the affordance writer's prey-perceiver `Bolt`
+    /// heuristic; downstream DSE consumers arrive with ticket 266
+    /// (prey-side AI), so the rows are behaviorally dormant until
+    /// then. One row per threat species, not per prey kind — prey
+    /// share an instinct table.
+    ///
+    /// Cats are the archetypal prey-killer.
+    #[serde(default = "default_cat_perceived_by_prey")]
+    pub cat_perceived_by_prey: f32,
+    /// Foxes hunt the same small-mammal menu.
+    #[serde(default = "default_fox_perceived_by_prey")]
+    pub fox_perceived_by_prey: f32,
+    /// Raptor shadow — highest ambient dread for ground prey.
+    #[serde(default = "default_hawk_perceived_by_prey")]
+    pub hawk_perceived_by_prey: f32,
+    /// Ambush-only threat; less feared in the open.
+    #[serde(default = "default_snake_perceived_by_prey")]
+    pub snake_perceived_by_prey: f32,
+    /// Apex threat reads as lethal to everything beneath it.
+    #[serde(default = "default_shadow_fox_perceived_by_prey")]
+    pub shadow_fox_perceived_by_prey: f32,
 }
 
 impl Default for SpeciesViolencePriors {
@@ -9000,8 +9025,38 @@ impl Default for SpeciesViolencePriors {
             cat_perceived_by_hawk: default_cat_perceived_by_hawk(),
             cat_perceived_by_snake: default_cat_perceived_by_snake(),
             cat_perceived_by_shadow_fox: default_cat_perceived_by_shadow_fox(),
+            cat_perceived_by_prey: default_cat_perceived_by_prey(),
+            fox_perceived_by_prey: default_fox_perceived_by_prey(),
+            hawk_perceived_by_prey: default_hawk_perceived_by_prey(),
+            snake_perceived_by_prey: default_snake_perceived_by_prey(),
+            shadow_fox_perceived_by_prey: default_shadow_fox_perceived_by_prey(),
         }
     }
+}
+
+/// 314: cat violence prior as perceived by prey.
+fn default_cat_perceived_by_prey() -> f32 {
+    0.9
+}
+
+/// 314: fox violence prior as perceived by prey.
+fn default_fox_perceived_by_prey() -> f32 {
+    0.8
+}
+
+/// 314: hawk violence prior as perceived by prey.
+fn default_hawk_perceived_by_prey() -> f32 {
+    0.85
+}
+
+/// 314: snake violence prior as perceived by prey.
+fn default_snake_perceived_by_prey() -> f32 {
+    0.6
+}
+
+/// 314: shadow-fox violence prior as perceived by prey.
+fn default_shadow_fox_perceived_by_prey() -> f32 {
+    0.9
 }
 
 /// 265: cat violence prior as perceived by foxes.

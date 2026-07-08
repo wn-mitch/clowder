@@ -136,7 +136,19 @@ impl Default for PreyState {
 
 /// Marker component for prey entities. Kept so existing queries using
 /// `With<PreyAnimal>` / `Without<PreyAnimal>` continue working.
+///
+/// 314: every prey entity carries [`PredatorBeliefs`] — its mental
+/// models of the threats it has encountered (cats AND wildlife
+/// predators). Expressed as a required component so all spawn paths
+/// (den spawns, world-gen, scenario presets, tests) are covered at
+/// compile time, mirroring `WildAnimal`'s required `CatBeliefs` (265).
+/// Seeded by `belief_integrator` Pass B from the
+/// `SpeciesViolencePriors` prey-perceiver rows; read by the affordance
+/// writer's prey-perceiver `Bolt` heuristic.
+///
+/// [`PredatorBeliefs`]: crate::components::beliefs::PredatorBeliefs
 #[derive(Component, Debug, Clone, Copy)]
+#[require(crate::components::beliefs::PredatorBeliefs)]
 pub struct PreyAnimal;
 
 // ---------------------------------------------------------------------------
