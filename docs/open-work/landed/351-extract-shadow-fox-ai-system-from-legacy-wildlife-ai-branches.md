@@ -1,7 +1,7 @@
 ---
 id: 351
 title: Extract shadow_fox_ai system from legacy wildlife_ai branches
-status: ready
+status: done
 cluster: wildlife
 orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: e6a0d627
+landed-on: 2026-07-08
 ---
 
 ## Why
@@ -110,3 +110,4 @@ beyond nothing-at-all.
 ## Log
 - 2026-05-19: accuracy audit — INCOMPLETE TEMPLATE: ticket body contains template placeholder text. Ticket was opened on 2026-05-15 but never filled in. [needs-review] for completion or status change.
 - 2026-07-08: template filled (release-plan step 22 pre-work). Audit finding that sharpens the scope: `wildlife_ai` and `predator_stalk_cats` are not "shadowfox branches inside shared systems" — post-cutover both are shadow-fox-only in production (query filters exclude all three `*State` species; `With<ShadowFoxDrives>` gates the stalk loop), so this is whole-system motion, not branch surgery. Extraction proceeding this session; gate is byte-identity vs `logs/tuned-42-9eb6e7ed` (485 precedent).
+- 2026-07-08: **landed** (plan step 22; commit e6a0d627). 1,504 lines moved byte-verbatim (content-anchored script, verified against the parent revision post-fmt): `wildlife_ai` + `is_patrol_terrain`, the three `shadowfox_*` ticks + `same_motivation_kind`, `predator_stalk_cats`, and both test clusters incl. their private helpers. Five registrations updated in place inside their `.chain()` blocks; one import pruned in `wildlife.rs`. **Gate: byte-identical** — `tuned-42-e6a0d627` (900s) matches the accepted `tuned-42-9eb6e7ed` stream bit-exactly for all 428,350 overlapping event lines (sole differing line is the candidate's own footer); the module-path rename does not perturb Bevy's schedule, strictly stronger than the 485 precedent (which had to caveat executor non-determinism). `just verdict` "fail" on this run is the known chain-rare `KnowledgePromoted` zero at 900s — same trajectory as the step-21 gate-3 diagnosis (the accepted reference fired it in its second 900s; a bit-exact prefix of an accepted stream cannot contain a new mechanism break); recurrence noted on the step-24 watch-item. Survival clean (Starvation 0, ShadowFoxAmbush 1, deaths 2 — identical to reference), continuity pass. Rode along in separate commits: d75a2517 fixes hawk/snake GOAP smoke tests that were failing at main (self-built Apps missing `ActionAffordances`, load-bearing since 265's live borrows — a step-21 verification gap), fb494397 refreshes the epic-060 265 sha row. Ticket 310's stages now have a clean home; renames deferred to 310's first behavior stage.
