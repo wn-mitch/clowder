@@ -8,7 +8,8 @@
 //! prefer ambush over active foraging).
 //!
 //! 265 adds a conditional `best_prey_strike_affordance` axis
-//! (dormant at 0.0) — max `Affordance(Strike, snake, prey)` over prey
+//! (active at first-light 0.10 since plan step 21) — max
+//! `Affordance(Strike, snake, prey)` over prey
 //! in detection range. Strike is adjacency-gated in the 261 writer,
 //! so the axis rewards holding an ambush spot prey actually pass.
 //!
@@ -55,7 +56,8 @@ impl SnakeAmbushingDse {
         ];
         let mut weights = vec![0.6, 0.4];
 
-        // 265: conditional strike-affordance axis, dormant at 0.0
+        // 265: conditional strike-affordance axis, active at
+        // first-light 0.10 since plan step 21
         // (the 264 socialize_target shape). Base two scale by
         // `(1 − extra)` so the WeightedSum stays at 1.0.
         let affordance_w = scoring
@@ -128,7 +130,11 @@ mod tests {
 
     #[test]
     fn snake_ambushing_has_two_axes() {
-        let s = ScoringConstants::default();
+        // Pinned via the explicitly-zeroed 265 weight (config-override
+        // escape hatch); at active defaults the conditional axis makes
+        // three.
+        let mut s = ScoringConstants::default();
+        s.snake_ambush_strike_affordance_weight = 0.0;
         assert_eq!(SnakeAmbushingDse::new(&s).considerations().len(), 2);
     }
 
@@ -154,11 +160,12 @@ mod tests {
     }
 
     #[test]
-    fn strike_affordance_axis_absent_at_default() {
-        // 265: weight ships at 0.0; the axis MUST NOT appear and the
-        // two-axis composition is byte-identical to pre-265.
-        let s = ScoringConstants::default();
-        assert_eq!(s.snake_ambush_strike_affordance_weight, 0.0);
+    fn strike_affordance_axis_absent_when_zeroed() {
+        // 265 activation: zeroing the weight (config-override escape
+        // hatch) MUST rebuild the pre-265 two-axis composition
+        // byte-identically.
+        let mut s = ScoringConstants::default();
+        s.snake_ambush_strike_affordance_weight = 0.0;
         let dse = SnakeAmbushingDse::new(&s);
         assert_eq!(dse.considerations().len(), 2);
         assert!(dse.considerations().iter().all(|c| !matches!(
@@ -177,5 +184,20 @@ mod tests {
         assert!((sum - 1.0).abs() < 1e-4, "sum was {sum}");
         assert!((dse.composition().weights[0] - 0.6 * 0.75).abs() < 1e-4);
         assert!((dse.composition().weights[2] - 0.25).abs() < 1e-4);
+    }
+
+    #[test]
+    fn axis_active_at_default_first_light() {
+        // 265 activation (plan step 21): first-light 0.10.
+        let s = ScoringConstants::default();
+        assert_eq!(s.snake_ambush_strike_affordance_weight, 0.10);
+        let dse = SnakeAmbushingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 3);
+        assert!(dse.considerations().iter().any(|c| matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == STRIKE_AFFORDANCE_INPUT
+        )));
+        assert!((dse.composition().weights[0] - 0.6 * 0.9).abs() < 1e-4);
+        assert!((dse.composition().weights[2] - 0.10).abs() < 1e-4);
     }
 }

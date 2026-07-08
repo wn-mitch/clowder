@@ -116,6 +116,11 @@ pub fn snake_evaluate_and_plan(
     dse_registry: Res<DseRegistry>,
     modifier_pipeline: Res<ModifierPipeline>,
     constants: Res<SimConstants>,
+    // 265 activation (plan step 21): live substrate borrow for the
+    // SnakeAmbushing/SnakeForaging affordance axes. Read-only — the
+    // byte-neutral read-edge class established by the 265 control
+    // ladder.
+    affordances: Res<crate::resources::ActionAffordances>,
     // Ticket 427 Step 3 — per-system A* arena.
     mut planner_scratch: bevy_ecs::prelude::Local<
         crate::ai::planner::core::PlannerScratch<SnakeDomain>,
@@ -126,13 +131,6 @@ pub fn snake_evaluate_and_plan(
     let prey_snapshot: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
     let prey_positions: Vec<Position> = prey_snapshot.iter().map(|(_, p)| *p).collect();
     let markers = MarkerSnapshot::new();
-    // 265: the SnakeAmbushing/SnakeForaging conditional affordance axes
-    // ship dormant at weight 0.0, so the scalars are never read. The
-    // live `Res<ActionAffordances>` borrow is deferred to the step-21
-    // activation commit (same deferral as 264's caretake pre-check in
-    // goap.rs) — taking it here would add an unordered conflict edge
-    // against `affordance_writer`'s `ResMut`.
-    let affordances_dormant = crate::resources::ActionAffordances::default();
 
     for (snake_entity, snake_state, snake_pos, needs, personality, cat_beliefs) in &snakes {
         let cats_nearby = cat_snapshot
@@ -141,7 +139,7 @@ pub fn snake_evaluate_and_plan(
             .count();
         // 265: the snake's own belief about how dangerous the cats in
         // detection range are — read by SnakeFleeing's conditional
-        // `perceived_cat_threat` axis (dormant at 0.0).
+        // `perceived_cat_threat` axis (active since plan step 21).
         let perceived_cat_threat = crate::components::beliefs::max_perceived_violence(
             cat_beliefs,
             cat_snapshot
@@ -159,7 +157,8 @@ pub fn snake_evaluate_and_plan(
         };
         // 265: best strike/stalk opportunity over prey in detection
         // range — read by the SnakeAmbushing/SnakeForaging conditional
-        // axes (dormant at 0.0).
+        // axes (active since plan step 21), fed by the 314
+        // wildlife-vs-prey writer rows.
         let prey_in_range = || {
             prey_snapshot
                 .iter()
@@ -167,13 +166,13 @@ pub fn snake_evaluate_and_plan(
                 .map(|(e, _)| *e)
         };
         let best_prey_strike_affordance = crate::resources::best_affordance_over_targets(
-            &affordances_dormant,
+            &affordances,
             snake_entity,
             prey_in_range(),
             &[crate::resources::ActionKind::Strike],
         );
         let best_prey_stalk_affordance = crate::resources::best_affordance_over_targets(
-            &affordances_dormant,
+            &affordances,
             snake_entity,
             prey_in_range(),
             &[crate::resources::ActionKind::Stalk],

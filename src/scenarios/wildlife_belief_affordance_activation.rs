@@ -135,6 +135,58 @@ fn spawn_scenario_fox(world: &mut World, pos: Position) -> bevy_ecs::entity::Ent
         .id()
 }
 
+// ---------------------------------------------------------------------------
+// Variant 2 — hawk Dive affordance vs aerial cover
+// ---------------------------------------------------------------------------
+
+/// Hawk between two mice at symmetric distance 6 (inside the 10-tile
+/// writer sensing range). The west mouse shelters under a live
+/// Thornward (repel radius 6 — a real `Ward` entity, not a setup-time
+/// `stamp_ward`, because `update_ward_coverage_map` clears and
+/// rebuilds from live wards every tick); the east mouse sits on open
+/// ground. `write_wildlife_vs_prey`'s Dive slot reads
+/// `1 − cover_at_target`, so open ground must out-afford cover.
+const HAWK_POS: Position = Position::new(20, 20);
+const COVERED_MOUSE_POS: Position = Position::new(14, 20);
+const OPEN_MOUSE_POS: Position = Position::new(26, 20);
+
+pub static SCENARIO_HAWK_DIVE_AERIAL_COVER: Scenario = Scenario {
+    name: "hawk_dive_affordance_aerial_cover",
+    default_focal: "Watcher",
+    default_ticks: 4,
+    setup: setup_hawk_dive_aerial_cover,
+    expected_features: &[],
+};
+
+fn setup_hawk_dive_aerial_cover(world: &mut World, seed: u64) {
+    use crate::components::prey::PreyKind;
+
+    init_scenario_world(world, seed);
+
+    // A named cat far from the action — the runner needs a focal to
+    // resolve, but it must not perturb the hawk/mice geometry.
+    spawn_cat(
+        world,
+        CatPreset::adult("Watcher", Position::new(5, 35)).with_marker(MarkerKind::Adult),
+    );
+
+    world.spawn((
+        HAWK_POS,
+        WildAnimal::new(WildSpecies::Hawk),
+        Health::default(),
+    ));
+
+    super::env::spawn_prey_at(world, COVERED_MOUSE_POS, PreyKind::Mouse);
+    super::env::spawn_prey_at(world, OPEN_MOUSE_POS, PreyKind::Mouse);
+
+    // Live ward sheltering the west mouse (thornward radius 6.0 at
+    // full strength; decay over a 4-tick run is negligible).
+    world.spawn((
+        crate::components::magic::Ward::thornward(),
+        COVERED_MOUSE_POS,
+    ));
+}
+
 fn stamp_cat_violence_belief(
     world: &mut World,
     fox: bevy_ecs::entity::Entity,
@@ -166,6 +218,7 @@ mod tests {
     use crate::ai::fox_planner::FoxDispositionKind;
     use crate::components::fox_goap_plan::FoxGoapPlan;
     use crate::scenarios::runner::build_scenario_app;
+    use bevy_ecs::prelude::{Entity, With};
 
     fn run_scenario_ticks(scenario: &Scenario, ticks: u32) -> bevy::app::App {
         let mut app = build_scenario_app(42, scenario, scenario.default_focal);
@@ -203,6 +256,50 @@ mod tests {
                 panic!("fox with a FoxGoapPlan not found in {} half-plane at tick {tick}; roster: {roster:?}",
                     if west { "west" } else { "east" })
             })
+    }
+
+    #[test]
+    fn hawk_dive_prefers_open_ground_mouse_over_covered() {
+        use crate::resources::{ActionAffordances, ActionKind};
+
+        let mut app = run_scenario_ticks(&SCENARIO_HAWK_DIVE_AERIAL_COVER, 4);
+        let world = app.world_mut();
+
+        let hawk = {
+            let mut q = world.query::<(Entity, &WildAnimal)>();
+            q.iter(world)
+                .find(|(_, w)| w.species == WildSpecies::Hawk)
+                .map(|(e, _)| e)
+                .expect("hawk not found")
+        };
+        // Mice may shuffle a tile or two over 4 ticks; the x=20
+        // half-plane still splits them.
+        let mouse_in_half = |world: &mut World, west: bool| -> Entity {
+            let mut q = world
+                .query_filtered::<(Entity, &Position), With<crate::components::prey::PreyAnimal>>();
+            q.iter(world)
+                .find(|(_, p)| (p.x() < 20) == west)
+                .map(|(e, _)| e)
+                .expect("mouse not found in expected half-plane")
+        };
+        let covered = mouse_in_half(world, true);
+        let open = mouse_in_half(world, false);
+
+        let read = |world: &World, target: Entity| -> f32 {
+            world
+                .resource::<ActionAffordances>()
+                .read(hawk, target, ActionKind::Dive)
+        };
+        let dive_open = read(world, open);
+        let dive_covered = read(world, covered);
+        assert!(
+            dive_open > 0.0,
+            "Dive against the open-ground mouse must populate; got {dive_open}"
+        );
+        assert!(
+            dive_open > dive_covered,
+            "open ground must out-afford ward cover: open={dive_open} covered={dive_covered}"
+        );
     }
 
     #[test]

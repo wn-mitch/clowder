@@ -90,17 +90,26 @@ pub struct HawkScoringContext<'a> {
     pub cats_nearby: usize,
     /// 265: max `Affordance(Dive|Chase, hawk, prey)` over prey in
     /// detection range, from substrate 261. Read by HawkHunting's
-    /// conditional `best_prey_predation_affordance` axis (dormant at
-    /// `hawk_hunting_prey_affordance_weight` 0.0). Wildlife-vs-prey
-    /// writer rows arrive with ticket 314; until then this reads 0.0.
+    /// conditional `best_prey_predation_affordance` axis (active at
+    /// first-light 0.10 since plan step 21), fed by the 314
+    /// wildlife-vs-prey writer rows.
     pub best_prey_predation_affordance: f32,
     /// 265: max `CatBeliefs[cat].perceived_violence_capability` over
     /// cats in avoidance range — the hawk's own belief about how
     /// dangerous the cats around it are. Read by HawkFleeing's
-    /// conditional `perceived_cat_threat` axis (dormant at
-    /// `hawk_flee_cat_violence_belief_weight` 0.0).
+    /// conditional `perceived_cat_threat` axis (active at first-light
+    /// 0.10 since plan step 21).
     pub perceived_cat_threat: f32,
-    /// Fox's current tile.
+    /// 265 activation: belief clause for the Fleeing outer gate,
+    /// precomputed in `hawk_goap` (this context carries no
+    /// `&ScoringConstants`): true when the belief axis is active AND
+    /// `perceived_cat_threat >= hawk_flee_belief_eligibility_threshold`.
+    /// Opens Fleeing for a healthy, un-outnumbered hawk that has
+    /// witnessed cat violence — without it the conditional axis is
+    /// election-dead in the single-cat case (the same naked-AND
+    /// silencing shape fixed on the fox side).
+    pub belief_flee_eligible: bool,
+    /// Hawk's current tile.
     pub self_position: Position,
     pub jitter_range: f32,
 }
@@ -217,8 +226,10 @@ pub fn score_hawk_dispositions(
         }
     }
 
-    // Fleeing: health deficit + cats nearby.
-    if ctx.needs.health_fraction < 0.5 || ctx.cats_nearby >= 2 {
+    // Fleeing: health deficit + cats nearby, extended by 265's
+    // activation with the precomputed belief clause (see
+    // `HawkScoringContext::belief_flee_eligible`).
+    if ctx.needs.health_fraction < 0.5 || ctx.cats_nearby >= 2 || ctx.belief_flee_eligible {
         let score = score_hawk_dse_by_id("hawk_fleeing", ctx, inputs);
         if score > 0.0 {
             scores.push((HawkDispositionKind::Fleeing, score + jitter(rng, j)));
@@ -306,6 +317,7 @@ mod tests {
             cats_nearby: 0,
             best_prey_predation_affordance: 0.0,
             perceived_cat_threat: 0.0,
+            belief_flee_eligible: false,
             self_position: Position::new(0, 0),
             jitter_range: 0.0,
         };
@@ -357,6 +369,7 @@ mod tests {
             cats_nearby: 0,
             best_prey_predation_affordance: affordance,
             perceived_cat_threat: 0.0,
+            belief_flee_eligible: false,
             self_position: Position::new(0, 0),
             jitter_range: 0.0,
         };
@@ -408,6 +421,7 @@ mod tests {
             cats_nearby: 2,
             best_prey_predation_affordance: 0.0,
             perceived_cat_threat: threat,
+            belief_flee_eligible: false,
             self_position: Position::new(0, 0),
             jitter_range: 0.0,
         };
@@ -437,6 +451,69 @@ mod tests {
         assert!(
             high > zero,
             "believed threat=1.0 must outscore 0.0 when active (high={high}, zero={zero})"
+        );
+    }
+
+    #[test]
+    fn belief_clause_makes_fleeing_eligible_for_healthy_lone_hawk() {
+        // 265 activation: the legacy gate (`health < 0.5 ||
+        // cats_nearby >= 2`) kept Fleeing out of the pool for a
+        // healthy hawk near ONE cat. The precomputed belief clause
+        // opens it; false restores the legacy gate exactly.
+        let scoring = crate::resources::sim_constants::ScoringConstants::default();
+        let needs = HawkNeeds {
+            hunger: 0.8,
+            health_fraction: 1.0, // fails the legacy health arm
+        };
+        let personality = HawkPersonality::default();
+        let base_ctx = |eligible: bool| HawkScoringContext {
+            needs: &needs,
+            personality: &personality,
+            prey_nearby: false,
+            cats_nearby: 1, // fails the legacy outnumbered arm
+            best_prey_predation_affordance: 0.0,
+            perceived_cat_threat: 0.9,
+            belief_flee_eligible: eligible,
+            self_position: Position::new(0, 0),
+            jitter_range: 0.0,
+        };
+
+        let mut registry = crate::ai::eval::DseRegistry::new();
+        registry
+            .hawk_dses
+            .push(crate::ai::dses::hawk_fleeing_dse(&scoring));
+        let modifier = crate::ai::eval::ModifierPipeline::default();
+        let markers = crate::ai::scoring::MarkerSnapshot::new();
+        let inputs = EvalInputs {
+            cat: Entity::PLACEHOLDER,
+            tick: 0,
+            position: Position::new(0, 0),
+            dse_registry: &registry,
+            modifier_pipeline: &modifier,
+            markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
+            focal_cat: None,
+            focal_capture: None,
+        };
+
+        let mut rng = rand::rng();
+        let with_clause = score_hawk_dispositions(&base_ctx(true), &inputs, &mut rng);
+        let without_clause = score_hawk_dispositions(&base_ctx(false), &inputs, &mut rng);
+        assert!(
+            with_clause
+                .scores
+                .iter()
+                .any(|(k, _)| *k == HawkDispositionKind::Fleeing),
+            "belief clause must admit Fleeing to the pool"
+        );
+        assert!(
+            !without_clause
+                .scores
+                .iter()
+                .any(|(k, _)| *k == HawkDispositionKind::Fleeing),
+            "without the clause the legacy gate must exclude Fleeing"
         );
     }
 }

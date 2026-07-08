@@ -6,7 +6,7 @@
 //! 0.3)` (steep, fires only under acute hunger), `aggression` via
 //! `Linear(1.0, 0.0)` (aggressive snakes forage more readily).
 //!
-//! 265 adds a conditional `best_prey_stalk_affordance` axis (dormant
+//! 265 adds a conditional `best_prey_stalk_affordance` axis (active
 //! at 0.0) — max `Affordance(Stalk, snake, prey)` over prey in
 //! detection range, from substrate 261.
 //!
@@ -53,7 +53,8 @@ impl SnakeForagingDse {
         ];
         let mut weights = vec![0.7, 0.3];
 
-        // 265: conditional stalk-affordance axis, dormant at 0.0
+        // 265: conditional stalk-affordance axis, active at
+        // first-light 0.10 since plan step 21
         // (the 264 socialize_target shape). Base two scale by
         // `(1 − extra)` so the WeightedSum stays at 1.0.
         let affordance_w = scoring.snake_forage_stalk_affordance_weight.clamp(0.0, 1.0);
@@ -124,7 +125,11 @@ mod tests {
 
     #[test]
     fn snake_foraging_has_two_axes() {
-        let s = ScoringConstants::default();
+        // Pinned via the explicitly-zeroed 265 weight (config-override
+        // escape hatch); at active defaults the conditional axis makes
+        // three.
+        let mut s = ScoringConstants::default();
+        s.snake_forage_stalk_affordance_weight = 0.0;
         assert_eq!(SnakeForagingDse::new(&s).considerations().len(), 2);
     }
 
@@ -136,11 +141,12 @@ mod tests {
     }
 
     #[test]
-    fn stalk_affordance_axis_absent_at_default() {
-        // 265: weight ships at 0.0; the axis MUST NOT appear and the
-        // two-axis composition is byte-identical to pre-265.
-        let s = ScoringConstants::default();
-        assert_eq!(s.snake_forage_stalk_affordance_weight, 0.0);
+    fn stalk_affordance_axis_absent_when_zeroed() {
+        // 265 activation: zeroing the weight (config-override escape
+        // hatch) MUST rebuild the pre-265 two-axis composition
+        // byte-identically.
+        let mut s = ScoringConstants::default();
+        s.snake_forage_stalk_affordance_weight = 0.0;
         let dse = SnakeForagingDse::new(&s);
         assert_eq!(dse.considerations().len(), 2);
         assert!(dse.considerations().iter().all(|c| !matches!(
@@ -159,5 +165,20 @@ mod tests {
         assert!((sum - 1.0).abs() < 1e-4, "sum was {sum}");
         assert!((dse.composition().weights[0] - 0.7 * 0.8).abs() < 1e-4);
         assert!((dse.composition().weights[2] - 0.2).abs() < 1e-4);
+    }
+
+    #[test]
+    fn axis_active_at_default_first_light() {
+        // 265 activation (plan step 21): first-light 0.10.
+        let s = ScoringConstants::default();
+        assert_eq!(s.snake_forage_stalk_affordance_weight, 0.10);
+        let dse = SnakeForagingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 3);
+        assert!(dse.considerations().iter().any(|c| matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == STALK_AFFORDANCE_INPUT
+        )));
+        assert!((dse.composition().weights[0] - 0.7 * 0.9).abs() < 1e-4);
+        assert!((dse.composition().weights[2] - 0.10).abs() < 1e-4);
     }
 }

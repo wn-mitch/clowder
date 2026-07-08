@@ -2923,19 +2923,21 @@ pub struct ScoringConstants {
     /// 265: weight on HawkHunting's conditional
     /// `best_prey_predation_affordance` axis — max over prey in
     /// detection range of `Affordance(Dive|Chase, hawk, prey)`.
-    /// Ships dormant at 0.0.
+    /// Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_hawk_hunting_prey_affordance_weight")]
     pub hawk_hunting_prey_affordance_weight: f32,
     /// 265: weight on SnakeAmbushing's conditional
     /// `best_prey_strike_affordance` axis — max over prey in detection
     /// range of `Affordance(Strike, snake, prey)`. Strike is
     /// adjacency-gated in the writer, so this axis rewards holding an
-    /// ambush spot prey actually pass. Ships dormant at 0.0.
+    /// ambush spot prey actually pass. Activated 2026-07-08 at
+    /// first-light 0.10.
     #[serde(default = "default_snake_ambush_strike_affordance_weight")]
     pub snake_ambush_strike_affordance_weight: f32,
     /// 265: weight on SnakeForaging's conditional
     /// `best_prey_stalk_affordance` axis — max over prey in detection
-    /// range of `Affordance(Stalk, snake, prey)`. Ships dormant at 0.0.
+    /// range of `Affordance(Stalk, snake, prey)`. Activated 2026-07-08
+    /// at first-light 0.10.
     #[serde(default = "default_snake_forage_stalk_affordance_weight")]
     pub snake_forage_stalk_affordance_weight: f32,
     /// 265: weight on FoxFleeing's conditional `perceived_cat_threat`
@@ -2957,11 +2959,18 @@ pub struct ScoringConstants {
     #[serde(default = "default_fox_flee_belief_eligibility_threshold")]
     pub fox_flee_belief_eligibility_threshold: f32,
     /// 265: weight on HawkFleeing's conditional `perceived_cat_threat`
-    /// axis. Ships dormant at 0.0.
+    /// axis. Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_hawk_flee_cat_violence_belief_weight")]
     pub hawk_flee_cat_violence_belief_weight: f32,
+    /// 265 activation: hawk-side peer of
+    /// `fox_flee_belief_eligibility_threshold` — belief level opening
+    /// the HawkFleeing outer gate for a healthy, un-outnumbered hawk.
+    /// Inert while `hawk_flee_cat_violence_belief_weight` is 0.0.
+    #[serde(default = "default_hawk_flee_belief_eligibility_threshold")]
+    pub hawk_flee_belief_eligibility_threshold: f32,
     /// 265: weight on SnakeFleeing's conditional `perceived_cat_threat`
-    /// axis. Ships dormant at 0.0.
+    /// axis. Activated 2026-07-08 at first-light 0.10 (no eligibility
+    /// clause — the snake gate already admits one nearby cat).
     #[serde(default = "default_snake_flee_cat_violence_belief_weight")]
     pub snake_flee_cat_violence_belief_weight: f32,
     /// 263: bias magnitude on the Hunt resolver's `stalk_start` band
@@ -3653,6 +3662,8 @@ impl Default for ScoringConstants {
             fox_flee_cat_violence_belief_weight: default_fox_flee_cat_violence_belief_weight(),
             fox_flee_belief_eligibility_threshold: default_fox_flee_belief_eligibility_threshold(),
             hawk_flee_cat_violence_belief_weight: default_hawk_flee_cat_violence_belief_weight(),
+            hawk_flee_belief_eligibility_threshold: default_hawk_flee_belief_eligibility_threshold(
+            ),
             snake_flee_cat_violence_belief_weight: default_snake_flee_cat_violence_belief_weight(),
             hunt_stalk_chase_affordance_bias: default_hunt_stalk_chase_affordance_bias(),
             ward_ambush_anchor_weight: default_ward_ambush_anchor_weight(),
@@ -5401,21 +5412,21 @@ fn default_fox_hunting_prey_affordance_weight() -> f32 {
 }
 
 /// 265: HawkHunting `best_prey_predation_affordance` axis weight.
-/// Ships dormant at 0.0; activation is plan step 21.
+/// Activated 2026-07-08 at first-light 0.10 (plan step 21).
 fn default_hawk_hunting_prey_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 265: SnakeAmbushing `best_prey_strike_affordance` axis weight.
-/// Ships dormant at 0.0; activation is plan step 21.
+/// Activated 2026-07-08 at first-light 0.10 (plan step 21).
 fn default_snake_ambush_strike_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 265: SnakeForaging `best_prey_stalk_affordance` axis weight.
-/// Ships dormant at 0.0; activation is plan step 21.
+/// Activated 2026-07-08 at first-light 0.10 (plan step 21).
 fn default_snake_forage_stalk_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 265: FoxFleeing `perceived_cat_threat` axis weight. Activated
@@ -5432,16 +5443,27 @@ fn default_fox_flee_belief_eligibility_threshold() -> f32 {
     0.75
 }
 
-/// 265: HawkFleeing `perceived_cat_threat` axis weight. Ships dormant
-/// at 0.0; activation is plan step 21.
+/// 265: HawkFleeing `perceived_cat_threat` axis weight. Activated
+/// 2026-07-08 at first-light 0.10 (plan step 21).
 fn default_hawk_flee_cat_violence_belief_weight() -> f32 {
-    0.0
+    0.10
 }
 
-/// 265: SnakeFleeing `perceived_cat_threat` axis weight. Ships dormant
-/// at 0.0; activation is plan step 21.
+/// 265 activation: HawkFleeing belief-eligibility threshold — the
+/// hawk-side peer of `fox_flee_belief_eligibility_threshold`. Above
+/// the 0.3 `cat_perceived_by_hawk` implant prior by a wide margin;
+/// only witnessed Attack/Hunt evidence trips it.
+fn default_hawk_flee_belief_eligibility_threshold() -> f32 {
+    0.75
+}
+
+/// 265: SnakeFleeing `perceived_cat_threat` axis weight. Activated
+/// 2026-07-08 at first-light 0.10 (plan step 21). No eligibility
+/// clause needed on the snake side — SnakeFleeing's legacy outer gate
+/// is `cats_nearby >= 1`, which already admits the single-cat case;
+/// the axis differentiates score, not eligibility.
 fn default_snake_flee_cat_violence_belief_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 256 R5: per-tick patrol deterrent deposit when a cat's

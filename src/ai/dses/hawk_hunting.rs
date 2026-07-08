@@ -5,7 +5,8 @@
 //! `Linear(1.0, 0.0)` (proportional to visible prey density).
 //!
 //! 265 adds a conditional `best_prey_predation_affordance` axis
-//! (dormant at 0.0) — max `Affordance(Dive|Chase, hawk, prey)` over
+//! (active at first-light 0.10 since plan step 21) — max
+//! `Affordance(Dive|Chase, hawk, prey)` over
 //! prey in detection range, from substrate 261.
 //!
 //! Maslow tier 1 — survival (feeding).
@@ -51,7 +52,8 @@ impl HawkHuntingDse {
         ];
         let mut weights = vec![0.7, 0.3];
 
-        // 265: conditional predation-affordance axis, dormant at 0.0
+        // 265: conditional predation-affordance axis, active at
+        // first-light 0.10 since plan step 21
         // (the 264 socialize_target shape). Base two scale by
         // `(1 − extra)` so the WeightedSum stays at 1.0.
         let affordance_w = scoring.hawk_hunting_prey_affordance_weight.clamp(0.0, 1.0);
@@ -122,7 +124,11 @@ mod tests {
 
     #[test]
     fn hawk_hunting_has_two_axes() {
-        let s = ScoringConstants::default();
+        // Pinned via the explicitly-zeroed 265 weight (config-override
+        // escape hatch); at active defaults the conditional
+        // prey-affordance axis makes three.
+        let mut s = ScoringConstants::default();
+        s.hawk_hunting_prey_affordance_weight = 0.0;
         assert_eq!(HawkHuntingDse::new(&s).considerations().len(), 2);
     }
 
@@ -150,17 +156,33 @@ mod tests {
     }
 
     #[test]
-    fn prey_affordance_axis_absent_at_default() {
-        // 265: weight ships at 0.0; the axis MUST NOT appear and the
-        // two-axis composition is byte-identical to pre-265.
-        let s = ScoringConstants::default();
-        assert_eq!(s.hawk_hunting_prey_affordance_weight, 0.0);
+    fn prey_affordance_axis_absent_when_zeroed() {
+        // 265 activation: zeroing the weight (config-override escape
+        // hatch) MUST rebuild the pre-265 two-axis composition
+        // byte-identically.
+        let mut s = ScoringConstants::default();
+        s.hawk_hunting_prey_affordance_weight = 0.0;
         let dse = HawkHuntingDse::new(&s);
         assert_eq!(dse.considerations().len(), 2);
         assert!(dse.considerations().iter().all(|c| !matches!(
             c,
             Consideration::Scalar(sc) if sc.name == PREY_AFFORDANCE_INPUT
         )));
+    }
+
+    #[test]
+    fn prey_affordance_axis_active_at_default() {
+        // 265 activation (plan step 21): first-light 0.10.
+        let s = ScoringConstants::default();
+        assert_eq!(s.hawk_hunting_prey_affordance_weight, 0.10);
+        let dse = HawkHuntingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 3);
+        assert!(dse.considerations().iter().any(|c| matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == PREY_AFFORDANCE_INPUT
+        )));
+        assert!((dse.composition().weights[0] - 0.7 * 0.9).abs() < 1e-4);
+        assert!((dse.composition().weights[2] - 0.10).abs() < 1e-4);
     }
 
     #[test]

@@ -4,7 +4,8 @@
 //! (injury-panic threshold), `boldness` via `Composite { Linear(slope=
 //! 0.5), Invert }` (damped invert — timid hawks flee more).
 //!
-//! 265 adds a conditional `perceived_cat_threat` axis (dormant at 0.0)
+//! 265 adds a conditional `perceived_cat_threat` axis (active at
+//! first-light 0.10 since plan step 21)
 //! — max `CatBeliefs[cat].perceived_violence_capability` over cats in
 //! avoidance range, the hawk's own belief about the danger around it.
 //!
@@ -58,9 +59,10 @@ impl HawkFleeingDse {
         ];
         let mut weights = vec![0.65, 0.35];
 
-        // 265: conditional belief axis, dormant at 0.0 (the 264
-        // socialize_target shape). Base two scale by `(1 − extra)`
-        // so the WeightedSum stays at 1.0.
+        // 265: conditional belief axis (the 264 socialize_target
+        // shape), active at first-light 0.10 since plan step 21;
+        // zeroing rebuilds the pre-265 shape. Base two scale by
+        // `(1 − extra)` so the WeightedSum stays at 1.0.
         let belief_w = scoring.hawk_flee_cat_violence_belief_weight.clamp(0.0, 1.0);
         if belief_w > 0.0 {
             let scale = 1.0 - belief_w;
@@ -129,7 +131,11 @@ mod tests {
 
     #[test]
     fn hawk_fleeing_has_two_axes() {
-        let s = ScoringConstants::default();
+        // Pinned via the explicitly-zeroed 265 weight (config-override
+        // escape hatch); at active defaults the conditional
+        // `perceived_cat_threat` axis makes three.
+        let mut s = ScoringConstants::default();
+        s.hawk_flee_cat_violence_belief_weight = 0.0;
         assert_eq!(HawkFleeingDse::new(&s).considerations().len(), 2);
     }
 
@@ -171,17 +177,33 @@ mod tests {
     }
 
     #[test]
-    fn cat_threat_axis_absent_at_default() {
-        // 265: weight ships at 0.0; the axis MUST NOT appear and the
-        // two-axis composition is byte-identical to pre-265.
-        let s = ScoringConstants::default();
-        assert_eq!(s.hawk_flee_cat_violence_belief_weight, 0.0);
+    fn cat_threat_axis_absent_when_zeroed() {
+        // 265 activation: zeroing the weight (config-override escape
+        // hatch) MUST rebuild the pre-265 two-axis composition
+        // byte-identically.
+        let mut s = ScoringConstants::default();
+        s.hawk_flee_cat_violence_belief_weight = 0.0;
         let dse = HawkFleeingDse::new(&s);
         assert_eq!(dse.considerations().len(), 2);
         assert!(dse.considerations().iter().all(|c| !matches!(
             c,
             Consideration::Scalar(sc) if sc.name == PERCEIVED_CAT_THREAT_INPUT
         )));
+    }
+
+    #[test]
+    fn cat_threat_axis_active_at_default() {
+        // 265 activation (plan step 21): first-light 0.10.
+        let s = ScoringConstants::default();
+        assert_eq!(s.hawk_flee_cat_violence_belief_weight, 0.10);
+        let dse = HawkFleeingDse::new(&s);
+        assert_eq!(dse.considerations().len(), 3);
+        assert!(dse.considerations().iter().any(|c| matches!(
+            c,
+            Consideration::Scalar(sc) if sc.name == PERCEIVED_CAT_THREAT_INPUT
+        )));
+        assert!((dse.composition().weights[0] - 0.65 * 0.9).abs() < 1e-4);
+        assert!((dse.composition().weights[2] - 0.10).abs() < 1e-4);
     }
 
     #[test]

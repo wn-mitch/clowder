@@ -104,19 +104,22 @@ pub struct SnakeScoringContext<'a> {
     pub on_warm_terrain: bool,
     /// 265: max `Affordance(Strike, snake, prey)` over prey in
     /// detection range, from substrate 261. Read by SnakeAmbushing's
-    /// conditional `best_prey_strike_affordance` axis (dormant at
-    /// `snake_ambush_strike_affordance_weight` 0.0). Wildlife-vs-prey
-    /// writer rows arrive with ticket 314; until then this reads 0.0.
+    /// conditional `best_prey_strike_affordance` axis (active at
+    /// first-light 0.10 since plan step 21; formerly dormant at
+    /// `snake_ambush_strike_affordance_weight` 0.0), fed by the 314
+    /// wildlife-vs-prey writer rows.
     pub best_prey_strike_affordance: f32,
     /// 265: max `Affordance(Stalk, snake, prey)` over prey in
     /// detection range. Read by SnakeForaging's conditional
-    /// `best_prey_stalk_affordance` axis (dormant at
+    /// `best_prey_stalk_affordance` axis (active at first-light
+    /// 0.10 since plan step 21; formerly dormant at
     /// `snake_forage_stalk_affordance_weight` 0.0).
     pub best_prey_stalk_affordance: f32,
     /// 265: max `CatBeliefs[cat].perceived_violence_capability` over
     /// cats in detection range — the snake's own belief about how
     /// dangerous the cats around it are. Read by SnakeFleeing's
-    /// conditional `perceived_cat_threat` axis (dormant at
+    /// conditional `perceived_cat_threat` axis (active at
+    /// first-light 0.10 since plan step 21; formerly dormant at
     /// `snake_flee_cat_violence_belief_weight` 0.0).
     pub perceived_cat_threat: f32,
     pub self_position: Position,

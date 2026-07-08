@@ -111,6 +111,10 @@ pub fn hawk_evaluate_and_plan(
     dse_registry: Res<DseRegistry>,
     modifier_pipeline: Res<ModifierPipeline>,
     constants: Res<SimConstants>,
+    // 265 activation (plan step 21): live substrate borrow for the
+    // HawkHunting prey-affordance axis. Read-only — the byte-neutral
+    // read-edge class established by the 265 control ladder.
+    affordances: Res<crate::resources::ActionAffordances>,
     // Ticket 427 Step 3 — per-system A* arena. Local (not Resource) so
     // hawk's planning system doesn't serialize with fox/snake — their
     // parallel-chain scheduling stays intact.
@@ -123,13 +127,6 @@ pub fn hawk_evaluate_and_plan(
     let prey_snapshot: Vec<(Entity, Position)> = prey.iter().map(|(e, p)| (e, *p)).collect();
     let prey_positions: Vec<Position> = prey_snapshot.iter().map(|(_, p)| *p).collect();
     let markers = MarkerSnapshot::new();
-    // 265: HawkHunting's conditional affordance axis ships dormant at
-    // weight 0.0, so the scalar is never read. The live
-    // `Res<ActionAffordances>` borrow is deferred to the step-21
-    // activation commit (same deferral as 264's caretake pre-check in
-    // goap.rs) — taking it here would add an unordered conflict edge
-    // against `affordance_writer`'s `ResMut`.
-    let affordances_dormant = crate::resources::ActionAffordances::default();
 
     for (hawk_entity, hawk_state, hawk_pos, needs, personality, cat_beliefs) in &hawks {
         let _ = hawk_state; // reserved for §L2.10.7 anchors when wired
@@ -139,7 +136,7 @@ pub fn hawk_evaluate_and_plan(
             .count();
         // 265: the hawk's own belief about how dangerous the cats in
         // avoidance range are — read by HawkFleeing's conditional
-        // `perceived_cat_threat` axis (dormant at 0.0).
+        // `perceived_cat_threat` axis (active since plan step 21).
         let perceived_cat_threat = crate::components::beliefs::max_perceived_violence(
             cat_beliefs,
             cat_snapshot
@@ -150,10 +147,16 @@ pub fn hawk_evaluate_and_plan(
         let prey_nearby = prey_positions
             .iter()
             .any(|p| p.distance_to(hawk_pos) <= hc.detection_range);
+        // 265 activation: belief clause for the Fleeing outer gate —
+        // active axis + witnessed evidence past the threshold. See
+        // `HawkScoringContext::belief_flee_eligible`.
+        let belief_flee_eligible = constants.scoring.hawk_flee_cat_violence_belief_weight > 0.0
+            && perceived_cat_threat >= constants.scoring.hawk_flee_belief_eligibility_threshold;
         // 265: best predation opportunity over prey in detection range —
-        // read by HawkHunting's conditional axis (dormant at 0.0).
+        // read by HawkHunting's conditional axis (active since plan
+        // step 21), fed by the 314 wildlife-vs-prey writer rows.
         let best_prey_predation_affordance = crate::resources::best_affordance_over_targets(
-            &affordances_dormant,
+            &affordances,
             hawk_entity,
             prey_snapshot
                 .iter()
@@ -172,6 +175,7 @@ pub fn hawk_evaluate_and_plan(
             cats_nearby,
             best_prey_predation_affordance,
             perceived_cat_threat,
+            belief_flee_eligible,
             self_position: *hawk_pos,
             jitter_range: 0.05,
         };

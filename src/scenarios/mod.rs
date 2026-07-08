@@ -297,6 +297,7 @@ pub const ALL: &[&Scenario] = &[
     // Election-level assertions: the activated wildlife axes must move
     // L3 outcomes, not just populate substrate reads.
     &wildlife_belief_affordance_activation::SCENARIO_FOX_BELIEF_HIGH_VIOLENCE,
+    &wildlife_belief_affordance_activation::SCENARIO_HAWK_DIVE_AERIAL_COVER,
     &play_engagement_cues::SCENARIO_PLAY_ENGAGEMENT_CUES,
     // 472 — festering-wound substrate. Preloads Ashitaka with a
     // WoundKind::Festering on FrontRightPaw and asserts (a) the wound
