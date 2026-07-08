@@ -556,6 +556,19 @@ mod tests {
     use crate::components::physical::Position;
     use bevy::prelude::Entity;
 
+    /// Pre-264 constants: the two step-20-activated axes zeroed so
+    /// exact-shape / exact-delta assertions keep pinning the legacy
+    /// seven-axis composition. Behavioral argmax tests stay on
+    /// `ScoringConstants::default()` — the active axes read uniform
+    /// values through the test fetchers, and uniform scaling
+    /// preserves argmax.
+    fn pre_264_scoring() -> ScoringConstants {
+        let mut s = ScoringConstants::default();
+        s.socialize_affiliation_weight = 0.0;
+        s.socialize_affordance_weight = 0.0;
+        s
+    }
+
     fn test_ctx(entity: Entity) -> EvalCtx<'static> {
         static MARKER: fn(&str, Entity) -> bool = |_, _| false;
         static NO_ENTITY_POS: fn(Entity) -> Option<Position> = |_| None;
@@ -587,7 +600,7 @@ mod tests {
         // Tickets 073 + 078 — five legacy axes + cooldown (073) +
         // pairing intention (078) = seven.
         assert_eq!(
-            socialize_target_dse(&ScoringConstants::default())
+            socialize_target_dse(&pre_264_scoring())
                 .per_target_considerations()
                 .len(),
             7
@@ -616,7 +629,7 @@ mod tests {
         // shrunken fraction of the pre-073 score plus a constant 1/6.
         // The renormalization just shifts the dynamic range; argmax is
         // preserved (verified by the orthogonal pick-stability tests).
-        let dse = socialize_target_dse(&ScoringConstants::default());
+        let dse = socialize_target_dse(&pre_264_scoring());
         let weights = &dse.composition().weights;
         let pre_073 = [0.20_f32, 0.28, 0.20, 0.12, 0.20];
         for (i, &pre) in pre_073.iter().enumerate() {
@@ -763,7 +776,7 @@ mod tests {
         // through the score economy. The mechanism is preserved
         // (Intention partner wins ceteris paribus) but expressed as
         // an IAUS axis with full traceability.
-        let dse = socialize_target_dse(&ScoringConstants::default());
+        let dse = socialize_target_dse(&pre_264_scoring());
         let cat = Entity::from_raw_u32(1).unwrap();
         let intended = Entity::from_raw_u32(10).unwrap();
         let other_friend = Entity::from_raw_u32(11).unwrap();
@@ -836,7 +849,7 @@ mod tests {
         // *delta* between Intention and non-Intention scores for the
         // same Friends-bonded peer is what the pin governed and is
         // what we preserve.
-        let dse = socialize_target_dse(&ScoringConstants::default());
+        let dse = socialize_target_dse(&pre_264_scoring());
         let cat = Entity::from_raw_u32(1).unwrap();
         let intended = Entity::from_raw_u32(10).unwrap();
         let ctx = test_ctx(cat);
@@ -1414,12 +1427,12 @@ mod tests {
     // -----------------------------------------------------------------
 
     #[test]
-    fn belief_affordance_axes_dormant_at_default() {
-        // 264: both weights ship at 0.0; the axes MUST NOT appear and
-        // the seven-axis composition is byte-identical to pre-264.
-        let s = ScoringConstants::default();
-        assert_eq!(s.socialize_affiliation_weight, 0.0);
-        assert_eq!(s.socialize_affordance_weight, 0.0);
+    fn belief_affordance_axes_absent_when_zeroed() {
+        // 264 conditional-axis contract: at 0.0 the axes MUST NOT
+        // appear and the seven-axis composition is byte-identical to
+        // pre-264 — the config-override escape hatch and the shape
+        // the dormant-wire null-drift gate proved.
+        let s = pre_264_scoring();
         let dse = socialize_target_dse(&s);
         assert_eq!(dse.per_target_considerations().len(), 7);
         assert!(dse.per_target_considerations().iter().all(|c| !matches!(
@@ -1429,6 +1442,25 @@ mod tests {
                     || sc.name == TARGET_SOCIALIZE_AFFORDANCE_INPUT
         )));
         let sum: f32 = dse.composition().weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn belief_affordance_axes_active_at_default() {
+        // Step-20 activation (2026-07-08): first-light 0.10 / 0.10 are
+        // the shipped defaults — nine axes, base seven scaled ×0.8,
+        // sum still 1.0.
+        let s = ScoringConstants::default();
+        assert_eq!(s.socialize_affiliation_weight, 0.10);
+        assert_eq!(s.socialize_affordance_weight, 0.10);
+        let dse = socialize_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 9);
+        let weights = &dse.composition().weights;
+        assert!((weights[7] - 0.10).abs() < 1e-6);
+        assert!((weights[8] - 0.10).abs() < 1e-6);
+        // Base axes carry the (1 − 0.2) renormalization.
+        assert!((weights[6] - 0.10 * 0.8).abs() < 1e-6);
+        let sum: f32 = weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-3);
     }
 

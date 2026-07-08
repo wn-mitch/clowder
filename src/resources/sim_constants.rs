@@ -2825,17 +2825,18 @@ pub struct ScoringConstants {
     /// facet (substrate 258), mapped `[-1, 1] → [0, 1]` with a 0.5
     /// neutral default for unmodeled / zero-strength targets. The
     /// asymmetric per-perceiver belief that supersedes the symmetric
-    /// `Relationships.fondness` read at activation (substrate first,
-    /// legacy axis retires second — pillar 2). WeightedSum: the seven
-    /// base axes scale by `(1 − Σ 264 extras)` when non-zero. Ships
-    /// dormant at 0.0; activation is plan step 20 (four-artifact).
+    /// `Relationships.fondness` read (substrate first, legacy axis
+    /// retires second — pillar 2; the fondness axis stays until the
+    /// belief axis has soak history). WeightedSum: the seven base
+    /// axes scale by `(1 − Σ 264 extras)` when non-zero. Activated
+    /// 2026-07-08 at first-light 0.10 (plan step 20, four-artifact).
     #[serde(default = "default_socialize_affiliation_weight")]
     pub socialize_affiliation_weight: f32,
     /// 264: weight on SocializeTarget's conditional
     /// `affordance_socialize` axis — reads `Affordance(Socialize,
     /// self, target)` from substrate 261 (estimator: proximity +
-    /// affiliation + low hostility + receptivity). Ships dormant at
-    /// 0.0; activation is plan step 20.
+    /// affiliation + low hostility + receptivity). Activated
+    /// 2026-07-08 at first-light 0.10 (plan step 20).
     #[serde(default = "default_socialize_affordance_weight")]
     pub socialize_affordance_weight: f32,
     /// 264: weight on GroomOtherTarget's conditional
@@ -5298,15 +5299,18 @@ fn default_hunt_stalk_chase_affordance_bias() -> f32 {
 }
 
 /// 264: SocializeTarget `target_affiliation` belief-axis weight.
-/// Ships dormant at 0.0; activation is plan step 20 (four-artifact).
+/// Activated 2026-07-08 (plan step 20, first-light 0.10): partner
+/// choice now reads the actor's own witnessed-practice belief
+/// alongside the symmetric Relationships ledger. Balance record:
+/// `docs/balance/264-social-activation.md`.
 fn default_socialize_affiliation_weight() -> f32 {
-    0.0
+    0.10
 }
 
-/// 264: SocializeTarget `affordance_socialize` axis weight. Ships
-/// dormant at 0.0; activation is plan step 20.
+/// 264: SocializeTarget `affordance_socialize` axis weight.
+/// Activated 2026-07-08 (plan step 20, first-light 0.10).
 fn default_socialize_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 264: GroomOtherTarget `target_affiliation` belief-axis weight.

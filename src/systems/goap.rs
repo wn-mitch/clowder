@@ -371,6 +371,15 @@ pub struct PlanResources<'w, 's> {
     /// `docs/systems/world-snapshots.md` for the substrate intent
     /// and the planned follow-on hoists.
     pub world_snapshots: Res<'w, crate::resources::world_snapshots::WorldSnapshots>,
+    /// 264 (step-20 activation) — live `ActionAffordances` borrow for
+    /// the scorer-side caretake pre-check, so the scorer's
+    /// `hungry_kitten_urgency` argmax equals the dispatch-site pick in
+    /// `resolve_goap_plans` (which reads the same resource through
+    /// `ExecutorContext`). Read-only: the writer (`affordance_writer`,
+    /// Chain 2b) runs earlier in the tick; this read-access schedule
+    /// edge was priced under the Socialize-activation gate soak
+    /// (byte-neutral class per the 265 control ladder).
+    pub action_affordances: Res<'w, crate::resources::action_affordances::ActionAffordances>,
 }
 
 /// Bundles magic resolver dependencies to keep resolve_goap_plans under 16 params.
@@ -1903,16 +1912,13 @@ pub fn evaluate_and_plan(
             // step-resolution site (goap.rs: FeedKitten step).
             None,
             parent_marker_active,
-            // 264 dormant: the affordance axis is absent at weight 0.0
-            // so this argument is never read — an empty table keeps
-            // `evaluate_and_plan` free of a new Res<ActionAffordances>
-            // edge against `affordance_writer` (schedule-topology
-            // hazard, `learning_bevy_schedule_edge_perturbation`;
-            // verified on the 2026-07-07 gate soak). The live Res
-            // borrow lands with the step-20 activation commit, where
-            // the schedule edge is four-artifact-gated and scorer
-            // urgency must equal the dispatch-site pick.
-            &crate::resources::ActionAffordances::default(),
+            // 264 step-20 activation: live substrate borrow. While
+            // `caretake_affordance_weight` is 0.0 the axis is absent
+            // and the table is unread; once lifted, the scorer's
+            // urgency argmax and the dispatch-site pick (which reads
+            // the same resource via `ExecutorContext`) see identical
+            // affordance rows.
+            &res.action_affordances,
             &mut res.dse_scratchpad,
         );
         // §Phase 4c.4 alloparenting Reframe A: bond-weighted compassion.
