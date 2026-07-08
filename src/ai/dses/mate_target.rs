@@ -369,6 +369,19 @@ mod tests {
     use super::*;
     use crate::resources::relationships::BondType;
 
+    /// Pre-264 constants: the two step-20-activated axes zeroed so
+    /// exact-shape assertions keep pinning the legacy four-axis
+    /// composition. Behavioral argmax tests stay on
+    /// `ScoringConstants::default()` — the active axes read uniform
+    /// values through the test fetchers, and uniform scaling
+    /// preserves argmax.
+    fn pre_264_scoring() -> ScoringConstants {
+        let mut s = ScoringConstants::default();
+        s.mate_receptivity_weight = 0.0;
+        s.mate_affordance_weight = 0.0;
+        s
+    }
+
     #[test]
     fn mate_target_dse_id_stable() {
         assert_eq!(
@@ -381,7 +394,7 @@ mod tests {
     fn mate_target_has_four_axes() {
         // Ticket 073 — three legacy axes + the cooldown axis = four.
         assert_eq!(
-            mate_target_dse(&ScoringConstants::default())
+            mate_target_dse(&pre_264_scoring())
                 .per_target_considerations()
                 .len(),
             4
@@ -696,10 +709,12 @@ mod tests {
     // -----------------------------------------------------------------
 
     #[test]
-    fn belief_affordance_axes_dormant_at_default() {
-        let s = ScoringConstants::default();
-        assert_eq!(s.mate_receptivity_weight, 0.0);
-        assert_eq!(s.mate_affordance_weight, 0.0);
+    fn belief_affordance_axes_absent_when_zeroed() {
+        // 264 conditional-axis contract: at 0.0 the axes MUST NOT
+        // appear and the four-axis composition is byte-identical to
+        // pre-264 — the config-override escape hatch and the shape
+        // the dormant-wire null-drift gate proved.
+        let s = pre_264_scoring();
         let dse = mate_target_dse(&s);
         assert_eq!(dse.per_target_considerations().len(), 4);
         assert!(dse.per_target_considerations().iter().all(|c| !matches!(
@@ -724,6 +739,23 @@ mod tests {
         assert!((dse.composition().weights[5] - 0.1).abs() < 1e-6);
         let sum: f32 = dse.composition().weights.iter().sum();
         assert!((sum - 1.0).abs() < 1e-3, "renormalized sum = {sum}");
+    }
+
+    #[test]
+    fn belief_affordance_axes_active_at_default() {
+        // Step-20 activation (2026-07-08): first-light 0.12 / 0.10 are
+        // the shipped defaults — six axes, base four scaled ×0.78,
+        // sum still 1.0.
+        let s = ScoringConstants::default();
+        assert_eq!(s.mate_receptivity_weight, 0.12);
+        assert_eq!(s.mate_affordance_weight, 0.10);
+        let dse = mate_target_dse(&s);
+        assert_eq!(dse.per_target_considerations().len(), 6);
+        let weights = &dse.composition().weights;
+        assert!((weights[4] - 0.12).abs() < 1e-6);
+        assert!((weights[5] - 0.10).abs() < 1e-6);
+        let sum: f32 = weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-3);
     }
 
     /// 264 — ticket microexperiment `mate_skips_low_receptivity_partner`

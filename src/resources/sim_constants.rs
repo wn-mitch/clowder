@@ -5334,16 +5334,18 @@ fn default_groom_other_affordance_weight() -> f32 {
 }
 
 /// 264: MateTarget `target_perceived_receptivity` belief-axis weight.
-/// Ships dormant at 0.0; activation is plan step 20 and must verify
-/// the 027 Mate-cadence canary.
+/// Activated 2026-07-08 (plan step 20, first-light 0.12 — the
+/// receptivity read is the downstream lever on the 126/027 Mate
+/// supply-chain problem, weighted slightly above the other first-light
+/// axes; gate verified the 027 Mate-cadence canary).
 fn default_mate_receptivity_weight() -> f32 {
-    0.0
+    0.12
 }
 
-/// 264: MateTarget `affordance_mate` axis weight. Ships dormant at
-/// 0.0; activation is plan step 20.
+/// 264: MateTarget `affordance_mate` axis weight. Activated
+/// 2026-07-08 (plan step 20, first-light 0.10).
 fn default_mate_affordance_weight() -> f32 {
-    0.0
+    0.10
 }
 
 /// 264: MentorTarget `affordance_mentor` axis weight. Ships dormant
