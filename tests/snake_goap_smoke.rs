@@ -25,6 +25,9 @@ fn build_test_app() -> App {
     app.insert_resource(TimeScale::from_config(&SimConfig::default(), 16.6667));
     app.insert_resource(SimConstants::default());
     app.insert_resource(SystemActivation::default());
+    // 265 — `snake_evaluate_and_plan` borrows the ActionAffordances
+    // substrate live; production inserts it in `plugins/setup.rs`.
+    app.insert_resource(clowder::resources::ActionAffordances::default());
 
     let scoring = ScoringConstants::default();
     let mut registry = DseRegistry::new();
