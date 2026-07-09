@@ -74,6 +74,7 @@ pub mod prey_byproduct_spawn;
 pub mod route_cost_decision;
 pub mod runner;
 pub mod shadowfox_hunger_hunt_cycle;
+pub mod shadowfox_kill_site_avoidance;
 pub mod shelter_belief_security;
 pub mod smoking_chain_complete;
 pub mod smoking_chain_eligibility;
@@ -305,6 +306,10 @@ pub const ALL: &[&Scenario] = &[
     // stalk-suppression threshold, and stays out of the hunt for the
     // rest of the run. Hosts the ShadowFoxHungerHuntEntered assertion.
     &shadowfox_hunger_hunt_cycle::SCENARIO,
+    // 310 S3 — fished-out-pond consideration: fresh kill-site memory
+    // reshapes the hunger election toward clean ground and names the
+    // exclusion. Hosts the ShadowFoxKillSiteAvoided assertion.
+    &shadowfox_kill_site_avoidance::SCENARIO,
     &play_engagement_cues::SCENARIO_PLAY_ENGAGEMENT_CUES,
     // 472 — festering-wound substrate. Preloads Ashitaka with a
     // WoundKind::Festering on FrontRightPaw and asserts (a) the wound

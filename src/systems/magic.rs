@@ -758,14 +758,16 @@ pub fn spawn_shadow_fox_from_corruption(
                     // Ticket 023 Phase A — four-drive motivation substrate.
                     // Coherence starts full; Resonance/Dread/Entropy are
                     // populated each motivation tick (Phase B).
-                    {
-                        let mut drives =
-                            crate::components::wildlife::ShadowFoxDrives::newly_manifested(
-                                corruption_at_spawn,
-                                constants.wildlife.shadow_fox_satiation_at_spawn,
-                            );
-                        drives.den_position = Some(den_pos);
-                        drives
+                    crate::components::wildlife::ShadowFoxDrives::newly_manifested(
+                        corruption_at_spawn,
+                        constants.wildlife.shadow_fox_satiation_at_spawn,
+                    ),
+                    // 310 S3 — per-entity spatial memory; the den tile
+                    // migrated here from ShadowFoxDrives (S2).
+                    crate::components::wildlife::ShadowFoxBeliefs {
+                        den_position: Some(den_pos),
+                        last_kill_site: None,
+                        last_kill_tick: 0,
                     },
                     Health::default(),
                     crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),

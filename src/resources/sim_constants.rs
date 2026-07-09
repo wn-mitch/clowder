@@ -6388,6 +6388,20 @@ pub struct WildlifeConstants {
     /// bounds den accumulation across spawn cycles. Default `8.0`.
     #[serde(default = "default_shadow_fox_den_reuse_radius")]
     pub shadow_fox_den_reuse_radius: f32,
+
+    // ----- Ticket 310 S3: kill-site memory -----
+    /// How long (ticks) a shadow-fox remembers its last kill site as
+    /// fished-out. Default `20_000` — outlasts the post-kill satiation
+    /// suppression window (~4.8k ticks from 1.0 back under the stalk
+    /// threshold), so when hunger returns the fox hunts *elsewhere*
+    /// instead of re-farming the same corner of the colony.
+    #[serde(default = "default_shadow_fox_kill_site_memory_ticks")]
+    pub shadow_fox_kill_site_memory_ticks: u64,
+    /// Cats within this distance of the remembered kill site are
+    /// excluded from stalk-target selection (legacy roll + hunger
+    /// election) while the memory is fresh. Default `6.0`.
+    #[serde(default = "default_shadow_fox_kill_site_avoid_radius")]
+    pub shadow_fox_kill_site_avoid_radius: f32,
 }
 
 impl Default for WildlifeConstants {
@@ -6475,8 +6489,18 @@ impl Default for WildlifeConstants {
             shadow_fox_retreat_arrival_radius: default_shadow_fox_retreat_arrival_radius(),
             shadow_fox_retreat_arrive_slow_radius: default_shadow_fox_retreat_arrive_slow_radius(),
             shadow_fox_den_reuse_radius: default_shadow_fox_den_reuse_radius(),
+            shadow_fox_kill_site_memory_ticks: default_shadow_fox_kill_site_memory_ticks(),
+            shadow_fox_kill_site_avoid_radius: default_shadow_fox_kill_site_avoid_radius(),
         }
     }
+}
+
+fn default_shadow_fox_kill_site_memory_ticks() -> u64 {
+    20_000
+}
+
+fn default_shadow_fox_kill_site_avoid_radius() -> f32 {
+    6.0
 }
 
 fn default_shadow_fox_retreat_arrival_radius() -> f32 {

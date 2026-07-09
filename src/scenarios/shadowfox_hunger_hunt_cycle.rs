@@ -83,8 +83,6 @@ fn setup(world: &mut World, seed: u64) {
         },
         FOX_POS,
     ));
-    let mut drives = ShadowFoxDrives::newly_manifested(0.9, 0.0);
-    drives.den_position = Some((FOX_POS.x(), FOX_POS.y()));
     world.spawn((
         WildAnimal::new(WildSpecies::ShadowFox),
         FOX_POS,
@@ -95,7 +93,13 @@ fn setup(world: &mut World, seed: u64) {
         // Patrolling/Circling), so the hunger election is the only
         // possible path into Stalking from the starting geometry.
         WildlifeAiState::Waiting,
-        drives,
+        ShadowFoxDrives::newly_manifested(0.9, 0.0),
+        // 310 S3 — den memory lives on beliefs now.
+        crate::components::wildlife::ShadowFoxBeliefs {
+            den_position: Some((FOX_POS.x(), FOX_POS.y())),
+            last_kill_site: None,
+            last_kill_tick: 0,
+        },
         crate::components::physical::Health::default(),
         crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
         crate::components::SensorySignature::WILDLIFE,

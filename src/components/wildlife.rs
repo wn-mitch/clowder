@@ -263,15 +263,6 @@ pub struct ShadowFoxDrives {
     /// neutral mid-scale value.
     #[serde(default = "default_satiation_for_pre_310_saves")]
     pub satiation: f32,
-    /// Ticket 310 S2 — tile of this shadow-fox's den (the
-    /// corruption-saturated spawn origin; a `ShadowFoxDen` entity
-    /// stands there). `None` on pre-S2 saves and scenario spawns that
-    /// predate dens — the post-ambush retreat falls back to the legacy
-    /// Patrolling reset when unset. S3 migrates this into
-    /// `ShadowFoxBeliefs` alongside kill-site and ward-encounter
-    /// memory.
-    #[serde(default)]
-    pub den_position: Option<(i32, i32)>,
 }
 
 /// Serde backfill for `ShadowFoxDrives.satiation` on pre-310 saves: a
@@ -297,11 +288,51 @@ impl ShadowFoxDrives {
             age_ticks: 0,
             origin_corruption,
             satiation: satiation_at_spawn,
-            // 310 S2 — the production spawn site records the den tile
-            // right after construction; scenario/test spawns without a
-            // den keep the legacy post-ambush Patrolling reset.
-            den_position: None,
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ShadowFoxBeliefs — per-entity spatial memory (ticket 310 S3)
+// ---------------------------------------------------------------------------
+
+/// Per-shadow-fox spatial memory: the BDI Belief slice of ticket 310.
+/// Bespoke rather than a `MentalModel` on purpose — shadow-foxes model
+/// *places* (den, fished-out hunting grounds), not other minds; the
+/// documented migration path is: if a future ticket needs shadow-foxes
+/// to model cats-as-agents (predicting patrols, fearing named
+/// defenders), these fields fold into a `MentalModel`-backed store the
+/// way `CatBeliefs`/`PredatorBeliefs` did in 258, and this component
+/// retires. Until then a table of tile coordinates is the honest size
+/// of the mind being modeled.
+///
+/// Readers/writers (substrate-stubs discipline — every field lands with
+/// both): `den_position` — written at spawn, read by the post-ambush
+/// retreat; `last_kill_site`/`last_kill_tick` — written on a landed
+/// ambush, read by the kill-site avoidance filter on both stalk-entry
+/// target selections (legacy roll + hunger election;
+/// `Feature::ShadowFoxKillSiteAvoided` fires when the filter changes
+/// the choice). The ticket's `last_ward_encounter` field ships with S5
+/// (its reader — ward-avoidance geometry) rather than as a dead field
+/// here.
+#[derive(Component, Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ShadowFoxBeliefs {
+    /// Tile of this fox's den (corruption-saturated manifestation
+    /// origin; a `ShadowFoxDen` entity stands there). Migrated from
+    /// `ShadowFoxDrives.den_position` (S2) in S3.
+    pub den_position: Option<(i32, i32)>,
+    /// Where this fox last landed an ambush — the fished-out pond.
+    pub last_kill_site: Option<(i32, i32)>,
+    /// Tick of that ambush; the avoidance filter expires after
+    /// `shadow_fox_kill_site_memory_ticks`.
+    pub last_kill_tick: u64,
+}
+
+impl ShadowFoxBeliefs {
+    /// True while the kill-site memory is fresh enough to bias hunting
+    /// away from `last_kill_site`.
+    pub fn kill_site_fresh(&self, now: u64, memory_ticks: u64) -> bool {
+        self.last_kill_site.is_some() && now.saturating_sub(self.last_kill_tick) < memory_ticks
     }
 }
 
