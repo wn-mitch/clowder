@@ -208,6 +208,13 @@ pub enum WildlifeAiState {
     /// `seed_corruption_rate`. Picked when the Entropy drive
     /// dominates.
     Seeding { frontier_x: i32, frontier_y: i32 },
+    /// Ticket 310 S2 — post-ambush retreat to the shadow-fox's den
+    /// (`ShadowFoxDrives.den_position`). SingleMinded: the motivation
+    /// tick's guard leaves it alone until arrival (like Stalking /
+    /// EncirclingWard); `wildlife_ai` drives it via `steering::arrive`
+    /// and releases to Patrolling within
+    /// `shadow_fox_retreat_arrival_radius` of the den.
+    Retreating { den_x: i32, den_y: i32 },
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +263,15 @@ pub struct ShadowFoxDrives {
     /// neutral mid-scale value.
     #[serde(default = "default_satiation_for_pre_310_saves")]
     pub satiation: f32,
+    /// Ticket 310 S2 — tile of this shadow-fox's den (the
+    /// corruption-saturated spawn origin; a `ShadowFoxDen` entity
+    /// stands there). `None` on pre-S2 saves and scenario spawns that
+    /// predate dens — the post-ambush retreat falls back to the legacy
+    /// Patrolling reset when unset. S3 migrates this into
+    /// `ShadowFoxBeliefs` alongside kill-site and ward-encounter
+    /// memory.
+    #[serde(default)]
+    pub den_position: Option<(i32, i32)>,
 }
 
 /// Serde backfill for `ShadowFoxDrives.satiation` on pre-310 saves: a
@@ -281,6 +297,10 @@ impl ShadowFoxDrives {
             age_ticks: 0,
             origin_corruption,
             satiation: satiation_at_spawn,
+            // 310 S2 — the production spawn site records the den tile
+            // right after construction; scenario/test spawns without a
+            // den keep the legacy post-ambush Patrolling reset.
+            den_position: None,
         }
     }
 }
@@ -453,6 +473,28 @@ impl FoxDen {
             last_fed_tick: tick, // treat spawn as freshly fed
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// ShadowFoxDen — supernatural den at a corruption-saturated origin (310 S2)
+// ---------------------------------------------------------------------------
+
+/// A shadow-fox den: the corruption-saturated tile a shadow-fox
+/// manifested from, persisted as a real world entity (items-are-real —
+/// a spatial anchor, not an abstract home flag). Distinguished from
+/// [`FoxDen`]: no cubs, no scent economy, no territory radius — its
+/// meaning is mythic (the wound in the ground the fox crawled out of)
+/// and mechanical (the post-ambush retreat target, S2; rest/recovery
+/// anchor, S4). `spawn_shadow_fox_from_corruption` reuses a den within
+/// `shadow_fox_den_reuse_radius` of a new manifestation instead of
+/// stacking duplicates — the corruption remembers its doors.
+#[derive(Component, Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ShadowFoxDen {
+    /// Tile corruption at establishment (narrative + balance
+    /// attribution, mirrors `ShadowFoxDrives.origin_corruption`).
+    pub origin_corruption: f32,
+    /// Tick when this den first opened.
+    pub established_tick: u64,
 }
 
 // ---------------------------------------------------------------------------

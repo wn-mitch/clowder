@@ -252,6 +252,10 @@ pub enum Feature {
     /// the nearest scanned cat — a goal-directed hunt, distinct from
     /// the legacy 5%/tick stalk roll in `predator_stalk_cats`.
     ShadowFoxHungerHuntEntered,
+    /// Ticket 310 S2 — a shadow-fox that landed an ambush entered
+    /// Retreating toward its den (SingleMinded until arrival) instead
+    /// of the legacy resume-patrol.
+    ShadowFoxRetreatEntered,
     DirectiveDelivered,
     // --- Hawk ecology (ticket 025 Phase 2) ---
     /// A hawk spotted prey within detection range. Witness: yes/no per
@@ -889,6 +893,7 @@ impl Feature {
         Feature::ShadowFoxHaunting,
         Feature::ShadowFoxHauntingEscalated,
         Feature::ShadowFoxHungerHuntEntered,
+        Feature::ShadowFoxRetreatEntered,
         Feature::DirectiveDelivered,
         // Hawk ecology (ticket 025 Phase 2). All four "trunk" positives
         // ship dormant via `expected_to_fire_per_soak() => false` in
@@ -1295,6 +1300,8 @@ impl Feature {
             // 310 S1 — hunger-elected Stalking is a state transition;
             // the harm, if any, is the downstream Ambush event.
             Feature::ShadowFoxHungerHuntEntered => Neutral,
+            // 310 S2 — retreat entry is a state transition.
+            Feature::ShadowFoxRetreatEntered => Neutral,
             Feature::CommitmentDropTriggered => Neutral,
             Feature::CommitmentDropBlind => Neutral,
             Feature::CommitmentDropSingleMinded => Neutral,
@@ -1362,6 +1369,10 @@ impl Feature {
             // radius and no stronger drive pressured — plausibly rare
             // per soak at first-light weight 0.10).
             Feature::ShadowFoxHungerHuntEntered => false,
+            // 310 S2 — fires only when an ambush lands (rare per soak
+            // at the satiation-gated cadence); the
+            // shadowfox_hunger_hunt_cycle scenario hosts the assertion.
+            Feature::ShadowFoxRetreatEntered => false,
             Feature::FateAwakened => false,
             Feature::SpiritCommunion => false,
             Feature::ShadowFoxAvoidedWard => false,
@@ -1925,6 +1936,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ShadowFoxSeedingEntered => "ShadowFoxSeedingEntered",
         Feature::ShadowFoxHaunting => "ShadowFoxHaunting",
         Feature::ShadowFoxHungerHuntEntered => "ShadowFoxHungerHuntEntered",
+        Feature::ShadowFoxRetreatEntered => "ShadowFoxRetreatEntered",
         Feature::ShadowFoxHauntingEscalated => "ShadowFoxHauntingEscalated",
         Feature::DirectiveDelivered => "DirectiveDelivered",
         // Ticket 025 Phase 2 — hawk/snake GOAP.
@@ -2260,7 +2272,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 169;
+        const EXPECTED_VARIANT_COUNT: usize = 170;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2421,9 +2433,11 @@ mod tests {
         // Ships `expected_to_fire_per_soak() => false` per the
         // new-Feature default; the shadowfox_hunger_hunt_cycle scenario
         // hosts its firing assertion.
+        // Ticket 310 S2: +1 Neutral (ShadowFoxRetreatEntered) for the
+        // post-ambush retreat-to-den transition; same scenario hosts it.
         assert_eq!(positive, 99);
         assert_eq!(negative, 25);
-        assert_eq!(neutral, 45);
+        assert_eq!(neutral, 46);
     }
 
     #[test]
@@ -2545,7 +2559,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            45
+            46
         );
     }
 

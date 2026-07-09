@@ -699,6 +699,10 @@ pub fn spawn_shadow_fox_from_corruption(
     map: ResMut<TileMap>,
     mut rng: ResMut<SimRng>,
     wildlife: Query<&WildAnimal>,
+    // 310 S2 — existing dens; a manifestation within
+    // `shadow_fox_den_reuse_radius` adopts one instead of stacking a
+    // duplicate at the same corruption pocket.
+    dens: Query<&Position, With<crate::components::wildlife::ShadowFoxDen>>,
     time: Res<TimeState>,
     time_scale: Res<TimeScale>,
     mut commands: Commands,
@@ -727,6 +731,26 @@ pub fn spawn_shadow_fox_from_corruption(
             {
                 activation.record(Feature::ShadowFoxSpawn);
                 let corruption_at_spawn = map.get(x, y).corruption;
+                // 310 S2 — the manifestation origin becomes the fox's
+                // den: adopt an existing ShadowFoxDen within the reuse
+                // radius, else open one here.
+                let spawn_pos = Position::new(x, y);
+                let reuse_radius = constants.wildlife.shadow_fox_den_reuse_radius;
+                let den_pos = dens
+                    .iter()
+                    .filter(|dp| spawn_pos.distance_to(dp) <= reuse_radius)
+                    .min_by_key(|dp| spawn_pos.tile_distance_squared(dp))
+                    .map(|dp| (dp.x(), dp.y()))
+                    .unwrap_or((x, y));
+                if den_pos == (x, y) && !dens.iter().any(|dp| dp.x() == x && dp.y() == y) {
+                    commands.spawn((
+                        crate::components::wildlife::ShadowFoxDen {
+                            origin_corruption: corruption_at_spawn,
+                            established_tick: time.tick,
+                        },
+                        spawn_pos,
+                    ));
+                }
                 commands.spawn((
                     WildAnimal::new(WildSpecies::ShadowFox),
                     Position::new(x, y),
@@ -734,10 +758,15 @@ pub fn spawn_shadow_fox_from_corruption(
                     // Ticket 023 Phase A — four-drive motivation substrate.
                     // Coherence starts full; Resonance/Dread/Entropy are
                     // populated each motivation tick (Phase B).
-                    crate::components::wildlife::ShadowFoxDrives::newly_manifested(
-                        corruption_at_spawn,
-                        constants.wildlife.shadow_fox_satiation_at_spawn,
-                    ),
+                    {
+                        let mut drives =
+                            crate::components::wildlife::ShadowFoxDrives::newly_manifested(
+                                corruption_at_spawn,
+                                constants.wildlife.shadow_fox_satiation_at_spawn,
+                            );
+                        drives.den_position = Some(den_pos);
+                        drives
+                    },
                     Health::default(),
                     crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
                     crate::components::SensorySignature::WILDLIFE,

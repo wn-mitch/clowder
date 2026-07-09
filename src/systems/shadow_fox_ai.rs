@@ -402,6 +402,27 @@ pub fn wildlife_ai(
                     desired.0 = Some(crate::ai::steering::seek(pos.0, next.0, species_speed));
                 }
             }
+            // ---- Ticket 310 S2: post-ambush retreat ----
+            WildlifeAiState::Retreating { den_x, den_y } => {
+                // SingleMinded home leg: `arrive` decelerates into the
+                // den instead of overshooting; release to Patrolling
+                // within the arrival radius. No ward/scent lookahead —
+                // the den sits in corrupted territory and the fox is
+                // leaving the colony, not probing it. (The
+                // `predator_stalk_cats` ward-flee check still overrides
+                // a retreat that crosses live ward coverage.)
+                let den = Position::new(den_x, den_y);
+                if pos.distance_to(&den) <= c.shadow_fox_retreat_arrival_radius {
+                    *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
+                } else {
+                    desired.0 = Some(crate::ai::steering::arrive(
+                        pos.0,
+                        den.0,
+                        species_speed,
+                        c.shadow_fox_retreat_arrive_slow_radius,
+                    ));
+                }
+            }
         }
 
         // ShadowFox spreads corruption to tiles it crosses.
@@ -616,7 +637,11 @@ pub fn shadowfox_motivation_tick(
         // canary the Phase C iteration is trying to restore.
         if matches!(
             *state,
-            WildlifeAiState::Stalking { .. } | WildlifeAiState::EncirclingWard { .. }
+            WildlifeAiState::Stalking { .. }
+                | WildlifeAiState::EncirclingWard { .. }
+                // 310 S2 — Retreating is SingleMinded: held until
+                // `wildlife_ai` releases it at the den.
+                | WildlifeAiState::Retreating { .. }
         ) {
             continue;
         }
@@ -1357,14 +1382,35 @@ pub fn predator_stalk_cats(
                             }
                         }
                     }
-                    // After ambush, revert to patrolling with cooldown before next stalk.
+                    // After ambush, set the cooldown before the next stalk.
                     animal.ambush_cooldown = c.ambush_cooldown_ticks;
                     // 310 S1 — the kill feeds it: satiation rises past
                     // the stalk-suppression threshold, so the next hunt
                     // waits on cadence decay, not just the cooldown.
                     drives.satiation =
                         (drives.satiation + c.shadow_fox_satiation_gain_ambush).min(1.0);
-                    *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
+                    // 310 S2 — a fed fox carries its kill home: retreat
+                    // to the den instead of the legacy resume-patrol.
+                    // SingleMinded — the motivation-tick guard holds it
+                    // until `wildlife_ai` releases it on arrival. Den
+                    // unknown (pre-S2 saves, scenario spawns) falls back
+                    // to the legacy Patrolling reset.
+                    *ai_state = match drives.den_position {
+                        Some((den_x, den_y)) => {
+                            activation.record(Feature::ShadowFoxRetreatEntered);
+                            if let Some(ref mut elog) = event_log {
+                                elog.push(
+                                    time.tick,
+                                    crate::resources::event_log::EventKind::ShadowFoxRetreatEntered {
+                                        location: (wl_pos.x(), wl_pos.y()),
+                                        den: (den_x, den_y),
+                                    },
+                                );
+                            }
+                            WildlifeAiState::Retreating { den_x, den_y }
+                        }
+                        None => WildlifeAiState::Patrolling { dx: 1, dy: 0 },
+                    };
                 } else if (dist as f32) > c.base_detection_range * 2.0 {
                     // Target moved too far, give up.
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
@@ -1555,6 +1601,7 @@ mod tests {
                     satiation: crate::resources::SimConstants::default()
                         .wildlife
                         .shadow_fox_satiation_at_spawn,
+                    den_position: None,
                 },
             ))
             .id()
@@ -1969,6 +2016,126 @@ mod tests {
         assert!(
             stalked,
             "hungry shadow-fox must keep the legacy 5%/tick stalk roll",
+        );
+    }
+
+    // ---- Ticket 310 S2: den + post-ambush retreat ----
+
+    #[test]
+    fn ambush_triggers_retreat_to_den() {
+        let (mut world, mut schedule) = setup_stalk_world();
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
+        {
+            let mut drives = world.get_mut::<ShadowFoxDrives>(entity).unwrap();
+            drives.satiation = 0.1;
+            drives.den_position = Some((2, 2));
+        }
+        spawn_ambushable_cat_at(&mut world, Position::new(6, 5));
+        *world.get_mut::<WildlifeAiState>(entity).unwrap() = WildlifeAiState::Stalking {
+            target_x: 6,
+            target_y: 5,
+        };
+
+        schedule.run(&mut world);
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            matches!(state, WildlifeAiState::Retreating { den_x: 2, den_y: 2 }),
+            "post-ambush state must be Retreating toward the den; got {state:?}",
+        );
+        let activation = world.resource::<SystemActivation>();
+        assert_eq!(
+            activation
+                .counts
+                .get(&Feature::ShadowFoxRetreatEntered)
+                .copied()
+                .unwrap_or(0),
+            1,
+        );
+    }
+
+    #[test]
+    fn ambush_without_den_falls_back_to_patrol() {
+        let (mut world, mut schedule) = setup_stalk_world();
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.1;
+        // den_position stays None (pre-S2 saves / bare scenario spawns).
+        spawn_ambushable_cat_at(&mut world, Position::new(6, 5));
+        *world.get_mut::<WildlifeAiState>(entity).unwrap() = WildlifeAiState::Stalking {
+            target_x: 6,
+            target_y: 5,
+        };
+
+        schedule.run(&mut world);
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            matches!(state, WildlifeAiState::Patrolling { .. }),
+            "denless ambush must keep the legacy Patrolling reset; got {state:?}",
+        );
+    }
+
+    #[test]
+    fn retreating_fox_arrives_and_releases_to_patrol() {
+        let (mut world, mut schedule) = setup_world();
+        let entity = spawn_animal(
+            &mut world,
+            WildSpecies::ShadowFox,
+            Position::new(5, 15),
+            WildlifeAiState::Retreating {
+                den_x: 12,
+                den_y: 15,
+            },
+        );
+
+        let mut released_at = None;
+        for tick in 0..120 {
+            schedule.run(&mut world);
+            if matches!(
+                world.get::<WildlifeAiState>(entity).unwrap(),
+                WildlifeAiState::Patrolling { .. }
+            ) {
+                released_at = Some(tick);
+                break;
+            }
+        }
+        let released_at =
+            released_at.expect("retreating fox should reach the den and release to Patrolling");
+        let pos = *world.get::<Position>(entity).unwrap();
+        let arrival = crate::resources::SimConstants::default()
+            .wildlife
+            .shadow_fox_retreat_arrival_radius;
+        assert!(
+            pos.distance_to(&Position::new(12, 15)) <= arrival + 1.0,
+            "release must happen at the den (got {:?} after tick {released_at})",
+            pos,
+        );
+    }
+
+    #[test]
+    fn motivation_tick_holds_retreating_singleminded() {
+        let (mut world, mut schedule) = setup_motivation_world();
+        {
+            let mut constants = world.resource_mut::<crate::resources::SimConstants>();
+            constants.wildlife.shadow_fox_motivation_jitter = 0.0;
+            constants.wildlife.shadow_fox_motivation_softmax_temp = 0.001;
+        }
+        // Starving fox with a cat in scan range: the hunger drive WOULD
+        // elect Stalking — but Retreating is SingleMinded.
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.0;
+        spawn_plain_cat_at(&mut world, Position::new(8, 5));
+        *world.get_mut::<WildlifeAiState>(entity).unwrap() =
+            WildlifeAiState::Retreating { den_x: 2, den_y: 2 };
+
+        for _ in 0..10 {
+            schedule.run(&mut world);
+        }
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            matches!(state, WildlifeAiState::Retreating { .. }),
+            "motivation tick must not interrupt a retreat; got {state:?}",
         );
     }
 

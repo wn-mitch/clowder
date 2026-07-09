@@ -43,7 +43,9 @@ pub static SCENARIO: Scenario = Scenario {
     default_focal: "Whisker",
     default_ticks: 120,
     setup,
-    expected_features: &["ShadowFoxHungerHuntEntered"],
+    // S2 extends the cycle assertion: the fed fox retreats to its den
+    // (spawned at FOX_POS) instead of resuming patrol at the kill site.
+    expected_features: &["ShadowFoxHungerHuntEntered", "ShadowFoxRetreatEntered"],
 };
 
 fn setup(world: &mut World, seed: u64) {
@@ -71,11 +73,29 @@ fn setup(world: &mut World, seed: u64) {
     // first-light weight). Bundle mirrors the production spawn in
     // `spawn_shadow_fox_from_corruption`; the `OnAdd<WildAnimal>`
     // observer authors the movement components.
+    // 310 S2 — the manifestation origin is the den (production spawn
+    // shape): a ShadowFoxDen entity at FOX_POS + den_position on drives,
+    // so the post-ambush retreat has a home leg to walk.
+    world.spawn((
+        crate::components::wildlife::ShadowFoxDen {
+            origin_corruption: 0.9,
+            established_tick: 0,
+        },
+        FOX_POS,
+    ));
+    let mut drives = ShadowFoxDrives::newly_manifested(0.9, 0.0);
+    drives.den_position = Some((FOX_POS.x(), FOX_POS.y()));
     world.spawn((
         WildAnimal::new(WildSpecies::ShadowFox),
         FOX_POS,
-        WildlifeAiState::Patrolling { dx: 1, dy: 0 },
-        ShadowFoxDrives::newly_manifested(0.9, 0.0),
+        // Waiting, not Patrolling: patrol drift raced the first
+        // motivation cadence into legacy detection range (≤ 8), letting
+        // the 5%/tick roll win the entry in some trajectory families.
+        // Waiting holds position (and the legacy roll only fires from
+        // Patrolling/Circling), so the hunger election is the only
+        // possible path into Stalking from the starting geometry.
+        WildlifeAiState::Waiting,
+        drives,
         crate::components::physical::Health::default(),
         crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
         crate::components::SensorySignature::WILDLIFE,
@@ -98,6 +118,7 @@ mod tests {
             .shadow_fox_stalk_satiation_threshold;
 
         let mut fed_at: Option<u32> = None;
+        let mut saw_retreating = false;
         for tick in 0..SCENARIO.default_ticks {
             app.update();
 
@@ -110,6 +131,9 @@ mod tests {
                 (d.clone(), s.clone())
             };
 
+            if matches!(state, WildlifeAiState::Retreating { .. }) {
+                saw_retreating = true;
+            }
             if fed_at.is_none() && drives.satiation >= threshold {
                 fed_at = Some(tick);
             }
@@ -145,6 +169,12 @@ mod tests {
         assert!(
             hunger_hunts >= 1,
             "the hunt must have entered through the hunger election, not the legacy roll",
+        );
+
+        // 310 S2 — the fed fox carried its kill home.
+        assert!(
+            saw_retreating,
+            "the fed shadow-fox must retreat to its den after the ambush",
         );
     }
 }

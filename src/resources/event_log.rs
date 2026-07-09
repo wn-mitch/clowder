@@ -455,6 +455,12 @@ pub enum EventKind {
         target: (i32, i32),
         satiation: f32,
     },
+    /// Ticket 310 S2 — post-ambush retreat entered: the fed shadow-fox
+    /// heads home to its den instead of resuming patrol in place.
+    ShadowFoxRetreatEntered {
+        location: (i32, i32),
+        den: (i32, i32),
+    },
 
     // -------------------------------------------------------------------
     // Continuity-canary events (§11.3 — "Emit events for: grooming fires,

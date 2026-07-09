@@ -6371,6 +6371,23 @@ pub struct WildlifeConstants {
     /// discipline.
     #[serde(default = "default_shadow_fox_hunger_drive_weight")]
     pub shadow_fox_hunger_drive_weight: f32,
+
+    // ----- Ticket 310 S2: den + post-ambush retreat -----
+    /// Distance from the den at which a Retreating shadow-fox counts
+    /// as arrived and releases to Patrolling. Default `1.5` tiles —
+    /// on or adjacent to the den tile.
+    #[serde(default = "default_shadow_fox_retreat_arrival_radius")]
+    pub shadow_fox_retreat_arrival_radius: f32,
+    /// `steering::arrive` slow-radius for the retreat leg — the fox
+    /// decelerates inside this distance of the den instead of
+    /// overshooting. Default `2.0` tiles.
+    #[serde(default = "default_shadow_fox_retreat_arrive_slow_radius")]
+    pub shadow_fox_retreat_arrive_slow_radius: f32,
+    /// A new manifestation within this distance of an existing
+    /// `ShadowFoxDen` adopts that den instead of opening another —
+    /// bounds den accumulation across spawn cycles. Default `8.0`.
+    #[serde(default = "default_shadow_fox_den_reuse_radius")]
+    pub shadow_fox_den_reuse_radius: f32,
 }
 
 impl Default for WildlifeConstants {
@@ -6455,8 +6472,23 @@ impl Default for WildlifeConstants {
             ),
             shadow_fox_stalk_satiation_threshold: default_shadow_fox_stalk_satiation_threshold(),
             shadow_fox_hunger_drive_weight: default_shadow_fox_hunger_drive_weight(),
+            shadow_fox_retreat_arrival_radius: default_shadow_fox_retreat_arrival_radius(),
+            shadow_fox_retreat_arrive_slow_radius: default_shadow_fox_retreat_arrive_slow_radius(),
+            shadow_fox_den_reuse_radius: default_shadow_fox_den_reuse_radius(),
         }
     }
+}
+
+fn default_shadow_fox_retreat_arrival_radius() -> f32 {
+    1.5
+}
+
+fn default_shadow_fox_retreat_arrive_slow_radius() -> f32 {
+    2.0
+}
+
+fn default_shadow_fox_den_reuse_radius() -> f32 {
+    8.0
 }
 
 fn default_shadow_fox_satiation_at_spawn() -> f32 {
