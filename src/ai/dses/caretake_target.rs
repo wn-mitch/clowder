@@ -326,7 +326,6 @@ pub fn resolve_caretake_target(
     // Spatial nearness axis (`caretake_target_nearness`) is computed
     // by the substrate from `EvalCtx::self_position` to each
     // candidate's tile per §L2.10.7.
-    let fetch_self = |_name: &str, _adult: Entity| -> f32 { 0.0 };
     // Reborrow kitten map as `&` for the closure capture.
     let kitten_by_entity = &scratch.kitten_by_entity;
     let fetch_target = |name: &str, _adult: Entity, target: Entity| -> f32 {
@@ -389,7 +388,6 @@ pub fn resolve_caretake_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

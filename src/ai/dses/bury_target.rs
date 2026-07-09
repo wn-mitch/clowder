@@ -181,7 +181,6 @@ pub fn resolve_bury_target(
     }
 
     let cooldown_was_applied = std::cell::Cell::new(false);
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_FONDNESS_INPUT => relationships
@@ -223,7 +222,6 @@ pub fn resolve_bury_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

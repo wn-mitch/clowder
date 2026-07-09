@@ -371,7 +371,6 @@ pub fn resolve_hunt_target(
     let alertness_map = &scratch.map_f32_a;
 
     let cooldown_was_applied = std::cell::Cell::new(false);
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, perceiver: Entity, target: Entity| -> f32 {
         match name {
             PREY_YIELD_INPUT => kind_map
@@ -438,7 +437,6 @@ pub fn resolve_hunt_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 
@@ -680,6 +678,13 @@ mod tests {
     fn picks_higher_yield_at_equal_distance_and_alertness() {
         // §6.1 Partial fix demo: Rabbit (yield=0.8125) wins over Mouse
         // (yield=0.625) when distance and alertness are tied.
+        //
+        // 516 tied-position discipline: the expected winner is listed
+        // FIRST. WeightedSum ties break toward the LATER candidate, so
+        // this ordering fails if the yield axis reads 0.0 for every
+        // candidate — the exact silent-death mode the pre-516 prefix
+        // routing produced (this test passed for months by listing the
+        // rabbit second and winning on the tie-break coincidence).
         let mut registry = DseRegistry::new();
         registry
             .target_taking_dses
@@ -693,7 +698,7 @@ mod tests {
             cat,
             Position::new(0, 0),
             0.0,
-            &[mouse, rabbit],
+            &[rabbit, mouse],
             &noop_relations(),
             &noop_overlays(),
             0,
@@ -729,54 +734,59 @@ mod tests {
         let alert = candidate(2, 2, 0, PreyKind::Rabbit, 0.9);
         let calm = candidate(3, 0, 2, PreyKind::Rabbit, 0.0);
 
-        // Run with bold cat first.
-        let bold_winner = resolve_hunt_target(
-            &registry,
-            cat,
-            Position::new(0, 0),
-            0.9, // boldness
-            &[alert, calm],
-            &noop_relations(),
-            &noop_overlays(),
-            0,
-            None,
-            None,
-            None,
-            None,
-            &ActionAffordances::default(),
-            &mut crate::resources::DseTargetScratchpad::default(),
-        );
-        // Calm prey still wins at this gap, but the resolver picks the
-        // single best. Run with patient and confirm same winner — what
-        // we're testing is that boldness shifts the score gap, not the
-        // identity. (Behaviorally: bold cats will *occasionally* pick
-        // alert prey once the gap is small enough to be flipped by
-        // other noise.) The structural assertion: bold cat returns
-        // some candidate and patient cat returns some candidate; the
-        // composition includes the tolerance axis live.
-        assert!(bold_winner.is_some());
+        // 516: upgraded from a structural is_some() check to the real
+        // gap assertion — the focal-target hook exposes per-candidate
+        // scores, so we measure the calm-vs-alert margin under each
+        // boldness and require the bold cat's margin to be strictly
+        // smaller. A dead tolerance axis makes both margins identical
+        // and fails the strict inequality.
+        let calm_minus_alert_gap = |boldness: f32| -> f32 {
+            let capture = crate::resources::FocalScoreCapture::default();
+            let name_lookup = |e: Entity| format!("{e:?}");
+            let hook = crate::ai::target_dse::FocalTargetHook {
+                capture: &capture,
+                name_lookup: &name_lookup,
+            };
+            let winner = resolve_hunt_target(
+                &registry,
+                cat,
+                Position::new(0, 0),
+                boldness,
+                &[alert, calm],
+                &noop_relations(),
+                &noop_overlays(),
+                0,
+                Some(hook),
+                None,
+                None,
+                None,
+                &ActionAffordances::default(),
+                &mut crate::resources::DseTargetScratchpad::default(),
+            );
+            // Calm prey wins at this alertness gap under both
+            // temperaments — the tolerance axis shifts the margin,
+            // not the identity.
+            assert_eq!(winner, Some(calm.entity));
+            let inner = capture.drain();
+            let ranking = &inner.target_rankings["hunt_target"];
+            let score_of = |e: Entity| {
+                ranking
+                    .candidates
+                    .iter()
+                    .find(|c| c.name == format!("{e:?}"))
+                    .expect("candidate present in focal ranking")
+                    .score
+            };
+            score_of(calm.entity) - score_of(alert.entity)
+        };
 
-        let patient_winner = resolve_hunt_target(
-            &registry,
-            cat,
-            Position::new(0, 0),
-            0.1, // patient
-            &[alert, calm],
-            &noop_relations(),
-            &noop_overlays(),
-            0,
-            None,
-            None,
-            None,
-            None,
-            &ActionAffordances::default(),
-            &mut crate::resources::DseTargetScratchpad::default(),
+        let bold_gap = calm_minus_alert_gap(0.9);
+        let patient_gap = calm_minus_alert_gap(0.1);
+        assert!(
+            bold_gap < patient_gap,
+            "boldness must shrink the calm-over-alert margin via the \
+             tolerance axis: bold gap {bold_gap} vs patient gap {patient_gap}"
         );
-        assert!(patient_winner.is_some());
-        // Default 0.15 weight is small enough that calm-vs-alert at
-        // 0.9 gap keeps calm winning in both cases — that's
-        // intentional. The structural test is that the resolver
-        // accepts the boldness param and produces a winner.
     }
 
     #[test]
@@ -792,15 +802,17 @@ mod tests {
             .target_taking_dses
             .push(hunt_target_dse(&ScoringConstants::default()));
         let cat = Entity::from_raw_u32(1).unwrap();
-        let alert_rabbit = candidate(2, 1, 0, PreyKind::Rabbit, 0.95);
+        // 516 tied-position discipline: expected winner (mouse) FIRST,
+        // so a dead prey_calm axis fails on the toward-later tie-break.
         let relaxed_mouse = candidate(3, 0, 1, PreyKind::Mouse, 0.0);
+        let alert_rabbit = candidate(2, 1, 0, PreyKind::Rabbit, 0.95);
 
         let out = resolve_hunt_target(
             &registry,
             cat,
             Position::new(0, 0),
             0.0,
-            &[alert_rabbit, relaxed_mouse],
+            &[relaxed_mouse, alert_rabbit],
             &noop_relations(),
             &noop_overlays(),
             0,

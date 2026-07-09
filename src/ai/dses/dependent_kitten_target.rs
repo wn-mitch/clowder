@@ -233,7 +233,6 @@ pub fn resolve_dependent_kitten_target(
         return None;
     }
 
-    let fetch_self = |_name: &str, _queen: Entity| -> f32 { 0.0 };
     let fetch_target = |_name: &str, _queen: Entity, _target: Entity| -> f32 { 0.0 };
 
     let entity_position = |_: Entity| -> Option<Position> { None };
@@ -259,7 +258,6 @@ pub fn resolve_dependent_kitten_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

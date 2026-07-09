@@ -230,7 +230,6 @@ pub fn resolve_build_target(
     // Spatial nearness axis (`build_target_nearness`) is computed by
     // the substrate from `EvalCtx::self_position` to each candidate's
     // tile per §L2.10.7.
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     // Reborrow lookup tables as `&` so the per-target closure captures
     // shared refs; disjoint from `&scratch.entities/positions`.
     let kind_map = &scratch.build_kind;
@@ -290,7 +289,6 @@ pub fn resolve_build_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

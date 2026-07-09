@@ -181,7 +181,6 @@ pub fn resolve_herbcraft_target(
         return None;
     }
 
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     // Reborrow as `&` for closure capture (disjoint from
     // `&scratch.entities/positions` below).
     let density_by_entity = &scratch.map_f32_a;
@@ -217,7 +216,6 @@ pub fn resolve_herbcraft_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

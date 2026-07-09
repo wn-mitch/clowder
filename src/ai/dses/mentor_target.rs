@@ -302,7 +302,6 @@ pub fn resolve_mentor_target(
     // the substrate from `EvalCtx::self_position` to each candidate's
     // tile per §L2.10.7, so no nearness branch lives in `fetch_target`.
     let cooldown_was_applied = std::cell::Cell::new(false);
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     // Reborrow skills map as `&` so the closure captures only the
     // shared reference; `&scratch.entities` / `&scratch.positions`
     // remain free for the evaluator below.
@@ -354,7 +353,6 @@ pub fn resolve_mentor_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

@@ -285,7 +285,6 @@ pub fn resolve_mate_target(
     // the substrate from `EvalCtx::self_position` to each candidate's
     // tile per §L2.10.7, so no nearness branch lives in `fetch_target`.
     let cooldown_was_applied = std::cell::Cell::new(false);
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_ROMANTIC_INPUT => relationships
@@ -336,7 +335,6 @@ pub fn resolve_mate_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

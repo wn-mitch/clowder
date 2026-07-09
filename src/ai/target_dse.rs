@@ -287,18 +287,27 @@ pub struct FocalTargetHook<'a> {
 ///   - `WeightedAverage` → score = Σ (rank_weight[i] × score[i])
 ///     over ranked candidates; winner = argmax.
 ///
-/// `fetch_target_scalar` is the per-target analog of the regular
-/// `fetch_scalar` closure — resolves named scalars against the
-/// candidate target (not the scoring cat). Example: `target_fondness`
-/// reads `Relationships::get(cat, target).fondness`, which only the
-/// target-scoped closure can resolve.
+/// `fetch_target_scalar` resolves *every* named scalar consideration —
+/// it receives `(name, cat, target)`, strictly more information than a
+/// self-scoped fetcher, so self-side inputs simply ignore `target`
+/// (e.g. `ally_proximity`) while target-side inputs use it (e.g.
+/// `target_fondness` reads `Relationships::get(cat, target).fondness`).
+///
+/// Ticket 516: there is deliberately NO self-scoped scalar fetcher.
+/// The pre-516 evaluator routed scalar names by `target_` prefix and
+/// sent everything unprefixed to a `fetch_self` closure that every
+/// production resolver stubbed as `|_, _| 0.0` — four registered hunt/
+/// fight axes silently read 0.0 for months. Routing all scalars
+/// through the one closure makes "axis registered but never fetched"
+/// impossible at this layer; the remaining failure mode (a missing
+/// match arm falling through to `_ => 0.0`) is pinned per-axis by
+/// tied-position behavioral tests in each resolver.
 pub fn evaluate_target_taking(
     dse: &TargetTakingDse,
     cat: Entity,
     candidates: &[Entity],
     candidate_positions: &[crate::components::physical::Position],
     ctx: &EvalCtx,
-    fetch_self_scalar: &dyn Fn(&str, Entity) -> f32,
     fetch_target_scalar: &dyn Fn(&str, Entity, Entity) -> f32,
 ) -> ScoredTargetTakingDse {
     evaluate_target_taking_with_reservations(
@@ -307,7 +316,6 @@ pub fn evaluate_target_taking(
         candidates,
         candidate_positions,
         ctx,
-        fetch_self_scalar,
         fetch_target_scalar,
         None,
         None,
@@ -336,7 +344,6 @@ pub fn evaluate_target_taking_with_reservations(
     candidates: &[Entity],
     candidate_positions: &[crate::components::physical::Position],
     ctx: &EvalCtx,
-    fetch_self_scalar: &dyn Fn(&str, Entity) -> f32,
     fetch_target_scalar: &dyn Fn(&str, Entity, Entity) -> f32,
     is_reserved_by_other: Option<&dyn Fn(Entity) -> bool>,
     mut on_contention: Option<&mut dyn FnMut(Entity)>,
@@ -407,15 +414,7 @@ pub fn evaluate_target_taking_with_reservations(
         let scores: Vec<f32> = considerations
             .iter()
             .map(|c| {
-                score_target_consideration(
-                    c,
-                    cat,
-                    *target,
-                    *target_pos,
-                    ctx,
-                    fetch_self_scalar,
-                    fetch_target_scalar,
-                )
+                score_target_consideration(c, cat, *target, *target_pos, ctx, fetch_target_scalar)
             })
             .collect();
         let composed = composition.compose(&scores);
@@ -447,20 +446,19 @@ fn score_target_consideration(
     target: Entity,
     target_pos: crate::components::physical::Position,
     ctx: &EvalCtx,
-    fetch_self_scalar: &dyn Fn(&str, Entity) -> f32,
     fetch_target_scalar: &dyn Fn(&str, Entity, Entity) -> f32,
 ) -> f32 {
     match consideration {
         Consideration::Scalar(s) => {
-            // Convention: scalar names prefixed `target_` resolve via the
-            // target-scoped fetcher; everything else resolves against the
-            // scoring cat. This convention matches §6.5's naming of
-            // target-side axes (`target_fondness`, `target_injury`, etc.).
-            if s.name.starts_with("target_") {
-                s.score(fetch_target_scalar(s.name, cat, target))
-            } else {
-                s.score(fetch_self_scalar(s.name, cat))
-            }
+            // Ticket 516: every scalar routes through the target-scoped
+            // fetcher, unconditionally. The pre-516 `target_` name-
+            // prefix routing sent unprefixed axes to a universally-
+            // stubbed self fetcher — `prey_yield` / `prey_calm` /
+            // `prey_alertness_tolerance` / `ally_proximity` all read a
+            // silent 0.0 in production while their unit tests passed on
+            // tie-break coincidence. Self-scoped inputs ignore the
+            // `target` argument inside the resolver's closure.
+            s.score(fetch_target_scalar(s.name, cat, target))
         }
         Consideration::Spatial(s) => {
             let landmark_pos = match s.landmark {
@@ -631,12 +629,55 @@ mod tests {
         };
         let cat = Entity::from_raw_u32(1).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |_: &str, _: Entity, _: Entity| 0.0;
-        let out = evaluate_target_taking(&dse, cat, &[], &[], &ctx, &fetch_self, &fetch_target);
+        let out = evaluate_target_taking(&dse, cat, &[], &[], &ctx, &fetch_target);
         assert_eq!(out.aggregated_score, 0.0);
         assert!(out.winning_target.is_none());
         assert!(out.intention.is_none());
+    }
+
+    #[test]
+    fn unprefixed_scalar_routes_to_target_fetcher() {
+        // Ticket 516 regression pin. Pre-516, scalar names without a
+        // `target_` prefix routed to a self-scoped fetcher that every
+        // production resolver stubbed to 0.0 — the axis scored 0.0 for
+        // every candidate with no L2 visibility. Post-516 ALL scalar
+        // names must reach the target-scoped fetcher. An unprefixed
+        // axis that differentiates candidates must therefore decide
+        // the argmax.
+        let dse = TargetTakingDse {
+            id: DseId("hunt"),
+            candidate_query: noop_candidate_query,
+            per_target_considerations: vec![Consideration::Scalar(ScalarConsideration::new(
+                "prey_yield", // deliberately unprefixed
+                linear_identity(),
+            ))],
+            composition: Composition::weighted_sum(vec![1.0]),
+            aggregation: TargetAggregation::Best,
+            intention: noop_intention,
+            required_stance: None,
+            eligibility: Default::default(),
+        };
+        let cat = Entity::from_raw_u32(1).unwrap();
+        let low = Entity::from_raw_u32(10).unwrap();
+        let high = Entity::from_raw_u32(11).unwrap();
+        let ctx = test_ctx(cat);
+        let fetch_target = |name: &str, _cat: Entity, target: Entity| match (name, target) {
+            ("prey_yield", t) if t == high => 0.9,
+            ("prey_yield", t) if t == low => 0.1,
+            _ => 0.0,
+        };
+        // Expected winner FIRST — WeightedSum ties break toward the
+        // later candidate, so a dead axis (both 0.0) picks `low` and
+        // this test fails. The 264/516 tied-position discipline.
+        let positions = vec![Position::new(1, 0), Position::new(1, 0)];
+        let out = evaluate_target_taking(&dse, cat, &[high, low], &positions, &ctx, &fetch_target);
+        assert_eq!(
+            out.winning_target,
+            Some(high),
+            "unprefixed scalar axis must reach the target-scoped fetcher and decide the argmax"
+        );
+        assert!((out.aggregated_score - 0.9).abs() < 1e-5);
     }
 
     #[test]
@@ -659,7 +700,6 @@ mod tests {
         let b = Entity::from_raw_u32(11).unwrap();
         let c = Entity::from_raw_u32(12).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |name: &str, _cat: Entity, target: Entity| match (name, target) {
             ("target_fondness", t) if t == a => 0.2,
             ("target_fondness", t) if t == b => 0.9,
@@ -671,15 +711,7 @@ mod tests {
             Position::new(2, 0),
             Position::new(3, 0),
         ];
-        let out = evaluate_target_taking(
-            &dse,
-            cat,
-            &[a, b, c],
-            &positions,
-            &ctx,
-            &fetch_self,
-            &fetch_target,
-        );
+        let out = evaluate_target_taking(&dse, cat, &[a, b, c], &positions, &ctx, &fetch_target);
         assert_eq!(out.winning_target, Some(b));
         assert!((out.aggregated_score - 0.9).abs() < 1e-5);
         assert!(out.intention.is_some());
@@ -710,7 +742,6 @@ mod tests {
         let b = Entity::from_raw_u32(11).unwrap();
         let c = Entity::from_raw_u32(12).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |name: &str, _: Entity, target: Entity| match (name, target) {
             ("target_threat", t) if t == a => 0.6,
             ("target_threat", t) if t == b => 0.4,
@@ -718,15 +749,7 @@ mod tests {
             _ => 0.0,
         };
         let positions = vec![Position::new(1, 0); 3];
-        let out = evaluate_target_taking(
-            &dse,
-            cat,
-            &[a, b, c],
-            &positions,
-            &ctx,
-            &fetch_self,
-            &fetch_target,
-        );
+        let out = evaluate_target_taking(&dse, cat, &[a, b, c], &positions, &ctx, &fetch_target);
         // Top 2: 0.6 + 0.4 = 1.0; winner is the argmax (a).
         assert!(
             (out.aggregated_score - 1.0).abs() < 1e-5,
@@ -755,22 +778,13 @@ mod tests {
         let a = Entity::from_raw_u32(10).unwrap();
         let b = Entity::from_raw_u32(11).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |name: &str, _: Entity, target: Entity| match (name, target) {
             ("target_gap", t) if t == a => 1.0,
             ("target_gap", t) if t == b => 0.5,
             _ => 0.0,
         };
         let positions = vec![Position::new(1, 0); 2];
-        let out = evaluate_target_taking(
-            &dse,
-            cat,
-            &[a, b],
-            &positions,
-            &ctx,
-            &fetch_self,
-            &fetch_target,
-        );
+        let out = evaluate_target_taking(&dse, cat, &[a, b], &positions, &ctx, &fetch_target);
         // Ranked: [(a, 1.0), (b, 0.5)]; weights [1, 0.5]; norm 1.5.
         // score = (1.0 × 1 + 0.5 × 0.5) / 1.5 = 1.25 / 1.5 ≈ 0.833
         assert!(
@@ -810,17 +824,8 @@ mod tests {
         let pos_a = Position::new(5, 0);
         let pos_b = Position::new(10, 0);
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |_: &str, _: Entity, _: Entity| 0.0;
-        let out = evaluate_target_taking(
-            &dse,
-            cat,
-            &[a, b],
-            &[pos_a, pos_b],
-            &ctx,
-            &fetch_self,
-            &fetch_target,
-        );
+        let out = evaluate_target_taking(&dse, cat, &[a, b], &[pos_a, pos_b], &ctx, &fetch_target);
         // Cat at (0,0); a at (5,0) → distance 5 → score 0.5;
         // b at (10,0) → distance 10 → score 1.0. Winner = b.
         assert_eq!(out.winning_target, Some(b));

@@ -292,7 +292,6 @@ pub fn resolve_apply_remedy_target(
     // Spatial nearness axis (`apply_remedy_target_nearness`) is
     // computed by the substrate from `EvalCtx::self_position` to each
     // candidate's tile per §L2.10.7.
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     // Reborrow as `&` so the closure captures a shared reference;
     // disjoint from `&scratch.entities` / `&scratch.positions` below.
     let injury_map = &scratch.map_f32_a;
@@ -332,7 +331,6 @@ pub fn resolve_apply_remedy_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

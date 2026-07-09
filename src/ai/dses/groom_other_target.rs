@@ -392,7 +392,6 @@ pub fn resolve_groom_other_target(
     // computed by the substrate from `EvalCtx::self_position` to each
     // candidate's tile per §L2.10.7.
     let cooldown_was_applied = std::cell::Cell::new(false);
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     // Reborrow temperatures as `&` so the closure captures only a
     // shared reference; disjoint from `&scratch.entities` /
     // `&scratch.positions` passed to the evaluator below.
@@ -456,7 +455,6 @@ pub fn resolve_groom_other_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 

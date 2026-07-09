@@ -382,7 +382,6 @@ pub fn resolve_fight_target(
     // the substrate from `EvalCtx::self_position` to each candidate's
     // tile per §L2.10.7.
     let cooldown_was_applied = std::cell::Cell::new(false);
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     // Ticket 427 Step 1 — reborrow the threat map as `&` so the per-target
     // fetcher closure captures only a shared reference to one scratch
     // field. `&scratch.entities` / `&scratch.positions` pass into the
@@ -395,9 +394,15 @@ pub fn resolve_fight_target(
                 let target_threat = threat_map.get(&target).copied().unwrap_or(0.0);
                 combat_advantage_normalized(self_combat, self_health_fraction, target_threat)
             }
-            // Ally-proximity is a self-side signal but named with the
-            // `target_`-absent convention — the target-scoped fetcher
-            // receives it regardless and returns the precomputed scalar.
+            // Ally-proximity is a self-side signal: the fetcher ignores
+            // `target` and returns the precomputed scalar. Live only
+            // since ticket 516 — pre-516 prefix routing sent this
+            // unprefixed name to the stubbed self fetcher (silent 0.0).
+            // Uniform across candidates, so it never changes the argmax;
+            // it lifts every candidate's score equally (§6.5.9 backup
+            // confidence). Note: this resolver returns only the winning
+            // target today, so the lift is latent until a caller
+            // consumes `aggregated_score` — recorded in ticket 516's log.
             ALLY_PROXIMITY_INPUT => ally_score,
             TARGET_PREDICTABILITY_INPUT => {
                 let signal = target_predictability_signal(cat_beliefs, predator_beliefs, target);
@@ -434,7 +439,6 @@ pub fn resolve_fight_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 
@@ -623,6 +627,64 @@ mod tests {
             &mut crate::resources::DseTargetScratchpad::default(),
         );
         assert!(out.is_none());
+    }
+
+    #[test]
+    fn ally_proximity_lifts_candidate_scores() {
+        // 516 liveness pin. `ally_proximity` is uniform across
+        // candidates (self-side signal), so it can never flip the
+        // argmax — the observable consequence of the axis being alive
+        // is that every candidate's score rises when allies stand
+        // nearby. Pre-516 the unprefixed name routed to the stubbed
+        // self fetcher and this delta was exactly 0.0. Measured
+        // through the focal-target hook's per-candidate ranking.
+        let mut registry = DseRegistry::new();
+        registry.target_taking_dses.push(fight_target_dse());
+        let cat = Entity::from_raw_u32(1).unwrap();
+        // ShadowFox: Cat→ShadowFox = Enemy, which `attack()` accepts
+        // (a Fox reads as Predator and the §9.3 prefilter drops it).
+        let fox = candidate(2, 2, 0, WildSpecies::ShadowFox, 0.15);
+
+        let score_with_allies = |allies: &[Position]| -> f32 {
+            let capture = crate::resources::FocalScoreCapture::default();
+            let name_lookup = |e: Entity| format!("{e:?}");
+            let hook = crate::ai::target_dse::FocalTargetHook {
+                capture: &capture,
+                name_lookup: &name_lookup,
+            };
+            let out = resolve_fight_target(
+                &registry,
+                cat,
+                Position::new(0, 0),
+                &[fox],
+                0.5,
+                1.0,
+                allies,
+                &crate::ai::faction::FactionRelations::canonical(),
+                &|_| crate::ai::faction::StanceOverlays::default(),
+                0,
+                Some(hook),
+                None,
+                None,
+                None,
+                &mut crate::resources::DseTargetScratchpad::default(),
+            );
+            assert_eq!(out, Some(fox.entity));
+            let inner = capture.drain();
+            inner.target_rankings["fight_target"].candidates[0].score
+        };
+
+        let lone = score_with_allies(&[]);
+        let backed = score_with_allies(&[
+            Position::new(1, 0),
+            Position::new(0, 1),
+            Position::new(1, 1),
+        ]);
+        assert!(
+            backed > lone + 1e-4,
+            "three in-radius allies must lift the fight score via the \
+             ally_proximity axis: backed {backed} vs lone {lone}"
+        );
     }
 
     #[test]

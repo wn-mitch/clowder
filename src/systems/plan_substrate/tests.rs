@@ -596,7 +596,6 @@ fn require_unreserved_filter_gates_non_owner_to_zero() {
         target_alive: None,
         field_cost: None,
     };
-    let fetch_self = |_: &str, _: Entity| 0.0;
     // owner_target rates higher quality; without the gate it would win.
     let fetch_target = |_: &str, _: Entity, t: Entity| -> f32 {
         if t == owner_target {
@@ -615,7 +614,6 @@ fn require_unreserved_filter_gates_non_owner_to_zero() {
         &[owner_target, stranger_target],
         &[Position::new(1, 0), Position::new(2, 0)],
         &ctx,
-        &fetch_self,
         &fetch_target,
         Some(&is_reserved_by_other),
         None,
@@ -698,7 +696,6 @@ fn require_unreserved_filter_passes_owner() {
         target_alive: None,
         field_cost: None,
     };
-    let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.7;
     // Owner case — `is_reserved_by_other` returns false because the
     // caller resolves the (cat, target) pair against the snapshot and
@@ -711,7 +708,6 @@ fn require_unreserved_filter_passes_owner() {
         &[target],
         &[Position::new(1, 0)],
         &ctx,
-        &fetch_self,
         &fetch_target,
         Some(&is_reserved_by_other),
         None,
@@ -784,7 +780,6 @@ fn require_unreserved_filter_inactive_when_dse_opts_out() {
         target_alive: None,
         field_cost: None,
     };
-    let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.7;
     // Closure says target is reserved — but the DSE doesn't opt in,
     // so the gate stays inactive. Score must reflect the underlying
@@ -797,7 +792,6 @@ fn require_unreserved_filter_inactive_when_dse_opts_out() {
         &[target],
         &[Position::new(1, 0)],
         &ctx,
-        &fetch_self,
         &fetch_target,
         Some(&is_reserved_by_other),
         None,
@@ -906,7 +900,6 @@ fn require_unreserved_fires_contention_hook() {
         target_alive: None,
         field_cost: None,
     };
-    let fetch_self = |_: &str, _: Entity| 0.0;
     let fetch_target = |_: &str, _: Entity, _: Entity| 0.5;
     let is_reserved_by_other = |target: Entity| target == a; // only `a` is gated.
 
@@ -918,7 +911,6 @@ fn require_unreserved_fires_contention_hook() {
         &[a, b],
         &[Position::new(1, 0), Position::new(2, 0)],
         &ctx,
-        &fetch_self,
         &fetch_target,
         Some(&is_reserved_by_other),
         Some(&mut on_contention),

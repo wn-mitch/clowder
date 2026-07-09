@@ -97,11 +97,12 @@ pub const TARGET_PARTNER_BOND_INPUT: &str = "target_partner_bond";
 pub const TARGET_AFFILIATION_INPUT: &str = "target_affiliation";
 /// 264 — per-target `Affordance(Socialize, self, target)` read from
 /// substrate 261. `target_`-prefixed (NOT the canonical
-/// `affordance_socialize` key) because `score_target_consideration`
-/// routes scalar names to the target-scoped fetcher only under the
-/// `target_` prefix — un-prefixed names fall through to the no-op
-/// `fetch_self` stub and read a silent 0.0 (the defect class ticket
-/// 516 audits across hunt's prey_* axes and 263's affordance key).
+/// `affordance_socialize` key) — chosen when the pre-516 evaluator
+/// still routed scalar names by prefix and unprefixed names read a
+/// silent 0.0 from the stubbed self fetcher. Ticket 516 retired the
+/// prefix routing (every scalar resolves through the target-scoped
+/// fetcher), so the prefix is no longer load-bearing; the key stays
+/// for trace continuity.
 pub const TARGET_SOCIALIZE_AFFORDANCE_INPUT: &str = "target_affordance_socialize";
 /// Re-export of the canonical key from `plan_substrate` so call sites
 /// in this module read a single name. Ticket 072 publishes the
@@ -437,7 +438,6 @@ pub fn resolve_socialize_target(
     // mutate it without taking `&mut`.
     let cooldown_was_applied = std::cell::Cell::new(false);
 
-    let fetch_self = |_name: &str, _cat: Entity| -> f32 { 0.0 };
     let fetch_target = |name: &str, cat: Entity, target: Entity| -> f32 {
         match name {
             TARGET_FONDNESS_INPUT => relationships
@@ -505,7 +505,6 @@ pub fn resolve_socialize_target(
         &scratch.entities,
         &scratch.positions,
         &ctx,
-        &fetch_self,
         &fetch_target,
     );
 
@@ -676,7 +675,6 @@ mod tests {
         let friend = Entity::from_raw_u32(10).unwrap();
         let acquaintance = Entity::from_raw_u32(11).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
                 TARGET_FONDNESS_INPUT => {
@@ -698,7 +696,6 @@ mod tests {
             &[friend, acquaintance],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_target,
         );
         assert_eq!(out.winning_target, Some(friend));
@@ -715,7 +712,6 @@ mod tests {
         let novel_stranger = Entity::from_raw_u32(10).unwrap();
         let familiar_friend = Entity::from_raw_u32(11).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
                 TARGET_FONDNESS_INPUT => 0.5, // tied
@@ -737,7 +733,6 @@ mod tests {
             &[novel_stranger, familiar_friend],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_target,
         );
         assert_eq!(out.winning_target, Some(novel_stranger));
@@ -781,7 +776,6 @@ mod tests {
         let intended = Entity::from_raw_u32(10).unwrap();
         let other_friend = Entity::from_raw_u32(11).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
                 TARGET_FONDNESS_INPUT => 0.5,
@@ -802,7 +796,6 @@ mod tests {
             &[intended, other_friend],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_target,
         );
         assert_eq!(out.winning_target, Some(intended));
@@ -853,7 +846,6 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         let intended = Entity::from_raw_u32(10).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
 
         // Same fondness / novelty / species / Friends-bond state for
         // both runs — the only difference is whether the intention
@@ -887,7 +879,6 @@ mod tests {
             &[intended],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_with_intention,
         );
         let without_out = evaluate_target_taking(
@@ -896,7 +887,6 @@ mod tests {
             &[intended],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_without_intention,
         );
 
@@ -929,7 +919,6 @@ mod tests {
         let novel_stranger = Entity::from_raw_u32(10).unwrap();
         let familiar_friend = Entity::from_raw_u32(11).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
                 TARGET_FONDNESS_INPUT => 0.5,
@@ -953,7 +942,6 @@ mod tests {
             &[novel_stranger, familiar_friend],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_target,
         );
         assert_eq!(out.winning_target, Some(novel_stranger));
@@ -971,7 +959,6 @@ mod tests {
         let friend = Entity::from_raw_u32(10).unwrap();
         let stranger = Entity::from_raw_u32(11).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
                 TARGET_FONDNESS_INPUT => {
@@ -994,7 +981,6 @@ mod tests {
             &[friend, stranger],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_target,
         );
         assert_eq!(out.winning_target, Some(friend));
@@ -1010,7 +996,6 @@ mod tests {
         let friend = Entity::from_raw_u32(10).unwrap();
         let partner = Entity::from_raw_u32(11).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
                 TARGET_FONDNESS_INPUT => 0.5,
@@ -1033,7 +1018,6 @@ mod tests {
             &[friend, partner],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_target,
         );
         assert_eq!(out.winning_target, Some(partner));
@@ -1051,7 +1035,6 @@ mod tests {
         let friend = Entity::from_raw_u32(10).unwrap();
         let beloved_stranger = Entity::from_raw_u32(11).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = move |name: &str, _: Entity, target: Entity| -> f32 {
             match name {
                 TARGET_FONDNESS_INPUT => {
@@ -1074,7 +1057,6 @@ mod tests {
             &[friend, beloved_stranger],
             &positions,
             &ctx,
-            &fetch_self,
             &fetch_target,
         );
         assert_eq!(out.winning_target, Some(beloved_stranger));
@@ -1085,9 +1067,8 @@ mod tests {
         let dse = socialize_target_dse(&ScoringConstants::default());
         let cat = Entity::from_raw_u32(1).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |_: &str, _: Entity, _: Entity| 0.0;
-        let out = evaluate_target_taking(&dse, cat, &[], &[], &ctx, &fetch_self, &fetch_target);
+        let out = evaluate_target_taking(&dse, cat, &[], &[], &ctx, &fetch_target);
         assert!(out.winning_target.is_none());
         assert!(out.intention.is_none());
         assert_eq!(out.aggregated_score, 0.0);
@@ -1272,7 +1253,6 @@ mod tests {
         let cat = Entity::from_raw_u32(1).unwrap();
         let target = Entity::from_raw_u32(10).unwrap();
         let ctx = test_ctx(cat);
-        let fetch_self = |_: &str, _: Entity| 0.0;
         let fetch_target = |name: &str, _: Entity, _: Entity| -> f32 {
             match name {
                 TARGET_FONDNESS_INPUT | TARGET_NOVELTY_INPUT | TARGET_SPECIES_COMPAT_INPUT => 1.0,
@@ -1285,7 +1265,6 @@ mod tests {
             &[target],
             &[Position::new(1, 0)],
             &ctx,
-            &fetch_self,
             &fetch_target,
         );
         match out.intention.expect("intention present for winning target") {
