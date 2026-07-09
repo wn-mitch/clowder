@@ -6409,6 +6409,15 @@ pub struct WildlifeConstants {
     /// elections per 900s). Default `6.0`.
     #[serde(default = "default_shadow_fox_retreat_min_distance")]
     pub shadow_fox_retreat_min_distance: f32,
+    /// 310 S4 — scale on the retreat DSE's election candidacy. Ships
+    /// DORMANT at `0.0`: two gate iterations could not find a
+    /// non-churning home-range shape (184–299 retreat elections per
+    /// 900s — fed foxes shuttling their range), so S2's event-driven
+    /// post-ambush retreat remains THE retreat mechanism and the
+    /// election candidacy waits on the follow-on rest-drive design.
+    /// Lift toward `1.0` to let fed-and-far foxes elect the walk home.
+    #[serde(default = "default_shadow_fox_retreat_election_scale")]
+    pub shadow_fox_retreat_election_scale: f32,
 
     // ----- Ticket 310 S3: kill-site memory -----
     /// How long (ticks) a shadow-fox remembers its last kill site as
@@ -6511,6 +6520,7 @@ impl Default for WildlifeConstants {
             shadow_fox_retreat_arrive_slow_radius: default_shadow_fox_retreat_arrive_slow_radius(),
             shadow_fox_den_reuse_radius: default_shadow_fox_den_reuse_radius(),
             shadow_fox_retreat_min_distance: default_shadow_fox_retreat_min_distance(),
+            shadow_fox_retreat_election_scale: default_shadow_fox_retreat_election_scale(),
             shadow_fox_kill_site_memory_ticks: default_shadow_fox_kill_site_memory_ticks(),
             shadow_fox_kill_site_avoid_radius: default_shadow_fox_kill_site_avoid_radius(),
         }
@@ -6539,6 +6549,10 @@ fn default_shadow_fox_den_reuse_radius() -> f32 {
 
 fn default_shadow_fox_retreat_min_distance() -> f32 {
     6.0
+}
+
+fn default_shadow_fox_retreat_election_scale() -> f32 {
+    0.0
 }
 
 fn default_shadow_fox_satiation_at_spawn() -> f32 {

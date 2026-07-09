@@ -898,15 +898,23 @@ pub fn shadowfox_motivation_tick(
         // same constant that gates the hunt, making the two candidates
         // complementary: satiation < threshold may hunt, ≥ threshold
         // may retreat.
-        let retreat_score = if den_pos.is_some()
+        // Ships election-DORMANT (scale 0.0): iterations 2–4 measured
+        // 184–299 retreat elections per 900s under every home-range
+        // shape tried — fed foxes shuttling their range instead of
+        // resting. S2's event-driven post-ambush retreat remains THE
+        // retreat; the candidacy waits on the follow-on rest-drive
+        // design (see ticket log).
+        let retreat_score = if c.shadow_fox_retreat_election_scale > 0.0
+            && den_pos.is_some()
             && den_distance > c.shadow_fox_retreat_min_distance
             && drives.satiation >= c.shadow_fox_stalk_satiation_threshold
         {
-            crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
-                "shadowfox_retreat",
-                &sf_ctx,
-                &eval_inputs,
-            )
+            c.shadow_fox_retreat_election_scale
+                * crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
+                    "shadowfox_retreat",
+                    &sf_ctx,
+                    &eval_inputs,
+                )
         } else {
             0.0
         };
@@ -2144,12 +2152,38 @@ mod tests {
     }
 
     #[test]
-    fn fed_far_fox_elects_retreat() {
+    fn retreat_election_dormant_at_default() {
+        // S4 close: the retreat candidacy ships at scale 0.0 — a
+        // fed-and-far fox must NOT elect the walk home at defaults
+        // (S2's event path owns retreat until the rest-drive design).
         let (mut world, mut schedule) = setup_motivation_world();
         {
             let mut constants = world.resource_mut::<crate::resources::SimConstants>();
             constants.wildlife.shadow_fox_motivation_jitter = 0.0;
             constants.wildlife.shadow_fox_motivation_softmax_temp = 0.001;
+        }
+        let entity = spawn_shadowfox_at(&mut world, Position::new(30, 30), 1.0);
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 1.0;
+        insert_beliefs(&mut world, entity, Some((2, 2)), None, 0);
+
+        for _ in 0..5 {
+            schedule.run(&mut world);
+        }
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            !matches!(state, WildlifeAiState::Retreating { .. }),
+            "retreat candidacy must be dormant at defaults; got {state:?}",
+        );
+    }
+
+    #[test]
+    fn fed_far_fox_elects_retreat_when_scale_lifted() {
+        let (mut world, mut schedule) = setup_motivation_world();
+        {
+            let mut constants = world.resource_mut::<crate::resources::SimConstants>();
+            constants.wildlife.shadow_fox_motivation_jitter = 0.0;
+            constants.wildlife.shadow_fox_motivation_softmax_temp = 0.001;
+            constants.wildlife.shadow_fox_retreat_election_scale = 1.0;
         }
         let entity = spawn_shadowfox_at(&mut world, Position::new(30, 30), 1.0);
         world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 1.0;
