@@ -1746,7 +1746,21 @@ impl Feature {
             Feature::WildlifeSpawned => true,
             Feature::DeathStarvation => true,
             Feature::DeathInjury => true,
-            Feature::KnowledgePromoted => true,
+            // 291's promotion is chain-rare: a 3-cat same-bucket belief
+            // quorum fires ~once per 100–160k ticks — the same order as
+            // a 900s soak window. Across the five 900s trajectory
+            // families ending at 310 S1 it fired in two and zeroed in
+            // three, so a per-soak never-fired gate is a coin flip that
+            // costs a doubled-window re-soak every tails (step-21
+            // gate 3, step-22, and 310 S1 all paid it). Demoted
+            // 2026-07-09. Mechanism-break protection lives in the
+            // `colony_knowledge_false_belief` scenario
+            // (`expected_features: ["KnowledgePromoted"]`, forced
+            // deterministically every `cargo test`) + 17 unit tests;
+            // ecological-starvation protection is the release-plan
+            // step-24 cadence watch-item checked at baseline
+            // re-promotes.
+            Feature::KnowledgePromoted => false,
             Feature::KnowledgeForgotten => true,
             Feature::DepositRejected => true,
             Feature::FoodCooked => true,
