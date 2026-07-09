@@ -769,9 +769,21 @@ pub fn shadowfox_motivation_tick(
             let fished_out = kill_site_filter
                 .map(|ks| cat_pos.distance_to(&ks) <= c.shadow_fox_kill_site_avoid_radius)
                 .unwrap_or(false);
+            // 310 S4 iteration 2 — ward parity: the retired legacy roll
+            // excluded ward-covered cats from its pool; the hunt
+            // election must too, or foxes elect hunts on protected
+            // cats, walk to the perimeter, get the stalk cancelled by
+            // the Stalking arm's target_warded check, and are left
+            // patrolling AT the ward edge where every step rolls the
+            // siege chance (first S4 gate soak: WardSiegeStarted
+            // +1375% per 10kt). Same substrate read as the 260
+            // avoidance channel. Dread/Haunting keep their pre-S4
+            // semantics (psychological pressure reaches over wards).
+            let warded =
+                ward_coverage.get(cat_pos.x(), cat_pos.y()) >= c.shadow_fox_ward_avoid_threshold;
             if fished_out {
                 nearest_fished_out_dist = nearest_fished_out_dist.min(dist);
-            } else {
+            } else if !warded {
                 if dist < nearest_cat_any_dist {
                     nearest_cat_any_dist = dist;
                     nearest_cat_any = Some(*cat_pos);
@@ -2081,6 +2093,47 @@ mod tests {
                 .copied()
                 .unwrap_or(0),
             1,
+        );
+    }
+
+    #[test]
+    fn hunt_election_skips_ward_covered_cat() {
+        // S4 iteration-2 regression (WardSiegeStarted +1375%): the hunt
+        // pool must exclude ward-covered cats, like the retired legacy
+        // roll did — otherwise foxes elect hunts on protected targets
+        // and end up patrolling ward perimeters rolling sieges.
+        let (mut world, mut schedule) = setup_motivation_world();
+        {
+            let mut constants = world.resource_mut::<crate::resources::SimConstants>();
+            constants.wildlife.shadow_fox_motivation_jitter = 0.0;
+            constants.wildlife.shadow_fox_motivation_softmax_temp = 0.001;
+        }
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.0;
+        // Nearer cat under ward coverage; farther cat unprotected.
+        spawn_plain_cat_at(&mut world, Position::new(8, 5));
+        spawn_plain_cat_at(&mut world, Position::new(5, 12));
+        {
+            let threshold = world
+                .resource::<crate::resources::SimConstants>()
+                .wildlife
+                .shadow_fox_ward_avoid_threshold;
+            let mut coverage = world.resource_mut::<crate::resources::WardCoverageMap>();
+            coverage.deposit(8, 5, threshold + 0.5);
+        }
+
+        schedule.run(&mut world);
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            matches!(
+                state,
+                WildlifeAiState::Stalking {
+                    target_x: 5,
+                    target_y: 12
+                }
+            ),
+            "the hunt must target the unprotected cat; got {state:?}",
         );
     }
 
