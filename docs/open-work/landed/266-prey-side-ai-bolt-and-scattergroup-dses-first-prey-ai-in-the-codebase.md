@@ -1,7 +1,7 @@
 ---
 id: 266
 title: Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase)
-status: ready
+status: done
 cluster: wildlife
 orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
@@ -10,9 +10,9 @@ parked: null
 blocked-by: []
 supersedes: []
 related-systems: [ai-substrate-refactor.md]
-related-balance: []
-landed-at: null
-landed-on: null
+related-balance: [266-prey-ai-bolt-scatter.md]
+landed-at: 7aad3c49
+landed-on: 2026-07-09
 ---
 
 ## Why
@@ -85,3 +85,5 @@ The payoff: predation feels like predation. Prey that bolt at the right moment +
 
 - 2026-05-10: opened sibling-to-258. First prey AI in the codebase. Enabled, not delivered, by the C3 + Affordance substrates landing in the same cluster lifecycle. Session plan: `~/.claude/plans/after-working-256-i-dreamy-fiddle.md`.
 - 2026-05-19: accuracy audit pass — no blockers; PreyKind enum referenced correctly; aspirational DSE files (prey_bolt, prey_scattergroup) not yet required to exist per implementation phase.
+- 2026-07-09: **Bolt landed** (c2730756, plan step 25; record `docs/balance/266-prey-ai-bolt-scatter.md`). Deltas vs the ticket sketch, all recorded in the balance doc: (1) alert set = Alert ∪ Fleeing — mouse `freeze_ticks == 1` means short-freeze species live in Fleeing and would never be scored otherwise; (2) `recency_of_threat_cue` deliberately NOT an axis (no prey-side writer exists — a registered axis with a structurally-zero input is the 516 silent-canary class); the live belief facet is the implanted `perceived_violence_capability`; (3) the ticket's `Affordance(Chase, predator, me)` read landed as the urgency axis exactly as scoped, plus 314's `Affordance(Bolt, me, threat)` as escape viability; (4) prey stay OUT of the AI tick loop entirely — `ai::prey_scoring` light dispatcher inside `prey_ai`, alert-set + 8-tick cadence (the ticket's performance-budget clause, resolved at the strong end). Gate: ground-species hunt success −9..−19% relative (predicted band), aggregate 61.4→68.4% via the 516 fish-distortion reversal, hard gates pass.
+- 2026-07-09: prey detection still covers cats only (`try_detect_cat` scans `With<Needs>`), so Bolt/Scatter fire against cat threats; wildlife predators (fox/hawk/snake) don't yet trigger the escape elections. Named follow-on candidate — the affordance rows for wildlife threats already exist (314 writes them), only the detection channel is missing.

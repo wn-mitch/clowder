@@ -69,7 +69,56 @@ colony: kittens 7, peak 15, fulfillment 0.199 (the fulfillment number
 keeps oscillating 0.20–0.27 across this family; band-calibration
 watch-item, not a trend).
 
-## Landing 2 — ScatterGroup — pending gate
+## Landing 2 — ScatterGroup (`7aad3c49`) — ACCEPTED (P2 reframed)
 
-Written before the gate soak; see predictions in
-`266-scatter-predictions` (scratchpad) and results appended below.
+**Gate:** four-artifact vs `logs/tuned-42-c2730756` (accepted Bolt stream).
+**Run:** `logs/tuned-42-7aad3c49` (seed 42, Simba focal, 900s, idle
+machine). **Verdict:** concern-band; survival PASS, continuity PASS, hard
+gates pass (Starvation 0, ShadowFoxAmbush 2 ≤ 10, never-fired 0). 517
+hitch scan clean (132 duplicate ticks all single-type — herd members
+bolting from a shared tile, the legitimate twin-entity class; 0 snapshot
+gaps).
+
+### Predictions → observations
+
+- **P1 (direct counts) — CONFIRMED: 432 `PreyBoltStarted` + 475
+  `PreyScatterStarted` per 900s.** The new EventKinds close the Bolt
+  gate's instrument gap on their first run. Scatter volume far exceeded
+  the "O(tens)" guess — prey cluster around dens, so the census gate is
+  satisfied more often than not. `expected_to_fire_per_soak` for both
+  Features can lift to `true` next commit (seed-42 observation
+  requirement met with three orders of magnitude of margin).
+- **P2 (±10% aggregate) — REFUTED-THEN-REFRAMED, honest emergence.**
+  Aggregate 68.4 → 75.9% (+10.9% rel); every species rose (mouse 75.0%,
+  rat 76.8%, rabbit 83.9% on 354 attempts — the herd species; fish
+  59.0%, continuing the 516-distortion recovery). The divergence
+  geometry itself works: chase timeouts became the top ground-prey
+  failure (the pursuing cat's `pursue()` lock does break, as designed).
+  But a flushed herd scatters across a field holding EIGHT hunting
+  cats — members fleeing their own threat cross other hunters' paths
+  and get picked up. This is the real reason cooperative predators
+  flush herds; the sim discovered it from geometry. Not a sign defect:
+  the ±34° parity rotation always keeps a positive away-component from
+  the elected threat (`scattering_herd_diverges` pins it).
+- **P3 hard gates — PASS.**
+- **P4 shape stable — holds by construction.**
+- **P5 throughput — 114 tps on the idle box** (family band 112–120):
+  confirms the Bolt run's 104 was compile contention and prices the
+  census + two-candidate election within the alert-set envelope.
+- **P6 hitch — clean.**
+
+KnowledgePromoted watch-item (step 24 → 25): still 0 per ~108k-tick
+window across all three step-25 streams (516 / Bolt / Scatter). The
+chain-rare demotion continues to hold; the false-belief scenario remains
+the mechanism gate. No action.
+
+### Hand-off to the band calibration
+
+Post-266 hunt success sits at **75.9%** against the 30–50% biology band
+— HIGHER than pre-prey-AI, because both emergent effects (fish-calm
+reversal, herd flushing into the pack) favor the cats. The calibration
+now has real instruments (bolt/scatter cadence via events; per-species
+success via `just q hunt-success`) and honest substrate on both sides.
+Escape-side knobs (`prey_bolt_election_threshold`,
+`prey_scatter_election_threshold`, `detection_base_chance`) are the
+pillar-2-preferred levers before any cat-side nerf.

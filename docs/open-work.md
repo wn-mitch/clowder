@@ -15,10 +15,10 @@ _Last generated: 2026-07-09._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 119 |
+| Ready | 121 |
 | Parked | 12 |
-| Blocked | 28 |
-| **Open total** | **164** |
+| Blocked | 29 |
+| **Open total** | **167** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -43,7 +43,7 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.92_
 - **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.91_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
-- **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · score 0.90_
+- **[233](docs/open-work/tickets/233-subscribe-non-pickup-work-dses-hunt-forage-cook-wander-explore-to-body-state-perception.md)** — Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception — _[ai-substrate] · score 0.90_
 
 ## Epic progress (8)
 
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (119)
+## Ready by cluster (121)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -106,7 +106,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[509](docs/open-work/tickets/509-mating-conversion-margin-haseligiblemate-flickers-with-htn-abandon-maslow-pregate-zeroes-eligible-windows-courtship-stage-advance-falloff-9130-to-12-and-the-section-7-commitment-layer-reads-00-all-run.md)** — Mating conversion margin: HasEligibleMate flickers with HTN Abandon, Maslow pregate zeroes eligible windows, courtship stage-advance falloff 9130-to-12, and the section-7 commitment layer reads 0.0 all run — _[ai-substrate] · added 2026-07-05_
 - **[510](docs/open-work/tickets/510-trash-vs-drop-disposal-margin-is-a-1e-4-coin-flip-with-a-midden-present-midden-discipline-exists-only-as-an-rng-draw.md)** — Trash vs Drop disposal margin is a 1e-4 coin flip with a Midden present — midden discipline exists only as an RNG draw — _[ai-substrate] · added 2026-07-05_
 
-### social-coordination (17 ready, 4 blocked)
+### social-coordination (19 ready, 4 blocked)
 
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
 - **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[social-coordination] · added 2026-05-07_
@@ -125,8 +125,10 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[408](docs/open-work/tickets/408-parental-engagement-asymptote-weights-balance-tuning-399-follow-on.md)** — Parental engagement asymptote weights — balance tuning (399 follow-on) — _[social-coordination] · added 2026-05-17_
 - **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · added 2026-05-26_
 - **[475](docs/open-work/tickets/475-current-role-query-helper-derive-active-role-from-existing-capability-markers-recent-action-history.md)** — Current-role query helper (derive active role from existing capability markers + recent action history) — _[social-coordination] · added 2026-05-26_
+- **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
+- **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
 
-### life-cycle (11 ready, 1 blocked)
+### life-cycle (12 ready, 1 blocked)
 
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
@@ -139,6 +141,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
+- **[521](docs/open-work/tickets/521-practice-play-solo-kitten-skill-rehearsal-motor-pattern-play-with-no-partner-builds-hunting-skill.md)** — Practice-play — solo kitten skill rehearsal (motor-pattern play with no partner, builds hunting skill) — _[life-cycle] · added 2026-07-09_
 
 ### items-crafting (10 ready, 4 blocked)
 
@@ -177,9 +180,8 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 - **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 
-### wildlife (8 ready, 1 blocked)
+### wildlife (7 ready, 1 blocked)
 
-- **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
 - **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
@@ -196,7 +198,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[299](docs/open-work/tickets/299-tune-ward-placement-distance-cost-penalty-285296297-architectural-follow-on.md)** — tune ward placement distance_cost penalty (285+296+297 architectural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
 
-### magic-mythic (5 ready, 4 blocked)
+### magic-mythic (5 ready, 5 blocked)
 
 - **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
 - **[238](docs/open-work/tickets/238-ceremony-richness-from-spirituality-spirituality-personality-axis-drives-narrative-length.md)** — Ceremony richness from spirituality — Spirituality personality axis drives narrative + length — _[magic-mythic] · added 2026-05-08_
@@ -233,7 +235,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 - **[514](docs/open-work/tickets/514-mentor-churn-mentor-target-elects-incapacitated-mentees-the-step-entry-alive-gate-then-rejects-1111-mentorcat-plan-failures-per-soak-on-incapacitation-heavy-trajectories.md)** — mentor churn: mentor_target elects Incapacitated mentees the step-entry alive-gate then rejects — 1111 MentorCat plan failures per soak on incapacitation-heavy trajectories — _[planning-substrate] · added 2026-07-07_
 
-## Ready by initiative (81 tag-memberships across 9 initiatives)
+## Ready by initiative (86 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -255,6 +257,24 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
 
+### world-richness (15 open, 15 landed)
+
+- **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · added 2026-05-16_
+- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
+- **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
+- **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
+- **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
+- **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
+- **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
+- **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
+- **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · added 2026-05-26_
+- **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
+- **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
+- **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
+- **[521](docs/open-work/tickets/521-practice-play-solo-kitten-skill-rehearsal-motor-pattern-play-with-no-partner-builds-hunting-skill.md)** — Practice-play — solo kitten skill rehearsal (motor-pattern play with no partner, builds hunting skill) — _[life-cycle] · added 2026-07-09_
+- **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
+- **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
+
 ### mythic-texture (14 open, 5 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -272,22 +292,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
 - **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
 
-### world-richness (12 open, 15 landed)
-
-- **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · added 2026-05-16_
-- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
-- **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
-- **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
-- **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
-- **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
-- **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
-- **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
-- **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · added 2026-05-26_
-- **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
-- **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
-- **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
-
-### welfare-fidelity (11 open, 7 landed)
+### welfare-fidelity (13 open, 7 landed)
 
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
@@ -300,6 +305,21 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · added 2026-05-26_
 - **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · added 2026-05-26_
 - **[475](docs/open-work/tickets/475-current-role-query-helper-derive-active-role-from-existing-capability-markers-recent-action-history.md)** — Current-role query helper (derive active role from existing capability markers + recent action history) — _[social-coordination] · added 2026-05-26_
+- **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
+- **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
+
+### generational-continuity (10 open, 6 landed)
+
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
+- **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · added 2026-05-07_
+- **[278](docs/open-work/tickets/278-asymmetric-courtship-roles-initiator-responder-on-jointintention.md)** — Asymmetric Courtship roles (Initiator / Responder) on JointIntention — _[social-coordination] · added 2026-05-11_
+- **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
+- **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
+- **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
+- **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
+- **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
+- **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
+- **[521](docs/open-work/tickets/521-practice-play-solo-kitten-skill-rehearsal-motor-pattern-play-with-no-partner-builds-hunting-skill.md)** — Practice-play — solo kitten skill rehearsal (motor-pattern play with no partner, builds hunting skill) — _[life-cycle] · added 2026-07-09_
 
 ### full-sensory-perception (9 open, 9 landed)
 
@@ -313,26 +333,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · added 2026-05-26_
 
-### generational-continuity (9 open, 6 landed)
-
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
-- **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · added 2026-05-07_
-- **[278](docs/open-work/tickets/278-asymmetric-courtship-roles-initiator-responder-on-jointintention.md)** — Asymmetric Courtship roles (Initiator / Responder) on JointIntention — _[social-coordination] · added 2026-05-11_
-- **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
-- **[385](docs/open-work/tickets/385-phase-1-history-gen-sim-loop-mode-worldgen-prehistory-leg.md)** — Phase-1 history-gen sim-loop mode (worldgen-prehistory leg) — _[ai-substrate] · added 2026-05-16_
-- **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
-- **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
-- **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
-- **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
-
-### predator-prey-dynamics (5 open, 15 landed)
-
-- **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
-- **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
-- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
-- **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
-- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
-
 ### worldgen-prehistory (5 open, 0 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -341,11 +341,18 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
+### predator-prey-dynamics (4 open, 16 landed)
+
+- **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
+- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
+- **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
+- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
+
 ### environmental-simulation (1 open, 3 landed)
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (119)
+## Ready (121)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -383,7 +390,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[242](docs/open-work/tickets/242-body-cue-substrate-disposition-observable-markers.md)** — Body-cue substrate (Disposition → observable markers) — _[belief-perception] · added 2026-05-08_
 - **[244](docs/open-work/tickets/244-audible-cue-substrate-alarm-calls-distress-cries-hissing.md)** — Audible cue substrate (alarm calls, distress cries, hissing) — _[belief-perception] · added 2026-05-08_
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
-- **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
 - **[267](docs/open-work/tickets/267-conflict-low-dses-threaten-posture-hiss-escalation-rungs-cheap-pre-fight-signaling.md)** — Conflict-low DSEs — Threaten / Posture / Hiss escalation rungs (cheap pre-Fight signaling) — _[combat-threat] · added 2026-05-10_
 - **[270](docs/open-work/tickets/270-engagethreat-split-from-patrol-dse-256-r6-follow-on-with-belief-actionaffordance.md)** — EngageThreat split from Patrol DSE (256 R6 follow-on with Belief + ActionAffordance) — _[combat-threat] · added 2026-05-10_
 - **[274](docs/open-work/tickets/274-co-mentoring-practice-on-jointintention-substrate.md)** — Co-mentoring practice on JointIntention substrate — _[social-coordination] · added 2026-05-11_
@@ -466,6 +472,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
 - **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
 - **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
+- **[521](docs/open-work/tickets/521-practice-play-solo-kitten-skill-rehearsal-motor-pattern-play-with-no-partner-builds-hunting-skill.md)** — Practice-play — solo kitten skill rehearsal (motor-pattern play with no partner, builds hunting skill) — _[life-cycle] · added 2026-07-09_
+- **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
+- **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
 
 ## Parked (12)
 
@@ -482,7 +491,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · parked 2026-05-25 · added 2026-05-18_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · parked 2026-05-20 · added 2026-05-20_
 
-## Blocked (28)
+## Blocked (29)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[018](docs/open-work/tickets/018-ruin-clearings.md)** — Ruin clearings (corruption nodes, PMD-flavored) — _[magic-mythic] · blocked-by 016 · added 2026-04-22_
@@ -512,15 +521,17 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[449](docs/open-work/tickets/449-svelte-sprite-iteration-editor-in-narrative-editor.md)** — Svelte sprite-iteration editor in narrative-editor — _[rendering] · blocked-by 448 · added 2026-05-22_
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
+- **[524](docs/open-work/tickets/524-colony-naming-rite-collective-ceremony-that-confers-a-name-on-a-kitten-place-or-event-colony-driven-mythic-texture-generator.md)** — Colony naming rite — collective ceremony that confers a name on a kitten, place, or event (colony-driven mythic-texture generator) — _[magic-mythic] · blocked-by 020 · added 2026-07-09_
 
-## Landed archive (384)
+## Landed archive (385)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-07 (19)
+### 2026-07 (20)
 
 - **[516](docs/open-work/landed/516-score-target-consideration-prefix-routing-sends-unprefixed-scalar-axes-to-the-no-op-fetch-self-hunt-target-prey-yieldprey-calmalertness-tolerance-dead-in-production-263-affordance-key-same-class.md)** — score_target_consideration prefix-routing sends unprefixed scalar axes to the no-op fetch_self — hunt_target prey_yield/prey_calm/alertness-tolerance dead in production; 263 affordance key same class _(2026-07-09)_
 - **[310](docs/open-work/landed/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball _(2026-07-09)_
+- **[266](docs/open-work/landed/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) _(2026-07-09)_
 - **[351](docs/open-work/landed/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches _(2026-07-08)_
 - **[265](docs/open-work/landed/265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md)** — Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox) _(2026-07-08)_
 - **[264](docs/open-work/landed/264-social-dse-consumers-wire-belief-affordance-axes-socialize-groomother-mate-mentor-care-feedkitten.md)** — Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten) _(2026-07-08)_
