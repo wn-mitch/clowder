@@ -6402,6 +6402,13 @@ pub struct WildlifeConstants {
     /// bounds den accumulation across spawn cycles. Default `8.0`.
     #[serde(default = "default_shadow_fox_den_reuse_radius")]
     pub shadow_fox_den_reuse_radius: f32,
+    /// 310 S4 — the retreat candidate stands only when the fox is at
+    /// least this far from its den: the home-range radius. With the
+    /// original `> arrival_radius` (1.5) eligibility, a fed fox
+    /// oscillated den ↔ 2-tiles-out every other cadence (299 retreat
+    /// elections per 900s). Default `6.0`.
+    #[serde(default = "default_shadow_fox_retreat_min_distance")]
+    pub shadow_fox_retreat_min_distance: f32,
 
     // ----- Ticket 310 S3: kill-site memory -----
     /// How long (ticks) a shadow-fox remembers its last kill site as
@@ -6503,6 +6510,7 @@ impl Default for WildlifeConstants {
             shadow_fox_retreat_arrival_radius: default_shadow_fox_retreat_arrival_radius(),
             shadow_fox_retreat_arrive_slow_radius: default_shadow_fox_retreat_arrive_slow_radius(),
             shadow_fox_den_reuse_radius: default_shadow_fox_den_reuse_radius(),
+            shadow_fox_retreat_min_distance: default_shadow_fox_retreat_min_distance(),
             shadow_fox_kill_site_memory_ticks: default_shadow_fox_kill_site_memory_ticks(),
             shadow_fox_kill_site_avoid_radius: default_shadow_fox_kill_site_avoid_radius(),
         }
@@ -6527,6 +6535,10 @@ fn default_shadow_fox_retreat_arrive_slow_radius() -> f32 {
 
 fn default_shadow_fox_den_reuse_radius() -> f32 {
     8.0
+}
+
+fn default_shadow_fox_retreat_min_distance() -> f32 {
+    6.0
 }
 
 fn default_shadow_fox_satiation_at_spawn() -> f32 {

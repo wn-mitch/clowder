@@ -413,7 +413,15 @@ pub fn wildlife_ai(
                 // a retreat that crosses live ward coverage.)
                 let den = Position::new(den_x, den_y);
                 if pos.distance_to(&den) <= c.shadow_fox_retreat_arrival_radius {
-                    *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
+                    // 310 S4 iteration 4 — arrival releases to den-rest
+                    // (Waiting), not to a patrol that wanders straight
+                    // back out of the home range and re-elects retreat
+                    // every other cadence. The den sits on corrupted
+                    // ground, so the resting fox recovers coherence;
+                    // the motivation tick lifts it out when hunger (or
+                    // any corruption drive, or nocturnal patrol)
+                    // returns — the complete hunt-feed-rest cycle.
+                    *ai_state = WildlifeAiState::Waiting;
                 } else {
                     desired.0 = Some(crate::ai::steering::arrive(
                         pos.0,
@@ -891,7 +899,7 @@ pub fn shadowfox_motivation_tick(
         // complementary: satiation < threshold may hunt, ≥ threshold
         // may retreat.
         let retreat_score = if den_pos.is_some()
-            && den_distance > c.shadow_fox_retreat_arrival_radius
+            && den_distance > c.shadow_fox_retreat_min_distance
             && drives.satiation >= c.shadow_fox_stalk_satiation_threshold
         {
             crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
@@ -2350,14 +2358,14 @@ mod tests {
             schedule.run(&mut world);
             if matches!(
                 world.get::<WildlifeAiState>(entity).unwrap(),
-                WildlifeAiState::Patrolling { .. }
+                WildlifeAiState::Waiting
             ) {
                 released_at = Some(tick);
                 break;
             }
         }
         let released_at =
-            released_at.expect("retreating fox should reach the den and release to Patrolling");
+            released_at.expect("retreating fox should reach the den and release to den-rest");
         let pos = *world.get::<Position>(entity).unwrap();
         let arrival = crate::resources::SimConstants::default()
             .wildlife
