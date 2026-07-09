@@ -2926,6 +2926,14 @@ pub struct ScoringConstants {
     /// Activated 2026-07-08 at first-light 0.10.
     #[serde(default = "default_hawk_hunting_prey_affordance_weight")]
     pub hawk_hunting_prey_affordance_weight: f32,
+    /// 310 S4 — conditional `best_cat_ambush_affordance` axis on
+    /// ShadowfoxHunt: max `Affordance(Ambush, fox, cat)` over cats in
+    /// the motivation scan, fed by the concealment-keyed estimator in
+    /// `write_wildlife_vs_cat`. `0.0` removes the axis and restores
+    /// the three-axis composition byte-exactly (conditional-axis
+    /// escape hatch). First-light 0.10 (310 S4, 2026-07-09).
+    #[serde(default = "default_shadowfox_hunt_cat_ambush_affordance_weight")]
+    pub shadowfox_hunt_cat_ambush_affordance_weight: f32,
     /// 265: weight on SnakeAmbushing's conditional
     /// `best_prey_strike_affordance` axis — max over prey in detection
     /// range of `Affordance(Strike, snake, prey)`. Strike is
@@ -3657,6 +3665,8 @@ impl Default for ScoringConstants {
             apply_remedy_affordance_weight: default_apply_remedy_affordance_weight(),
             fox_hunting_prey_affordance_weight: default_fox_hunting_prey_affordance_weight(),
             hawk_hunting_prey_affordance_weight: default_hawk_hunting_prey_affordance_weight(),
+            shadowfox_hunt_cat_ambush_affordance_weight:
+                default_shadowfox_hunt_cat_ambush_affordance_weight(),
             snake_ambush_strike_affordance_weight: default_snake_ambush_strike_affordance_weight(),
             snake_forage_stalk_affordance_weight: default_snake_forage_stalk_affordance_weight(),
             fox_flee_cat_violence_belief_weight: default_fox_flee_cat_violence_belief_weight(),
@@ -5413,6 +5423,10 @@ fn default_fox_hunting_prey_affordance_weight() -> f32 {
 
 /// 265: HawkHunting `best_prey_predation_affordance` axis weight.
 /// Activated 2026-07-08 at first-light 0.10 (plan step 21).
+fn default_shadowfox_hunt_cat_ambush_affordance_weight() -> f32 {
+    0.10
+}
+
 fn default_hawk_hunting_prey_affordance_weight() -> f32 {
     0.10
 }

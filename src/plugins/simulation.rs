@@ -102,6 +102,19 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry.hawk_dses.push(dses::hawk_hunting_dse(scoring));
     registry.hawk_dses.push(dses::hawk_fleeing_dse(scoring));
     registry.hawk_dses.push(dses::hawk_resting_dse());
+    // 310 S4 — shadow-fox hunt/retreat/patrol. Scored via
+    // `shadowfox_scoring::score_shadowfox_dse_by_id` as candidates in
+    // the 023 motivation softmax; Patrolling stays the implicit
+    // fallback when nothing clears the pressure floor.
+    registry
+        .shadowfox_dses
+        .push(dses::shadowfox_hunt_dse(scoring));
+    registry
+        .shadowfox_dses
+        .push(dses::shadowfox_retreat_dse(scoring));
+    registry
+        .shadowfox_dses
+        .push(dses::shadowfox_patrol_dse(scoring));
     registry.snake_dses.push(dses::snake_ambushing_dse(scoring));
     registry.snake_dses.push(dses::snake_foraging_dse(scoring));
     registry.snake_dses.push(dses::snake_fleeing_dse(scoring));

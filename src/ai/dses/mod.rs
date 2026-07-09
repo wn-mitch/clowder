@@ -108,6 +108,9 @@ pub mod mentor_target;
 pub mod patrol;
 pub mod picking_up;
 pub mod practice_magic;
+pub mod shadowfox_hunt;
+pub mod shadowfox_patrol;
+pub mod shadowfox_retreat;
 pub mod sleep;
 pub mod smoke_meat;
 pub mod snake_ambushing;
@@ -174,6 +177,9 @@ pub use picking_up::picking_up_dse;
 pub use practice_magic::{
     cleanse_dse, colony_cleanse_dse, commune_dse, durable_ward_dse, harvest_dse, scry_dse,
 };
+pub use shadowfox_hunt::shadowfox_hunt_dse;
+pub use shadowfox_patrol::shadowfox_patrol_dse;
+pub use shadowfox_retreat::shadowfox_retreat_dse;
 pub use sleep::sleep_dse;
 pub use smoke_meat::smoke_meat_dse;
 pub use snake_ambushing::snake_ambushing_dse;

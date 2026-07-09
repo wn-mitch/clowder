@@ -68,6 +68,9 @@ pub struct DseRegistry {
     pub fox_dses: Vec<Box<dyn Dse>>,
     pub hawk_dses: Vec<Box<dyn Dse>>,
     pub snake_dses: Vec<Box<dyn Dse>>,
+    /// 310 S4 — shadow-fox hunt/retreat/patrol, scored as candidates
+    /// inside the 023 motivation softmax (one election, pillar 4).
+    pub shadowfox_dses: Vec<Box<dyn Dse>>,
     pub aspiration_dses: Vec<Box<dyn Dse>>,
     pub coordinator_dses: Vec<Box<dyn Dse>>,
     pub narrative_dses: Vec<Box<dyn Dse>>,
@@ -112,12 +115,21 @@ impl DseRegistry {
             .map(|boxed| boxed.as_ref())
     }
 
+    /// Find a registered shadow-fox DSE by its string id (310 S4).
+    pub fn shadowfox_dse(&self, id: &str) -> Option<&dyn Dse> {
+        self.shadowfox_dses
+            .iter()
+            .find(|d| d.id().0 == id)
+            .map(|boxed| boxed.as_ref())
+    }
+
     pub fn total(&self) -> usize {
         self.cat_dses.len()
             + self.target_taking_dses.len()
             + self.fox_dses.len()
             + self.hawk_dses.len()
             + self.snake_dses.len()
+            + self.shadowfox_dses.len()
             + self.aspiration_dses.len()
             + self.coordinator_dses.len()
             + self.narrative_dses.len()

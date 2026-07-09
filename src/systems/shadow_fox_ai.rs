@@ -558,10 +558,11 @@ pub fn shadowfox_coherence_tick(
 pub fn shadowfox_motivation_tick(
     mut query: Query<
         (
+            Entity,
             &Position,
             &mut WildlifeAiState,
             &mut ShadowFoxDrives,
-            // 310 S3 — kill-site memory filters the hunger target;
+            // 310 S3 — kill-site memory filters the hunt target;
             // Option so pre-S3 saves (no beliefs component) keep
             // electing unfiltered.
             Option<&crate::components::wildlife::ShadowFoxBeliefs>,
@@ -571,6 +572,7 @@ pub fn shadowfox_motivation_tick(
     wards: Query<(&Ward, &Position), Without<WildAnimal>>,
     cats: Query<
         (
+            Entity,
             &Position,
             &Mood,
             Option<&crate::components::prev_safety_deficit::PrevSafetyDeficit>,
@@ -589,6 +591,12 @@ pub fn shadowfox_motivation_tick(
     mut rng: ResMut<SimRng>,
     mut activation: ResMut<SystemActivation>,
     mut event_log: Option<ResMut<crate::resources::event_log::EventLog>>,
+    // 310 S4 — hunt/retreat/patrol are registry DSEs scored through
+    // the L2 evaluator and stand as candidates in this softmax.
+    dse_registry: Res<crate::ai::eval::DseRegistry>,
+    modifier_pipeline: Res<crate::ai::eval::ModifierPipeline>,
+    config: Res<crate::resources::time::SimConfig>,
+    affordances: Res<crate::resources::ActionAffordances>,
 ) {
     let c = &constants.wildlife;
     let cadence = c.shadow_fox_motivation_tick_cadence.max(1);
@@ -619,16 +627,22 @@ pub fn shadowfox_motivation_tick(
     // The isolation factor below is computed per-candidate against the
     // position list (O(N²) — cheap because cap=2 shadow-foxes × ~12
     // cats × cadence=16).
-    let cat_data: Vec<(Position, f32, f32)> = cats
+    let cat_data: Vec<(Entity, Position, f32, f32)> = cats
         .iter()
-        .map(|(p, mood, prev_safety)| {
+        .map(|(entity, p, mood, prev_safety)| {
             let safety_deficit = prev_safety.map(|s| s.0).unwrap_or(0.0).clamp(0.0, 1.0);
-            (*p, mood.valence, safety_deficit)
+            (entity, *p, mood.valence, safety_deficit)
         })
         .collect();
-    let cat_anchors: Vec<Position> = cat_data.iter().map(|(p, _, _)| *p).collect();
+    let cat_anchors: Vec<Position> = cat_data.iter().map(|(_, p, _, _)| *p).collect();
 
-    for (pos, mut state, mut drives, beliefs) in &mut query {
+    // 310 S4 — day-phase scalar for the nocturnal hunt/patrol axes.
+    let night = crate::ai::shadowfox_scoring::night_scalar(
+        crate::resources::time::DayPhase::from_tick(time.tick, &config),
+    );
+    let markers = crate::ai::scoring::MarkerSnapshot::new();
+
+    for (fox_entity, pos, mut state, mut drives, beliefs) in &mut query {
         // 310 S1 — satiation decays once per motivation cadence,
         // *before* the Stalking/EncirclingWard guard below so a
         // besieging or actively-hunting shadow-fox gets hungrier too.
@@ -744,7 +758,10 @@ pub fn shadowfox_motivation_tick(
         let mut nearest_cat_any: Option<Position> = None;
         let mut nearest_cat_any_dist = f32::INFINITY;
         let mut nearest_fished_out_dist = f32::INFINITY;
-        for (cat_pos, mood, safety_deficit) in cat_data.iter() {
+        // 310 S4 — max Affordance(Ambush, fox, cat) over eligible cats
+        // (261 substrate; concealment-keyed estimator).
+        let mut best_cat_ambush_affordance: f32 = 0.0;
+        for (cat_entity, cat_pos, mood, safety_deficit) in cat_data.iter() {
             let dist = pos.distance_to(cat_pos);
             if dist > scan_radius {
                 continue;
@@ -754,9 +771,16 @@ pub fn shadowfox_motivation_tick(
                 .unwrap_or(false);
             if fished_out {
                 nearest_fished_out_dist = nearest_fished_out_dist.min(dist);
-            } else if dist < nearest_cat_any_dist {
-                nearest_cat_any_dist = dist;
-                nearest_cat_any = Some(*cat_pos);
+            } else {
+                if dist < nearest_cat_any_dist {
+                    nearest_cat_any_dist = dist;
+                    nearest_cat_any = Some(*cat_pos);
+                }
+                best_cat_ambush_affordance = best_cat_ambush_affordance.max(affordances.read(
+                    fox_entity,
+                    *cat_entity,
+                    crate::resources::action_affordances::ActionKind::Ambush,
+                ));
             }
             // Mood term: 0.0 when valence == +1, 1.0 when valence == -1.
             let mood_term = (0.5 - 0.5 * mood.clamp(-1.0, 1.0)).clamp(0.0, 1.0);
@@ -793,28 +817,73 @@ pub fn shadowfox_motivation_tick(
             })
             .unwrap_or(0.0);
 
-        // ---- Hunger pressure (310 S1): fifth drive, conditional ----
-        // `(1 − satiation)²` shaped like the Coherence pressure; the
-        // weight is the conditional-axis switch — at 0.0 the fifth
-        // score (and its jitter draw) is skipped entirely, restoring
-        // the four-drive softmax byte-exactly.
-        let hunger_active = c.shadow_fox_hunger_drive_weight > 0.0;
-        let hunger_pressure = if hunger_active {
-            (1.0 - drives.satiation).max(0.0).powi(2) * c.shadow_fox_hunger_drive_weight
+        // ---- DSE-scored candidates (310 S4) ----
+        // Hunt / Retreat / Patrol are registry DSEs scored through the
+        // L2 evaluator (trace-visible, modifier-pipeline'd); they stand
+        // in this softmax next to the four hand-scored corruption
+        // drives — ONE election (pillar 4). Each candidate is
+        // eligibility-gated before scoring (the S1 lesson: the softmax
+        // temperature spread must never be able to elect a candidate
+        // whose own drive is quiet):
+        // - Hunt: a fed predator does not stand (satiation ≥ the stalk
+        //   threshold — the same gate constant S1 introduced), and a
+        //   target must exist after the S3 kill-site filter.
+        // - Retreat: only with a known den meaningfully far away.
+        // - All three: score must clear the motivation pressure floor.
+        let den_pos = beliefs.and_then(|b| b.den_position);
+        let den_distance = den_pos
+            .map(|(dx, dy)| pos.distance_to(&Position::new(dx, dy)))
+            .unwrap_or(0.0);
+        let sf_ctx = crate::ai::shadowfox_scoring::ShadowfoxScoringContext {
+            hunger_urgency: (1.0 - drives.satiation).clamp(0.0, 1.0),
+            satiation: drives.satiation,
+            cat_in_scan: nearest_cat_any.is_some(),
+            night_scalar: night,
+            best_cat_ambush_affordance,
+            den_distance_norm: (den_distance / scan_radius.max(1.0)).clamp(0.0, 1.0),
+            self_position: *pos,
+        };
+        let eval_inputs = crate::ai::scoring::EvalInputs {
+            cat: fox_entity,
+            position: *pos,
+            tick: time.tick,
+            dse_registry: &dse_registry,
+            modifier_pipeline: &modifier_pipeline,
+            markers: &markers,
+            colony_landmarks: &Default::default(),
+            exploration_map: &Default::default(),
+            corruption_landmarks: &Default::default(),
+            focal_cat: None,
+            focal_capture: None,
+        };
+        let floor = c.shadow_fox_motivation_min_pressure;
+
+        let hunt_score = if drives.satiation < c.shadow_fox_stalk_satiation_threshold
+            && nearest_cat_any.is_some()
+        {
+            crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
+                "shadowfox_hunt",
+                &sf_ctx,
+                &eval_inputs,
+            )
         } else {
             0.0
         };
-        // Eligibility, not just weight: hunger stands for election only
-        // when its own pressure clears the floor. The four 023 drives
-        // are benign at near-zero pressure (their states walk somewhere
-        // and pace), so softmax temperature spread electing one is
-        // harmless churn — but hunger elects Stalking, and the first
-        // S1 gate soak showed the spread electing it at satiation 0.98
-        // (pressure ~2e-5) whenever *another* drive opened the floor,
-        // producing sub-cooldown ambush waves on a single cat. A fed
-        // predator may not stand for the hunt election at all.
-        let hunger_eligible =
-            hunger_active && hunger_pressure >= c.shadow_fox_motivation_min_pressure;
+        let retreat_score =
+            if den_pos.is_some() && den_distance > c.shadow_fox_retreat_arrival_radius {
+                crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
+                    "shadowfox_retreat",
+                    &sf_ctx,
+                    &eval_inputs,
+                )
+            } else {
+                0.0
+            };
+        let patrol_score = crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
+            "shadowfox_patrol",
+            &sf_ctx,
+            &eval_inputs,
+        );
 
         // Store the latest pressures on the component for trace observability.
         drives.resonance = resonance_pressure;
@@ -822,32 +891,47 @@ pub fn shadowfox_motivation_tick(
         drives.entropy = entropy_pressure;
         drives.age_ticks = drives.age_ticks.saturating_add(0); // no-op; tick advanced by coherence system
 
-        // ---- Pressure floor: only transition when a drive is genuinely
-        // pressured. Without this guard, Phase B's softmax monotonically
-        // pulls shadow-foxes out of Patrolling and the existing
-        // Stalking → Ambush → Banishment chain (mythic-texture canary)
-        // never fires. Falls through to leave the current state alone.
-        let max_pressure = coherence_pressure
-            .max(resonance_pressure)
-            .max(dread_pressure)
-            .max(entropy_pressure)
-            .max(hunger_pressure);
-        if max_pressure < c.shadow_fox_motivation_min_pressure {
+        // ---- Candidate list: eligibility before scoring ----
+        #[derive(Clone, Copy)]
+        enum Candidate {
+            Coherence,
+            Resonance,
+            Dread,
+            Entropy,
+            Hunt,
+            Retreat,
+            Patrol,
+        }
+        let mut candidates: Vec<(Candidate, f32)> = vec![
+            (Candidate::Coherence, coherence_pressure),
+            (Candidate::Resonance, resonance_pressure),
+            (Candidate::Dread, dread_pressure),
+            (Candidate::Entropy, entropy_pressure),
+        ];
+        if hunt_score >= floor {
+            candidates.push((Candidate::Hunt, hunt_score));
+        }
+        if retreat_score >= floor {
+            candidates.push((Candidate::Retreat, retreat_score));
+        }
+        if patrol_score >= floor {
+            candidates.push((Candidate::Patrol, patrol_score));
+        }
+
+        // ---- Pressure floor: only transition when something is
+        // genuinely pressured (Phase B guard, unchanged in spirit —
+        // daytime patrol sits below the floor, so quiet days hold the
+        // current state).
+        let max_pressure = candidates
+            .iter()
+            .map(|(_, s)| *s)
+            .fold(f32::NEG_INFINITY, f32::max);
+        if max_pressure < floor {
             continue;
         }
 
         // ---- Softmax with jitter ----
-        // 310 S1 — the score list is 4 or 5 entries; index 4, when
-        // present, is the hunger drive (eligibility-gated above).
-        let mut scores = vec![
-            coherence_pressure,
-            resonance_pressure,
-            dread_pressure,
-            entropy_pressure,
-        ];
-        if hunger_eligible {
-            scores.push(hunger_pressure);
-        }
+        let mut scores: Vec<f32> = candidates.iter().map(|(_, s)| *s).collect();
         for s in scores.iter_mut() {
             // Symmetric uniform jitter; clamp so noisy ties never go negative.
             *s = (*s + rng.rng.random::<f32>() * 2.0 * jitter - jitter).max(0.0);
@@ -860,8 +944,8 @@ pub fn shadowfox_motivation_tick(
             sum += exps[i];
         }
         let sample = rng.rng.random::<f32>() * sum;
+        let mut winner = candidates.len() - 1;
         let mut cum = 0.0f32;
-        let mut winner = 0usize;
         for (i, &e) in exps.iter().enumerate() {
             cum += e;
             if sample <= cum {
@@ -871,12 +955,12 @@ pub fn shadowfox_motivation_tick(
         }
 
         // ---- Apply winning state if it actually changes ----
-        let next_state: Option<WildlifeAiState> = match winner {
-            0 => best_corruption_tile.map(|t| WildlifeAiState::Reconstituting {
+        let next_state: Option<WildlifeAiState> = match candidates[winner].0 {
+            Candidate::Coherence => best_corruption_tile.map(|t| WildlifeAiState::Reconstituting {
                 tile_x: t.x(),
                 tile_y: t.y(),
             }),
-            1 => nearest_threatened
+            Candidate::Resonance => nearest_threatened
                 .zip(ward_anchors.iter().min_by_key(|(wp, _)| {
                     nearest_threatened
                         .map(|t| t.tile_distance_squared(wp))
@@ -889,22 +973,20 @@ pub fn shadowfox_motivation_tick(
                         angle: 0.0,
                     },
                 ),
-            2 => nearest_cat.map(|cp| WildlifeAiState::Haunting {
+            Candidate::Dread => nearest_cat.map(|cp| WildlifeAiState::Haunting {
                 target_x: cp.x(),
                 target_y: cp.y(),
                 edge_distance: haunt_edge,
                 ticks: 0,
             }),
-            3 => nearest_frontier.map(|fp| WildlifeAiState::Seeding {
+            Candidate::Entropy => nearest_frontier.map(|fp| WildlifeAiState::Seeding {
                 frontier_x: fp.x(),
                 frontier_y: fp.y(),
             }),
-            // 310 S1 — hunger elects a goal-directed hunt: Stalking
-            // toward the nearest scanned cat. `predator_stalk_cats`
-            // then drives the approach/ambush exactly as it does for
-            // stalks its own 5%/tick roll initiates, and the guard at
-            // the top of this loop leaves the hunt uninterrupted.
-            4 => {
+            // Hunt elects a goal-directed stalk toward the nearest
+            // eligible cat; `predator_stalk_cats` drives the
+            // approach/ambush and the loop guard holds the hunt.
+            Candidate::Hunt => {
                 // 310 S3 — the kill-site memory shaped this election.
                 if kill_site_excluded_nearer {
                     activation.record(Feature::ShadowFoxKillSiteAvoided);
@@ -914,7 +996,11 @@ pub fn shadowfox_motivation_tick(
                     target_y: cp.y(),
                 })
             }
-            _ => None,
+            Candidate::Retreat => den_pos.map(|(dx, dy)| WildlifeAiState::Retreating {
+                den_x: dx,
+                den_y: dy,
+            }),
+            Candidate::Patrol => Some(WildlifeAiState::Patrolling { dx: 1, dy: 0 }),
         };
 
         // Only transition + emit when the chosen variant *kind* differs
@@ -930,10 +1016,13 @@ pub fn shadowfox_motivation_tick(
                     WildlifeAiState::Tending { .. } => Some(Feature::ShadowFoxTendingEntered),
                     WildlifeAiState::Haunting { .. } => Some(Feature::ShadowFoxHauntingEntered),
                     WildlifeAiState::Seeding { .. } => Some(Feature::ShadowFoxSeedingEntered),
-                    // 310 S1 — Stalking reaches this match only via the
-                    // hunger arm (the guard above skips already-Stalking
-                    // shadow-foxes before scoring).
+                    // Stalking reaches this match only via the Hunt
+                    // candidate (S4 — the DSE that absorbed S1's hunger
+                    // drive; the guard skips already-Stalking foxes).
                     WildlifeAiState::Stalking { .. } => Some(Feature::ShadowFoxHungerHuntEntered),
+                    // 310 S4 — retreat elected by the DSE (the S2
+                    // event-driven post-ambush entry emits separately).
+                    WildlifeAiState::Retreating { .. } => Some(Feature::ShadowFoxRetreatEntered),
                     _ => None,
                 };
                 if let Some(f) = feature {
@@ -970,6 +1059,12 @@ pub fn shadowfox_motivation_tick(
                                 location: (pos.x(), pos.y()),
                                 target: (target_x, target_y),
                                 satiation: drives.satiation,
+                            })
+                        }
+                        WildlifeAiState::Retreating { den_x, den_y } => {
+                            Some(crate::resources::event_log::EventKind::ShadowFoxRetreatEntered {
+                                location: (pos.x(), pos.y()),
+                                den: (den_x, den_y),
                             })
                         }
                         _ => None,
@@ -1120,6 +1215,12 @@ fn same_motivation_kind(a: &WildlifeAiState, b: &WildlifeAiState) -> bool {
         ) | (
             WildlifeAiState::Seeding { .. },
             WildlifeAiState::Seeding { .. }
+        ) | (
+            // 310 S4 — re-electing Patrol while already Patrolling is a
+            // no-op so the cadence never resets patrol-jitter wandering
+            // back to the pinned (1, 0) heading.
+            WildlifeAiState::Patrolling { .. },
+            WildlifeAiState::Patrolling { .. }
         )
     )
 }
@@ -1245,82 +1346,15 @@ pub fn predator_stalk_cats(
             }
         }
 
-        match *ai_state {
-            WildlifeAiState::Patrolling { .. } | WildlifeAiState::Circling { .. } => {
-                // Don't initiate new stalks during post-ambush cooldown.
-                if animal.ambush_cooldown > 0 {
-                    continue;
-                }
-
-                // 310 S1 — a fed shadow-fox doesn't hunt: skip the
-                // legacy 5%/tick stalk roll while satiation holds at or
-                // above the threshold. Cadence decay re-opens
-                // eligibility; the hunger drive can also elect Stalking
-                // directly through the motivation softmax.
-                if drives.satiation >= c.shadow_fox_stalk_satiation_threshold {
-                    continue;
-                }
-
-                // Find nearest cat within detection range, not inside a
-                // ward. Phase 5a: shadow-fox sight channel with LoS.
-                let visible = |cp: &Position| {
-                    crate::systems::sensing::observer_sees_at_with_los(
-                        crate::components::SensorySpecies::Wild(WildSpecies::ShadowFox),
-                        *wl_pos,
-                        &constants.sensory.shadow_fox,
-                        *cp,
-                        crate::components::SensorySignature::CAT,
-                        c.base_detection_range,
-                        &map,
-                    )
-                };
-                let unwarded = |cp: &Position| {
-                    !ward_positions
-                        .iter()
-                        .any(|(wp, radius)| (cp.distance_to(wp)) <= *radius)
-                };
-                let nearest = cat_positions
-                    .iter()
-                    .filter(|(_, cp)| visible(cp))
-                    .filter(|(_, cp)| unwarded(cp))
-                    .filter(|(_, cp)| {
-                        kill_site_filter
-                            .map(|ks| cp.distance_to(&ks) > c.shadow_fox_kill_site_avoid_radius)
-                            .unwrap_or(true)
-                    })
-                    .min_by_key(|(_, cp)| wl_pos.tile_distance_squared(cp));
-                // Name the consideration when memory (not geometry)
-                // emptied or reshaped the pool: some visible, unwarded
-                // cat was excluded that is nearer than the survivor.
-                if let Some(ks) = kill_site_filter {
-                    let nearest_excluded = cat_positions
-                        .iter()
-                        .filter(|(_, cp)| visible(cp))
-                        .filter(|(_, cp)| unwarded(cp))
-                        .filter(|(_, cp)| {
-                            cp.distance_to(&ks) <= c.shadow_fox_kill_site_avoid_radius
-                        })
-                        .map(|(_, cp)| wl_pos.tile_distance_squared(cp))
-                        .min();
-                    let survivor = nearest.map(|(_, cp)| wl_pos.tile_distance_squared(cp));
-                    if nearest_excluded.is_some()
-                        && (survivor.is_none() || nearest_excluded < survivor)
-                    {
-                        activation.record(Feature::ShadowFoxKillSiteAvoided);
-                    }
-                }
-
-                if let Some((_, cat_pos)) = nearest {
-                    // 5% chance per tick to begin stalking.
-                    if rng.rng.random::<f32>() < 0.05 {
-                        *ai_state = WildlifeAiState::Stalking {
-                            target_x: cat_pos.x(),
-                            target_y: cat_pos.y(),
-                        };
-                    }
-                }
-            }
-            WildlifeAiState::Stalking { target_x, target_y } => {
+        // 310 S4 — the legacy 5%/tick stalk roll RETIRED: hunt entry
+        // is the `shadowfox_hunt` DSE candidate in the motivation
+        // softmax (deliberate, hunger/night/affordance scored,
+        // kill-site filtered). This system keeps the active-stalk
+        // execution below; `ambush_cooldown` is now vestigial for
+        // shadow-foxes (nothing reads it here) and retires fully with
+        // S5's ward-snapshot work if still dead.
+        if let WildlifeAiState::Stalking { target_x, target_y } = *ai_state {
+            {
                 // Cancel stalk if target is inside a ward's radius.
                 let target_pos = Position::new(target_x, target_y);
                 let target_warded = ward_positions
@@ -1528,7 +1562,6 @@ pub fn predator_stalk_cats(
                     }
                 }
             }
-            _ => {}
         }
     }
 }
@@ -1796,6 +1829,16 @@ mod tests {
         // the motivation tick runs on every schedule.run.
         world.insert_resource(TimeState::default());
         world.insert_resource(crate::resources::WardCoverageMap::default());
+        // 310 S4 — DSE candidates score through the registry.
+        let mut registry = crate::ai::eval::DseRegistry::new();
+        crate::plugins::simulation::populate_dse_registry(
+            &mut registry,
+            &crate::resources::sim_constants::ScoringConstants::default(),
+        );
+        world.insert_resource(registry);
+        world.insert_resource(crate::ai::eval::ModifierPipeline::default());
+        world.insert_resource(crate::resources::time::SimConfig::default());
+        world.insert_resource(crate::resources::ActionAffordances::default());
 
         let mut schedule = Schedule::default();
         schedule.add_systems(shadowfox_motivation_tick);
@@ -2096,27 +2139,25 @@ mod tests {
     }
 
     #[test]
-    fn hungry_shadowfox_still_stalks() {
+    fn legacy_roll_retired_no_stalk_without_election() {
+        // 310 S4 — the 5%/tick roll is retired: without the motivation
+        // election in the schedule, a hungry fox with a visible cat
+        // must never enter Stalking through predator_stalk_cats.
         let (mut world, mut schedule) = setup_stalk_world();
         let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
         world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.0;
         spawn_ambushable_cat_at(&mut world, Position::new(8, 5));
 
-        let mut stalked = false;
         for _ in 0..300 {
             schedule.run(&mut world);
-            if matches!(
-                world.get::<WildlifeAiState>(entity).unwrap(),
-                WildlifeAiState::Stalking { .. }
-            ) {
-                stalked = true;
-                break;
-            }
+            assert!(
+                !matches!(
+                    world.get::<WildlifeAiState>(entity).unwrap(),
+                    WildlifeAiState::Stalking { .. }
+                ),
+                "no stalk may start without a hunt election",
+            );
         }
-        assert!(
-            stalked,
-            "hungry shadow-fox must keep the legacy 5%/tick stalk roll",
-        );
     }
 
     // ---- Ticket 310 S2: den + post-ambush retreat ----
@@ -2285,61 +2326,74 @@ mod tests {
     }
 
     #[test]
-    fn legacy_roll_skips_fished_out_cat() {
+    fn stalk_retarget_respects_kill_site_filter() {
+        // 310 S3/S4 — the active-stalk retarget is a selection: with a
+        // fresh kill memory on the nearer cat, the retarget must
+        // re-point to the eligible farther cat, not snap back.
         let (mut world, mut schedule) = setup_stalk_world();
         let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
         world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.0;
-        // Fresh kill memory right on top of the only visible cat.
         insert_beliefs(&mut world, entity, Some((2, 2)), Some((8, 5)), 0);
+        // Fished cat adjacent to the kill site; clean cat farther away.
         spawn_ambushable_cat_at(&mut world, Position::new(8, 5));
+        spawn_ambushable_cat_at(&mut world, Position::new(5, 11));
+        // Committed stalk pointing at stale coordinates near the kill
+        // site — the retarget branch (dist > 1, within give-up range)
+        // must re-point to the clean cat.
+        *world.get_mut::<WildlifeAiState>(entity).unwrap() = WildlifeAiState::Stalking {
+            target_x: 8,
+            target_y: 6,
+        };
 
-        for _ in 0..300 {
-            schedule.run(&mut world);
-            let state = world.get::<WildlifeAiState>(entity).unwrap();
-            assert!(
-                !matches!(state, WildlifeAiState::Stalking { .. }),
-                "the only cat sits in the fished-out radius — no stalk may start",
-            );
-        }
-        let activation = world.resource::<SystemActivation>();
+        schedule.run(&mut world);
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
         assert!(
-            activation
-                .counts
-                .get(&Feature::ShadowFoxKillSiteAvoided)
-                .copied()
-                .unwrap_or(0)
-                >= 1,
-            "the exclusion must be named, not silent",
+            matches!(
+                state,
+                WildlifeAiState::Stalking {
+                    target_x: 5,
+                    target_y: 11
+                }
+            ),
+            "retarget must pick the clean-ground cat; got {state:?}",
         );
     }
 
     #[test]
     fn expired_kill_site_memory_frees_the_ground() {
-        let (mut world, mut schedule) = setup_stalk_world();
+        // Election-level (310 S4): with the memory expired, the hunt
+        // targets the near cat the fresh memory would have excluded.
+        let (mut world, mut schedule) = setup_motivation_world();
+        {
+            let mut constants = world.resource_mut::<crate::resources::SimConstants>();
+            constants.wildlife.shadow_fox_motivation_jitter = 0.0;
+            constants.wildlife.shadow_fox_motivation_softmax_temp = 0.001;
+        }
         let memory = crate::resources::SimConstants::default()
             .wildlife
             .shadow_fox_kill_site_memory_ticks;
-        // TimeState::default() tick 0; stamp the kill far enough in the
-        // "past" via a tick beyond the window: set last_kill_tick = 0
-        // and advance TimeState past the memory horizon.
-        world.resource_mut::<TimeState>().tick = memory + 1;
+        // Advance time past the memory horizon, keeping the cadence
+        // alignment (memory_ticks default is a multiple of 16).
+        world.resource_mut::<TimeState>().tick = memory;
         let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
         world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.0;
         insert_beliefs(&mut world, entity, Some((2, 2)), Some((8, 5)), 0);
-        spawn_ambushable_cat_at(&mut world, Position::new(8, 5));
+        spawn_plain_cat_at(&mut world, Position::new(8, 5));
 
-        let mut stalked = false;
-        for _ in 0..300 {
-            schedule.run(&mut world);
-            if matches!(
-                world.get::<WildlifeAiState>(entity).unwrap(),
-                WildlifeAiState::Stalking { .. }
-            ) {
-                stalked = true;
-                break;
-            }
-        }
-        assert!(stalked, "expired memory must not gate the hunt");
+        schedule.run(&mut world);
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            matches!(
+                state,
+                WildlifeAiState::Stalking {
+                    target_x: 8,
+                    target_y: 5
+                }
+            ),
+            "expired memory must not gate the hunt; got {state:?}",
+        );
     }
 
     #[test]

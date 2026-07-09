@@ -96,6 +96,10 @@ struct WildSnapshot {
     species: WildSpecies,
     threat_power: f32,
     health_fraction: f32,
+    /// 310 S4 — corruption at the perceiver's tile: the shadow-fox's
+    /// concealment medium (ward coverage is anti-cover for it — wards
+    /// repel it; corruption hides it).
+    tile_corruption: f32,
 }
 
 /// 314: compact per-prey snapshot. `flee_speed` is the effective
@@ -116,11 +120,13 @@ struct PreySnapshot {
 // System
 // ---------------------------------------------------------------------------
 
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn affordance_writer(
     constants: Res<SimConstants>,
     fox_scent: Res<FoxScentMap>,
     ward_coverage: Res<WardCoverageMap>,
+    // 310 S4 — corruption read for the shadow-fox concealment snapshot.
+    map: Res<crate::resources::map::TileMap>,
     mut affordances: ResMut<ActionAffordances>,
     cats: Query<
         (
@@ -177,12 +183,18 @@ pub fn affordance_writer(
 
     let mut wild_snaps: Vec<WildSnapshot> = Vec::with_capacity(wildlife.iter().count());
     for (entity, pos, animal, health) in wildlife.iter() {
+        let tile_corruption = if map.in_bounds(pos.x(), pos.y()) {
+            map.get(pos.x(), pos.y()).corruption
+        } else {
+            0.0
+        };
         wild_snaps.push(WildSnapshot {
             entity,
             position: *pos,
             species: animal.species,
             threat_power: animal.threat_power,
             health_fraction: (health.current / health.max.max(f32::EPSILON)).clamp(0.0, 1.0),
+            tile_corruption,
         });
     }
 
@@ -855,14 +867,21 @@ fn write_wildlife_vs_cat(
             );
         }
         WildSpecies::ShadowFox => {
-            // Ambush — peak when perceiver has high cover and target has low cover.
+            // Ambush — peak when the fox is concealed and the target is
+            // exposed. 310 S4: concealment for a corruption-born
+            // predator is TILE CORRUPTION at its position, not ward
+            // coverage (wards repel it — using `cover_self` here
+            // inverted the ecology: a fox pressed against a ward read
+            // as maximally hidden). Target exposure stays ward-based:
+            // a cat outside ward cover is exposed. Feeds the
+            // ShadowfoxHunt `best_cat_ambush_affordance` axis.
             affordances.write(
                 perceiver.entity,
                 target.entity,
                 ActionKind::Ambush,
                 composite(
                     &pred.ambush,
-                    cover_self,
+                    perceiver.tile_corruption,
                     1.0 - cover_at_target,
                     my_health,
                     prox,
@@ -1133,6 +1152,12 @@ mod tests {
         world.insert_resource(FoxScentMap::default());
         world.insert_resource(WardCoverageMap::default_map());
         world.insert_resource(crate::resources::ColonyDistrictMap::default());
+        // 310 S4 — corruption read for the shadow-fox concealment snapshot.
+        world.insert_resource(crate::resources::map::TileMap::new(
+            40,
+            40,
+            crate::resources::map::Terrain::Grass,
+        ));
         let mut schedule = Schedule::default();
         schedule.add_systems(affordance_writer);
         (world, schedule)
@@ -1313,6 +1338,34 @@ mod tests {
         assert_eq!(a.read(fox, mouse, ActionKind::Dive), 0.0);
         assert_eq!(a.read(fox, mouse, ActionKind::Pounce), 0.0);
         assert_eq!(a.read(fox, mouse, ActionKind::Strike), 0.0);
+    }
+
+    #[test]
+    fn shadowfox_ambush_affordance_scales_with_concealment() {
+        // 310 S4 (265's deferred shadowfox slice): the Ambush-vs-cat
+        // estimator keys concealment on TILE CORRUPTION at the fox's
+        // position — a fox in dense corruption affords a better ambush
+        // than one on clean ground, all else equal. (Ward coverage is
+        // anti-cover for a shadow-fox; using it here inverted the
+        // ecology pre-S4.)
+        let (mut world, mut schedule) = test_world();
+        let cat = spawn_cat(&mut world, Position::new(10, 10));
+        let concealed = spawn_wild(&mut world, WildSpecies::ShadowFox, Position::new(7, 10));
+        let exposed = spawn_wild(&mut world, WildSpecies::ShadowFox, Position::new(13, 10));
+        {
+            let mut map = world.resource_mut::<crate::resources::map::TileMap>();
+            map.get_mut(7, 10).corruption = 0.9;
+        }
+
+        schedule.run(&mut world);
+
+        let affordances = world.resource::<ActionAffordances>();
+        let hidden = affordances.read(concealed, cat, ActionKind::Ambush);
+        let open = affordances.read(exposed, cat, ActionKind::Ambush);
+        assert!(
+            hidden > open,
+            "corruption concealment must raise the ambush affordance ({hidden} vs {open})",
+        );
     }
 
     #[test]
