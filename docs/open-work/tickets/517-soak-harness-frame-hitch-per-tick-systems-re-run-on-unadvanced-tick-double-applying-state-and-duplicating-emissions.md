@@ -3,7 +3,7 @@ id: 517
 title: Soak harness frame-hitch: per-tick systems re-run on unadvanced tick, double-applying state and duplicating emissions
 status: ready
 cluster: tooling-diagnostics-ui
-orchestration: coherent-block
+orchestration: swarm-safe
 initiative: []
 added: 2026-07-09
 parked: null
