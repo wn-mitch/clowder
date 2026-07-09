@@ -881,16 +881,27 @@ pub fn shadowfox_motivation_tick(
         } else {
             0.0
         };
-        let retreat_score =
-            if den_pos.is_some() && den_distance > c.shadow_fox_retreat_arrival_radius {
-                crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
-                    "shadowfox_retreat",
-                    &sf_ctx,
-                    &eval_inputs,
-                )
-            } else {
-                0.0
-            };
+        // S4 iteration 3 — retreat is FED-and-far: a WeightedSum cannot
+        // express the conjunction (the den-distance axis alone scored
+        // ~0.54 for any far-wandered fox, hungry or not — 194 retreat
+        // elections per 900s, den-commute churn, and each arrival's
+        // eastward patrol reset marched foxes back at the colony's
+        // warded side). The "fed" half is an eligibility gate on the
+        // same constant that gates the hunt, making the two candidates
+        // complementary: satiation < threshold may hunt, ≥ threshold
+        // may retreat.
+        let retreat_score = if den_pos.is_some()
+            && den_distance > c.shadow_fox_retreat_arrival_radius
+            && drives.satiation >= c.shadow_fox_stalk_satiation_threshold
+        {
+            crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
+                "shadowfox_retreat",
+                &sf_ctx,
+                &eval_inputs,
+            )
+        } else {
+            0.0
+        };
         let patrol_score = crate::ai::shadowfox_scoring::score_shadowfox_dse_by_id(
             "shadowfox_patrol",
             &sf_ctx,
@@ -2093,6 +2104,55 @@ mod tests {
                 .copied()
                 .unwrap_or(0),
             1,
+        );
+    }
+
+    #[test]
+    fn hungry_far_fox_does_not_elect_retreat() {
+        // S4 iteration-3 regression (194 retreat elections / 900s):
+        // retreat is FED-and-far; a hungry fox far from its den must
+        // not commute home.
+        let (mut world, mut schedule) = setup_motivation_world();
+        {
+            let mut constants = world.resource_mut::<crate::resources::SimConstants>();
+            constants.wildlife.shadow_fox_motivation_jitter = 0.0;
+            constants.wildlife.shadow_fox_motivation_softmax_temp = 0.001;
+        }
+        let entity = spawn_shadowfox_at(&mut world, Position::new(30, 30), 1.0);
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.5;
+        insert_beliefs(&mut world, entity, Some((2, 2)), None, 0);
+        // No cats in scan: hunt has no target; retreat must not stand
+        // either (satiation 0.5 < 0.7), so nothing above the floor at
+        // day... pin night so patrol could stand — the assertion is
+        // specifically NOT Retreating.
+        for _ in 0..5 {
+            schedule.run(&mut world);
+        }
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            !matches!(state, WildlifeAiState::Retreating { .. }),
+            "hungry fox must not elect retreat; got {state:?}",
+        );
+    }
+
+    #[test]
+    fn fed_far_fox_elects_retreat() {
+        let (mut world, mut schedule) = setup_motivation_world();
+        {
+            let mut constants = world.resource_mut::<crate::resources::SimConstants>();
+            constants.wildlife.shadow_fox_motivation_jitter = 0.0;
+            constants.wildlife.shadow_fox_motivation_softmax_temp = 0.001;
+        }
+        let entity = spawn_shadowfox_at(&mut world, Position::new(30, 30), 1.0);
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 1.0;
+        insert_beliefs(&mut world, entity, Some((2, 2)), None, 0);
+
+        schedule.run(&mut world);
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            matches!(state, WildlifeAiState::Retreating { den_x: 2, den_y: 2 }),
+            "fed-and-far fox must elect retreat; got {state:?}",
         );
     }
 

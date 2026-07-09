@@ -9,8 +9,12 @@
 //! and `den_distance_norm` via `Linear(1, 0)` (farther from home →
 //! stronger pull).
 //!
-//! Outer gate in the candidate layer: no den in `ShadowFoxBeliefs` →
-//! the candidate does not stand (the dispatcher returns no score).
+//! Outer gates in the candidate layer: no den in `ShadowFoxBeliefs` →
+//! the candidate does not stand; satiation below the stalk threshold →
+//! it does not stand either (FED-and-far is a conjunction a WeightedSum
+//! cannot express — the first S4 gate soaks measured 194 retreat
+//! elections per 900s from the den-distance axis alone). The satiation
+//! axis then orders urgency among eligible cases.
 //!
 //! Maslow tier 1 — survival (self-preservation).
 
