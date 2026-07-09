@@ -15,10 +15,10 @@ _Last generated: 2026-07-09._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 117 |
+| Ready | 119 |
 | Parked | 12 |
 | Blocked | 28 |
-| **Open total** | **162** |
+| **Open total** | **164** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (117)
+## Ready by cluster (119)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -177,7 +177,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 - **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 
-### wildlife (6 ready, 1 blocked)
+### wildlife (8 ready, 1 blocked)
 
 - **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
 - **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
@@ -185,6 +185,8 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 - **[513](docs/open-work/tickets/513-shadowfox-colony-pressure-channel-fading-under-fluid-movement-drives-softmax-self-anchors-on-remote-corruption-reconstituting-seeding-loop-scent-shell-repels-at-fine-granularity-wardsiegehaunting-interactions-zero-on-both-gate-seeds.md)** — shadowfox colony-pressure channel fading under fluid movement: drives softmax self-anchors on remote corruption (Reconstituting-Seeding loop), scent shell repels at fine granularity, ward/siege/haunting interactions zero on both gate seeds — _[wildlife] · added 2026-07-06_
 - **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
+- **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
+- **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
 
 ### buildings-zones (5 ready, 2 blocked)
 
@@ -231,7 +233,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 - **[514](docs/open-work/tickets/514-mentor-churn-mentor-target-elects-incapacitated-mentees-the-step-entry-alive-gate-then-rejects-1111-mentorcat-plan-failures-per-soak-on-incapacitation-heavy-trajectories.md)** — mentor churn: mentor_target elects Incapacitated mentees the step-entry alive-gate then rejects — 1111 MentorCat plan failures per soak on incapacitation-heavy trajectories — _[planning-substrate] · added 2026-07-07_
 
-## Ready by initiative (77 tag-memberships across 9 initiatives)
+## Ready by initiative (81 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -253,7 +255,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
 
-### mythic-texture (12 open, 5 landed)
+### mythic-texture (14 open, 5 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[010](docs/open-work/tickets/010-post-death-biographies-via-claude-api.md)** — Post-death biographies via Claude API (presenter) — _[magic-mythic] · added 2026-04-21_
@@ -267,6 +269,23 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[458](docs/open-work/tickets/458-practicemagic-soft-affinity-skill-considerations.md)** — PracticeMagic soft affinity / skill considerations — _[magic-mythic] · added 2026-05-23_
 - **[460](docs/open-work/tickets/460-ward-placement-rate-over-shoots-after-magic-gate-retirement.md)** — Ward placement rate over-shoots after magic gate retirement — _[magic-mythic] · added 2026-05-23_
+- **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
+- **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
+
+### world-richness (12 open, 15 landed)
+
+- **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · added 2026-05-16_
+- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
+- **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
+- **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
+- **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
+- **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
+- **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
+- **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
+- **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · added 2026-05-26_
+- **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
+- **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
+- **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
 
 ### welfare-fidelity (11 open, 7 landed)
 
@@ -282,20 +301,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · added 2026-05-26_
 - **[475](docs/open-work/tickets/475-current-role-query-helper-derive-active-role-from-existing-capability-markers-recent-action-history.md)** — Current-role query helper (derive active role from existing capability markers + recent action history) — _[social-coordination] · added 2026-05-26_
 
-### world-richness (11 open, 15 landed)
-
-- **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · added 2026-05-16_
-- **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
-- **[377](docs/open-work/tickets/377-rare-drops-narrative-items-situational-trigger-rpg-expression-layer-lucky-rabbits-foot-etc.md)** — rare drops & narrative items: situational-trigger rpg-expression layer (lucky rabbit's foot etc.) — _[items-crafting] · added 2026-05-16_
-- **[379](docs/open-work/tickets/379-shadowfox-banishment-byproducts-shadow-bone-fox-pelt-shadow-tooth-on-successful-banishment-outcomes.md)** — ShadowFox banishment byproducts: shadow-bone, fox-pelt, shadow-tooth on successful banishment outcomes — _[items-crafting] · added 2026-05-16_
-- **[380](docs/open-work/tickets/380-cat-death-byproducts-heirloom-eligible-bones-and-fur-tuft-for-370-heirloom-372-generational-tapestry.md)** — cat-death byproducts: heirloom-eligible bones and fur-tuft for 370 Heirloom + 372 Generational Tapestry — _[items-crafting] · added 2026-05-16_
-- **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
-- **[435](docs/open-work/tickets/435-recipeinputanyof-substrate-collapse-4-smoked-recipes-to-1-unblock-generalized-fuel-input.md)** — RecipeInput::AnyOf substrate (collapse 4 smoked.* recipes to 1; unblock generalized fuel input) — _[items-crafting] · added 2026-05-21_
-- **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
-- **[474](docs/open-work/tickets/474-warder-succession-shaman-dispatch-demand-signals-festering-peer-aftermath-ripple.md)** — Warder succession + shaman dispatch demand signals (festering-peer aftermath ripple) — _[social-coordination] · added 2026-05-26_
-- **[478](docs/open-work/tickets/478-itemset-enum-on-item-kinds-retire-is-warriors-kit-recipe-metadata.md)** — ItemSet enum on item kinds (retire is_warriors_kit recipe metadata) — _[items-crafting] · added 2026-05-26_
-- **[479](docs/open-work/tickets/479-ranged-attack-mode-for-sling-action-phase-ammo-model-read-of-equipmentmodifiersranged-enabled.md)** — Ranged-attack mode for Sling — Action / phase / ammo model + read of EquipmentModifiers.ranged_enabled — _[items-crafting] · added 2026-05-27_
-
 ### full-sensory-perception (9 open, 9 landed)
 
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
@@ -308,7 +313,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · added 2026-05-26_
 
-### generational-continuity (8 open, 6 landed)
+### generational-continuity (9 open, 6 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · added 2026-05-07_
@@ -318,6 +323,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
+- **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
 
 ### predator-prey-dynamics (5 open, 15 landed)
 
@@ -339,7 +345,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (117)
+## Ready (119)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -458,6 +464,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 - **[517](docs/open-work/tickets/517-soak-harness-frame-hitch-per-tick-systems-re-run-on-unadvanced-tick-double-applying-state-and-duplicating-emissions.md)** — Soak harness frame-hitch: per-tick systems re-run on unadvanced tick, double-applying state and duplicating emissions — _[tooling-diagnostics-ui] · added 2026-07-09_
 - **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
+- **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
+- **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
 
 ## Parked (12)
 
