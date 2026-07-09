@@ -42,6 +42,12 @@ pub struct PreyScoringContext {
     /// believed lethality + escape-speed ratio + alertness), from
     /// 314's prey-perceiver heuristic.
     pub bolt_affordance: f32,
+    /// `Affordance(ScatterGroup, me, threat)` — 314's herd-flush
+    /// heuristic (group density + threat proximity + readiness +
+    /// health). The ≥1-same-kind-neighbor eligibility gate lives in
+    /// `prey_ai`'s election arm, NOT here (the writer's quartet does
+    /// not hard-gate on the census).
+    pub scatter_group_affordance: f32,
     pub self_position: Position,
 }
 
@@ -58,6 +64,10 @@ fn prey_ctx_scalars(ctx: &PreyScoringContext) -> HashMap<&'static str, f32> {
     m.insert(
         crate::ai::dses::prey_bolt::BOLT_AFFORDANCE_INPUT,
         ctx.bolt_affordance.clamp(0.0, 1.0),
+    );
+    m.insert(
+        crate::ai::dses::prey_scatter_group::SCATTER_GROUP_AFFORDANCE_INPUT,
+        ctx.scatter_group_affordance.clamp(0.0, 1.0),
     );
     m
 }
@@ -139,8 +149,42 @@ mod tests {
             threat_chase_affordance: chase,
             threat_violence_belief: violence,
             bolt_affordance: bolt,
+            scatter_group_affordance: 0.0,
             self_position: Position::new(10, 10),
         }
+    }
+
+    #[test]
+    fn dense_herd_scatter_outscores_lone_bolt() {
+        // The election argmax property: with a committed threat, a
+        // saturated herd affordance pushes ScatterGroup above Bolt for
+        // the same (prey, threat) pair; with no herd (writer would
+        // still leak ~0.25×(prox+alert+health), but the prey_ai census
+        // gate keeps the candidate from standing — here we just check
+        // score ordering at 0.0) Bolt wins.
+        let r = registry();
+        let pipeline = ModifierPipeline::default();
+        let markers = MarkerSnapshot::new();
+        let inputs = test_inputs!(&r, &pipeline, &markers);
+
+        let herd = PreyScoringContext {
+            scatter_group_affordance: 0.95,
+            ..ctx(0.8, 0.6, 0.5)
+        };
+        let scatter = score_prey_dse_by_id("prey_scatter_group", &herd, &inputs);
+        let bolt = score_prey_dse_by_id("prey_bolt", &herd, &inputs);
+        assert!(
+            scatter > bolt,
+            "dense herd + committed chase must prefer the flush ({scatter} vs {bolt})"
+        );
+
+        let lone = ctx(0.8, 0.6, 0.5);
+        let scatter_lone = score_prey_dse_by_id("prey_scatter_group", &lone, &inputs);
+        let bolt_lone = score_prey_dse_by_id("prey_bolt", &lone, &inputs);
+        assert!(
+            bolt_lone > scatter_lone,
+            "no herd affordance → Bolt must win the argmax ({bolt_lone} vs {scatter_lone})"
+        );
     }
 
     #[test]

@@ -461,6 +461,27 @@ pub enum EventKind {
         location: (i32, i32),
         den: (i32, i32),
     },
+    /// Ticket 266 — a prey Bolt election won: the prey left the legacy
+    /// freeze/flee machine for `Bolting` (predicted-position evasion).
+    /// `score` is the winning `prey_bolt` DSE score at election time.
+    /// Emitted so bolt cadence is countable per soak (`just q events
+    /// --kind=PreyBoltStarted`) — the Feature tally alone never
+    /// reaches the footer, which left the first Bolt gate measuring
+    /// the mechanism only indirectly through hunt-success drops.
+    PreyBoltStarted {
+        location: (i32, i32),
+        threat: (i32, i32),
+        score: f32,
+    },
+    /// Ticket 266 — a prey ScatterGroup election won: herd flush with
+    /// parity-mirrored divergent headings. `neighbors` is the same-kind
+    /// census that made the candidate eligible.
+    PreyScatterStarted {
+        location: (i32, i32),
+        threat: (i32, i32),
+        score: f32,
+        neighbors: u32,
+    },
 
     // -------------------------------------------------------------------
     // Continuity-canary events (§11.3 — "Emit events for: grooming fires,

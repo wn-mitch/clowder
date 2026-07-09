@@ -72,6 +72,7 @@ pub mod play_engagement_cues;
 pub mod preset;
 pub mod prey_bolt_chase;
 pub mod prey_byproduct_spawn;
+pub mod prey_scatter_flush;
 pub mod route_cost_decision;
 pub mod runner;
 pub mod shadowfox_hunger_hunt_cycle;
@@ -170,6 +171,9 @@ pub const ALL: &[&Scenario] = &[
     // 266 — prey Bolt election under a committed close threat
     // (Feature::PreyBoltElected named-transition gate).
     &prey_bolt_chase::SCENARIO,
+    // 266 — herd flush: ScatterGroup out-ranks Bolt for grouped prey
+    // (Feature::PreyScatterElected named-transition gate).
+    &prey_scatter_flush::SCENARIO,
     &prey_byproduct_spawn::SCENARIO_MOUSE,
     &prey_byproduct_spawn::SCENARIO_RAT,
     &prey_byproduct_spawn::SCENARIO_RABBIT,

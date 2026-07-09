@@ -267,6 +267,12 @@ pub enum Feature {
     /// an alert-set cadence tick, and the prey entered
     /// `PreyAiState::Bolting` (predicted-position evasion).
     PreyBoltElected,
+    /// Ticket 266 — the herd-flush election won: same-kind neighbors
+    /// present (census-gated) and the ScatterGroup score out-ranked
+    /// Bolt above threshold; the prey entered
+    /// `PreyAiState::Scattering` (divergent predicted-position
+    /// evasion — crossing paths break a pursuer's interception lock).
+    PreyScatterElected,
     DirectiveDelivered,
     // --- Hawk ecology (ticket 025 Phase 2) ---
     /// A hawk spotted prey within detection range. Witness: yes/no per
@@ -907,6 +913,7 @@ impl Feature {
         Feature::ShadowFoxRetreatEntered,
         Feature::ShadowFoxKillSiteAvoided,
         Feature::PreyBoltElected,
+        Feature::PreyScatterElected,
         Feature::DirectiveDelivered,
         // Hawk ecology (ticket 025 Phase 2). All four "trunk" positives
         // ship dormant via `expected_to_fire_per_soak() => false` in
@@ -1321,6 +1328,7 @@ impl Feature {
             // (hunt success shift) is judged at the soak layer, not
             // per-event.
             Feature::PreyBoltElected => Neutral,
+            Feature::PreyScatterElected => Neutral,
             Feature::CommitmentDropTriggered => Neutral,
             Feature::CommitmentDropBlind => Neutral,
             Feature::CommitmentDropSingleMinded => Neutral,
@@ -1402,6 +1410,10 @@ impl Feature {
             // prey's Alert window. The prey_bolt_chase scenario hosts
             // the deterministic assertion.
             Feature::PreyBoltElected => false,
+            // 266 — sibling default: needs a committed chase AND a
+            // same-kind herd in range; the prey_scatter_flush scenario
+            // hosts the deterministic assertion.
+            Feature::PreyScatterElected => false,
             Feature::FateAwakened => false,
             Feature::SpiritCommunion => false,
             Feature::ShadowFoxAvoidedWard => false,
@@ -1968,6 +1980,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::ShadowFoxRetreatEntered => "ShadowFoxRetreatEntered",
         Feature::ShadowFoxKillSiteAvoided => "ShadowFoxKillSiteAvoided",
         Feature::PreyBoltElected => "PreyBoltElected",
+        Feature::PreyScatterElected => "PreyScatterElected",
         Feature::ShadowFoxHauntingEscalated => "ShadowFoxHauntingEscalated",
         Feature::DirectiveDelivered => "DirectiveDelivered",
         // Ticket 025 Phase 2 — hawk/snake GOAP.
@@ -2303,7 +2316,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 172;
+        const EXPECTED_VARIANT_COUNT: usize = 173;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2468,14 +2481,15 @@ mod tests {
         // post-ambush retreat-to-den transition; same scenario hosts it.
         // Ticket 310 S3: +1 Neutral (ShadowFoxKillSiteAvoided) for the
         // fished-out-pond selection consideration.
-        // Ticket 266: +1 Neutral (PreyBoltElected) for the prey Bolt
-        // election (state transition; ecological outcome judged at the
-        // soak layer). Ships `expected_to_fire_per_soak() => false`
-        // per the new-Feature default; the prey_bolt_chase scenario
-        // hosts its firing assertion.
+        // Ticket 266: +2 Neutral (PreyBoltElected / PreyScatterElected)
+        // for the prey escape elections (state transitions; ecological
+        // outcome judged at the soak layer). Both ship
+        // `expected_to_fire_per_soak() => false` per the new-Feature
+        // default; the prey_bolt_chase / prey_scatter_flush scenarios
+        // host the firing assertions.
         assert_eq!(positive, 99);
         assert_eq!(negative, 25);
-        assert_eq!(neutral, 48);
+        assert_eq!(neutral, 49);
     }
 
     #[test]
@@ -2587,7 +2601,7 @@ mod tests {
         // Ticket 482: +3 Positive (ItemSourcedFromPreservation /
         // ItemSourcedFromHarvestCarcass / ItemSourcedFromForageIngredient)
         // promoting the three Source-shaped sites 429 deferred.
-        // Ticket 266: +1 Neutral (PreyBoltElected).
+        // Ticket 266: +2 Neutral (PreyBoltElected / PreyScatterElected).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
             99
@@ -2598,7 +2612,7 @@ mod tests {
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Neutral),
-            48
+            49
         );
     }
 

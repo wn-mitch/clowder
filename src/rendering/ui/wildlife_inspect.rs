@@ -192,6 +192,7 @@ fn ai_state_label(state: &crate::components::prey::PreyAiState) -> &'static str 
         PreyAiState::Fleeing { .. } => "Fleeing",
         PreyAiState::BurstFlight { .. } => "BurstFlight",
         PreyAiState::Bolting { .. } => "Bolting",
+        PreyAiState::Scattering { .. } => "Scattering",
     }
 }
 

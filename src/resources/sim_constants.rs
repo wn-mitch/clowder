@@ -1768,6 +1768,21 @@ pub struct PreyConstants {
     /// counterpart. 0.0 degrades to classic away-from-current flight.
     #[serde(default = "default_prey_bolt_lead_ticks")]
     pub prey_bolt_lead_ticks: f32,
+    /// Minimum `prey_scatter_group` DSE score for the herd-flush
+    /// election. Shares Bolt's first-light value; both candidates
+    /// stand in one election per (prey, threat) pair and the argmax
+    /// above its own threshold wins. The ≥1-same-kind-neighbor
+    /// eligibility gate is separate (the affordance writer's quartet
+    /// does not hard-gate on the census).
+    #[serde(default = "default_prey_scatter_election_threshold")]
+    pub prey_scatter_election_threshold: f32,
+    /// Radians a Scattering prey's flee heading rotates away from the
+    /// straight predicted-position evasion line. Sign alternates by
+    /// entity-id parity (deterministic — no RNG in the resolution), so
+    /// herd members diverge and cross paths, breaking a pursuing cat's
+    /// `pursue()` lead-interception lock.
+    #[serde(default = "default_prey_scatter_divergence_radians")]
+    pub prey_scatter_divergence_radians: f32,
 }
 
 fn default_prey_ai_cadence_ticks() -> u64 {
@@ -1780,6 +1795,14 @@ fn default_prey_bolt_election_threshold() -> f32 {
 
 fn default_prey_bolt_lead_ticks() -> f32 {
     4.0
+}
+
+fn default_prey_scatter_election_threshold() -> f32 {
+    0.45
+}
+
+fn default_prey_scatter_divergence_radians() -> f32 {
+    0.6
 }
 
 fn default_prey_scent_deposit_per_tick() -> f32 {
@@ -1855,6 +1878,8 @@ impl Default for PreyConstants {
             prey_ai_cadence_ticks: default_prey_ai_cadence_ticks(),
             prey_bolt_election_threshold: default_prey_bolt_election_threshold(),
             prey_bolt_lead_ticks: default_prey_bolt_lead_ticks(),
+            prey_scatter_election_threshold: default_prey_scatter_election_threshold(),
+            prey_scatter_divergence_radians: default_prey_scatter_divergence_radians(),
         }
     }
 }

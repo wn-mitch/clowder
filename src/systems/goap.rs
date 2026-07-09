@@ -9696,7 +9696,7 @@ fn resolve_engage_prey(
     state.last_observed_position = Some(*pos);
     let prey_is_fleeing = matches!(
         prey_state.ai_state,
-        PreyAiState::Fleeing { .. } | PreyAiState::Bolting { .. }
+        PreyAiState::Fleeing { .. } | PreyAiState::Bolting { .. } | PreyAiState::Scattering { .. }
     );
     let prey_awareness = prey_state.ai_state;
     let catch_mod = prey_cfg.catch_difficulty;
@@ -9876,7 +9876,8 @@ fn resolve_engage_prey(
             // aware as a ground-fleeing target.
             PreyAiState::Fleeing { .. }
             | PreyAiState::BurstFlight { .. }
-            | PreyAiState::Bolting { .. } => d.pounce_awareness_fleeing,
+            | PreyAiState::Bolting { .. }
+            | PreyAiState::Scattering { .. } => d.pounce_awareness_fleeing,
         };
         let distance_mod = match dist {
             0..=1 => d.pounce_distance_close_mod,

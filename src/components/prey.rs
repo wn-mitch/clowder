@@ -89,6 +89,18 @@ pub enum PreyAiState {
         from: Entity,
         ticks: u64,
     },
+    /// 266 — DSE-elected herd flush. Same election as `Bolting` (one
+    /// argmax per (prey, threat) pair); wins when same-kind neighbors
+    /// stand in sensing range (census eligibility gate) and the
+    /// `prey_scatter_group` score out-ranks Bolt. Resolution is
+    /// Bolting's predicted-position evasion with the heading rotated
+    /// ± `prey_scatter_divergence_radians` by entity-id parity —
+    /// deterministic divergence, so herd members cross paths and a
+    /// pursuing cat's `pursue()` interception lock breaks.
+    Scattering {
+        from: Entity,
+        ticks: u64,
+    },
 }
 
 // ---------------------------------------------------------------------------

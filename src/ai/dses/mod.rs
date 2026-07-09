@@ -109,6 +109,7 @@ pub mod patrol;
 pub mod picking_up;
 pub mod practice_magic;
 pub mod prey_bolt;
+pub mod prey_scatter_group;
 pub mod shadowfox_hunt;
 pub mod shadowfox_patrol;
 pub mod shadowfox_retreat;
@@ -179,6 +180,7 @@ pub use practice_magic::{
     cleanse_dse, colony_cleanse_dse, commune_dse, durable_ward_dse, harvest_dse, scry_dse,
 };
 pub use prey_bolt::prey_bolt_dse;
+pub use prey_scatter_group::prey_scatter_group_dse;
 pub use shadowfox_hunt::shadowfox_hunt_dse;
 pub use shadowfox_patrol::shadowfox_patrol_dse;
 pub use shadowfox_retreat::shadowfox_retreat_dse;

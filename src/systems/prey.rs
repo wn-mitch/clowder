@@ -269,26 +269,50 @@ pub struct PreyElectionParams<'w, 's> {
         &'static crate::components::physical::Velocity,
         (Without<PreyAnimal>, Without<Dead>),
     >,
+    /// Election events (`PreyBoltStarted` / `PreyScatterStarted`) so
+    /// escape cadence is countable per soak. Optional — headless runs
+    /// carry the log; bare test/scenario worlds may not (the shadowfox
+    /// motivation tick precedent).
+    pub event_log: Option<ResMut<'w, crate::resources::event_log::EventLog>>,
 }
 
-/// 266 — the Bolt election for one (prey, threat) pair. Reads the
+/// 266 — the winner of the one-per-(prey, threat) escape election.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EscapeElection {
+    Bolt,
+    Scatter,
+}
+
+/// 266 — the escape election for one (prey, threat) pair. Reads the
 /// mutually-perceivable chase readiness, the prey's implanted violence
-/// belief, and the escape-viability affordance; scores the registry
-/// `prey_bolt` DSE through the L2 evaluator (trace-visible,
-/// modifier-pipeline'd). Records `Feature::PreyBoltElected` and
-/// returns `true` when the score clears the election threshold — the
-/// caller applies the `Bolting` transition.
+/// belief, and the escape-viability affordances; scores the registry
+/// `prey_bolt` and `prey_scatter_group` DSEs through the L2 evaluator
+/// (trace-visible, modifier-pipeline'd) and picks the argmax of the
+/// candidates that clear their thresholds — ONE election, pillar 4.
+///
+/// The ScatterGroup candidate stands only with ≥ 1 same-kind neighbor
+/// in sensing range (`same_kind_neighbors` census, computed by the
+/// caller on cadence ticks): the 314 writer's quartet composes a
+/// non-zero score for a lone prey from its prox/alert/health slots, so
+/// the grouped-AND-committed conjunction is enforced here at
+/// eligibility, not inside the WeightedSum (310 S4 lesson).
+///
+/// Records the matching `Feature::Prey*Elected`; the caller applies
+/// the state transition.
 #[allow(clippy::too_many_arguments)]
-fn try_elect_bolt(
+fn try_elect_escape(
     prey_entity: Entity,
     threat: Entity,
+    threat_pos: &Position,
     beliefs: &crate::components::beliefs::PredatorBeliefs,
     pos: &Position,
     p: &crate::resources::sim_constants::PreyConstants,
     markers: &crate::ai::scoring::MarkerSnapshot,
     tick: u64,
+    same_kind_neighbors: usize,
     election: &mut PreyElectionParams,
-) -> bool {
+) -> Option<EscapeElection> {
+    use crate::resources::action_affordances::ActionKind;
     let violence = beliefs
         .models
         .get(&threat)
@@ -296,16 +320,17 @@ fn try_elect_bolt(
         .map(|m| m.perceived_violence_capability.value)
         .unwrap_or(0.0);
     let sf_ctx = crate::ai::prey_scoring::PreyScoringContext {
-        threat_chase_affordance: election.affordances.read(
-            threat,
-            prey_entity,
-            crate::resources::action_affordances::ActionKind::Chase,
-        ),
+        threat_chase_affordance: election
+            .affordances
+            .read(threat, prey_entity, ActionKind::Chase),
         threat_violence_belief: violence,
-        bolt_affordance: election.affordances.read(
+        bolt_affordance: election
+            .affordances
+            .read(prey_entity, threat, ActionKind::Bolt),
+        scatter_group_affordance: election.affordances.read(
             prey_entity,
             threat,
-            crate::resources::action_affordances::ActionKind::Bolt,
+            ActionKind::ScatterGroup,
         ),
         self_position: *pos,
     };
@@ -322,13 +347,45 @@ fn try_elect_bolt(
         focal_cat: None,
         focal_capture: None,
     };
-    let score = crate::ai::prey_scoring::score_prey_dse_by_id("prey_bolt", &sf_ctx, &eval_inputs);
-    if score >= p.prey_bolt_election_threshold {
-        election.activation.record(Feature::PreyBoltElected);
-        true
+    let bolt_score =
+        crate::ai::prey_scoring::score_prey_dse_by_id("prey_bolt", &sf_ctx, &eval_inputs);
+    let scatter_score = if same_kind_neighbors >= 1 {
+        crate::ai::prey_scoring::score_prey_dse_by_id("prey_scatter_group", &sf_ctx, &eval_inputs)
     } else {
-        false
+        0.0
+    };
+
+    let bolt_clears = bolt_score >= p.prey_bolt_election_threshold;
+    let scatter_clears =
+        same_kind_neighbors >= 1 && scatter_score >= p.prey_scatter_election_threshold;
+    let winner = match (bolt_clears, scatter_clears) {
+        (false, false) => return None,
+        (_, true) if scatter_score >= bolt_score || !bolt_clears => {
+            election.activation.record(Feature::PreyScatterElected);
+            EscapeElection::Scatter
+        }
+        _ => {
+            election.activation.record(Feature::PreyBoltElected);
+            EscapeElection::Bolt
+        }
+    };
+    if let Some(elog) = election.event_log.as_deref_mut() {
+        let kind = match winner {
+            EscapeElection::Bolt => crate::resources::event_log::EventKind::PreyBoltStarted {
+                location: (pos.x(), pos.y()),
+                threat: (threat_pos.x(), threat_pos.y()),
+                score: bolt_score,
+            },
+            EscapeElection::Scatter => crate::resources::event_log::EventKind::PreyScatterStarted {
+                location: (pos.x(), pos.y()),
+                threat: (threat_pos.x(), threat_pos.y()),
+                score: scatter_score,
+                neighbors: same_kind_neighbors as u32,
+            },
+        };
+        elog.push(tick, kind);
     }
+    Some(winner)
 }
 
 /// Advance the AI state machine for all living prey animals.
@@ -394,6 +451,18 @@ pub fn prey_ai(
     // the evaluator API requires the surface).
     let markers = crate::ai::scoring::MarkerSnapshot::new();
     let bolt_cadence_tick = time.tick.is_multiple_of(p.prey_ai_cadence_ticks.max(1));
+    // 266 — same-kind census snapshot for the ScatterGroup eligibility
+    // gate. Taken only on cadence ticks (O(prey) collect; the per-prey
+    // filter below runs only for alert-set prey, which are few).
+    let prey_census: Vec<(Entity, PreyKind, Position)> = if bolt_cadence_tick {
+        query
+            .iter()
+            .map(|(e, cfg, _, pos, _, _)| (e, cfg.kind, *pos))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let census_range = constants.affordances.sensing_range;
     for (prey_entity, config, mut state, pos, mut desired, beliefs) in &mut query {
         // O(1) den lookup for predation pressure → vigilance.
         let (pressure, home_den_pos) = state
@@ -605,32 +674,52 @@ pub fn prey_ai(
                 let still_near =
                     threat_pos.is_some_and(|tp| pos.distance_to(tp) <= config.alert_radius + 2.0);
 
-                // 266 — Bolt election, alert-set + cadence gated.
+                // 266 — escape election, alert-set + cadence gated.
                 // Ground-flee species only: birds keep BurstFlight and
                 // fish keep Stationary (designed escapes). A win
-                // preempts the freeze timer (bolt at the *right*
+                // preempts the freeze timer (bolt/flush at the *right*
                 // moment, not at a fixed tick count).
-                let elected_bolt = bolt_cadence_tick
+                let elected = if bolt_cadence_tick
                     && still_near
                     && matches!(
                         config.flee_strategy,
                         FleeStrategy::Standard | FleeStrategy::SeekCover
-                    )
-                    && try_elect_bolt(
+                    ) {
+                    let same_kind_neighbors = prey_census
+                        .iter()
+                        .filter(|(e, k, p2)| {
+                            *e != prey_entity
+                                && *k == config.kind
+                                && pos.distance_to(p2) <= census_range
+                        })
+                        .count();
+                    let tp = threat_pos.expect("still_near implies a live threat position");
+                    try_elect_escape(
                         prey_entity,
                         threat,
+                        tp,
                         beliefs,
                         &pos,
                         p,
                         &markers,
                         time.tick,
+                        same_kind_neighbors,
                         &mut election,
-                    );
+                    )
+                } else {
+                    None
+                };
 
-                if elected_bolt {
-                    state.ai_state = PreyAiState::Bolting {
-                        from: threat,
-                        ticks: 0,
+                if let Some(winner) = elected {
+                    state.ai_state = match winner {
+                        EscapeElection::Bolt => PreyAiState::Bolting {
+                            from: threat,
+                            ticks: 0,
+                        },
+                        EscapeElection::Scatter => PreyAiState::Scattering {
+                            from: threat,
+                            ticks: 0,
+                        },
                     };
                 } else if !still_near {
                     state.ai_state = PreyAiState::Idle;
@@ -678,30 +767,51 @@ pub fn prey_ai(
 
                 // 266 — Fleeing is in the alert set (it holds a live
                 // detected threat). On cadence ticks a fleeing
-                // ground-prey re-assesses and upgrades to Bolting
-                // (predicted-position evasion) when the election wins.
-                // Short-freeze species (mouse: freeze_ticks == 1)
-                // spend nearly the whole encounter here — without this
-                // arm they would never be scored. Bolting never
-                // downgrades back to Fleeing, so there is no ping-pong.
+                // ground-prey re-assesses and upgrades to Bolting or
+                // Scattering (predicted-position evasion) when the
+                // election wins. Short-freeze species (mouse:
+                // freeze_ticks == 1) spend nearly the whole encounter
+                // here — without this arm they would never be scored.
+                // Neither elected state downgrades back to Fleeing, so
+                // there is no ping-pong; `ticks` carries over so the
+                // upgrade never extends total flight duration.
                 if bolt_cadence_tick
                     && matches!(
                         config.flee_strategy,
                         FleeStrategy::Standard | FleeStrategy::SeekCover
                     )
-                    && try_elect_bolt(
+                {
+                    let same_kind_neighbors = prey_census
+                        .iter()
+                        .filter(|(e, k, p2)| {
+                            *e != prey_entity
+                                && *k == config.kind
+                                && pos.distance_to(p2) <= census_range
+                        })
+                        .count();
+                    let tp = threat_pos.expect("should_stop covers a lost threat position");
+                    match try_elect_escape(
                         prey_entity,
                         from,
+                        tp,
                         beliefs,
                         &pos,
                         p,
                         &markers,
                         time.tick,
+                        same_kind_neighbors,
                         &mut election,
-                    )
-                {
-                    state.ai_state = PreyAiState::Bolting { from, ticks };
-                    continue;
+                    ) {
+                        Some(EscapeElection::Bolt) => {
+                            state.ai_state = PreyAiState::Bolting { from, ticks };
+                            continue;
+                        }
+                        Some(EscapeElection::Scatter) => {
+                            state.ai_state = PreyAiState::Scattering { from, ticks };
+                            continue;
+                        }
+                        None => {}
+                    }
                 }
 
                 let tp = threat_pos.unwrap();
@@ -864,6 +974,80 @@ pub fn prey_ai(
                 }
 
                 state.ai_state = PreyAiState::Bolting {
+                    from,
+                    ticks: new_ticks,
+                };
+            }
+
+            PreyAiState::Scattering { from, ticks } => {
+                let new_ticks = ticks + 1;
+
+                let threat_pos = cat_positions
+                    .get(from)
+                    .map(|(_, p, _, _)| p)
+                    .or_else(|_| positions.get(from))
+                    .ok();
+
+                let should_stop = new_ticks >= config.flee_duration
+                    || threat_pos.is_none()
+                    || threat_pos
+                        .map(|tp| pos.distance_to(tp) > p.flee_stop_distance)
+                        .unwrap_or(true);
+                if should_stop {
+                    state.alertness = 0.0;
+                    state.ai_state = PreyAiState::Idle;
+                    continue;
+                }
+                let tp = threat_pos.unwrap();
+
+                // 266 — the herd flush: Bolting's predicted-position
+                // evasion with the heading rotated ± the divergence
+                // angle by entity-id parity. Deterministic (no RNG),
+                // so neighbors split into two crossing streams and a
+                // pursuing cat's `pursue()` lead loses its lock.
+                let lead = p.prey_bolt_lead_ticks;
+                let tv = election
+                    .threat_velocities
+                    .get(from)
+                    .map(|v| v.0)
+                    .unwrap_or_default();
+                let predicted =
+                    bevy::math::Vec2::new(tp.x() as f32 + tv.x * lead, tp.y() as f32 + tv.y * lead);
+                let away = (pos.0 - predicted).normalize_or_zero();
+
+                let flee_cap =
+                    constants.movement.prey_ground_max_speed * config.flee_speed.max(1) as f32;
+                let rotated_aim = if away != bevy::math::Vec2::ZERO {
+                    let sign = if prey_entity.to_bits() % 2 == 0 {
+                        1.0
+                    } else {
+                        -1.0
+                    };
+                    let (s, c) = (p.prey_scatter_divergence_radians * sign).sin_cos();
+                    let dir =
+                        bevy::math::Vec2::new(away.x * c - away.y * s, away.x * s + away.y * c);
+                    let nx = (pos.x() as f32 + dir.x * 2.0).round() as i32;
+                    let ny = (pos.y() as f32 + dir.y * 2.0).round() as i32;
+                    Some((nx, ny))
+                        .filter(|&(nx, ny)| can_move_to(nx, ny, config.habitat, &map))
+                        .filter(|&(nx, ny)| nx != pos.x() || ny != pos.y())
+                } else {
+                    None
+                };
+                let aim = rotated_aim.or_else(|| {
+                    let predicted_tile =
+                        Position::new(predicted.x.round() as i32, predicted.y.round() as i32);
+                    flee_step_target(&pos, &predicted_tile, config.habitat, &map)
+                });
+                if let Some((nx, ny)) = aim {
+                    desired.0 = Some(crate::ai::steering::seek(
+                        pos.0,
+                        Position::new(nx, ny).0,
+                        flee_cap,
+                    ));
+                }
+
+                state.ai_state = PreyAiState::Scattering {
                     from,
                     ticks: new_ticks,
                 };
@@ -1989,6 +2173,143 @@ mod tests {
             );
         }
         assert_eq!(bolt_elected_count(&world), 0);
+    }
+
+    fn write_scatter_affordance(world: &mut World, threat: Entity, prey: Entity, scatter: f32) {
+        use crate::resources::action_affordances::ActionKind;
+        let mut aff = world.resource_mut::<crate::resources::ActionAffordances>();
+        aff.write(prey, threat, ActionKind::ScatterGroup, scatter);
+    }
+
+    #[test]
+    fn herd_prey_scatters_where_lone_prey_bolts() {
+        // One election, two candidates: with a same-kind neighbor in
+        // census range and a saturated herd affordance, ScatterGroup
+        // out-ranks Bolt; without a neighbor the Scatter candidate
+        // does not stand (the census eligibility gate — the writer's
+        // quartet leaks a non-zero score for lone prey) and Bolt wins.
+        let (mut world, mut schedule) = setup_ai();
+        let threat = world.spawn(Position::new(8, 10)).id();
+
+        // Herd case: two rabbits side by side, both alert on the threat.
+        let r1 = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Rabbit,
+            Position::new(11, 10),
+            PreyAiState::Alert { threat, ticks: 0 },
+        );
+        let r2 = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Rabbit,
+            Position::new(12, 10),
+            PreyAiState::Alert { threat, ticks: 0 },
+        );
+        for prey in [r1, r2] {
+            write_bolt_affordances(&mut world, threat, prey, 0.9);
+            write_scatter_affordance(&mut world, threat, prey, 0.95);
+        }
+
+        schedule.run(&mut world);
+
+        let mut q = world.query_filtered::<&PreyState, With<PreyAnimal>>();
+        let scattering = q
+            .iter(&world)
+            .filter(|s| matches!(s.ai_state, PreyAiState::Scattering { .. }))
+            .count();
+        assert_eq!(
+            scattering, 2,
+            "both herd members should elect the flush over the lone bolt"
+        );
+        let scatter_count = world
+            .resource::<SystemActivation>()
+            .counts
+            .get(&crate::resources::system_activation::Feature::PreyScatterElected)
+            .copied()
+            .unwrap_or(0);
+        assert_eq!(scatter_count, 2, "the flush elections must be named");
+    }
+
+    #[test]
+    fn lone_prey_with_leaked_scatter_affordance_still_bolts() {
+        // The census eligibility gate: even with a (leaked) non-zero
+        // ScatterGroup affordance row, a prey with NO same-kind
+        // neighbor must not elect the herd flush.
+        let (mut world, mut schedule) = setup_ai();
+        let threat = world.spawn(Position::new(8, 10)).id();
+        let lone = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Rabbit,
+            Position::new(11, 10),
+            PreyAiState::Alert { threat, ticks: 0 },
+        );
+        write_bolt_affordances(&mut world, threat, lone, 0.9);
+        // The lone-prey leak the DSE module doc names: prox + alert +
+        // health still compose ~0.5+ without any neighbor.
+        write_scatter_affordance(&mut world, threat, lone, 0.6);
+
+        schedule.run(&mut world);
+
+        let prey_state = world
+            .query_filtered::<&PreyState, With<PreyAnimal>>()
+            .single(&world)
+            .unwrap();
+        assert!(
+            matches!(prey_state.ai_state, PreyAiState::Bolting { .. }),
+            "no neighbors → the Scatter candidate must not stand; got {:?}",
+            prey_state.ai_state,
+        );
+    }
+
+    #[test]
+    fn scattering_herd_diverges() {
+        // The deterministic parity split: two consecutive-id prey
+        // Scattering from the same stationary threat take mirrored
+        // rotated headings and end up laterally separated.
+        let (mut world, mut schedule) = setup_ai();
+        let threat = world
+            .spawn((
+                Position::new(5, 10),
+                crate::components::physical::Velocity(bevy::math::Vec2::ZERO),
+            ))
+            .id();
+        let start = Position::new(9, 10);
+        let a = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Mouse,
+            start,
+            PreyAiState::Scattering {
+                from: threat,
+                ticks: 0,
+            },
+        );
+        let b = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Mouse,
+            Position::new(9, 11),
+            PreyAiState::Scattering {
+                from: threat,
+                ticks: 0,
+            },
+        );
+        // Consecutive spawns → adjacent entity ids → opposite parity.
+        assert_ne!(a.to_bits() % 2, b.to_bits() % 2);
+
+        for _ in 0..8 {
+            schedule.run(&mut world);
+        }
+
+        let pa = *world.entity(a).get::<Position>().unwrap();
+        let pb = *world.entity(b).get::<Position>().unwrap();
+        let lateral_gap = (pa.y() - pb.y()).abs();
+        assert!(
+            lateral_gap > 1,
+            "mirrored divergence should separate the pair laterally; \
+             got {pa:?} vs {pb:?}"
+        );
+        // Both still gained distance on the threat (it's a flush, not
+        // a milling circle).
+        let tpos = Position::new(5, 10);
+        assert!(pa.distance_to(&tpos) > start.distance_to(&tpos));
     }
 
     #[test]
