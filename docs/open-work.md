@@ -15,10 +15,10 @@ _Last generated: 2026-07-09._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 117 |
+| Ready | 118 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **163** |
+| **Open total** | **164** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (117)
+## Ready by cluster (118)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -177,7 +177,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 - **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 
-### wildlife (6 ready, 1 blocked)
+### wildlife (7 ready, 1 blocked)
 
 - **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
 - **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
@@ -185,6 +185,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 - **[513](docs/open-work/tickets/513-shadowfox-colony-pressure-channel-fading-under-fluid-movement-drives-softmax-self-anchors-on-remote-corruption-reconstituting-seeding-loop-scent-shell-repels-at-fine-granularity-wardsiegehaunting-interactions-zero-on-both-gate-seeds.md)** — shadowfox colony-pressure channel fading under fluid movement: drives softmax self-anchors on remote corruption (Reconstituting-Seeding loop), scent shell repels at fine granularity, ward/siege/haunting interactions zero on both gate seeds — _[wildlife] · added 2026-07-06_
+- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
 
 ### buildings-zones (5 ready, 2 blocked)
 
@@ -339,7 +340,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (117)
+## Ready (118)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -458,6 +459,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 - **[516](docs/open-work/tickets/516-score-target-consideration-prefix-routing-sends-unprefixed-scalar-axes-to-the-no-op-fetch-self-hunt-target-prey-yieldprey-calmalertness-tolerance-dead-in-production-263-affordance-key-same-class.md)** — score_target_consideration prefix-routing sends unprefixed scalar axes to the no-op fetch_self — hunt_target prey_yield/prey_calm/alertness-tolerance dead in production; 263 affordance key same class — _[ai-substrate] · added 2026-07-07_
 - **[517](docs/open-work/tickets/517-soak-harness-frame-hitch-per-tick-systems-re-run-on-unadvanced-tick-double-applying-state-and-duplicating-emissions.md)** — Soak harness frame-hitch: per-tick systems re-run on unadvanced tick, double-applying state and duplicating emissions — _[tooling-diagnostics-ui] · added 2026-07-09_
+- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
 
 ## Parked (12)
 
