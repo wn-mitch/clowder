@@ -941,11 +941,8 @@ pub fn shadowfox_motivation_tick(
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn shadowfox_haunting_drain(
     mut shadowfoxes: Query<
-        (&Position, &mut WildlifeAiState),
-        (
-            With<ShadowFoxDrives>,
-            Without<crate::components::wildlife::Carcass>,
-        ),
+        (&Position, &mut WildlifeAiState, &ShadowFoxDrives),
+        Without<crate::components::wildlife::Carcass>,
     >,
     mut cats: Query<
         (&Position, &mut Needs, &mut Mood),
@@ -968,7 +965,7 @@ pub fn shadowfox_haunting_drain(
     let escalation_ticks = c.shadow_fox_haunting_escalation_ticks;
     let haunt_edge = c.shadow_fox_haunting_edge_distance;
 
-    for (fox_pos, mut state) in &mut shadowfoxes {
+    for (fox_pos, mut state, drives) in &mut shadowfoxes {
         // Only operate on shadow-foxes currently in Haunting.
         let (target_x, target_y, current_ticks) = match *state {
             WildlifeAiState::Haunting {
@@ -983,7 +980,22 @@ pub fn shadowfox_haunting_drain(
         // Escalation check: enough cumulative haunting → promote to
         // Stalking. The existing pre-023 `predator_stalk_cats` system
         // will then handle the cat-vs-fox combat resolution.
-        if current_ticks >= escalation_ticks {
+        //
+        // 310 S1 — satiation gates every physical-predation entry, and
+        // this is the third one (legacy roll, hunger election,
+        // escalation). Ungated, this path is a positive feedback loop:
+        // an ambush tanks the victim's mood/safety, which is exactly
+        // what Dread reads, so the motivation tick re-elects Haunting
+        // and 30 ticks later the fox attacks again — the second S1
+        // gate soak measured ~45-tick same-cat ambush trains (the
+        // ambush execution itself never checks `ambush_cooldown`,
+        // which only gates fresh stalk rolls). A fed shadow-fox keeps
+        // haunting — the drain below still runs, "it watches, and
+        // waits" — and the promotion fires once cadence decay brings
+        // satiation back under the stalk threshold.
+        if current_ticks >= escalation_ticks
+            && drives.satiation < c.shadow_fox_stalk_satiation_threshold
+        {
             *state = WildlifeAiState::Stalking { target_x, target_y };
             activation.record(Feature::ShadowFoxHauntingEscalated);
             continue;
@@ -1795,6 +1807,90 @@ mod tests {
                 .unwrap_or(0),
             0,
             "no hunger-hunt election may fire below the pressure floor",
+        );
+    }
+
+    fn setup_haunting_world() -> (World, Schedule) {
+        let mut world = World::new();
+        world.insert_resource(crate::resources::SimConstants::default());
+        world.insert_resource(TimeState::default());
+        world.insert_resource(SystemActivation::default());
+
+        let mut schedule = Schedule::default();
+        schedule.add_systems(shadowfox_haunting_drain);
+        (world, schedule)
+    }
+
+    /// Second-gate-soak regression: the Haunting → Stalking escalation
+    /// is the third physical-predation entry and must respect the same
+    /// satiation gate as the stalk roll and the hunger election —
+    /// ungated it forms the ambush → dread → haunt → escalate → ambush
+    /// feedback loop (~45-tick same-cat ambush trains).
+    #[test]
+    fn fed_haunting_fox_does_not_escalate() {
+        let (mut world, mut schedule) = setup_haunting_world();
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 1.0;
+        *world.get_mut::<WildlifeAiState>(entity).unwrap() = WildlifeAiState::Haunting {
+            target_x: 8,
+            target_y: 5,
+            edge_distance: 5.0,
+            ticks: 10_000, // far past escalation_ticks (30)
+        };
+
+        for _ in 0..50 {
+            schedule.run(&mut world);
+        }
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            matches!(state, WildlifeAiState::Haunting { .. }),
+            "fed shadow-fox must keep haunting, not escalate to Stalking; got {state:?}",
+        );
+        let activation = world.resource::<SystemActivation>();
+        assert_eq!(
+            activation
+                .counts
+                .get(&Feature::ShadowFoxHauntingEscalated)
+                .copied()
+                .unwrap_or(0),
+            0,
+        );
+    }
+
+    #[test]
+    fn hungry_haunting_fox_escalates() {
+        let (mut world, mut schedule) = setup_haunting_world();
+        let entity = spawn_shadowfox_at(&mut world, Position::new(5, 5), 1.0);
+        world.get_mut::<ShadowFoxDrives>(entity).unwrap().satiation = 0.0;
+        *world.get_mut::<WildlifeAiState>(entity).unwrap() = WildlifeAiState::Haunting {
+            target_x: 8,
+            target_y: 5,
+            edge_distance: 5.0,
+            ticks: 10_000,
+        };
+
+        schedule.run(&mut world);
+
+        let state = world.get::<WildlifeAiState>(entity).unwrap();
+        assert!(
+            matches!(
+                state,
+                WildlifeAiState::Stalking {
+                    target_x: 8,
+                    target_y: 5
+                }
+            ),
+            "hungry shadow-fox past the escalation threshold must promote to Stalking; got {state:?}",
+        );
+        let activation = world.resource::<SystemActivation>();
+        assert_eq!(
+            activation
+                .counts
+                .get(&Feature::ShadowFoxHauntingEscalated)
+                .copied()
+                .unwrap_or(0),
+            1,
         );
     }
 
