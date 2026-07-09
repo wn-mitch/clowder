@@ -19,6 +19,7 @@ pub mod methods;
 pub mod modifier;
 pub mod pathfinding;
 pub mod planner;
+pub mod prey_scoring;
 pub mod route_cost;
 pub mod scoring;
 pub mod shadowfox_scoring;

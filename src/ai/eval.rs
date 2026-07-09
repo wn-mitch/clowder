@@ -71,6 +71,11 @@ pub struct DseRegistry {
     /// 310 S4 — shadow-fox hunt/retreat/patrol, scored as candidates
     /// inside the 023 motivation softmax (one election, pillar 4).
     pub shadowfox_dses: Vec<Box<dyn Dse>>,
+    /// 266 — prey-side threat-response DSEs (Bolt, ScatterGroup).
+    /// Scored by the alert-set-gated light dispatcher in
+    /// `ai::prey_scoring` from inside `prey_ai` — prey never enter
+    /// `evaluate_and_plan` (no GOAP, no markers, no Maslow ladder).
+    pub prey_dses: Vec<Box<dyn Dse>>,
     pub aspiration_dses: Vec<Box<dyn Dse>>,
     pub coordinator_dses: Vec<Box<dyn Dse>>,
     pub narrative_dses: Vec<Box<dyn Dse>>,
@@ -123,6 +128,14 @@ impl DseRegistry {
             .map(|boxed| boxed.as_ref())
     }
 
+    /// Find a registered prey DSE by its string id (266).
+    pub fn prey_dse(&self, id: &str) -> Option<&dyn Dse> {
+        self.prey_dses
+            .iter()
+            .find(|d| d.id().0 == id)
+            .map(|boxed| boxed.as_ref())
+    }
+
     pub fn total(&self) -> usize {
         self.cat_dses.len()
             + self.target_taking_dses.len()
@@ -130,6 +143,7 @@ impl DseRegistry {
             + self.hawk_dses.len()
             + self.snake_dses.len()
             + self.shadowfox_dses.len()
+            + self.prey_dses.len()
             + self.aspiration_dses.len()
             + self.coordinator_dses.len()
             + self.narrative_dses.len()

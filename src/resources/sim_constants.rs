@@ -1741,6 +1741,45 @@ pub struct PreyConstants {
     /// invalidating per-species ecology.
     #[serde(default = "default_prey_scent_deposit_normalizer")]
     pub scent_deposit_normalizer: f32,
+
+    // --- Prey AI (266) ---
+    /// Cadence (in ticks) of the prey-side DSE election inside
+    /// `prey_ai`. Only prey in the alert set (state machine holds a
+    /// live detected threat) are scored, and only on ticks divisible
+    /// by this cadence — the plan's perf-pinned shape (the
+    /// `prey_ai`/`try_detect_cat` frame was 8.0% inclusive before prey
+    /// scoring existed; idle prey must stay free).
+    #[serde(default = "default_prey_ai_cadence_ticks")]
+    pub prey_ai_cadence_ticks: u64,
+    /// Minimum `prey_bolt` DSE score for the Bolt election to preempt
+    /// the legacy freeze-timer `Alert → Fleeing` transition. Below it
+    /// the prey holds its freeze (the ethological default) and the
+    /// legacy path proceeds. With the chase-affordance axis gated to
+    /// 0.0 by the writer's min-eligibility floor, belief + head-start
+    /// alone compose to ≤ 0.55 — this threshold must stay above that
+    /// saturation point's realistic range so an uncommitted predator
+    /// never triggers a bolt (the `prey_no_bolt_at_low_affordance`
+    /// contract).
+    #[serde(default = "default_prey_bolt_election_threshold")]
+    pub prey_bolt_election_threshold: f32,
+    /// Ticks of threat-velocity lead when a Bolting prey picks its
+    /// flee direction: it flees the threat's *predicted* position
+    /// (`pos + vel × lead`), not its current tile — the anti-`pursue()`
+    /// counterpart. 0.0 degrades to classic away-from-current flight.
+    #[serde(default = "default_prey_bolt_lead_ticks")]
+    pub prey_bolt_lead_ticks: f32,
+}
+
+fn default_prey_ai_cadence_ticks() -> u64 {
+    8
+}
+
+fn default_prey_bolt_election_threshold() -> f32 {
+    0.45
+}
+
+fn default_prey_bolt_lead_ticks() -> f32 {
+    4.0
 }
 
 fn default_prey_scent_deposit_per_tick() -> f32 {
@@ -1813,6 +1852,9 @@ impl Default for PreyConstants {
             scent_deposit_per_tick: default_prey_scent_deposit_per_tick(),
             scent_decay_rate: default_prey_scent_decay_rate(),
             scent_deposit_normalizer: default_prey_scent_deposit_normalizer(),
+            prey_ai_cadence_ticks: default_prey_ai_cadence_ticks(),
+            prey_bolt_election_threshold: default_prey_bolt_election_threshold(),
+            prey_bolt_lead_ticks: default_prey_bolt_lead_ticks(),
         }
     }
 }

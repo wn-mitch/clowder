@@ -70,6 +70,7 @@ pub mod patrol_recalibration;
 pub mod picking_up_scavenging;
 pub mod play_engagement_cues;
 pub mod preset;
+pub mod prey_bolt_chase;
 pub mod prey_byproduct_spawn;
 pub mod route_cost_decision;
 pub mod runner;
@@ -166,6 +167,9 @@ pub const ALL: &[&Scenario] = &[
     // not met by the default test world; Fish row is covered by the
     // `prey_byproducts_table_default_matches_spec` unit test and the
     // seed-42 soak).
+    // 266 — prey Bolt election under a committed close threat
+    // (Feature::PreyBoltElected named-transition gate).
+    &prey_bolt_chase::SCENARIO,
     &prey_byproduct_spawn::SCENARIO_MOUSE,
     &prey_byproduct_spawn::SCENARIO_RAT,
     &prey_byproduct_spawn::SCENARIO_RABBIT,

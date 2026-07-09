@@ -195,6 +195,28 @@ pub fn seed_prey_ecosystem(world: &mut World) {
 fn presimulate_prey(world: &mut World) {
     use bevy_ecs::schedule::Schedule;
 
+    // 266 — `prey_ai` carries the Bolt-election `SystemParam` bundle
+    // (DseRegistry / ModifierPipeline / ActionAffordances /
+    // SystemActivation), and this presim runs inside
+    // `setup_world_exclusive`, BEFORE `register_dses_at_startup`
+    // inserts the real pipeline. Guard-insert defaults so param
+    // validation passes; behavior-neutral because the presim world has
+    // no cats — no threat is ever detected, so the election arm is
+    // unreachable (prey stay Idle/Grazing). The startup system
+    // overwrites the pipeline with the constants-built one afterward.
+    if !world.contains_resource::<crate::ai::eval::DseRegistry>() {
+        world.init_resource::<crate::ai::eval::DseRegistry>();
+    }
+    if !world.contains_resource::<crate::ai::eval::ModifierPipeline>() {
+        world.init_resource::<crate::ai::eval::ModifierPipeline>();
+    }
+    if !world.contains_resource::<crate::resources::ActionAffordances>() {
+        world.init_resource::<crate::resources::ActionAffordances>();
+    }
+    if !world.contains_resource::<crate::resources::system_activation::SystemActivation>() {
+        world.init_resource::<crate::resources::system_activation::SystemActivation>();
+    }
+
     let mut schedule = Schedule::default();
     schedule.add_systems(
         (

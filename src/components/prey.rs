@@ -74,6 +74,21 @@ pub enum PreyAiState {
         target_x: i32,
         target_y: i32,
     },
+    /// 266 — DSE-elected flight (the first prey AI election in the
+    /// codebase). Entered from `Alert` when the `prey_bolt` score
+    /// (threat chase affordance + believed violence + escape
+    /// viability) clears `PreyConstants::prey_bolt_election_threshold`
+    /// on an alert-set cadence tick — preempting the legacy
+    /// freeze-timer transition to `Fleeing`, which remains the
+    /// no-election fallback. Distinct from `Fleeing`: a Bolting prey
+    /// evades the threat's *predicted* position (`pos + vel × lead`),
+    /// the anti-`pursue()` geometry, instead of its current tile.
+    /// Ground-flee species only (`Standard` / `SeekCover`); birds keep
+    /// `BurstFlight`, fish keep `Stationary`.
+    Bolting {
+        from: Entity,
+        ticks: u64,
+    },
 }
 
 // ---------------------------------------------------------------------------

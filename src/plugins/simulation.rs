@@ -115,6 +115,10 @@ pub fn populate_dse_registry(registry: &mut DseRegistry, scoring: &ScoringConsta
     registry
         .shadowfox_dses
         .push(dses::shadowfox_patrol_dse(scoring));
+    // 266 — prey Bolt. Scored via `prey_scoring::score_prey_dse_by_id`
+    // from `prey_ai`'s alert-set election; the legacy freeze-timer
+    // `Alert → Fleeing` transition stays as the no-election fallback.
+    registry.prey_dses.push(dses::prey_bolt_dse(scoring));
     registry.snake_dses.push(dses::snake_ambushing_dse(scoring));
     registry.snake_dses.push(dses::snake_foraging_dse(scoring));
     registry.snake_dses.push(dses::snake_fleeing_dse(scoring));

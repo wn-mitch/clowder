@@ -3815,7 +3815,10 @@ fn dispatch_chain_step(
                     return;
                 };
                 let prey_pos = *prey_pos;
-                let prey_is_fleeing = matches!(prey_state.ai_state, PreyAiState::Fleeing { .. });
+                let prey_is_fleeing = matches!(
+                    prey_state.ai_state,
+                    PreyAiState::Fleeing { .. } | PreyAiState::Bolting { .. }
+                );
                 let prey_awareness = prey_state.ai_state;
                 let catch_mod = prey_cfg.catch_difficulty;
                 let item_kind = prey_cfg.item_kind;
@@ -3870,9 +3873,9 @@ fn dispatch_chain_step(
                         PreyAiState::Alert { .. } => d.pounce_awareness_alert,
                         // 140 step 10 — an airborne escaping bird is at
                         // least as aware as a ground-fleeing target.
-                        PreyAiState::Fleeing { .. } | PreyAiState::BurstFlight { .. } => {
-                            d.pounce_awareness_fleeing
-                        }
+                        PreyAiState::Fleeing { .. }
+                        | PreyAiState::BurstFlight { .. }
+                        | PreyAiState::Bolting { .. } => d.pounce_awareness_fleeing,
                     };
                     let distance_mod = match dist {
                         0..=1 => d.pounce_distance_close_mod,

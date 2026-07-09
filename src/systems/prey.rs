@@ -249,19 +249,115 @@ fn find_cover_direction(
 // prey_ai system
 // ---------------------------------------------------------------------------
 
+/// 266 — everything the alert-set Bolt election needs, bundled so
+/// `prey_ai` stays under Bevy's 16-param limit (`SystemParam` structs
+/// preferred over `Option<Res<T>>` hacks per the ECS rules).
+#[derive(bevy_ecs::system::SystemParam)]
+pub struct PreyElectionParams<'w, 's> {
+    pub dse_registry: Res<'w, crate::ai::eval::DseRegistry>,
+    pub modifier_pipeline: Res<'w, crate::ai::eval::ModifierPipeline>,
+    pub affordances: Res<'w, crate::resources::ActionAffordances>,
+    pub activation: ResMut<'w, SystemActivation>,
+    /// Threat velocity for the Bolting arm's predicted-position
+    /// evasion. `Without<PreyAnimal>` keeps it provably disjoint from
+    /// the mutable prey query; Alert threats are always cats today
+    /// (`try_detect_cat` scans cats only), all of which carry
+    /// `Velocity` post-Phase-II.
+    pub threat_velocities: Query<
+        'w,
+        's,
+        &'static crate::components::physical::Velocity,
+        (Without<PreyAnimal>, Without<Dead>),
+    >,
+}
+
+/// 266 — the Bolt election for one (prey, threat) pair. Reads the
+/// mutually-perceivable chase readiness, the prey's implanted violence
+/// belief, and the escape-viability affordance; scores the registry
+/// `prey_bolt` DSE through the L2 evaluator (trace-visible,
+/// modifier-pipeline'd). Records `Feature::PreyBoltElected` and
+/// returns `true` when the score clears the election threshold — the
+/// caller applies the `Bolting` transition.
+#[allow(clippy::too_many_arguments)]
+fn try_elect_bolt(
+    prey_entity: Entity,
+    threat: Entity,
+    beliefs: &crate::components::beliefs::PredatorBeliefs,
+    pos: &Position,
+    p: &crate::resources::sim_constants::PreyConstants,
+    markers: &crate::ai::scoring::MarkerSnapshot,
+    tick: u64,
+    election: &mut PreyElectionParams,
+) -> bool {
+    let violence = beliefs
+        .models
+        .get(&threat)
+        .filter(|m| m.perceived_violence_capability.strength > 0.0)
+        .map(|m| m.perceived_violence_capability.value)
+        .unwrap_or(0.0);
+    let sf_ctx = crate::ai::prey_scoring::PreyScoringContext {
+        threat_chase_affordance: election.affordances.read(
+            threat,
+            prey_entity,
+            crate::resources::action_affordances::ActionKind::Chase,
+        ),
+        threat_violence_belief: violence,
+        bolt_affordance: election.affordances.read(
+            prey_entity,
+            threat,
+            crate::resources::action_affordances::ActionKind::Bolt,
+        ),
+        self_position: *pos,
+    };
+    let eval_inputs = crate::ai::scoring::EvalInputs {
+        cat: prey_entity,
+        position: *pos,
+        tick,
+        dse_registry: &election.dse_registry,
+        modifier_pipeline: &election.modifier_pipeline,
+        markers,
+        colony_landmarks: &Default::default(),
+        exploration_map: &Default::default(),
+        corruption_landmarks: &Default::default(),
+        focal_cat: None,
+        focal_capture: None,
+    };
+    let score = crate::ai::prey_scoring::score_prey_dse_by_id("prey_bolt", &sf_ctx, &eval_inputs);
+    if score >= p.prey_bolt_election_threshold {
+        election.activation.record(Feature::PreyBoltElected);
+        true
+    } else {
+        false
+    }
+}
+
 /// Advance the AI state machine for all living prey animals.
 ///
 /// Species-differentiated: movement speed, alertness, flee strategy (Standard,
 /// SeekCover, Teleport, Stationary), and freeze/alert durations all come from
 /// the `PreyConfig` component.
+///
+/// 266 — prey in the alert set (`Alert { threat }` or
+/// `Fleeing { from }`: a live *detected* threat, so the stealth/tremor
+/// detection model stays the honest perception gate) are additionally
+/// scored through the `prey_bolt` DSE every
+/// `PreyConstants::prey_ai_cadence_ticks` ticks. A winning election
+/// preempts the freeze-timer `Alert → Fleeing` transition — or
+/// upgrades an already-Fleeing prey — to `Bolting` (predicted-position
+/// evasion). Fleeing is in the set because short-freeze species
+/// (mouse: `freeze_ticks == 1`) spend almost their whole encounter in
+/// `Fleeing` and would otherwise never be scored. No election → the
+/// legacy state machine proceeds unchanged.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn prey_ai(
     mut query: Query<
         (
+            Entity,
             &PreyConfig,
             &mut PreyState,
             &mut Position,
             &mut crate::components::physical::DesiredVelocity,
+            &crate::components::beliefs::PredatorBeliefs,
         ),
         (With<PreyAnimal>, Without<Dead>),
     >,
@@ -288,11 +384,17 @@ pub fn prey_ai(
     time: Res<TimeState>,
     // 477 — focal-cat resolver-trace sink for cloak-mask / noise reads.
     focal_trace: crate::resources::trace_log::FocalTraceParam,
+    // 266 — alert-set Bolt election bundle.
+    mut election: PreyElectionParams,
 ) {
     let p = &constants.prey;
     let focal_sink = focal_trace.sink(time.tick);
     let grazing_max_ticks = p.grazing_max_duration.ticks(&time_scale);
-    for (config, mut state, pos, mut desired) in &mut query {
+    // 266 — one marker snapshot per system run (prey have no markers;
+    // the evaluator API requires the surface).
+    let markers = crate::ai::scoring::MarkerSnapshot::new();
+    let bolt_cadence_tick = time.tick.is_multiple_of(p.prey_ai_cadence_ticks.max(1));
+    for (prey_entity, config, mut state, pos, mut desired, beliefs) in &mut query {
         // O(1) den lookup for predation pressure → vigilance.
         let (pressure, home_den_pos) = state
             .home_den
@@ -503,7 +605,34 @@ pub fn prey_ai(
                 let still_near =
                     threat_pos.is_some_and(|tp| pos.distance_to(tp) <= config.alert_radius + 2.0);
 
-                if !still_near {
+                // 266 — Bolt election, alert-set + cadence gated.
+                // Ground-flee species only: birds keep BurstFlight and
+                // fish keep Stationary (designed escapes). A win
+                // preempts the freeze timer (bolt at the *right*
+                // moment, not at a fixed tick count).
+                let elected_bolt = bolt_cadence_tick
+                    && still_near
+                    && matches!(
+                        config.flee_strategy,
+                        FleeStrategy::Standard | FleeStrategy::SeekCover
+                    )
+                    && try_elect_bolt(
+                        prey_entity,
+                        threat,
+                        beliefs,
+                        &pos,
+                        p,
+                        &markers,
+                        time.tick,
+                        &mut election,
+                    );
+
+                if elected_bolt {
+                    state.ai_state = PreyAiState::Bolting {
+                        from: threat,
+                        ticks: 0,
+                    };
+                } else if !still_near {
                     state.ai_state = PreyAiState::Idle;
                 } else if new_ticks >= config.freeze_ticks {
                     // Compute flee direction toward home den (if any).
@@ -544,6 +673,34 @@ pub fn prey_ai(
                 if should_stop {
                     state.alertness = 0.0;
                     state.ai_state = PreyAiState::Idle;
+                    continue;
+                }
+
+                // 266 — Fleeing is in the alert set (it holds a live
+                // detected threat). On cadence ticks a fleeing
+                // ground-prey re-assesses and upgrades to Bolting
+                // (predicted-position evasion) when the election wins.
+                // Short-freeze species (mouse: freeze_ticks == 1)
+                // spend nearly the whole encounter here — without this
+                // arm they would never be scored. Bolting never
+                // downgrades back to Fleeing, so there is no ping-pong.
+                if bolt_cadence_tick
+                    && matches!(
+                        config.flee_strategy,
+                        FleeStrategy::Standard | FleeStrategy::SeekCover
+                    )
+                    && try_elect_bolt(
+                        prey_entity,
+                        from,
+                        beliefs,
+                        &pos,
+                        p,
+                        &markers,
+                        time.tick,
+                        &mut election,
+                    )
+                {
+                    state.ai_state = PreyAiState::Bolting { from, ticks };
                     continue;
                 }
 
@@ -642,6 +799,74 @@ pub fn prey_ai(
                     target.0,
                     constants.movement.bird_burst_speed,
                 ));
+            }
+
+            PreyAiState::Bolting { from, ticks } => {
+                let new_ticks = ticks + 1;
+
+                let threat_pos = cat_positions
+                    .get(from)
+                    .map(|(_, p, _, _)| p)
+                    .or_else(|_| positions.get(from))
+                    .ok();
+
+                // Same termination shape as Fleeing: duration, threat
+                // gone, or safe distance reached.
+                let should_stop = new_ticks >= config.flee_duration
+                    || threat_pos.is_none()
+                    || threat_pos
+                        .map(|tp| pos.distance_to(tp) > p.flee_stop_distance)
+                        .unwrap_or(true);
+                if should_stop {
+                    state.alertness = 0.0;
+                    state.ai_state = PreyAiState::Idle;
+                    continue;
+                }
+                let tp = threat_pos.unwrap();
+
+                // 266 — the anti-`pursue()` geometry: flee the threat's
+                // *predicted* position (pos + vel × lead), not its
+                // current tile. Against a lead-intercepting hunter the
+                // interception point is the danger; evading it swings
+                // the flee heading sideways and — through the
+                // integrator's acceleration-limited steer — produces
+                // the bolt *arc*. A stationary threat degrades to
+                // classic away-from-current flight.
+                let lead = p.prey_bolt_lead_ticks;
+                let tv = election
+                    .threat_velocities
+                    .get(from)
+                    .map(|v| v.0)
+                    .unwrap_or_default();
+                let predicted = Position::new(
+                    (tp.x() as f32 + tv.x * lead).round() as i32,
+                    (tp.y() as f32 + tv.y * lead).round() as i32,
+                );
+
+                let flee_cap =
+                    constants.movement.prey_ground_max_speed * config.flee_speed.max(1) as f32;
+                // Decision-side habitat checks stay tile-grid (the
+                // step-10 contract); SeekCover species keep their
+                // cover preference against the predicted position.
+                let aim = match config.flee_strategy {
+                    FleeStrategy::SeekCover => find_cover_direction(&pos, &predicted, &map)
+                        .map(|(dx, dy)| (pos.x() + dx, pos.y() + dy))
+                        .filter(|&(nx, ny)| can_move_to(nx, ny, config.habitat, &map))
+                        .or_else(|| flee_step_target(&pos, &predicted, config.habitat, &map)),
+                    _ => flee_step_target(&pos, &predicted, config.habitat, &map),
+                };
+                if let Some((nx, ny)) = aim {
+                    desired.0 = Some(crate::ai::steering::seek(
+                        pos.0,
+                        Position::new(nx, ny).0,
+                        flee_cap,
+                    ));
+                }
+
+                state.ai_state = PreyAiState::Bolting {
+                    from,
+                    ticks: new_ticks,
+                };
             }
         }
     }
@@ -1431,6 +1656,17 @@ mod tests {
             paused: false,
             speed: crate::resources::SimSpeed::Normal,
         });
+        // 266 — the alert-set Bolt election's PreyElectionParams
+        // resources (Res params fail validation when absent).
+        let mut registry = crate::ai::eval::DseRegistry::new();
+        crate::plugins::simulation::populate_dse_registry(
+            &mut registry,
+            &crate::resources::sim_constants::ScoringConstants::default(),
+        );
+        world.insert_resource(registry);
+        world.insert_resource(crate::ai::eval::ModifierPipeline::default());
+        world.insert_resource(crate::resources::ActionAffordances::default());
+        world.insert_resource(SystemActivation::default());
         let mut schedule = Schedule::default();
         // 140 step 10 — prey_ai writes desire; the integrator moves.
         // Chain them like the production schedule (prey_ai -> Chain 4).
@@ -1584,6 +1820,228 @@ mod tests {
                 PreyAiState::Alert { .. } | PreyAiState::Fleeing { .. }
             ),
             "rabbit near cat should enter Alert or Fleeing, got {:?}",
+            prey_state.ai_state,
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // 266 — Bolt election tests
+    // -----------------------------------------------------------------------
+
+    /// Spawn a prey of `kind` in the given ai_state, returning its Entity.
+    fn spawn_prey_in_state(
+        world: &mut World,
+        kind: PreyKind,
+        pos: Position,
+        ai_state: PreyAiState,
+    ) -> Entity {
+        let registry = world.resource::<SpeciesRegistry>();
+        let profile = registry.find(kind);
+        let config = profile.to_config();
+        let mut state = PreyState::default();
+        state.alertness = 1.0;
+        state.ai_state = ai_state;
+        let fluid = fluid_prey_components(&config);
+        world
+            .spawn((PreyAnimal, config, state, Health::default(), pos, fluid))
+            .id()
+    }
+
+    fn write_bolt_affordances(world: &mut World, threat: Entity, prey: Entity, chase: f32) {
+        use crate::resources::action_affordances::ActionKind;
+        let mut aff = world.resource_mut::<crate::resources::ActionAffordances>();
+        aff.write(threat, prey, ActionKind::Chase, chase);
+        aff.write(prey, threat, ActionKind::Bolt, 0.7);
+    }
+
+    fn bolt_elected_count(world: &World) -> u64 {
+        world
+            .resource::<SystemActivation>()
+            .counts
+            .get(&crate::resources::system_activation::Feature::PreyBoltElected)
+            .copied()
+            .unwrap_or(0)
+    }
+
+    #[test]
+    fn alert_prey_bolts_on_committed_chase() {
+        // Ticket 266 `prey_bolt_at_chase_affordance_threshold`: a
+        // rabbit (freeze_ticks=10) holding its freeze bolts the moment
+        // the threat's chase affordance reads committed — preempting
+        // the freeze timer.
+        let (mut world, mut schedule) = setup_ai();
+        let threat = world.spawn(Position::new(8, 10)).id();
+        let prey = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Rabbit,
+            Position::new(11, 10),
+            PreyAiState::Alert { threat, ticks: 0 },
+        );
+        write_bolt_affordances(&mut world, threat, prey, 0.9);
+
+        schedule.run(&mut world);
+
+        let prey_state = world
+            .query_filtered::<&PreyState, With<PreyAnimal>>()
+            .single(&world)
+            .unwrap();
+        assert!(
+            matches!(prey_state.ai_state, PreyAiState::Bolting { .. }),
+            "committed chase must elect Bolting; got {:?}",
+            prey_state.ai_state,
+        );
+        assert_eq!(bolt_elected_count(&world), 1, "the election must be named");
+    }
+
+    #[test]
+    fn alert_prey_holds_freeze_at_low_chase_affordance() {
+        // Ticket 266 `prey_no_bolt_at_low_affordance`: threat nearby
+        // but the writer's min-eligibility gate zeroed its Chase read
+        // (wounded / uncommitted). Belief + head start alone must not
+        // elect — the freeze holds.
+        let (mut world, mut schedule) = setup_ai();
+        let threat = world.spawn(Position::new(8, 10)).id();
+        let prey = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Rabbit,
+            Position::new(11, 10),
+            PreyAiState::Alert { threat, ticks: 0 },
+        );
+        // Chase affordance deliberately 0.0 (gated); escape still open.
+        write_bolt_affordances(&mut world, threat, prey, 0.0);
+
+        schedule.run(&mut world);
+
+        let prey_state = world
+            .query_filtered::<&PreyState, With<PreyAnimal>>()
+            .single(&world)
+            .unwrap();
+        assert!(
+            matches!(prey_state.ai_state, PreyAiState::Alert { .. }),
+            "uncommitted threat must not elect a bolt; got {:?}",
+            prey_state.ai_state,
+        );
+        assert_eq!(bolt_elected_count(&world), 0);
+    }
+
+    #[test]
+    fn fleeing_prey_upgrades_to_bolting() {
+        // Short-freeze species (mouse: freeze_ticks == 1) spend the
+        // encounter in Fleeing — the alert set includes it so they
+        // still get the election.
+        let (mut world, mut schedule) = setup_ai();
+        let threat = world.spawn(Position::new(8, 10)).id();
+        let prey = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Mouse,
+            Position::new(11, 10),
+            PreyAiState::Fleeing {
+                from: threat,
+                toward: None,
+                ticks: 2,
+            },
+        );
+        write_bolt_affordances(&mut world, threat, prey, 0.9);
+
+        schedule.run(&mut world);
+
+        let prey_state = world
+            .query_filtered::<&PreyState, With<PreyAnimal>>()
+            .single(&world)
+            .unwrap();
+        assert!(
+            matches!(prey_state.ai_state, PreyAiState::Bolting { .. }),
+            "fleeing mouse must upgrade to Bolting; got {:?}",
+            prey_state.ai_state,
+        );
+    }
+
+    #[test]
+    fn bird_and_fish_never_bolt() {
+        // Designed escapes stay: birds BurstFlight, fish Stationary.
+        let (mut world, mut schedule) = setup_ai();
+        let threat = world.spawn(Position::new(8, 10)).id();
+        let bird = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Bird,
+            Position::new(11, 10),
+            PreyAiState::Alert { threat, ticks: 0 },
+        );
+        write_bolt_affordances(&mut world, threat, bird, 0.9);
+        let fish = spawn_prey_in_state(
+            &mut world,
+            PreyKind::Fish,
+            Position::new(12, 10),
+            PreyAiState::Alert { threat, ticks: 0 },
+        );
+        write_bolt_affordances(&mut world, threat, fish, 0.9);
+
+        for _ in 0..5 {
+            schedule.run(&mut world);
+        }
+
+        let mut q = world.query_filtered::<&PreyState, With<PreyAnimal>>();
+        for s in q.iter(&world) {
+            assert!(
+                !matches!(s.ai_state, PreyAiState::Bolting { .. }),
+                "Teleport/Stationary species must never elect Bolt; got {:?}",
+                s.ai_state,
+            );
+        }
+        assert_eq!(bolt_elected_count(&world), 0);
+    }
+
+    #[test]
+    fn bolting_prey_evades_and_escapes() {
+        // Resolution: a Bolting prey gains distance on its threat and
+        // releases to Idle once beyond flee_stop_distance.
+        let (mut world, mut schedule) = setup_ai();
+        // Threat carries Velocity — the predicted-position read.
+        let threat = world
+            .spawn((
+                Position::new(5, 5),
+                crate::components::physical::Velocity(bevy::math::Vec2::new(0.5, 0.0)),
+            ))
+            .id();
+        let start = Position::new(7, 7);
+        spawn_prey_in_state(
+            &mut world,
+            PreyKind::Mouse,
+            start,
+            PreyAiState::Bolting {
+                from: threat,
+                ticks: 0,
+            },
+        );
+
+        for _ in 0..10 {
+            schedule.run(&mut world);
+        }
+
+        let final_pos = *world
+            .query_filtered::<&Position, With<PreyAnimal>>()
+            .single(&world)
+            .unwrap();
+        let threat_pos = Position::new(5, 5);
+        assert!(
+            final_pos.distance_to(&threat_pos) > start.distance_to(&threat_pos),
+            "bolting prey must gain distance: start {start:?}, end {final_pos:?}"
+        );
+
+        // Run past the safe distance / duration — must release to Idle.
+        for _ in 0..80 {
+            schedule.run(&mut world);
+        }
+        let prey_state = world
+            .query_filtered::<&PreyState, With<PreyAnimal>>()
+            .single(&world)
+            .unwrap();
+        assert!(
+            matches!(
+                prey_state.ai_state,
+                PreyAiState::Idle | PreyAiState::Grazing { .. }
+            ),
+            "bolt must terminate once safe; got {:?}",
             prey_state.ai_state,
         );
     }
