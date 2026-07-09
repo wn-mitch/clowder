@@ -1276,7 +1276,7 @@ pub fn predator_stalk_cats(
     mut wildlife: Query<
         (
             Entity,
-            &mut WildAnimal,
+            &WildAnimal,
             &Position,
             &mut WildlifeAiState,
             &mut Health,
@@ -1321,16 +1321,24 @@ pub fn predator_stalk_cats(
     mut witnessable_writer: MessageWriter<crate::messages::witnessable_event::WitnessableEvent>,
     // 477 — focal-cat resolver-trace sink for ambush armor reduction.
     focal_trace: crate::resources::trace_log::FocalTraceParam,
+    // 310 S5 — ward avoidance decisions read the substrate-visible
+    // coverage map (260 pattern); the `ward_positions × repel_multiplier`
+    // snapshot is retired. The pre-260 multiplier held shadow-foxes
+    // ~27 tiles off every ward — the safety blanket ticket 310 exists
+    // to replace with predator AI.
+    ward_coverage: Res<crate::resources::WardCoverageMap>,
 ) {
     let focal_sink = focal_trace.sink(time.tick);
     let c = &constants.wildlife;
-    let ward_multiplier = constants.magic.shadow_fox_ward_repel_multiplier;
+    let ward_avoid_threshold = c.shadow_fox_ward_avoid_threshold;
 
-    // Snapshot ward positions (non-inverted, alive).
-    let ward_positions: Vec<(Position, f32)> = wards
+    // Ward anchor positions — GEOMETRY ONLY (the flee-away heading
+    // needs a concrete ward to run from); every avoidance DECISION
+    // below reads `WardCoverageMap` (310 S5, 260 pattern).
+    let ward_anchor_positions: Vec<Position> = wards
         .iter()
         .filter(|(w, _)| !w.inverted && w.strength > 0.01)
-        .map(|(w, p)| (*p, w.repel_radius() * ward_multiplier))
+        .map(|(_, p)| *p)
         .collect();
 
     // Snapshot cat positions for stalking target selection.
@@ -1339,18 +1347,13 @@ pub fn predator_stalk_cats(
         .map(|(e, p, _, _, _, _, _, _)| (e, *p))
         .collect();
 
-    for (predator_entity, mut animal, wl_pos, mut ai_state, _health, mut drives, mut beliefs) in
+    for (predator_entity, animal, wl_pos, mut ai_state, _health, mut drives, mut beliefs) in
         &mut wildlife
     {
         // `&mut ShadowFoxDrives` access gates this loop to shadow
         // foxes only (regular foxes use fox_ai_decision; hawks/snakes
         // don't carry the drives substrate). Ticket 023 Phase A;
         // 310 S1 lifted the `With` filter to component access.
-
-        // Tick down ambush cooldown.
-        if animal.ambush_cooldown > 0 {
-            animal.ambush_cooldown -= 1;
-        }
 
         // 310 S3 — the kill-site consideration gates every target
         // selection in this system (selection layer, not movement
@@ -1366,14 +1369,15 @@ pub fn predator_stalk_cats(
         });
 
         // --- Ward avoidance: shadow foxes absolutely avoid wards ---
-        let in_ward = ward_positions
-            .iter()
-            .any(|(wp, radius)| (wl_pos.distance_to(wp)) <= *radius);
+        // 310 S5 — the decision reads coverage at the fox's own tile
+        // (trace-visible via the ward_coverage InfluenceMap metadata),
+        // not the multiplied-radius snapshot.
+        let in_ward = ward_coverage.get(wl_pos.x(), wl_pos.y()) >= ward_avoid_threshold;
         if in_ward {
-            // Flee away from nearest ward.
-            if let Some((ward_pos, _)) = ward_positions
+            // Flee away from nearest ward (geometry anchor).
+            if let Some(ward_pos) = ward_anchor_positions
                 .iter()
-                .min_by_key(|(wp, _)| wl_pos.tile_distance_squared(wp))
+                .min_by_key(|wp| wl_pos.tile_distance_squared(wp))
             {
                 let away_dx = (wl_pos.x() - ward_pos.x()).signum();
                 let away_dy = (wl_pos.y() - ward_pos.y()).signum();
@@ -1394,11 +1398,12 @@ pub fn predator_stalk_cats(
         // S5's ward-snapshot work if still dead.
         if let WildlifeAiState::Stalking { target_x, target_y } = *ai_state {
             {
-                // Cancel stalk if target is inside a ward's radius.
+                // Cancel stalk if the target stands in ward coverage
+                // (310 S5 — same read as the hunt-pool filter, one
+                // substrate channel for every ward decision).
                 let target_pos = Position::new(target_x, target_y);
-                let target_warded = ward_positions
-                    .iter()
-                    .any(|(wp, radius)| (target_pos.distance_to(wp)) <= *radius);
+                let target_warded =
+                    ward_coverage.get(target_pos.x(), target_pos.y()) >= ward_avoid_threshold;
                 if target_warded {
                     *ai_state = WildlifeAiState::Patrolling { dx: 1, dy: 0 };
                     activation.record(Feature::ShadowFoxAvoidedWard);
@@ -1538,8 +1543,9 @@ pub fn predator_stalk_cats(
                             }
                         }
                     }
-                    // After ambush, set the cooldown before the next stalk.
-                    animal.ambush_cooldown = c.ambush_cooldown_ticks;
+                    // 310 S5 — `ambush_cooldown` writes retired (dead
+                    // since S4 retired the roll, its only reader).
+                    // Satiation is the cadence gate.
                     // 310 S1 — the kill feeds it: satiation rises past
                     // the stalk-suppression threshold, so the next hunt
                     // waits on cadence decay, not just the cooldown.
@@ -2253,6 +2259,8 @@ mod tests {
         world.init_resource::<bevy_ecs::message::Messages<
             crate::messages::witnessable_event::WitnessableEvent,
         >>();
+        // 310 S5 — ward decisions read the coverage map.
+        world.insert_resource(crate::resources::WardCoverageMap::default());
 
         let mut schedule = Schedule::default();
         schedule.add_systems(predator_stalk_cats);
@@ -2617,11 +2625,8 @@ mod tests {
             "ambush should add the satiation gain; got {}",
             drives.satiation,
         );
-        let animal = world.get::<WildAnimal>(entity).unwrap();
-        assert!(
-            animal.ambush_cooldown > 0,
-            "ambush must still set the legacy cooldown",
-        );
+        // 310 S5 — ambush_cooldown writes retired (dead since the S4
+        // roll retirement); satiation is the cadence gate.
         assert!(
             drives.satiation
                 >= crate::resources::SimConstants::default()
