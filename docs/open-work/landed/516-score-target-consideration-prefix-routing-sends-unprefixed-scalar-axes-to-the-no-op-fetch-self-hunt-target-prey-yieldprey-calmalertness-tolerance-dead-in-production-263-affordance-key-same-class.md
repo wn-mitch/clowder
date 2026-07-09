@@ -1,7 +1,7 @@
 ---
 id: 516
 title: score_target_consideration prefix-routing sends unprefixed scalar axes to the no-op fetch_self — hunt_target prey_yield/prey_calm/alertness-tolerance dead in production; 263 affordance key same class
-status: ready
+status: done
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
@@ -10,9 +10,9 @@ parked: null
 blocked-by: []
 supersedes: []
 related-systems: []
-related-balance: []
-landed-at: null
-landed-on: null
+related-balance: [516-hunt-axis-revival.md]
+landed-at: afcc14e2
+landed-on: 2026-07-09
 ---
 
 ## Why
