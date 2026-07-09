@@ -1,7 +1,7 @@
 ---
 id: 310
 title: ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball
-status: ready
+status: done
 cluster: wildlife
 orchestration: substrate-sensitive
 initiative: [predator-prey-dynamics]
@@ -11,8 +11,8 @@ blocked-by: []
 supersedes: []
 related-systems: []
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: cf3d55ae
+landed-on: 2026-07-09
 ---
 
 ## Why
@@ -81,3 +81,4 @@ Order of work likely: (1) lift the satiation drive (smallest mechanism change, b
 - 2026-07-09: **S2 landed (den + post-ambush retreat)** — commit 571815fd; record `docs/balance/310-s2-den-retreat.md`. `ShadowFoxDen` world entity at the corruption origin (reuse radius 8 bounds accumulation), `den_position` on drives (serde-default None; S3 migrates it into `ShadowFoxBeliefs`), SingleMinded `WildlifeAiState::Retreating` entered on a landed ambush (motivation-guard held, `steering::arrive`, released at `shadow_fox_retreat_arrival_radius`). Gate `tuned-42-571815fd`: concern-band, survival/continuity PASS; mechanism exact — one ambush with paired `ShadowFoxRetreatEntered` same tick. Scenario extended to the full hunt-feed-retreat cycle and de-raced (Waiting start — the S1 pass had been trajectory-family luck; patrol drift could beat the first motivation cadence into legacy detection range). Watch-item sharpened: fulfillment −13..−16% across four consecutive families — trend-shaped, check explicitly at step 24.
 - 2026-07-09: **S3 landed (ambush memory)** — commit aa365199; record `docs/balance/310-s3-kill-site-memory.md`. `ShadowFoxBeliefs` place-memory component (den migrated from drives; last_kill_site/tick on ambush; MentalModel migration path documented in rustdoc; last_ward_encounter deferred to S5 with its reader). Kill-site consideration at ALL THREE target selections — the scenario caught that the active-stalk retarget was a third, unfiltered selection silently overriding elections (movement-layer selection, pillar violation; now filtered, empty pool holds the committed target). `ShadowFoxKillSiteAvoided` names memory-reshaped choices; `shadowfox_kill_site_avoidance` scenario hosts. Gate `tuned-42-aa365199`: concern-band, survival/continuity PASS, zero drift flags — the fulfillment −13..−16% streak breaks at four families. Interpretation call logged: per-entity memory semantics (killer avoids its own site) per the ticket's design text.
 - 2026-07-09: **S4 landed (DSE-shaped scoring + time-of-day)** — commits 2484bdb8 → 344e6d39 → 1d181030 → 246153e0 → 910a1cb7 (accepted gate `tuned-42-910a1cb7`); record `docs/balance/310-s4-dse-scoring.md`. `shadowfox_{hunt,retreat,patrol}` in DseRegistry via `shadowfox_scoring.rs`, standing as eligibility-gated candidates in the SINGLE 023 motivation softmax (pillar 4); legacy 5%/tick roll retired; 265 affordance slice absorbed with the Ambush estimator re-keyed ward-cover → tile-corruption concealment; night_scalar day-phase texture. Five-iteration gate: (1) hunt-pool ward parity (sieges +1375% — third occurrence of the carry-ALL-legacy-filters class); (2–4) the retreat oscillator (WS conjunction trap; fed foxes shuttled 184–299×/900s under every home-range shape) → retreat election closed DORMANT per close-the-clade (`shadow_fox_retreat_election_scale` 0.0; S2 event path owns retreat; den-rest arrival stays) → **ticket 518** (rest drive). Accepted posture: 13 deliberate hunts at satiation 0.54–0.70, 12 spread ambushes, retreats = event path; predation engagement ~6× the pinball era with chronic Haunting pressure (health −20.8%) — designed direction, intensity flagged as a named step-24/25 posture item.
+- 2026-07-09: **S5 landed — ticket complete** (commit cf3d55ae; record `docs/balance/310-s5-ward-snapshot-retirement.md`). The pre-260 `ward_positions × shadow_fox_ward_repel_multiplier` snapshot retired from `predator_stalk_cats`: every ward decision (in-ward flee, stalk-cancel, hunt-pool filter) now reads `WardCoverageMap` against `shadow_fox_ward_avoid_threshold`; ward entities remain geometry-only flee anchors. Dead `ambush_cooldown` writes retired (readerless since S4); `last_ward_encounter` descoped (no honest reader — 518/pack-coordination may motivate it). **The ticket's headline verification confirmed**: 11 ambushes spread at 4.9k–20.8k-tick gaps, no waves; deaths 2 ≤ 10; haunting fell to 152 and the colony reads better than the S4 artifact (fulfillment +80%, health flag gone) — the ×3 blanket had been pinning foxes into a narrow annulus at the ward line. Five stages: S1 satiation (12c5eea9…1effd660), S2 den+retreat (571815fd), S3 kill-site memory (aa365199), S4 DSE scoring (2484bdb8…910a1cb7, retreat election dormant → 518), S5 this. Rolled forward: predation posture → steps 24/25; rest drive → 518; near-zero-drive election sibling on the 023 drives → noted in S1 record.

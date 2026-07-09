@@ -15,10 +15,10 @@ _Last generated: 2026-07-09._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 118 |
+| Ready | 117 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **164** |
+| **Open total** | **163** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -43,7 +43,7 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.91_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
 - **[516](docs/open-work/tickets/516-score-target-consideration-prefix-routing-sends-unprefixed-scalar-axes-to-the-no-op-fetch-self-hunt-target-prey-yieldprey-calmalertness-tolerance-dead-in-production-263-affordance-key-same-class.md)** — score_target_consideration prefix-routing sends unprefixed scalar axes to the no-op fetch_self — hunt_target prey_yield/prey_calm/alertness-tolerance dead in production; 263 affordance key same class — _[ai-substrate] · score 0.91_
-- **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · score 0.91_
+- **[233](docs/open-work/tickets/233-subscribe-non-pickup-work-dses-hunt-forage-cook-wander-explore-to-body-state-perception.md)** — Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception — _[ai-substrate] · score 0.90_
 
 ## Epic progress (8)
 
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (118)
+## Ready by cluster (117)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -177,10 +177,9 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 - **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 
-### wildlife (7 ready, 1 blocked)
+### wildlife (6 ready, 1 blocked)
 
 - **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
-- **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
 - **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
@@ -320,13 +319,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 
-### predator-prey-dynamics (5 open, 14 landed)
+### predator-prey-dynamics (5 open, 15 landed)
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 - **[266](docs/open-work/tickets/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) — _[wildlife] · added 2026-05-10_
 - **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
-- **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
+- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
 
 ### worldgen-prehistory (5 open, 0 landed)
 
@@ -340,7 +339,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (118)
+## Ready (117)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -395,7 +394,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
-- **[310](docs/open-work/tickets/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball — _[wildlife] · added 2026-05-13_
 - **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
 - **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
@@ -508,12 +506,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 
-## Landed archive (382)
+## Landed archive (383)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-07 (17)
+### 2026-07 (18)
 
+- **[310](docs/open-work/landed/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball _(2026-07-09)_
 - **[351](docs/open-work/landed/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches _(2026-07-08)_
 - **[265](docs/open-work/landed/265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md)** — Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox) _(2026-07-08)_
 - **[264](docs/open-work/landed/264-social-dse-consumers-wire-belief-affordance-axes-socialize-groomother-mate-mentor-care-feedkitten.md)** — Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten) _(2026-07-08)_
