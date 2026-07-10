@@ -104,3 +104,4 @@ IVM. Substrate already present to build on: `CatMoved` (431 Stage A),
 - 2026-07-09: opened from `/ideate` (atlas Information-flow page). Skip-scoped
   generalization of 505; deliberately excludes incremental-maintenance and LOD to
   stay behavior-preserving. Paired with 527 as the low-risk perf track.
+- 2026-07-09: RC flamegraph evidence (logs/flamegraphs/42-1d28ff6e54af, v0.4.0 release gate): `try_detect_cat` is now the #1 sim knife — 24.7% self / 25.6% inclusive of the whole profile (was 8.0% inclusive at the 2026-06-09 table), top child `equipment_effects::equipment_modifiers_for` (the 477 per-pair cloak/noise reads). Idle/grazing prey scanning every cat every tick is precisely the at-rest-skip shape this ticket generalizes; prey detection is a strong first candidate.

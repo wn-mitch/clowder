@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-09 — "Free Range"
+
+### Added
+- **Fluid free-range movement for every creature** (epic 135 phases 3+): persistent `Velocity` + consumed `DesiredVelocity` with an acceleration-limited integrator (momentum, curved turns, no instant reversals); cost-aware string-pulled path smoothing (no more 45°-quantized staircases, and shortcuts can't cross scent/corruption the router paid to avoid); gaits (stalk 0.4× / walk / sprint 3×); `pursue()` lead interception for hunts; separation steering replacing the jitter-teleport hacks; terrain finally costs speed, not just route preference; birds fly escape bursts instead of teleporting; snakes slither continuously. Contract reference: `docs/systems/movement.md`
+- **Prey-side AI — the first prey elections in the codebase** (266): `Bolt` (individual, predicted-position evasion — the anti-`pursue()` geometry) and `ScatterGroup` (herd flush with deterministic divergent headings that break pursuit locks) scored through a light alert-set-gated dispatcher; prey never enter the cat planner. Escape cadence is instrumented (`PreyBoltStarted`/`PreyScatterStarted` events)
+- **Goal-directed shadow-fox** (310): satiation drive gating all predation entries, den + retreat, kill-site memory ("fished-out pond" avoidance named at the selection layer), hunt/retreat/patrol as registry DSEs standing in the single motivation softmax, corruption-keyed ambush affordance; the legacy 5%/tick stalk roll and the ward-repel ×3 blanket are retired — ambushes now spread across the run instead of arriving in waves
+- Wildlife + social belief/affordance wiring activated (263/264/265/314): live per-target affordance and belief axes for Socialize/Groom/Mate/Mentor/Caretake/FeedKitten and fox/hawk/snake predation + fleeing; raw-HP caretaking read retired for belief triage; wildlife carry cat-beliefs and prey carry predator-beliefs
+- C3 retirement chain completed (291/292): ColonyKnowledge promotion via mental-model quorum (carrier-count + Memory scan retired) with a citable false-belief scenario; RecentTargetFailures → ContextBeliefs predictability
+- `belief_divergence_duration_ticks` footer instrument; throughput footer + verdict drift channel + promote ratchet (498/499) enforced per-landing all release
+
+### Changed
+- **Perception metric pivoted back to world-space Euclidean** (deliberate 494 inversion): isotropic continuous movement makes Euclidean the substrate-correct metric; Chebyshev stays for tile-tactical reads (strike range, adjacency). Diagonal travel is √2 slower than the grid era — hypothesis-carried re-baseline
+- Hunt target selection is now genuinely yield/calm-aware (516): the target-DSE scalar prefix-routing defect silently zeroed `prey_yield`/`prey_calm`/`prey_alertness_tolerance`/`ally_proximity` for months; the self-fetcher channel is deleted and every scalar routes through the target-scoped fetcher, with tied-position tests that fail on dead axes
+- `MovementBudget` reduced to a speed cap (accumulator/`try_spend_step` retired)
+
+### Performance
+- `Relationships` full-map-scan audit + `modify_familiarity` knife (500), sustained-copresence re-knife, near-pair-cache death-retain (486) — Phase I banked the budget; the release exit gate measures standard-soak p90 throughput at **132 tps vs 89.8 at v0.3.0** (+47%) with the full fluid-movement + prey-AI stack aboard
+
+### Fixed
+- Fish hunting: shoreline-pounce vantage + election reachability gate (467-B) — fish success honest at ~45–60% instead of a 3%-success churn flooding every hunt metric
+- Hawk/snake GOAP smoke tests repaired (missing `ActionAffordances` in self-built test worlds)
+
+### Known issues
+- Cat hunt success sits **above** the 30–50% biology band (75.9% aggregate post-266 — competent prey made hunting *better* via herd flushing and calmer ground prey; uniform escape-knob calibration proven inert). Calibration is ticket 530 (per-species locomotion + strike-window economy), blocked on 529
+- Orphaned kittens can starve amid colony surplus if their caretaker dies (156's unresolved orphan-care corner; ticket 529)
+- `try_detect_cat` is the new #1 sim knife (25.6% inclusive at the RC flamegraph; tickets 527/528)
+- Soak-harness frame-hitch under host load can fork trajectories (517); founder cuddle-puddle dispersion persists (490/501)
+
 ## [0.3.0] - 2026-06-09
 
 ### Added

@@ -2,7 +2,7 @@
 
 # Components
 
-221 component types derived from `#[derive(Component)]`.
+222 component types derived from `#[derive(Component)]`.
 
 ## `src/components/aspiration_emission.rs`
 
@@ -1100,11 +1100,10 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### MovementBudget (struct)
 
-> Per-entity step-opportunity accumulator. Ticked by `accumulate_movement_budget`; spent by movement consumers.
+> Per-entity maximum speed in tiles/tick. Read by the integrator as the displacement clamp and by interoception as the flee top-speed.  Serde note: pre-140-step-13 saves carry an extra `accumulator` field — serde's default unknown-field tolerance drops it on load.
 
 | Field | Type |
 |-------|------|
-| `accumulator` | `f32` |
 | `per_tick` | `f32` |
 
 ## `src/components/parenting_activity.rs`
@@ -1260,7 +1259,7 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 
 ### PreyAnimal (struct)
 
-> Marker component for prey entities. Kept so existing queries using `With<PreyAnimal>` / `Without<PreyAnimal>` continue working.
+> Marker component for prey entities. Kept so existing queries using `With<PreyAnimal>` / `Without<PreyAnimal>` continue working.  314: every prey entity carries [`PredatorBeliefs`] — its mental models of the threats it has encountered (cats AND wildlife predators). Expressed as a required component so all spawn paths (den spawns, world-gen, scenario presets, tests) are covered at compile time, mirroring `WildAnimal`'s required `CatBeliefs` (265). Seeded by `belief_integrator` Pass B from the `SpeciesViolencePriors` prey-perceiver rows; read by the affordance writer's prey-perceiver `Bolt` heuristic.  [`PredatorBeliefs`]: crate::components::beliefs::PredatorBeliefs
 
 ### PreyDen (struct)
 
@@ -1282,16 +1281,6 @@ Variants: `Straight`, `Gay`, `Bisexual`, `Asexual`
 ### CatRecentCrafts (struct)
 
 > Per-cat ring buffer recording the last `RECENT_CRAFTS_CAPACITY` crafted recipes plus the tick each was made. See module docs for lifecycle and contract notes.
-
-## `src/components/recent_target_failures.rs`
-
-### RecentTargetFailures (struct)
-
-> Per-cat memory of recently-failed `(action, target)` pairs. See the module docs for placement, lifecycle, and contract notes.  `failures.get(&(action, target))` returns the **tick** at which the pair last failed. Cooldown age is `now - failed_tick`. Higher-level code never reads the raw map; the `target_recent_failure_age_normalized` sensor in `plan_substrate` is the only sanctioned read.
-
-| Field | Type |
-|-------|------|
-| `failures` | `HashMap<(GoapActionKind, Entity), u64>` |
 
 ## `src/components/recipe.rs`
 
@@ -1432,7 +1421,7 @@ Variants: `Cat`, `Wild`, `Prey`
 
 ### WildAnimal (struct)
 
-> Marks an entity as a wild animal with species-specific behavior.
+> Marks an entity as a wild animal with species-specific behavior.  265: requires [`CatBeliefs`](crate::components::beliefs::CatBeliefs) — every wildlife entity carries its own mental models of cats, the wildlife-symmetric half of the 258 belief substrate ("fox decides this cat will kill me if I don't fight" from the same substrate cats read). The required-component contract covers every spawn site (edge-spawn, world-gen, den breeding, corruption spawn) at compile time instead of per-site insertion. Integrated + decayed by `belief_integrator`'s wildlife witness pass; read (dormant) by the wildlife fleeing DSEs' `perceived_cat_threat` axes.
 
 | Field | Type |
 |-------|------|
@@ -1446,7 +1435,7 @@ Variants: `Cat`, `Wild`, `Prey`
 
 > Mutable AI state for wildlife movement decisions.
 
-Variants: `Patrolling`, `Circling`, `center_x`, `center_y`, `angle`, `Waiting`, `Fleeing`, `Stalking`, `EncirclingWard`, `ward_x`, `ward_y`, `angle`, `ticks`, `Reconstituting`, `Tending`, `ward_x`, `ward_y`, `angle`, `Haunting`, `target_x`, `target_y`, `edge_distance`, `ticks`, `Seeding`
+Variants: `Patrolling`, `Circling`, `center_x`, `center_y`, `angle`, `Waiting`, `Fleeing`, `Stalking`, `EncirclingWard`, `ward_x`, `ward_y`, `angle`, `ticks`, `Reconstituting`, `Tending`, `ward_x`, `ward_y`, `angle`, `Haunting`, `target_x`, `target_y`, `edge_distance`, `ticks`, `Seeding`, `Retreating`
 
 ### ShadowFoxDrives (struct)
 
@@ -1460,6 +1449,17 @@ Variants: `Patrolling`, `Circling`, `center_x`, `center_y`, `angle`, `Waiting`, 
 | `entropy` | `f32` |
 | `age_ticks` | `u64` |
 | `origin_corruption` | `f32` |
+| `satiation` | `f32` |
+
+### ShadowFoxBeliefs (struct)
+
+> Per-shadow-fox spatial memory: the BDI Belief slice of ticket 310. Bespoke rather than a `MentalModel` on purpose — shadow-foxes model *places* (den, fished-out hunting grounds), not other minds; the documented migration path is: if a future ticket needs shadow-foxes to model cats-as-agents (predicting patrols, fearing named defenders), these fields fold into a `MentalModel`-backed store the way `CatBeliefs`/`PredatorBeliefs` did in 258, and this component retires. Until then a table of tile coordinates is the honest size of the mind being modeled.  Readers/writers (substrate-stubs discipline — every field lands with both): `den_position` — written at spawn, read by the post-ambush retreat; `last_kill_site`/`last_kill_tick` — written on a landed ambush, read by the kill-site avoidance filter on both stalk-entry target selections (legacy roll + hunger election; `Feature::ShadowFoxKillSiteAvoided` fires when the filter changes the choice). The ticket's `last_ward_encounter` field ships with S5 (its reader — ward-avoidance geometry) rather than as a dead field here.
+
+| Field | Type |
+|-------|------|
+| `den_position` | `Option<(i32, i32)>` |
+| `last_kill_site` | `Option<(i32, i32)>` |
+| `last_kill_tick` | `u64` |
 
 ### Carcass (struct)
 
@@ -1508,6 +1508,15 @@ Variants: `PatrolTerritory`, `HuntingPrey`, `Returning`, `Resting`, `Dispersing`
 | `scent_strength` | `f32` |
 | `established_tick` | `u64` |
 | `last_fed_tick` | `u64` |
+
+### ShadowFoxDen (struct)
+
+> A shadow-fox den: the corruption-saturated tile a shadow-fox manifested from, persisted as a real world entity (items-are-real — a spatial anchor, not an abstract home flag). Distinguished from [`FoxDen`]: no cubs, no scent economy, no territory radius — its meaning is mythic (the wound in the ground the fox crawled out of) and mechanical (the post-ambush retreat target, S2; rest/recovery anchor, S4). `spawn_shadow_fox_from_corruption` reuses a den within `shadow_fox_den_reuse_radius` of a new manifestation instead of stacking duplicates — the corruption remembers its doors.
+
+| Field | Type |
+|-------|------|
+| `origin_corruption` | `f32` |
+| `established_tick` | `u64` |
 
 ### HawkAiPhase (enum)
 

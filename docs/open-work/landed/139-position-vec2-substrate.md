@@ -2,7 +2,7 @@
 id: 139
 title: Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration)
 epic: true
-status: ready
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
@@ -12,8 +12,8 @@ blocked-by: [135]
 supersedes: []
 related-systems: [project-vision.md, ai-substrate-refactor.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 7ba5a40d
+landed-on: 2026-07-09
 ---
 
 ## Why
@@ -120,3 +120,4 @@ This phase is the substrate change that unblocks Phase 3 (#140) steering / smoot
   492 (Euclidean perception) + 493 (pathfinding cleanup). 139 is now
   the parent tracking ticket for that trio; `epic: true` keeps it out
   of `just next` recommendations.
+- 2026-07-09: landed at the 0.4.0 release ceremony (plan step 28) as the tracking parent of the 491/492/493 slices — all three landed (491 substrate switch 7ba5a40d, 492 metric split, 493 pathfinding cleanup at plan step 4). The 494 Chebyshev perception decision was deliberately inverted at plan step 8 (world-space Euclidean; Chebyshev demoted to tile-tactical reads) — see docs/systems/movement.md.

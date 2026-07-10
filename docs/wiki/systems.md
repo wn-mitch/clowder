@@ -39,6 +39,7 @@ Status of each design document cross-referenced against `SimulationPlugin::build
 | Log Analytics Dashboard | *[Aspirational]* | — | [doc](../systems/log-analytics-dashboard.md) |
 | Mental Breaks | *[Aspirational]* | — | [doc](../systems/mental-breaks.md) |
 | Monuments — Civic & Memorial Structures | *[Aspirational]* | — | [doc](../systems/monuments.md) |
+| Movement — fluid free-range locomotion (0.4.0, epic 135 / plan Phase II) | *[Aspirational]* | — | [doc](../systems/movement.md) |
 | NamedLandmark Substrate — Event-Anchored Naming | *[Aspirational]* | — | [doc](../systems/naming.md) |
 | Happy Paths (Usage-worn Trails) | *[Aspirational]* | — | [doc](../systems/paths.md) |
 | Phase 6a §7 commitment gate — attempt status | *[Aspirational]* | — | [doc](../systems/phase-6a-commitment-gate-attempt.md) |
@@ -83,20 +84,21 @@ System modules with registered functions but no design doc:
 - **injury_cache**: cache_last_body_part_injury
 - **interoception**: author_self_markers
 - **movement**: apply_separation, integrate_velocities
-- **movement_budget**: on_wild_animal_added, accumulate_movement_budget
+- **movement_budget**: on_wild_animal_added, on_prey_animal_added, insert_missing_movement_components
 - **parenting_activity**: ParentingScalars, update_parenting_activity_biological, tick_parental_engagement, populate_parenting_scalars
-- **plan_substrate**: expire_reservations, sensors, update_prev_safety_deficit
+- **plan_substrate**: expire_reservations, update_prev_safety_deficit
 - **playbow_emitter**: emit_play_bows, emit_reciprocal_advances
 - **pregnancy**: tick_pregnancy
 - **preservation**: advance_preservation_drying
 - **prey**: prey_population, prey_hunger, prey_ai, prey_scent_tick, prey_den_lifecycle, update_den_pressure, apply_den_raids, orphan_prey_adopt_or_found
 - **sensing**: tremor_tick, update_terrain_markers, update_target_existence_markers, update_hide_eligible_markers
+- **shadow_fox_ai**: shadowfox_coherence_tick, shadowfox_motivation_tick, shadowfox_haunting_drain, wildlife_ai, predator_stalk_cats
 - **shelter_beliefs**: claim_home_dens, update_shelter_continuity, emit_den_condition_events, detect_den_sieges
 - **snake_goap**: snake_needs_tick, sync_snake_needs, snake_evaluate_and_plan, snake_resolve_goap_plans, snake_lifecycle_tick
 - **snapshot**: emit_cat_snapshots, emit_position_traces, emit_spatial_snapshots
 - **sustained_copresence**: SustainedCoPresenceTracker, track_sustained_copresence
 - **task_chains**: resolve_task_chains
 - **trace_emit**: emit_focal_trace
-- **wildlife**: shadowfox_coherence_tick, shadowfox_motivation_tick, shadowfox_haunting_drain, spawn_wildlife, wildlife_ai, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, predator_stalk_cats, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
+- **wildlife**: spawn_wildlife, fox_needs_tick, fox_ai_decision, fox_scent_tick, update_fox_approach_corridor_map, predator_hunt_prey, carcass_decay, carcass_scent_tick, detect_threats, fox_lifecycle_tick, fox_confrontation_tick, fox_store_raid_tick, cleanup_wildlife
 - **world_snapshots**: populate_world_snapshots
 

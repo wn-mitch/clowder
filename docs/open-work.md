@@ -17,8 +17,8 @@ _Last generated: 2026-07-09._
 | In progress | 5 |
 | Ready | 127 |
 | Parked | 12 |
-| Blocked | 29 |
-| **Open total** | **173** |
+| Blocked | 28 |
+| **Open total** | **172** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -40,10 +40,10 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 ### Next-recommended (from `just next`)
 
 - **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · score 0.94_
+- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.92_
 - **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.92_
 - **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.91_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
-- **[233](docs/open-work/tickets/233-subscribe-non-pickup-work-dses-hunt-forage-cook-wander-explore-to-body-state-perception.md)** — Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception — _[ai-substrate] · score 0.90_
+- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · score 0.91_
 
 ## Epic progress (8)
 
@@ -57,7 +57,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 | **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 27 | 21 | 6 (0 / 3 / 1 / 2) | `▰▰▰▰▰▰▰▰▱▱` 78% |
 | **[135](docs/open-work/tickets/135-continuous-position-migration.md)** Continuous-position migration | ready | 0 | — | — | _no roster_ |
-| **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** Phase 2 | ready | 0 | — | — | _no roster_ |
+| **[139](docs/open-work/landed/139-position-vec2-substrate.md)** Phase 2 | done | 0 | — | — | _no roster_ |
 | **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** Sim per-tick throughput | in-progress | 0 | — | — | _no roster_ |
 
 ## In progress (5)
@@ -72,13 +72,12 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (32 ready, 4 blocked)
+### ai-substrate (32 ready, 3 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · added 2026-05-02_
-- **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[ai-substrate] · blocked-by 135 · added 2026-05-02_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
 - **[233](docs/open-work/tickets/233-subscribe-non-pickup-work-dses-hunt-forage-cook-wander-explore-to-body-state-perception.md)** — Subscribe non-pickup work DSEs (Hunt Forage Cook Wander Explore) to body-state perception — _[ai-substrate] · added 2026-05-08_
 - **[241](docs/open-work/tickets/241-burial-canary-structurally-hard-to-fire-post-230-death-rate-audit-canary-policy.md)** — Burial canary structurally hard to fire post-230 — death-rate audit + canary policy — _[ai-substrate] · added 2026-05-08_
@@ -106,6 +105,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[509](docs/open-work/tickets/509-mating-conversion-margin-haseligiblemate-flickers-with-htn-abandon-maslow-pregate-zeroes-eligible-windows-courtship-stage-advance-falloff-9130-to-12-and-the-section-7-commitment-layer-reads-00-all-run.md)** — Mating conversion margin: HasEligibleMate flickers with HTN Abandon, Maslow pregate zeroes eligible windows, courtship stage-advance falloff 9130-to-12, and the section-7 commitment layer reads 0.0 all run — _[ai-substrate] · added 2026-07-05_
 - **[510](docs/open-work/tickets/510-trash-vs-drop-disposal-margin-is-a-1e-4-coin-flip-with-a-midden-present-midden-discipline-exists-only-as-an-rng-draw.md)** — Trash vs Drop disposal margin is a 1e-4 coin flip with a Midden present — midden discipline exists only as an RNG draw — _[ai-substrate] · added 2026-07-05_
 - **[528](docs/open-work/tickets/528-entropy-proportional-compute-one-state-delta-skip-gate-all-hot-per-tick-passes-consult-generalizing-505-at-rest-skip-480-child.md)** — Entropy-proportional compute — one state-delta skip-gate all hot per-tick passes consult, generalizing 505 at-rest skip (480 child) — _[ai-substrate] · added 2026-07-09_
+- **[531](docs/open-work/tickets/531-flow-field-pursuit-per-target-field-for-multi-entity-convergence-140-4-spin-off-deferred-from-040.md)** — Flow-field pursuit — per-target field for multi-entity convergence (140 §4 spin-off, deferred from 0.4.0) — _[ai-substrate] · added 2026-07-09_
 
 ### social-coordination (20 ready, 4 blocked)
 
@@ -230,7 +230,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 ### balance (2 ready)
 
 - **[512](docs/open-work/tickets/512-remote-starvation-eats-spatial-discount-floor-loses-every-softmax-to-resting-under-critical-hunger-no-desperation-lever-lifts-the-distance-discount-as-hunger-goes-critical.md)** — remote starvation: Eat's spatial discount floor loses every softmax to Resting under critical hunger — no desperation lever lifts the distance discount as hunger goes critical — _[balance] · added 2026-07-06_
-- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · added 2026-07-09_
+- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · blocked-by 529 · added 2026-07-09_
 
 ### rendering (2 ready, 1 blocked)
 
@@ -241,7 +241,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 - **[514](docs/open-work/tickets/514-mentor-churn-mentor-target-elects-incapacitated-mentees-the-step-entry-alive-gate-then-rejects-1111-mentorcat-plan-failures-per-soak-on-incapacitation-heavy-trajectories.md)** — mentor churn: mentor_target elects Incapacitated mentees the step-entry alive-gate then rejects — 1111 MentorCat plan failures per soak on incapacitation-heavy trajectories — _[planning-substrate] · added 2026-07-07_
 
-## Ready by initiative (90 tag-memberships across 9 initiatives)
+## Ready by initiative (91 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -343,6 +343,14 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · added 2026-05-26_
 
+### predator-prey-dynamics (5 open, 16 landed)
+
+- **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
+- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
+- **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
+- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
+- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · blocked-by 529 · added 2026-07-09_
+
 ### worldgen-prehistory (5 open, 0 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -350,13 +358,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[387](docs/open-work/tickets/387-multi-generation-lineage-substrate-kin-tracking-depth-3.md)** — Multi-generation lineage substrate (kin-tracking depth >=3) — _[life-cycle] · added 2026-05-16_
 - **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
-
-### predator-prey-dynamics (4 open, 16 landed)
-
-- **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
-- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
-- **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
-- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
 
 ### environmental-simulation (1 open, 3 landed)
 
@@ -375,7 +376,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
 - **[135](docs/open-work/tickets/135-continuous-position-migration.md)** — Continuous-position migration — epic (Vec2<f32> substrate, smooth motion, species speed) — _[ai-substrate] · added 2026-05-02_
 - **[136](docs/open-work/tickets/136-wounded-ally-and-positional-dependents.md)** — WoundedAlly marker + positional dependent-proximity for escape_viability — _[combat-threat] · added 2026-05-02_
-- **[139](docs/open-work/tickets/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) — _[ai-substrate] · blocked-by 135 · added 2026-05-02_
 - **[143](docs/open-work/tickets/143-intraspecies-conflict-fight.md)** — IntraspeciesConflictResponseFight — territorial combat valence (same-species) — _[combat-threat] · added 2026-05-02_
 - **[145](docs/open-work/tickets/145-submit-gesture-dse.md)** — Submit gesture DSE — appeasement infrastructure for IntraspeciesConflict.Fawn — _[combat-threat] · added 2026-05-02_
 - **[147](docs/open-work/tickets/147-per-axis-distress-modifier-tuning.md)** — Per-axis distress-modifier value tuning (multi-seed hypothesize) — _[ai-substrate] · added 2026-05-02_
@@ -490,7 +490,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[527](docs/open-work/tickets/527-perf-regression-land-time-fence-per-system-self-percent-budget-gate-so-per-tick-cost-cannot-creep-invisibly-480-meta-child.md)** — Perf-regression land-time fence — per-system self-percent budget gate so per-tick cost cannot creep invisibly (480 meta-child) — _[tooling-diagnostics-ui] · added 2026-07-09_
 - **[528](docs/open-work/tickets/528-entropy-proportional-compute-one-state-delta-skip-gate-all-hot-per-tick-passes-consult-generalizing-505-at-rest-skip-480-child.md)** — Entropy-proportional compute — one state-delta skip-gate all hot per-tick passes consult, generalizing 505 at-rest skip (480 child) — _[ai-substrate] · added 2026-07-09_
 - **[529](docs/open-work/tickets/529-orphan-kitten-provisioning-gap-kitten-starves-amid-colony-surplus-after-its-caretaker-dies-156s-unresolved-orphan-care-corner.md)** — Orphan-kitten provisioning gap — kitten starves amid colony surplus after its caretaker dies (156's unresolved orphan-care corner) — _[social-coordination] · added 2026-07-09_
-- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · added 2026-07-09_
+- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · blocked-by 529 · added 2026-07-09_
+- **[531](docs/open-work/tickets/531-flow-field-pursuit-per-target-field-for-multi-entity-convergence-140-4-spin-off-deferred-from-040.md)** — Flow-field pursuit — per-target field for multi-entity convergence (140 §4 spin-off, deferred from 0.4.0) — _[ai-substrate] · added 2026-07-09_
 
 ## Parked (12)
 
@@ -507,7 +508,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · parked 2026-05-25 · added 2026-05-18_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · parked 2026-05-20 · added 2026-05-20_
 
-## Blocked (29)
+## Blocked (28)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[018](docs/open-work/tickets/018-ruin-clearings.md)** — Ruin clearings (corruption nodes, PMD-flavored) — _[magic-mythic] · blocked-by 016 · added 2026-04-22_
@@ -517,7 +518,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[057](docs/open-work/tickets/057-coordinator-directive-intention-strategy-row.md)** — §7.3 coordinator-directive Intention strategy row — `SingleMinded` with override — _[social-coordination] · blocked-by 128 · added 2026-04-27_
 - **[129](docs/open-work/tickets/129-care-dses-perceivable-intentions.md)** — Care DSEs over perceivable intentions — _[social-coordination] · blocked-by 242, 243 · added 2026-05-02_
 - **[130](docs/open-work/tickets/130-trust-weighted-coordinator-momentum.md)** — Trust-weighted coordinator directive momentum — _[social-coordination] · blocked-by 057 · added 2026-05-02_
-- **[140](docs/open-work/tickets/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish — _[ai-substrate] · blocked-by 139 · added 2026-05-02_
 - **[144](docs/open-work/tickets/144-intraspecies-conflict-fawn.md)** — IntraspeciesConflictResponseFawn — appeasement valence (belly-up, slow blink) — _[combat-threat] · blocked-by 145 · added 2026-05-02_
 - **[243](docs/open-work/tickets/243-behavior-observation-l1-channel-target-side-body-cue-physical-marker-reads.md)** — Behavior-observation L1 channel (target-side body-cue + physical marker reads) — _[belief-perception] · blocked-by 242 · added 2026-05-08_
 - **[245](docs/open-work/tickets/245-ambient-predatorprey-behavior-observation-enrichment.md)** — Ambient predator/prey behavior-observation enrichment — _[wildlife] · blocked-by 243 · added 2026-05-08_
@@ -539,15 +539,17 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 - **[524](docs/open-work/tickets/524-colony-naming-rite-collective-ceremony-that-confers-a-name-on-a-kitten-place-or-event-colony-driven-mythic-texture-generator.md)** — Colony naming rite — collective ceremony that confers a name on a kitten, place, or event (colony-driven mythic-texture generator) — _[magic-mythic] · blocked-by 020 · added 2026-07-09_
 
-## Landed archive (385)
+## Landed archive (387)
 
 Full history: [`docs/open-work/landed/`](docs/open-work/landed/).
 
-### 2026-07 (20)
+### 2026-07 (22)
 
 - **[516](docs/open-work/landed/516-score-target-consideration-prefix-routing-sends-unprefixed-scalar-axes-to-the-no-op-fetch-self-hunt-target-prey-yieldprey-calmalertness-tolerance-dead-in-production-263-affordance-key-same-class.md)** — score_target_consideration prefix-routing sends unprefixed scalar axes to the no-op fetch_self — hunt_target prey_yield/prey_calm/alertness-tolerance dead in production; 263 affordance key same class _(2026-07-09)_
 - **[310](docs/open-work/landed/310-shadowfox-goal-directed-behavior-den-satiation-drive-ambush-memory-replace-random-walk-pinball.md)** — ShadowFox goal-directed behavior — den + satiation drive + ambush memory replace random-walk pinball _(2026-07-09)_
 - **[266](docs/open-work/landed/266-prey-side-ai-bolt-and-scattergroup-dses-first-prey-ai-in-the-codebase.md)** — Prey-side AI — Bolt and ScatterGroup DSEs (first prey AI in the codebase) _(2026-07-09)_
+- **[140](docs/open-work/landed/140-steering-and-pursuit-polish.md)** — Phase 3 — Steering, smooth pursuit / flee, pathfinder polish _(2026-07-09)_
+- **[139](docs/open-work/landed/139-position-vec2-substrate.md)** — Phase 2 — Position becomes Vec2<f32> (continuous-position substrate migration) _(2026-07-09)_
 - **[351](docs/open-work/landed/351-extract-shadow-fox-ai-system-from-legacy-wildlife-ai-branches.md)** — Extract shadow_fox_ai system from legacy wildlife_ai branches _(2026-07-08)_
 - **[265](docs/open-work/landed/265-wildlife-symmetric-dse-consumers-wire-belief-affordance-fox-hawk-snake-shadowfox.md)** — Wildlife symmetric DSE consumers wire belief + affordance (fox, hawk, snake, shadowfox) _(2026-07-08)_
 - **[264](docs/open-work/landed/264-social-dse-consumers-wire-belief-affordance-axes-socialize-groomother-mate-mentor-care-feedkitten.md)** — Social DSE consumers wire belief + affordance axes (Socialize, GroomOther, Mate, Mentor, Care, FeedKitten) _(2026-07-08)_

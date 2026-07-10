@@ -1,18 +1,18 @@
 ---
 id: 140
 title: Phase 3 — Steering, smooth pursuit / flee, pathfinder polish
-status: blocked
+status: done
 cluster: ai-substrate
 initiative: []
 orchestration: substrate-sensitive
 added: 2026-05-02
 parked: null
-blocked-by: [139]
+blocked-by: []
 supersedes: []
 related-systems: [project-vision.md]
 related-balance: []
-landed-at: null
-landed-on: null
+landed-at: 7c6a368a
+landed-on: 2026-07-09
 ---
 
 ## Why
@@ -83,3 +83,4 @@ Phase 3 of the continuous-position migration (epic ticket 135). With Phase 2 (#1
 
 - 2026-05-02: Opened as Phase 3 of the 135 continuous-position-migration epic. Blocked-by 131 (Phase 2 substrate); independent of Phase 0 (#137) and Phase 1 (#138).
 - 2026-05-19: accuracy audit pass — blocked status correct; blocked-by [139] correct (Phase 2, not 131 typo, since 139 is Phase 2); steering primitives (seek/arrive/flee/wander) well-scoped; movement integrator and flow-field optimization documented.
+- 2026-07-09: landed at the 0.4.0 release ceremony (plan step 28). Scope absorbed by the Phase II redesign (plan steps 5–13, final commit 7c6a368a): steering primitives shipped beyond this sketch (seek/arrive/flee/wander + pursue/separation + cost-aware smooth_path), integrator at Chain-4 head with Euclidean clamp + wall-slide + terrain speed, gaits + lead-interception pursuit. §4 flow-field pursuit is the one unabsorbed item — spun off to ticket 531 per plan step 13.

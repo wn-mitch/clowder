@@ -125,9 +125,13 @@ Each numbered item is a separately-committed, separately-soaked landing (jj, sol
 ### Phase VI — Release ceremony
 
 26. **Perf release gate** — flamegraph + perf soak at RC: p90 ticks/sec > the v0.3.0 tag's p90 (`just logdb-chart soak-throughput-over-time` is the authoritative trend instrument; the verdict `throughput_drift` channel and promote ratchet enforce per-landing, but the release gate is the cross-run p90). HEAD is already ahead of the tag (459 landed post-tag) — the gate verifies Phases II–V didn't spend more than Phase I banked.
+    - **PASSED 2026-07-09**: like-for-like 900s seed-42 soaks — v0.3.0-era (05-25..06-10, n=40) p50 68.2 / p90 89.8 tps vs v0.4.0-RC (07-05+, n=63) p50 116.5 / **p90 132.0 tps (+47%)**. Chart regenerated (`logs/charts/soak-throughput-over-time-20260710T004745Z.html`); no runs exist at the tag commit itself, so the era family is the comparison population (it already includes some post-tag Phase-I gains — a stricter bar; still +47%). RC flamegraph `logs/flamegraphs/42-1d28ff6e54af`: `try_detect_cat` is the new #1 knife (24.7% self / 25.6% inclusive, was 8.0% at the 06-09 table; per-pair 477 equipment reads are the top child) — evidence logged on ticket 528; not a release blocker at +47% headroom.
 27. ⚑ **`just baseline-dataset v0.4.0`** + promote.
+    - Dataset kicked off at the release commit (post-bump) — multi-hour background orchestrator; promote + tag follow its REPORT.
 28. **Land all tickets** — `just land` each (clears blocked-by on dependents + regen index); `just similar-build` once at end; `just wiki` (SimulationPlugin changed).
+    - **DONE 2026-07-09**: release-scope audit — 500/486/484/493/466/467/264/265/314/291/292/351/310/266/516 all landed as-they-went; **139 + 140 landed at the ceremony** (139 = tracking parent of the landed 491/492/493 trio; 140 = scope absorbed by plan steps 5–13, §4 flow-field spun off to **ticket 531**). 304/315/060 stay open by design (post-release scope). `just wiki` regenerated; `just similar-build` run.
 29. **CHANGELOG.md** 0.4.0 entry; `Cargo.toml` 0.3.0 → 0.4.0; commit; annotated tag `v0.4.0`, `jj git push` + push tag. New `docs/systems/movement.md` documenting Velocity/DesiredVelocity, smoothing, gait, arrival, and metric conventions.
+    - **Docs + bump DONE 2026-07-09**: CHANGELOG 0.4.0 "Free Range" entry; Cargo.toml → 0.4.0; `docs/systems/movement.md` written (contract reference: components, integrator, steering, gaits, arrival + metric conventions). Tag + push AFTER the step-27 dataset validates.
 
 ---
 

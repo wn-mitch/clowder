@@ -122,6 +122,7 @@
 |-------|------|
 | `entries` | `Vec<KnowledgeEntry>` |
 | `recently_forgotten` | `HashMap<String, u64>` |
+| `divergence_duration_ticks` | `u64` |
 
 ## `src/resources/colony_landmarks.rs`
 

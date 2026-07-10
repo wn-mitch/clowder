@@ -82,10 +82,8 @@ graph TD
         social_befriend_wildlife --> needs_decay_grooming
         plan_substrate_expire_reservations["plan_substrate::expire_reservations"]
         needs_decay_grooming --> plan_substrate_expire_reservations
-        plan_substrate_sensors["plan_substrate::sensors"]
-        plan_substrate_expire_reservations --> plan_substrate_sensors
         needs_eat_from_inventory["needs::eat_from_inventory"]
-        plan_substrate_sensors --> needs_eat_from_inventory
+        plan_substrate_expire_reservations --> needs_eat_from_inventory
         needs_decay_exploration["needs::decay_exploration"]
         needs_eat_from_inventory --> needs_decay_exploration
         needs_stamp_passive_exploration["needs::stamp_passive_exploration"]
@@ -243,6 +241,7 @@ graph TD
     end
     subgraph standalone["Standalone Systems"]
         movement_budget_on_wild_animal_added["movement_budget::on_wild_animal_added"]
+        movement_budget_on_prey_animal_added["movement_budget::on_prey_animal_added"]
         magic_CorruptionPushback["magic::CorruptionPushback"]
         sustained_copresence_SustainedCoPresenceTracker["sustained_copresence::SustainedCoPresenceTracker"]
         parenting_activity_ParentingScalars["parenting_activity::ParentingScalars"]
@@ -264,12 +263,12 @@ graph TD
         magic_apply_corruption_pushback["magic::apply_corruption_pushback"]
         magic_update_corruption_landmarks["magic::update_corruption_landmarks"]
         magic_spawn_shadow_fox_from_corruption["magic::spawn_shadow_fox_from_corruption"]
-        movement_budget_accumulate_movement_budget["movement_budget::accumulate_movement_budget"]
-        wildlife_shadowfox_coherence_tick["wildlife::shadowfox_coherence_tick"]
-        wildlife_shadowfox_motivation_tick["wildlife::shadowfox_motivation_tick"]
-        wildlife_shadowfox_haunting_drain["wildlife::shadowfox_haunting_drain"]
+        movement_budget_insert_missing_movement_components["movement_budget::insert_missing_movement_components"]
+        shadow_fox_ai_shadowfox_coherence_tick["shadow_fox_ai::shadowfox_coherence_tick"]
+        shadow_fox_ai_shadowfox_motivation_tick["shadow_fox_ai::shadowfox_motivation_tick"]
+        shadow_fox_ai_shadowfox_haunting_drain["shadow_fox_ai::shadowfox_haunting_drain"]
         wildlife_spawn_wildlife["wildlife::spawn_wildlife"]
-        wildlife_wildlife_ai["wildlife::wildlife_ai"]
+        shadow_fox_ai_wildlife_ai["shadow_fox_ai::wildlife_ai"]
         wildlife_fox_needs_tick["wildlife::fox_needs_tick"]
         fox_goap_sync_fox_needs["fox_goap::sync_fox_needs"]
         fox_goap_fox_evaluate_and_plan["fox_goap::fox_evaluate_and_plan"]
@@ -290,7 +289,7 @@ graph TD
         wildlife_predator_hunt_prey["wildlife::predator_hunt_prey"]
         wildlife_carcass_decay["wildlife::carcass_decay"]
         wildlife_carcass_scent_tick["wildlife::carcass_scent_tick"]
-        wildlife_predator_stalk_cats["wildlife::predator_stalk_cats"]
+        shadow_fox_ai_predator_stalk_cats["shadow_fox_ai::predator_stalk_cats"]
         hawk_goap_hawk_lifecycle_tick["hawk_goap::hawk_lifecycle_tick"]
         snake_goap_snake_lifecycle_tick["snake_goap::snake_lifecycle_tick"]
         prey_prey_population["prey::prey_population"]
