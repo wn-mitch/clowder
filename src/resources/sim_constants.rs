@@ -1633,6 +1633,18 @@ impl Default for FounderAgeConstants {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PreyConstants {
+    /// Per-tick base probability that a prey animal notices a cat
+    /// inside its sensory envelope (`try_detect_cat`'s Bernoulli gate;
+    /// scaled by proximity, alertness, vigilance, and the cat's
+    /// action-modulated tremor signature).
+    ///
+    /// Band-calibration iteration 1 (plan step 25): 0.10 → 0.14.
+    /// Post-266 hunt success sat at 75.9% aggregate against the
+    /// 30–50% biology band; most kills land before the prey ever
+    /// reacts. Sharper vigilance moves failure into the honest
+    /// channels (detected → bolt/scatter → lost during approach),
+    /// preserving the ticket-100 stalk-tremor contrast (a patient
+    /// stalk still suppresses the tremor input this chance multiplies).
     pub detection_base_chance: f32,
     pub alertness_base: f32,
     pub alertness_range: f32,
@@ -1760,6 +1772,14 @@ pub struct PreyConstants {
     /// saturation point's realistic range so an uncommitted predator
     /// never triggers a bolt (the `prey_no_bolt_at_low_affordance`
     /// contract).
+    ///
+    /// Band-calibration iteration 1 (plan step 25): 0.45 → 0.38. First
+    /// light measured 432 bolts/900s with ground-prey hunt success at
+    /// 70–84% — well above the 30–50% biology band. Lowering the
+    /// election bar makes prey bolt on less-committed chases (earlier,
+    /// more often), the pillar-2-preferred lever over cat-side nerfs.
+    /// 0.38 keeps the belief+head-start ceiling (≈ 0.55 of weight ×
+    /// realistic inputs ≈ 0.30) safely below the bar.
     #[serde(default = "default_prey_bolt_election_threshold")]
     pub prey_bolt_election_threshold: f32,
     /// Ticks of threat-velocity lead when a Bolting prey picks its
@@ -1790,7 +1810,7 @@ fn default_prey_ai_cadence_ticks() -> u64 {
 }
 
 fn default_prey_bolt_election_threshold() -> f32 {
-    0.45
+    0.38
 }
 
 fn default_prey_bolt_lead_ticks() -> f32 {
@@ -1798,7 +1818,7 @@ fn default_prey_bolt_lead_ticks() -> f32 {
 }
 
 fn default_prey_scatter_election_threshold() -> f32 {
-    0.45
+    0.38
 }
 
 fn default_prey_scatter_divergence_radians() -> f32 {
@@ -1820,7 +1840,7 @@ fn default_prey_scent_deposit_normalizer() -> f32 {
 impl Default for PreyConstants {
     fn default() -> Self {
         Self {
-            detection_base_chance: 0.10,
+            detection_base_chance: 0.14,
             alertness_base: 0.5,
             alertness_range: 0.5,
             alertness_recovery: 0.005,

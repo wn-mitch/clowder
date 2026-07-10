@@ -15,10 +15,10 @@ _Last generated: 2026-07-09._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 121 |
+| Ready | 123 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **167** |
+| **Open total** | **169** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,7 +68,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (121)
+## Ready by cluster (123)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
@@ -128,7 +128,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
 - **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
 
-### life-cycle (12 ready, 1 blocked)
+### life-cycle (14 ready, 1 blocked)
 
 - **[053](docs/open-work/tickets/053-death-event-grief-emission.md)** — §7.7.b death-event grief emission — relationship-classified survivors payload — _[life-cycle] · added 2026-04-27_
 - **[115](docs/open-work/tickets/115-bond-weighted-social-recovery.md)** — Bond-weighted social recovery — fondness scales Needs.social inflow — _[life-cycle] · added 2026-05-01_
@@ -142,6 +142,8 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[407](docs/open-work/tickets/407-77b-grief-cascade-proper-builds-on-400-lifelong-parentingactivity-persistence.md)** — §7.7.b grief cascade proper (builds on 400 lifelong-ParentingActivity persistence) — _[life-cycle] · added 2026-05-17_
 - **[416](docs/open-work/tickets/416-starvation-rebalance-promote-graded-cliff-body-condition-defaults-to-ship-behavior.md)** — Starvation rebalance — promote graded-cliff + body-condition defaults to ship behavior — _[life-cycle] · added 2026-05-18_
 - **[521](docs/open-work/tickets/521-practice-play-solo-kitten-skill-rehearsal-motor-pattern-play-with-no-partner-builds-hunting-skill.md)** — Practice-play — solo kitten skill rehearsal (motor-pattern play with no partner, builds hunting skill) — _[life-cycle] · added 2026-07-09_
+- **[525](docs/open-work/tickets/525-lost-lore-a-skill-dies-with-its-last-untaught-holder-colony-loses-a-craft-when-the-only-knower-dies-with-no-apprentice.md)** — Lost lore — a skill dies with its last untaught holder (colony loses a craft when the only knower dies with no apprentice) — _[life-cycle] · added 2026-07-09_
+- **[526](docs/open-work/tickets/526-kitten-emulation-payoff-a-kitten-co-present-with-an-adult-performing-a-skill-gains-a-learning-boost-bounded-observational-learning-no-culture-drift-layer.md)** — Kitten emulation payoff — a kitten co-present with an adult performing a skill gains a learning boost (bounded observational learning, no culture-drift layer) — _[life-cycle] · added 2026-07-09_
 
 ### items-crafting (10 ready, 4 blocked)
 
@@ -235,11 +237,11 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 - **[514](docs/open-work/tickets/514-mentor-churn-mentor-target-elects-incapacitated-mentees-the-step-entry-alive-gate-then-rejects-1111-mentorcat-plan-failures-per-soak-on-incapacitation-heavy-trajectories.md)** — mentor churn: mentor_target elects Incapacitated mentees the step-entry alive-gate then rejects — 1111 MentorCat plan failures per soak on incapacitation-heavy trajectories — _[planning-substrate] · added 2026-07-07_
 
-## Ready by initiative (86 tag-memberships across 9 initiatives)
+## Ready by initiative (90 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
-### smarter-cats (15 open, 36 landed)
+### smarter-cats (16 open, 36 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[134](docs/open-work/tickets/134-phobia-modifier-family.md)** — Phobia modifier family — Crusader-Kings-style trait modifiers on urge response — _[ai-substrate] · added 2026-05-02_
@@ -256,8 +258,9 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[405](docs/open-work/tickets/405-family-ritual-substrate-ritualkind-ritualwitness-bond-multiplier-transmission-399-cluster.md)** — Family ritual substrate (RitualKind + RitualWitness + bond-multiplier transmission; 399-cluster) — _[social-coordination] · added 2026-05-17_
 - **[406](docs/open-work/tickets/406-mastery-substrate-per-cat-skill-levels-399-follow-on-enables-teach-skill-bias.md)** — Mastery substrate (per-cat skill levels; 399 follow-on enables teach_skill_bias) — _[ai-substrate] · added 2026-05-17_
 - **[483](docs/open-work/tickets/483-goap-side-eatfromowninventory-plan-step-lift-the-autonomic-eat-from-pocket-reflex-into-l2l3-election.md)** — GOAP-side EatFromOwnInventory plan step — lift the autonomic eat-from-pocket reflex into L2/L3 election — _[ai-substrate] · added 2026-05-27_
+- **[526](docs/open-work/tickets/526-kitten-emulation-payoff-a-kitten-co-present-with-an-adult-performing-a-skill-gains-a-learning-boost-bounded-observational-learning-no-culture-drift-layer.md)** — Kitten emulation payoff — a kitten co-present with an adult performing a skill gains a learning boost (bounded observational learning, no culture-drift layer) — _[life-cycle] · added 2026-07-09_
 
-### world-richness (15 open, 15 landed)
+### world-richness (16 open, 15 landed)
 
 - **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · added 2026-05-16_
 - **[376](docs/open-work/tickets/376-terrain-keyed-harvestables-reedflintclayochrecharcoalshell-as-discrete-harvestable-entities.md)** — terrain-keyed harvestables: reed/flint/clay/ochre/charcoal/shell as discrete harvestable entities — _[items-crafting] · added 2026-05-16_
@@ -274,6 +277,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[521](docs/open-work/tickets/521-practice-play-solo-kitten-skill-rehearsal-motor-pattern-play-with-no-partner-builds-hunting-skill.md)** — Practice-play — solo kitten skill rehearsal (motor-pattern play with no partner, builds hunting skill) — _[life-cycle] · added 2026-07-09_
 - **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
 - **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
+- **[525](docs/open-work/tickets/525-lost-lore-a-skill-dies-with-its-last-untaught-holder-colony-loses-a-craft-when-the-only-knower-dies-with-no-apprentice.md)** — Lost lore — a skill dies with its last untaught holder (colony loses a craft when the only knower dies with no apprentice) — _[life-cycle] · added 2026-07-09_
 
 ### mythic-texture (14 open, 5 landed)
 
@@ -308,7 +312,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
 - **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
 
-### generational-continuity (10 open, 6 landed)
+### generational-continuity (12 open, 6 landed)
 
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
 - **[221](docs/open-work/tickets/221-caretake-gates-on-ambush-recency-at-kitten-tile.md)** — caretake gates on ambush-recency at kitten tile — _[life-cycle] · added 2026-05-07_
@@ -320,6 +324,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[392](docs/open-work/tickets/392-c2-versu-social-practices-courtship-mentoring-as-multi-stage-practices.md)** — C2 Versu social practices (courtship + mentoring as multi-stage practices) — _[social-coordination] · added 2026-05-16_
 - **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
 - **[521](docs/open-work/tickets/521-practice-play-solo-kitten-skill-rehearsal-motor-pattern-play-with-no-partner-builds-hunting-skill.md)** — Practice-play — solo kitten skill rehearsal (motor-pattern play with no partner, builds hunting skill) — _[life-cycle] · added 2026-07-09_
+- **[525](docs/open-work/tickets/525-lost-lore-a-skill-dies-with-its-last-untaught-holder-colony-loses-a-craft-when-the-only-knower-dies-with-no-apprentice.md)** — Lost lore — a skill dies with its last untaught holder (colony loses a craft when the only knower dies with no apprentice) — _[life-cycle] · added 2026-07-09_
+- **[526](docs/open-work/tickets/526-kitten-emulation-payoff-a-kitten-co-present-with-an-adult-performing-a-skill-gains-a-learning-boost-bounded-observational-learning-no-culture-drift-layer.md)** — Kitten emulation payoff — a kitten co-present with an adult performing a skill gains a learning boost (bounded observational learning, no culture-drift layer) — _[life-cycle] · added 2026-07-09_
 
 ### full-sensory-perception (9 open, 9 landed)
 
@@ -352,7 +358,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (121)
+## Ready (123)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -475,6 +481,8 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[521](docs/open-work/tickets/521-practice-play-solo-kitten-skill-rehearsal-motor-pattern-play-with-no-partner-builds-hunting-skill.md)** — Practice-play — solo kitten skill rehearsal (motor-pattern play with no partner, builds hunting skill) — _[life-cycle] · added 2026-07-09_
 - **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
 - **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
+- **[525](docs/open-work/tickets/525-lost-lore-a-skill-dies-with-its-last-untaught-holder-colony-loses-a-craft-when-the-only-knower-dies-with-no-apprentice.md)** — Lost lore — a skill dies with its last untaught holder (colony loses a craft when the only knower dies with no apprentice) — _[life-cycle] · added 2026-07-09_
+- **[526](docs/open-work/tickets/526-kitten-emulation-payoff-a-kitten-co-present-with-an-adult-performing-a-skill-gains-a-learning-boost-bounded-observational-learning-no-culture-drift-layer.md)** — Kitten emulation payoff — a kitten co-present with an adult performing a skill gains a learning boost (bounded observational learning, no culture-drift layer) — _[life-cycle] · added 2026-07-09_
 
 ## Parked (12)
 

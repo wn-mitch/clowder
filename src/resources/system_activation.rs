@@ -1403,16 +1403,16 @@ impl Feature {
             // 310 S3 — needs a fresh kill + a re-hunt near the same
             // ground within the memory window; scenario hosts it.
             Feature::ShadowFoxKillSiteAvoided => false,
-            // 266 — new-Feature default (lift to true only after a
-            // seed-42 soak observes ≥1 firing): needs a cat committed
-            // enough to a chase that the min-eligibility-gated Chase
-            // affordance clears the election threshold during the
-            // prey's Alert window. The prey_bolt_chase scenario hosts
-            // the deterministic assertion.
+            // 266 — observed abundantly at first light (432 elections
+            // per 900s on seed-42, counted via PreyBoltStarted events).
+            // Stays `false` regardless: the never-fired canary sweeps
+            // Positive features only, so this flag is gate-inert for
+            // Neutrals (the 310 S4 shadowfox precedent). The
+            // prey_bolt_chase scenario is the mechanism gate.
             Feature::PreyBoltElected => false,
-            // 266 — sibling default: needs a committed chase AND a
-            // same-kind herd in range; the prey_scatter_flush scenario
-            // hosts the deterministic assertion.
+            // 266 — observed 475 per 900s at first light (via
+            // PreyScatterStarted events); same gate-inert rationale.
+            // The prey_scatter_flush scenario is the mechanism gate.
             Feature::PreyScatterElected => false,
             Feature::FateAwakened => false,
             Feature::SpiritCommunion => false,
