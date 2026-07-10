@@ -1638,13 +1638,12 @@ pub struct PreyConstants {
     /// scaled by proximity, alertness, vigilance, and the cat's
     /// action-modulated tremor signature).
     ///
-    /// Band-calibration iteration 1 (plan step 25): 0.10 → 0.14.
-    /// Post-266 hunt success sat at 75.9% aggregate against the
-    /// 30–50% biology band; most kills land before the prey ever
-    /// reacts. Sharper vigilance moves failure into the honest
-    /// channels (detected → bolt/scatter → lost during approach),
-    /// preserving the ticket-100 stalk-tremor contrast (a patient
-    /// stalk still suppresses the tremor input this chance multiplies).
+    /// Band-calibration iteration 1 (plan step 25, 2026-07-09) tried
+    /// 0.10 → 0.14 and measured it INERT on both escape cadence and
+    /// hunt success (detection was not the binding constraint — prey
+    /// already detect approaching hunters during the approach window;
+    /// the kills land through chase kinematics and the pounce strike
+    /// window). Reverted; see the band-calibration ticket.
     pub detection_base_chance: f32,
     pub alertness_base: f32,
     pub alertness_range: f32,
@@ -1773,13 +1772,14 @@ pub struct PreyConstants {
     /// never triggers a bolt (the `prey_no_bolt_at_low_affordance`
     /// contract).
     ///
-    /// Band-calibration iteration 1 (plan step 25): 0.45 → 0.38. First
-    /// light measured 432 bolts/900s with ground-prey hunt success at
-    /// 70–84% — well above the 30–50% biology band. Lowering the
-    /// election bar makes prey bolt on less-committed chases (earlier,
-    /// more often), the pillar-2-preferred lever over cat-side nerfs.
-    /// 0.38 keeps the belief+head-start ceiling (≈ 0.55 of weight ×
-    /// realistic inputs ≈ 0.30) safely below the bar.
+    /// Band-calibration iteration 1 (plan step 25, 2026-07-09) tried
+    /// 0.45 → 0.38 and measured it INERT: escape cadence unchanged
+    /// (917 vs 907 elections/900s) — the election score distribution
+    /// is bimodal (committed chases score ≈ 0.65+, uncommitted ≈ 0.25)
+    /// so almost nothing lives between the two thresholds. Reverted.
+    /// Hunt success is decided downstream of the election, in the
+    /// chase kinematics (sprint 3.0 vs ground-prey flee cap 1.0) and
+    /// the pounce strike window — see the band-calibration ticket.
     #[serde(default = "default_prey_bolt_election_threshold")]
     pub prey_bolt_election_threshold: f32,
     /// Ticks of threat-velocity lead when a Bolting prey picks its
@@ -1810,7 +1810,7 @@ fn default_prey_ai_cadence_ticks() -> u64 {
 }
 
 fn default_prey_bolt_election_threshold() -> f32 {
-    0.38
+    0.45
 }
 
 fn default_prey_bolt_lead_ticks() -> f32 {
@@ -1818,7 +1818,7 @@ fn default_prey_bolt_lead_ticks() -> f32 {
 }
 
 fn default_prey_scatter_election_threshold() -> f32 {
-    0.38
+    0.45
 }
 
 fn default_prey_scatter_divergence_radians() -> f32 {
@@ -1840,7 +1840,7 @@ fn default_prey_scent_deposit_normalizer() -> f32 {
 impl Default for PreyConstants {
     fn default() -> Self {
         Self {
-            detection_base_chance: 0.14,
+            detection_base_chance: 0.10,
             alertness_base: 0.5,
             alertness_range: 0.5,
             alertness_recovery: 0.005,

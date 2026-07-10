@@ -15,10 +15,10 @@ _Last generated: 2026-07-09._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 123 |
+| Ready | 127 |
 | Parked | 12 |
 | Blocked | 29 |
-| **Open total** | **169** |
+| **Open total** | **173** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,11 +68,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (123)
+## Ready by cluster (127)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (31 ready, 4 blocked)
+### ai-substrate (32 ready, 4 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -105,8 +105,9 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[507](docs/open-work/tickets/507-recalibrate-social-perception-and-welfare-constants-against-undiluted-post-506-inputs-fulfillment-38pct-happiness-13pct-social-status-distress-live-for-the-first-time.md)** — Recalibrate social-perception and welfare constants against undiluted post-506 inputs (fulfillment -38pct, happiness -13pct, social_status_distress live for the first time) — _[ai-substrate] · added 2026-07-05_
 - **[509](docs/open-work/tickets/509-mating-conversion-margin-haseligiblemate-flickers-with-htn-abandon-maslow-pregate-zeroes-eligible-windows-courtship-stage-advance-falloff-9130-to-12-and-the-section-7-commitment-layer-reads-00-all-run.md)** — Mating conversion margin: HasEligibleMate flickers with HTN Abandon, Maslow pregate zeroes eligible windows, courtship stage-advance falloff 9130-to-12, and the section-7 commitment layer reads 0.0 all run — _[ai-substrate] · added 2026-07-05_
 - **[510](docs/open-work/tickets/510-trash-vs-drop-disposal-margin-is-a-1e-4-coin-flip-with-a-midden-present-midden-discipline-exists-only-as-an-rng-draw.md)** — Trash vs Drop disposal margin is a 1e-4 coin flip with a Midden present — midden discipline exists only as an RNG draw — _[ai-substrate] · added 2026-07-05_
+- **[528](docs/open-work/tickets/528-entropy-proportional-compute-one-state-delta-skip-gate-all-hot-per-tick-passes-consult-generalizing-505-at-rest-skip-480-child.md)** — Entropy-proportional compute — one state-delta skip-gate all hot per-tick passes consult, generalizing 505 at-rest skip (480 child) — _[ai-substrate] · added 2026-07-09_
 
-### social-coordination (19 ready, 4 blocked)
+### social-coordination (20 ready, 4 blocked)
 
 - **[192](docs/open-work/tickets/192-handing-target-picker-l2.md)** — handing_target_dse — L2 multi-axis recipient picker (188 follow-on) — _[social-coordination] · added 2026-05-06_
 - **[213](docs/open-work/tickets/213-tune-groom-food-security-weight.md)** — tune groom_food_security_weight — _[social-coordination] · added 2026-05-07_
@@ -127,6 +128,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[475](docs/open-work/tickets/475-current-role-query-helper-derive-active-role-from-existing-capability-markers-recent-action-history.md)** — Current-role query helper (derive active role from existing capability markers + recent action history) — _[social-coordination] · added 2026-05-26_
 - **[522](docs/open-work/tickets/522-ectoparasite-load-grooming-as-a-real-health-economy-slow-parasite-axis-allogrooming-reduces-neglect-accumulates-to-illness.md)** — Ectoparasite load — grooming as a real health economy (slow parasite axis allogrooming reduces, neglect accumulates to illness) — _[social-coordination] · added 2026-07-09_
 - **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
+- **[529](docs/open-work/tickets/529-orphan-kitten-provisioning-gap-kitten-starves-amid-colony-surplus-after-its-caretaker-dies-156s-unresolved-orphan-care-corner.md)** — Orphan-kitten provisioning gap — kitten starves amid colony surplus after its caretaker dies (156's unresolved orphan-care corner) — _[social-coordination] · added 2026-07-09_
 
 ### life-cycle (14 ready, 1 blocked)
 
@@ -192,6 +194,15 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
 - **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
 
+### tooling-diagnostics-ui (6 ready)
+
+- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
+- **[456](docs/open-work/tickets/456-goap-plan-construction-integration-test-for-commitment-strategy-goal-priority.md)** — GOAP plan-construction integration test for commitment-strategy goal priority — _[tooling-diagnostics-ui] · added 2026-05-23_
+- **[517](docs/open-work/tickets/517-soak-harness-frame-hitch-per-tick-systems-re-run-on-unadvanced-tick-double-applying-state-and-duplicating-emissions.md)** — Soak harness frame-hitch: per-tick systems re-run on unadvanced tick, double-applying state and duplicating emissions — _[tooling-diagnostics-ui] · added 2026-07-09_
+- **[527](docs/open-work/tickets/527-perf-regression-land-time-fence-per-system-self-percent-budget-gate-so-per-tick-cost-cannot-creep-invisibly-480-meta-child.md)** — Perf-regression land-time fence — per-system self-percent budget gate so per-tick cost cannot creep invisibly (480 meta-child) — _[tooling-diagnostics-ui] · added 2026-07-09_
+
 ### buildings-zones (5 ready, 2 blocked)
 
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _[buildings-zones] · added 2026-04-27_
@@ -216,22 +227,15 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
 - **[455](docs/open-work/tickets/455-prune-landed-ticket-entries-from-substrate-stubsallowlist-and-add-ci-guard.md)** — Prune landed-ticket entries from substrate_stubs.allowlist and add CI guard — _[process-discipline] · added 2026-05-23_
 
-### tooling-diagnostics-ui (5 ready)
+### balance (2 ready)
 
-- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
-- **[456](docs/open-work/tickets/456-goap-plan-construction-integration-test-for-commitment-strategy-goal-priority.md)** — GOAP plan-construction integration test for commitment-strategy goal priority — _[tooling-diagnostics-ui] · added 2026-05-23_
-- **[517](docs/open-work/tickets/517-soak-harness-frame-hitch-per-tick-systems-re-run-on-unadvanced-tick-double-applying-state-and-duplicating-emissions.md)** — Soak harness frame-hitch: per-tick systems re-run on unadvanced tick, double-applying state and duplicating emissions — _[tooling-diagnostics-ui] · added 2026-07-09_
+- **[512](docs/open-work/tickets/512-remote-starvation-eats-spatial-discount-floor-loses-every-softmax-to-resting-under-critical-hunger-no-desperation-lever-lifts-the-distance-discount-as-hunger-goes-critical.md)** — remote starvation: Eat's spatial discount floor loses every softmax to Resting under critical hunger — no desperation lever lifts the distance discount as hunger goes critical — _[balance] · added 2026-07-06_
+- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · added 2026-07-09_
 
 ### rendering (2 ready, 1 blocked)
 
 - **[434](docs/open-work/tickets/434-terrain-visual-polish-for-preservation-stations-dryingrack-smokingrack-sprite-variants.md)** — Terrain visual polish for preservation stations (DryingRack + SmokingRack sprite variants) — _[rendering] · added 2026-05-21_
 - **[448](docs/open-work/tickets/448-data-driven-sprite-bindings-hot-reload.md)** — Data-driven sprite bindings + hot reload — _[rendering] · added 2026-05-22_
-
-### balance (1 ready)
-
-- **[512](docs/open-work/tickets/512-remote-starvation-eats-spatial-discount-floor-loses-every-softmax-to-resting-under-critical-hunger-no-desperation-lever-lifts-the-distance-discount-as-hunger-goes-critical.md)** — remote starvation: Eat's spatial discount floor loses every softmax to Resting under critical hunger — no desperation lever lifts the distance discount as hunger goes critical — _[balance] · added 2026-07-06_
 
 ### planning-substrate (1 ready)
 
@@ -358,7 +362,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (123)
+## Ready (127)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -483,6 +487,10 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[523](docs/open-work/tickets/523-the-heap-communal-huddle-for-collective-warmth-multi-cat-pile-scoring-on-the-warmth-need-social-side-effect.md)** — The Heap — communal huddle for collective warmth (multi-cat pile scoring on the warmth need, social side-effect) — _[social-coordination] · added 2026-07-09_
 - **[525](docs/open-work/tickets/525-lost-lore-a-skill-dies-with-its-last-untaught-holder-colony-loses-a-craft-when-the-only-knower-dies-with-no-apprentice.md)** — Lost lore — a skill dies with its last untaught holder (colony loses a craft when the only knower dies with no apprentice) — _[life-cycle] · added 2026-07-09_
 - **[526](docs/open-work/tickets/526-kitten-emulation-payoff-a-kitten-co-present-with-an-adult-performing-a-skill-gains-a-learning-boost-bounded-observational-learning-no-culture-drift-layer.md)** — Kitten emulation payoff — a kitten co-present with an adult performing a skill gains a learning boost (bounded observational learning, no culture-drift layer) — _[life-cycle] · added 2026-07-09_
+- **[527](docs/open-work/tickets/527-perf-regression-land-time-fence-per-system-self-percent-budget-gate-so-per-tick-cost-cannot-creep-invisibly-480-meta-child.md)** — Perf-regression land-time fence — per-system self-percent budget gate so per-tick cost cannot creep invisibly (480 meta-child) — _[tooling-diagnostics-ui] · added 2026-07-09_
+- **[528](docs/open-work/tickets/528-entropy-proportional-compute-one-state-delta-skip-gate-all-hot-per-tick-passes-consult-generalizing-505-at-rest-skip-480-child.md)** — Entropy-proportional compute — one state-delta skip-gate all hot per-tick passes consult, generalizing 505 at-rest skip (480 child) — _[ai-substrate] · added 2026-07-09_
+- **[529](docs/open-work/tickets/529-orphan-kitten-provisioning-gap-kitten-starves-amid-colony-surplus-after-its-caretaker-dies-156s-unresolved-orphan-care-corner.md)** — Orphan-kitten provisioning gap — kitten starves amid colony surplus after its caretaker dies (156's unresolved orphan-care corner) — _[social-coordination] · added 2026-07-09_
+- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · added 2026-07-09_
 
 ## Parked (12)
 

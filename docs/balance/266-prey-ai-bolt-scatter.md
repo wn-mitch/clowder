@@ -122,3 +122,44 @@ success via `just q hunt-success`) and honest substrate on both sides.
 Escape-side knobs (`prey_bolt_election_threshold`,
 `prey_scatter_election_threshold`, `detection_base_chance`) are the
 pillar-2-preferred levers before any cat-side nerf.
+
+## Band-calibration iteration 1 (`9306c110`) — FAIL, REVERTED, PARKED
+
+**Knobs:** bolt/scatter thresholds 0.45 → 0.38, `detection_base_chance`
+0.10 → 0.14 (uniform escape-side family). **Run:**
+`logs/tuned-42-9306c110` vs the accepted Scatter stream. **Verdict:
+FAIL** — `Starvation == 0` hard gate (1 starvation death).
+
+### Both prediction families refuted
+
+- **The knobs are inert.** Escape cadence 917 vs 907 elections/900s
+  (predicted 1,300–2,300); hunt success 77.5% vs 75.9% (predicted a
+  10–25-pt drop); kills 735 vs 714. The election score distribution is
+  bimodal — committed chases score ≈ 0.65+, uncommitted ≈ 0.25 — so
+  nothing lives between 0.38 and 0.45; and detection is not the binding
+  constraint on escape volume. Success is decided DOWNSTREAM of the
+  elections: chase kinematics (`sprint_speed_mult` 3.0 vs ground-prey
+  flee cap 1.0 — chases are geometrically certain; mouse hit 94.4% this
+  run with six chase timeouts total) and the pounce strike window
+  (`pounce_awareness_idle` 0.95). Knob values reverted; the refutation
+  is recorded on the constants' doc-comments.
+- **The starvation is NOT a food undershoot.** Kill volume was the
+  highest of the four step-25 streams; nourishment 0.692. Finchkit-18
+  (a kitten) starved ~43k ticks after its likely caretaker Calcifer
+  died of injury, churning 1,993 plans / 1,714 failures (1,629
+  `SelfGroom: starvation_override`) while the colony ate. This is
+  ticket 156's explicitly-unresolved "orphan-care path" corner (its
+  named follow-on, 158, was repurposed for GroomedOther) → **ticket 529
+  opened** with the layer-walk plan.
+
+### Disposition
+
+The calibration is **parked behind 529** (`ticket 530`, blocked-by):
+the orphan pathology fails the hard gate on trajectories independent of
+the knobs, making every calibration soak a gate lottery — the
+park-behind-the-blocker rule. The remaining honest levers are
+design-shaped and per-species (rabbit locomotion, strike-window
+reaction, fish wariness — full analysis in 530), which is the plan's
+own "per-PreyKind only if uniform fails" fallback. 0.4.0 ships at the
+honest above-band 75.9%; step 25 closes on the accepted Scatter stream
+(`7aad3c49`).
