@@ -2,19 +2,62 @@ set positional-arguments := true
 
 # Run the simulation
 run *ARGS:
-    cargo run -- {{ARGS}}
+    just _run-gui {{ARGS}}
 
 # Run with a specific seed
 seed SEED:
-    cargo run -- --seed {{SEED}}
+    just _run-gui --seed {{SEED}}
 
 # Load from autosave
 load:
-    cargo run -- --load saves/autosave.json
+    just _run-gui --load saves/autosave.json
 
 # Run headless simulation (default 60s)
 headless *ARGS:
     cargo run -- --headless {{ARGS}}
+
+# Assemble an ephemeral Clowder.app around the fresh debug binary and launch it
+# via `open` so macOS treats it as a regular foreground app (Dock icon, Cmd-Tab,
+# click-to-focus). A bare `cargo run` binary is a faceless process that modern
+# macOS (26+) refuses to grant focus/activation rights — see macos/Info.plist.
+# On non-macOS this is a plain `cargo run`.
+_run-gui *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "$(uname)" != "Darwin" ]; then
+      exec cargo run -- "$@"
+    fi
+    cargo build
+    APP="target/debug/Clowder.app"
+    mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+    cp macos/Info.plist "$APP/Contents/Info.plist"
+    # Hardlink (not symlink) the fresh binary so current_exe() reports the
+    # in-bundle path Contents/MacOS/clowder; a symlink resolves back to
+    # target/debug/clowder, and restore_bundle_workdir (src/main.rs) keys off
+    # the ".app/Contents/MacOS/" path to decide whether to chdir. cargo replaces
+    # the binary by rename on rebuild, so re-link every launch. Fall back to cp
+    # if hardlink fails (e.g. target/ on a different filesystem).
+    ln -f target/debug/clowder "$APP/Contents/MacOS/clowder" \
+      || cp -f target/debug/clowder "$APP/Contents/MacOS/clowder"
+    # `open` starts the app with cwd `/` and no CARGO_MANIFEST_DIR, which breaks
+    # Clowder's cwd-relative reads (assets/, saves/, logs/) and Bevy's asset root.
+    # Record the repo root so the binary chdirs back at startup (see
+    # restore_bundle_workdir in src/main.rs) — a bundled launch then behaves
+    # filesystem-identically to `cargo run`.
+    printf '%s' "$PWD" > "$APP/Contents/Resources/clowder-workdir"
+    # `open` detaches the app under launchd, so trap Ctrl-C to kill it too.
+    trap 'pkill -x clowder 2>/dev/null || true' INT TERM
+    # Stream the app's stdout/stderr back to this terminal (cargo-run feel).
+    # NOT `/dev/stdout` — that's a per-process fd symlink launchd can't resolve
+    # (LaunchServices error -10810). The controlling tty is a real device node
+    # any process can open. No tty (piped/non-interactive) → launch without
+    # redirection so `open` still succeeds.
+    TTY="$(tty 2>/dev/null || true)"
+    if [ -c "$TTY" ]; then
+      open "$APP" --wait-apps --stdout "$TTY" --stderr "$TTY" --args "$@"
+    else
+      open "$APP" --wait-apps --args "$@"
+    fi
 
 # Stage H gate (ticket 431) — refuses if target/release/clowder's baked
 # commit ≠ HEAD. build.rs already reruns on .git/HEAD changes, but a

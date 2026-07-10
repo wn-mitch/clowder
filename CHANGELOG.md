@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Game window not taking focus on macOS: `just run` / `just seed` / `just load` now launch inside a generated `Clowder.app` bundle via `open`, so LaunchServices grants the window Dock/Cmd-Tab/activation rights. Bare `cargo run` binaries are faceless processes that macOS 26+ refuses to bring to the foreground.
+
 ## [0.4.0] - 2026-07-09 — "Free Range"
 
 ### Added

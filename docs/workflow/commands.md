@@ -4,6 +4,7 @@ Cheat sheet for the `just`-recipes most worth knowing about. Categorized by inte
 
 ## Daily
 
+- `just run` / `just seed <n>` / `just load` — launch the interactive sim. On macOS these assemble an ephemeral `Clowder.app` around the fresh debug binary and launch via `open`, so the window takes focus (Dock icon + Cmd-Tab). Quit with Ctrl-C, Esc, or Cmd-Q. (`just headless` is unaffected — no window.)
 - `just check` / `just test` / `just ci` — `check` includes step-resolver and time-unit linters.
 - `just open-work` / `just open-work-ready` / `just open-work-wip` — ticket queues.
 - `just land <id>` / `just open-ticket "<title>"` — **the only sanctioned way to land or open a ticket.** See [`ticket-lifecycle.md`](ticket-lifecycle.md).

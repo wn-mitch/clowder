@@ -49,6 +49,45 @@ struct CliArgs {
     game_day_seconds: f32,
 }
 
+/// Restore the repo-root working directory when launched from a generated
+/// `Clowder.app` bundle via `open` (see the `just run` recipe).
+///
+/// `open` starts the process with cwd `/` and no `CARGO_MANIFEST_DIR`, which
+/// breaks Clowder's many cwd-relative filesystem reads (`assets/narrative`,
+/// `assets/data/zodiac.ron`, `assets/sprites/bindings.toml`, `saves/`, `logs/`)
+/// and Bevy's `AssetServer` root. The recipe records the repo root in
+/// `Contents/Resources/clowder-workdir`; restoring it here (plus pointing
+/// `BEVY_ASSET_ROOT` at it, since the `AssetServer` resolves via env/exe rather
+/// than cwd) makes a bundled launch filesystem-identical to `cargo run`.
+///
+/// No-op unless the executable lives inside a `.app` bundle, so `cargo run`,
+/// headless runs, and non-macOS builds are untouched.
+#[cfg(target_os = "macos")]
+fn restore_bundle_workdir() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    if !exe.to_string_lossy().contains(".app/Contents/MacOS/") {
+        return;
+    }
+    let Some(macos_dir) = exe.parent() else {
+        return;
+    };
+    let marker = macos_dir.join("../Resources/clowder-workdir");
+    let Ok(contents) = std::fs::read_to_string(&marker) else {
+        return;
+    };
+    let dir = contents.trim();
+    if dir.is_empty() {
+        return;
+    }
+    if std::env::set_current_dir(dir).is_ok() {
+        // BEVY_ASSET_ROOT takes precedence over CARGO_MANIFEST_DIR / current_exe
+        // in Bevy's asset base-path resolution.
+        std::env::set_var("BEVY_ASSET_ROOT", dir);
+    }
+}
+
 fn main() {
     // Stage H gate (ticket 431) — early-exit print of the binary's baked
     // GIT_HASH / dirty flag, used by `just _check-binary-fresh` to refuse
@@ -63,6 +102,12 @@ fn main() {
         );
         return;
     }
+
+    // Restore the repo-root cwd + asset root when launched from a Clowder.app
+    // bundle (see restore_bundle_workdir doc + the `just run` recipe). No-op for
+    // `cargo run` / headless / non-macOS.
+    #[cfg(target_os = "macos")]
+    restore_bundle_workdir();
 
     let args = parse_args();
 

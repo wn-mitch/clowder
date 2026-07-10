@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Minimal bundle manifest for `just run` on macOS. `just` assembles an
+  ephemeral target/debug/Clowder.app around the freshly-built binary and
+  launches it via `open`, so LaunchServices treats Clowder as a regular
+  foreground app (Dock icon, Cmd-Tab, click-to-focus, activation). A bare
+  `cargo run` binary is a faceless process that modern macOS (26+) refuses to
+  grant those rights. Keep this file free of machine-specific paths.
+-->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Clowder</string>
+    <key>CFBundleDisplayName</key>
+    <string>Clowder</string>
+    <key>CFBundleExecutable</key>
+    <string>clowder</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.clowder.clowder</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>LSEnvironment</key>
+    <dict>
+        <key>RUST_BACKTRACE</key>
+        <string>1</string>
+    </dict>
+</dict>
+</plist>
