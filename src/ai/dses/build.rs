@@ -32,6 +32,7 @@ pub const DILIGENCE_INPUT: &str = "diligence";
 pub const SITE_PRESENCE_INPUT: &str = "has_construction_site";
 pub const REPAIR_PRESENCE_INPUT: &str = "has_damaged_building";
 pub const CHRONIC_FULL_INPUT: &str = "colony_stores_chronically_full";
+pub const SURPLUS_FOOD_INPUT: &str = "surplus_food_perceptible";
 
 /// §L2.10.7 Build range — Manhattan tiles for the
 /// nearest-construction-site anchor. 25 ≈ a long colony walk;
@@ -61,6 +62,13 @@ impl BuildDse {
             }),
             post: PostOp::Invert,
         };
+        // Ethological colony-start: surplus-food demand axis. Nested via a
+        // `(1 - w)` remainder so the RtEO sum stays 1.0 at any weight; ships
+        // dormant at `build_surplus_food_weight = 0.0` → the four canonical
+        // axes keep their full weights and this axis contributes nothing
+        // (byte-identical to the pre-feature composition).
+        let surplus_weight = scoring.build_surplus_food_weight.clamp(0.0, 1.0);
+        let remainder = 1.0 - surplus_weight;
         Self {
             id: DseId("build"),
             considerations: vec![
@@ -105,13 +113,31 @@ impl BuildDse {
                     markers::ColonyStoresChronicallyFull::KEY,
                     scoring.build_chronic_full_weight,
                 )),
+                // Ethological colony-start: "there is ungathered food nearby
+                // — build a larder to hold it." High belief → high score, no
+                // invert (unlike Forage's saturation axis, this is a demand
+                // signal, not a satiation one). Dormant at land.
+                Consideration::Scalar(ScalarConsideration::new(
+                    SURPLUS_FOOD_INPUT,
+                    Curve::Logistic {
+                        steepness: 8.0,
+                        midpoint: 0.5,
+                    },
+                )),
             ],
             // RtEO sum = 1.0. Diligence is primary; spatial axis pulls
             // toward the site; repair-presence and chronic-full demand
             // are auxiliary pull signals (each smaller than spatial so
             // diligence + site dominate when no repair / chronic demand
-            // exists).
-            composition: Composition::weighted_sum(vec![0.4, 0.25, 0.20, 0.15]),
+            // exists). The surplus-food axis is nested via `(1 - surplus_weight)`
+            // on the four canonical weights so the sum stays 1.0; dormant at 0.0.
+            composition: Composition::weighted_sum(vec![
+                0.4 * remainder,
+                0.25 * remainder,
+                0.20 * remainder,
+                0.15 * remainder,
+                surplus_weight,
+            ]),
             // §13.1: incapacitated cats can only Eat/Sleep/Idle.
             eligibility: EligibilityFilter::new().forbid(markers::Incapacitated::KEY),
         }
@@ -176,10 +202,40 @@ mod tests {
     }
 
     #[test]
-    fn build_consideration_count_is_four() {
+    fn build_consideration_count_is_five() {
         let s = ScoringConstants::default();
-        // 179: diligence + site_distance + repair_presence + chronic_full
-        assert_eq!(BuildDse::new(&s).considerations().len(), 4);
+        // diligence + site_distance + repair_presence + chronic_full
+        // + surplus_food (ethological colony-start)
+        assert_eq!(BuildDse::new(&s).considerations().len(), 5);
+    }
+
+    #[test]
+    fn build_surplus_axis_dormant_at_default_zero() {
+        let s = ScoringConstants::default();
+        assert_eq!(s.build_surplus_food_weight, 0.0);
+        let dse = BuildDse::new(&s);
+        let weights = &dse.composition().weights;
+        // Five axes; the surplus axis (last) is 0.0 at default, and the
+        // four canonical weights are their original values (× remainder=1).
+        assert_eq!(weights.len(), 5);
+        assert_eq!(weights[4], 0.0);
+        assert!((weights[0] - 0.4).abs() < 1e-6);
+        assert!((weights[1] - 0.25).abs() < 1e-6);
+        assert!((weights[2] - 0.20).abs() < 1e-6);
+        assert!((weights[3] - 0.15).abs() < 1e-6);
+    }
+
+    #[test]
+    fn build_surplus_axis_preserves_sum_when_active() {
+        let mut s = ScoringConstants::default();
+        s.build_surplus_food_weight = 0.3;
+        let dse = BuildDse::new(&s);
+        let sum: f32 = dse.composition().weights.iter().sum();
+        assert!(
+            (sum - 1.0).abs() < 1e-4,
+            "RtEO sum must stay 1.0; got {sum}"
+        );
+        assert!((dse.composition().weights[4] - 0.3).abs() < 1e-6);
     }
 
     #[test]

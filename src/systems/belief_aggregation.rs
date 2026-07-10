@@ -162,6 +162,7 @@ fn select_facet(model: &MentalModel, slot: FacetSlot) -> &Facet {
         FacetSlot::PerceivedHostility => &model.perceived_hostility,
         FacetSlot::PerceivedReceptivity => &model.perceived_receptivity,
         FacetSlot::PreyYield => &model.prey_yield,
+        FacetSlot::SurplusFood => &model.surplus_food,
     }
 }
 

@@ -116,6 +116,69 @@ pub const MASTER_OF_THE_HUNT: AspirationChain = AspirationChain {
     expected_valence_target: 0.30,
 };
 
+/// Ethological colony-start: the caching/gathering-provider emit. Reuses
+/// the `hunt_prey` label (Live method, Hunting domain) per the v1
+/// "reuse an existing method label" path — the Hunting domain's
+/// `matching_actions` already spans `[Hunt, Forage]`, so a cat holding this
+/// chain gets its Forage (surplus-cache) score lifted through the same
+/// `AspirationLift` path Provider-of-the-Colony uses. A follow-on may mint a
+/// dedicated `cache_surplus` method + `Provisioning` domain if PickUp needs
+/// its own domain-lift; for v1 the caching bias rides Forage.
+const CACHE_EMITS: &[Emit] = &[Emit {
+    label: "hunt_prey",
+    applicable_when: always_true,
+    strategy: CommitmentStrategy::SingleMinded,
+    priority: Priority::Primary,
+}];
+
+/// Ethological colony-start: the forager-cacher identity arc — the cat who
+/// gathers the windfall and stocks the larder, distinct from
+/// [`PROVIDER_OF_THE_COLONY`]'s hunter-provider. Progress tracks the caching
+/// actions (Forage + PickUp) rather than Hunt; same Hunting domain so the
+/// Forage surplus-cache axis is lifted. Milestone narratives are the
+/// mythic-texture payoff (a named "Keeper of the Larder" per healthy sim
+/// year contributes to the mythic-texture continuity canary).
+pub const KEEPER_OF_THE_LARDER: AspirationChain = AspirationChain {
+    name: "Keeper of the Larder",
+    domain: AspirationDomain::Hunting,
+    milestones: &[
+        Milestone {
+            name: "First Cache",
+            gate: always_true,
+            progress_tracker: ProgressTracker::ActionCount {
+                actions: &[Action::Forage, Action::PickUp],
+                count: 5,
+            },
+            emits: CACHE_EMITS,
+            narrative_on_complete: "{name} tucks the first windfall into the stores, satisfied.",
+        },
+        Milestone {
+            name: "Full Shelves",
+            gate: always_true,
+            progress_tracker: ProgressTracker::ActionCount {
+                actions: &[Action::Forage, Action::PickUp],
+                count: 20,
+            },
+            emits: CACHE_EMITS,
+            narrative_on_complete: "Nothing edible escapes {name}'s notice for long.",
+        },
+        Milestone {
+            name: "Keeper of the Larder",
+            gate: always_true,
+            progress_tracker: ProgressTracker::ActionCount {
+                actions: &[Action::Forage, Action::PickUp],
+                count: 40,
+            },
+            emits: CACHE_EMITS,
+            narrative_on_complete: "The stores are never bare while {name} keeps them.",
+        },
+    ],
+    completion_narrative:
+        "{name} is the Keeper of the Larder -- the colony eats through winter because {subject} gathered.",
+    incompatible_with: &[],
+    expected_valence_target: 0.20,
+};
+
 pub const PROVIDER_OF_THE_COLONY: AspirationChain = AspirationChain {
     name: "Provider of the Colony",
     domain: AspirationDomain::Hunting,

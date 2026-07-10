@@ -143,6 +143,7 @@ pub fn init_scenario_world_with(world: &mut World, seed: u64, cfg: ScenarioWorld
     // which is registered in the canonical schedule.
     world.insert_resource(crate::resources::GraveAuraMap::default());
     world.insert_resource(crate::resources::FoodLocationMap::default());
+    world.insert_resource(crate::resources::GroundSurplusMap::default());
     world.insert_resource(crate::resources::GardenLocationMap::default());
     world.insert_resource(crate::resources::ConstructionSiteMap::default());
     world.insert_resource(crate::resources::KittenCryMap::default());

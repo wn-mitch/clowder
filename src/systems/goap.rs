@@ -2588,6 +2588,20 @@ pub fn evaluate_and_plan(
                     lb.models.get(&key).map(|m| m.recency_of_threat_cue.value)
                 })
                 .unwrap_or(0.0),
+            // Ethological colony-start: per-cat `LocationBeliefs.surplus_food`
+            // at the cat's current bucket — the perception feeding the
+            // surplus-caching axes. Same read shape as
+            // `recent_ambush_at_position`; 0.0 when the cat has no belief for
+            // that bucket or lacks the `LocationBeliefs` component.
+            surplus_food_perceptible: world_state
+                .location_beliefs
+                .get(entity)
+                .ok()
+                .and_then(|lb| {
+                    let key = crate::components::beliefs::bucket_position(pos.x(), pos.y());
+                    lb.models.get(&key).map(|m| m.surplus_food.value)
+                })
+                .unwrap_or(0.0),
             carcass_scent_at_position: colony.carcass_scent_map.get(pos.x(), pos.y()),
             // 301: coordinator-stamped ward-placement intent at cat's
             // position. Dormant at default — the resource is allocated

@@ -2698,6 +2698,16 @@ pub struct ScoringConstants {
     /// balance-tuning is the follow-on ticket.
     #[serde(default = "default_build_chronic_full_weight")]
     pub build_chronic_full_weight: f32,
+    /// Ethological colony-start: weight on the `surplus_food_perceptible`
+    /// axis in Build's DSE composition — "there is ungathered food nearby
+    /// and I should build a larder to hold it." Ships **dormant at 0.0**
+    /// (byte-identical to the pre-feature 4-axis composition). Once a Stores
+    /// construction site exists (placed by the colony-self/coordinator
+    /// no-store trigger), lifting this makes cats who perceive surplus
+    /// prioritize working that site. Nested via `(1 - w)` remainder so the
+    /// RtEO sum stays 1.0 at any weight.
+    #[serde(default = "default_build_surplus_food_weight")]
+    pub build_surplus_food_weight: f32,
     /// 176: weight on the `colony_food_security` saturation axis in
     /// Hunt's DSE composition. Ships dormant at 0.0 — 181 closed
     /// with a documented predator-exposure cascade that survives
@@ -2801,6 +2811,30 @@ pub struct ScoringConstants {
     /// a follow-on ticket.
     #[serde(default = "default_forage_route_cost_weight")]
     pub forage_route_cost_weight: f32,
+    /// Ethological colony-start: weight on Forage's `surplus_food_perceptible`
+    /// axis — the surplus/windfall caching drive. High belief that ungathered
+    /// food is nearby lifts Forage **independently of personal hunger and
+    /// colony-stores deficit**, so a well-fed founder gathers-and-caches the
+    /// visible windfall (the missing "phase 1: surplus perception" of the
+    /// provisioning cycle). Nested as the outermost `(1 - w)` remainder over
+    /// the existing six-term composition so the RtEO sum stays 1.0. Ships
+    /// **dormant at 0.0** (byte-identical to the pre-feature composition);
+    /// self-extinguishing once tuned up because gathered food depletes the
+    /// GroundSurplusMap and the slow-decay belief fades.
+    #[serde(default = "default_forage_surplus_cache_weight")]
+    pub forage_surplus_cache_weight: f32,
+    /// Ethological colony-start: weight on the surplus term of PickingUp's
+    /// `pickup_gather_motivation` axis. PickingUp is a pure product (scavenge
+    /// urgency × health damping); a product can only gate *down*, so surplus
+    /// can't be an added factor. Instead it broadens the first axis input to
+    /// `max(1 - colony_food_security, w · surplus_food_perceptible)`. At the
+    /// default **0.0** the surplus term vanishes and the axis is byte-identical
+    /// to the pre-feature `Invert(Logistic(colony_food_security))` (the
+    /// logistic symmetry `Logistic(1-s) == Invert(Logistic(s))`). Lifting it
+    /// lets a sated founder who perceives the founding scatter pick it up and
+    /// cache it — the OnGround items Forage's terrain-gated axis can't reach.
+    #[serde(default = "default_pickup_surplus_weight")]
+    pub pickup_surplus_weight: f32,
     /// 228: weight on Patrol's `Consideration::Field` route-cost axis.
     /// Reads `OwnRouteCost` at `TerritoryPerimeterAnchor` — the cat's
     /// flooded path-cost to the patrol perimeter, including
@@ -3721,6 +3755,7 @@ impl Default for ScoringConstants {
             thornbriar_stash_low_threshold: default_thornbriar_stash_low_threshold(),
             farm_herb_pressure_weight: default_farm_herb_pressure_weight(),
             build_chronic_full_weight: default_build_chronic_full_weight(),
+            build_surplus_food_weight: default_build_surplus_food_weight(),
             hunt_food_security_weight: default_hunt_food_security_weight(),
             forage_food_security_weight: default_forage_food_security_weight(),
             mentor_food_security_weight: default_mentor_food_security_weight(),
@@ -3783,6 +3818,8 @@ impl Default for ScoringConstants {
             cat_patrol_deterrent_path_cost_max: default_cat_patrol_deterrent_path_cost_max(),
             cat_patrol_deterrent_overlay_weight: default_cat_patrol_deterrent_overlay_weight(),
             forage_route_cost_weight: default_forage_route_cost_weight(),
+            forage_surplus_cache_weight: default_forage_surplus_cache_weight(),
+            pickup_surplus_weight: default_pickup_surplus_weight(),
             hunt_route_cost_weight: default_hunt_route_cost_weight(),
             wander_route_cost_weight: default_wander_route_cost_weight(),
             explore_route_cost_weight: default_explore_route_cost_weight(),
@@ -5145,6 +5182,13 @@ fn default_build_chronic_full_weight() -> f32 {
     0.5
 }
 
+/// Ethological colony-start: Build DSE weight on the
+/// `surplus_food_perceptible` axis. Ships dormant at 0.0 —
+/// see `ScoringConstants::build_surplus_food_weight`.
+fn default_build_surplus_food_weight() -> f32 {
+    0.0
+}
+
 /// 176: Hunt DSE saturation weight on the `colony_food_security`
 /// axis. Ships dormant at 0.0 — see
 /// `ScoringConstants::hunt_food_security_weight`.
@@ -5593,6 +5637,18 @@ fn default_cat_patrol_deterrent_overlay_weight() -> f32 {
 /// 228: Forage `Consideration::Field` route-cost axis weight. Ships
 /// dormant at 0.0.
 fn default_forage_route_cost_weight() -> f32 {
+    0.0
+}
+
+/// Ethological colony-start: Forage surplus-caching axis weight. Ships
+/// dormant at 0.0 — see `ScoringConstants::forage_surplus_cache_weight`.
+fn default_forage_surplus_cache_weight() -> f32 {
+    0.0
+}
+
+/// Ethological colony-start: PickingUp surplus-broadening weight. Ships
+/// dormant at 0.0 — see `ScoringConstants::pickup_surplus_weight`.
+fn default_pickup_surplus_weight() -> f32 {
     0.0
 }
 
@@ -7241,6 +7297,18 @@ pub struct CoordinationConstants {
     pub forage_critical_multiplier: f32,
     pub build_repair_priority_base: f32,
     pub build_repair_priority_building_scale: f32,
+    /// Ethological colony-start: priority of the day-1 colony-self Build
+    /// directive that places the colony's first `Stores` when no coordinator
+    /// exists yet and no store has been built. Mirrors the coordinator
+    /// `no_store` pressure channel into the founder-phase self-queue so the
+    /// caching loop (`HasFoodStorageAccessible` → PickingUp → deposit) can
+    /// close before a coordinator is elected. **Ships dormant at 0.0** — the
+    /// directive is only emitted when this is `> 0.0`, so the feature lands
+    /// seed-42-neutral. First-light activation lifts this alongside the
+    /// `forage_surplus_cache_weight` / `build_surplus_food_weight` /
+    /// `pickup_surplus_weight` levers. Activate toward ~0.8 (high — a colony
+    /// with nowhere to store food cannot provision).
+    pub colony_self_no_store_priority: f32,
     /// Range from colony buildings within which wildlife counts as a threat.
     pub threat_proximity_range: f32,
     /// Priority for targeted patrol toward an incursion point.
@@ -7657,6 +7725,7 @@ impl Default for CoordinationConstants {
             forage_critical_multiplier: 0.8,
             build_repair_priority_base: 0.6,
             build_repair_priority_building_scale: 0.1,
+            colony_self_no_store_priority: 0.0,
             threat_proximity_range: 20.0,
             threat_patrol_targeted_priority: 0.6,
             colony_breach_range: 8.0,
@@ -8814,6 +8883,13 @@ pub struct InfluenceMapConstants {
     /// #7. Each functional Stores or Kitchen paints a disc of this
     /// radius scaled by `Structure::effectiveness()`.
     pub food_location_sense_range: f32,
+    /// Falloff radius (world tiles) for `GroundSurplusMap` — ungathered
+    /// OnGround food. Tighter than `food_location_sense_range` (15.0)
+    /// because scattered food is a local windfall a cat notices nearby,
+    /// not a landmark building visible from across the colony. Matches the
+    /// belief-integrator `WITNESS_RANGE` (10) so a cat's surplus belief
+    /// covers roughly what it can sense.
+    pub ground_surplus_sense_range: f32,
     /// Falloff radius for `GardenLocationMap` — §5.6.3 row #10.
     pub garden_location_sense_range: f32,
     /// Falloff radius for `ConstructionSiteMap` — §5.6.3 row #9.
@@ -8853,6 +8929,7 @@ impl Default for InfluenceMapConstants {
     fn default() -> Self {
         Self {
             food_location_sense_range: 15.0,
+            ground_surplus_sense_range: 10.0,
             garden_location_sense_range: 15.0,
             construction_site_sense_range: 15.0,
             kitten_cry_sense_range: 30.0,
@@ -9417,6 +9494,11 @@ pub struct BeliefsConstants {
     /// across many observations, not a fast reactive read. Replaces the
     /// legacy `HuntingPriors` proxy grid.
     pub prey_yield: BeliefAxisTunables,
+    /// Per-location ungathered-food belief on [`LocationBeliefs`]. Slow-
+    /// timescale — scattered food is a stable spatial fact built across
+    /// stagger-tick observations of `GroundSurplusMap`, not a fast reactive
+    /// read. Decays toward 0 as food is gathered and the map empties.
+    pub surplus_food: BeliefAxisTunables,
     pub species_violence_priors: SpeciesViolencePriors,
     /// Passive-decay pass runs every Nth tick, with per-cat phase staggered
     /// by `entity.index() % period`. Default 20 — amortizes cost; missing
@@ -9488,6 +9570,7 @@ impl Default for BeliefsConstants {
             perceived_hostility: BeliefAxisTunables::fast(),
             perceived_receptivity: BeliefAxisTunables::slow(),
             prey_yield: BeliefAxisTunables::slow(),
+            surplus_food: BeliefAxisTunables::slow(),
             species_violence_priors: SpeciesViolencePriors::default(),
             decay_stagger_period: 20,
             low_ward_reserve_threshold: 2,

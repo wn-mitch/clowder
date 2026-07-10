@@ -252,6 +252,13 @@ pub struct AspirationChain {
 pub const ALL_CHAINS: &[&AspirationChain] = &[
     &hunting::MASTER_OF_THE_HUNT,
     &hunting::PROVIDER_OF_THE_COLONY,
+    // Ethological colony-start: forager-cacher identity arc. PARKED at land —
+    // `KEEPER_OF_THE_LARDER` emits an active `AspirationLift` on the Hunting
+    // domain (which spans Forage), so listing it here is NOT seed-42-neutral:
+    // cats adopt it and their Forage score lifts, perturbing the deterministic
+    // scenario fixtures. Re-enable in the first-light activation pass, together
+    // with lifting the dormant surplus weights (forage_surplus_cache_weight etc.).
+    // &hunting::KEEPER_OF_THE_LARDER,
     &combat::WARRIORS_PATH,
     &combat::SHADOW_FIGHTER,
     &social::HEART_OF_THE_COLONY,

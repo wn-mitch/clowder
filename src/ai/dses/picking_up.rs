@@ -54,13 +54,13 @@ use bevy::prelude::*;
 
 use crate::ai::composition::Composition;
 use crate::ai::considerations::{Consideration, ScalarConsideration};
-use crate::ai::curves::{Curve, PostOp};
+use crate::ai::curves::Curve;
 use crate::ai::dse::{
     CommitmentStrategy, Dse, DseId, EligibilityFilter, EvalCtx, GoalState, Intention,
 };
 use crate::components::markers;
 
-pub const SCAVENGE_INPUT: &str = "colony_food_security";
+pub const SCAVENGE_INPUT: &str = "pickup_gather_motivation";
 pub const HEALTH_DEFICIT_INPUT: &str = "health_deficit";
 
 pub struct PickingUpDse {
@@ -72,15 +72,17 @@ pub struct PickingUpDse {
 
 impl PickingUpDse {
     pub fn new() -> Self {
-        // Scavenge urgency = inverted Logistic over `colony_food_security`.
-        // Logistic(8, 0.5) gives a steep transition around 0.5; Invert
-        // flips so low food-security → high score, high → ~0.
-        let scavenge_urgency = Curve::Composite {
-            inner: Box::new(Curve::Logistic {
-                steepness: 8.0,
-                midpoint: 0.5,
-            }),
-            post: PostOp::Invert,
+        // Gather urgency = plain Logistic over `pickup_gather_motivation`.
+        // The motivation scalar is already urgency-oriented (high = pick up):
+        // `max(1 - colony_food_security, w · surplus_food_perceptible)`. At
+        // the dormant default `pickup_surplus_weight = 0.0` it reduces to
+        // `1 - colony_food_security`, and `Logistic(1 - s) == Invert(Logistic(s))`
+        // reproduces the pre-feature inverted-over-`colony_food_security`
+        // axis exactly (byte-identical at land). The surplus term (ethological
+        // colony-start) enters through the scalar, keeping this a pure product.
+        let scavenge_urgency = Curve::Logistic {
+            steepness: 8.0,
+            midpoint: 0.5,
         };
         // 231 R3b: health-deficit damping. Linear(slope=-1, intercept=1)
         // evaluates to 1.0 at deficit=0 (full HP → no suppression) and
@@ -164,43 +166,47 @@ mod tests {
     }
 
     #[test]
-    fn picking_up_scavenges_when_food_security_low() {
-        // 185: replaced 178's default-zero curve with an inverted
-        // Logistic. Food-security 0.0 (colony starving / cat hungry)
-        // should score near 1.0; food-security 1.0 (sated + stockpiled)
-        // should score near 0.0.
+    fn picking_up_scavenges_when_gather_motivation_high() {
+        // The axis now reads the urgency-oriented `pickup_gather_motivation`
+        // scalar (high = pick up) through a plain Logistic, rather than
+        // `colony_food_security` through an inverted one. Motivation 1.0
+        // (colony insecure OR strong ground surplus) → near 1.0; motivation
+        // 0.0 (secure, no surplus) → near 0.0. Note the input semantics are
+        // the mirror of the pre-feature axis: `Logistic(1 - s)` reproduces
+        // the old `Invert(Logistic(s))` at `pickup_surplus_weight = 0.0`.
         let dse = PickingUpDse::new();
         let c = match &dse.considerations()[0] {
             Consideration::Scalar(sc) => &sc.curve,
             _ => panic!("expected scalar"),
         };
-        let low = c.evaluate(0.0);
-        let mid = c.evaluate(0.5);
         let high = c.evaluate(1.0);
-        // High urgency at low food-security.
+        let mid = c.evaluate(0.5);
+        let low = c.evaluate(0.0);
+        // High urgency at high gather-motivation (insecure colony / surplus).
         assert!(
-            low > 0.9,
-            "expected scavenge urgency >0.9 at food_security=0, got {low}"
+            high > 0.9,
+            "expected gather urgency >0.9 at motivation=1, got {high}"
         );
         // Symmetric around midpoint 0.5.
         assert!(
             (mid - 0.5).abs() < 1e-3,
-            "expected scavenge urgency ≈0.5 at food_security=0.5, got {mid}"
+            "expected gather urgency ≈0.5 at motivation=0.5, got {mid}"
         );
-        // Low urgency at high food-security.
+        // Low urgency at low gather-motivation (secure, nothing to gather).
         assert!(
-            high < 0.1,
-            "expected scavenge urgency <0.1 at food_security=1, got {high}"
+            low < 0.1,
+            "expected gather urgency <0.1 at motivation=0, got {low}"
         );
     }
 
     #[test]
-    fn picking_up_axis_is_food_security() {
+    fn picking_up_axis_is_gather_motivation() {
         let dse = PickingUpDse::new();
         match &dse.considerations()[0] {
             Consideration::Scalar(sc) => assert_eq!(sc.name, SCAVENGE_INPUT),
             _ => panic!("expected ScalarConsideration"),
         }
+        assert_eq!(SCAVENGE_INPUT, "pickup_gather_motivation");
     }
 
     #[test]

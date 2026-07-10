@@ -703,6 +703,38 @@ pub fn assess_colony_needs(
                 placement_failure_count: 0,
             });
         }
+        // Ethological colony-start: place the colony's first Stores. The
+        // coordinator `no_store` pressure channel (accumulate_build_pressure)
+        // only fires once a coordinator is elected — days of alignment
+        // accrual. Until then the founder-phase self-queue never emitted a
+        // *new-construction* Build directive (only repairs of existing
+        // damaged buildings), so `HasFoodStorageAccessible` stayed false for
+        // every founder, PickingUp/deposit stayed ineligible, and the
+        // surplus-caching loop could not close. Mirror the coordinator's
+        // no-store semantics here: when no finished Stores exists and no
+        // construction site is already in progress (one build at a time,
+        // matching the coordinator path), emit a blueprint-carrying Build
+        // directive. `dispatch_urgent_directives` + the planner resolve the
+        // `Some(Stores)` blueprint into a placed site. This is the trigger
+        // that makes the surplus-aware Build DSE axis and the C1 caching
+        // drive actionable — without a placed site the Build DSE has nothing
+        // to walk to.
+        let has_stores = building_query.iter().any(|(_, s, _, site)| {
+            site.is_none() && s.kind == crate::components::building::StructureType::Stores
+        });
+        let has_unfinished_site = building_query.iter().any(|(_, _, _, site)| site.is_some());
+        // Dormant at land: only emit when the priority lever is lifted off
+        // 0.0 (first-light activation), so the feature is seed-42-neutral.
+        if cc.colony_self_no_store_priority > 0.0 && !has_stores && !has_unfinished_site {
+            self_queue.directives.push(Directive {
+                kind: DirectiveKind::Build,
+                priority: cc.colony_self_no_store_priority.min(1.0),
+                target_entity: None,
+                target_position: None,
+                blueprint: Some(crate::components::building::StructureType::Stores),
+                placement_failure_count: 0,
+            });
+        }
         // Repair the worst-damaged finished building if any are
         // below the base threshold. Mirrors the per-coordinator
         // "worst_building" pick at the base threshold (no
@@ -1721,6 +1753,10 @@ pub fn spawn_construction_sites(
     mut activation: ResMut<SystemActivation>,
     mut log: ResMut<NarrativeLog>,
     time: Res<TimeState>,
+    // Ethological colony-start: the founder-phase Build(Stores) directive
+    // lives here (no coordinator to carry it), so the site-spawner must
+    // drain it too — the coordinator-only loop above never sees it.
+    mut self_queue: ResMut<crate::components::coordination::ColonySelfDirectiveQueue>,
 ) {
     use crate::resources::sim_constants::BuildingPlacementSemantics;
 
@@ -1881,6 +1917,107 @@ pub fn spawn_construction_sites(
         );
 
         queue.directives.remove(idx);
+    }
+
+    // Ethological colony-start: drain the colony-self Build directive. The
+    // founder-phase colony has no Coordinator to hang a DirectiveQueue on,
+    // so `assess_colony_needs` parks its new-Stores directive in the
+    // `ColonySelfDirectiveQueue`. Mirror the coordinator placement/spawn
+    // logic for the single blueprint-carrying self-directive. Dedup on the
+    // live `construction_sites` query + `spawned_this_tick` + completed
+    // buildings so we never place two, and remove the directive on success.
+    if let Some(idx) = self_queue
+        .directives
+        .iter()
+        .position(|d| d.kind == DirectiveKind::Build && d.blueprint.is_some())
+    {
+        let blueprint = self_queue.directives[idx].blueprint.unwrap();
+        let already_exists = construction_sites
+            .iter()
+            .any(|site| site.blueprint == blueprint)
+            || spawned_this_tick.contains(&blueprint);
+        let already_built = building_positions.iter().any(|(_, _, k)| *k == blueprint);
+        if already_exists || already_built {
+            self_queue.directives.remove(idx);
+        } else {
+            let size = blueprint.default_size();
+            let center = colony_center.0;
+            let buildings_of_kind: Vec<Position> = building_positions
+                .iter()
+                .filter(|(_, _, k)| *k == blueprint)
+                .map(|(p, _, _)| *p)
+                .collect();
+            let placement = match constants.scoring.building_placement_semantics {
+                BuildingPlacementSemantics::Spiral => {
+                    find_building_placement_spiral(&map, center, size, &occupied)
+                }
+                BuildingPlacementSemantics::InfluenceMap => {
+                    // Deterministic per-call RNG seeded by tick (no coordinator
+                    // entity to fold in on the founder-phase path).
+                    let seed = time.tick.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                    let mut local_rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
+                    compute_building_placement(
+                        blueprint,
+                        size,
+                        center,
+                        &occupied,
+                        &buildings_of_kind,
+                        &district,
+                        &fox_corridor,
+                        &food_location,
+                        &garden_location,
+                        &map,
+                        &constants,
+                        &mut local_rng,
+                    )
+                }
+            };
+            if let Some(anchor) = placement {
+                let terrain = blueprint.terrain();
+                for dy in 0..size.1 {
+                    for dx in 0..size.0 {
+                        let x = anchor.x() + dx;
+                        let y = anchor.y() + dy;
+                        if map.in_bounds(x, y) {
+                            map.set(x, y, terrain);
+                        }
+                    }
+                }
+                cover_map.mark_dirty();
+                let site = crate::components::building::ConstructionSite::new_prefunded(blueprint);
+                commands.spawn((
+                    Name(format!(
+                        "Construction: {}",
+                        structure_display_name(blueprint)
+                    )),
+                    anchor,
+                    crate::components::building::Structure {
+                        kind: blueprint,
+                        condition: 0.0,
+                        cleanliness: 0.0,
+                        size,
+                    },
+                    site,
+                ));
+                spawned_this_tick.insert(blueprint);
+                activation.record(Feature::ConstructionSiteSpawned);
+                log.push(
+                    time.tick,
+                    format!(
+                        "With no leader yet, the founders mark out a site for a new {}.",
+                        structure_display_name(blueprint),
+                    ),
+                    NarrativeTier::Significant,
+                );
+                self_queue.directives.remove(idx);
+            } else {
+                // Placement failed this tick (crowded / no valid spot);
+                // leave the directive so it retries next tick.
+                self_queue.directives[idx].placement_failure_count = self_queue.directives[idx]
+                    .placement_failure_count
+                    .saturating_add(1);
+            }
+        }
     }
 }
 

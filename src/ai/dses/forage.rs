@@ -76,6 +76,17 @@ impl ForageDse {
             }),
             post: PostOp::Invert,
         };
+        // Ethological colony-start: surplus/windfall caching axis — the
+        // outermost nesting level. Carves `cache_weight` off the top and
+        // scales every other term by `cache_remainder` so the RtEO sum
+        // stays 1.0. Dormant at 0.0 → `cache_remainder = 1.0`, leaving the
+        // six-term base composition byte-identical.
+        let cache_weight = scoring.forage_surplus_cache_weight.clamp(0.0, 1.0);
+        let cache_remainder = 1.0 - cache_weight;
+        let surplus_curve = Curve::Logistic {
+            steepness: 8.0,
+            midpoint: 0.5,
+        };
         let route_cost_remainder = 1.0 - route_cost_weight;
         let remainder = (1.0 - saturation_weight) * route_cost_remainder;
         let saturation_term = saturation_weight * route_cost_remainder;
@@ -108,6 +119,16 @@ impl ForageDse {
                     FORAGE_CLUSTER_RANGE,
                     route_cost_curve,
                 )),
+                // Ethological colony-start: surplus/windfall caching axis.
+                // High `surplus_food_perceptible` belief (ungathered food
+                // nearby) lifts Forage independently of hunger/scarcity —
+                // NO invert (this is a demand/opportunity signal, unlike the
+                // saturation axis above). A sated founder perceiving the
+                // founding scatter is drawn to gather-and-cache it.
+                Consideration::Scalar(ScalarConsideration::new(
+                    "surplus_food_perceptible",
+                    surplus_curve,
+                )),
             ],
             // RtEO weights: diligence still dominates — the point of
             // Forage vs. Hunt is diligent non-bold cats choose it.
@@ -116,12 +137,13 @@ impl ForageDse {
             // their remainders. Ships dormant (both extra weights at
             // 0) so the original four weights stay canonical.
             composition: Composition::weighted_sum(vec![
-                0.24 * remainder,
-                0.20 * remainder,
-                0.36 * remainder,
-                0.20 * remainder,
-                saturation_term,
-                route_cost_weight,
+                0.24 * remainder * cache_remainder,
+                0.20 * remainder * cache_remainder,
+                0.36 * remainder * cache_remainder,
+                0.20 * remainder * cache_remainder,
+                saturation_term * cache_remainder,
+                route_cost_weight * cache_remainder,
+                cache_weight,
             ]),
             // §4 batch 2: `.require(CanForage)` gates on ¬Kitten ∧
             // ¬Injured ∧ forageable terrain nearby. Retires the
@@ -214,8 +236,44 @@ mod tests {
         let weights = &dse.composition().weights;
         assert!((weights[0] - 0.24).abs() < 1e-4);
         assert!((weights[4]).abs() < 1e-6);
-        // 228: route-cost axis added; six axes total at default.
-        assert_eq!(dse.considerations().len(), 6);
+        // 228: route-cost axis; ethological colony-start: surplus-cache
+        // axis. Seven axes total at default.
+        assert_eq!(dse.considerations().len(), 7);
+    }
+
+    #[test]
+    fn forage_surplus_cache_dormant_at_default_zero() {
+        // Ethological colony-start: with default
+        // `forage_surplus_cache_weight = 0.0` the surplus axis (index 6)
+        // contributes zero and the six base axes keep their canonical
+        // weights (× cache_remainder = 1.0) — byte-identical to pre-feature.
+        let s = ScoringConstants::default();
+        assert!((s.forage_surplus_cache_weight).abs() < 1e-6);
+        let dse = ForageDse::new(&s);
+        let weights = &dse.composition().weights;
+        assert_eq!(weights.len(), 7);
+        assert!((weights[6]).abs() < 1e-6);
+        assert!((weights[0] - 0.24).abs() < 1e-4);
+        let has_axis = dse.considerations().iter().any(|c| match c {
+            Consideration::Scalar(sc) => sc.name == "surplus_food_perceptible",
+            _ => false,
+        });
+        assert!(has_axis);
+    }
+
+    #[test]
+    fn forage_surplus_cache_scales_others_when_weight_nonzero() {
+        // When tuned up, the surplus axis carves its weight off the top and
+        // scales every other term by (1 - cache_weight); RtEO sum stays 1.0.
+        let mut s = ScoringConstants::default();
+        s.forage_surplus_cache_weight = 0.2;
+        let dse = ForageDse::new(&s);
+        let weights = &dse.composition().weights;
+        // 0.24 × cache_remainder(0.8) = 0.192.
+        assert!((weights[0] - 0.192).abs() < 1e-4);
+        assert!((weights[6] - 0.2).abs() < 1e-4);
+        let sum: f32 = weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-4);
     }
 
     #[test]

@@ -397,6 +397,40 @@ pub fn update_food_location_map(
     }
 }
 
+/// Re-stamp `GroundSurplusMap` from live OnGround food `Item` entities.
+///
+/// Each ungathered food item paints a linear-falloff disc of
+/// `ground_surplus_sense_range` tiles at full strength; overlapping items
+/// (a scattered pile) sum toward 1.0. Mirrors the same OnGround-food surface
+/// the `HasGroundCarcass` marker author scans (`kind.is_food()` at
+/// `ItemLocation::OnGround`), so the surplus belief and the PickingUp
+/// eligibility gate agree on what "there is food to gather" means.
+///
+/// Producer for the per-cat `surplus_food` belief facet (authored in
+/// `integrate_beliefs` Pass B). `BuildMaterialItem`s are excluded — hauled
+/// construction wood is not gatherable food.
+pub fn update_ground_surplus_map(
+    items: Query<
+        (&crate::components::items::Item, &Position),
+        bevy_ecs::query::Without<crate::components::items::BuildMaterialItem>,
+    >,
+    mut map: ResMut<crate::resources::GroundSurplusMap>,
+    constants: Res<SimConstants>,
+) {
+    let sense_range = constants.influence_maps.ground_surplus_sense_range;
+    map.clear();
+    for (item, pos) in &items {
+        if !matches!(
+            item.location,
+            crate::components::items::ItemLocation::OnGround
+        ) || !item.kind.is_food()
+        {
+            continue;
+        }
+        map.stamp(pos.x(), pos.y(), 1.0, sense_range);
+    }
+}
+
 /// Re-stamp `GardenLocationMap` from live `Garden` `Structure`
 /// entities. §5.6.3 row #10 — sight × colony.
 ///

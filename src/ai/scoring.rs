@@ -493,6 +493,16 @@ pub struct ScoringContext<'a> {
     /// that folds into the unified `Memory.LocationModel.last_threat`
     /// facet when ToT cluster C3 (ticket 007) lands.
     pub recent_ambush_at_position: f32,
+    /// Ethological colony-start: per-cat `LocationBeliefs.surplus_food`
+    /// sampled at the cat's current bucket (0.0–1.0). High means the cat
+    /// believes there is ungathered food to gather and cache nearby.
+    /// Authored in `integrate_beliefs` Pass B from `GroundSurplusMap`; reads
+    /// 0.0 when the cat has no belief for that bucket (never sensed nearby
+    /// surplus) OR is missing the `LocationBeliefs` component. Consumed as
+    /// the `surplus_food_perceptible` scalar by the Forage / PickingUp
+    /// surplus-caching axes and the Build DSE build-a-larder axis — all of
+    /// which ship dormant at weight 0.0.
+    pub surplus_food_perceptible: f32,
     /// 220: per-tile `CarcassScentMap` sample at the cat's current
     /// position (0.0–1.0). The Phase 2C substrate deposits scent each
     /// tick from actionable carcass entities (`!cleansed || !harvested`)
@@ -783,9 +793,21 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs, m: &mut HashMap<&'stat
     // Consumed by Hunt / Forage DSEs as a saturation axis when their
     // weights are lifted from 0.0.
     let hunger_satisfaction = ctx.needs.hunger.clamp(0.0, 1.0);
+    let colony_food_security = ctx.food_fraction.clamp(0.0, 1.0).min(hunger_satisfaction);
+    m.insert("colony_food_security", colony_food_security);
+    // Ethological colony-start: PickingUp gather-motivation. The scavenge
+    // urgency `1 - colony_food_security` (drives pickup when the colony is
+    // insecure) broadened with the perceived ground-surplus, gated by a
+    // dormant weight. At `pickup_surplus_weight = 0.0` this is exactly
+    // `1 - colony_food_security`, which through PickingUp's plain Logistic
+    // reproduces the pre-feature `Invert(Logistic(colony_food_security))`
+    // axis (logistic symmetry) — byte-identical at land. Lifting the weight
+    // lets a sated founder near the founding scatter pick it up and cache it.
     m.insert(
-        "colony_food_security",
-        ctx.food_fraction.clamp(0.0, 1.0).min(hunger_satisfaction),
+        "pickup_gather_motivation",
+        (1.0 - colony_food_security)
+            .max(ctx.scoring.pickup_surplus_weight * ctx.surplus_food_perceptible)
+            .clamp(0.0, 1.0),
     );
     // 178: per-cat inventory food load. Discarding/Trashing DSEs read
     // this through their Logistic curve; the colony-state composition
@@ -1058,6 +1080,14 @@ fn ctx_scalars(ctx: &ScoringContext, inputs: &EvalInputs, m: &mut HashMap<&'stat
     m.insert(
         "recent_ambush_at_position",
         ctx.recent_ambush_at_position.clamp(0.0, 1.0),
+    );
+    // Ethological colony-start: surplus-food belief at the cat's bucket.
+    // Consumed by the Forage / PickingUp surplus-caching axes and the Build
+    // DSE build-a-larder axis (all dormant at weight 0.0 at land); emitted
+    // here so it surfaces in trace-*.jsonl L2 capture for verification.
+    m.insert(
+        "surplus_food_perceptible",
+        ctx.surplus_food_perceptible.clamp(0.0, 1.0),
     );
     // 101 — env-quality scalars. Signed range `[-1.0, 1.0]`. The four
     // mood-relevant axes (comfort / cleanliness / beauty / mystery)
@@ -3156,6 +3186,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
             local_comfort: 0.0,
@@ -3367,6 +3398,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
             local_comfort: 0.0,
@@ -3602,6 +3634,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
             local_comfort: 0.0,
@@ -3900,6 +3933,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
             local_comfort: 0.0,
@@ -4059,6 +4093,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
             local_comfort: 0.0,
@@ -4230,6 +4265,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
             local_comfort: 0.0,
@@ -4634,6 +4670,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
             local_comfort: 0.0,
@@ -4775,6 +4812,7 @@ mod tests {
             social_status_distress: 0.0,
             fox_scent_level: 0.0,
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: 0.0,
             ward_intent_at_position: 0.0,
             local_comfort: 0.0,

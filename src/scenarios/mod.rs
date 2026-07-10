@@ -80,6 +80,7 @@ pub mod shadowfox_kill_site_avoidance;
 pub mod shelter_belief_security;
 pub mod smoking_chain_complete;
 pub mod smoking_chain_eligibility;
+pub mod surplus_caching_start;
 pub mod surrounded_colony;
 pub mod ward_placement;
 pub mod wildlife_belief_affordance_activation;
@@ -268,6 +269,7 @@ pub const ALL: &[&Scenario] = &[
     // resulting low-reserve state via stagger-tick InventoryObserved
     // broadcasts; `HasLowWardReserve` marker fires.
     &colony_reserves_belief::SCENARIO,
+    &surplus_caching_start::SCENARIO,
     // 291 — false consensus promotes; contested bucket does not.
     &colony_knowledge_false_belief::SCENARIO,
     // 374 — ShelterBeliefs substrate first-light. Four-phase

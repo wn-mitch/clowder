@@ -1053,6 +1053,7 @@ pub fn evaluate_dispositions(
             // `goap.rs::evaluate_and_plan` reads the per-cat
             // `LocationBeliefs.recency_of_threat_cue` properly.
             recent_ambush_at_position: 0.0,
+            surplus_food_perceptible: 0.0,
             carcass_scent_at_position: colony.carcass_scent_map.get(pos.x(), pos.y()),
             // 301: coordinator-stamped ward-placement intent at cat's
             // position. Dormant at default; see `goap.rs` mirror site.

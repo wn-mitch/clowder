@@ -133,6 +133,14 @@ pub enum Feature {
     StorageUpgraded,
     DepositRejected,
     DepositFailedNoStore,
+    /// Ethological colony-start: a cat's per-cat `surplus_food` location
+    /// belief lifted off zero from a stagger-tick read of `GroundSurplusMap`
+    /// — i.e. the cat now perceives ungathered ground food nearby. Positive:
+    /// the perception half of the surplus-caching drive. New-Feature default
+    /// `expected_to_fire_per_soak() => false` per the 1:1 sibling rule;
+    /// promote to `true` once a seed-42 soak observes ≥1 firing (the founding
+    /// scatter should trigger it on day 1, but land dormant until verified).
+    SurplusFoodBeliefFormed,
     ItemRetrieved,
     /// Ticket 084: a cat deposited ≥1 herb of any `HerbKind` into a
     /// Stores building's `StoredHerbs` via the `DepositHerbs` GOAP
@@ -858,6 +866,7 @@ impl Feature {
         Feature::StorageUpgraded,
         Feature::DepositRejected,
         Feature::DepositFailedNoStore,
+        Feature::SurplusFoodBeliefFormed,
         Feature::ItemRetrieved,
         Feature::HerbsDeposited,
         Feature::HerbsRetrieved,
@@ -1084,6 +1093,7 @@ impl Feature {
             Feature::KnowledgePromoted => Positive,
             Feature::SpiritCommunion => Positive,
             Feature::StorageUpgraded => Positive,
+            Feature::SurplusFoodBeliefFormed => Positive,
             Feature::ItemRetrieved => Positive,
             Feature::HerbsDeposited => Positive,
             Feature::HerbsRetrieved => Positive,
@@ -1813,6 +1823,10 @@ impl Feature {
             // step-24 cadence watch-item checked at baseline
             // re-promotes.
             Feature::KnowledgePromoted => false,
+            // New-Feature default per the 1:1 sibling rule — false until a
+            // seed-42 soak observes ≥1 firing. The day-1 founding scatter
+            // should trigger it, but land dormant until verified.
+            Feature::SurplusFoodBeliefFormed => false,
             Feature::KnowledgeForgotten => true,
             Feature::DepositRejected => true,
             Feature::FoodCooked => true,
@@ -1931,6 +1945,7 @@ pub fn feature_name(f: Feature) -> &'static str {
         Feature::DeathOldAge => "DeathOldAge",
         Feature::DeathInjury => "DeathInjury",
         Feature::KnowledgePromoted => "KnowledgePromoted",
+        Feature::SurplusFoodBeliefFormed => "SurplusFoodBeliefFormed",
         Feature::KnowledgeForgotten => "KnowledgeForgotten",
         Feature::SpiritCommunion => "SpiritCommunion",
         Feature::StorageUpgraded => "StorageUpgraded",
@@ -2316,7 +2331,7 @@ mod tests {
     #[test]
     fn feature_all_is_exhaustive_and_unique() {
         use std::collections::HashSet;
-        const EXPECTED_VARIANT_COUNT: usize = 173;
+        const EXPECTED_VARIANT_COUNT: usize = 174;
         let distinct: HashSet<_> = Feature::ALL.iter().map(std::mem::discriminant).collect();
         assert_eq!(
             distinct.len(),
@@ -2487,7 +2502,7 @@ mod tests {
         // `expected_to_fire_per_soak() => false` per the new-Feature
         // default; the prey_bolt_chase / prey_scatter_flush scenarios
         // host the firing assertions.
-        assert_eq!(positive, 99);
+        assert_eq!(positive, 100);
         assert_eq!(negative, 25);
         assert_eq!(neutral, 49);
     }
@@ -2604,7 +2619,7 @@ mod tests {
         // Ticket 266: +2 Neutral (PreyBoltElected / PreyScatterElected).
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Positive),
-            99
+            100
         );
         assert_eq!(
             SystemActivation::features_total_in(FeatureCategory::Negative),

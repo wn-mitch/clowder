@@ -186,6 +186,18 @@ pub struct MentalModel {
     /// (`BeliefAxisTunables::slow()`) — spatial yield is stable, not a
     /// fast reactive signal.
     pub prey_yield: Facet,
+    /// Per-cat per-location belief about ungathered food. Range `[0.0, 1.0]`
+    /// — high means "there is food to gather and cache near here", low means
+    /// "nothing to collect". Authored in `integrate_beliefs` Pass B by
+    /// sampling [`GroundSurplusMap`](crate::resources::GroundSurplusMap) near
+    /// the witness on its stagger tick (a passive spatial read, like
+    /// `ShelterBeliefs.continuity` — NOT an event flood). Consumed as the
+    /// `surplus_food_perceptible` scoring scalar by the Forage / PickingUp
+    /// surplus-caching axes and the Build DSE's build-a-larder axis. Only
+    /// meaningful on [`LocationBeliefs`] (the cat-keyed models don't author
+    /// it). Slow-timescale tunables — scattered food is a stable spatial
+    /// fact, not a fast reactive signal.
+    pub surplus_food: Facet,
     pub last_updated_tick: u64,
     pub evidence_count: u32,
     pub candidates: Vec<CandidateFacet>,
@@ -218,6 +230,9 @@ pub enum FacetSlot {
     /// 293: per-location prey-yield belief. Only meaningful on
     /// [`LocationBeliefs`] (the cat-keyed mental models don't author it).
     PreyYield,
+    /// Per-location ungathered-food belief. Only meaningful on
+    /// [`LocationBeliefs`]. Drives the surplus-caching axes.
+    SurplusFood,
 }
 
 // ---------------------------------------------------------------------------

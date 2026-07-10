@@ -629,6 +629,7 @@ fn build_new_world(world: &mut World, seed: u64, test_map: bool) {
 
     // Insert food-location map resource (ticket 006 — §5.6.3 row #7).
     world.insert_resource(crate::resources::FoodLocationMap::default());
+    world.insert_resource(crate::resources::GroundSurplusMap::default());
 
     // Insert garden-location map resource (ticket 006 — §5.6.3 row #10).
     world.insert_resource(crate::resources::GardenLocationMap::default());

@@ -39,7 +39,9 @@ use crate::messages::witnessable_event::WitnessableEvent;
 use crate::resources::sim_constants::{
     BeliefAxisTunables, BeliefsConstants, ShelterBeliefConstants, SpeciesViolencePriors,
 };
+use crate::resources::system_activation::{Feature, SystemActivation};
 use crate::resources::time::TimeState;
+use crate::resources::GroundSurplusMap;
 use crate::resources::SimConstants;
 
 /// Manhattan-distance witness radius for v1. Mirrors the
@@ -79,7 +81,7 @@ const SCENT_OBSERVED_VALUE: f32 = 0.65;
 /// eligibility but witnessed violence is needed to push past it.
 const FLEE_CUE_OBSERVED_VALUE: f32 = 0.75;
 
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn integrate_beliefs(
     time: Res<TimeState>,
     constants: Res<SimConstants>,
@@ -119,6 +121,12 @@ pub fn integrate_beliefs(
         (Entity, &Position, &mut PredatorBeliefs),
         (With<PreyAnimal>, Without<Dead>),
     >,
+    // Ethological colony-start: ground-food source read by Pass B into the
+    // per-cat `surplus_food` location belief. `Option` so belief-integrator
+    // unit tests (which don't build the influence-map/activation resources)
+    // still run — the surplus authoring is simply skipped when absent.
+    ground_surplus: Option<Res<GroundSurplusMap>>,
+    mut activation: Option<ResMut<SystemActivation>>,
 ) {
     let tick = time.tick;
     let cfg = &constants.beliefs;
@@ -237,6 +245,35 @@ pub fn integrate_beliefs(
         decay_models(&mut preds.models, tick, cfg, period);
         decay_models(&mut contexts.models, tick, cfg, period);
         decay_reserves(&mut reserves.reserves, cfg);
+
+        // Ethological colony-start: passive stagger-tick read of
+        // `GroundSurplusMap` into the per-cat `surplus_food` location belief
+        // at the cat's own bucket. NOT event-driven — scattered ground food
+        // is a slowly-changing spatial fact, so emitting a `WitnessableEvent`
+        // per food cluster per tick would be a per-tick flood the house rules
+        // forbid. Mirrors `ShelterBeliefs.continuity`'s passive per-stagger
+        // read. Authored after decay so the fresh observation isn't clipped
+        // by the same-tick forgetting sweep. The map's linear-falloff disc
+        // already folds in nearby food, so a point-read at the cat's position
+        // reflects the surrounding windfall.
+        if let Some(map) = ground_surplus.as_deref() {
+            let observed = map.get(witness_pos.x(), witness_pos.y());
+            if observed > 0.0 {
+                let key = bucket_position(witness_pos.x(), witness_pos.y());
+                let loc_model = locs.models.entry(key).or_default();
+                update_facet(
+                    &mut loc_model.surplus_food,
+                    observed,
+                    tick,
+                    &cfg.surplus_food,
+                );
+                loc_model.last_updated_tick = tick;
+                loc_model.evidence_count = loc_model.evidence_count.saturating_add(1);
+                if let Some(activation) = activation.as_deref_mut() {
+                    activation.record(Feature::SurplusFoodBeliefFormed);
+                }
+            }
+        }
     }
 
     // ---- Pass B (265) — wildlife Implant + Forgetting ------------------
@@ -1309,6 +1346,7 @@ fn decay_models<K: std::hash::Hash + Eq + Copy>(
             period,
         );
         decay_facet(&mut model.prey_yield, &cfg.prey_yield, period);
+        decay_facet(&mut model.surplus_food, &cfg.surplus_food, period);
         model.last_updated_tick = tick;
         let max_strength = [
             model.perceived_injury_level.strength,
@@ -1320,6 +1358,7 @@ fn decay_models<K: std::hash::Hash + Eq + Copy>(
             model.perceived_hostility.strength,
             model.perceived_receptivity.strength,
             model.prey_yield.strength,
+            model.surplus_food.strength,
         ]
         .into_iter()
         .fold(0.0f32, f32::max);
@@ -1476,6 +1515,69 @@ mod tests {
             model.perceived_violence_capability.last_source,
             EvidenceKind::Implant
         );
+    }
+
+    #[test]
+    fn ground_surplus_lifts_surplus_food_belief() {
+        use crate::resources::GroundSurplusMap;
+
+        let (mut world, mut schedule) = test_world(0);
+        // Ungathered food stamped near where the cat stands.
+        let mut map = GroundSurplusMap::default_map();
+        map.stamp(10, 10, 1.0, 10.0);
+        assert!(map.get(10, 10) > 0.0, "sanity: stamp should read nonzero");
+        world.insert_resource(map);
+
+        let cat = spawn_cat(&mut world, Position::new(10, 10));
+
+        // Run past one stagger phase so Pass B authors the belief at least once.
+        let period = SimConstants::default().beliefs.decay_stagger_period;
+        for _ in 0..(period + 1) {
+            schedule.run(&mut world);
+            let mut time = world.resource_mut::<TimeState>();
+            time.tick += 1;
+        }
+
+        let locs = world.get::<LocationBeliefs>(cat).unwrap();
+        let key = bucket_position(10, 10);
+        let model = locs
+            .models
+            .get(&key)
+            .expect("surplus_food belief should be authored at the cat's bucket");
+        assert!(
+            model.surplus_food.value > 0.0,
+            "surplus_food should lift off zero from GroundSurplusMap; got {}",
+            model.surplus_food.value
+        );
+        assert!(model.surplus_food.strength > 0.0);
+        assert_eq!(model.surplus_food.last_source, EvidenceKind::Observation);
+    }
+
+    #[test]
+    fn no_ground_surplus_leaves_belief_at_zero() {
+        use crate::resources::GroundSurplusMap;
+
+        let (mut world, mut schedule) = test_world(0);
+        // Empty map — no ungathered food anywhere.
+        world.insert_resource(GroundSurplusMap::default_map());
+        let cat = spawn_cat(&mut world, Position::new(10, 10));
+
+        let period = SimConstants::default().beliefs.decay_stagger_period;
+        for _ in 0..(period + 1) {
+            schedule.run(&mut world);
+            let mut time = world.resource_mut::<TimeState>();
+            time.tick += 1;
+        }
+
+        let locs = world.get::<LocationBeliefs>(cat).unwrap();
+        let key = bucket_position(10, 10);
+        // Either no entry, or an entry with a zero surplus_food value.
+        let v = locs
+            .models
+            .get(&key)
+            .map(|m| m.surplus_food.value)
+            .unwrap_or(0.0);
+        assert_eq!(v, 0.0, "surplus_food should stay zero with no ground food");
     }
 
     // 265 — wildlife-witness coverage: implant, observation subset,

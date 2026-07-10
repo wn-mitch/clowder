@@ -516,6 +516,24 @@ impl InfluenceMap for crate::resources::FoodLocationMap {
     }
 }
 
+impl InfluenceMap for crate::resources::GroundSurplusMap {
+    fn metadata(&self) -> MapMetadata {
+        MapMetadata {
+            // Ethological colony-start: ungathered OnGround food — the
+            // windfall a cat could gather and cache. Sight × colony,
+            // following the FoodLocationMap convention. Feeds the per-cat
+            // `surplus_food` belief facet.
+            name: "ground_surplus",
+            channel: ChannelKind::Sight,
+            faction: Faction::Colony,
+        }
+    }
+
+    fn base_sample(&self, pos: Position) -> f32 {
+        self.get(pos.x(), pos.y())
+    }
+}
+
 impl InfluenceMap for crate::resources::GardenLocationMap {
     fn metadata(&self) -> MapMetadata {
         MapMetadata {

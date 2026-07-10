@@ -173,8 +173,9 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
         BeautyMap, CarcassScentMap, CatPatrolDeterrentMap, CatScentMap, CleanlinessMap,
         ColonyDistrictMap, ComfortMap, ConstructionSiteMap, CorruptionInfluenceMap,
         CoverAvailabilityMap, ExplorationMap, FoodLocationMap, FoxApproachCorridorMap, FoxScentMap,
-        GardenLocationMap, GraveAuraMap, HerbLocationMap, KittenCryMap, MysteryMap, PreyScentMaps,
-        TileMap, TremorMap, WardCoverageMap, WardIntentMap, WardSiegeFearMap,
+        GardenLocationMap, GraveAuraMap, GroundSurplusMap, HerbLocationMap, KittenCryMap,
+        MysteryMap, PreyScentMaps, TileMap, TremorMap, WardCoverageMap, WardIntentMap,
+        WardSiegeFearMap,
     };
 
     registry.register::<FoxScentMap>();
@@ -243,6 +244,11 @@ pub fn populate_influence_map_registry(registry: &mut InfluenceMapRegistry) {
     // `trace-*.jsonl` for soak-trace verification once activated.
     registry.register::<WardIntentMap>();
     registry.register::<FoodLocationMap>();
+    // Ethological colony-start: ungathered OnGround food. Producer always
+    // runs; the consuming `surplus_food` belief facet feeds Forage/PickUp/Build
+    // axes that ship dormant at 0.0, so registering here surfaces the field in
+    // `trace-*.jsonl` for soak-trace verification at first-light activation.
+    registry.register::<GroundSurplusMap>();
     registry.register::<GardenLocationMap>();
     registry.register::<ConstructionSiteMap>();
     registry.register::<KittenCryMap>();
@@ -1462,6 +1468,7 @@ impl Plugin for SimulationPlugin {
                         systems::buildings::decay_building_condition,
                         systems::buildings::update_colony_landmarks,
                         systems::buildings::update_food_location_map,
+                        systems::buildings::update_ground_surplus_map,
                         systems::buildings::update_garden_location_map,
                         systems::buildings::update_construction_site_map,
                         // 101: env-quality influence-map sweep + feature
