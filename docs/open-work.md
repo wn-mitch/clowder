@@ -15,10 +15,10 @@ _Last generated: 2026-07-09._
 | Status | Count |
 |---|---|
 | In progress | 5 |
-| Ready | 127 |
+| Ready | 132 |
 | Parked | 12 |
-| Blocked | 28 |
-| **Open total** | **172** |
+| Blocked | 29 |
+| **Open total** | **178** |
 | Pre-existing | 0 |
 
 Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-existing}/`. Landing archive: `docs/open-work/landed/`.
@@ -68,11 +68,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
-## Ready by cluster (127)
+## Ready by cluster (132)
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (32 ready, 3 blocked)
+### ai-substrate (32 ready, 4 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -147,6 +147,21 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[525](docs/open-work/tickets/525-lost-lore-a-skill-dies-with-its-last-untaught-holder-colony-loses-a-craft-when-the-only-knower-dies-with-no-apprentice.md)** — Lost lore — a skill dies with its last untaught holder (colony loses a craft when the only knower dies with no apprentice) — _[life-cycle] · added 2026-07-09_
 - **[526](docs/open-work/tickets/526-kitten-emulation-payoff-a-kitten-co-present-with-an-adult-performing-a-skill-gains-a-learning-boost-bounded-observational-learning-no-culture-drift-layer.md)** — Kitten emulation payoff — a kitten co-present with an adult performing a skill gains a learning boost (bounded observational learning, no culture-drift layer) — _[life-cycle] · added 2026-07-09_
 
+### wildlife (12 ready, 1 blocked)
+
+- **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
+- **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
+- **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
+- **[513](docs/open-work/tickets/513-shadowfox-colony-pressure-channel-fading-under-fluid-movement-drives-softmax-self-anchors-on-remote-corruption-reconstituting-seeding-loop-scent-shell-repels-at-fine-granularity-wardsiegehaunting-interactions-zero-on-both-gate-seeds.md)** — shadowfox colony-pressure channel fading under fluid movement: drives softmax self-anchors on remote corruption (Reconstituting-Seeding loop), scent shell repels at fine granularity, ward/siege/haunting interactions zero on both gate seeds — _[wildlife] · added 2026-07-06_
+- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
+- **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
+- **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
+- **[533](docs/open-work/tickets/533-prey-graze-real-depletable-regrowing-vegetation-resources-herb-regrowth-model-replace-passive-hunger-relief-hand-wave-so-prey-hunger-and-prey-population-gain-an-honest-ecological-input.md)** — Prey graze real depletable regrowing vegetation resources (herb-regrowth model) — replace passive_hunger_relief hand-wave so prey_hunger and prey_population gain an honest ecological input — _[wildlife] · added 2026-07-09_
+- **[534](docs/open-work/tickets/534-prey-sentinel-and-forage-division-of-labor-one-grazing-group-member-holds-high-cadence-vigilance-foragers-run-cheap-detection-sentinel-alarm-propagates-group-boltscatter-perf-positive-n-detection-passes-to-1.md)** — Prey sentinel and forage division of labor — one grazing-group member holds high-cadence vigilance, foragers run cheap detection, sentinel alarm propagates group Bolt/Scatter (perf-positive: N detection passes to 1) — _[wildlife] · added 2026-07-09_
+- **[535](docs/open-work/tickets/535-prey-freeze-tonic-immobility-dse-third-escape-election-beside-boltscatter-for-low-escape-viability-suppresses-predator-detection-affordance-mirrors-cat-side-fleefightfreeze-trio-tickets-104105.md)** — Prey freeze / tonic-immobility DSE — third escape election beside Bolt/Scatter for low-escape-viability, suppresses predator detection affordance (mirrors cat-side Flee/Fight/Freeze trio, tickets 104/105) — _[wildlife] · added 2026-07-09_
+- **[536](docs/open-work/tickets/536-prey-landscape-of-fear-grazing-displacement-bias-graze-tile-selection-away-from-high-carcass-scent-colony-hunting-map-tiles-so-hunted-areas-empty-and-prey-concentrate-elsewhere-reuses-existing-maps.md)** — Prey landscape-of-fear grazing displacement — bias graze-tile selection away from high carcass_scent / colony_hunting_map tiles so hunted areas empty and prey concentrate elsewhere (reuses existing maps) — _[wildlife] · added 2026-07-09_
+- **[537](docs/open-work/tickets/537-prey-mob-and-harry-dense-same-kind-group-elects-a-mob-dse-against-a-weakinjured-predator-converges-and-applies-deterrence-push-into-predator-retreat-scoring-first-symmetric-prey-predator-action-enriched-by-245-body-cue-reads.md)** — Prey mob-and-harry — dense same-kind group elects a Mob DSE against a weak/injured predator, converges and applies deterrence push into predator retreat scoring (first symmetric prey->predator action; enriched by 245 body-cue reads) — _[wildlife] · added 2026-07-09_
+
 ### items-crafting (10 ready, 4 blocked)
 
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
@@ -183,16 +198,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[289](docs/open-work/tickets/289-engagethreat-retry-cooldown-after-morale-break-suppress-immediate-guarding-re-election-under-active-fight-directive.md)** — EngageThreat retry cooldown after morale_break — suppress immediate Guarding re-election under active Fight directive — _[combat-threat] · added 2026-05-11_
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 - **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
-
-### wildlife (7 ready, 1 blocked)
-
-- **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
-- **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
-- **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
-- **[513](docs/open-work/tickets/513-shadowfox-colony-pressure-channel-fading-under-fluid-movement-drives-softmax-self-anchors-on-remote-corruption-reconstituting-seeding-loop-scent-shell-repels-at-fine-granularity-wardsiegehaunting-interactions-zero-on-both-gate-seeds.md)** — shadowfox colony-pressure channel fading under fluid movement: drives softmax self-anchors on remote corruption (Reconstituting-Seeding loop), scent shell repels at fine granularity, ward/siege/haunting interactions zero on both gate seeds — _[wildlife] · added 2026-07-06_
-- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
-- **[519](docs/open-work/tickets/519-emberwing-hatch-seasonal-ephemeral-insect-bloom-that-kittens-play-chase-a-named-once-a-year-event.md)** — Emberwing hatch — seasonal ephemeral insect bloom that kittens play-chase, a named once-a-year event — _[wildlife] · added 2026-07-09_
-- **[520](docs/open-work/tickets/520-the-moss-back-a-long-lived-landmark-beast-elders-remember-and-teach-kittens-about-across-generations.md)** — The Moss-Back — a long-lived landmark beast elders remember and teach kittens about across generations — _[wildlife] · added 2026-07-09_
 
 ### tooling-diagnostics-ui (6 ready)
 
@@ -241,7 +246,7 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 
 - **[514](docs/open-work/tickets/514-mentor-churn-mentor-target-elects-incapacitated-mentees-the-step-entry-alive-gate-then-rejects-1111-mentorcat-plan-failures-per-soak-on-incapacitation-heavy-trajectories.md)** — mentor churn: mentor_target elects Incapacitated mentees the step-entry alive-gate then rejects — 1111 MentorCat plan failures per soak on incapacitation-heavy trajectories — _[planning-substrate] · added 2026-07-07_
 
-## Ready by initiative (91 tag-memberships across 9 initiatives)
+## Ready by initiative (96 tag-memberships across 9 initiatives)
 
 Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in multiple subsections. Tickets without any initiative tag are omitted here and visible under `## Ready by cluster`. See `docs/open-work/initiatives/` for outcome definitions.
 
@@ -331,6 +336,19 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[525](docs/open-work/tickets/525-lost-lore-a-skill-dies-with-its-last-untaught-holder-colony-loses-a-craft-when-the-only-knower-dies-with-no-apprentice.md)** — Lost lore — a skill dies with its last untaught holder (colony loses a craft when the only knower dies with no apprentice) — _[life-cycle] · added 2026-07-09_
 - **[526](docs/open-work/tickets/526-kitten-emulation-payoff-a-kitten-co-present-with-an-adult-performing-a-skill-gains-a-learning-boost-bounded-observational-learning-no-culture-drift-layer.md)** — Kitten emulation payoff — a kitten co-present with an adult performing a skill gains a learning boost (bounded observational learning, no culture-drift layer) — _[life-cycle] · added 2026-07-09_
 
+### predator-prey-dynamics (10 open, 16 landed)
+
+- **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
+- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
+- **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
+- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
+- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · blocked-by 529 · added 2026-07-09_
+- **[533](docs/open-work/tickets/533-prey-graze-real-depletable-regrowing-vegetation-resources-herb-regrowth-model-replace-passive-hunger-relief-hand-wave-so-prey-hunger-and-prey-population-gain-an-honest-ecological-input.md)** — Prey graze real depletable regrowing vegetation resources (herb-regrowth model) — replace passive_hunger_relief hand-wave so prey_hunger and prey_population gain an honest ecological input — _[wildlife] · added 2026-07-09_
+- **[534](docs/open-work/tickets/534-prey-sentinel-and-forage-division-of-labor-one-grazing-group-member-holds-high-cadence-vigilance-foragers-run-cheap-detection-sentinel-alarm-propagates-group-boltscatter-perf-positive-n-detection-passes-to-1.md)** — Prey sentinel and forage division of labor — one grazing-group member holds high-cadence vigilance, foragers run cheap detection, sentinel alarm propagates group Bolt/Scatter (perf-positive: N detection passes to 1) — _[wildlife] · added 2026-07-09_
+- **[535](docs/open-work/tickets/535-prey-freeze-tonic-immobility-dse-third-escape-election-beside-boltscatter-for-low-escape-viability-suppresses-predator-detection-affordance-mirrors-cat-side-fleefightfreeze-trio-tickets-104105.md)** — Prey freeze / tonic-immobility DSE — third escape election beside Bolt/Scatter for low-escape-viability, suppresses predator detection affordance (mirrors cat-side Flee/Fight/Freeze trio, tickets 104/105) — _[wildlife] · added 2026-07-09_
+- **[536](docs/open-work/tickets/536-prey-landscape-of-fear-grazing-displacement-bias-graze-tile-selection-away-from-high-carcass-scent-colony-hunting-map-tiles-so-hunted-areas-empty-and-prey-concentrate-elsewhere-reuses-existing-maps.md)** — Prey landscape-of-fear grazing displacement — bias graze-tile selection away from high carcass_scent / colony_hunting_map tiles so hunted areas empty and prey concentrate elsewhere (reuses existing maps) — _[wildlife] · added 2026-07-09_
+- **[537](docs/open-work/tickets/537-prey-mob-and-harry-dense-same-kind-group-elects-a-mob-dse-against-a-weakinjured-predator-converges-and-applies-deterrence-push-into-predator-retreat-scoring-first-symmetric-prey-predator-action-enriched-by-245-body-cue-reads.md)** — Prey mob-and-harry — dense same-kind group elects a Mob DSE against a weak/injured predator, converges and applies deterrence push into predator retreat scoring (first symmetric prey->predator action; enriched by 245 body-cue reads) — _[wildlife] · added 2026-07-09_
+
 ### full-sensory-perception (9 open, 9 landed)
 
 - **[020](docs/open-work/tickets/020-namedlandmark-substrate.md)** — NamedLandmark substrate (cross-consumer naming) — _[belief-perception] · added 2026-04-22_
@@ -342,14 +360,6 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[473](docs/open-work/tickets/473-corrupted-kin-signal-influence-map-warmthbond-modulated-perception-of-festering-peers.md)** — Corrupted-kin signal influence map (warmth/bond-modulated perception of festering peers) — _[belief-perception] · added 2026-05-26_
-
-### predator-prey-dynamics (5 open, 16 landed)
-
-- **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
-- **[283](docs/open-work/tickets/283-split-fox-scent-perception-into-territorial-mark-and-recent-presence-channels.md)** — Split fox-scent perception into territorial-mark and recent-presence channels — _[belief-perception] · added 2026-05-11_
-- **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
-- **[518](docs/open-work/tickets/518-shadowfox-rest-drive-activate-the-dormant-retreat-election-with-a-non-churning-home-range-shape.md)** — ShadowFox rest drive — activate the dormant retreat election with a non-churning home-range shape — _[wildlife] · added 2026-07-09_
-- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · blocked-by 529 · added 2026-07-09_
 
 ### worldgen-prehistory (5 open, 0 landed)
 
@@ -363,7 +373,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 
 - **[180](docs/open-work/tickets/180-death-stamp-scent-anchor.md)** — Death-stamp / scent-anchor at kill sites (176 follow-on) — _[belief-perception] · added 2026-05-05_
 
-## Ready (127)
+## Ready (132)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -492,6 +502,11 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[529](docs/open-work/tickets/529-orphan-kitten-provisioning-gap-kitten-starves-amid-colony-surplus-after-its-caretaker-dies-156s-unresolved-orphan-care-corner.md)** — Orphan-kitten provisioning gap — kitten starves amid colony surplus after its caretaker dies (156's unresolved orphan-care corner) — _[social-coordination] · added 2026-07-09_
 - **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · blocked-by 529 · added 2026-07-09_
 - **[531](docs/open-work/tickets/531-flow-field-pursuit-per-target-field-for-multi-entity-convergence-140-4-spin-off-deferred-from-040.md)** — Flow-field pursuit — per-target field for multi-entity convergence (140 §4 spin-off, deferred from 0.4.0) — _[ai-substrate] · added 2026-07-09_
+- **[533](docs/open-work/tickets/533-prey-graze-real-depletable-regrowing-vegetation-resources-herb-regrowth-model-replace-passive-hunger-relief-hand-wave-so-prey-hunger-and-prey-population-gain-an-honest-ecological-input.md)** — Prey graze real depletable regrowing vegetation resources (herb-regrowth model) — replace passive_hunger_relief hand-wave so prey_hunger and prey_population gain an honest ecological input — _[wildlife] · added 2026-07-09_
+- **[534](docs/open-work/tickets/534-prey-sentinel-and-forage-division-of-labor-one-grazing-group-member-holds-high-cadence-vigilance-foragers-run-cheap-detection-sentinel-alarm-propagates-group-boltscatter-perf-positive-n-detection-passes-to-1.md)** — Prey sentinel and forage division of labor — one grazing-group member holds high-cadence vigilance, foragers run cheap detection, sentinel alarm propagates group Bolt/Scatter (perf-positive: N detection passes to 1) — _[wildlife] · added 2026-07-09_
+- **[535](docs/open-work/tickets/535-prey-freeze-tonic-immobility-dse-third-escape-election-beside-boltscatter-for-low-escape-viability-suppresses-predator-detection-affordance-mirrors-cat-side-fleefightfreeze-trio-tickets-104105.md)** — Prey freeze / tonic-immobility DSE — third escape election beside Bolt/Scatter for low-escape-viability, suppresses predator detection affordance (mirrors cat-side Flee/Fight/Freeze trio, tickets 104/105) — _[wildlife] · added 2026-07-09_
+- **[536](docs/open-work/tickets/536-prey-landscape-of-fear-grazing-displacement-bias-graze-tile-selection-away-from-high-carcass-scent-colony-hunting-map-tiles-so-hunted-areas-empty-and-prey-concentrate-elsewhere-reuses-existing-maps.md)** — Prey landscape-of-fear grazing displacement — bias graze-tile selection away from high carcass_scent / colony_hunting_map tiles so hunted areas empty and prey concentrate elsewhere (reuses existing maps) — _[wildlife] · added 2026-07-09_
+- **[537](docs/open-work/tickets/537-prey-mob-and-harry-dense-same-kind-group-elects-a-mob-dse-against-a-weakinjured-predator-converges-and-applies-deterrence-push-into-predator-retreat-scoring-first-symmetric-prey-predator-action-enriched-by-245-body-cue-reads.md)** — Prey mob-and-harry — dense same-kind group elects a Mob DSE against a weak/injured predator, converges and applies deterrence push into predator retreat scoring (first symmetric prey->predator action; enriched by 245 body-cue reads) — _[wildlife] · added 2026-07-09_
 
 ## Parked (12)
 
@@ -508,7 +523,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[415](docs/open-work/tickets/415-playfired-gate-orthogonal-to-explore-play-metric-stuck-at-14-across-066-four-fix.md)** — PlayFired gate orthogonal to Explore — play metric stuck at 14 across 066 four-fix — _[ai-substrate] · parked 2026-05-25 · added 2026-05-18_
 - **[432](docs/open-work/tickets/432-431-stage-c-follow-on-rescoped-per-cat-route-cost-field-caching-design.md)** — 431 Stage C follow-on — rescoped per-cat route-cost field caching design — _[ai-substrate] · parked 2026-05-20 · added 2026-05-20_
 
-## Blocked (28)
+## Blocked (29)
 
 - **[011](docs/open-work/tickets/011-cat-conversation-rendering-via-haiku.md)** — Cat-conversation rendering via Haiku (presenter over C3) — _[magic-mythic] · blocked-by 010 · added 2026-04-21_
 - **[018](docs/open-work/tickets/018-ruin-clearings.md)** — Ruin clearings (corruption nodes, PMD-flavored) — _[magic-mythic] · blocked-by 016 · added 2026-04-22_
@@ -538,6 +553,7 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[454](docs/open-work/tickets/454-decompose-systemsdispositionrs-into-a-disposition-submodule-per-chain-dispatch-seam.md)** — Decompose systems/disposition.rs into a disposition/ submodule per chain-dispatch seam — _[ai-substrate] · blocked-by 441 · added 2026-05-23_
 - **[481](docs/open-work/tickets/481-wire-acquire-stealth-via-commission-htn-method-coordinator-commission-substrate.md)** — Wire acquire_stealth_via_commission HTN method (coordinator-commission substrate) — _[items-crafting] · blocked-by 381 · added 2026-05-27_
 - **[524](docs/open-work/tickets/524-colony-naming-rite-collective-ceremony-that-confers-a-name-on-a-kitten-place-or-event-colony-driven-mythic-texture-generator.md)** — Colony naming rite — collective ceremony that confers a name on a kitten, place, or event (colony-driven mythic-texture generator) — _[magic-mythic] · blocked-by 020 · added 2026-07-09_
+- **[532](docs/open-work/tickets/532-tick-time-budget-scheduler-priority-tiered-per-tick-compute-allocation-discretionary-passes-defer-under-load-atlas-economic-page-behavior-changing-needs-balance-framing.md)** — Tick-time budget scheduler — priority-tiered per-tick compute allocation, discretionary passes defer under load (atlas Economic page, behavior-changing — needs balance framing) — _[ai-substrate] · blocked-by 527, 528 · added 2026-07-09_
 
 ## Landed archive (387)
 
