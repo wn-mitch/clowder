@@ -1,0 +1,383 @@
+{
+  "label": "v0.4.0",
+  "run_dir": "/Users/will.mitchell/clowder/logs/tuned-42-48586277",
+  "events_path": "/Users/will.mitchell/clowder/logs/tuned-42-48586277/events.jsonl",
+  "commit_hash_short": "48586277",
+  "commit_dirty": false,
+  "seed": 42,
+  "duration_secs": 900,
+  "promoted_at": "2026-07-10T03:42:34Z",
+  "footer_snapshot": {
+    "_footer": true,
+    "anxiety_interrupt_total": 0,
+    "belief_divergence_duration_ticks": 0,
+    "colony_score": {
+      "aggregate": 4041.1300682995616,
+      "bonds_formed": 59,
+      "deaths_injury": 2,
+      "deaths_old_age": 0,
+      "deaths_starvation": 0,
+      "fulfillment": 0.2878054976463318,
+      "happiness": 0.5585904717445374,
+      "health": 0.777501106262207,
+      "kittens_born": 4,
+      "kittens_matured": 0,
+      "nourishment": 0.7708480954170227,
+      "peak_population": 11,
+      "seasons_survived": 5,
+      "shelter": 0.04868166893720627,
+      "structures_built": 9,
+      "welfare": 0.48868536949157715
+    },
+    "colony_score_at_checkpoint": {
+      "aggregate": 3544.7104238461316,
+      "bonds_formed": 42,
+      "captured_at_elapsed_tick": 50000,
+      "checkpoint_constant": 50000,
+      "deaths_injury": 1,
+      "deaths_old_age": 0,
+      "deaths_starvation": 0,
+      "fulfillment": 0.3348527252674103,
+      "happiness": 0.6723291277885437,
+      "health": 0.8571563363075256,
+      "kittens_born": 2,
+      "kittens_matured": 0,
+      "nourishment": 0.7038944959640503,
+      "peak_population": 10,
+      "seasons_survived": 2,
+      "shelter": 0.0983966514468193,
+      "structures_built": 9,
+      "welfare": 0.5333258509635925
+    },
+    "continuity_tallies": {
+      "burial": 0,
+      "courtship": 15756,
+      "grooming": 2583,
+      "mentoring": 8327,
+      "mythic-texture": 0,
+      "play": 124
+    },
+    "deaths_by_cause": {
+      "ShadowFoxAmbush": 2
+    },
+    "elapsed_ticks": 103123,
+    "final_tick": 1303123,
+    "founder_dispersion": [
+      {
+        "mean_dist": 3.047869942082741,
+        "samples": 29,
+        "window_end_elapsed": 3000,
+        "window_start_elapsed": 0
+      },
+      {
+        "mean_dist": 8.636459683314992,
+        "samples": 30,
+        "window_end_elapsed": 6000,
+        "window_start_elapsed": 3000
+      },
+      {
+        "mean_dist": 8.14146842884355,
+        "samples": 30,
+        "window_end_elapsed": 9000,
+        "window_start_elapsed": 6000
+      },
+      {
+        "mean_dist": 8.52303472485451,
+        "samples": 30,
+        "window_end_elapsed": 12000,
+        "window_start_elapsed": 9000
+      },
+      {
+        "mean_dist": 7.907388141578689,
+        "samples": 30,
+        "window_end_elapsed": 15000,
+        "window_start_elapsed": 12000
+      },
+      {
+        "mean_dist": 10.572885836664787,
+        "samples": 30,
+        "window_end_elapsed": 18000,
+        "window_start_elapsed": 15000
+      },
+      {
+        "mean_dist": 9.926269490907995,
+        "samples": 30,
+        "window_end_elapsed": 21000,
+        "window_start_elapsed": 18000
+      },
+      {
+        "mean_dist": 9.80186297191484,
+        "samples": 30,
+        "window_end_elapsed": 24000,
+        "window_start_elapsed": 21000
+      },
+      {
+        "mean_dist": 10.147832613449818,
+        "samples": 30,
+        "window_end_elapsed": 27000,
+        "window_start_elapsed": 24000
+      },
+      {
+        "mean_dist": 8.187977487991619,
+        "samples": 30,
+        "window_end_elapsed": 30000,
+        "window_start_elapsed": 27000
+      },
+      {
+        "mean_dist": 11.153036033508682,
+        "samples": 30,
+        "window_end_elapsed": 33000,
+        "window_start_elapsed": 30000
+      },
+      {
+        "mean_dist": 10.72061727742456,
+        "samples": 30,
+        "window_end_elapsed": 36000,
+        "window_start_elapsed": 33000
+      },
+      {
+        "mean_dist": 12.280193262213034,
+        "samples": 30,
+        "window_end_elapsed": 39000,
+        "window_start_elapsed": 36000
+      },
+      {
+        "mean_dist": 9.634387566477791,
+        "samples": 30,
+        "window_end_elapsed": 42000,
+        "window_start_elapsed": 39000
+      },
+      {
+        "mean_dist": 10.25139593731782,
+        "samples": 30,
+        "window_end_elapsed": 45000,
+        "window_start_elapsed": 42000
+      },
+      {
+        "mean_dist": 9.733918421071923,
+        "samples": 30,
+        "window_end_elapsed": 48000,
+        "window_start_elapsed": 45000
+      },
+      {
+        "mean_dist": 12.647181810635333,
+        "samples": 30,
+        "window_end_elapsed": 51000,
+        "window_start_elapsed": 48000
+      },
+      {
+        "mean_dist": 11.585730080226437,
+        "samples": 30,
+        "window_end_elapsed": 54000,
+        "window_start_elapsed": 51000
+      },
+      {
+        "mean_dist": 11.985358434305649,
+        "samples": 30,
+        "window_end_elapsed": 57000,
+        "window_start_elapsed": 54000
+      },
+      {
+        "mean_dist": 11.537135634543171,
+        "samples": 30,
+        "window_end_elapsed": 60000,
+        "window_start_elapsed": 57000
+      },
+      {
+        "mean_dist": 12.532241573881928,
+        "samples": 30,
+        "window_end_elapsed": 63000,
+        "window_start_elapsed": 60000
+      },
+      {
+        "mean_dist": 15.763809060531916,
+        "samples": 30,
+        "window_end_elapsed": 66000,
+        "window_start_elapsed": 63000
+      },
+      {
+        "mean_dist": 13.349593593803139,
+        "samples": 30,
+        "window_end_elapsed": 69000,
+        "window_start_elapsed": 66000
+      },
+      {
+        "mean_dist": 10.945822136412382,
+        "samples": 30,
+        "window_end_elapsed": 72000,
+        "window_start_elapsed": 69000
+      },
+      {
+        "mean_dist": 8.03456104745344,
+        "samples": 30,
+        "window_end_elapsed": 75000,
+        "window_start_elapsed": 72000
+      },
+      {
+        "mean_dist": 9.29131536909936,
+        "samples": 30,
+        "window_end_elapsed": 78000,
+        "window_start_elapsed": 75000
+      },
+      {
+        "mean_dist": 13.942526524825002,
+        "samples": 30,
+        "window_end_elapsed": 81000,
+        "window_start_elapsed": 78000
+      },
+      {
+        "mean_dist": 9.112391062204685,
+        "samples": 30,
+        "window_end_elapsed": 84000,
+        "window_start_elapsed": 81000
+      },
+      {
+        "mean_dist": 7.359219047044297,
+        "samples": 30,
+        "window_end_elapsed": 87000,
+        "window_start_elapsed": 84000
+      },
+      {
+        "mean_dist": 6.200605645256583,
+        "samples": 30,
+        "window_end_elapsed": 90000,
+        "window_start_elapsed": 87000
+      },
+      {
+        "mean_dist": 5.808135251091455,
+        "samples": 30,
+        "window_end_elapsed": 93000,
+        "window_start_elapsed": 90000
+      },
+      {
+        "mean_dist": 7.478159278473724,
+        "samples": 30,
+        "window_end_elapsed": 96000,
+        "window_start_elapsed": 93000
+      },
+      {
+        "mean_dist": 11.061963465539147,
+        "samples": 30,
+        "window_end_elapsed": 99000,
+        "window_start_elapsed": 96000
+      },
+      {
+        "mean_dist": 12.54188984169179,
+        "samples": 30,
+        "window_end_elapsed": 102000,
+        "window_start_elapsed": 99000
+      },
+      {
+        "mean_dist": 11.958055952977718,
+        "samples": 12,
+        "window_end_elapsed": 105000,
+        "window_start_elapsed": 102000
+      }
+    ],
+    "interrupts_by_reason": {},
+    "negative_events_total": 191396,
+    "neutral_features_active": 39,
+    "neutral_features_total": 49,
+    "never_fired_expected_positives": [],
+    "plan_failures_by_reason": {
+      "Construct: construction site not found": 3,
+      "Construct: no target for Construct": 2,
+      "DropItem: drop: empty inventory": 2,
+      "DryFood: no idle drying rack in range": 2,
+      "EngagePrey: anxiety spooked prey": 19,
+      "EngagePrey: chase timeout": 82,
+      "EngagePrey: consumed catch in place": 47,
+      "EngagePrey: global step timeout": 3,
+      "EngagePrey: lost prey during approach": 96,
+      "EngagePrey: no prey target for engage": 48,
+      "EngagePrey: prey teleported": 7,
+      "EngagePrey: prey unreachable": 23,
+      "EngagePrey: seeking another target": 31,
+      "EngagePrey: stuck while chasing": 1,
+      "EngagePrey: target invalid at step entry: Despawned": 462,
+      "EngageThreat: morale_break": 1,
+      "ForageItem: consumed forage in place": 2,
+      "ForageItem: nothing found while foraging": 116,
+      "GatherHerb: target invalid at step entry: Despawned": 2,
+      "GroomOther: target invalid at step entry: Incapacitated": 13,
+      "HandoffItem: handoff: no transferable slot in actor inventory": 2,
+      "MentorCat: target invalid at step entry: Incapacitated": 1545,
+      "PickUpItemFromGround: pick_up: no target item on disposition": 7,
+      "RetrieveCraftInputs(RecipeId(\"behavioral.courtship_gift.polished_stone\")): stores missing recipe input for behavioral.courtship_gift.polished_stone": 15,
+      "RetrieveCraftInputs(RecipeId(\"warriors_kit.bone_stiletto\")): stores missing recipe input for warriors_kit.bone_stiletto": 9,
+      "RetrieveCraftInputs(RecipeId(\"warriors_kit.hide_bracers\")): stores missing recipe input for warriors_kit.hide_bracers": 3,
+      "Scry: misfire: fizzle": 1,
+      "SearchPrey: no scent found": 121,
+      "SocializeWith: target invalid at step entry: Incapacitated": 11,
+      "TrashItemAtMidden: trash: no item-slot in inventory": 2,
+      "TravelTo(CarcassPile): no reachable zone target": 2,
+      "TravelTo(HerbPatch): no path and stuck": 198
+    },
+    "planning_failures_by_disposition": {
+      "Foraging": 40,
+      "Herbalism": 23,
+      "Hunting": 80,
+      "PickingUp": 117
+    },
+    "planning_failures_by_reason": {
+      "Foraging:GoalUnreachable": 40,
+      "Herbalism:GoalUnreachable": 23,
+      "Hunting:GoalUnreachable": 80,
+      "PickingUp:GoalUnreachable": 117
+    },
+    "positive_features_active": 68,
+    "positive_features_total": 99,
+    "shadow_fox_spawn_total": 2,
+    "shadow_foxes_avoided_ward_total": 5069,
+    "start_tick": 1200000,
+    "ticks_per_sec": 114.57978658469206,
+    "wall_elapsed_secs": 900.010403875,
+    "ward_avg_strength_final": 0.0,
+    "ward_count_final": 0,
+    "ward_siege_started_total": 705,
+    "wards_despawned_total": 44,
+    "wards_placed_total": 42,
+    "welfare_axes": {
+      "acceptance": {
+        "axis": "acceptance",
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0,
+        "n": 10,
+        "stdev": 0.0
+      },
+      "mastery": {
+        "axis": "mastery",
+        "max": 0.9940913319587708,
+        "mean": 0.5276190042495728,
+        "min": 0.0,
+        "n": 10,
+        "stdev": 0.4346151351928711
+      },
+      "purpose": {
+        "axis": "purpose",
+        "max": 0.9976680874824524,
+        "mean": 0.2556844651699066,
+        "min": 0.0,
+        "n": 10,
+        "stdev": 0.40471014380455017
+      },
+      "respect": {
+        "axis": "respect",
+        "max": 1.0,
+        "mean": 0.7849346399307251,
+        "min": 0.0,
+        "n": 10,
+        "stdev": 0.3938644826412201
+      },
+      "social_warmth": {
+        "axis": "social_warmth",
+        "max": 0.9972803592681885,
+        "mean": 0.9201048612594604,
+        "min": 0.5324639678001404,
+        "n": 10,
+        "stdev": 0.1361537128686905
+      }
+    }
+  }
+}
