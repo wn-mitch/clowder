@@ -1,0 +1,25 @@
+# Ticket 315 / 263 activation — Flee affordance axis.
+# Pre-registered before lifting the default from 0.0 to 0.5.
+# Secondary checks after the sweep: survival hard gates, continuity tallies,
+# focal Flee frame-diff, and `just q anomalies` election-share canary.
+hypothesis: |
+  Activating `scoring.flee_affordance_weight=0.5` lets the Flee DSE price the
+  ActionAffordances substrate's richer "can this cat actually escape this
+  threat now?" signal instead of relying only on safety deficit, boldness,
+  nearest-threat distance, and health. Because the affordance writer composes
+  proximity, cover, health, and perceived violence capability, Flee should win
+  more often in genuinely escapable predator-pressure moments and less often
+  as blind panic. The primary ambush canary remains the hard gate; the
+  measurable prediction uses the rubric's stress aggregate because a zero-
+  ambush baseline cannot produce a percentage delta. The expected signal is
+  lower negative-event load without starving continuity behaviors.
+constants_patch:
+  scoring:
+    flee_affordance_weight: 0.5
+prediction:
+  metric: negative_events_total
+  direction: decrease
+  rough_magnitude_pct: [10, 1000]
+seeds: [42]
+reps: 1
+duration: 900

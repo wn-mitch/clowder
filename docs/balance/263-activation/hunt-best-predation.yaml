@@ -1,0 +1,23 @@
+# Ticket 315 / 263 activation — Hunt per-target predation-affordance axis.
+# Pre-registered before lifting the default from 0.0 to 0.15.
+# Secondary checks after the sweep: Hunt target frame-diff, plan-failure mix,
+# survival/continuity gates, and election-share anomaly scan.
+hypothesis: |
+  Activating `scoring.hunt_best_predation_weight=0.15` adds the fifth
+  per-target Hunt axis `hunt_best_predation_affordance`, backed by the
+  cat-vs-prey ActionAffordances writer landed by ticket 314 and the ticket 516
+  scalar-routing fix. HuntTarget should prefer prey that are actually catchable
+  by Stalk, Chase, or Pounce now, while the existing yield/calm/cooldown axes
+  retain 85% of the WeightedSum mass. The ecological prediction is a lower
+  rate of EngagePrey approach-loss failures because cats select prey whose
+  current affordance says the resolver can finish the hunt.
+constants_patch:
+  scoring:
+    hunt_best_predation_weight: 0.15
+prediction:
+  metric: "plan_failures_by_reason.EngagePrey: lost prey during approach"
+  direction: decrease
+  rough_magnitude_pct: [10, 1000]
+seeds: [42]
+reps: 1
+duration: 900

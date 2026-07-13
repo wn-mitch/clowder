@@ -1,12 +1,12 @@
 ---
 id: 315
 title: activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias)
-status: ready
+status: parked
 cluster: ai-substrate
 orchestration: substrate-sensitive
 initiative: []
 added: 2026-05-13
-parked: null
+parked: 2026-07-13
 blocked-by: []
 supersedes: []
 related-systems: []
@@ -38,15 +38,15 @@ Ticket 263 lands four new substrate axes (Flee `flee_affordance`, Patrol `patrol
 
 ## Current state
 
-Blocked-by 263 (lands the substrate axes dormant) and 314 (extends ActionAffordances writer to cover cat-vs-prey so Hunt's affordance axis becomes meaningful). Once both land, this ticket is the substrate-activation pass.
+263, 314, and 516 are landed; the target-axis routing blocker is resolved. 2026-07-13 activation evidence parks this ticket again: the batched all-axis hypothesis moved `negative_events_total` the wrong way (+12.8%), the activation verdict is `concern` because `continuity_tallies.play=0`, and this session workspace lacks `logs/baselines/current.json`, so footer drift against the active baseline registry is unavailable. Defaults remain dormant.
 
 ## Approach
 
-1. Read 263's plan file (`~/.claude/plans/work-263-zippy-sparrow.md`) for the activation-recommendation rationale per axis.
-2. One `specs/263-activation-*.yaml` per axis.
-3. `just hypothesize specs/263-activation-flee.yaml` etc.
-4. Frame-diff each treatment against the post-263-dormant baseline to confirm DSE-specific drift is concordant with the hypothesis and no orthogonal DSE drifts >10%.
-5. Promote the post-activation soak to a named baseline via `just promote`.
+1. Use `docs/balance/263-activation/*.yaml` as the per-axis and batched hypothesis specs.
+2. `just hypothesize` each axis or a documented batched equivalent before changing defaults.
+3. Frame-diff each accepted treatment against the post-263-dormant baseline to confirm DSE-specific drift is concordant with the hypothesis and no orthogonal DSE drifts >10%.
+4. Run an activation soak and `just verdict`; the result must pass survival and continuity gates.
+5. Do **not** promote a baseline from a session workspace; leave baseline promotion to the master after a valid pass.
 
 ## Verification
 
@@ -70,3 +70,4 @@ Blocked-by 263 (lands the substrate axes dormant) and 314 (extends ActionAfforda
 - 2026-05-13: opened as 263 activation follow-on. Owns the four-artifact methodology that 263 deferred.
 - 2026-05-19: accuracy audit pass — blocked-by 314 is open ready (not landed); 263 is landed; four-artifact methodology discipline is sound; frame-diff and canary scoping correct.
 - 2026-07-07: re-blocked on 516 — `hunt_best_predation_affordance` routes to the no-op fetch_self under the current `target_`-prefix dispatch, so activating it before 516's routing fix would soak-verify a null axis.
+- 2026-07-13: ticket 516 blocker verified resolved (`src/ai/target_dse.rs` routes every scalar through `fetch_target_scalar`; landed ticket 516 status done). Activation was **not** implemented. Evidence under `docs/balance/263-activation/`: HuntTarget and Hunt resolver axes concord individually (`EngagePrey: lost prey during approach` −88.7% / −81.5%), Patrol concords narrowly on fallback stress metric (`negative_events_total` −10.8%), but Flee is inconclusive (`negative_events_total` −6.6%, within noise after ShadowFoxAmbush floored at zero). The required batched gate fails wrong-direction (`negative_events_total` +12.8%), `just verdict logs/sweep-263-activation/all-axes-treatment/42-1` is `concern` on `continuity_tallies.play=0`, `just q anomalies` also reports play/burial/mythic-texture zero, and `logs/baselines/current.json` is absent in this session workspace. Parked without lifting defaults.

@@ -14,9 +14,9 @@ _Last generated: 2026-07-13._
 
 | Status | Count |
 |---|---|
-| In progress | 6 |
+| In progress | 5 |
 | Ready | 131 |
-| Parked | 12 |
+| Parked | 13 |
 | Blocked | 29 |
 | **Open total** | **178** |
 | Pre-existing | 0 |
@@ -25,7 +25,7 @@ Source of truth: one markdown file per entry under `docs/open-work/{tickets,pre-
 
 Queue-view commands: `just open-work` · `just open-work-ready` · `just open-work-wip` · `just open-work-active` · `just open-work-epics` · `just open-work-index` (regenerate).
 
-## Active focus (6 in-progress · 0 ready blockers · 5 next-recommended)
+## Active focus (5 in-progress · 0 ready blockers · 0 next-recommended)
 
 Auto-generated projection: what's load-bearing right now. In-progress tickets, ready tickets that unblock active work, and the top-5 from `just next`. See `## Ready by cluster` / `## Ready by initiative` below for the full queue.
 
@@ -34,17 +34,8 @@ Auto-generated projection: what's load-bearing right now. In-progress tickets, r
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
-- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
-
-### Next-recommended (from `just next`)
-
-- **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · score 0.94_
-- **[401](docs/open-work/tickets/401-hunt-target-axis-toward-partner-stores-proximity-399-follow-on.md)** — Hunt target-axis toward partner_Stores_proximity (399 follow-on) — _[ai-substrate] · score 0.92_
-- **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · score 0.91_
-- **[402](docs/open-work/tickets/402-patrol-target-axis-toward-nest-proximity-anxiety-flight-flavor-399-follow-on.md)** — Patrol target-axis toward nest_proximity + anxiety flight-flavor (399 follow-on) — _[ai-substrate] · score 0.91_
-- **[530](docs/open-work/tickets/530-hunt-success-biology-band-calibration-per-species-locomotion-strike-window-economy-uniform-escape-knobs-proven-inert.md)** — Hunt-success biology-band calibration — per-species locomotion + strike-window economy (uniform escape knobs proven inert) — _[balance] · score 0.91_
 
 ## Epic progress (8)
 
@@ -53,7 +44,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | Epic | Status | Children | Done | Open (in-progress / ready / blocked / parked) | Progress |
 |---|---|---|---|---|---|
 | **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** Crafting | in-progress | 29 | 16 | 13 (0 / 10 / 3 / 0) | `▰▰▰▰▰▰▱▱▱▱` 55% |
-| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 15 | 18 (1 / 11 / 4 / 2) | `▰▰▰▰▱▱▱▱▱▱` 45% |
+| **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** AI substrate refactor | in-progress | 33 | 15 | 18 (1 / 10 / 4 / 3) | `▰▰▰▰▱▱▱▱▱▱` 45% |
 | **[093](docs/open-work/landed/093-substrate-over-override-epic.md)** Substrate-over-override | done | 30 | 30 | 0 (0 / 0 / 0 / 0) | `▰▰▰▰▰▰▰▰▰▰` 100% |
 | **[095](docs/open-work/landed/095-body-zones-epic.md)** Body zones | done | 0 | — | — | _no roster_ |
 | **[128](docs/open-work/tickets/128-htn-method-composition.md)** HTN method composition | in-progress | 27 | 21 | 6 (0 / 3 / 1 / 2) | `▰▰▰▰▰▰▰▰▱▱` 78% |
@@ -61,12 +52,11 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 | **[139](docs/open-work/landed/139-position-vec2-substrate.md)** Phase 2 | done | 0 | — | — | _no roster_ |
 | **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** Sim per-tick throughput | in-progress | 0 | — | — | _no roster_ |
 
-## In progress (6)
+## In progress (5)
 
 - **[016](docs/open-work/tickets/016-crafting-items-recipes-stations.md)** — Crafting — items, recipes, stations (epic dashboard) — _[items-crafting] · added 2026-04-22_
 - **[060](docs/open-work/tickets/060-ai-substrate-refactor-epic.md)** — AI substrate refactor — program epic — _[ai-substrate] · added 2026-04-27_
 - **[128](docs/open-work/tickets/128-htn-method-composition.md)** — HTN method composition — epic — _[ai-substrate] · added 2026-05-02_
-- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[413](docs/open-work/tickets/413-substrate-stub-catalogue.md)** — Substrate stub catalogue — orphan markers + invalid consideration string-name references — _[ai-substrate] · added 2026-05-05_
 - **[480](docs/open-work/tickets/480-sim-per-tick-throughput-regression-63-p90-decline-197-72-tickssec-over-five-weeks-flamegraph-bisect-reclaim.md)** — Sim per-tick throughput — perf epic (reclaim p90 ticks/sec, stairstep regression from substrate refactor) — _[ai-substrate] · added 2026-05-27_
 
@@ -74,7 +64,7 @@ Per-epic completion derived from each epic's roster table (or inline child refer
 
 Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` for the taxonomy. The Uncategorized count is the actionable signal — tickets without a cluster don't show up in `just open-work-ready --cluster X` filters.
 
-### ai-substrate (32 ready, 4 blocked)
+### ai-substrate (31 ready, 4 blocked)
 
 - **[003](docs/open-work/tickets/003-mentor-score-magnitude.md)** — Mentor score magnitude — _[ai-substrate] · added 2026-04-20_
 - **[009](docs/open-work/tickets/009-cluster-e-worldgen-richness.md)** — World-generation richness (Cluster E) — _[ai-substrate] · added 2026-04-20_
@@ -85,7 +75,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[241](docs/open-work/tickets/241-burial-canary-structurally-hard-to-fire-post-230-death-rate-audit-canary-policy.md)** — Burial canary structurally hard to fire post-230 — death-rate audit + canary policy — _[ai-substrate] · added 2026-05-08_
 - **[253](docs/open-work/tickets/253-restingspot-zone-resolution-as-belief-proxy-fall-through-to-ownsleepingspot-when-no-stores.md)** — RestingSpot zone resolution as belief proxy — fall through to OwnSleepingSpot when no Stores — _[ai-substrate] · added 2026-05-09_
 - **[286](docs/open-work/tickets/286-lower-threatproximityadrenalineflee-viability-threshold-so-cornered-cats-receive-flee-lift.md)** — Lower ThreatProximityAdrenalineFlee viability threshold so cornered cats receive flee_lift — _[ai-substrate] · added 2026-05-11_
-- **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · added 2026-05-13_
 - **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
 - **[373](docs/open-work/tickets/373-denworkshop-food-retrieval-broaden-eat-substrate-beyond-stores-only.md)** — Den/Workshop food retrieval — broaden eat substrate beyond Stores-only — _[ai-substrate] · added 2026-05-16_
 - **[383](docs/open-work/tickets/383-build-cadence-under-population-growth-shelter-pressure-under-fires-once-colony-establishes.md)** — Build-cadence under population growth — shelter pressure under-fires once colony establishes — _[ai-substrate] · added 2026-05-16_
@@ -201,6 +190,15 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[424](docs/open-work/tickets/424-balance-follow-on-tune-hide-dse-lifts-from-inert-defaults.md)** — Balance follow-on — tune Hide DSE lifts from inert defaults — _[combat-threat] · added 2026-05-19_
 - **[515](docs/open-work/tickets/515-cat-vs-cat-aggression-substrate-disposition-plan-template-resolver-for-intra-colony-hostile-escalation-beyond-the-267-threatenposturehiss-rungs-050-target-unblocks-304.md)** — cat-vs-cat aggression substrate — disposition, plan template, resolver for intra-colony hostile escalation beyond the 267 Threaten/Posture/Hiss rungs (0.5.0 target; unblocks 304) — _[combat-threat] · added 2026-07-07_
 
+### tooling-diagnostics-ui (6 ready)
+
+- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
+- **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
+- **[456](docs/open-work/tickets/456-goap-plan-construction-integration-test-for-commitment-strategy-goal-priority.md)** — GOAP plan-construction integration test for commitment-strategy goal priority — _[tooling-diagnostics-ui] · added 2026-05-23_
+- **[517](docs/open-work/tickets/517-soak-harness-frame-hitch-per-tick-systems-re-run-on-unadvanced-tick-double-applying-state-and-duplicating-emissions.md)** — Soak harness frame-hitch: per-tick systems re-run on unadvanced tick, double-applying state and duplicating emissions — _[tooling-diagnostics-ui] · added 2026-07-09_
+- **[527](docs/open-work/tickets/527-perf-regression-land-time-fence-per-system-self-percent-budget-gate-so-per-tick-cost-cannot-creep-invisibly-480-meta-child.md)** — Perf-regression land-time fence — per-system self-percent budget gate so per-tick cost cannot creep invisibly (480 meta-child) — _[tooling-diagnostics-ui] · added 2026-07-09_
+
 ### buildings-zones (5 ready, 2 blocked)
 
 - **[063](docs/open-work/tickets/063-ward-strength-promotion.md)** — Ward-strength promotion — first-class spatial axis (§5.6.3 row #3) — _[buildings-zones] · added 2026-04-27_
@@ -224,14 +222,6 @@ Cluster = categorical bucket (one per ticket). See `docs/open-work/clusters.md` 
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[411](docs/open-work/tickets/411-re-spawn-ticket-339-after-polecat-exit-ritual-fix.md)** — re-spawn ticket 339 after polecat exit-ritual fix — _[process-discipline] · added 2026-05-18_
 - **[455](docs/open-work/tickets/455-prune-landed-ticket-entries-from-substrate-stubsallowlist-and-add-ci-guard.md)** — Prune landed-ticket entries from substrate_stubs.allowlist and add CI guard — _[process-discipline] · added 2026-05-23_
-
-### tooling-diagnostics-ui (5 ready)
-
-- **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
-- **[389](docs/open-work/tickets/389-history-gen-throughput-uplift-10-100x-via-renderingnarrativediagnostic-gating.md)** — History-gen throughput uplift (10-100x via rendering/narrative/diagnostic gating) — _[tooling-diagnostics-ui] · added 2026-05-16_
-- **[456](docs/open-work/tickets/456-goap-plan-construction-integration-test-for-commitment-strategy-goal-priority.md)** — GOAP plan-construction integration test for commitment-strategy goal priority — _[tooling-diagnostics-ui] · added 2026-05-23_
-- **[517](docs/open-work/tickets/517-soak-harness-frame-hitch-per-tick-systems-re-run-on-unadvanced-tick-double-applying-state-and-duplicating-emissions.md)** — Soak harness frame-hitch: per-tick systems re-run on unadvanced tick, double-applying state and duplicating emissions — _[tooling-diagnostics-ui] · added 2026-07-09_
-- **[527](docs/open-work/tickets/527-perf-regression-land-time-fence-per-system-self-percent-budget-gate-so-per-tick-cost-cannot-creep-invisibly-480-meta-child.md)** — Perf-regression land-time fence — per-system self-percent budget gate so per-tick cost cannot creep invisibly (480 meta-child) — _[tooling-diagnostics-ui] · added 2026-07-09_
 
 ### balance (2 ready)
 
@@ -427,13 +417,13 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[303](docs/open-work/tickets/303-split-cat-value-into-movement-intensity-and-residence-axes-298-structural-follow-on.md)** — split cat_value into movement-intensity and residence axes (298 structural follow-on) — _[buildings-zones] · added 2026-05-12_
 - **[304](docs/open-work/tickets/304-witnessableeventattack-emit-gated-on-cat-vs-cat-aggression-substrate.md)** — WitnessableEvent::Attack emit — gated on cat-vs-cat aggression substrate — _[belief-perception] · blocked-by 515 · added 2026-05-12_
 - **[309](docs/open-work/tickets/309-herbcraft-dse-reserve-deficit-consideration-anticipatory-ward-remedy-crafting-from-colonyreservesbelief.md)** — Herbcraft DSE reserve-deficit consideration — anticipatory ward / remedy crafting from ColonyReservesBelief — _[items-crafting] · added 2026-05-13_
-- **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · added 2026-05-13_
 - **[316](docs/open-work/tickets/316-hunt-resolver-writes-stepphase-enum-for-focal-trace-visibility-263-follow-on.md)** — Hunt resolver writes StepPhase enum for focal-trace visibility (263 follow-on) — _[ai-substrate] · added 2026-05-13_
 - **[324](docs/open-work/tickets/324-gestation-method-mirror-pregnant-stages.md)** — gestation_method — mirror Pregnant stages — _[life-cycle] · added 2026-05-14_
 - **[335](docs/open-work/tickets/335-coordinator-directives-as-htn-method-seeds-057-integration.md)** — Coordinator directives as HTN method seeds — 057 integration — _[social-coordination] · added 2026-05-14_
 - **[341](docs/open-work/tickets/341-retarget-057-blocked-by-from-126-to-128.md)** — Retarget 057 blocked-by from 126 to 128 — _[process-discipline] · added 2026-05-14_
 - **[348](docs/open-work/tickets/348-hawk-snake-balance-iteration-first-tuning-pass-post-goap-cutover.md)** — Hawk + snake balance iteration — first tuning pass post-GOAP cutover — _[wildlife] · added 2026-05-15_
 - **[349](docs/open-work/tickets/349-hawk-snake-perceptual-fact-docs-hawk-ecologymd-snake-ecologymd.md)** — Hawk + snake perceptual-fact docs (hawk-ecology.md, snake-ecology.md) — _[wildlife] · added 2026-05-15_
+- **[350](docs/open-work/tickets/350-rebuild-sensitivity-map-post-wildlife-goap-25-new-constants.md)** — Rebuild sensitivity-map post-wildlife-GOAP (25 new constants) — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[352](docs/open-work/tickets/352-hawk-snake-goap-narrative-templates-hawkspottedprey-divelanded-snakestruckprey-basked-ambushed.md)** — Hawk + snake GOAP narrative templates (HawkSpottedPrey, DiveLanded, SnakeStruckPrey, Basked, Ambushed) — _[wildlife] · added 2026-05-15_
 - **[355](docs/open-work/tickets/355-parallel-session-stage-2-foreman-polecat-cli-dispatch-verdict-gated-refinery-auto.md)** — Parallel-session Stage 2: /foreman + polecat CLI dispatch + verdict-gated refinery --auto — _[tooling-diagnostics-ui] · added 2026-05-15_
 - **[370](docs/open-work/tickets/370-phase-3-identity-mentorship-adornment-mentorship-token-heirloom-piece-shell-collar-bone-and-wire-tiara-stone-set-pin-016-phase-3-first-wearable-producer.md)** — Phase 3 identity, mentorship, adornment — Mentorship Token, Heirloom Piece, Shell Collar, Bone-and-Wire Tiara, Stone-Set Pin (016 Phase 3, first wearable producer) — _[items-crafting] · added 2026-05-16_
@@ -508,13 +498,14 @@ Initiative = thematic outcome (zero-or-more per ticket). Tickets may appear in m
 - **[536](docs/open-work/tickets/536-prey-landscape-of-fear-grazing-displacement-bias-graze-tile-selection-away-from-high-carcass-scent-colony-hunting-map-tiles-so-hunted-areas-empty-and-prey-concentrate-elsewhere-reuses-existing-maps.md)** — Prey landscape-of-fear grazing displacement — bias graze-tile selection away from high carcass_scent / colony_hunting_map tiles so hunted areas empty and prey concentrate elsewhere (reuses existing maps) — _[wildlife] · added 2026-07-09_
 - **[537](docs/open-work/tickets/537-prey-mob-and-harry-dense-same-kind-group-elects-a-mob-dse-against-a-weakinjured-predator-converges-and-applies-deterrence-push-into-predator-retreat-scoring-first-symmetric-prey-predator-action-enriched-by-245-body-cue-reads.md)** — Prey mob-and-harry — dense same-kind group elects a Mob DSE against a weak/injured predator, converges and applies deterrence push into predator retreat scoring (first symmetric prey->predator action; enriched by 245 body-cue reads) — _[wildlife] · added 2026-07-09_
 
-## Parked (12)
+## Parked (13)
 
 - **[015](docs/open-work/tickets/015-alloparenting-reframe-b.md)** — Alloparenting Reframe B — mama drops kitten at hearth near resting elder — _[life-cycle] · parked 2026-04-22 · added 2026-04-22_
 - **[058](docs/open-work/tickets/058-tradition-unfiltered-loop-fix.md)** — §3.5.3 item 1 Tradition modifier — fix unfiltered-loop port — _[ai-substrate] · parked 2026-04-30 · added 2026-04-27_
 - **[059](docs/open-work/tickets/059-phase-7-substrate-cleanup.md)** — Phase 7 substrate cleanup — `ScoringContext` removal, §10 unblock map sweep, spec drift reconcile — _[ai-substrate] · parked 2026-04-27 · added 2026-04-27_
 - **[249](docs/open-work/tickets/249-extend-dispositionfailurecooldown-coverage-to-restingguardingpickingup-et-al-r3-from-247.md)** — Extend DispositionFailureCooldown coverage to Resting/Guarding/PickingUp et al. (R3 from 247) — _[ai-substrate] · parked 2026-05-09 · added 2026-05-08_
 - **[273](docs/open-work/tickets/273-caretake-plans-complete-but-kittenfed-never-fires-kitten-starvation-chronic.md)** — Caretake plans complete but KittenFed never fires — kitten starvation chronic — _[life-cycle] · parked 2026-05-11 · added 2026-05-11_
+- **[315](docs/open-work/tickets/315-activate-263-axes-with-four-artifact-methodology-fleepatrolhunt-resolver-bias.md)** — activate 263 axes with four-artifact methodology (Flee/Patrol/Hunt + resolver bias) — _[ai-substrate] · parked 2026-07-13 · added 2026-05-13_
 - **[342](docs/open-work/tickets/342-phase-2-unordered-method-bodies-partial-order.md)** — Phase-2 :unordered method bodies + partial-order — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[343](docs/open-work/tickets/343-emit-cooldown-discipline-per-emit-cooldown-ticks.md)** — Emit-cooldown discipline — per-emit cooldown_ticks — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_
 - **[345](docs/open-work/tickets/345-771-aspiration-soft-class-per-pair-weights.md)** — §7.7.1 aspiration soft-class per-pair weights — _[ai-substrate] · parked 2026-05-14 · added 2026-05-14_

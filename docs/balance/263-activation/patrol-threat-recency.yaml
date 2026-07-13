@@ -1,0 +1,26 @@
+# Ticket 315 / 263 activation — Patrol threat-recency axis.
+# Pre-registered before lifting the default from 0.0 to 1.0.
+# Secondary checks after the sweep: Patrol L3 share from `just q actions`,
+# focal Patrol frame-diff, survival/continuity gates, and election-share anomaly scan.
+hypothesis: |
+  Activating `scoring.patrol_threat_recency_weight=1.0` lets Patrol's
+  CompensatedProduct read per-cat LocationBeliefs at the patrol perimeter
+  anchor. Recently shocked or ambushed sectors become low-attractiveness
+  patrol targets instead of being treated as ordinary perimeter work. This is
+  the substrate-priced fix for the L3 patrol-absorption cascade: Patrol should
+  remain available as territory defense, but not absorb elections by walking
+  cats back into sectors their own memory marks unsafe. The primary ambush
+  canary remains the hard gate; the measurable prediction uses the rubric's
+  stress aggregate because a zero-ambush baseline cannot produce a percentage
+  delta. The expected signal is lower negative-event load while continuity
+  canaries still fire.
+constants_patch:
+  scoring:
+    patrol_threat_recency_weight: 1.0
+prediction:
+  metric: negative_events_total
+  direction: decrease
+  rough_magnitude_pct: [10, 1000]
+seeds: [42]
+reps: 1
+duration: 900

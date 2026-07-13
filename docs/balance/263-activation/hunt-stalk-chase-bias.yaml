@@ -1,0 +1,23 @@
+# Ticket 315 / 263 activation — Hunt resolver stalk/chase affordance bias.
+# Pre-registered before lifting the default from 0.0 to 0.25.
+# Secondary checks after the sweep: Hunt L3/plan-failure mix, focal frame-diff,
+# survival/continuity gates, and election-share anomaly scan.
+hypothesis: |
+  Activating `scoring.hunt_stalk_chase_affordance_bias=0.25` lets the
+  EngagePrey resolver bias its stalk-start band from live Stalk-vs-Chase
+  affordance asymmetry. High Stalk affordance widens the stalking band for
+  unaware prey; high Chase affordance narrows it so cats commit to pursuit
+  sooner against flushed prey. Because pounce range stays invariant, the bias
+  should improve phase choice without changing the physics of the catch. The
+  ecological prediction is fewer EngagePrey approach-loss failures and no
+  survival or continuity regression.
+constants_patch:
+  scoring:
+    hunt_stalk_chase_affordance_bias: 0.25
+prediction:
+  metric: "plan_failures_by_reason.EngagePrey: lost prey during approach"
+  direction: decrease
+  rough_magnitude_pct: [10, 1000]
+seeds: [42]
+reps: 1
+duration: 900

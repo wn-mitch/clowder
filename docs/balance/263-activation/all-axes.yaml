@@ -1,0 +1,28 @@
+# Ticket 315 / 263 activation — batched equivalent for the four dormant axes.
+# This is the acceptance-equivalent run for the activation set: Flee, Patrol,
+# HuntTarget, and EngagePrey resolver bias lift together to their recommended
+# first-light values before the defaults are changed.
+hypothesis: |
+  Activating the four ticket-263 axes together prices the same substrate at the
+  three places that consume it: Flee uses direct escape affordance, Patrol uses
+  subjective threat recency at the perimeter, HuntTarget uses best current
+  predation affordance, and EngagePrey uses Stalk-vs-Chase affordance asymmetry
+  to choose the phase band. The individual Flee ambush canary can floor at zero
+  on seed 42, so the batched gate uses the healthy-colony stress aggregate as
+  the measurable acceptance metric while keeping Starvation, ShadowFoxAmbush,
+  and continuity as hard gates. The expected colony-level signal is materially
+  lower negative-event load, with Flee/Patrol/Hunt frame-diff movement carrying
+  the mechanism attribution.
+constants_patch:
+  scoring:
+    flee_affordance_weight: 0.5
+    patrol_threat_recency_weight: 1.0
+    hunt_best_predation_weight: 0.15
+    hunt_stalk_chase_affordance_bias: 0.25
+prediction:
+  metric: negative_events_total
+  direction: decrease
+  rough_magnitude_pct: [10, 1000]
+seeds: [42]
+reps: 1
+duration: 900
