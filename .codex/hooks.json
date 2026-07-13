@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/will.mitchell/clowder/.codex/hooks/no-log-overwrite.py'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/will.mitchell/clowder/.codex/hooks/post-soak-collapse-check.py'"
+          }
+        ]
+      }
+    ]
+  }
+}
